@@ -58,6 +58,9 @@ class CreateQueryDefinitionInput(BaseRequestModel):
     """Input for creating a prometheus query definition."""
 
     name: str = Field(min_length=1, max_length=256, description="Human-readable name")
+    description: str | None = Field(default=None, description="Human-readable description")
+    rank: int = Field(default=0, ge=0, description="Sort rank (lower = higher priority)")
+    category_id: UUID | None = Field(default=None, description="Category ID")
     metric_name: str = Field(description="Prometheus metric name")
     query_template: str = Field(description="PromQL template with placeholders")
     time_window: str | None = Field(
@@ -89,11 +92,25 @@ class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
 class ModifyQueryDefinitionInput(BaseRequestModel):
     """Input for modifying a prometheus query definition.
 
-    Only ``time_window`` uses ``Sentinel`` because it is the only nullable DB column;
-    all other fields are non-nullable, so ``None`` simply means "do not update".
+    Nullable DB columns (``time_window``, ``description``, ``category_id``) use the
+    ``Sentinel`` pattern so callers can distinguish "leave unchanged" from "clear to null".
+    Non-nullable fields use ``None`` to mean "do not update".
     """
 
     name: str | None = Field(default=None, description="Updated human-readable name")
+    description: str | Sentinel | None = Field(
+        default=SENTINEL,
+        description=(
+            "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear."
+        ),
+    )
+    rank: int | None = Field(default=None, ge=0, description="Updated sort rank")
+    category_id: UUID | Sentinel | None = Field(
+        default=SENTINEL,
+        description=(
+            "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear."
+        ),
+    )
     metric_name: str | None = Field(default=None, description="Updated Prometheus metric name")
     query_template: str | None = Field(
         default=None, description="Updated PromQL template with placeholders"
@@ -137,6 +154,7 @@ class QueryDefinitionFilter(BaseRequestModel):
     """Filter for prometheus query definition search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
+    category_id: UUID | None = Field(default=None, description="Filter by category ID")
 
 
 class QueryDefinitionOrder(BaseRequestModel):

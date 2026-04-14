@@ -11,6 +11,7 @@ from sqlalchemy.engine import CursorResult
 from ai.backend.common.exception import PrometheusQueryPresetCategoryNotFound
 from ai.backend.manager.data.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryData,
+    PrometheusQueryPresetCategoryListResult,
 )
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
@@ -69,8 +70,14 @@ class PrometheusQueryPresetCategoryDBSource:
     async def search(
         self,
         querier: BatchQuerier,
-    ) -> list[PrometheusQueryPresetCategoryData]:
+    ) -> PrometheusQueryPresetCategoryListResult:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(PrometheusQueryPresetCategoryRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            return [row.PrometheusQueryPresetCategoryRow.to_data() for row in result.rows]
+            items = [row.PrometheusQueryPresetCategoryRow.to_data() for row in result.rows]
+            return PrometheusQueryPresetCategoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

@@ -14,6 +14,7 @@ from ai.backend.common.resilience import (
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryData,
+    PrometheusQueryPresetCategoryListResult,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
 
@@ -74,5 +75,6 @@ class PrometheusQueryPresetCategoryRepository:
     async def search(
         self,
         querier: BatchQuerier,
-    ) -> list[PrometheusQueryPresetCategoryData]:
+    ) -> PrometheusQueryPresetCategoryListResult:
+        """Searches prometheus query preset categories with total count."""
         return await self._db_source.search(querier=querier)

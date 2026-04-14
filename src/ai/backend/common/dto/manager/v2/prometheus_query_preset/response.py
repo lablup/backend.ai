@@ -39,6 +39,9 @@ class QueryDefinitionNode(BaseResponseModel):
 
     id: UUID = Field(description="Query definition ID")
     name: str = Field(description="Human-readable name")
+    description: str | None = Field(default=None, description="Human-readable description")
+    rank: int = Field(default=0, description="Sort rank")
+    category_id: UUID | None = Field(default=None, description="Category ID")
     metric_name: str = Field(description="Prometheus metric name")
     query_template: str = Field(description="PromQL template with placeholders")
     time_window: str | None = Field(default=None, description="Default time window")

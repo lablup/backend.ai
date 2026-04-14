@@ -38,6 +38,9 @@ from .payloads import QueryDefinitionOptionsGQL
 class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     id: NodeID[str] = gql_field(description="Query definition UUID (primary key).")
     name: str = gql_field(description="Human-readable query definition identifier.")
+    description: str | None = gql_field(description="Human-readable description.")
+    rank: int = gql_field(description="Sort rank (lower = higher priority).")
+    category_id: str | None = gql_field(description="Category UUID.")
     metric_name: str = gql_field(description="Prometheus metric name.")
     query_template: str = gql_field(description="PromQL template with placeholders.")
     time_window: str | None = gql_field(

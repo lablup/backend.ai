@@ -1175,6 +1175,8 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-runtime-variant-presets.json
   ./backend.ai mgr fixture populate fixtures/manager/example-login-client-types.json
   ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-preset-categories.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-presets.json
 
   # Populate artifact registries with substituted MinIO credentials
   TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"

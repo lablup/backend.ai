@@ -80,6 +80,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         creator: Creator[PrometheusQueryPresetRow] = Creator(
             spec=PrometheusQueryPresetCreatorSpec(
                 name=input.name,
+                description=input.description,
+                rank=input.rank,
+                category_id=input.category_id,
                 metric_name=input.metric_name,
                 query_template=input.query_template,
                 time_window=input.time_window,
@@ -224,6 +227,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter.category_id is not None:
+            conditions.append(PrometheusQueryPresetConditions.by_category_id(filter.category_id))
+
         return conditions
 
     @staticmethod
@@ -234,6 +240,8 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             match order.field.value:
                 case "name":
                     result.append(PrometheusQueryPresetOrders.name(ascending))
+                case "rank":
+                    result.append(PrometheusQueryPresetOrders.rank(ascending))
                 case "created_at":
                     result.append(PrometheusQueryPresetOrders.created_at(ascending))
                 case "updated_at":
@@ -253,6 +261,19 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
+            description=TriState.nop()
+            if isinstance(input.description, Sentinel)
+            else TriState.nullify()
+            if input.description is None
+            else TriState.update(input.description),
+            rank=(
+                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
+            ),
+            category_id=TriState.nop()
+            if isinstance(input.category_id, Sentinel)
+            else TriState.nullify()
+            if input.category_id is None
+            else TriState.update(input.category_id),
             metric_name=(
                 OptionalState.update(input.metric_name)
                 if input.metric_name is not None
@@ -286,6 +307,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         return QueryDefinitionNode(
             id=data.id,
             name=data.name,
+            description=data.description,
+            rank=data.rank,
+            category_id=data.category_id,
             metric_name=data.metric_name,
             query_template=data.query_template,
             time_window=data.time_window,

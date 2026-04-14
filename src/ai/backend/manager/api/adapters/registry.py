@@ -26,6 +26,9 @@ from ai.backend.manager.api.adapters.notification import NotificationAdapter
 from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
 from ai.backend.manager.api.adapters.project import ProjectAdapter
 from ai.backend.manager.api.adapters.prometheus_query_preset import PrometheusQueryPresetAdapter
+from ai.backend.manager.api.adapters.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryAdapter,
+)
 from ai.backend.manager.api.adapters.rbac import RBACAdapter
 from ai.backend.manager.api.adapters.reservoir_registry import ReservoirRegistryAdapter
 from ai.backend.manager.api.adapters.resource_allocation import ResourceAllocationAdapter
@@ -79,6 +82,7 @@ class Adapters:
         object_storage: ObjectStorageAdapter,
         project: ProjectAdapter,
         prometheus_query_preset: PrometheusQueryPresetAdapter,
+        prometheus_query_preset_category: PrometheusQueryPresetCategoryAdapter,
         rbac: RBACAdapter,
         reservoir_registry: ReservoirRegistryAdapter,
         resource_allocation: ResourceAllocationAdapter,
@@ -118,6 +122,7 @@ class Adapters:
         self.object_storage = object_storage
         self.project = project
         self.prometheus_query_preset = prometheus_query_preset
+        self.prometheus_query_preset_category = prometheus_query_preset_category
         self.rbac = rbac
         self.reservoir_registry = reservoir_registry
         self.resource_allocation = resource_allocation
@@ -166,6 +171,7 @@ class Adapters:
             object_storage=ObjectStorageAdapter(processors),
             project=ProjectAdapter(processors),
             prometheus_query_preset=PrometheusQueryPresetAdapter(processors),
+            prometheus_query_preset_category=PrometheusQueryPresetCategoryAdapter(processors),
             rbac=RBACAdapter(processors),
             reservoir_registry=ReservoirRegistryAdapter(processors),
             resource_allocation=ResourceAllocationAdapter(processors, config_provider),

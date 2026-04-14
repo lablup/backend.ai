@@ -1,3 +1,6 @@
-from .types import PrometheusQueryPresetCategoryData
+from .types import PrometheusQueryPresetCategoryData, PrometheusQueryPresetCategoryListResult
 
-__all__ = ("PrometheusQueryPresetCategoryData",)
+__all__ = (
+    "PrometheusQueryPresetCategoryData",
+    "PrometheusQueryPresetCategoryListResult",
+)

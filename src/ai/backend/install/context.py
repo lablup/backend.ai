@@ -452,6 +452,10 @@ class Context(metaclass=ABCMeta):
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
+            "ai.backend.install.fixtures", "example-prometheus-query-preset-categories.json"
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with self.resource_path(
             "ai.backend.install.fixtures", "example-prometheus-query-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])

@@ -116,6 +116,7 @@ class EntityType(enum.StrEnum):
     RESOURCE_OVERVIEW = "resource_overview"
     RESOURCE_GROUP = "resource_group"
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
+    PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus_query_preset_category"
     RESOURCE_PRESET = "resource_preset"
     MODEL_CARD = "model_card"
     ROLE = "role"

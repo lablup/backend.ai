@@ -104,6 +104,15 @@ def prometheus_query_preset() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.prometheus_query_preset_category:prometheus_query_preset_category",
+    name="prometheus-query-definition-category",
+)
+def prometheus_query_preset_category() -> None:
+    """Admin prometheus query definition category commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.resource_allocation:resource_allocation",
     name="resource-allocation",
 )
