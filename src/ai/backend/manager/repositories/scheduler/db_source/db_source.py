@@ -4774,6 +4774,26 @@ class ScheduleDBSource:
             result = await conn.execute(sa.select(sa.func.now()))
             return result.scalar_one()
 
+    async def resolve_main_access_keys(
+        self, session_ids: Sequence[SessionId]
+    ) -> dict[SessionId, AccessKey]:
+        """Resolve the main access key for each session's owner.
+
+        Joins ``sessions`` → ``users`` to look up the owner's
+        ``main_access_key``. Sessions whose owner has no configured
+        main access key are omitted from the returned mapping.
+        """
+        if not session_ids:
+            return {}
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = (
+                sa.select(SessionRow.id, UserRow.main_access_key)
+                .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
+                .where(SessionRow.id.in_([sid for sid in session_ids]))
+            )
+            rows = (await db_sess.execute(stmt)).all()
+            return {SessionId(row[0]): AccessKey(row[1]) for row in rows if row[1] is not None}
+
     async def _get_db_now_in_session(self, db_sess: SASession) -> datetime:
         """Get the current timestamp from the database within an existing session.
 

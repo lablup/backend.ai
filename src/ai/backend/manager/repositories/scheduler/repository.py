@@ -959,3 +959,9 @@ class SchedulerRepository:
             Current database timestamp with timezone
         """
         return await self._db_source.get_db_now()
+
+    async def resolve_main_access_keys(
+        self, session_ids: Sequence[SessionId]
+    ) -> dict[SessionId, AccessKey]:
+        """Resolve the main access key for each session's owner."""
+        return await self._db_source.resolve_main_access_keys(session_ids)
