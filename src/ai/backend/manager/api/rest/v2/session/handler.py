@@ -159,7 +159,7 @@ class V2SessionHandler:
     ) -> APIResponse:
         """Shut down a service in a session."""
         await self._adapter.shutdown_service(
-            path.parsed.session_id, body.parsed, access_key=user_ctx.access_key
+            path.parsed.session_id, body.parsed, user_id=user_ctx.user_uuid
         )
         return APIResponse.no_content(status_code=HTTPStatus.NO_CONTENT)
 
@@ -172,7 +172,7 @@ class V2SessionHandler:
         """Get container logs for a session."""
         result = await self._adapter.get_logs(
             path.parsed.session_id,
-            access_key=user_ctx.access_key,
+            user_id=user_ctx.user_uuid,
             kernel_id=query.parsed.kernel_id,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
@@ -185,6 +185,6 @@ class V2SessionHandler:
     ) -> APIResponse:
         """Update a session."""
         result = await self._adapter.update(
-            path.parsed.session_id, body.parsed, access_key=user_ctx.access_key
+            path.parsed.session_id, body.parsed, user_id=user_ctx.user_uuid
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

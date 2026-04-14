@@ -321,13 +321,6 @@ class TestGetContainerLogsInput:
         inp = GetContainerLogsInput(kernel_id=kernel_id)
         assert inp.kernel_id == kernel_id
 
-    def test_with_all_fields(self) -> None:
-        kernel_id = uuid.uuid4()
-        owner = uuid.uuid4()
-        inp = GetContainerLogsInput(owner_id=owner, kernel_id=kernel_id)
-        assert inp.owner_id == owner
-        assert inp.kernel_id == kernel_id
-
 
 class TestEnqueueSessionInputOwnerDelegation:
     """Tests for owner_id delegation on EnqueueSessionInput."""

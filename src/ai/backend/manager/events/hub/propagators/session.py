@@ -213,7 +213,7 @@ class SessionEventPropagator(EventPropagator):
                             SessionRow.access_key,
                             SessionRow.domain_name,
                             SessionRow.group_id,
-                            SessionRow.user_uuid,
+                            SessionRow.owner_id,
                         )
                     )
                 )

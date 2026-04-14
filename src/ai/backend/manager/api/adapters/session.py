@@ -450,7 +450,7 @@ class SessionAdapter(BaseAdapter):
         orders = self._convert_session_orders(input.order) if input.order else []
 
         def _by_user_uuid() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.user_uuid == user.user_id
+            return SessionRow.owner_id == user.user_id
 
         querier = self._build_querier(
             conditions=conditions,
@@ -849,12 +849,12 @@ class SessionAdapter(BaseAdapter):
         self,
         session_id: UUID,
         input: ShutdownSessionServiceInput,
-        access_key: str,
+        user_id: UUID,
     ) -> None:
         """Shut down a service in a session."""
         action = ShutdownServiceAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
+            owner_id=user_id,
             service_name=input.service,
         )
         await self._processors.session.shutdown_service.wait_for_complete(action)
@@ -866,20 +866,20 @@ class SessionAdapter(BaseAdapter):
     async def get_logs(
         self,
         session_id: UUID,
-        access_key: str,
+        user_id: UUID,
         kernel_id: UUID | None = None,
         owner_id: UUID | None = None,
     ) -> SessionLogsPayload:
         """Get container logs for a session.
 
         When ``owner_id`` is provided, the logs are fetched on behalf of the
-        delegated owner. Otherwise the caller's own access key is used.
+        delegated owner. Otherwise the caller's own user_id is used.
         """
+        effective_owner = owner_id if owner_id is not None else user_id
         action = GetContainerLogsAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
+            owner_id=effective_owner,
             kernel_id=KernelId(kernel_id) if kernel_id else None,
-            owner_id=owner_id,
         )
         result = await self._processors.session.get_container_logs.wait_for_complete(action)
         logs_text = result.result.get("result", {}).get("logs", "")
@@ -893,14 +893,14 @@ class SessionAdapter(BaseAdapter):
         self,
         session_id: UUID,
         input: UpdateSessionInput,
-        access_key: str,
+        user_id: UUID,
     ) -> UpdateSessionPayload:
         """Update session fields (currently supports rename only)."""
         if input.name is not None:
             action = RenameSessionAction(
                 session_name=str(session_id),
                 new_name=input.name,
-                owner_access_key=AccessKey(access_key),
+                owner_id=user_id,
             )
             result = await self._processors.session.rename_session.wait_for_complete(action)
             return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
@@ -939,13 +939,15 @@ class SessionAdapter(BaseAdapter):
         return SessionNode(
             id=data.id,
             domain_name=data.domain_name,
-            user_id=data.user_uuid,
+            user_id=data.owner_id,
             project_id=data.group_id,
             metadata=SessionMetadataInfoGQLDTO(
                 creation_id=data.creation_id or "",
                 name=data.name or "",
                 session_type=data.session_type.value,
-                access_key=str(data.access_key) if data.access_key else "",
+                access_key=data.owner.main_access_key
+                if data.owner and data.owner.main_access_key
+                else "",
                 cluster_mode=data.cluster_mode.name,
                 cluster_size=data.cluster_size,
                 priority=data.priority,
@@ -1017,8 +1019,8 @@ class SessionAdapter(BaseAdapter):
                 session_type=info.session.session_type.value,
             ),
             user_info=KernelUserInfoGQLDTO(
-                user_id=info.user_permission.user_uuid,
-                access_key=info.user_permission.access_key,
+                user_id=info.user_permission.owner_id,
+                access_key="",
                 domain_name=info.user_permission.domain_name,
                 group_id=info.user_permission.group_id,
             ),

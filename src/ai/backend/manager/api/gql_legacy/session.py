@@ -422,8 +422,8 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=session_data.domain_name,
             project_id=session_data.group_id,
-            user_id=session_data.user_uuid,
-            access_key=session_data.access_key,
+            user_id=session_data.owner_id,
+            access_key=session_data.owner.main_access_key if session_data.owner else None,
             owner=UserNode.from_dataclass(ctx, session_data.owner),
             # status
             status=session_data.status.name,
@@ -1267,7 +1267,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
-            .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
+            .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
         query = sa.select(sa.func.count(sa.distinct(SessionRow.id))).select_from(j)
@@ -1308,7 +1308,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-                UserRow, SessionRow.user_uuid == UserRow.uuid
+                UserRow, SessionRow.owner_id == UserRow.uuid
             )
         )
         query = (
@@ -1356,7 +1356,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         access_key: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            UserRow, SessionRow.user_uuid == UserRow.uuid
+            UserRow, SessionRow.owner_id == UserRow.uuid
         )
         query = (
             sa.select(

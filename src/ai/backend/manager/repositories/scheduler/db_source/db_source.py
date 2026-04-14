@@ -316,7 +316,7 @@ class ScheduleDBSource:
                 SessionRow.id,
                 SessionRow.access_key,
                 SessionRow.requested_slots,
-                SessionRow.user_uuid,
+                SessionRow.owner_id,
                 SessionRow.group_id,
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
@@ -3156,7 +3156,7 @@ class ScheduleDBSource:
                 SessionRow.name,
                 SessionRow.environ,
                 SessionRow.cluster_mode,
-                SessionRow.user_uuid,
+                SessionRow.owner_id,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -4160,7 +4160,7 @@ class ScheduleDBSource:
                 SessionRow.name,
                 SessionRow.environ,
                 SessionRow.cluster_mode,
-                SessionRow.user_uuid,
+                SessionRow.owner_id,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -4495,7 +4495,7 @@ class ScheduleDBSource:
                 SessionRow.name,
                 SessionRow.environ,
                 SessionRow.cluster_mode,
-                SessionRow.user_uuid,
+                SessionRow.owner_id,
             )
             session_result = await execute_batch_querier(db_sess, session_query, querier)
 
@@ -4616,7 +4616,7 @@ class ScheduleDBSource:
             sessions_for_start: list[SessionDataForStart] = []
             for session_id in session_ids:
                 session_info = session_info_map[session_id]
-                user_info = user_map.get(session_info["user_uuid"])
+                user_info = user_map.get(session_info["owner_id"])
                 if not user_info:
                     log.warning(f"User info not found for session {session_id}")
                     continue
@@ -4631,7 +4631,7 @@ class ScheduleDBSource:
                         cluster_mode=session_info["cluster_mode"],
                         kernels=session_info["kernels"],
                         environ=session_info.get("environ") or {},
-                        user_uuid=session_info["user_uuid"],
+                        owner_id=session_info["owner_id"],
                         user_email=user_info.email,
                         user_name=user_info.username,
                     )
@@ -4788,3 +4788,21 @@ class ScheduleDBSource:
         """
         result = await db_sess.execute(sa.select(sa.func.now()))
         return result.scalar_one()
+
+    async def resolve_main_access_keys(
+        self, session_ids: Sequence[SessionId]
+    ) -> dict[SessionId, AccessKey]:
+        """Resolve the main access key for each session's owner.
+
+        Joins sessions → users to look up the owner's main_access_key.
+        """
+        if not session_ids:
+            return {}
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = (
+                sa.select(SessionRow.id, UserRow.main_access_key)
+                .join(UserRow, SessionRow.owner_id == UserRow.uuid)
+                .where(SessionRow.id.in_([sid for sid in session_ids]))
+            )
+            rows = (await db_sess.execute(stmt)).all()
+            return {SessionId(row[0]): AccessKey(row[1]) for row in rows if row[1] is not None}

@@ -821,8 +821,7 @@ class TestMarkTerminatingSchedulingHistory:
             domain_name=test_domain_name,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
+            owner_id=test_user_uuid,
             agent_id=test_agent_id,
         )
 

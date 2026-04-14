@@ -713,11 +713,11 @@ class TestCreateFromParams:
         self,
         sample_access_key: AccessKey,
         sample_user_id: UUID,
-        delegated_owner_access_key: AccessKey,
+        delegated_owner_id: UUID,
     ) -> CreateFromParamsAction:
         """
         CreateFromParamsAction representing an admin (sample_user_id) creating
-        a session on behalf of another user via owner_access_key.
+        a session on behalf of another user via owner_id.
         """
         return CreateFromParamsAction(
             params=CreateFromParamsActionParams(
@@ -733,7 +733,7 @@ class TestCreateFromParams:
                 tag="",
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=delegated_owner_access_key,
+                owner_id=delegated_owner_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
