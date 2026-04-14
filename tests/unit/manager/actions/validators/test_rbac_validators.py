@@ -1,10 +1,12 @@
 """Tests for RBAC action validators, focused on the superadmin bypass (BA-5721).
 
 These tests drive the validators against a real ``PermissionControllerRepository``
-backed by a real Postgres connection. Permission rows are seeded directly into
-the RBAC tables instead of mocked, so the bypass path (no DB lookup) and the
-non-superadmin enforcement path (real CTE-based scope chain check) are both
-exercised end to end.
+backed by a real Postgres connection. Permission rows are seeded directly at the
+target element's own scope (DOMAIN for project-create, VFOLDER for vfolder-update),
+so the non-superadmin path exercises the self-scope branch of
+``check_permission_with_scope_chain`` — not the upward CTE traversal over
+``association_scopes_entities`` AUTO edges. The superadmin bypass path is also
+covered with no permission rows seeded at all.
 """
 
 from __future__ import annotations
