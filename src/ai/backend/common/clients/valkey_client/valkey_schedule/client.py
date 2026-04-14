@@ -850,6 +850,8 @@ class ValkeyScheduleClient:
             return None
 
         data = {k.decode(): v.decode() for k, v in result.items()}
+        if "route_id" not in data:
+            return None
         return RouteHealthRecord.from_valkey_hash(data)
 
     @valkey_schedule_resilience.apply()
@@ -888,6 +890,10 @@ class ValkeyScheduleClient:
                 continue
 
             data = {k.decode(): v.decode() for k, v in raw.items()}
+            if "route_id" not in data:
+                # Partial hash (e.g., only running_at set by mark_route_running_at)
+                records[route_id] = None
+                continue
             records[route_id] = RouteHealthRecord.from_valkey_hash(data)
 
         return records
