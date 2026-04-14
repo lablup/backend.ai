@@ -1370,6 +1370,11 @@ type UserResourcePolicy {
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+
+  """
+  Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited.
+  """
+  max_concurrent_logins: Int
 }
 
 type ProjectResourcePolicy {
@@ -3153,6 +3158,11 @@ input CreateUserResourcePolicyInput {
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+
+  """
+  Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited.
+  """
+  max_concurrent_logins: Int
 }
 
 type ModifyUserResourcePolicy {
@@ -3180,6 +3190,11 @@ input ModifyUserResourcePolicyInput {
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+
+  """
+  Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited.
+  """
+  max_concurrent_logins: Int
 }
 
 type DeleteUserResourcePolicy {

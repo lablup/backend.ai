@@ -3739,6 +3739,11 @@ input CreateUserResourcePolicyInput
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+
+  """
+  Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited.
+  """
+  max_concurrent_logins: Int
 }
 
 """Added in 26.4.0. Input for creating a user resource policy."""
@@ -9442,6 +9447,11 @@ input ModifyUserResourcePolicyInput
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+
+  """
+  Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited.
+  """
+  max_concurrent_logins: Int
 }
 
 """Added in 26.4.0. Input for moving a file inside a virtual folder."""
@@ -17846,6 +17856,11 @@ type UserResourcePolicy
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+
+  """
+  Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited.
+  """
+  max_concurrent_logins: Int
 }
 
 """
