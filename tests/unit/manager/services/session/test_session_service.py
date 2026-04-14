@@ -1740,6 +1740,7 @@ class TestSearchKernels:
             ),
             user_permission=UserPermission(
                 owner_id=user_id,
+                main_access_key=None,
                 domain_name="default",
                 group_id=group_id,
                 uid=1000,

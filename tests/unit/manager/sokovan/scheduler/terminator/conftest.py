@@ -214,6 +214,7 @@ def _create_kernel_info(
         ),
         user_permission=UserPermission(
             owner_id=uuid4(),
+            main_access_key=None,
             domain_name="default",
             group_id=uuid4(),
             uid=None,

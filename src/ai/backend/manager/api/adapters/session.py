@@ -1014,7 +1014,7 @@ class SessionAdapter(BaseAdapter):
             ),
             user_info=KernelUserInfoGQLDTO(
                 user_id=info.user_permission.owner_id,
-                access_key="",
+                access_key=info.user_permission.main_access_key or "",
                 domain_name=info.user_permission.domain_name,
                 group_id=info.user_permission.group_id,
             ),

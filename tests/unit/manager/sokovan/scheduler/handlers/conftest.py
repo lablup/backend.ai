@@ -160,6 +160,7 @@ def _create_session(
             ),
             user_permission=UserPermission(
                 owner_id=user_uuid,
+                main_access_key=None,
                 domain_name="default",
                 group_id=group_id,
                 uid=None,
@@ -260,6 +261,7 @@ def _create_kernel(
         ),
         user_permission=UserPermission(
             owner_id=user_uuid,
+            main_access_key=None,
             domain_name="default",
             group_id=group_id,
             uid=None,

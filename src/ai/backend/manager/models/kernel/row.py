@@ -998,6 +998,7 @@ class KernelRow(Base):  # type: ignore[misc]
             ),
             user_permission=UserPermission(
                 owner_id=self.user_uuid,
+                main_access_key=self.user_row.main_access_key if self.user_row else None,
                 domain_name=self.domain_name,
                 group_id=self.group_id,
                 uid=self.uid,
