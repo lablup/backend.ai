@@ -60,7 +60,7 @@ class DRFScheduler(AbstractScheduler):
                 slot_share = Decimal(value) / slot_cap
                 if dominant_share < slot_share:
                     dominant_share = slot_share
-            owner_id = existing_sess.owner_id
+            owner_id = existing_sess.user_uuid
             if owner_id is not None:
                 if self.per_user_dominant_share[owner_id] < dominant_share:
                     self.per_user_dominant_share[owner_id] = dominant_share

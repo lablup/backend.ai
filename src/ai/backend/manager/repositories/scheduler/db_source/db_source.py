@@ -351,9 +351,9 @@ class ScheduleDBSource:
             if session_id not in sessions_map:
                 sessions_map[session_id] = PendingSessionData(
                     id=session_id,
-                    access_key=row.access_key,
+                    main_access_key=row.access_key,
                     requested_slots=row.requested_slots,
-                    user_uuid=row.user_uuid,
+                    owner_id=row.user_uuid,
                     group_id=row.group_id,
                     domain_name=row.domain_name,
                     scaling_group_name=row.scaling_group_name,

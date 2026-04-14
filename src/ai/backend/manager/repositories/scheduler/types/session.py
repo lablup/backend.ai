@@ -44,8 +44,7 @@ class PendingSessionData:
     """Pending session data for scheduling."""
 
     id: SessionId
-    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
-    access_key: AccessKey
+    main_access_key: AccessKey
     requested_slots: ResourceSlot
     owner_id: UUID
     group_id: UUID
@@ -65,7 +64,7 @@ class PendingSessionData:
         kernel_workloads = [k.to_kernel_workload() for k in self.kernels]
         return SessionWorkload(
             session_id=self.id,
-            main_access_key=self.access_key,
+            main_access_key=self.main_access_key,
             requested_slots=self.requested_slots,
             owner_id=self.owner_id,
             group_id=self.group_id,

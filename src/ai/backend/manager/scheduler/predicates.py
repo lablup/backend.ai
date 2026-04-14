@@ -60,6 +60,11 @@ async def check_concurrency(
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     main_ak = await _resolve_main_access_key(db_sess, sess_ctx)
+    if main_ak is None:
+        return PredicateResult(
+            False,
+            "Session owner has no main_access_key; cannot evaluate concurrency policy",
+        )
 
     async def _get_max_concurrent_sessions() -> int:
         resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
@@ -144,6 +149,8 @@ async def check_keypair_resource_limit(
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     main_ak = await _resolve_main_access_key(db_sess, sess_ctx)
+    if main_ak is None:
+        return PredicateResult(False, "Session owner has no main_access_key")
     resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(KeyPairRow.access_key == main_ak)
     select_query = sa.select(KeyPairResourcePolicyRow).where(
         KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
@@ -162,9 +169,6 @@ async def check_keypair_resource_limit(
     total_keypair_allowed = ResourceSlot.from_policy(
         resource_policy_map, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
-
-    if main_ak is None:
-        return PredicateResult(False, "Session has no access key")
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
         AccessKey(main_ak), db_sess=db_sess
     )
@@ -308,6 +312,8 @@ async def check_pending_session_count_limit(
     failure_msgs = []
 
     main_ak = await _resolve_main_access_key(db_sess, sess_ctx)
+    if main_ak is None:
+        return PredicateResult(False, "Session owner has no main_access_key")
     query = (
         sa.select(SessionRow)
         .where(
@@ -370,6 +376,8 @@ async def check_pending_session_resource_limit(
     failure_msgs = []
 
     main_ak = await _resolve_main_access_key(db_sess, sess_ctx)
+    if main_ak is None:
+        return PredicateResult(False, "Session owner has no main_access_key")
     query = (
         sa.select(SessionRow)
         .where(
