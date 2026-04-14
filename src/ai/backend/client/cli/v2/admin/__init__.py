@@ -136,6 +136,15 @@ def keypair() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.resource_group:resource_group",
+    name="resource-group",
+)
+def resource_group() -> None:
+    """Admin resource group commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.login_client_type:login_client_type",
     name="login-client-type",
 )

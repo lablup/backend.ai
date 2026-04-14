@@ -55,7 +55,7 @@ class KeypairResourcePolicyDBSource:
                     KeyPairRow,
                     KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
                 )
-                .where(KeyPairRow.user_id == str(user_id))
+                .where(KeyPairRow.user == user_id)
                 .where(KeyPairRow.is_active.is_(True))
                 .limit(1)
             )

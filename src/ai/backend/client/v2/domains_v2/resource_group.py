@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedResourceGroupsPayload,
     CreateResourceGroupPayload,
     DeleteResourceGroupPayload,
-    ResourceGroupNode,
+    ResourceGroupDetailNode,
     ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
@@ -56,12 +56,12 @@ class V2ResourceGroupClient(BaseDomainClient):
             response_model=CreateResourceGroupPayload,
         )
 
-    async def get(self, name: str) -> ResourceGroupNode:
+    async def get(self, name: str) -> ResourceGroupDetailNode:
         """Retrieve a single resource group by name."""
         return await self._client.typed_request(
             "GET",
             f"{_PATH}/{name}",
-            response_model=ResourceGroupNode,
+            response_model=ResourceGroupDetailNode,
         )
 
     async def update(
