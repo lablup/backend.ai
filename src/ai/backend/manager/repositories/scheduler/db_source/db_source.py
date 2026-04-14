@@ -1488,7 +1488,7 @@ class ScheduleDBSource:
                 db_sess,
                 spec.user_scope.domain_name,
                 str(spec.user_scope.group_id),
-                spec.main_access_key,
+                spec.access_key,
             )
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
@@ -1509,7 +1509,7 @@ class ScheduleDBSource:
             dotfile_data = await self._fetch_dotfiles(
                 db_sess,
                 spec.user_scope,
-                spec.main_access_key,
+                spec.access_key,
                 vfolder_mounts,
             )
 
@@ -1553,7 +1553,7 @@ class ScheduleDBSource:
                 db_sess,
                 spec.user_scope.domain_name,
                 str(spec.user_scope.group_id),
-                spec.main_access_key,
+                spec.access_key,
             )
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
@@ -2927,11 +2927,6 @@ class ScheduleDBSource:
                 session_id=session.id,
                 creation_id=session.creation_id or "",
                 main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
-                else AccessKey(""),
->>>>>>> e35caec08 (refactor(BA-5650-I): drop stray non-BA-5650 changes from slice)
-=======
-                main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
->>>>>>> 9fbd63dda (fix(BA-5650-I): resolve cascaded rebase conflicts and align tests)
                 reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
@@ -2979,11 +2974,6 @@ class ScheduleDBSource:
                     session_id=session.id,
                     creation_id=session.creation_id or "",
                     main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
-                    else AccessKey(""),
->>>>>>> e35caec08 (refactor(BA-5650-I): drop stray non-BA-5650 changes from slice)
-=======
->>>>>>> c2dad7307 (refactor(BA-5650-I): test and remaining ORM updates)
->>>>>>> f0233454a (refactor(BA-5650-I): test and remaining ORM updates)
                     reason="triggered-by-scheduler",
                 )
             )
@@ -4827,21 +4817,3 @@ class ScheduleDBSource:
         """
         result = await db_sess.execute(sa.select(sa.func.now()))
         return result.scalar_one()
-
-    async def resolve_main_access_keys(
-        self, session_ids: Sequence[SessionId]
-    ) -> dict[SessionId, AccessKey]:
-        """Resolve the main access key for each session's owner.
-
-        Joins sessions → users to look up the owner's main_access_key.
-        """
-        if not session_ids:
-            return {}
-        async with self._db.begin_readonly_session() as db_sess:
-            stmt = (
-                sa.select(SessionRow.id, UserRow.main_access_key)
-                .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
-                .where(SessionRow.id.in_([sid for sid in session_ids]))
-            )
-            rows = (await db_sess.execute(stmt)).all()
-            return {SessionId(row[0]): AccessKey(row[1]) for row in rows if row[1] is not None}

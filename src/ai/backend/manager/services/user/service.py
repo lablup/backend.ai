@@ -242,10 +242,7 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=action.user_info_ctx.uuid,
-<<<<<<< HEAD
                 target_main_access_key=AccessKey(target_main_ak),
-=======
->>>>>>> d59487b17 (refactor(BA-5650-I): test and remaining ORM updates)
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -326,10 +323,7 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
-<<<<<<< HEAD
                 target_main_access_key=AccessKey(target_main_ak),
-=======
->>>>>>> d59487b17 (refactor(BA-5650-I): test and remaining ORM updates)
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
