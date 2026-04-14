@@ -48,10 +48,12 @@ class DomainData:
         return f"domain-{self.name}-admin"
 
     def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
-        return {
+        operations: dict[RBACElementType, Iterable[OperationType]] = {
             entity.to_element(): OperationType.admin_operations()
             for entity in EntityType.admin_accessible_entity_types_in_domain()
         }
+        operations[RBACElementType.DOMAIN_ADMIN_PAGE] = {OperationType.READ}
+        return operations
 
 
 @dataclass
