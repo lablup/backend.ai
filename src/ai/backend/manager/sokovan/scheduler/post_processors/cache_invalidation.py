@@ -27,11 +27,11 @@ class CacheInvalidationPostProcessor(PostProcessor):
         affected_keys: set[AccessKey] = set()
 
         for info in context.result.successes:
-            if info.main_access_key:
-                affected_keys.add(info.main_access_key)
+            if info.access_key:
+                affected_keys.add(info.access_key)
         for info in context.result.failures:
-            if info.main_access_key:
-                affected_keys.add(info.main_access_key)
+            if info.access_key:
+                affected_keys.add(info.access_key)
 
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))
