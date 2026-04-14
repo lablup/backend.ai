@@ -106,7 +106,8 @@ def _create_session(
             name=f"session-{sid}",
             domain_name="default",
             group_id=group_id,
-            owner_id=user_uuid,
+            user_uuid=user_uuid,
+            access_key=access_key,
             session_type=session_type,
             priority=0,
             created_at=now,
@@ -160,7 +161,7 @@ def _create_session(
             ),
             user_permission=UserPermission(
                 owner_id=user_uuid,
-                main_access_key=None,
+                main_access_key=access_key,
                 domain_name="default",
                 group_id=group_id,
                 uid=None,
@@ -261,7 +262,7 @@ def _create_kernel(
         ),
         user_permission=UserPermission(
             owner_id=user_uuid,
-            main_access_key=None,
+            main_access_key="test-access-key",
             domain_name="default",
             group_id=group_id,
             uid=None,
@@ -544,7 +545,7 @@ def schedule_result_success_factory() -> Callable[..., ScheduleResult]:
             ScheduledSessionData(
                 session_id=s.session_info.identity.id,
                 creation_id=s.session_info.identity.creation_id,
-                main_access_key=AccessKey("test-access-key"),
+                access_key=AccessKey(s.session_info.metadata.access_key),
                 reason="scheduled-successfully",
             )
             for s in sessions
@@ -563,7 +564,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
             SessionDataForPull(
                 session_id=s.session_info.identity.id,
                 creation_id=s.session_info.identity.creation_id,
-                main_access_key=AccessKey("test-access-key"),
+                access_key=AccessKey(s.session_info.metadata.access_key),
                 kernels=[
                     KernelBindingData(
                         kernel_id=KernelId(k.id),
@@ -608,7 +609,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
             SessionDataForStart(
                 session_id=s.session_info.identity.id,
                 creation_id=s.session_info.identity.creation_id,
-                main_access_key=AccessKey("test-access-key"),
+                access_key=AccessKey(s.session_info.metadata.access_key),
                 session_type=s.session_info.identity.session_type,
                 name=s.session_info.identity.name,
                 cluster_mode=ClusterMode(s.session_info.resource.cluster_mode),
@@ -623,7 +624,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                     )
                     for k in s.kernel_infos
                 ],
-                owner_id=s.session_info.metadata.owner_id,
+                user_uuid=s.session_info.metadata.user_uuid,
                 user_email="test@example.com",
                 user_name="test-user",
                 environ={},
@@ -659,7 +660,7 @@ def terminating_session_data_factory() -> Callable[..., list[TerminatingSessionD
         return [
             TerminatingSessionData(
                 session_id=s.session_info.identity.id,
-                main_access_key=AccessKey("test-access-key"),
+                access_key=AccessKey(s.session_info.metadata.access_key),
                 creation_id=s.session_info.identity.creation_id,
                 status=s.session_info.lifecycle.status,
                 status_info="user-requested",

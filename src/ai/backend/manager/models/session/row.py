@@ -1288,7 +1288,7 @@ class SessionRow(Base):  # type: ignore[misc]
         self.user_uuid = user_uuid
         self.access_key = access_key
         for kernel_row in self.kernels:
-            kernel_row.delegate_ownership(user_uuid, access_key)
+            kernel_row.delegate_ownership(user_uuid)
 
     @staticmethod
     async def delete_by_user_id(user_uuid: UUID, *, db_session: SASession) -> None:

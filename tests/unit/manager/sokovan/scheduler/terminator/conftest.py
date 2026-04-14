@@ -137,7 +137,7 @@ def _create_terminating_session_data(
 
     return TerminatingSessionData(
         session_id=session_id or SessionId(uuid4()),
-        main_access_key=AccessKey("test-key"),
+        access_key=AccessKey("test-key"),
         creation_id=str(uuid4()),
         status=SessionStatus.TERMINATING,
         status_info=status_info,
@@ -214,7 +214,7 @@ def _create_kernel_info(
         ),
         user_permission=UserPermission(
             owner_id=uuid4(),
-            main_access_key=None,
+            main_access_key="test-access-key",
             domain_name="default",
             group_id=uuid4(),
             uid=None,
