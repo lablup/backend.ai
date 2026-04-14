@@ -566,13 +566,20 @@ class InstallReport(Static):
                 """
                     )
                 )
-            with TabPane("App-Proxy Worker", id="appproxy-worker"):
+            with TabPane("App-Proxy Workers", id="appproxy-worker"):
                 yield Markdown(
                     textwrap.dedent(
                         f"""
+                **HTTP Worker** (interactive + inference):
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
                 $ ./backend.ai app-proxy worker start-server --debug
+                ```
+
+                **TCP Worker** (interactive, TCP protocol):
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backend.ai app-proxy worker start-server -f app-proxy-worker-tcp.toml --debug
                 ```
                 """
                     )
