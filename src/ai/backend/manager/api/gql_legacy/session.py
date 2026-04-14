@@ -23,7 +23,6 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
-from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
     ClusterMode,
     KernelId,
@@ -391,7 +390,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         return result
 
     @classmethod
-    def from_dataclass(
+    async def from_dataclass(
         cls,
         ctx: GraphQueryContext,
         session_data: SessionData,
@@ -405,8 +404,16 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         else:
             vfolder_mounts = [vf.vfid.folder_id for vf in session_data.vfolder_mounts]
 
-        if session_data.owner is None:
-            raise SessionWithInvalidStateError()
+        # access_key on this node is the owner's main_access_key. When the
+        # caller hasn't eagerly loaded session_data.owner, fall back to the
+        # user repository so the required field is always populated from the
+        # always-present owner_id.
+        if session_data.owner is not None:
+            main_access_key = session_data.owner.main_access_key
+        else:
+            main_access_key = await ctx.user_repository.get_main_access_key_by_id(
+                session_data.owner_id
+            )
 
         result = cls(
             # identity
@@ -422,9 +429,9 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=session_data.domain_name,
             project_id=session_data.group_id,
-            user_id=session_data.user_uuid,
-            access_key=session_data.access_key,
-            owner=UserNode.from_dataclass(ctx, session_data.owner),
+            user_id=session_data.owner_id,
+            access_key=main_access_key,
+            owner=UserNode.from_dataclass(ctx, session_data.owner) if session_data.owner else None,
             # status
             status=session_data.status.name,
             # status_changed=row.status_changed,  # FIXME: generated attribute
@@ -919,7 +926,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[mis
         )
 
         return ModifyComputeSession(
-            ComputeSessionNode.from_dataclass(graph_ctx, result.session_data),
+            await ComputeSessionNode.from_dataclass(graph_ctx, result.session_data),
             input.get("client_mutation_id"),
         )
 
@@ -970,7 +977,7 @@ class CheckAndTransitStatus(graphene.Mutation):  # type: ignore[misc]
                 )
             )
             session_nodes.append(
-                ComputeSessionNode.from_dataclass(graph_ctx, action_result.session_data)
+                await ComputeSessionNode.from_dataclass(graph_ctx, action_result.session_data)
             )
 
         return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))
