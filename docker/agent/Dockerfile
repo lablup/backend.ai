@@ -3,7 +3,12 @@
 # -------- Stage 1: builder --------
 # Build wheels for the agent and its intra-repo dependencies using Pants.
 # Run from the repo root:
+#   git lfs install && git lfs pull   # required: krunner/nsenter binaries
 #   docker build -f docker/agent/Dockerfile -t backend.ai-agent:dev .
+# LFS note (todo.md §5.2 I-20): backendai-socket-relay.img.*.tar.gz and
+# linuxkit-nsenter.img.*.tar.gz are LFS-tracked. Without `git lfs pull`, the
+# wheels ship ~132-byte pointer files and the agent crashes at boot with
+# `gzip.BadGzipFile: Not a gzipped file`.
 FROM python:3.13.7-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive \

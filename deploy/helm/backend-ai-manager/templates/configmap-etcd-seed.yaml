@@ -15,7 +15,7 @@ data:
   there by Service DNS gives failover semantics with a simple standalone URL.
 */}}
 {{- $_ := set $seed "redis" (dict
-    "addr" (printf "%s:6379" (include "bai-manager.redisSentinelHost" .))
-    "password" .Values.redis.auth.password) }}
+    "addr" (printf "%s:6379" (include "bai-manager.redisHost" .))
+    "password" .Values.redis.password) }}
     {{- toJson $seed | nindent 4 }}
 {{- end }}

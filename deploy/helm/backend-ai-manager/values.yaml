@@ -1,5 +1,4 @@
-## Backend.AI Manager Helm values.
-## For production, override all passwords/secrets and pin image digests.
+## Backend.AI Manager Helm values (dev/smoke: single-replica deps, no HA).
 
 image:
   repository: backend.ai-manager
@@ -10,18 +9,14 @@ imagePullSecrets: []
 
 manager:
   replicaCount: 1
-  # Host docker group GID — needed so the manager (uid 1000, backendai) can
-  # access /var/run/docker.sock mounted from the node. Set to the output of
-  # `getent group docker` on the target node (e.g., 999 on minikube/Debian).
+  # Host docker group GID — must match `getent group docker` on the node the
+  # manager pod is pinned to (nodeSelector below).
   dockerGid: 999
   service:
     type: ClusterIP
     port: 8081
-  # Internal Pod port the manager binds to.
   bindPort: 8081
-  # JWT / signing secret. Override in production via --set-string or an external Secret.
   secret: "CHANGE-ME-MANAGER-SECRET"
-  # Additional env vars injected into the manager container.
   extraEnv: []
   resources:
     requests:
@@ -31,19 +26,47 @@ manager:
       cpu: "2"
       memory: 2Gi
   podAnnotations: {}
+  # Pin to the Swarm leader node. See todo.md §5.2 I-21.
   nodeSelector: {}
+  # If the target node has a Backend.AI-specific taint (e.g., ser8 carries
+  # `backendai.io/dedicated=swarm-manager:NoSchedule`), tolerate it here.
+  # tolerations:
+  #   - key: backendai.io/dedicated
+  #     operator: Equal
+  #     value: swarm-manager
+  #     effect: NoSchedule
   tolerations: []
   affinity: {}
+
+## ---------------- Embedded deps (single replica, no HA) ----------------
+postgres:
+  image: postgres:16
+  username: backendai
+  database: backendai
+  password: "CHANGE-ME-POSTGRES-PASSWORD"
+  storage:
+    size: 20Gi
+    storageClassName: ""   # empty → cluster default
+
+redis:
+  image: redis:7
+  password: "CHANGE-ME-REDIS-PASSWORD"
+  storage:
+    size: 4Gi
+    storageClassName: ""
+
+etcd:
+  image: quay.io/coreos/etcd:v3.5.15
+  storage:
+    size: 4Gi
+    storageClassName: ""
 
 ## Seed etcd with Backend.AI global config on first install (Helm hook Job).
 etcdSeed:
   enabled: true
-  # Rendered into a ConfigMap and fed to `backend.ai mgr etcd put-json CONFIG`.
   config:
     system:
       timezone: "UTC"
-    redis:
-      addr: ""  # filled in by the chart from the redis subchart service
     docker:
       image:
         auto_pull: "digest"
@@ -52,53 +75,8 @@ etcdSeed:
         agent: "0.0.0.0/0"
         container: "0.0.0.0/0"
 
-## Run `backend.ai mgr schema oneshot` on install/upgrade (Helm hook Job).
 schemaMigrate:
   enabled: true
 
-## Populate bootstrap data (default domain/group/scaling-group/keypairs) on
-## first install. Source is files/bootstrap-fixture.json in the chart.
 fixture:
   enabled: true
-
-## ---------------- Subchart: PostgreSQL HA (Patroni) ----------------
-postgresql-ha:
-  enabled: true
-  postgresql:
-    replicaCount: 3
-    username: backendai
-    password: "CHANGE-ME-POSTGRES-PASSWORD"
-    database: backendai
-    repmgrPassword: "CHANGE-ME-REPMGR-PASSWORD"
-  pgpool:
-    adminPassword: "CHANGE-ME-PGPOOL-ADMIN"
-    replicaCount: 2
-  persistence:
-    enabled: true
-    size: 20Gi
-
-## ---------------- Subchart: Redis (replication + Sentinel) ---------
-redis:
-  enabled: true
-  architecture: replication
-  auth:
-    enabled: true
-    password: "CHANGE-ME-REDIS-PASSWORD"
-    sentinel: true
-  sentinel:
-    enabled: true
-    masterSet: mymaster
-    quorum: 2
-  replica:
-    replicaCount: 3
-
-## ---------------- Subchart: etcd -----------------------------------
-etcd:
-  enabled: true
-  replicaCount: 3
-  auth:
-    rbac:
-      create: false  # Backend.AI connects without auth by default; enable later
-  persistence:
-    enabled: true
-    size: 8Gi

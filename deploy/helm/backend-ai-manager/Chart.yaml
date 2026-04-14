@@ -1,20 +1,6 @@
 apiVersion: v2
 name: backend-ai-manager
-description: Backend.AI Manager with HA dependencies (PostgreSQL, Redis Sentinel, etcd)
+description: Backend.AI Manager with single-replica dependencies (PostgreSQL, Redis, etcd) for development.
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "26.4.0"
-
-dependencies:
-  - name: postgresql-ha
-    version: "15.x.x"
-    repository: https://charts.bitnami.com/bitnami
-    condition: postgresql-ha.enabled
-  - name: redis
-    version: "20.x.x"
-    repository: https://charts.bitnami.com/bitnami
-    condition: redis.enabled
-  - name: etcd
-    version: "10.x.x"
-    repository: https://charts.bitnami.com/bitnami
-    condition: etcd.enabled

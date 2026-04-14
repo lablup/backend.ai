@@ -3,6 +3,7 @@
 # -------- Stage 1: builder --------
 # Build wheels for the manager and its internal dependencies using Pants.
 # Run from the repo root:
+#   git lfs install && git lfs pull   # required: see docker/agent/Dockerfile
 #   docker build -f docker/manager/Dockerfile -t backend.ai-manager:dev .
 FROM python:3.13.7-slim AS builder
 

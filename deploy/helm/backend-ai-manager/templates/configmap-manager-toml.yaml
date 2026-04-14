@@ -8,7 +8,7 @@ data:
   alembic.ini: |
     [alembic]
     script_location = ai.backend.manager.models:alembic
-    sqlalchemy.url = postgresql+asyncpg://{{ index .Values "postgresql-ha" "postgresql" "username" }}:__POSTGRES_PASSWORD__@{{ include "bai-manager.postgresHost" . }}:5432/{{ index .Values "postgresql-ha" "postgresql" "database" }}
+    sqlalchemy.url = postgresql+asyncpg://{{ .Values.postgres.username }}:__POSTGRES_PASSWORD__@{{ include "bai-manager.postgresHost" . }}:5432/{{ .Values.postgres.database }}
 
     [loggers]
     keys = root,sqlalchemy,alembic
@@ -40,8 +40,8 @@ data:
     [db]
     type = "postgresql"
     addr = { host = "{{ include "bai-manager.postgresHost" . }}", port = 5432 }
-    name = {{ index .Values "postgresql-ha" "postgresql" "database" | quote }}
-    user = {{ index .Values "postgresql-ha" "postgresql" "username" | quote }}
+    name = {{ .Values.postgres.database | quote }}
+    user = {{ .Values.postgres.username | quote }}
     password = "__POSTGRES_PASSWORD__"
 
     [etcd]
@@ -58,14 +58,8 @@ data:
     rpc-auth-manager-keypair = "/var/lib/backend.ai/keys/manager.key_secret"
 
     [redis]
-    service-name = "{{ .Values.redis.sentinel.masterSet }}"
+    addr = { host = "{{ include "bai-manager.redisHost" . }}", port = 6379 }
     password = "__REDIS_PASSWORD__"
-    use_tls = false
-    tls_skip_verify = true
-
-    [[redis.sentinel]]
-    host = "{{ include "bai-manager.redisSentinelHost" . }}"
-    port = 26379
 
     [logging]
     level = "INFO"

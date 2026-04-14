@@ -18,12 +18,12 @@ app.kubernetes.io/name: {{ include "bai-manager.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{/* Subchart service DNS — assumes default Bitnami chart fullnames. */}}
+{{/* Service DNS for bundled single-replica deps. */}}
 {{- define "bai-manager.postgresHost" -}}
-{{- printf "%s-postgresql-ha-pgpool" .Release.Name -}}
+{{- printf "%s-postgres" .Release.Name -}}
 {{- end -}}
 
-{{- define "bai-manager.redisSentinelHost" -}}
+{{- define "bai-manager.redisHost" -}}
 {{- printf "%s-redis" .Release.Name -}}
 {{- end -}}
 
