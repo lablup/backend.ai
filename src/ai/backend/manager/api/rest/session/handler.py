@@ -275,7 +275,7 @@ class SessionHandler:
         owner_id = params.owner_id if params.owner_id is not None else request["user"]["uuid"]
 
         log.info(
-            "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
+            "GET_OR_CREATE (ak:{0}, img:{1}, s:{2})",
             requester_access_key,
             owner_id if owner_id != request["user"]["uuid"] else "*",
             params.image,
@@ -380,7 +380,7 @@ class SessionHandler:
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         owner_id = params.owner_id if params.owner_id is not None else request["user"]["uuid"]
         log.info(
-            "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
+            "GET_OR_CREATE (ak:{0}, img:{1}, s:{2})",
             requester_access_key,
             owner_id if owner_id != request["user"]["uuid"] else "*",
             params.image,
@@ -443,7 +443,7 @@ class SessionHandler:
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         owner_id = params.owner_id if params.owner_id is not None else request["user"]["uuid"]
         log.info(
-            "CREAT_CLUSTER (ak:{0}/{1}, s:{2})",
+            "CREAT_CLUSTER (ak:{0}, s:{1})",
             requester_access_key,
             owner_id if owner_id != request["user"]["uuid"] else "*",
             params.session_name,
