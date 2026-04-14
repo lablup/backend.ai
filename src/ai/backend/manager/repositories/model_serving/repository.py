@@ -5,7 +5,6 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from pydantic import HttpUrl
-from ruamel.yaml import YAML
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
@@ -40,7 +39,7 @@ from ai.backend.manager.data.model_serving.types import (
     UserData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.vfolder.types import VFolderLocation, VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -81,9 +80,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
-from ai.backend.manager.repositories.deployment.storage_source.storage_source import (
-    DeploymentStorageSource,
-)
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -832,15 +828,6 @@ class ModelServingRepository:
                     if current_rev is None:
                         raise InvalidAPIParameters("Endpoint has no current revision")
 
-                    # Re-read model definition from vfolder to pick up file changes
-                    refreshed_model_definition = await self._fetch_model_definition_from_vfolder(
-                        db_session,
-                        storage_manager,
-                        current_rev.model,
-                        spec.model_definition_path.optional_value()
-                        or current_rev.model_definition_path,
-                    )
-
                     # Resolve image if changed
                     image_id = current_rev.image
                     image_ref = spec.image.optional_value()
@@ -873,7 +860,6 @@ class ModelServingRepository:
                             if spec.model_definition_path.optional_value() is not None
                             else current_rev.model_definition_path
                         ),
-                        model_definition=refreshed_model_definition or current_rev.model_definition,
                         resource_group=endpoint_row.resource_group,
                         resource_opts=(
                             spec.resource_opts.optional_value()
@@ -954,51 +940,6 @@ class ModelServingRepository:
             raise
         except Exception:
             raise
-
-    async def _fetch_model_definition_from_vfolder(
-        self,
-        db_session: SASession,
-        storage_manager: StorageSessionManager,
-        vfolder_id: uuid.UUID | None,
-        model_definition_path: str | None,
-    ) -> dict[str, Any] | None:
-        """Re-read model definition file from the vfolder storage.
-
-        Returns the parsed YAML content, or None if the file cannot be read.
-        """
-        if vfolder_id is None:
-            return None
-        try:
-            vf_query = sa.select(
-                VFolderRow.id,
-                VFolderRow.host,
-                VFolderRow.quota_scope_id,
-                VFolderRow.ownership_type,
-                VFolderRow.usage_mode,
-            ).where(VFolderRow.id == vfolder_id)
-            vf_result = await db_session.execute(vf_query)
-            vf_row = vf_result.one_or_none()
-            if vf_row is None:
-                return None
-
-            vfolder_location = VFolderLocation(
-                id=vf_row.id,
-                quota_scope_id=vf_row.quota_scope_id,
-                host=vf_row.host,
-                ownership_type=vf_row.ownership_type,
-                usage_mode=vf_row.usage_mode,
-            )
-            candidates = (
-                [model_definition_path]
-                if model_definition_path
-                else ["model-definition.yaml", "model-definition.yml"]
-            )
-            storage_source = DeploymentStorageSource(storage_manager)
-            content = await storage_source.fetch_definition_file(vfolder_location, candidates)
-            yaml = YAML()
-            return cast(dict[str, Any], yaml.load(content))
-        except Exception:
-            return None
 
     @model_serving_repository_resilience.apply()
     async def search_auto_scaling_rules(

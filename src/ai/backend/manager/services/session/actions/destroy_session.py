@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
@@ -15,7 +14,6 @@ class DestroySessionAction(SessionAction):
     session_name: str
     forced: bool
     recursive: bool
-    owner_access_key: AccessKey
 
     @override
     def entity_id(self) -> str | None:

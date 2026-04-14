@@ -33,7 +33,7 @@ class CreateFromTemplateActionParams:
     tag: str | Undefined
     priority: int
     is_preemptible: bool
-    owner_access_key: AccessKey | Undefined
+    owner_id: uuid.UUID | Undefined
     enqueue_only: bool
     max_wait_seconds: int
     starts_at: str | None

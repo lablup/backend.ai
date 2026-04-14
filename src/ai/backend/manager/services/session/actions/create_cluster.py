@@ -30,7 +30,7 @@ class CreateClusterAction(SessionScopeAction):
     domain_name: str
     scaling_group_name: str
     requester_access_key: AccessKey
-    owner_access_key: AccessKey
+    owner_id: uuid.UUID
     tag: str
     enqueue_only: bool
     keypair_resource_policy: dict[str, Any] | None
