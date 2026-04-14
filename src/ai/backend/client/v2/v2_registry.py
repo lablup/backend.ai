@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
     from .domains_v2.image import V2ImageClient
     from .domains_v2.keypair import V2KeypairClient
+    from .domains_v2.login_client_type import V2LoginClientTypeClient
     from .domains_v2.login_history import V2LoginHistoryClient
     from .domains_v2.login_session import V2LoginSessionClient
     from .domains_v2.model_card import V2ModelCardClient
@@ -162,6 +163,12 @@ class V2ClientRegistry:
         from .domains_v2.keypair import V2KeypairClient
 
         return V2KeypairClient(self._client)
+
+    @cached_property
+    def login_client_type(self) -> V2LoginClientTypeClient:
+        from .domains_v2.login_client_type import V2LoginClientTypeClient
+
+        return V2LoginClientTypeClient(self._client)
 
     @cached_property
     def login_history(self) -> V2LoginHistoryClient:
