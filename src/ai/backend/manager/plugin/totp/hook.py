@@ -59,9 +59,9 @@ class TOTPHook(HookPlugin):
     async def validate_otp(
         self, request: web.Request, params: Any, user: Any, keypair: Any
     ) -> web.Response | None:
-        if not user["totp_activated"]:
+        if not user.totp_activated:
             if self._plugin_config.forced:
-                token = self._token_parser.serialize(str(user["uuid"]))
+                token = self._token_parser.serialize(str(user.uuid))
                 auth_data = RequireTwoFactorRegistrationResponse(
                     response_type=AuthResponseType.REQUIRE_TWO_FACTOR_REGISTRATION,
                     token=token,
@@ -74,7 +74,7 @@ class TOTPHook(HookPlugin):
                 )
             log.info("TOTP.VALIDATE_OTP(TOTP not forced, user TOTP not activated)")
             return None
-        if not user["totp_key"]:
+        if not user.totp_key:
             raise Reject("User activated TOTP but TOTP key does not exist")
 
         otp = params.get("stoken") or params.get("sToken") or params.get("otp")
@@ -89,7 +89,7 @@ class TOTPHook(HookPlugin):
                 },
             )
 
-        totp = pyotp.TOTP(user["totp_key"])
+        totp = pyotp.TOTP(user.totp_key)
         if not totp.verify(otp):
             raise Reject("Invalid TOTP code provided")
         log.info("TOTP.VALIDATE_OTP(TOTP validated successfully)")
