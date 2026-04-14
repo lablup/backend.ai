@@ -2749,7 +2749,7 @@ type DeleteReservoirRegistryPayload {
 
 """Added in 26.4.1. Payload for resource group deletion."""
 type DeleteResourceGroupPayloadGQL {
-  """UUID of the deleted resource group."""
+  """Name of the deleted resource group."""
   id: String!
 }
 

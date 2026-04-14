@@ -4418,7 +4418,7 @@ type DeleteReservoirRegistryPayload
 type DeleteResourceGroupPayloadGQL
   @join__type(graph: STRAWBERRY)
 {
-  """UUID of the deleted resource group."""
+  """Name of the deleted resource group."""
   id: String!
 }
 

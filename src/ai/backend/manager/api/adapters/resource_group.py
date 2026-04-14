@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -39,7 +38,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupDetailNode,
     ResourceGroupMetadataInfo,
     ResourceGroupNetworkConfigInfo,
-    ResourceGroupNode,
     ResourceGroupSchedulerConfigInfo,
     ResourceGroupStatusInfo,
     ResourceInfoNode,
@@ -187,23 +185,13 @@ class ResourceGroupSearchPayload:
     has_previous_page: bool
 
 
-# Sentinel UUID used when converting ScalingGroupData to ResourceGroupNode.
-# ScalingGroupData does not have a UUID field (name is the primary key),
-# so this zero-UUID signals that the id field is not populated from actual data.
-_EMPTY_UUID = UUID(int=0)
-
-
 class ResourceGroupAdapter(BaseAdapter):
     """Adapter for resource group (scaling group) operations.
 
     Bridges CreateResourceGroupInput / UpdateResourceGroupInput DTOs to
     ScalingGroup Processor actions and converts results back to Pydantic DTOs.
 
-    Note on ResourceGroupNode.id:
-        ScalingGroupData uses ``name`` (str) as primary key.  ResourceGroupNode
-        declares ``id: UUID`` for DTO consistency with other domains.  When
-        converting from ScalingGroupData the ``id`` field is set to a sentinel
-        zero-UUID because no UUID is available in the data model.  Callers that
+    Note: ScalingGroupData uses ``name`` (str) as primary key.  Callers that
         need an opaque identifier should use the ``name`` field instead.
     """
 
@@ -353,7 +341,7 @@ class ResourceGroupAdapter(BaseAdapter):
         )
 
         return CreateResourceGroupPayload(
-            resource_group=self._data_to_node(action_result.scaling_group),
+            resource_group=self._data_to_detail_node(action_result.scaling_group),
         )
 
     async def update(
@@ -398,7 +386,7 @@ class ResourceGroupAdapter(BaseAdapter):
         )
 
         return UpdateResourceGroupPayload(
-            resource_group=self._data_to_node(action_result.scaling_group),
+            resource_group=self._data_to_detail_node(action_result.scaling_group),
         )
 
     async def get_resource_info(self, scaling_group: str) -> ResourceInfoNode:
@@ -613,7 +601,7 @@ class ResourceGroupAdapter(BaseAdapter):
     async def purge(
         self,
         name: str,
-    ) -> ResourceGroupNode:
+    ) -> ResourceGroupDetailNode:
         """Purge a resource group by name.
 
         Args:
@@ -627,7 +615,7 @@ class ResourceGroupAdapter(BaseAdapter):
             PurgeScalingGroupAction(purger=purger)
         )
 
-        return self._data_to_node(action_result.data)
+        return self._data_to_detail_node(action_result.data)
 
     # Allow / Disallow operations
 
@@ -761,32 +749,4 @@ class ResourceGroupAdapter(BaseAdapter):
                     mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
                 ),
             ),
-        )
-
-    @staticmethod
-    def _data_to_node(data: ScalingGroupData) -> ResourceGroupNode:
-        """Convert ScalingGroupData to ResourceGroupNode DTO.
-
-        Note:
-            ``ResourceGroupNode.id`` is set to a sentinel zero-UUID because
-            ScalingGroupData (and the underlying ORM row) does not have a UUID
-            field — ``name`` is the primary key.  Callers should use ``name``
-            as the opaque identifier for resource groups.
-
-            ``domain_name``, ``total_resource_slots``, ``allowed_vfolder_hosts``,
-            ``resource_policy``, and ``modified_at`` are also not available in
-            ScalingGroupData; they are set to sensible placeholder values.
-        """
-        return ResourceGroupNode(
-            id=_EMPTY_UUID,
-            name=data.name,
-            domain_name="",
-            description=data.metadata.description or None,
-            is_active=data.status.is_active,
-            total_resource_slots={},
-            allowed_vfolder_hosts={},
-            integration_name=None,
-            resource_policy=None,
-            created_at=data.metadata.created_at,
-            modified_at=datetime.fromtimestamp(0, tz=UTC),
         )

@@ -82,19 +82,19 @@ class ResourceGroupNode(BaseResponseModel):
 class CreateResourceGroupPayload(BaseResponseModel):
     """Payload for resource group creation mutation result."""
 
-    resource_group: ResourceGroupNode = Field(description="Created resource group.")
+    resource_group: ResourceGroupDetailNode = Field(description="Created resource group.")
 
 
 class UpdateResourceGroupPayload(BaseResponseModel):
     """Payload for resource group update mutation result."""
 
-    resource_group: ResourceGroupNode = Field(description="Updated resource group.")
+    resource_group: ResourceGroupDetailNode = Field(description="Updated resource group.")
 
 
 class DeleteResourceGroupPayload(BaseResponseModel):
     """Payload for resource group deletion mutation result."""
 
-    id: UUID = Field(description="UUID of the deleted resource group.")
+    id: str = Field(description="Name of the deleted resource group.")
 
 
 class AdminSearchResourceGroupsPayload(BaseResponseModel):

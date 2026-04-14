@@ -8,8 +8,19 @@ from datetime import UTC, datetime
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     CreateResourceGroupPayload,
     DeleteResourceGroupPayload,
+    PreemptionConfigInfo,
+    ResourceGroupDetailNode,
+    ResourceGroupMetadataInfo,
+    ResourceGroupNetworkConfigInfo,
     ResourceGroupNode,
+    ResourceGroupSchedulerConfigInfo,
+    ResourceGroupStatusInfo,
     UpdateResourceGroupPayload,
+)
+from ai.backend.common.dto.manager.v2.resource_group.types import (
+    PreemptionModeDTO,
+    PreemptionOrderDTO,
+    SchedulerTypeDTO,
 )
 
 
@@ -26,6 +37,30 @@ def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
         resource_policy=None,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         modified_at=datetime(2024, 6, 1, tzinfo=UTC),
+    )
+
+
+def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupDetailNode:
+    return ResourceGroupDetailNode(
+        id=name,
+        name=name,
+        status=ResourceGroupStatusInfo(is_active=True, is_public=True),
+        metadata=ResourceGroupMetadataInfo(
+            description="A test resource group",
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+        ),
+        network=ResourceGroupNetworkConfigInfo(
+            wsproxy_addr="http://localhost:10200",
+            use_host_network=False,
+        ),
+        scheduler=ResourceGroupSchedulerConfigInfo(
+            type=SchedulerTypeDTO.FIFO,
+            preemption=PreemptionConfigInfo(
+                preemptible_priority=5,
+                order=PreemptionOrderDTO.OLDEST,
+                mode=PreemptionModeDTO.TERMINATE,
+            ),
+        ),
     )
 
 
@@ -68,12 +103,12 @@ class TestCreateResourceGroupPayload:
     """Tests for CreateResourceGroupPayload model."""
 
     def test_valid_creation(self) -> None:
-        node = _make_resource_group_node()
+        node = _make_resource_group_detail_node()
         payload = CreateResourceGroupPayload(resource_group=node)
         assert payload.resource_group.name == "test-group"
 
     def test_round_trip(self) -> None:
-        node = _make_resource_group_node()
+        node = _make_resource_group_detail_node()
         payload = CreateResourceGroupPayload(resource_group=node)
         json_data = payload.model_dump_json()
         restored = CreateResourceGroupPayload.model_validate_json(json_data)
@@ -84,12 +119,12 @@ class TestUpdateResourceGroupPayload:
     """Tests for UpdateResourceGroupPayload model."""
 
     def test_valid_creation(self) -> None:
-        node = _make_resource_group_node()
+        node = _make_resource_group_detail_node()
         payload = UpdateResourceGroupPayload(resource_group=node)
         assert payload.resource_group.name == "test-group"
 
     def test_round_trip(self) -> None:
-        node = _make_resource_group_node()
+        node = _make_resource_group_detail_node()
         payload = UpdateResourceGroupPayload(resource_group=node)
         json_data = payload.model_dump_json()
         restored = UpdateResourceGroupPayload.model_validate_json(json_data)
@@ -100,13 +135,11 @@ class TestDeleteResourceGroupPayload:
     """Tests for DeleteResourceGroupPayload model."""
 
     def test_valid_creation(self) -> None:
-        group_id = uuid.uuid4()
-        payload = DeleteResourceGroupPayload(id=group_id)
-        assert payload.id == group_id
+        payload = DeleteResourceGroupPayload(id="test-group")
+        assert payload.id == "test-group"
 
     def test_round_trip(self) -> None:
-        group_id = uuid.uuid4()
-        payload = DeleteResourceGroupPayload(id=group_id)
+        payload = DeleteResourceGroupPayload(id="test-group")
         json_data = payload.model_dump_json()
         restored = DeleteResourceGroupPayload.model_validate_json(json_data)
         assert restored.id == payload.id
