@@ -1149,7 +1149,7 @@ class ScheduleDBSource:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        access_key=AccessKey(session_row.access_key)
+                        main_access_key=AccessKey(session_row.access_key)
                         if session_row.access_key
                         else AccessKey(""),
                         creation_id=session_row.creation_id or "",
@@ -1213,7 +1213,7 @@ class ScheduleDBSource:
                         SweptSessionInfo(
                             session_id=row.id,
                             creation_id=row.creation_id,
-                            access_key=row.access_key,
+                            main_access_key=row.access_key,
                         )
                     )
 
@@ -1486,7 +1486,7 @@ class ScheduleDBSource:
                 db_sess,
                 spec.user_scope.domain_name,
                 str(spec.user_scope.group_id),
-                spec.access_key,
+                spec.main_access_key,
             )
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
@@ -1507,7 +1507,7 @@ class ScheduleDBSource:
             dotfile_data = await self._fetch_dotfiles(
                 db_sess,
                 spec.user_scope,
-                spec.access_key,
+                spec.main_access_key,
                 vfolder_mounts,
             )
 
@@ -1551,7 +1551,7 @@ class ScheduleDBSource:
                 db_sess,
                 spec.user_scope.domain_name,
                 str(spec.user_scope.group_id),
-                spec.access_key,
+                spec.main_access_key,
             )
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
@@ -1857,7 +1857,7 @@ class ScheduleDBSource:
                             ScheduledSessionData(
                                 session_id=allocation.session_id,
                                 creation_id=creation_id,
-                                access_key=access_key,
+                                main_access_key=access_key,
                                 reason="triggered-by-scheduler",
                             )
                         )
@@ -2917,7 +2917,7 @@ class ScheduleDBSource:
             scheduled_session = ScheduledSessionData(
                 session_id=session.id,
                 creation_id=session.creation_id or "",
-                access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
+                main_access_key=AccessKey(session.main_access_key) if session.main_access_key else AccessKey(""),
                 reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
@@ -2962,8 +2962,8 @@ class ScheduleDBSource:
                 ScheduledSessionData(
                     session_id=session.id,
                     creation_id=session.creation_id or "",
-                    access_key=AccessKey(session.access_key)
-                    if session.access_key
+                    main_access_key=AccessKey(session.main_access_key)
+                    if session.main_access_key
                     else AccessKey(""),
                     reason="triggered-by-scheduler",
                 )
@@ -3102,7 +3102,7 @@ class ScheduleDBSource:
                 sessions_map[session_id] = SessionDataForPull(
                     session_id=session_id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    main_access_key=row.access_key,
                     kernels=[],
                 )
 
@@ -3294,7 +3294,7 @@ class ScheduleDBSource:
                 SessionDataForStart(
                     session_id=session_info["id"],
                     creation_id=session_info["creation_id"],
-                    access_key=session_info["access_key"],
+                    main_access_key=session_info["access_key"],
                     session_type=session_info["session_type"],
                     name=session_info["name"],
                     cluster_mode=session_info["cluster_mode"],
@@ -4074,7 +4074,7 @@ class ScheduleDBSource:
                 sessions_map[session_id] = SessionDataForPull(
                     session_id=session_id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    main_access_key=row.access_key,
                     kernels=[],
                 )
 
@@ -4293,7 +4293,7 @@ class ScheduleDBSource:
                 SessionDataForStart(
                     session_id=session_info["id"],
                     creation_id=session_info["creation_id"],
-                    access_key=session_info["access_key"],
+                    main_access_key=session_info["access_key"],
                     session_type=session_info["session_type"],
                     name=session_info["name"],
                     cluster_mode=session_info["cluster_mode"],
@@ -4369,7 +4369,7 @@ class ScheduleDBSource:
                 sessions_map[row.id] = SessionDataForPull(
                     session_id=row.id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    main_access_key=row.access_key,
                     kernels=[],
                 )
 
@@ -4625,7 +4625,7 @@ class ScheduleDBSource:
                     SessionDataForStart(
                         session_id=session_info["id"],
                         creation_id=session_info["creation_id"],
-                        access_key=session_info["access_key"],
+                        main_access_key=session_info["access_key"],
                         session_type=session_info["session_type"],
                         name=session_info["name"],
                         cluster_mode=session_info["cluster_mode"],

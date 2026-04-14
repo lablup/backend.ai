@@ -26,13 +26,13 @@ class KeypairResourceLimitValidator(ValidatorRule):
 
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
-        policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)
+        policy = snapshot.resource_policy.keypair_policies.get(workload.main_access_key)
         if not policy:
             # If no policy is defined, we can't validate - let it pass
             return
 
         # Get current keypair occupancy (occupied_slots is list[SlotQuantity])
-        key_occupancy = snapshot.resource_occupancy.by_keypair.get(workload.access_key)
+        key_occupancy = snapshot.resource_occupancy.by_keypair.get(workload.main_access_key)
         if key_occupancy:
             key_occupied = ResourceSlot({
                 sq.slot_name: sq.quantity for sq in key_occupancy.occupied_slots

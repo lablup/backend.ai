@@ -137,7 +137,7 @@ class SessionLifecycleManager:
                 )
                 # BA-5609: resolve main_access_key from owner_id; external
                 # hook plugins still receive the resolved access key.
-                session_main_access_key = await self._user_repository.get_main_access_key_by_uuid(
+                session_main_access_key = await self._user_repository.get_main_access_key_by_id(
                     session_row.user_uuid
                 )
                 await self.hook_plugin_ctx.notify(

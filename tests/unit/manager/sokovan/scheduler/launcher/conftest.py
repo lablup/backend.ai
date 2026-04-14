@@ -163,7 +163,7 @@ def _create_session_for_pull(
     return SessionDataForPull(
         session_id=session_id or SessionId(uuid4()),
         creation_id=str(uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         kernels=kernels,
     )
 
@@ -234,7 +234,7 @@ def _create_session_for_start(
     return SessionDataForStart(
         session_id=session_id or SessionId(uuid4()),
         creation_id=str(uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         session_type=SessionTypes.INTERACTIVE,
         name="test-session",
         owner_id=uuid4(),

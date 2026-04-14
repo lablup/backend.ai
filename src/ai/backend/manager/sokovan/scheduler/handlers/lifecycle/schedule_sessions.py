@@ -159,7 +159,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                     from_status=from_status,
                     reason=event_data.reason,
                     creation_id=event_data.creation_id,
-                    access_key=event_data.access_key,
+                    access_key=event_data.main_access_key,
                 )
             )
 

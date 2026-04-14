@@ -229,7 +229,7 @@ class SessionLauncher:
             session.session_id,
             session.session_type,
             session.name,
-            session.access_key,
+            session.main_access_key,
             session.cluster_mode,
         )
         log.debug(log_fmt + "try-starting", *log_args)
@@ -273,7 +273,7 @@ class SessionLauncher:
                     k.cluster_hostname or f"{k.cluster_role}{k.cluster_idx}"
                     for k in session.kernels
                 ),
-                "BACKENDAI_ACCESS_KEY": session.access_key,
+                "BACKENDAI_ACCESS_KEY": session.main_access_key,
                 # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
                 "BACKENDAI_PREOPEN_PORTS": (
                     ",".join(str(port) for port in session.kernels[0].preopen_ports)

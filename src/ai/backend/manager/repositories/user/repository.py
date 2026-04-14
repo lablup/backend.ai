@@ -78,9 +78,9 @@ class UserRepository:
         return await self._db_source.get_user_by_uuid(user_uuid)
 
     @user_repository_resilience.apply()
-    async def get_main_access_key_by_uuid(self, user_uuid: UUID) -> str | None:
+    async def get_main_access_key_by_id(self, user_uuid: UUID) -> str | None:
         """Return the user's ``main_access_key`` or ``None`` if unset/missing."""
-        return await self._db_source.get_main_access_key_by_uuid(user_uuid)
+        return await self._db_source.get_main_access_key_by_id(user_uuid)
 
     @user_repository_resilience.apply()
     async def get_by_email_validated(

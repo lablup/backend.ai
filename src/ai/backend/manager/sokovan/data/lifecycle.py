@@ -64,8 +64,7 @@ class SessionDataForPull:
 
     session_id: SessionId
     creation_id: str
-    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
-    access_key: AccessKey
+    main_access_key: AccessKey
     kernels: list[KernelBindingData]
 
 
@@ -75,8 +74,7 @@ class SessionDataForStart:
 
     session_id: SessionId
     creation_id: str
-    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
-    access_key: AccessKey
+    main_access_key: AccessKey
     session_type: SessionTypes
     name: str
     cluster_mode: ClusterMode
@@ -95,8 +93,7 @@ class ScheduledSessionData:
 
     session_id: SessionId
     creation_id: str
-    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
-    access_key: AccessKey
+    main_access_key: AccessKey
     session_type: SessionTypes
     name: str
     kernels: list[KernelBindingData]
@@ -160,8 +157,7 @@ class PreparedSessionData:
 
     session_id: SessionId
     creation_id: str
-    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
-    access_key: AccessKey
+    main_access_key: AccessKey
     session_type: SessionTypes
     name: str
     cluster_mode: ClusterMode

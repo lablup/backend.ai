@@ -411,7 +411,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         if session_data.owner is not None:
             main_access_key = session_data.owner.main_access_key
         else:
-            main_access_key = await ctx.user_repository.get_main_access_key_by_uuid(
+            main_access_key = await ctx.user_repository.get_main_access_key_by_id(
                 session_data.owner_id
             )
 

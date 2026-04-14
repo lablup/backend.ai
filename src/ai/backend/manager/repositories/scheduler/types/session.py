@@ -65,7 +65,7 @@ class PendingSessionData:
         kernel_workloads = [k.to_kernel_workload() for k in self.kernels]
         return SessionWorkload(
             session_id=self.id,
-            access_key=self.access_key,
+            main_access_key=self.access_key,
             requested_slots=self.requested_slots,
             owner_id=self.owner_id,
             group_id=self.group_id,
@@ -91,7 +91,7 @@ class PendingSessions:
     @cached_property
     def access_keys(self) -> set[AccessKey]:
         """Extract unique access keys from pending sessions."""
-        return {s.access_key for s in self.sessions}
+        return {s.main_access_key for s in self.sessions}
 
     @cached_property
     def owner_ids(self) -> set[UUID]:
@@ -126,8 +126,7 @@ class TerminatingSessionData:
     """Data for a session that needs to be terminated."""
 
     session_id: SessionId
-    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
-    access_key: AccessKey
+    main_access_key: AccessKey
     creation_id: str
     status: SessionStatus
     status_info: str
@@ -163,8 +162,7 @@ class SweptSessionInfo:
 
     session_id: SessionId
     creation_id: str
-    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
-    access_key: AccessKey
+    main_access_key: AccessKey
 
 
 @dataclass

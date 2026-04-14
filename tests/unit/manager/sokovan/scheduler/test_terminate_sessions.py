@@ -126,7 +126,7 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key=AccessKey("test-key"),
+            main_access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="USER_REQUESTED",
@@ -181,7 +181,7 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key=AccessKey("test-key"),
+            main_access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="FORCED_TERMINATION",
@@ -233,7 +233,7 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key=AccessKey("test-key"),
+            main_access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="TEST_PARTIAL",
@@ -310,7 +310,7 @@ class TestTerminateSessions:
             sessions.append(
                 TerminatingSessionData(
                     session_id=session_id,
-                    access_key=AccessKey(f"key-{i}"),
+                    main_access_key=AccessKey(f"key-{i}"),
                     creation_id=f"creation-{i}",
                     status=SessionStatus.TERMINATING,
                     status_info="BATCH_TERMINATION",
@@ -364,7 +364,7 @@ class TestTerminateSessions:
 
         terminating_session = TerminatingSessionData(
             session_id=session_id,
-            access_key=AccessKey("test-key"),
+            main_access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
             status_info="NO_KERNELS",

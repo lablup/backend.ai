@@ -31,7 +31,7 @@ class TestPendingSessionResourceLimitValidator:
     def test_passes_when_under_limit(self, validator: PendingSessionResourceLimitValidator) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("2"), mem=Decimal("2")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -82,7 +82,7 @@ class TestPendingSessionResourceLimitValidator:
     def test_passes_when_no_limit(self, validator: PendingSessionResourceLimitValidator) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -131,7 +131,7 @@ class TestPendingSessionResourceLimitValidator:
     def test_passes_when_no_policy(self, validator: PendingSessionResourceLimitValidator) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -173,7 +173,7 @@ class TestPendingSessionResourceLimitValidator:
     ) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),

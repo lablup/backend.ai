@@ -35,7 +35,7 @@ class TestConcurrencyValidator:
     def workload(self) -> SessionWorkload:
         return SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -48,7 +48,7 @@ class TestConcurrencyValidator:
     def sftp_workload(self) -> SessionWorkload:
         return SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),

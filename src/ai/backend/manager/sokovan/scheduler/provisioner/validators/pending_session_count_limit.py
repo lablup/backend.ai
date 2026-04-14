@@ -22,7 +22,7 @@ class PendingSessionCountLimitValidator(ValidatorRule):
 
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
-        policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)
+        policy = snapshot.resource_policy.keypair_policies.get(workload.main_access_key)
         if not policy:
             # If no policy is defined, we can't validate - let it pass
             return
@@ -34,7 +34,7 @@ class PendingSessionCountLimitValidator(ValidatorRule):
             return
 
         # Get current pending sessions for this keypair
-        pending_sessions = snapshot.pending_sessions.by_keypair.get(workload.access_key, [])
+        pending_sessions = snapshot.pending_sessions.by_keypair.get(workload.main_access_key, [])
         current_pending_count = len(pending_sessions)
 
         # Check if creating this session would exceed the limit

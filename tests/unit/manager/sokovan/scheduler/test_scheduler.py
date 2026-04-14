@@ -65,7 +65,7 @@ def create_session_workload(
 
     return SessionWorkload(
         session_id=session_id,
-        access_key=access_key,
+        main_access_key=access_key,
         requested_slots=requested_slots,
         owner_id=user_uuid,
         group_id=group_id,

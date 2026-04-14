@@ -31,7 +31,7 @@ class TestDependenciesValidator:
     def test_passes_when_no_dependencies(self, validator: DependenciesValidator) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -60,7 +60,7 @@ class TestDependenciesValidator:
         dep_id = SessionId(uuid.uuid4())
         workload = SessionWorkload(
             session_id=session_id,
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -99,7 +99,7 @@ class TestDependenciesValidator:
         dep_id = SessionId(uuid.uuid4())
         workload = SessionWorkload(
             session_id=session_id,
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -143,7 +143,7 @@ class TestDependenciesValidator:
         dep_id2 = SessionId(uuid.uuid4())
         workload = SessionWorkload(
             session_id=session_id,
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
             owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
