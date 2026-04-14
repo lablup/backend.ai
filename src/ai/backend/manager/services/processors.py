@@ -202,6 +202,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.prometheus_query_preset.service import (
         PrometheusQueryPresetService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.prometheus_query_preset_category.processors import (
+        PrometheusQueryPresetCategoryProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.prometheus_query_preset_category.service import (
+        PrometheusQueryPresetCategoryService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.resource_allocation.processors import (
         ResourceAllocationProcessors,  # pants: no-infer-dep
     )
@@ -377,6 +383,7 @@ class Services:
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     prometheus_query_preset: PrometheusQueryPresetService
+    prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
     runtime_variant: RuntimeVariantService
@@ -441,6 +448,7 @@ class Processors(AbstractProcessorPackage):
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     prometheus_query_preset: PrometheusQueryPresetProcessors
+    prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
     runtime_variant: RuntimeVariantProcessors
@@ -498,6 +506,7 @@ class Processors(AbstractProcessorPackage):
             *self.user_resource_policy.supported_actions(),
             *self.project_resource_policy.supported_actions(),
             *self.prometheus_query_preset.supported_actions(),
+            *self.prometheus_query_preset_category.supported_actions(),
             *self.resource_preset.supported_actions(),
             *self.resource_slot.supported_actions(),
             *self.runtime_variant.supported_actions(),

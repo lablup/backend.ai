@@ -17,6 +17,9 @@ from ai.backend.manager.models.prometheus_query_preset.conditions import (
 )
 from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
+from ai.backend.manager.models.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryRow,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -87,7 +90,7 @@ class TestPrometheusQueryPresetOptions:
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
             database_connection,
-            [PrometheusQueryPresetRow],
+            [PrometheusQueryPresetCategoryRow, PrometheusQueryPresetRow],
         ):
             yield database_connection
 

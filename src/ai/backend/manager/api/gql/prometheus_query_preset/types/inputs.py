@@ -52,6 +52,9 @@ class QueryDefinitionOptionsInput(PydanticInputMixin[CreateQueryDefinitionOption
 )
 class CreateQueryDefinitionInput(PydanticInputMixin[CreateQueryDefinitionInputDTO]):
     name: str = gql_field(description="Human-readable identifier (must be unique).")
+    description: str | None = gql_field(description="Human-readable description.", default=None)
+    rank: int = gql_field(description="Sort rank.", default=0)
+    category_id: str | None = gql_field(description="Category UUID.", default=None)
     metric_name: str = gql_field(description="Prometheus metric name.")
     query_template: str = gql_field(
         description="PromQL template with {labels}, {window}, {group_by} placeholders."
@@ -87,6 +90,9 @@ class ModifyQueryDefinitionOptionsInputGQL(
 )
 class ModifyQueryDefinitionInput(PydanticInputMixin[ModifyQueryDefinitionInputDTO]):
     name: str | None = gql_field(description="New name.", default=UNSET)
+    description: str | None = gql_field(description="New description.", default=UNSET)
+    rank: int | None = gql_field(description="New sort rank.", default=UNSET)
+    category_id: str | None = gql_field(description="New category UUID.", default=UNSET)
     metric_name: str | None = gql_field(description="New metric name.", default=UNSET)
     query_template: str | None = gql_field(description="New PromQL template.", default=UNSET)
     time_window: str | None = gql_field(description="New default time window.", default=UNSET)

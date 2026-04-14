@@ -95,6 +95,12 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
+from ai.backend.manager.services.prometheus_query_preset_category.processors import (
+    PrometheusQueryPresetCategoryProcessors,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.service import (
+    PrometheusQueryPresetCategoryService,
+)
 from ai.backend.manager.services.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
@@ -268,6 +274,9 @@ def create_services(args: ServiceArgs) -> Services:
             repository=repositories.prometheus_query_preset.repository,
             prometheus_client=args.prometheus_client,
             default_timewindow=args.config_provider.config.metric.timewindow,
+        ),
+        prometheus_query_preset_category=PrometheusQueryPresetCategoryService(
+            repository=repositories.prometheus_query_preset_category.repository,
         ),
         resource_preset=ResourcePresetService(
             repositories.resource_preset.repository,
@@ -461,6 +470,9 @@ def create_processors(
         ),
         prometheus_query_preset=PrometheusQueryPresetProcessors(
             services.prometheus_query_preset, action_monitors, validators
+        ),
+        prometheus_query_preset_category=PrometheusQueryPresetCategoryProcessors(
+            services.prometheus_query_preset_category, action_monitors, validators
         ),
         resource_preset=ResourcePresetProcessors(
             services.resource_preset, action_monitors, validators

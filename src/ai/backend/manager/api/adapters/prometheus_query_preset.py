@@ -46,7 +46,6 @@ from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQ
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
     Updater,
@@ -68,8 +67,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
-
-DEFAULT_PAGINATION_LIMIT = 50
+from .pagination import PaginationSpec
 
 
 class PrometheusQueryPresetAdapter(BaseAdapter):
@@ -80,6 +78,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         creator: Creator[PrometheusQueryPresetRow] = Creator(
             spec=PrometheusQueryPresetCreatorSpec(
                 name=input.name,
+                description=input.description,
+                rank=input.rank,
+                category_id=input.category_id,
                 metric_name=input.metric_name,
                 query_template=input.query_template,
                 time_window=input.time_window,
@@ -201,13 +202,29 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
         return DeleteQueryDefinitionPayload(id=action_result.preset_id)
 
+    _PAGINATION_SPEC = PaginationSpec(
+        forward_order=PrometheusQueryPresetOrders.created_at(ascending=False),
+        backward_order=PrometheusQueryPresetOrders.created_at(ascending=True),
+        forward_condition_factory=PrometheusQueryPresetConditions.by_cursor_forward,
+        backward_condition_factory=PrometheusQueryPresetConditions.by_cursor_backward,
+        tiebreaker_order=PrometheusQueryPresetRow.id.asc(),
+    )
+
     def build_querier(self, input: SearchQueryDefinitionsInput) -> BatchQuerier:
         """Build a BatchQuerier from the search input DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        pagination = self._build_pagination(input)
-
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=self._PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
     def _convert_filter(self, filter: QueryDefinitionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -224,6 +241,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter.category_id is not None:
+            conditions.append(PrometheusQueryPresetConditions.by_category_id(filter.category_id))
+
         return conditions
 
     @staticmethod
@@ -234,6 +254,8 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             match order.field.value:
                 case "name":
                     result.append(PrometheusQueryPresetOrders.name(ascending))
+                case "rank":
+                    result.append(PrometheusQueryPresetOrders.rank(ascending))
                 case "created_at":
                     result.append(PrometheusQueryPresetOrders.created_at(ascending))
                 case "updated_at":
@@ -241,18 +263,24 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         return result
 
     @staticmethod
-    def _build_pagination(input: SearchQueryDefinitionsInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    @staticmethod
     def _build_updater_spec(input: ModifyQueryDefinitionInput) -> PrometheusQueryPresetUpdaterSpec:
         return PrometheusQueryPresetUpdaterSpec(
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
+            description=TriState.nop()
+            if isinstance(input.description, Sentinel)
+            else TriState.nullify()
+            if input.description is None
+            else TriState.update(input.description),
+            rank=(
+                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
+            ),
+            category_id=TriState.nop()
+            if isinstance(input.category_id, Sentinel)
+            else TriState.nullify()
+            if input.category_id is None
+            else TriState.update(input.category_id),
             metric_name=(
                 OptionalState.update(input.metric_name)
                 if input.metric_name is not None
@@ -286,6 +314,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         return QueryDefinitionNode(
             id=data.id,
             name=data.name,
+            description=data.description,
+            rank=data.rank,
+            category_id=data.category_id,
             metric_name=data.metric_name,
             query_template=data.query_template,
             time_window=data.time_window,

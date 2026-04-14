@@ -182,6 +182,7 @@ class ErrorDomain(enum.StrEnum):
     DATABASE = "database"
     USER_RESOURCE_POLICY = "user-resource-policy"
     PROMETHEUS_QUERY_PRESET = "prometheus-query-preset"
+    PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus-query-preset-category"
     RUNTIME_VARIANT = "runtime-variant"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
@@ -1192,6 +1193,18 @@ class PrometheusQueryPresetInvalidLabel(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.PROMETHEUS_QUERY_PRESET,
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class PrometheusQueryPresetCategoryNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/prometheus-query-preset-category-not-found"
+    error_title = "The prometheus query preset category does not exist."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET_CATEGORY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 

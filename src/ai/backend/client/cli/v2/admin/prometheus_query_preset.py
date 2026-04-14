@@ -25,30 +25,59 @@ def prometheus_query_preset() -> None:
 
 
 @prometheus_query_preset.command()
-@click.argument("body", type=str)
-def create(body: str) -> None:
-    """Create a new prometheus query definition (superadmin only).
-
-    BODY is a JSON string with creation fields.
-    """
-    import json
-    import sys
-
+@click.option("--name", required=True, type=str, help="Human-readable name (unique).")
+@click.option("--metric-name", required=True, type=str, help="Prometheus metric name.")
+@click.option(
+    "--query-template", required=True, type=str, help="PromQL template with placeholders."
+)
+@click.option("--time-window", default=None, type=str, help="Default time window (e.g. '5m').")
+@click.option(
+    "--filter-label",
+    multiple=True,
+    help="Allowed filter label key (repeatable).",
+)
+@click.option(
+    "--group-label",
+    multiple=True,
+    help="Allowed group-by label key (repeatable).",
+)
+@click.option("--description", default=None, type=str, help="Human-readable description.")
+@click.option("--rank", default=0, type=int, help="Sort rank (lower = higher priority).")
+@click.option("--category-id", default=None, type=click.UUID, help="Category UUID.")
+def create(
+    name: str,
+    metric_name: str,
+    query_template: str,
+    time_window: str | None,
+    filter_label: tuple[str, ...],
+    group_label: tuple[str, ...],
+    description: str | None,
+    rank: int,
+    category_id: UUID | None,
+) -> None:
+    """Create a new prometheus query definition (superadmin only)."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         CreateQueryDefinitionInput,
+        CreateQueryDefinitionOptionsInput,
     )
-
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        click.echo(f"Invalid JSON: {e}", err=True)
-        sys.exit(1)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.create(
-                CreateQueryDefinitionInput(**data),
+                CreateQueryDefinitionInput(
+                    name=name,
+                    metric_name=metric_name,
+                    query_template=query_template,
+                    time_window=time_window,
+                    options=CreateQueryDefinitionOptionsInput(
+                        filter_labels=list(filter_label),
+                        group_labels=list(group_label),
+                    ),
+                    description=description,
+                    rank=rank,
+                    category_id=category_id,
+                ),
             )
             print_result(result)
         finally:
@@ -59,30 +88,42 @@ def create(body: str) -> None:
 
 @prometheus_query_preset.command()
 @click.argument("preset_id", type=click.UUID)
-@click.argument("body", type=str)
-def update(preset_id: UUID, body: str) -> None:
-    """Update a prometheus query definition (superadmin only).
-
-    BODY is a JSON string with fields to update.
-    """
-    import json
-    import sys
-
+@click.option("--name", default=None, type=str, help="Updated name.")
+@click.option("--metric-name", default=None, type=str, help="Updated Prometheus metric name.")
+@click.option("--query-template", default=None, type=str, help="Updated PromQL template.")
+@click.option("--time-window", default=None, type=str, help="Updated time window.")
+@click.option("--description", default=None, type=str, help="Updated description.")
+@click.option("--rank", default=None, type=int, help="Updated sort rank.")
+@click.option("--category-id", default=None, type=click.UUID, help="Updated category UUID.")
+def update(
+    preset_id: UUID,
+    name: str | None,
+    metric_name: str | None,
+    query_template: str | None,
+    time_window: str | None,
+    description: str | None,
+    rank: int | None,
+    category_id: UUID | None,
+) -> None:
+    """Update a prometheus query definition (superadmin only)."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         ModifyQueryDefinitionInput,
     )
-
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        click.echo(f"Invalid JSON: {e}", err=True)
-        sys.exit(1)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.update(
-                preset_id, ModifyQueryDefinitionInput(**data)
+                preset_id,
+                ModifyQueryDefinitionInput(
+                    name=name,
+                    metric_name=metric_name,
+                    query_template=query_template,
+                    time_window=time_window,
+                    description=description,
+                    rank=rank,
+                    category_id=category_id,
+                ),
             )
             print_result(result)
         finally:

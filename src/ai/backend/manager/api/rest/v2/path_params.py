@@ -97,5 +97,9 @@ class TokenIdPathParam(BaseRequestModel):
     token_id: UUID = Field(description="Token UUID")
 
 
+class CategoryIdPathParam(BaseRequestModel):
+    category_id: UUID = Field(description="Category UUID")
+
+
 class AccessKeyPathParam(BaseRequestModel):
     access_key: str = Field(description="Access key string")

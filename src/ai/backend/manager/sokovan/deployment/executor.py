@@ -761,8 +761,17 @@ class DeploymentExecutor:
 
         preset_data: PrometheusQueryPresetData = presets[preset_id]
 
-        # Auto-inject deployment-specific label for scoping
-        labels = {"model_service_name": LabelMatcher.exact(deployment.metadata.name)}
+        # Auto-inject deployment-specific labels declared in preset filter_labels
+        available_labels: dict[str, str] = {
+            "deployment_id": str(deployment.id),
+            "project": str(deployment.metadata.project),
+            "session_owner": str(deployment.metadata.session_owner),
+        }
+        labels = {
+            k: LabelMatcher.exact(v)
+            for k, v in available_labels.items()
+            if k in preset_data.filter_labels
+        }
 
         # time_window: preset default → fallback to "5m"
         time_window = preset_data.time_window or "5m"

@@ -58,6 +58,9 @@ class CreateQueryDefinitionInput(BaseRequestModel):
     """Input for creating a prometheus query definition."""
 
     name: str = Field(min_length=1, max_length=256, description="Human-readable name")
+    description: str | None = Field(default=None, description="Human-readable description")
+    rank: int = Field(default=0, ge=0, description="Sort rank (lower = higher priority)")
+    category_id: UUID | None = Field(default=None, description="Category ID")
     metric_name: str = Field(description="Prometheus metric name")
     query_template: str = Field(description="PromQL template with placeholders")
     time_window: str | None = Field(
@@ -89,11 +92,25 @@ class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
 class ModifyQueryDefinitionInput(BaseRequestModel):
     """Input for modifying a prometheus query definition.
 
-    Only ``time_window`` uses ``Sentinel`` because it is the only nullable DB column;
-    all other fields are non-nullable, so ``None`` simply means "do not update".
+    Nullable DB columns (``time_window``, ``description``, ``category_id``) use the
+    ``Sentinel`` pattern so callers can distinguish "leave unchanged" from "clear to null".
+    Non-nullable fields use ``None`` to mean "do not update".
     """
 
     name: str | None = Field(default=None, description="Updated human-readable name")
+    description: str | Sentinel | None = Field(
+        default=SENTINEL,
+        description=(
+            "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear."
+        ),
+    )
+    rank: int | None = Field(default=None, ge=0, description="Updated sort rank")
+    category_id: UUID | Sentinel | None = Field(
+        default=SENTINEL,
+        description=(
+            "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear."
+        ),
+    )
     metric_name: str | None = Field(default=None, description="Updated Prometheus metric name")
     query_template: str | None = Field(
         default=None, description="Updated PromQL template with placeholders"
@@ -137,6 +154,7 @@ class QueryDefinitionFilter(BaseRequestModel):
     """Filter for prometheus query definition search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
+    category_id: UUID | None = Field(default=None, description="Filter by category ID")
 
 
 class QueryDefinitionOrder(BaseRequestModel):
@@ -147,16 +165,25 @@ class QueryDefinitionOrder(BaseRequestModel):
 
 
 class SearchQueryDefinitionsInput(BaseRequestModel):
-    """Input for searching prometheus query definitions with filters, orders, and pagination."""
+    """Input for searching prometheus query definitions with filters, orders, and pagination.
+
+    Supports two pagination modes (mutually exclusive):
+    - Cursor-based: first/after (forward) or last/before (backward)
+    - Offset-based: limit/offset
+    """
 
     filter: QueryDefinitionFilter | None = Field(default=None, description="Filter conditions")
     order: list[QueryDefinitionOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    # Cursor-based pagination (Relay)
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Maximum items to return")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip")
 
 
 class MetricLabelEntry(BaseRequestModel):

@@ -70,6 +70,10 @@ def build_v2_routes(
     from .project.registry import register_v2_project_routes
     from .prometheus_query_preset.handler import V2PrometheusQueryPresetHandler
     from .prometheus_query_preset.registry import register_v2_prometheus_query_preset_routes
+    from .prometheus_query_preset_category.handler import V2PrometheusQueryPresetCategoryHandler
+    from .prometheus_query_preset_category.registry import (
+        register_v2_prometheus_query_preset_category_routes,
+    )
     from .rbac.handler import V2RBACHandler
     from .rbac.registry import register_v2_rbac_routes
     from .reservoir_registry.handler import V2ReservoirRegistryHandler
@@ -130,6 +134,9 @@ def build_v2_routes(
     project_handler = V2ProjectHandler(adapter=adapters.project)
     prometheus_query_preset_handler = V2PrometheusQueryPresetHandler(
         adapter=adapters.prometheus_query_preset
+    )
+    prometheus_query_preset_category_handler = V2PrometheusQueryPresetCategoryHandler(
+        adapter=adapters.prometheus_query_preset_category
     )
     rbac_handler = V2RBACHandler(adapter=adapters.rbac)
     reservoir_registry_handler = V2ReservoirRegistryHandler(adapter=adapters.reservoir_registry)
@@ -193,6 +200,11 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_prometheus_query_preset_routes(prometheus_query_preset_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_prometheus_query_preset_category_routes(
+            prometheus_query_preset_category_handler, route_deps
+        )
     )
     v2_reg.add_subregistry(register_v2_rbac_routes(rbac_handler, route_deps))
     v2_reg.add_subregistry(

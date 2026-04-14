@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from .domains_v2.object_storage import V2ObjectStorageClient
     from .domains_v2.project import V2ProjectClient
     from .domains_v2.prometheus_query_preset import V2PrometheusQueryPresetClient
+    from .domains_v2.prometheus_query_preset_category import V2PrometheusQueryPresetCategoryClient
     from .domains_v2.rbac import V2RBACClient
     from .domains_v2.reservoir_registry import V2ReservoirRegistryClient
     from .domains_v2.resource_allocation import V2ResourceAllocationClient
@@ -211,6 +212,14 @@ class V2ClientRegistry:
         from .domains_v2.prometheus_query_preset import V2PrometheusQueryPresetClient
 
         return V2PrometheusQueryPresetClient(self._client)
+
+    @cached_property
+    def prometheus_query_preset_category(self) -> V2PrometheusQueryPresetCategoryClient:
+        from .domains_v2.prometheus_query_preset_category import (
+            V2PrometheusQueryPresetCategoryClient,
+        )
+
+        return V2PrometheusQueryPresetCategoryClient(self._client)
 
     @cached_property
     def rbac(self) -> V2RBACClient:
