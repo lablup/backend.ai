@@ -80,7 +80,7 @@ class FairShareSequencer(WorkloadSequencer):
         # If a user doesn't have recorded factors, use default (lowest priority)
         return sorted(
             workloads,
-            key=lambda w: self._get_sort_key(w.user_uuid, user_factors),
+            key=lambda w: self._get_sort_key(w.owner_id, user_factors),
         )
 
     async def _load_factors(
@@ -92,7 +92,7 @@ class FairShareSequencer(WorkloadSequencer):
         # Group user_ids by project_id
         project_users: dict[UUID, set[UUID]] = defaultdict(set)
         for w in workloads:
-            project_users[w.group_id].add(w.user_uuid)
+            project_users[w.group_id].add(w.owner_id)
 
         # Build ProjectUserIds list
         project_user_ids = [

@@ -374,7 +374,7 @@ class SessionProvisioner:
 
         # 1. Update resource occupancy - add the session's allocated slots
         # Update keypair occupancy
-        current_keypair = snapshot.resource_occupancy.by_keypair.get(workload.access_key)
+        current_keypair = snapshot.resource_occupancy.by_keypair.get(workload.main_access_key)
         if current_keypair is None:
             current_keypair = KeypairOccupancy(
                 occupied_slots=[], session_count=0, sftp_session_count=0
@@ -389,11 +389,11 @@ class SessionProvisioner:
         else:
             current_keypair.session_count += 1
 
-        snapshot.resource_occupancy.by_keypair[workload.access_key] = current_keypair
+        snapshot.resource_occupancy.by_keypair[workload.main_access_key] = current_keypair
 
         # Update user occupancy
-        current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, [])
-        snapshot.resource_occupancy.by_user[workload.user_uuid] = add_quantities(
+        current_user = snapshot.resource_occupancy.by_user.get(workload.owner_id, [])
+        snapshot.resource_occupancy.by_user[workload.owner_id] = add_quantities(
             current_user, total_quantities
         )
 
@@ -412,12 +412,20 @@ class SessionProvisioner:
         # 2. Update concurrency counts
         if workload.is_private:
             # Increment SFTP session count
-            current_sftp = snapshot.concurrency.sftp_sessions_by_keypair.get(workload.access_key, 0)
-            snapshot.concurrency.sftp_sessions_by_keypair[workload.access_key] = current_sftp + 1
+            current_sftp = snapshot.concurrency.sftp_sessions_by_keypair.get(
+                workload.main_access_key, 0
+            )
+            snapshot.concurrency.sftp_sessions_by_keypair[workload.main_access_key] = (
+                current_sftp + 1
+            )
         else:
             # Increment regular session count
-            current_sessions = snapshot.concurrency.sessions_by_keypair.get(workload.access_key, 0)
-            snapshot.concurrency.sessions_by_keypair[workload.access_key] = current_sessions + 1
+            current_sessions = snapshot.concurrency.sessions_by_keypair.get(
+                workload.main_access_key, 0
+            )
+            snapshot.concurrency.sessions_by_keypair[workload.main_access_key] = (
+                current_sessions + 1
+            )
 
     async def _allocate_workload(
         self,

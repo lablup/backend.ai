@@ -77,12 +77,11 @@ class SessionWorkload:
 
     # Session identifier
     session_id: SessionId
-    # User identification for fairness calculation
-    access_key: AccessKey
+    main_access_key: AccessKey
     # Resource requirements
     requested_slots: ResourceSlot
-    # User UUID for user resource limit checks
-    user_uuid: UUID
+    # Owner (user) UUID for user resource limit checks
+    owner_id: UUID
     # Group ID for group resource limit checks
     group_id: UUID
     # Domain name for domain resource limit checks

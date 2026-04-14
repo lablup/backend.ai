@@ -229,7 +229,7 @@ class SessionLauncher:
             session.session_id,
             session.session_type,
             session.name,
-            session.access_key,
+            session.main_access_key,
             session.cluster_mode,
         )
         log.debug(log_fmt + "try-starting", *log_args)
@@ -262,7 +262,7 @@ class SessionLauncher:
             }
             environ: dict[str, str] = {
                 **session.environ,
-                "BACKENDAI_USER_UUID": str(session.user_uuid),
+                "BACKENDAI_USER_UUID": str(session.owner_id),
                 "BACKENDAI_USER_EMAIL": session.user_email,
                 "BACKENDAI_USER_NAME": session.user_name,
                 "BACKENDAI_SESSION_ID": str(session.session_id),
@@ -273,7 +273,7 @@ class SessionLauncher:
                     k.cluster_hostname or f"{k.cluster_role}{k.cluster_idx}"
                     for k in session.kernels
                 ),
-                "BACKENDAI_ACCESS_KEY": session.access_key,
+                "BACKENDAI_ACCESS_KEY": session.main_access_key,
                 # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
                 "BACKENDAI_PREOPEN_PORTS": (
                     ",".join(str(port) for port in session.kernels[0].preopen_ports)
@@ -335,7 +335,7 @@ class SessionLauncher:
                         "image": kernel_image_config,
                         "kernel_id": kernel_id_str,
                         "session_id": str(session.session_id),
-                        "owner_user_id": str(session.user_uuid),
+                        "owner_user_id": str(session.owner_id),
                         "owner_project_id": None,  # TODO: Implement project-owned sessions
                         "network_id": str(session.session_id),
                         "session_type": session.session_type,

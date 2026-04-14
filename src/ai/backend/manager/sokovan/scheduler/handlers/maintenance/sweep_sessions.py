@@ -118,7 +118,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
                         from_status=session_data.session_info.lifecycle.status,
                         reason="PENDING_TIMEOUT_EXCEEDED",
                         creation_id=timed_out.creation_id,
-                        access_key=timed_out.access_key,
+                        access_key=timed_out.main_access_key,
                     )
                 )
 

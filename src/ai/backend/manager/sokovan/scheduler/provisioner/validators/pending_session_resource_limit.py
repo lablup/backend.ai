@@ -23,7 +23,7 @@ class PendingSessionResourceLimitValidator(ValidatorRule):
 
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
-        policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)
+        policy = snapshot.resource_policy.keypair_policies.get(workload.main_access_key)
         if not policy:
             # If no policy is defined, we can't validate - let it pass
             return
@@ -35,7 +35,7 @@ class PendingSessionResourceLimitValidator(ValidatorRule):
             return
 
         # Calculate current pending session resource usage
-        pending_sessions = snapshot.pending_sessions.by_keypair.get(workload.access_key, [])
+        pending_sessions = snapshot.pending_sessions.by_keypair.get(workload.main_access_key, [])
         current_pending_slots = ResourceSlot()
         for session in pending_sessions:
             current_pending_slots += session.requested_slots

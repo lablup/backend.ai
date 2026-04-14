@@ -25,7 +25,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.leader.tasks import EventTaskSpec
-from ai.backend.common.types import AccessKey, AgentId, SessionId
+from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -831,6 +831,8 @@ class ScheduleCoordinator:
                     "check_kernel_status",
                     success_detail=f"All kernels ready for {spec.success_status.value}",
                 ):
+                    # BA-5609: resolve main_access_key for cache invalidation consumer.
+                    access_key_by_id = await self._repository.resolve_main_access_keys(session_ids)
                     result = SessionExecutionResult()
                     for session_info in session_infos:
                         result.successes.append(
@@ -839,7 +841,7 @@ class ScheduleCoordinator:
                                 from_status=session_info.lifecycle.status,
                                 reason=spec.reason,
                                 creation_id=session_info.identity.creation_id,
-                                access_key=AccessKey(session_info.metadata.access_key),
+                                access_key=access_key_by_id.get(session_info.identity.id),
                             )
                         )
 

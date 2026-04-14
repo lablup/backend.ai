@@ -22,15 +22,15 @@ class ConcurrencyValidator(ValidatorRule):
 
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
-        policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)
+        policy = snapshot.resource_policy.keypair_policies.get(workload.main_access_key)
         if not policy:
             # If no policy is defined, we can't validate - let it pass
             return
 
         # Get current session count
-        current_sessions = snapshot.concurrency.sessions_by_keypair.get(workload.access_key, 0)
+        current_sessions = snapshot.concurrency.sessions_by_keypair.get(workload.main_access_key, 0)
         current_sftp_sessions = snapshot.concurrency.sftp_sessions_by_keypair.get(
-            workload.access_key, 0
+            workload.main_access_key, 0
         )
 
         # Check the appropriate limit based on session type
