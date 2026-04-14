@@ -294,7 +294,7 @@ class CUDAPlugin(AbstractComputePlugin):
                             continue
                         nvidia_device_reqs = [
                             x
-                            for x in container_info.get("HostConfig", {}).get("DeviceRequests", [])
+                            for x in container_info.get("HostConfig", {}).get("DeviceRequests") or []
                             if x["Driver"] == "nvidia"
                         ]
                         if not nvidia_device_reqs:
