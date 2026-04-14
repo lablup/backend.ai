@@ -236,7 +236,11 @@ class TerminatedTransitionHook(StatusTransitionHook):
             ):
                 try:
                     # Update route info (removal)
-                    await self._deps.deployment_repository.update_endpoint_route_info(endpoint_id)
+                    await (
+                        self._deps.deployment_repository.update_endpoint_route_info_for_termination(
+                            endpoint_id
+                        )
+                    )
 
                     # Send event to app proxy
                     await self._deps.event_producer.anycast_event(

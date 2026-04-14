@@ -1129,6 +1129,31 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
+    async def update_endpoint_route_info_for_termination(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> None:
+        connection_info = await self._db_source.generate_route_connection_info(endpoint_id)
+
+        try:
+            health_check_config = await self._db_source.get_endpoint_health_check_config(
+                endpoint_id
+            )
+        except Exception:
+            log.warning(
+                "Failed to get health check config for endpoint {} during termination, "
+                "proceeding without it",
+                endpoint_id,
+            )
+            health_check_config = None
+
+        await self._valkey_live.update_appproxy_redis_info(
+            endpoint_id,
+            connection_info,
+            health_check_config,
+        )
+
+    @deployment_repository_resilience.apply()
     async def list_active_endpoint_ids(self) -> list[uuid.UUID]:
         """Return every endpoint id whose lifecycle_stage is considered active.
 
