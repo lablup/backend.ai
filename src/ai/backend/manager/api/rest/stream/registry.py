@@ -25,10 +25,17 @@ def register_stream_routes(
     stream_cleanup_handler: StreamCleanupEventHandler,
 ) -> RouteRegistry:
     """Build the stream sub-application."""
-    from .handler import PrivateContext, stream_app_ctx, stream_shutdown
+    from .handler import stream_app_ctx, stream_shutdown
 
     reg = RouteRegistry.create("stream", route_deps.cors_options)
-    ctx = PrivateContext()
+    # The handler was built in tree.py with its own PrivateContext; reuse the
+    # same instance here so the lifecycle hook initializes the object the
+    # handler actually reads at request time. Without this, two separate
+    # PrivateContext instances existed — one held by the handler and one
+    # initialized by cleanup_ctx — and `stream_execute_handlers` was only
+    # populated on the latter, raising AttributeError on
+    # GET /stream/session/.../execute.
+    ctx = handler._ctx
 
     # Wire lifecycle hooks — capture deps via closure
     reg.app.cleanup_ctx.append(
