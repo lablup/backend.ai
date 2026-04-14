@@ -17,7 +17,7 @@ from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.types import AccessKey, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import (
@@ -136,6 +136,13 @@ class UserDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
             return user_row.to_data()
+
+    async def get_main_access_key_by_id(self, user_uuid: UUID) -> str | None:
+        """Return the user's ``main_access_key`` or ``None`` if unset/missing."""
+        async with self._db.begin_readonly_session() as db_session:
+            return await db_session.scalar(
+                sa.select(UserRow.main_access_key).where(UserRow.uuid == user_uuid)
+            )
 
     async def get_by_email_validated(
         self,
@@ -665,13 +672,10 @@ class UserDBSource:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
         async with self._db.begin_session() as session:
-            await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, target_main_access_key
-            )
+            await EndpointRow.delegate_endpoint_ownership(session, user_uuid, target_user_uuid)
 
     async def delete_endpoints(
         self,

@@ -16,7 +16,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SlotName
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -76,6 +76,11 @@ class UserRepository:
         Admin-only operation.
         """
         return await self._db_source.get_user_by_uuid(user_uuid)
+
+    @user_repository_resilience.apply()
+    async def get_main_access_key_by_id(self, user_uuid: UUID) -> str | None:
+        """Return the user's ``main_access_key`` or ``None`` if unset/missing."""
+        return await self._db_source.get_main_access_key_by_id(user_uuid)
 
     @user_repository_resilience.apply()
     async def get_by_email_validated(
@@ -186,12 +191,9 @@ class UserRepository:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
-        await self._db_source.delegate_endpoint_ownership(
-            user_uuid, target_user_uuid, target_main_access_key
-        )
+        await self._db_source.delegate_endpoint_ownership(user_uuid, target_user_uuid)
 
     @user_repository_resilience.apply()
     async def delete_endpoints(
