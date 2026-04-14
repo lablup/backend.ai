@@ -528,6 +528,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """Authorizing with correct credentials must return non-empty access_key,
         secret_key, and the correct user role."""
@@ -537,6 +538,7 @@ class TestAuthorize:
                 domain=auth_user_fixture.domain_name,
                 username=auth_user_fixture.email,
                 password=auth_user_fixture.password,
+                client_type_id=sample_client_type_id,
             ),
         )
         assert isinstance(result, AuthorizeResponse)
@@ -548,6 +550,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """Authorizing with an incorrect password must raise AuthenticationError (401)."""
         with pytest.raises(AuthenticationError):
@@ -557,6 +560,7 @@ class TestAuthorize:
                     domain=auth_user_fixture.domain_name,
                     username=auth_user_fixture.email,
                     password="completely-wrong-password",
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -644,6 +648,7 @@ class TestPasswordChange:
         auth_user_registry: BackendAIClientRegistry,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """After a password change, authorize (login) with the new password must succeed.
         This is an end-to-end check that the change is actually persisted to the database."""
@@ -661,6 +666,7 @@ class TestPasswordChange:
                 domain=auth_user_fixture.domain_name,
                 username=auth_user_fixture.email,
                 password=new_password,
+                client_type_id=sample_client_type_id,
             ),
         )
         assert isinstance(result, AuthorizeResponse)
@@ -671,6 +677,7 @@ class TestPasswordChange:
         auth_user_registry: BackendAIClientRegistry,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """After a password change, authorize with the old password must fail
         with AuthenticationError (401).
@@ -691,6 +698,7 @@ class TestPasswordChange:
                     domain=auth_user_fixture.domain_name,
                     username=auth_user_fixture.email,
                     password=old_password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -710,6 +718,7 @@ class TestPasswordExpiry:
         admin_registry: BackendAIClientRegistry,
         expired_password_user: _ExpiredPasswordUserData,
         config_provider: ManagerConfigProvider,
+        sample_client_type_id: uuid.UUID,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """With max_password_age=90 days, a user whose password_changed_at is 200 days ago
@@ -723,6 +732,7 @@ class TestPasswordExpiry:
                     domain=expired_password_user.domain_name,
                     username=expired_password_user.email,
                     password=expired_password_user.password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
 

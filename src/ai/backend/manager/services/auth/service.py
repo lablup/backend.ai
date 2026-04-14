@@ -177,7 +177,8 @@ class AuthService:
         if action.type != AuthTokenType.KEYPAIR:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
-        user, active_sessions = await self._verify_user(action, auth_config)
+        login_client_type_id = action.client_type_id
+        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
 
         try:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
@@ -186,7 +187,7 @@ class AuthService:
             keypair_row, live_sessions = post_result
 
             return await self._create_login_session(
-                action, user, keypair_row, live_sessions, auth_config
+                action, user, keypair_row, live_sessions, auth_config, login_client_type_id
             )
         except (
             AuthorizationFailed,
@@ -205,6 +206,7 @@ class AuthService:
         self,
         action: AuthorizeAction,
         auth_config: AuthConfig,
+        login_client_type_id: uuid.UUID,
     ) -> tuple[RowMapping, list[ActiveSessionInfo]]:
         """Step 1: Verify user identity via hook or password."""
         params = action.hook_params
@@ -217,7 +219,9 @@ class AuthService:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result:
             user = hook_result.result
-            active_sessions = await self._auth_repository.get_active_session_tokens(user.uuid)
+            active_sessions = await self._auth_repository.get_active_session_tokens(
+                user.uuid, login_client_type_id=login_client_type_id
+            )
             return user, active_sessions
 
         target_password_info = PasswordInfo(
@@ -230,6 +234,7 @@ class AuthService:
             action.domain_name,
             action.email,
             target_password_info=target_password_info,
+            login_client_type_id=login_client_type_id,
         )
         return cred_result.user, cred_result.active_sessions
 
@@ -320,6 +325,7 @@ class AuthService:
         keypair_row: Any,
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
+        login_client_type_id: uuid.UUID,
     ) -> AuthorizeActionResult:
         """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed.
 
@@ -351,6 +357,7 @@ class AuthService:
             user_id=user.uuid,
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
+            login_client_type_id=login_client_type_id,
         )
 
         if tokens_to_invalidate:

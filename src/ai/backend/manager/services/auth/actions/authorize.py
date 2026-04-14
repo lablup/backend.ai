@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from aiohttp import web
 
@@ -19,6 +20,7 @@ class AuthorizeAction(AuthAction):
     password: str
     stoken: str | None
     otp: str | None
+    client_type_id: UUID
     force: bool = False
 
     @override

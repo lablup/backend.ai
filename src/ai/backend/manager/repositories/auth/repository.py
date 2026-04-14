@@ -100,11 +100,14 @@ class AuthRepository:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
+        *,
+        login_client_type_id: UUID | None = None,
     ) -> CredentialVerificationResult:
         return await self._db_source.verify_credential(
             domain_name,
             email,
             target_password_info,
+            login_client_type_id=login_client_type_id,
         )
 
     @auth_repository_resilience.apply()
@@ -113,11 +116,14 @@ class AuthRepository:
         user_id: UUID,
         access_key: str,
         domain_name: str,
+        *,
+        login_client_type_id: UUID | None = None,
     ) -> LoginSessionCreationResult:
         return await self._db_source.create_login_session(
             user_id,
             access_key,
             domain_name,
+            login_client_type_id=login_client_type_id,
         )
 
     @auth_repository_resilience.apply()
@@ -147,8 +153,12 @@ class AuthRepository:
     # --- Login Session ---
 
     @auth_repository_resilience.apply()
-    async def get_active_session_tokens(self, user_id: UUID) -> list[ActiveSessionInfo]:
-        return await self._db_source.fetch_active_session_tokens(user_id)
+    async def get_active_session_tokens(
+        self, user_id: UUID, *, login_client_type_id: UUID | None = None
+    ) -> list[ActiveSessionInfo]:
+        return await self._db_source.fetch_active_session_tokens(
+            user_id, login_client_type_id=login_client_type_id
+        )
 
     @auth_repository_resilience.apply()
     async def invalidate_login_session_by_token(self, session_token: str) -> None:

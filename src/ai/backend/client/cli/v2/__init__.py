@@ -187,6 +187,15 @@ def object_storage() -> None:
 # ------------------------------------------------------------------ RBAC & resources
 
 
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.login_client_type.commands:login_client_type",
+    name="login-client-type",
+)
+def login_client_type() -> None:
+    """Read-only commands for inspecting registered login client types."""
+
+
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.rbac:rbac")
 def rbac() -> None:
     """RBAC commands."""
