@@ -56,6 +56,7 @@ class SessionLifecycleManager:
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
         registry: AgentRegistry,
+        user_repository: UserRepository,
     ) -> None:
         self.db = db
         self.valkey_stat = valkey_stat
@@ -63,7 +64,7 @@ class SessionLifecycleManager:
         self.event_producer = event_producer
         self.hook_plugin_ctx = hook_plugin_ctx
         self.registry = registry
-        self._user_repository = UserRepository(db)
+        self._user_repository = user_repository
 
         def _encode(sid: SessionId) -> bytes:
             return sid.bytes

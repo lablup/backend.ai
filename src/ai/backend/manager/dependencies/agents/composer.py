@@ -20,6 +20,7 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
@@ -188,6 +189,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 hook_plugin_ctx=setup_input.hook_plugin_ctx,
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 scheduling_controller=scheduling_controller,
+                user_repository=UserRepository(setup_input.db),
                 debug=setup_input.config_provider.config.debug.enabled,
                 manager_public_key=setup_input.agent_cache.manager_public_key,
                 manager_secret_key=setup_input.agent_cache.manager_secret_key,

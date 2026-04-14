@@ -30,8 +30,8 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
 async def _resolve_main_access_key(db_sess: SASession, sess_ctx: SessionRow) -> str | None:
-    """Resolve the owner's main access key via UserRow join (post owner_id refactor)."""
-    stmt = sa.select(UserRow.main_access_key).where(UserRow.uuid == sess_ctx.owner_id)
+    """Resolve the owner's main access key via UserRow join."""
+    stmt = sa.select(UserRow.main_access_key).where(UserRow.uuid == sess_ctx.user_uuid)
     return await db_sess.scalar(stmt)
 
 
@@ -192,7 +192,7 @@ async def check_user_resource_limit(
 ) -> PredicateResult:
     main_ak = (
         sa.select(UserRow.main_access_key)
-        .where(UserRow.uuid == sess_ctx.owner_id)
+        .where(UserRow.uuid == sess_ctx.user_uuid)
         .scalar_subquery()
     )
     resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(KeyPairRow.access_key == main_ak)
@@ -203,7 +203,7 @@ async def check_user_resource_limit(
     if resource_policy is None:
         return PredicateResult(
             False,
-            f"User has no main-keypair or the main-keypair has no keypair resource policy (uid: {sess_ctx.owner_id})",
+            f"User has no main-keypair or the main-keypair has no keypair resource policy (uid: {sess_ctx.user_uuid})",
         )
 
     resource_policy_map = {
@@ -213,9 +213,9 @@ async def check_user_resource_limit(
     total_main_keypair_allowed = ResourceSlot.from_policy(
         resource_policy_map, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
-    user_occupied = await sched_ctx.registry.get_user_occupancy(sess_ctx.owner_id, db_sess=db_sess)
-    log.debug("user:{} current-occupancy: {}", sess_ctx.owner_id, user_occupied)
-    log.debug("user:{} total-allowed: {}", sess_ctx.owner_id, total_main_keypair_allowed)
+    user_occupied = await sched_ctx.registry.get_user_occupancy(sess_ctx.user_uuid, db_sess=db_sess)
+    log.debug("user:{} current-occupancy: {}", sess_ctx.user_uuid, user_occupied)
+    log.debug("user:{} total-allowed: {}", sess_ctx.user_uuid, total_main_keypair_allowed)
     if not (user_occupied + sess_ctx.requested_slots <= total_main_keypair_allowed):
         return PredicateResult(
             False,
@@ -311,7 +311,7 @@ async def check_pending_session_count_limit(
     query = (
         sa.select(SessionRow)
         .where(
-            (SessionRow.user_uuid == sess_ctx.owner_id)
+            (SessionRow.user_uuid == sess_ctx.user_uuid)
             & (SessionRow.status == SessionStatus.PENDING)
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))
@@ -373,7 +373,7 @@ async def check_pending_session_resource_limit(
     query = (
         sa.select(SessionRow)
         .where(
-            (SessionRow.user_uuid == sess_ctx.owner_id)
+            (SessionRow.user_uuid == sess_ctx.user_uuid)
             & (SessionRow.status == SessionStatus.PENDING)
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))

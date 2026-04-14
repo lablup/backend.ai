@@ -27,20 +27,20 @@ from ai.backend.manager.repositories.base import QueryCondition
 from .row import SessionRow
 
 
-def _owners_where_main_access_key(
-    condition: sa.sql.expression.ColumnElement[bool],
-) -> sa.sql.expression.ColumnElement[bool]:
-    """Return a predicate matching SessionRow.user_uuid against users whose main_access_key satisfies ``condition``."""
-    return SessionRow.user_uuid.in_(
-        sa.select(UserRow.uuid).where(
-            UserRow.main_access_key.is_not(None),
-            condition,
-        )
-    )
-
-
 class SessionConditions:
     """Query conditions for sessions."""
+
+    @staticmethod
+    def _owners_where_main_access_key(
+        condition: sa.sql.expression.ColumnElement[bool],
+    ) -> sa.sql.expression.ColumnElement[bool]:
+        """Return a predicate matching SessionRow.user_uuid against users whose main_access_key satisfies ``condition``."""
+        return SessionRow.user_uuid.in_(
+            sa.select(UserRow.uuid).where(
+                UserRow.main_access_key.is_not(None),
+                condition,
+            )
+        )
 
     @staticmethod
     def by_ids(session_ids: Collection[SessionId]) -> QueryCondition:
@@ -124,7 +124,7 @@ class SessionConditions:
                 match = UserRow.main_access_key.ilike(f"%{spec.value}%")
             else:
                 match = UserRow.main_access_key.like(f"%{spec.value}%")
-            condition = _owners_where_main_access_key(match)
+            condition = SessionConditions._owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -138,7 +138,7 @@ class SessionConditions:
                 match = sa.func.lower(UserRow.main_access_key) == spec.value.lower()
             else:
                 match = UserRow.main_access_key == spec.value
-            condition = _owners_where_main_access_key(match)
+            condition = SessionConditions._owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -152,7 +152,7 @@ class SessionConditions:
                 match = UserRow.main_access_key.ilike(f"{spec.value}%")
             else:
                 match = UserRow.main_access_key.like(f"{spec.value}%")
-            condition = _owners_where_main_access_key(match)
+            condition = SessionConditions._owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -166,7 +166,7 @@ class SessionConditions:
                 match = UserRow.main_access_key.ilike(f"%{spec.value}")
             else:
                 match = UserRow.main_access_key.like(f"%{spec.value}")
-            condition = _owners_where_main_access_key(match)
+            condition = SessionConditions._owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -180,7 +180,7 @@ class SessionConditions:
                 match = sa.func.lower(UserRow.main_access_key).in_([v.lower() for v in spec.values])
             else:
                 match = UserRow.main_access_key.in_(spec.values)
-            condition = _owners_where_main_access_key(match)
+            condition = SessionConditions._owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition

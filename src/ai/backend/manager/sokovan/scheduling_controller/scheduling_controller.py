@@ -257,7 +257,7 @@ class SchedulingController:
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
-            (session_data.id, session_data.name, session_data.access_key),
+            (session_data.id, session_data.name, session_data.main_access_key),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -295,7 +295,7 @@ class SchedulingController:
             )
         await self._hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
-            (session_id, session_data.name, session_data.access_key),
+            (session_id, session_data.name, session_data.main_access_key),
         )
         return session_id
 

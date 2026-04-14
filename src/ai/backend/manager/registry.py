@@ -116,6 +116,7 @@ from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAl
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from .agent_cache import AgentRPCCache
@@ -221,6 +222,7 @@ class AgentRegistry:
         hook_plugin_ctx: HookPluginContext,
         network_plugin_ctx: NetworkPluginContext,
         scheduling_controller: SchedulingController,
+        user_repository: UserRepository,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
@@ -252,6 +254,7 @@ class AgentRegistry:
             event_producer,
             hook_plugin_ctx,
             self,
+            user_repository,
         )
         self._client_pool = ClientPool(tcp_client_session_factory)
 
