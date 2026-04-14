@@ -169,15 +169,12 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         sa.Index(
-            "ix_endpoints_unique_name_when_active",
+            "ix_endpoints_unique_name_when_not_destroyed",
             "name",
             "domain",
             "project",
             unique=True,
-            postgresql_where=sa.column("lifecycle_stage").notin_([
-                EndpointLifecycle.DESTROYING.value,
-                EndpointLifecycle.DESTROYED.value,
-            ]),
+            postgresql_where=(sa.column("lifecycle_stage") != EndpointLifecycle.DESTROYED.value),
         ),
         sa.Index(
             "ix_endpoints_lifecycle_sub_step",
@@ -530,7 +527,6 @@ class EndpointRow(Base):  # type: ignore[misc]
         db_session: AsyncSession,
         owner_user_uuid: UUID,
         target_user_uuid: UUID,
-        target_access_key: AccessKey,
     ) -> None:
         from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 
@@ -554,7 +550,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
         )
         for session_row in session_rows:
-            session_row.delegate_ownership(target_user_uuid, target_access_key)
+            session_row.delegate_ownership(target_user_uuid)
 
     async def generate_route_info(
         self, db_sess: AsyncSession
