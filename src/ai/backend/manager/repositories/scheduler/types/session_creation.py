@@ -222,8 +222,8 @@ class KernelEnqueueData:
     scaling_group: str
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
-    access_key: AccessKey
+    owner_id: UUID
+    main_access_key: AccessKey
     image: str  # Canonical image name
     architecture: str
     registry: str
@@ -268,8 +268,8 @@ class SessionEnqueueData:
     id: SessionId
     creation_id: str
     name: str
-    access_key: AccessKey
-    user_uuid: UUID
+    main_access_key: AccessKey
+    owner_id: UUID
     group_id: UUID
     domain_name: str
     scaling_group_name: str

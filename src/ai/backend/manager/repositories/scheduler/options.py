@@ -108,58 +108,6 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_access_key_contains(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = SessionRow.access_key.ilike(f"%{spec.value}%")
-            else:
-                condition = SessionRow.access_key.like(f"%{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_access_key_equals(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = sa.func.lower(SessionRow.access_key) == spec.value.lower()
-            else:
-                condition = SessionRow.access_key == spec.value
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_access_key_starts_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = SessionRow.access_key.ilike(f"{spec.value}%")
-            else:
-                condition = SessionRow.access_key.like(f"{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_access_key_ends_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = SessionRow.access_key.ilike(f"%{spec.value}")
-            else:
-                condition = SessionRow.access_key.like(f"%{spec.value}")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
     def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
@@ -413,8 +361,8 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_user_uuid_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
-        """Factory for user UUID equality filter."""
+    def by_owner_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for owner_id equality filter."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.negated:
@@ -424,8 +372,8 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_user_uuid_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
-        """Factory for user UUID IN filter."""
+    def by_owner_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for owner_id IN filter."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.negated:
