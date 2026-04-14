@@ -1044,9 +1044,6 @@ class TestCreateFromParams:
         delegated_owner_access_key: AccessKey,
         delegated_session_action: CreateFromParamsAction,
     ) -> None:
-        session_service._user_repository.get_user_by_uuid = AsyncMock(  # type: ignore[attr-defined]
-            return_value=MagicMock(main_access_key=str(delegated_owner_access_key))
-        )
         """
         Regression test for BA-5608.
 
@@ -1057,6 +1054,11 @@ class TestCreateFromParams:
         identity leaked into the session row, causing scaling group access
         checks and container UID/GID lookups to use the wrong user.
         """
+        user_repo_mock = MagicMock()
+        user_repo_mock.get_user_by_uuid = AsyncMock(
+            return_value=MagicMock(main_access_key=str(delegated_owner_access_key))
+        )
+        session_service._user_repository = user_repo_mock
         new_session_id = str(uuid4())
         mock_session_repository.query_userinfo = AsyncMock(
             return_value=SessionOwnerContext(
