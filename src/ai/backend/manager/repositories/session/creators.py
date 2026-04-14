@@ -17,7 +17,7 @@ class SessionRowCreatorSpec(CreatorSpec[SessionRow]):
     This spec is designed for retrofitting existing code that already builds
     SessionRow instances. It simply returns the provided row in build_row().
 
-    For scope information needed by RBACEntityCreator, use the row's user_uuid
+    For scope information needed by RBACEntityCreator, use the row's owner_id
     field as the scope_id with ScopeType.USER.
     """
 
