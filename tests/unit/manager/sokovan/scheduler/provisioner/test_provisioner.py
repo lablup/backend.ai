@@ -66,7 +66,7 @@ def _create_scheduling_data_with_strategy(
     # Create one pending session
     session = PendingSessionData(
         id=SessionId(uuid.uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
         owner_id=uuid.uuid4(),
         group_id=uuid.uuid4(),

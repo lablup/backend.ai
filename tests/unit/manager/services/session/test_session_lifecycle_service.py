@@ -210,6 +210,7 @@ def _make_session_data(
 ) -> SessionData:
     return SessionData(
         id=session_id,
+        owner_id=user_id,
         creation_id="test-creation-id",
         name=name,
         session_type=session_type,
