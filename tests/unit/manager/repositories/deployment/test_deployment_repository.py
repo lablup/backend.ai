@@ -3815,3 +3815,110 @@ class TestDeploymentRepositoryDuplicateName:
 
         assert result.metadata.name == "reusable-endpoint"
         assert result.metadata.project == test_group.id
+
+    async def test_create_endpoint_still_blocked_when_existing_is_destroying(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+        test_image_id: uuid.UUID,
+    ) -> None:
+        """The application-level uniqueness check still rejects new endpoints
+        whose name collides with an endpoint currently in DESTROYING.
+
+        This guards against accidental relaxation of the user-visible behavior
+        when the partial unique index is narrowed in BA-5698.
+        """
+        first_creator = self._create_endpoint_creator(
+            name="destroying-blocked",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+        first_result = await deployment_repository.create_endpoint_legacy(first_creator)
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == first_result.id)
+                .values(lifecycle_stage=EndpointLifecycle.DESTROYING)
+            )
+
+        second_creator = self._create_endpoint_creator(
+            name="destroying-blocked",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+        with pytest.raises(DeploymentNameAlreadyExists):
+            await deployment_repository.create_endpoint_legacy(second_creator)
+
+    async def test_destroy_endpoint_with_destroying_sibling_does_not_conflict(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """Regression for BA-5698.
+
+        Two endpoint rows can legitimately coexist with the same
+        (name, domain, project) when one is already in DESTROYING — for example
+        when a stuck DESTROYING row was reached via a non-standard path or
+        survived a prior incident. Transitioning the active sibling to
+        DESTROYING must not collide on the partial unique index. The narrowed
+        predicate (which excludes DESTROYING/DESTROYED) keeps the destroy UPDATE
+        from re-inserting an index entry that races with the sibling.
+        """
+        duplicate_name = f"dup-destroy-{uuid.uuid4().hex[:8]}"
+        target_id = uuid.uuid4()
+        sibling_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            target = EndpointRow(
+                id=target_id,
+                name=duplicate_name,
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=1,
+                desired_replicas=1,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.CREATED,
+            )
+            sibling = EndpointRow(
+                id=sibling_id,
+                name=duplicate_name,
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=0,
+                desired_replicas=0,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DESTROYING,
+            )
+            db_sess.add_all([target, sibling])
+            await db_sess.commit()
+
+        succeeded = await deployment_repository.destroy_endpoint(target_id)
+        assert succeeded is True
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            target_stage = (
+                await db_sess.execute(
+                    sa.select(EndpointRow.lifecycle_stage).where(EndpointRow.id == target_id)
+                )
+            ).scalar_one()
+            assert target_stage == EndpointLifecycle.DESTROYING
