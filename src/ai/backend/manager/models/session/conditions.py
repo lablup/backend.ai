@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from ai.backend.common.data.filter_specs import (
+        StringInMatchSpec,
         StringMatchSpec,
         UUIDEqualMatchSpec,
         UUIDInMatchSpec,
@@ -20,9 +21,22 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import SessionRow
+
+
+def _owners_where_main_access_key(
+    condition: sa.sql.expression.ColumnElement[bool],
+) -> sa.sql.expression.ColumnElement[bool]:
+    """Return a predicate matching SessionRow.owner_id against users whose main_access_key satisfies ``condition``."""
+    return SessionRow.owner_id.in_(
+        sa.select(UserRow.uuid).where(
+            UserRow.main_access_key.is_not(None),
+            condition,
+        )
+    )
 
 
 class SessionConditions:
@@ -107,11 +121,10 @@ class SessionConditions:
     def by_access_key_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition: sa.sql.expression.ColumnElement[bool] = SessionRow.access_key.ilike(
-                    f"%{spec.value}%"
-                )
+                match = UserRow.main_access_key.ilike(f"%{spec.value}%")
             else:
-                condition = SessionRow.access_key.like(f"%{spec.value}%")
+                match = UserRow.main_access_key.like(f"%{spec.value}%")
+            condition = _owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -121,11 +134,11 @@ class SessionConditions:
     @staticmethod
     def by_access_key_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition: sa.sql.expression.ColumnElement[bool]
             if spec.case_insensitive:
-                condition = sa.func.lower(SessionRow.access_key) == spec.value.lower()
+                match = sa.func.lower(UserRow.main_access_key) == spec.value.lower()
             else:
-                condition = SessionRow.access_key == spec.value
+                match = UserRow.main_access_key == spec.value
+            condition = _owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -136,11 +149,10 @@ class SessionConditions:
     def by_access_key_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition: sa.sql.expression.ColumnElement[bool] = SessionRow.access_key.ilike(
-                    f"{spec.value}%"
-                )
+                match = UserRow.main_access_key.ilike(f"{spec.value}%")
             else:
-                condition = SessionRow.access_key.like(f"{spec.value}%")
+                match = UserRow.main_access_key.like(f"{spec.value}%")
+            condition = _owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -150,24 +162,30 @@ class SessionConditions:
     @staticmethod
     def by_access_key_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition: sa.sql.expression.ColumnElement[bool]
             if spec.case_insensitive:
-                condition = cast(
-                    sa.sql.expression.ColumnElement[bool],
-                    SessionRow.access_key.ilike(f"%{spec.value}"),
-                )
+                match = UserRow.main_access_key.ilike(f"%{spec.value}")
             else:
-                condition = cast(
-                    sa.sql.expression.ColumnElement[bool],
-                    SessionRow.access_key.like(f"%{spec.value}"),
-                )
+                match = UserRow.main_access_key.like(f"%{spec.value}")
+            condition = _owners_where_main_access_key(match)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
 
         return inner
 
-    by_access_key_in = staticmethod(make_string_in_factory(SessionRow.access_key))
+    @staticmethod
+    def by_access_key_in(spec: StringInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                match = sa.func.lower(UserRow.main_access_key).in_([v.lower() for v in spec.values])
+            else:
+                match = UserRow.main_access_key.in_(spec.values)
+            condition = _owners_where_main_access_key(match)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
 
     @staticmethod
     def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
