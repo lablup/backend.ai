@@ -48,6 +48,10 @@ from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions
     GetMyStorageHostPermissionsAction,
     GetMyStorageHostPermissionsActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.get_v2 import (
+    GetVFolderV2Action,
+    GetVFolderV2ActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -151,6 +155,7 @@ class VFolderProcessors(AbstractProcessorPackage):
     batch_load_vfolders_by_ids: ActionProcessor[
         BatchLoadVFoldersByIdsAction, BatchLoadVFoldersByIdsActionResult
     ]
+    get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
     create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
     create_upload_session_v2: ActionProcessor[
         CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
@@ -240,6 +245,9 @@ class VFolderProcessors(AbstractProcessorPackage):
         )
 
         # V2 actions
+        self.get_v2 = SingleEntityActionProcessor(
+            service.get_v2, action_monitors, validators=single_entity_rbac_validators
+        )
         self.create_vfolder_v2 = ActionProcessor(service.create_v2, action_monitors)
         self.create_upload_session_v2 = ActionProcessor(
             service.create_upload_session_v2, action_monitors
@@ -282,6 +290,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             BatchLoadVFoldersByIdsAction.spec(),
             CreateVFolderV2Action.spec(),
             CreateUploadSessionV2Action.spec(),
+            GetVFolderV2Action.spec(),
             DeleteVFolderV2Action.spec(),
             PurgeVFolderV2Action.spec(),
             CloneVFolderV2Action.spec(),

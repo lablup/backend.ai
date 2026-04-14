@@ -111,6 +111,10 @@ from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions
     GetMyStorageHostPermissionsActionResult,
     StorageHostPermissionEntry,
 )
+from ai.backend.manager.services.vfolder.actions.get_v2 import (
+    GetVFolderV2Action,
+    GetVFolderV2ActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -1615,6 +1619,11 @@ class VFolderService:
             token=storage_reply["token"],
             url=str(client_api_url / "upload"),
         )
+
+    async def get_v2(self, action: GetVFolderV2Action) -> GetVFolderV2ActionResult:
+        """Get a single vfolder by ID (v2). RBAC is enforced at the processor level."""
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        return GetVFolderV2ActionResult(vfolder=vfolder_data)
 
     async def delete_v2(self, action: DeleteVFolderV2Action) -> DeleteVFolderV2ActionResult:
         """Delete (trash) a vfolder (v2). Resolves policy internally from user_id."""
