@@ -85,18 +85,18 @@ VFSStorageEdge = Edge[VFSStorage]
     ),
 )
 class VFSStorageConnection(Connection[VFSStorage]):
-    @gql_field(description="The count of this entity.")  # type: ignore[misc]
+    @gql_field(description="The count of this entity.")
     def count(self) -> int:
         return len(self.edges)
 
 
-@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
     node = await info.context.adapters.vfs_storage.get(UUID(id))
     return VFSStorage.from_pydantic(node)
 
 
-@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="List all VFS storages"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="List all VFS storages"))
 async def vfs_storages(
     info: Info[StrawberryGQLContext],
     before: str | None = None,
@@ -186,7 +186,7 @@ class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Create a new VFS storage"),
     name="createVFSStorage",
-)  # type: ignore[misc]
+)
 async def create_vfs_storage(
     input: CreateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateVFSStoragePayload:
@@ -197,7 +197,7 @@ async def create_vfs_storage(
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Update an existing VFS storage"),
     name="updateVFSStorage",
-)  # type: ignore[misc]
+)
 async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateVFSStoragePayload:
@@ -208,7 +208,7 @@ async def update_vfs_storage(
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Delete a VFS storage"),
     name="deleteVFSStorage",
-)  # type: ignore[misc]
+)
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteVFSStoragePayload:

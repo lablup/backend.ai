@@ -175,14 +175,14 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
 
     @gql_field(
         description="The session ID associated with the replica. This can be null right after replica creation."
-    )  # type: ignore[misc]
+    )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
             ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
         return Session(id=ID(session_global_id))
 
-    @gql_field(description="The revision of this entity.")  # type: ignore[misc]
+    @gql_field(description="The revision of this entity.")
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
         """Resolve revision by ID."""
         node = await info.context.adapters.deployment.get_revision(UUID(str(self.revision_id)))

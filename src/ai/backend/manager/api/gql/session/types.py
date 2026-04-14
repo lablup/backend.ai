@@ -320,13 +320,13 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="The domain this session belongs to.")
-    )  # type: ignore[misc]
+    )
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
         return await info.context.data_loaders.domain_loader.load(self.domain_name)
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="The user who owns this session.")
-    )  # type: ignore[misc]
+    )
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
         user_data = await info.context.data_loaders.user_loader.load(UUID(str(self.user_id)))
         if user_data is None:
@@ -335,7 +335,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="The project this session belongs to.")
-    )  # type: ignore[misc]
+    )
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
         project_data = await info.context.data_loaders.project_loader.load(
             UUID(str(self.project_id))
@@ -348,7 +348,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         BackendAIGQLMeta(
             added_version="26.3.0", description="The resource group this session is assigned to."
         )
-    )  # type: ignore[misc]
+    )
     async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
         if self.resource.resource_group_name is None:
             return None
@@ -364,7 +364,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             added_version="26.3.0",
             description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
         )
-    )  # type: ignore[misc]
+    )
     async def images(self) -> ImageV2ConnectionGQL:
         raise NotImplementedError
 
@@ -372,7 +372,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         BackendAIGQLMeta(
             added_version="26.3.0", description="The kernels belonging to this session."
         )
-    )  # type: ignore[misc]
+    )
     async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL:
         user = current_user()
         if user is None:

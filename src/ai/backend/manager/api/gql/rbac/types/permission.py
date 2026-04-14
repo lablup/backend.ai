@@ -114,7 +114,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_field(description="The role this permission belongs to.")  # type: ignore[misc]
+    @gql_field(description="The role this permission belongs to.")
     async def role(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -127,7 +127,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         return await info.context.data_loaders.role_loader.load(self.role_id)
 
-    @gql_field(description="The scope this permission applies to.")  # type: ignore[misc]
+    @gql_field(description="The scope this permission applies to.")
     async def scope(
         self,
         *,

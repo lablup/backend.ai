@@ -870,7 +870,7 @@ schema = CustomizedSchema(
     mutation=Mutation,
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
-    federation_version="2.7",
+    federation_version="2.11",
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,

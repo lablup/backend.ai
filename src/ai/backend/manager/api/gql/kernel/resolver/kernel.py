@@ -26,7 +26,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="Query a single kernel by ID.")
-)  # type: ignore[misc]
+)
 async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -42,7 +42,7 @@ async def kernel_v2(
         added_version="26.2.0",
         description="Query kernels with pagination and filtering. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_kernels_v2(
     info: Info[StrawberryGQLContext],
     filter: KernelV2FilterGQL | None = None,
@@ -83,7 +83,7 @@ async def admin_kernels_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="Query kernels within a specific session.")
-)  # type: ignore[misc]
+)
 async def session_kernels_v2(
     info: Info[StrawberryGQLContext],
     scope: SessionScope,

@@ -63,7 +63,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     entity_id: str
     registered_at: datetime
 
-    @gql_field(description="The resolved entity object.")  # type: ignore[misc]
+    @gql_field(description="The resolved entity object.")
     async def entity(
         self,
         *,

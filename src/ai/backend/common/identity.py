@@ -11,11 +11,9 @@ import os
 import socket
 import uuid
 from collections.abc import Awaitable, Callable, Iterable
+from ipaddress import IPv4Network, IPv6Network, ip_address
 from ipaddress import _BaseAddress as BaseIPAddress
-from ipaddress import _BaseNetwork as BaseIPNetwork
-from ipaddress import ip_address
 from pathlib import Path, PosixPath
-from typing import Any
 
 import aiodns
 import aiohttp
@@ -35,6 +33,8 @@ __all__ = (
     "get_root_fs_type",
     "get_wsl_version",
 )
+
+type BaseIPNetwork = IPv4Network | IPv6Network
 
 log = logging.getLogger(__spec__.name)
 
@@ -148,7 +148,7 @@ async def detect_cloud() -> CloudProvider | None:
     return None
 
 
-def fetch_local_ipaddrs(cidr: BaseIPNetwork[Any]) -> Iterable[BaseIPAddress]:
+def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
     proto = socket.AF_INET if cidr.version == 4 else socket.AF_INET6
     for adapter in ifaddr.get_adapters():
         if not adapter.ips:
@@ -215,7 +215,7 @@ else:
 
 _defined: bool = False
 get_instance_id: Callable[[], Awaitable[str]]
-get_instance_ip: Callable[[BaseIPNetwork[Any] | None], Awaitable[str]]
+get_instance_ip: Callable[[BaseIPNetwork | None], Awaitable[str]]
 get_instance_type: Callable[[], Awaitable[str]]
 get_instance_region: Callable[[], Awaitable[str]]
 
@@ -240,7 +240,7 @@ def _define_functions() -> None:
                     _metadata_prefix + "instance-id", lambda: f"i-{socket.gethostname()}"
                 )
 
-            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
                 return await curl(_metadata_prefix + "local-ipv4", "127.0.0.1")
 
             async def _get_instance_type() -> str:
@@ -280,7 +280,7 @@ def _define_functions() -> None:
                 vm_id_hash = base64.b32encode(vm_id.bytes[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
                 data = await curl(
                     _metadata_prefix,
                     None,
@@ -354,7 +354,7 @@ def _define_functions() -> None:
                 vm_id_hash = base64.b32encode(vm_id_int.to_bytes(8, "big")[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
                 return await curl(
                     _metadata_prefix + "instance/network-interfaces/0/ip",
                     "127.0.0.1",
@@ -383,7 +383,7 @@ def _define_functions() -> None:
             async def _get_instance_id() -> str:
                 return f"i-{socket.gethostname()}"
 
-            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
                 if _subnet_hint is not None and _subnet_hint.prefixlen > 0:
                     local_ipaddrs = [*fetch_local_ipaddrs(_subnet_hint)]
                     if local_ipaddrs:

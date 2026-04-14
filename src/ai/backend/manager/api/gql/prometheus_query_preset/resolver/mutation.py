@@ -34,7 +34,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
     BackendAIGQLMeta(
         added_version="26.3.0", description="Create a new query definition (admin only)"
     )
-)  # type: ignore[misc]
+)
 async def admin_create_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     input: CreateQueryDefinitionInput,
@@ -50,7 +50,7 @@ async def admin_create_prometheus_query_preset(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Modify an existing query definition (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_modify_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
@@ -67,7 +67,7 @@ async def admin_modify_prometheus_query_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Delete a query definition (admin only)")
-)  # type: ignore[misc]
+)
 async def admin_delete_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,

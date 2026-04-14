@@ -116,7 +116,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     created_at: datetime | None = gql_field(description="The timestamp when the route was created.")
     error_data: JSON | None = gql_field(description="Error data if the route is in a failed state.")
 
-    @gql_field(description="The deployment this route belongs to.")  # type: ignore[misc]
+    @gql_field(description="The deployment this route belongs to.")
     async def deployment(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
@@ -129,7 +129,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
 
     @gql_field(
         description="The session associated with the route. Can be null if the route is still provisioning."
-    )  # type: ignore[misc]
+    )
     async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
         """Return session global ID if available."""
         if self.session_id is None:
@@ -139,7 +139,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         )
         return ID(session_global_id)
 
-    @gql_field(description="The revision associated with the route.")  # type: ignore[misc]
+    @gql_field(description="The revision associated with the route.")
     async def revision(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:

@@ -31,7 +31,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.2.0",
         description="Get a single project by ID. Returns an error if project is not found.",
     )
-)  # type: ignore[misc]
+)
 async def project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -46,7 +46,7 @@ async def project_v2(
         added_version="26.2.0",
         description="List all projects with filtering and pagination (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_projects_v2(
     info: Info[StrawberryGQLContext],
     filter: ProjectV2Filter | None = None,
@@ -91,7 +91,7 @@ async def admin_projects_v2(
         added_version="26.2.0",
         description="List projects within a specific domain. Requires domain admin privileges or higher.",
     )
-)  # type: ignore[misc]
+)
 async def domain_projects_v2(
     info: Info[StrawberryGQLContext],
     scope: DomainProjectScope,
@@ -140,7 +140,7 @@ async def domain_projects_v2(
         added_version="26.2.0",
         description="Get the domain that a project belongs to. Returns an error if project or domain is not found.",
     )
-)  # type: ignore[misc]
+)
 async def project_domain_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,

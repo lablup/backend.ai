@@ -104,7 +104,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
 
     @gql_field(
         description="Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used)."
-    )  # type: ignore[misc]
+    )
     async def fair_share(
         self,
         info: Info,
@@ -126,7 +126,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             added_version="26.4.0",
             description="Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.",
         )
-    )  # type: ignore[misc]
+    )
     async def active_resource_overview(
         self,
         info: Info,
@@ -138,7 +138,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
 
     @gql_field(
         description="Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time."
-    )  # type: ignore[misc]
+    )
     async def usage_buckets(
         self,
         info: Info,
@@ -194,7 +194,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             count=payload.total_count,
         )
 
-    @gql_field(description="The domain this project belongs to.")  # type: ignore[misc]
+    @gql_field(description="The domain this project belongs to.")
     async def domain(
         self,
         info: Info,
@@ -211,7 +211,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             raise DomainNotFound(self.organization.domain_name)
         return domain
 
-    @gql_field(description="Users who are members of this project.")  # type: ignore[misc]
+    @gql_field(description="Users who are members of this project.")
     async def users(
         self,
         info: Info,

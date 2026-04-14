@@ -38,7 +38,7 @@ from ai.backend.manager.errors.user import UserNotFound
         added_version="26.3.0",
         description="Query sessions with pagination and filtering. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_sessions_v2(
     info: Info[StrawberryGQLContext],
     filter: SessionV2FilterGQL | None = None,
@@ -82,7 +82,7 @@ async def admin_sessions_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="List sessions within a specific project. Requires project membership or higher privileges.",
     )
-)  # type: ignore[misc]
+)
 async def project_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectSessionScopeGQL,
@@ -129,7 +129,7 @@ async def project_sessions_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Enqueue a new compute session.",
     ),
-)  # type: ignore[misc]
+)
 async def enqueue_session(
     input: EnqueueSessionInputGQL,
     info: Info[StrawberryGQLContext],
@@ -157,7 +157,7 @@ async def enqueue_session(
         added_version=NEXT_RELEASE_VERSION,
         description="Terminate sessions within a project scope.",
     ),
-)  # type: ignore[misc]
+)
 async def terminate_project_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectSessionScopeGQL,

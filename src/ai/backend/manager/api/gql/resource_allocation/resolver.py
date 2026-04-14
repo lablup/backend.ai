@@ -32,7 +32,7 @@ from .types import (
         added_version=NEXT_RELEASE_VERSION,
         description="Get my keypair resource allocation (current user).",
     )
-)  # type: ignore[misc]
+)
 async def my_keypair_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
 ) -> KeypairResourceAllocationPayloadGQL:
@@ -45,7 +45,7 @@ async def my_keypair_resource_allocation_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get project resource allocation (project usage).",
     )
-)  # type: ignore[misc]
+)
 async def project_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -61,7 +61,7 @@ async def project_resource_allocation_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get domain resource allocation (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_domain_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
@@ -78,7 +78,7 @@ async def admin_domain_resource_allocation_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get resource group resource allocation.",
     )
-)  # type: ignore[misc]
+)
 async def resource_group_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -94,7 +94,7 @@ async def resource_group_resource_allocation_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get effective resource allocation for the current user.",
     )
-)  # type: ignore[misc]
+)
 async def effective_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     input: EffectiveResourceAllocationInputGQL,
@@ -110,7 +110,7 @@ async def effective_resource_allocation_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get effective resource allocation for a specific user (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_effective_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     input: AdminEffectiveResourceAllocationInputGQL,
@@ -127,7 +127,7 @@ async def admin_effective_resource_allocation_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Check which resource presets are available for session creation.",
     )
-)  # type: ignore[misc]
+)
 async def check_preset_availability_v2(
     info: Info[StrawberryGQLContext],
     input: CheckPresetAvailabilityInputGQL,

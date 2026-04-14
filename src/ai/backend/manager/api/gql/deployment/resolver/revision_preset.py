@@ -39,7 +39,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Search deployment revision presets.",
     )
-)  # type: ignore[misc]
+)
 async def deployment_revision_presets(
     info: Info[StrawberryGQLContext],
     filter: DeploymentRevisionPresetFilterGQL | None = None,
@@ -96,7 +96,7 @@ async def deployment_revision_presets(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single deployment revision preset by ID.",
     )
-)  # type: ignore[misc]
+)
 async def deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -110,7 +110,7 @@ async def deployment_revision_preset(
         added_version=NEXT_RELEASE_VERSION,
         description="Create a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     input: CreateDeploymentRevisionPresetInputGQL,
@@ -126,7 +126,7 @@ async def admin_create_deployment_revision_preset(
         added_version=NEXT_RELEASE_VERSION,
         description="Update a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     input: UpdateDeploymentRevisionPresetInputGQL,
@@ -142,7 +142,7 @@ async def admin_update_deployment_revision_preset(
         added_version=NEXT_RELEASE_VERSION,
         description="Delete a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,

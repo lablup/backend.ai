@@ -37,7 +37,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Search runtime variant presets.",
     )
-)  # type: ignore[misc]
+)
 async def runtime_variant_presets(
     info: Info[StrawberryGQLContext],
     filter: RuntimeVariantPresetFilterGQL | None = None,
@@ -96,7 +96,7 @@ async def runtime_variant_presets(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single runtime variant preset by ID.",
     )
-)  # type: ignore[misc]
+)
 async def runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -110,7 +110,7 @@ async def runtime_variant_preset(
         added_version=NEXT_RELEASE_VERSION,
         description="Create a runtime variant preset (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     input: CreateRuntimeVariantPresetInputGQL,
@@ -126,7 +126,7 @@ async def admin_create_runtime_variant_preset(
         added_version=NEXT_RELEASE_VERSION,
         description="Update a runtime variant preset (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     input: UpdateRuntimeVariantPresetInputGQL,
@@ -142,7 +142,7 @@ async def admin_update_runtime_variant_preset(
         added_version=NEXT_RELEASE_VERSION,
         description="Delete a runtime variant preset (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,

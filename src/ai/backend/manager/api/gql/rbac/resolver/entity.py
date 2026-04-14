@@ -26,7 +26,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.3.0",
         description="Search entity associations (admin only). Optionally filter by entity_type and entity_id.",
     )
-)  # type: ignore[misc]
+)
 async def admin_entities(
     info: Info[StrawberryGQLContext],
     filter: EntityFilter | None = None,

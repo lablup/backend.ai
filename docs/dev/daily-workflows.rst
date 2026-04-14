@@ -215,7 +215,7 @@ For example, the Ruff executable is exported as ``dist/export/bin/ruff``.
 Other tools that require Python virtualenv (e.g., Mypy) are still exported as virtualenvs.
 
 For Pantsbuild 2.23 or older, the tool binaries are exported as regular Python virtualenvs like
-``dist/export/python/virtualenvs/ruff/3.13.7/bin/ruff``.
+``dist/export/python/virtualenvs/ruff/3.14.3/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -279,7 +279,7 @@ Set the following keys in the workspace settings to configure Python tools:
    * - Setting ID
      - Example value
    * - ``mypy-type-checker.interpreter``
-     - ``["/abs/path/to/dist/export/python/virtualenvs/mypy/3.13.7/bin/python"]`` (use the absolute path)
+     - ``["/abs/path/to/dist/export/python/virtualenvs/mypy/3.14.3/bin/python"]`` (use the absolute path)
    * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.path``
@@ -313,7 +313,7 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.14.3/bin/mypy'
    let g:ale_python_ruff_executable = s:cwd . '/dist/export/bin/ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
@@ -330,10 +330,10 @@ as basedpyright shares most configurations with pyright).
    {
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
-     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.7/lib/python3.13/site-packages"],
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.14.3/bin/python",
+     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.14.3/lib/python3.14/site-packages"],
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.14.3/bin/mypy",
      "python.linting.ruffEnabled": true,
      "python.linting.ruffPath": "dist/export/bin/ruff",
      "python.formatting.provider": "ruff",
@@ -345,10 +345,10 @@ as basedpyright shares most configurations with pyright).
    {
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
-     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.7/lib/python3.13/site-packages"],
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.14.3/bin/python",
+     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.14.3/lib/python3.14/site-packages"],
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.14.3/bin/mypy",
      "python.linting.ruffEnabled": false,  // delegate to coc-ruff
      "python.formatting.provider": "none",  // delegate to coc-ruff
      "pyright.organizeimports.provider": "none",  // delegate to coc-ruff
@@ -725,7 +725,7 @@ Making a new release
   line, e.g., using ``set noeol`` in Vim.  This is also configured in
   ``./editorconfig``)
 
-* Run ``LOCKSET=towncrier/3.13.7 ./py -m towncrier`` to auto-generate the changelog.
+* Run ``LOCKSET=towncrier/3.14.3 ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
     actually modifying the filesystem.

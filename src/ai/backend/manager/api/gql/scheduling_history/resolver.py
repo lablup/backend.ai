@@ -93,7 +93,7 @@ class RouteHistoryConnection(Connection[RouteHistory]):
         added_version=NEXT_RELEASE_VERSION,
         description="List session scheduling history (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_session_scheduling_histories(
     info: Info[StrawberryGQLContext],
     filter: SessionSchedulingHistoryFilter | None = None,
@@ -141,7 +141,7 @@ async def admin_session_scheduling_histories(
         description="List session scheduling history (superadmin only)",
     ),
     deprecation_reason="Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def session_scheduling_histories(
     info: Info[StrawberryGQLContext],
     filter: SessionSchedulingHistoryFilter | None = None,
@@ -189,7 +189,7 @@ async def session_scheduling_histories(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION, description="List deployment history (admin only)"
     )
-)  # type: ignore[misc]
+)
 async def admin_deployment_histories(
     info: Info[StrawberryGQLContext],
     filter: DeploymentHistoryFilter | None = None,
@@ -233,7 +233,7 @@ async def admin_deployment_histories(
         added_version=NEXT_RELEASE_VERSION, description="List deployment history (superadmin only)"
     ),
     deprecation_reason="Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def deployment_histories(
     info: Info[StrawberryGQLContext],
     filter: DeploymentHistoryFilter | None = None,
@@ -278,7 +278,7 @@ async def deployment_histories(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION, description="List route history (admin only)"
     )
-)  # type: ignore[misc]
+)
 async def admin_route_histories(
     info: Info[StrawberryGQLContext],
     filter: RouteHistoryFilter | None = None,
@@ -322,7 +322,7 @@ async def admin_route_histories(
         added_version=NEXT_RELEASE_VERSION, description="List route history (superadmin only)"
     ),
     deprecation_reason="Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def route_histories(
     info: Info[StrawberryGQLContext],
     filter: RouteHistoryFilter | None = None,
@@ -370,7 +370,7 @@ async def route_histories(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific session."
     )
-)  # type: ignore[misc]
+)
 async def session_scoped_scheduling_histories(
     info: Info[StrawberryGQLContext],
     scope: SessionScope,
@@ -418,7 +418,7 @@ async def session_scoped_scheduling_histories(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific deployment."
     )
-)  # type: ignore[misc]
+)
 async def deployment_scoped_scheduling_histories(
     info: Info[StrawberryGQLContext],
     scope: DeploymentScope,
@@ -463,7 +463,7 @@ async def deployment_scoped_scheduling_histories(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific route."
     )
-)  # type: ignore[misc]
+)
 async def route_scoped_scheduling_histories(
     info: Info[StrawberryGQLContext],
     scope: RouteScope,

@@ -44,7 +44,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single keypair resource policy by name (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -59,7 +59,7 @@ async def admin_keypair_resource_policy_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="List all keypair resource policies with pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_keypair_resource_policies_v2(
     info: Info[StrawberryGQLContext],
     filter: KeypairResourcePolicyV2Filter | None = None,
@@ -103,7 +103,7 @@ async def admin_keypair_resource_policies_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get the current user's keypair resource policy.",
     )
-)  # type: ignore[misc]
+)
 async def my_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
 ) -> KeypairResourcePolicyV2GQL | None:
@@ -119,7 +119,7 @@ async def my_keypair_resource_policy_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single user resource policy by name (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -134,7 +134,7 @@ async def admin_user_resource_policy_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="List all user resource policies with pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_user_resource_policies_v2(
     info: Info[StrawberryGQLContext],
     filter: UserResourcePolicyV2Filter | None = None,
@@ -178,7 +178,7 @@ async def admin_user_resource_policies_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get the current user's user resource policy.",
     )
-)  # type: ignore[misc]
+)
 async def my_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
 ) -> UserResourcePolicyV2GQL | None:
@@ -194,7 +194,7 @@ async def my_user_resource_policy_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single project resource policy by name (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_project_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -209,7 +209,7 @@ async def admin_project_resource_policy_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="List all project resource policies with pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_project_resource_policies_v2(
     info: Info[StrawberryGQLContext],
     filter: ProjectResourcePolicyV2Filter | None = None,

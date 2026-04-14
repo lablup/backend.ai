@@ -34,7 +34,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.",
     )
-)  # type: ignore[misc]
+)
 async def prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
@@ -50,7 +50,7 @@ async def prometheus_query_preset(
         added_version=NEXT_RELEASE_VERSION,
         description="List prometheus query presets with filtering and pagination. Available to any authenticated user since presets are a shared catalog of metric query templates.",
     )
-)  # type: ignore[misc]
+)
 async def prometheus_query_presets(
     info: Info[StrawberryGQLContext],
     filter: QueryDefinitionFilter | None = None,
@@ -90,7 +90,7 @@ async def prometheus_query_presets(
         added_version=NEXT_RELEASE_VERSION,
         description="Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.",
     )
-)  # type: ignore[misc]
+)
 async def prometheus_query_preset_result(
     info: Info[StrawberryGQLContext],
     id: ID,

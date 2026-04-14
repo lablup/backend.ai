@@ -132,7 +132,7 @@ class BackgroundTaskEventPayloadGQL:
         return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
 
 
-@gql_subscription(  # type: ignore[misc]
+@gql_subscription(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(

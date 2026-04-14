@@ -27,7 +27,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="25.15.0", description="Get aggregate agent resource statistics")
-)  # type: ignore[misc]
+)
 async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
     total = await info.context.adapters.agent.get_total_resources()
     resource = AgentResourceGQL(
@@ -42,7 +42,7 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
     BackendAIGQLMeta(
         added_version="26.1.0", description="List agents with filtering and pagination"
     )
-)  # type: ignore[misc]
+)
 async def agents_v2(
     info: Info[StrawberryGQLContext],
     filter: AgentFilterGQL | None = None,

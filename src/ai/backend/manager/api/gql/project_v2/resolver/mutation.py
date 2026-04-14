@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Create a new project (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_project_v2(
     info: Info[StrawberryGQLContext],
     input: CreateProjectInputGQL,
@@ -47,7 +47,7 @@ async def admin_create_project_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -65,7 +65,7 @@ async def admin_update_project_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Soft-delete a project (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -82,7 +82,7 @@ async def admin_delete_project_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Permanently purge a project and all associated data (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_purge_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -99,7 +99,7 @@ async def admin_purge_project_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Unassign users from a project. RBAC validates project admin permission.",
     )
-)  # type: ignore[misc]
+)
 async def unassign_users_from_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,

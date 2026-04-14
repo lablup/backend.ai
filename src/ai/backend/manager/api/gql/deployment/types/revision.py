@@ -211,7 +211,7 @@ class ResourceConfig:
         default=None,
     )
 
-    @gql_field(description="The resource group of this entity.")  # type: ignore[misc]
+    @gql_field(description="The resource group of this entity.")
     def resource_group(self) -> ResourceGroup:
         """Resolves the federated ResourceGroup."""
         global_id = to_global_id(
@@ -256,7 +256,7 @@ class ModelMountConfig:
         description="Path to the model definition file within the mounted folder."
     )
 
-    @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
+    @gql_field(description="The vfolder of this entity.")
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
         vfolder_global_id = to_global_id(
             VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
@@ -277,7 +277,7 @@ class ExtraVFolderMountInfoGQL:
         description="Mount destination path inside the container.", default=None
     )
 
-    @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
+    @gql_field(description="The vfolder of this entity.")
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
         vfolder_global_id = to_global_id(
             VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
@@ -437,7 +437,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     )
     created_at: datetime = gql_field(description="Timestamp when the revision was created.")
 
-    @gql_field(description="The image of this entity.")  # type: ignore[misc]
+    @gql_field(description="The image of this entity.")
     async def image(self, info: Info[StrawberryGQLContext]) -> Image:
         image_global_id = to_global_id(
             ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True

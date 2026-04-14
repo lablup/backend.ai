@@ -29,7 +29,7 @@ from .types import (
         added_version="26.3.0",
         description="Returns a single resource slot type by slot_name, or null.",
     )
-)  # type: ignore[misc]
+)
 async def resource_slot_type(
     info: Info[StrawberryGQLContext],
     slot_name: str,
@@ -43,7 +43,7 @@ async def resource_slot_type(
         added_version="26.3.0",
         description="Returns resource slot types with pagination and filtering.",
     )
-)  # type: ignore[misc]
+)
 async def resource_slot_types(
     info: Info[StrawberryGQLContext],
     filter: ResourceSlotTypeFilterGQL | None = None,

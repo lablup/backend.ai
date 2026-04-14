@@ -646,7 +646,7 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     updated_at: datetime
     availability: ArtifactAvailability
 
-    @gql_field(description="The revisions of this entity.")  # type: ignore[misc]
+    @gql_field(description="The revisions of this entity.")
     async def revisions(
         self,
         info: Info[StrawberryGQLContext],
@@ -761,7 +761,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_field(description="The artifact of this entity.")  # type: ignore[misc]
+    @gql_field(description="The artifact of this entity.")
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
         revision_node = await info.context.adapters.artifact.get_revision(uuid.UUID(self.id))
         artifact_node = await info.context.adapters.artifact.get(revision_node.artifact_id)

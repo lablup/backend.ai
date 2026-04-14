@@ -286,7 +286,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         BackendAIGQLMeta(
             added_version="26.1.0", description="Load the container count for this agent."
         )
-    )  # type: ignore[misc]
+    )
     async def container_count(
         self,
         info: Info[StrawberryGQLContext],
@@ -301,7 +301,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             added_version="26.2.0",
             description="List of kernels running on this agent with pagination support.",
         )
-    )  # type: ignore[misc]
+    )
     async def kernels(
         self,
         info: Info[StrawberryGQLContext],
@@ -362,7 +362,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             added_version="26.3.0",
             description="List of sessions running on this agent with pagination support.",
         )
-    )  # type: ignore[misc]
+    )
     async def sessions(
         self,
         info: Info[StrawberryGQLContext],
@@ -425,7 +425,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             added_version="26.3.0",
             description="Per-slot resource capacity and usage for this agent.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],

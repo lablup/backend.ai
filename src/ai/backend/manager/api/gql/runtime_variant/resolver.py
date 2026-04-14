@@ -37,7 +37,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Search runtime variants.",
     )
-)  # type: ignore[misc]
+)
 async def runtime_variants(
     info: Info[StrawberryGQLContext],
     filter: RuntimeVariantFilterGQL | None = None,
@@ -96,7 +96,7 @@ async def runtime_variants(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single runtime variant by ID.",
     )
-)  # type: ignore[misc]
+)
 async def runtime_variant(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -110,7 +110,7 @@ async def runtime_variant(
         added_version=NEXT_RELEASE_VERSION,
         description="Create a new runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: CreateRuntimeVariantInputGQL,
@@ -126,7 +126,7 @@ async def admin_create_runtime_variant(
         added_version=NEXT_RELEASE_VERSION,
         description="Update a runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: UpdateRuntimeVariantInputGQL,
@@ -142,7 +142,7 @@ async def admin_update_runtime_variant(
         added_version=NEXT_RELEASE_VERSION,
         description="Delete a runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_runtime_variant(
     info: Info[StrawberryGQLContext],
     id: UUID,

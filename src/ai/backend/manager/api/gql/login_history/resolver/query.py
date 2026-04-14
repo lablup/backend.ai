@@ -31,7 +31,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Query login history with pagination and filtering. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_login_history_v2(
     info: Info[StrawberryGQLContext],
     filter: LoginHistoryFilterGQL | None = None,
@@ -75,7 +75,7 @@ async def admin_login_history_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Query login history of the current user with pagination and filtering.",
     )
-)  # type: ignore[misc]
+)
 async def my_login_history_v2(
     info: Info[StrawberryGQLContext],
     filter: LoginHistoryFilterGQL | None = None,

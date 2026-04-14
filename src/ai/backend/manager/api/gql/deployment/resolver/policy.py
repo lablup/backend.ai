@@ -23,7 +23,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration",
     )
-)  # type: ignore[misc]
+)
 async def update_deployment_policy(
     input: UpdateDeploymentPolicyInputGQL,
     info: Info[StrawberryGQLContext],

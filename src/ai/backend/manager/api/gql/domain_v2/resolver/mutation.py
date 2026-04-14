@@ -40,7 +40,7 @@ def _get_user_info() -> UserInfo:
         added_version=NEXT_RELEASE_VERSION,
         description="Create a new domain (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_domain_v2(
     info: Info[StrawberryGQLContext],
     input: CreateDomainInputGQL,
@@ -57,7 +57,7 @@ async def admin_create_domain_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
@@ -77,7 +77,7 @@ async def admin_update_domain_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Soft-delete a domain (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
@@ -96,7 +96,7 @@ async def admin_delete_domain_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_purge_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,

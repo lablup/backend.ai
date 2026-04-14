@@ -46,7 +46,7 @@ def _get_current_user_id() -> UUID:
         added_version=NEXT_RELEASE_VERSION,
         description="Issue a new keypair for the current user. Settings (resource_policy, rate_limit, is_admin) are inherited from the main keypair. The secret_key is only returned at creation time.",
     )
-)  # type: ignore[misc]
+)
 async def issue_my_keypair(
     info: Info[StrawberryGQLContext],
 ) -> IssueMyKeypairPayloadGQL:
@@ -60,7 +60,7 @@ async def issue_my_keypair(
         added_version=NEXT_RELEASE_VERSION,
         description="Revoke a keypair owned by the current user. The main access key cannot be revoked — switch it first.",
     )
-)  # type: ignore[misc]
+)
 async def revoke_my_keypair(
     info: Info[StrawberryGQLContext],
     input: RevokeMyKeypairInputGQL,
@@ -75,7 +75,7 @@ async def revoke_my_keypair(
         added_version=NEXT_RELEASE_VERSION,
         description="Update a keypair owned by the current user (e.g. toggle active state). The keypair must be owned by the current user.",
     )
-)  # type: ignore[misc]
+)
 async def update_my_keypair(
     info: Info[StrawberryGQLContext],
     input: UpdateMyKeypairInputGQL,
@@ -92,7 +92,7 @@ async def update_my_keypair(
         added_version=NEXT_RELEASE_VERSION,
         description="Switch the main access key for the current user. The target keypair must be active and owned by the user.",
     )
-)  # type: ignore[misc]
+)
 async def switch_my_main_access_key(
     info: Info[StrawberryGQLContext],
     input: SwitchMyMainAccessKeyInputGQL,
@@ -110,7 +110,7 @@ async def switch_my_main_access_key(
         added_version=NEXT_RELEASE_VERSION,
         description="Admin creates a keypair for a specified user. The secret_key is only returned at creation time.",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_keypair_v2(
     info: Info[StrawberryGQLContext],
     input: AdminCreateKeypairInputGQL,
@@ -125,7 +125,7 @@ async def admin_create_keypair_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Admin updates a keypair (e.g. toggle active state, change resource policy).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_keypair_v2(
     info: Info[StrawberryGQLContext],
     input: AdminUpdateKeypairInputGQL,
@@ -140,7 +140,7 @@ async def admin_update_keypair_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Admin deletes a keypair by access key. Cannot delete a main access key.",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_keypair_v2(
     info: Info[StrawberryGQLContext],
     access_key: str,
