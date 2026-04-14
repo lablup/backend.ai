@@ -51,12 +51,10 @@ class AuthorizeRequest(BaseRequestModel):
         default=None,
         description="One-time password for TOTP-based two-factor authentication",
     )
-    client_type_id: UUID | None = Field(
-        default=None,
+    client_type_id: UUID = Field(
         description=(
             "Login client type UUID (must reference an existing login_client_types row). "
-            "Concurrent session limits are enforced per client type. "
-            "When omitted, session tracking is not scoped by client type."
+            "Concurrent session limits are enforced per client type."
         ),
     )
     force: bool = Field(

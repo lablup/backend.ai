@@ -493,16 +493,11 @@ class DeploymentService:
         # Create initial revision if provided, via the same path as add_model_revision
         # to ensure preset/merge/resolve logic is applied consistently.
         if revision is not None:
-            add_result = await self.add_model_revision(
+            initial_revision_creator = dataclasses.replace(revision, auto_activate=True)
+            await self.add_model_revision(
                 AddModelRevisionAction(
                     model_deployment_id=deployment_info.id,
-                    adder=revision,
-                )
-            )
-            await self.activate_revision(
-                ActivateRevisionAction(
-                    deployment_id=deployment_info.id,
-                    revision_id=add_result.revision.id,
+                    adder=initial_revision_creator,
                 )
             )
 
@@ -990,6 +985,15 @@ class DeploymentService:
         revision_data = await self._deployment_repository.create_revision_with_next_number(
             creator, deployment_id
         )
+
+        # Auto-activate revision if requested
+        if action.adder.auto_activate:
+            await self.activate_revision(
+                ActivateRevisionAction(
+                    deployment_id=deployment_id,
+                    revision_id=revision_data.id,
+                )
+            )
 
         return AddModelRevisionActionResult(revision=revision_data)
 
