@@ -25,12 +25,10 @@ from ai.backend.common.dto.manager.session.request import (
     GetAbusingReportRequest,
     GetCommitStatusRequest,
     GetContainerLogsRequest,
-    GetStatusHistoryRequest,
     GetTaskLogsRequest,
     ListFilesRequest,
     MatchSessionsRequest,
     RenameSessionRequest,
-    RestartSessionRequest,
     ShutdownServiceRequest,
     StartServiceRequest,
     SyncAgentRegistryRequest,
@@ -343,15 +341,6 @@ class TestDestroySessionRequest:
         assert req.recursive is False
 
 
-class TestRestartSessionRequest:
-    def test_defaults(self) -> None:
-        # The request model carries no fields; ensure it still accepts an
-        # empty body and that the removed ``owner_access_key`` is gone.
-        req = RestartSessionRequest()
-        assert not hasattr(req, "owner_access_key")
-        assert req.model_dump() == {}
-
-
 class TestMatchSessionsRequest:
     def test_required(self) -> None:
         req = MatchSessionsRequest.model_validate({"id": "some-session"})
@@ -440,10 +429,3 @@ class TestGetTaskLogsRequest:
         kid = uuid4()
         req = GetTaskLogsRequest.model_validate({"taskId": str(kid)})
         assert req.kernel_id == kid
-
-
-class TestGetStatusHistoryRequest:
-    def test_defaults(self) -> None:
-        req = GetStatusHistoryRequest()
-        assert not hasattr(req, "owner_access_key")
-        assert req.model_dump() == {}
