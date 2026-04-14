@@ -24,27 +24,12 @@ branch_labels = None
 depends_on = None
 
 
-def _column_names(inspector: sa.engine.reflection.Inspector, table: str) -> set[str]:
-    return {c["name"] for c in inspector.get_columns(table)}
-
-
-def _index_names(inspector: sa.engine.reflection.Inspector, table: str) -> set[str]:
-    return {ix["name"] for ix in inspector.get_indexes(table) if ix["name"] is not None}
-
-
 def upgrade() -> None:
-    bind = op.get_bind()
-    inspector = sa.inspect(bind)
-
-    for table in ("sessions", "kernels"):
-        cols = _column_names(inspector, table)
-        if "access_key" not in cols:
-            continue
-        # Drop any index referencing access_key on this table first.
-        for ix_name in _index_names(inspector, table):
-            if "access_key" in ix_name:
-                op.drop_index(ix_name, table_name=table)
-        op.drop_column(table, "access_key")
+    # The (access_key, sess_id) partial unique index on ``kernels`` references the
+    # column being dropped — remove it first.
+    op.drop_index("ix_kernels_unique_sess_token", table_name="kernels")
+    op.drop_column("kernels", "access_key")
+    op.drop_column("sessions", "access_key")
 
 
 def downgrade() -> None:
@@ -55,14 +40,18 @@ def downgrade() -> None:
     depended on the old column must resolve ``main_access_key`` via the
     ``users`` table instead.
     """
-    bind = op.get_bind()
-    inspector = sa.inspect(bind)
-
-    for table in ("sessions", "kernels"):
-        cols = _column_names(inspector, table)
-        if "access_key" in cols:
-            continue
-        op.add_column(
-            table,
-            sa.Column("access_key", sa.String(length=20), nullable=True),
-        )
+    op.add_column(
+        "sessions",
+        sa.Column("access_key", sa.String(length=20), nullable=True),
+    )
+    op.add_column(
+        "kernels",
+        sa.Column("access_key", sa.String(length=20), nullable=True),
+    )
+    op.create_index(
+        op.f("ix_kernels_unique_sess_token"),
+        "kernels",
+        ["access_key", "sess_id"],
+        unique=True,
+        postgresql_where=sa.text("kernels.status != 'TERMINATED' and kernels.role = 'master'"),
+    )
