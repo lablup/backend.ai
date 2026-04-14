@@ -135,13 +135,11 @@ class TestDeleteResourceGroupPayload:
     """Tests for DeleteResourceGroupPayload model."""
 
     def test_valid_creation(self) -> None:
-        group_id = uuid.uuid4()
-        payload = DeleteResourceGroupPayload(id=group_id)
-        assert payload.id == group_id
+        payload = DeleteResourceGroupPayload(id="test-group")
+        assert payload.id == "test-group"
 
     def test_round_trip(self) -> None:
-        group_id = uuid.uuid4()
-        payload = DeleteResourceGroupPayload(id=group_id)
+        payload = DeleteResourceGroupPayload(id="test-group")
         json_data = payload.model_dump_json()
         restored = DeleteResourceGroupPayload.model_validate_json(json_data)
         assert restored.id == payload.id
