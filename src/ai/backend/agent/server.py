@@ -88,7 +88,7 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
