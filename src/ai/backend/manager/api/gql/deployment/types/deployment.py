@@ -71,6 +71,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentMetadataInfoDTO,
     DeploymentNetworkAccessInfoDTO,
+    DeploymentOrderField,
     DeploymentStrategyInfoDTO,
     ReplicaStateInfo,
 )
@@ -140,7 +141,6 @@ from ai.backend.manager.api.gql_legacy.user import UserNode
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchScope,
     AutoScalingRuleSearchScope,
-    DeploymentOrderField,
     ReplicaSearchScope,
     RevisionSearchScope,
 )
