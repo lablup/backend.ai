@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -21,7 +20,6 @@ class ExecuteSessionActionParams:
 class ExecuteSessionAction(SessionAction):
     session_name: str
     api_version: tuple[Any, ...]
-    owner_id: uuid.UUID
     params: ExecuteSessionActionParams
 
     @override

@@ -245,7 +245,6 @@ def sample_session_data(
         agent_ids=["i-ubuntu"],
         domain_name="default",
         group_id=sample_group_id,
-        owner_id=sample_user_id,
         images=["cr.backend.ai/stable/python:latest"],
         tag=None,
         occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
@@ -296,7 +295,6 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
-            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -319,7 +317,6 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="nonexistent",
-            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -348,7 +345,6 @@ class TestMatchSessions:
                 agent_ids=[],
                 domain_name="default",
                 group_id=sample_group_id,
-                owner_id=sample_user_id,
                 images=["python:latest"],
                 tag=None,
                 occupying_slots=ResourceSlot({}),
@@ -384,7 +380,6 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
-            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -422,7 +417,6 @@ class TestGetStatusHistory:
 
         action = GetStatusHistoryAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_status_history(action)
 
@@ -444,7 +438,6 @@ class TestGetStatusHistory:
 
         action = GetStatusHistoryAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -466,7 +459,6 @@ class TestGetStatusHistory:
 
         action = GetStatusHistoryAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_status_history(action)
 
@@ -505,7 +497,6 @@ class TestDestroySession:
             session_name="test-session",
             forced=False,
             recursive=False,
-            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
@@ -540,7 +531,6 @@ class TestDestroySession:
             session_name="test-session",
             forced=False,
             recursive=False,
-            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
@@ -576,7 +566,6 @@ class TestDestroySession:
             session_name="test-session",
             forced=True,
             recursive=False,
-            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
@@ -612,7 +601,6 @@ class TestDestroySession:
             session_name="test-session",
             forced=False,
             recursive=True,
-            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
@@ -645,7 +633,6 @@ class TestDestroySession:
             session_name="nonexistent",
             forced=False,
             recursive=False,
-            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
@@ -683,7 +670,6 @@ class TestComplete:
 
         action = CompleteAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             code="print('Hello')",
             options=None,
         )
@@ -710,7 +696,6 @@ class TestComplete:
 
         action = CompleteAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
             code="print('Hello')",
             options=None,
         )
@@ -777,7 +762,6 @@ class TestGetSessionInfo:
 
         action = GetSessionInfoAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_session_info(action)
 
@@ -806,7 +790,6 @@ class TestGetSessionInfo:
 
         action = GetSessionInfoAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_session_info(action)
 
@@ -827,7 +810,6 @@ class TestGetSessionInfo:
 
         action = GetSessionInfoAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -858,7 +840,6 @@ class TestDownloadFiles:
         action = DownloadFilesAction(
             user_id=sample_user_id,
             session_name="test-session",
-            owner_id=sample_user_id,
             files=["test_file.txt"],
         )
         result = await session_service.download_files(action)
@@ -885,7 +866,6 @@ class TestDownloadFiles:
         action = DownloadFilesAction(
             user_id=sample_user_id,
             session_name="nonexistent",
-            owner_id=sample_user_id,
             files=["test_file.txt"],
         )
 
@@ -908,7 +888,6 @@ class TestDownloadFiles:
         action = DownloadFilesAction(
             user_id=sample_user_id,
             session_name="test-session",
-            owner_id=sample_user_id,
             files=["file1.txt", "file2.txt", "file3.txt", "file4.txt", "file5.txt", "file6.txt"],
         )
 
@@ -939,7 +918,6 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_direct_access_info(action)
 
@@ -963,7 +941,6 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -992,7 +969,6 @@ class TestRenameSession:
 
         action = RenameSessionAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             new_name="new-session-name",
         )
         result = await session_service.rename_session(action)
@@ -1018,7 +994,6 @@ class TestRenameSession:
 
         action = RenameSessionAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             new_name="new-session-name",
         )
 
@@ -1049,7 +1024,6 @@ class TestRestartSession:
 
         action = RestartSessionAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.restart_session(action)
 
@@ -1074,7 +1048,6 @@ class TestRestartSession:
 
         action = RestartSessionAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1104,7 +1077,6 @@ class TestShutdownService:
 
         action = ShutdownServiceAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             service_name="test-service",
         )
         result = await session_service.shutdown_service(action)
@@ -1129,7 +1101,6 @@ class TestShutdownService:
 
         action = ShutdownServiceAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
             service_name="test-service",
         )
 
@@ -1177,7 +1148,6 @@ class TestUploadFiles:
 
         action = UploadFilesAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             reader=mock_reader,
         )
         result = await session_service.upload_files(action)
@@ -1203,7 +1173,6 @@ class TestUploadFiles:
 
         action = UploadFilesAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
             reader=mock_reader,
         )
 
@@ -1250,7 +1219,6 @@ class TestExecute:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(4, 0),
-            owner_id=sample_user_id,
             params=params,
         )
         result = await session_service.execute_session(action)
@@ -1284,7 +1252,6 @@ class TestExecute:
         action = ExecuteSessionAction(
             session_name="nonexistent",
             api_version=(4, 0),
-            owner_id=sample_user_id,
             params=params,
         )
 
@@ -1315,7 +1282,6 @@ class TestInterrupt:
 
         action = InterruptSessionAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.interrupt(action)
 
@@ -1339,7 +1305,6 @@ class TestInterrupt:
 
         action = InterruptSessionAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1373,7 +1338,6 @@ class TestListFiles:
             user_id=sample_user_id,
             path="/home/work",
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.list_files(action)
 
@@ -1399,7 +1363,6 @@ class TestListFiles:
             user_id=sample_user_id,
             path="/home/work",
             session_name="nonexistent",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1433,7 +1396,6 @@ class TestGetContainerLogs:
 
         action = GetContainerLogsAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             kernel_id=None,  # Optional - get logs from main kernel
         )
         result = await session_service.get_container_logs(action)
@@ -1459,7 +1421,6 @@ class TestGetContainerLogs:
 
         action = GetContainerLogsAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
             kernel_id=None,
         )
 

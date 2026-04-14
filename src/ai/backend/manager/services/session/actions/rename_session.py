@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -12,7 +11,6 @@ from ai.backend.manager.services.session.base import SessionAction
 class RenameSessionAction(SessionAction):
     session_name: str
     new_name: str
-    owner_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:

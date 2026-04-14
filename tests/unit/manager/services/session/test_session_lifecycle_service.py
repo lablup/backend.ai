@@ -220,7 +220,6 @@ def _make_session_data(
         agent_ids=["i-ubuntu"],
         domain_name="default",
         group_id=group_id,
-        owner_id=user_id,
         images=["cr.backend.ai/stable/python:latest"],
         tag=None,
         occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
@@ -311,7 +310,6 @@ class TestCommitSession:
 
         action = CommitSessionAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             filename=None,
         )
 
@@ -334,7 +332,6 @@ class TestCommitSession:
 
         action = CommitSessionAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
             filename=None,
         )
 
@@ -363,7 +360,6 @@ class TestCommitSession:
 
         action = CommitSessionAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             filename="my-snapshot.tar.gz",
         )
 
@@ -398,7 +394,6 @@ class TestGetCommitStatus:
 
         action = GetCommitStatusAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_commit_status(action)
 
@@ -418,7 +413,6 @@ class TestGetCommitStatus:
 
         action = GetCommitStatusAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -461,7 +455,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(1,),
-            owner_id=sample_user_id,
             params=ExecuteSessionActionParams(
                 mode=None,
                 options=None,
@@ -506,7 +499,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_id=sample_user_id,
             params=ExecuteSessionActionParams(
                 mode="batch",
                 options=None,
@@ -545,7 +537,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_id=sample_user_id,
             params=ExecuteSessionActionParams(
                 mode="complete",
                 options={},
@@ -576,7 +567,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_id=sample_user_id,
             params=ExecuteSessionActionParams(
                 mode="continue",
                 options=None,
@@ -607,7 +597,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_id=sample_user_id,
             params=ExecuteSessionActionParams(
                 mode="invalid_mode",
                 options=None,
@@ -638,7 +627,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_id=sample_user_id,
             params=ExecuteSessionActionParams(
                 mode=None,
                 options=None,
@@ -679,7 +667,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_id=sample_user_id,
             params=ExecuteSessionActionParams(
                 mode="query",
                 options=None,
@@ -1387,7 +1374,6 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
-            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -1407,7 +1393,6 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="nonexistent",
-            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -1425,7 +1410,6 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
-            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         await session_service.match_sessions(action)
@@ -1457,7 +1441,6 @@ class TestGetAbusingReport:
 
         action = GetAbusingReportAction(
             session_name="test-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_abusing_report(action)
 
@@ -1476,7 +1459,6 @@ class TestGetAbusingReport:
 
         action = GetAbusingReportAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1510,7 +1492,6 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="system-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_direct_access_info(action)
 
@@ -1540,7 +1521,6 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="interactive-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_direct_access_info(action)
 
@@ -1569,7 +1549,6 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="system-session",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(KernelNotReady):
@@ -1604,7 +1583,6 @@ class TestGetDependencyGraph:
 
         action = GetDependencyGraphAction(
             root_session_name="root-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_dependency_graph(action)
 
@@ -1633,7 +1611,6 @@ class TestGetDependencyGraph:
 
         action = GetDependencyGraphAction(
             root_session_name="root-session",
-            owner_id=sample_user_id,
         )
         result = await session_service.get_dependency_graph(action)
 
@@ -1652,7 +1629,6 @@ class TestGetDependencyGraph:
 
         action = GetDependencyGraphAction(
             root_session_name="root-session",
-            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1879,7 +1855,6 @@ class TestShutdownService:
 
         action = ShutdownServiceAction(
             session_name="test-session",
-            owner_id=sample_user_id,
             service_name="jupyter",
         )
         result = await session_service.shutdown_service(action)
@@ -1900,7 +1875,6 @@ class TestShutdownService:
 
         action = ShutdownServiceAction(
             session_name="nonexistent",
-            owner_id=sample_user_id,
             service_name="jupyter",
         )
 

@@ -19,7 +19,6 @@ class MatchSessionsAction(SessionScopeAction):
     """
 
     id_or_name_prefix: str
-    owner_id: uuid.UUID
     user_id: uuid.UUID
 
     @override

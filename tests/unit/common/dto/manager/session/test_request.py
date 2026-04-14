@@ -341,13 +341,12 @@ class TestDestroySessionRequest:
         req = DestroySessionRequest()
         assert req.forced is False
         assert req.recursive is False
-        assert req.owner_id is None
 
 
 class TestRestartSessionRequest:
     def test_defaults(self) -> None:
         req = RestartSessionRequest()
-        assert req.owner_id is None
+        assert req is not None
 
 
 class TestMatchSessionsRequest:
@@ -443,4 +442,4 @@ class TestGetTaskLogsRequest:
 class TestGetStatusHistoryRequest:
     def test_defaults(self) -> None:
         req = GetStatusHistoryRequest()
-        assert req.owner_id is None
+        assert req is not None

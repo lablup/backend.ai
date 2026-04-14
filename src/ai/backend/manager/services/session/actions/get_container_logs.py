@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -13,7 +12,6 @@ from ai.backend.manager.services.session.base import SessionAction
 @dataclass
 class GetContainerLogsAction(SessionAction):
     session_name: str
-    owner_id: uuid.UUID
     kernel_id: KernelId | None
 
     @override

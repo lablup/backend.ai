@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
@@ -14,7 +13,6 @@ from ai.backend.manager.services.session.base import SessionAction
 @dataclass
 class CompleteAction(SessionAction):
     session_name: str
-    owner_id: uuid.UUID
     code: str
     # TODO: Add type
     options: Mapping[str, Any] | None

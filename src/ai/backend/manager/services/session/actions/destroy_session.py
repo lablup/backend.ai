@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -15,7 +14,6 @@ class DestroySessionAction(SessionAction):
     session_name: str
     forced: bool
     recursive: bool
-    owner_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:

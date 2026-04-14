@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -13,7 +12,6 @@ from ai.backend.manager.services.session.actions.file_base import SessionFileAct
 @dataclass
 class UploadFilesAction(SessionFileAction):
     session_name: str
-    owner_id: uuid.UUID
     # TODO: Refactor this.
     reader: MultipartReader
 

@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -11,7 +10,6 @@ from ai.backend.manager.services.session.actions.app_service_base import Session
 @dataclass
 class ShutdownServiceAction(SessionAppServiceAction):
     session_name: str
-    owner_id: uuid.UUID
     service_name: str
 
     @override

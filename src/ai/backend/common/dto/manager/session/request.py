@@ -352,13 +352,10 @@ class DestroySessionRequest(BaseRequestModel):
 
     forced: bool = False
     recursive: bool = False
-    owner_id: UUID | None = None
 
 
 class RestartSessionRequest(BaseRequestModel):
     """PATCH ``/{session_name}``"""
-
-    owner_id: UUID | None = None
 
 
 class MatchSessionsRequest(BaseRequestModel):
@@ -437,5 +434,3 @@ class GetTaskLogsRequest(BaseRequestModel):
 
 class GetStatusHistoryRequest(BaseRequestModel):
     """GET ``/{session_name}/status-history``"""
-
-    owner_id: UUID | None = None

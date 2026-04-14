@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
@@ -12,7 +11,6 @@ from ai.backend.manager.services.session.actions.commit_base import SessionCommi
 @dataclass
 class CommitSessionAction(SessionCommitAction):
     session_name: str
-    owner_id: uuid.UUID
     filename: str | None
 
     @override

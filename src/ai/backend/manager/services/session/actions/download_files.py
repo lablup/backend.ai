@@ -13,7 +13,6 @@ class DownloadFilesAction(SessionFileAction):
     user_id: uuid.UUID
     session_name: str
     files: list[str]
-    owner_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:

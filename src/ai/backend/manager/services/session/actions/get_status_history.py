@@ -11,7 +11,6 @@ from ai.backend.manager.services.session.base import SessionAction
 @dataclass
 class GetStatusHistoryAction(SessionAction):
     session_name: str
-    owner_id: uuid.UUID
 
     @override
     @classmethod

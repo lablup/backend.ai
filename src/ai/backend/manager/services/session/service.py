@@ -19,6 +19,7 @@ from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
@@ -269,6 +270,18 @@ class SessionService:
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
+    @staticmethod
+    def _requester_user_id() -> uuid.UUID:
+        """Return the authenticated caller's user UUID from context.
+
+        Raises ``InternalServerError`` if no user is in context (should never
+        happen after the auth middleware).
+        """
+        user = current_user()
+        if user is None:
+            raise InternalServerError("No authenticated user in request context")
+        return user.user_id
+
     async def _resolve_owner_main_access_key(
         self,
         owner_id: uuid.UUID,
@@ -288,7 +301,7 @@ class SessionService:
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         filename = action.filename
 
         myself = asyncio.current_task()
@@ -314,7 +327,7 @@ class SessionService:
 
     async def complete(self, action: CompleteAction) -> CompleteActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         code = action.code
         options = action.options or {}
 
@@ -337,7 +350,7 @@ class SessionService:
         self, action: ConvertSessionToImageAction
     ) -> ConvertSessionToImageActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         image_name = action.image_name
         image_visibility = action.image_visibility
         image_owner_id = action.image_owner_id
@@ -783,7 +796,7 @@ class SessionService:
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         forced = action.forced
         recursive = action.recursive
 
@@ -867,7 +880,7 @@ class SessionService:
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         owner_access_key = await self._resolve_owner_main_access_key(owner_id)
         user_id = action.user_id
         file = action.file
@@ -894,7 +907,7 @@ class SessionService:
 
     async def download_files(self, action: DownloadFilesAction) -> DownloadFilesActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         user_id = action.user_id
         files = action.files
         session = await self._session_repository.get_session_validated(
@@ -937,7 +950,7 @@ class SessionService:
 
     async def execute_session(self, action: ExecuteSessionAction) -> ExecuteSessionActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         api_version = action.api_version
 
         resp = {}
@@ -1020,7 +1033,7 @@ class SessionService:
         self, action: GetAbusingReportAction
     ) -> GetAbusingReportActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         session = await self._session_repository.get_session_validated(
             session_name,
             owner_id,
@@ -1034,7 +1047,7 @@ class SessionService:
 
     async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
 
         session = await self._session_repository.get_session_validated(
             session_name,
@@ -1055,7 +1068,7 @@ class SessionService:
     ) -> GetContainerLogsActionResult:
         resp = {"result": {"logs": ""}}
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         kernel_id = action.kernel_id
 
         compute_session = await self._session_repository.get_session_validated(
@@ -1101,7 +1114,7 @@ class SessionService:
         self, action: GetDependencyGraphAction
     ) -> GetDependencyGraphActionResult:
         root_session_name = action.root_session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
 
         dependency_graph = await self._session_repository.find_dependency_sessions(
             root_session_name, owner_id
@@ -1127,7 +1140,7 @@ class SessionService:
         self, action: GetDirectAccessInfoAction
     ) -> GetDirectAccessInfoActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
 
         sess = await self._session_repository.get_session_validated(
             session_name,
@@ -1164,7 +1177,7 @@ class SessionService:
 
     async def get_session_info(self, action: GetSessionInfoAction) -> GetSessionInfoActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
 
         sess = await self._session_repository.get_session_validated(
             session_name,
@@ -1214,7 +1227,7 @@ class SessionService:
         self, action: GetStatusHistoryAction
     ) -> GetStatusHistoryActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
 
         session_row = await self._session_repository.get_session_validated(
             session_name,
@@ -1227,7 +1240,7 @@ class SessionService:
 
     async def interrupt(self, action: InterruptSessionAction) -> InterruptSessionActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
 
         session = await self._session_repository.get_session_validated(
             session_name,
@@ -1241,7 +1254,7 @@ class SessionService:
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         user_id = action.user_id
         path = action.path
 
@@ -1270,7 +1283,7 @@ class SessionService:
 
     async def match_sessions(self, action: MatchSessionsAction) -> MatchSessionsActionResult:
         id_or_name_prefix = action.id_or_name_prefix
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
 
         matches: list[dict[str, Any]] = []
         sessions = await self._session_repository.match_sessions(
@@ -1290,7 +1303,7 @@ class SessionService:
 
     async def rename_session(self, action: RenameSessionAction) -> RenameSessionActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         new_name = action.new_name
 
         try:
@@ -1308,7 +1321,7 @@ class SessionService:
 
     async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
 
         session = await self._session_repository.get_session_validated(
             session_name,
@@ -1321,7 +1334,7 @@ class SessionService:
 
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         service_name = action.service_name
 
         session = await self._session_repository.get_session_validated(
@@ -1453,7 +1466,7 @@ class SessionService:
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
         session_name = action.session_name
-        owner_id = action.owner_id
+        owner_id = self._requester_user_id()
         reader = action.reader
 
         session = await self._session_repository.get_session_validated(

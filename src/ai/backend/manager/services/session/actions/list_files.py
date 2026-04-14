@@ -14,7 +14,6 @@ class ListFilesAction(SessionFileAction):
     user_id: uuid.UUID
     path: str
     session_name: str
-    owner_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:

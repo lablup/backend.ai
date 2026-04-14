@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -12,7 +11,6 @@ from ai.backend.manager.services.session.types import LegacySessionInfo
 @dataclass
 class GetSessionInfoAction(SessionAction):
     session_name: str
-    owner_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:

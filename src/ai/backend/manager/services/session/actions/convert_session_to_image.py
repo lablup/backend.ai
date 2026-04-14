@@ -12,7 +12,6 @@ from ai.backend.manager.services.session.base import SessionAction
 @dataclass
 class ConvertSessionToImageAction(SessionAction):
     session_name: str
-    owner_id: uuid.UUID
     image_name: str
     image_visibility: CustomizedImageVisibilityScope
     image_owner_id: uuid.UUID
