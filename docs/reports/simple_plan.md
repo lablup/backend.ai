@@ -141,6 +141,52 @@ The following are the minimum-effort selections from the main architecture docum
 
 **Trade-off accepted**: Cannot integrate with K8s NetworkPolicy or service mesh for kernel containers.
 
+> **IMPORTANT — Manager node pinning required**: Because the Manager participates in the Docker Swarm as a **Swarm Manager** (to create/manage overlay networks for multi-node sessions), the Manager Pod **must be pinned to a specific node** that has been joined to the Swarm as a manager. Rescheduling the Manager to another node would break Swarm membership and overlay network operations.
+>
+> Apply via Helm values:
+> ```yaml
+> manager:
+>   nodeSelector:
+>     backendai.io/role: swarm-manager
+>   tolerations:
+>     - key: backendai.io/dedicated
+>       operator: Equal
+>       value: swarm-manager
+>       effect: NoSchedule
+> ```
+> And label/taint the target node:
+> ```bash
+> kubectl label node <node> backendai.io/role=swarm-manager
+> kubectl taint node <node> backendai.io/dedicated=swarm-manager:NoSchedule
+> docker swarm init  # or `docker swarm join --token <manager-token> ...`
+> ```
+>
+> For HA: Swarm requires an odd number of managers (3 or 5). If running multiple Manager replicas, each replica must be pinned to a distinct pre-joined Swarm manager node (use `podAntiAffinity` + per-replica `nodeSelector`).
+
+> **IMPORTANT — Docker group GID portability**: Both the Manager Pod (when it talks to the host Swarm daemon) and the Agent Pod (DooD) mount `/var/run/docker.sock` from the host. The in-container user must belong to the *host's* docker group GID, which is **not** stable across distros (Debian/Ubuntu: `999`, RHEL/Rocky/AlmaLinux: often `995` or site-specific, hardened images: arbitrary).
+>
+> A single hardcoded value in `values.yaml` (e.g., `manager.dockerGid: 999`) breaks on any node whose docker group differs. Mitigations:
+> 1. **Init-container GID detection** (recommended): on Pod start, `stat -c '%g' /var/run/docker.sock` → write to a shared emptyDir, and launch the main container with that value as a supplementary group (requires `runAsNonRoot` + `supplementalGroups` patched at runtime, or entrypoint wrapper that `exec setpriv --groups=$GID ...`).
+> 2. **Per-node values override**: enforce a homogeneous distro/GID across the agent pool, documented as a prerequisite.
+> 3. **`hostUsers: false` + user namespace remap** (K8s 1.30+): only works when the kernel supports shifted UID/GID mounts — still experimental for hostPath sockets.
+
+> **IMPORTANT — CNI ↔ Swarm VXLAN port conflict**: Docker Swarm overlay defaults to **UDP 4789**, which is the same port used by Flannel (vxlan backend) and Calico (VXLAN mode). Co-locating Swarm with one of these CNIs on the same node causes silent overlay failures: `docker swarm init` succeeds, but cross-node container traffic is dropped because the CNI grabs the socket first.
+>
+> | CNI | Default encap | Default port | Conflicts with Swarm 4789? |
+> |---|---|---|---|
+> | Cilium (VXLAN) | VXLAN | UDP 8472 | No |
+> | Cilium (Geneve / native routing) | Geneve / none | 6081 / — | No |
+> | **Flannel (vxlan)** | VXLAN | **UDP 4789** | **Yes** |
+> | **Calico (VXLAN mode)** | VXLAN | **UDP 4789** | **Yes** |
+> | Calico (IPIP / BGP) | IPIP / none | — | No |
+> | Weave | VXLAN (fastdp) | UDP 6784 | No |
+>
+> **Policy**: regardless of which CNI is currently deployed, always initialize Swarm with `--data-path-port 7789` so a future CNI swap, Cilium tunnel-port change, or addition of another VXLAN tool (Multus + macvlan-overlay, etc.) cannot silently break multi-node sessions. Verify the operator-modifiable VXLAN port on existing CNI before install:
+> ```bash
+> kubectl get felixconfiguration default -o yaml | grep -i vxlan   # Calico
+> kubectl -n kube-flannel get cm kube-flannel-cfg -o yaml | grep -i port  # Flannel
+> ```
+
 ### 4.3 GPU Driver: Host-Level Installation (no GPU Operator)
 
 | Reason | Details |
@@ -172,22 +218,35 @@ The following are the minimum-effort selections from the main architecture docum
 
 **Trade-off accepted**: Infrastructure team must mount NFS on each node (use cloud-init or Ansible).
 
-### 4.6 Redis HA: Bitnami Helm Sentinel Mode (3 pods)
+### 4.6 Redis HA: Valkey (OSS fork) with Sentinel
+
+> **Bitnami 유료화 대응**: 2025-08-28부로 Bitnami 이미지가 `docker.io/bitnamilegacy/*`로 이동되고 최신 보안 패치는 Bitnami Secure Images (유료 구독)로만 제공됨. **Plan 1은 전 컴포넌트 OSS로만 구성한다.**
 
 | Reason | Details |
 |---|---|
-| Smallest footprint | 3 pods total (master + replica + sentinel sidecar in each) |
-| Already supported | Backend.AI Sentinel client code already exists |
-| Single Helm chart | Standard `bitnami/redis` |
-| Auto-failover | Sentinel handles master election |
+| BSD 라이선스, 장기 지원 | Valkey는 Redis 7.4 기반 커뮤니티 포크 (Linux Foundation, AWS/Google/Oracle 후원) |
+| Backend.AI 호환 | Redis 프로토콜 100% 호환, 기존 Sentinel 클라이언트 코드 그대로 사용 |
+| 공식 Helm 차트 | `valkey-io/valkey` (replication + Sentinel 모드 지원) |
+| 대안 | `ot-container-kit/redis-operator` (Sentinel/Cluster 둘 다 지원, Operator 방식) |
 
-### 4.7 PostgreSQL: Single Instance (or external managed)
+### 4.7 PostgreSQL HA: CloudNativePG Operator
 
 | Reason | Details |
 |---|---|
-| Simplest | Single StatefulSet, single PVC |
-| External option | Can point to AWS RDS / managed Postgres |
-| HA deferred | CloudNativePG operator can be added later |
+| CNCF Sandbox 프로젝트 | Apache-2.0, EDB 주도, 활발한 커뮤니티 |
+| Operator 네이티브 | `Cluster` CRD 하나로 HA, 백업, PITR, 롤링 업그레이드 관리 |
+| Patroni 불필요 | 자체 failover 로직 내장, etcd 의존성 없음 |
+| Backend.AI 호환 | 표준 PostgreSQL 프로토콜, 연결 문자열만 주입 |
+| External option | AWS RDS / Google Cloud SQL / Azure Database도 동일 방식으로 DB URL만 주입 |
+
+### 4.7.1 etcd: 자체 StatefulSet (의존성 제거)
+
+| Reason | Details |
+|---|---|
+| 공식 차트 부재 | etcd-io는 Helm 차트 공식 제공 안 함, etcd-operator는 사실상 아카이브 |
+| 요구사항 단순 | Backend.AI는 read/write/watch + 옵션 RBAC만 사용 — 70줄 StatefulSet으로 충분 |
+| OSS 이미지 | `quay.io/coreos/etcd:v3.5.x` (Apache-2.0) 직접 사용 |
+| 구성 | 3 replica StatefulSet + headless Service + PVC (8Gi) + 기본 RBAC |
 
 ### 4.8 Agent Networking: hostNetwork: true
 
@@ -402,6 +461,9 @@ This estimate assumes:
 | GPU device plugin conflict | Low | Medium | Do not install device plugin on agent nodes |
 | Docker Swarm overlay + K8s CNI overlap | Medium | Medium | Use distinct CIDR ranges (172.30.0.0/16 for Swarm) |
 | Agent pod eviction | Low | High | Use `priorityClassName: backendai-agent-critical` |
+| Manager rescheduled off Swarm manager node | Medium | High | Pin Manager Pod via `nodeSelector` + taint to the Swarm manager node (see §4.2) |
+| Docker group GID mismatch between nodes | Medium | High | `docker.sock` host mount requires the in-Pod user to belong to the host's docker group GID (Debian/Ubuntu: 999, RHEL/Rocky: varies). A single hardcoded `dockerGid` in `values.yaml` breaks on mixed-distro clusters — detect GID at Pod start (init-container reads `stat -c '%g' /var/run/docker.sock` and injects as supplementary group) or set per-node values override |
+| CNI ↔ Swarm VXLAN port conflict (4789) | High (Flannel/Calico-VXLAN) / None (Cilium) | High | Always init Swarm with `--data-path-port 7789` regardless of current CNI; see §4.2 conflict matrix |
 | NFS mount disappears | Low | High | Host-level mount independent of Agent pod |
 | Image registry auth desync | Low | Medium | Helm post-install hook re-syncs on every upgrade |
 | DB migration failure | Medium | High | Helm pre-upgrade hook aborts upgrade on failure |
