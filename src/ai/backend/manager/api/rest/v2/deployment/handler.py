@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
     AddRevisionGQLInputDTO,
-    AddRevisionOptions,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     BulkDeleteAccessTokensInput,
@@ -156,9 +155,7 @@ class V2DeploymentHandler:
         body: BodyParam[AddRevisionGQLInputDTO],
     ) -> APIResponse:
         """Add a new model revision to a deployment."""
-        result = await self._adapter.add_revision(
-            body.parsed, body.parsed.options or AddRevisionOptions()
-        )
+        result = await self._adapter.add_revision(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def get_revision(

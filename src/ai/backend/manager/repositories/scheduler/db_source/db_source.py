@@ -1216,6 +1216,7 @@ class ScheduleDBSource:
                             session_id=row.id,
                             creation_id=row.creation_id,
                             main_access_key=row.access_key,
+>>>>>>> e8b82576d (refactor(BA-5650-I): test and remaining ORM updates)
                         )
                     )
 
@@ -1488,7 +1489,7 @@ class ScheduleDBSource:
                 db_sess,
                 spec.user_scope.domain_name,
                 str(spec.user_scope.group_id),
-                spec.access_key,
+                spec.main_access_key,
             )
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
@@ -1509,7 +1510,7 @@ class ScheduleDBSource:
             dotfile_data = await self._fetch_dotfiles(
                 db_sess,
                 spec.user_scope,
-                spec.access_key,
+                spec.main_access_key,
                 vfolder_mounts,
             )
 
@@ -1553,7 +1554,7 @@ class ScheduleDBSource:
                 db_sess,
                 spec.user_scope.domain_name,
                 str(spec.user_scope.group_id),
-                spec.access_key,
+                spec.main_access_key,
             )
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
@@ -4625,7 +4626,7 @@ class ScheduleDBSource:
             sessions_for_start: list[SessionDataForStart] = []
             for session_id in session_ids:
                 session_info = session_info_map[session_id]
-                user_info = user_map.get(session_info["user_uuid"])
+                user_info = user_map.get(session_info["owner_id"])
                 if not user_info:
                     log.warning(f"User info not found for session {session_id}")
                     continue
@@ -4817,3 +4818,21 @@ class ScheduleDBSource:
         """
         result = await db_sess.execute(sa.select(sa.func.now()))
         return result.scalar_one()
+
+    async def resolve_main_access_keys(
+        self, session_ids: Sequence[SessionId]
+    ) -> dict[SessionId, AccessKey]:
+        """Resolve the main access key for each session's owner.
+
+        Joins sessions → users to look up the owner's main_access_key.
+        """
+        if not session_ids:
+            return {}
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = (
+                sa.select(SessionRow.id, UserRow.main_access_key)
+                .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
+                .where(SessionRow.id.in_([sid for sid in session_ids]))
+            )
+            rows = (await db_sess.execute(stmt)).all()
+            return {SessionId(row[0]): AccessKey(row[1]) for row in rows if row[1] is not None}

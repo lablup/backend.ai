@@ -250,7 +250,6 @@ class TestEnqueueSessionSchedulingHistory:
         async with db_with_cleanup.begin_session() as db_sess:
             keypair = KeyPairRow(
                 user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
-                access_key=access_key,
                 secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                 is_active=True,
                 is_admin=False,
@@ -587,7 +586,6 @@ class TestMarkTerminatingSchedulingHistory:
         async with db_with_cleanup.begin_session() as db_sess:
             keypair = KeyPairRow(
                 user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
-                access_key=access_key,
                 secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
                 is_active=True,
                 is_admin=False,
@@ -662,8 +660,7 @@ class TestMarkTerminatingSchedulingHistory:
         domain_name: str,
         scaling_group_name: str,
         group_id: uuid.UUID,
-        user_uuid: uuid.UUID,
-        access_key: AccessKey,
+        owner_id: uuid.UUID,
         agent_id: str,
     ) -> SessionId:
         """Helper to create a session with a kernel in given statuses."""
@@ -710,8 +707,7 @@ class TestMarkTerminatingSchedulingHistory:
                 requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 domain_name=domain_name,
                 group_id=group_id,
-                user_uuid=user_uuid,
-                access_key=access_key,
+                user_uuid=owner_id,
                 mounts=[],
                 environ={},
                 vfolder_mounts=[],
@@ -746,8 +742,7 @@ class TestMarkTerminatingSchedulingHistory:
             domain_name=test_domain_name,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
+            owner_id=test_user_uuid,
             agent_id=test_agent_id,
         )
 
@@ -787,8 +782,7 @@ class TestMarkTerminatingSchedulingHistory:
             domain_name=test_domain_name,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
+            owner_id=test_user_uuid,
             agent_id=test_agent_id,
         )
 
@@ -827,8 +821,7 @@ class TestMarkTerminatingSchedulingHistory:
             domain_name=test_domain_name,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
+            owner_id=test_user_uuid,
             agent_id=test_agent_id,
         )
 
@@ -868,8 +861,7 @@ class TestMarkTerminatingSchedulingHistory:
             domain_name=test_domain_name,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
+            owner_id=test_user_uuid,
             agent_id=test_agent_id,
         )
         scheduled_session_id = await self._create_session_with_kernel(
@@ -879,8 +871,7 @@ class TestMarkTerminatingSchedulingHistory:
             domain_name=test_domain_name,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
+            owner_id=test_user_uuid,
             agent_id=test_agent_id,
         )
 
