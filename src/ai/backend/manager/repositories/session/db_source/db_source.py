@@ -305,7 +305,9 @@ class SessionDBSource:
             if session_row is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
-            if session_name and session_row.user_uuid is not None:
+            if session_name:
+                # ``SessionRow.user_uuid`` is non-nullable, so we only need to
+                # gate on whether a new name was provided.
                 # Check the owner of the target session has any session with the same name
                 try:
                     sess = await SessionRow.get_session(
@@ -379,7 +381,7 @@ class SessionDBSource:
 
         :param db_sess: Database session
         :param root_session_name_or_id: Root session name or ID
-        :param access_key: Access key of the session owner
+        :param owner_id: UUID of the session owner
         :param allow_stale: Whether to allow stale sessions
         :return: Tuple of (root_session_id, set of dependent session IDs)
         """
