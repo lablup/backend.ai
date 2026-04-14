@@ -30,8 +30,8 @@ from .row import SessionRow
 def _owners_where_main_access_key(
     condition: sa.sql.expression.ColumnElement[bool],
 ) -> sa.sql.expression.ColumnElement[bool]:
-    """Return a predicate matching SessionRow.owner_id against users whose main_access_key satisfies ``condition``."""
-    return SessionRow.owner_id.in_(
+    """Return a predicate matching SessionRow.user_uuid against users whose main_access_key satisfies ``condition``."""
+    return SessionRow.user_uuid.in_(
         sa.select(UserRow.uuid).where(
             UserRow.main_access_key.is_not(None),
             condition,
@@ -476,8 +476,8 @@ class SessionConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.negated:
-                return SessionRow.owner_id != spec.value
-            return SessionRow.owner_id == spec.value
+                return SessionRow.user_uuid != spec.value
+            return SessionRow.user_uuid == spec.value
 
         return inner
 
@@ -487,8 +487,8 @@ class SessionConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.negated:
-                return SessionRow.owner_id.notin_(spec.values)
-            return SessionRow.owner_id.in_(spec.values)
+                return SessionRow.user_uuid.notin_(spec.values)
+            return SessionRow.user_uuid.in_(spec.values)
 
         return inner
 

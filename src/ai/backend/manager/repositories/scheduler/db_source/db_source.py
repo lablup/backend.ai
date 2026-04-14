@@ -316,7 +316,7 @@ class ScheduleDBSource:
                 SessionRow.id,
                 SessionRow.access_key,
                 SessionRow.requested_slots,
-                SessionRow.owner_id,
+                SessionRow.user_uuid,
                 SessionRow.group_id,
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
@@ -3156,7 +3156,7 @@ class ScheduleDBSource:
                 SessionRow.name,
                 SessionRow.environ,
                 SessionRow.cluster_mode,
-                SessionRow.owner_id,
+                SessionRow.user_uuid,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -4160,7 +4160,7 @@ class ScheduleDBSource:
                 SessionRow.name,
                 SessionRow.environ,
                 SessionRow.cluster_mode,
-                SessionRow.owner_id,
+                SessionRow.user_uuid,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -4495,7 +4495,7 @@ class ScheduleDBSource:
                 SessionRow.name,
                 SessionRow.environ,
                 SessionRow.cluster_mode,
-                SessionRow.owner_id,
+                SessionRow.user_uuid,
             )
             session_result = await execute_batch_querier(db_sess, session_query, querier)
 
@@ -4801,7 +4801,7 @@ class ScheduleDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             stmt = (
                 sa.select(SessionRow.id, UserRow.main_access_key)
-                .join(UserRow, SessionRow.owner_id == UserRow.uuid)
+                .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
                 .where(SessionRow.id.in_([sid for sid in session_ids]))
             )
             rows = (await db_sess.execute(stmt)).all()

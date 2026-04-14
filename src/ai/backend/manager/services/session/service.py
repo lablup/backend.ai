@@ -1521,7 +1521,7 @@ class SessionService:
 
         # Regular users can only transit their own sessions
         if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-            if session_row.owner_id != user_id:
+            if session_row.user_uuid != user_id:
                 log.warning(
                     f"You are not allowed to transit other user's session status, skip (s:{session_id})"
                 )
@@ -1559,7 +1559,7 @@ class SessionService:
                     session_row = await self._session_repository.get_session_to_determine_status(
                         sid
                     )
-                    if session_row.owner_id == user_id:
+                    if session_row.user_uuid == user_id:
                         accessible_session_ids.append(sid)
                     else:
                         log.warning(

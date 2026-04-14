@@ -703,7 +703,7 @@ class UserDBSource:
                 .order_by(sa.asc(kernels.c.created_at))
             )
             if user_uuid is not None:
-                query = query.where(kernels.c.owner_id == user_uuid)
+                query = query.where(kernels.c.user_uuid == user_uuid)
             result = await conn.execute(query)
             return result.fetchall()
 

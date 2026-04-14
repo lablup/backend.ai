@@ -503,7 +503,7 @@ def _build_session_fetch_query(
 ) -> sa.sql.Select[Any]:
     cond = base_cond
     if owner_id is not None:
-        cond = cond & (SessionRow.owner_id == owner_id)
+        cond = cond & (SessionRow.user_uuid == owner_id)
     if not allow_stale:
         cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
     query = (
@@ -627,7 +627,7 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
-    return UserRow.uuid == foreign(SessionRow.owner_id)
+    return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
 class SessionRow(Base):  # type: ignore[misc]
@@ -702,14 +702,14 @@ class SessionRow(Base):  # type: ignore[misc]
         "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
     )
     group: Mapped[GroupRow] = relationship("GroupRow", back_populates="sessions")
-    owner_id: Mapped[UUID] = mapped_column(
-        "owner_id", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
+    user_uuid: Mapped[UUID] = mapped_column(
+        "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
     user: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         back_populates="sessions",
-        foreign_keys=[owner_id],
+        foreign_keys=[user_uuid],
     )
 
     # `image` column is identical to kernels `image` column.
@@ -858,7 +858,7 @@ class SessionRow(Base):  # type: ignore[misc]
         sa.Index(
             "ix_sessions_unique_name_per_owner_nonterminal",
             "name",
-            "owner_id",
+            "user_uuid",
             unique=True,
             postgresql_where=sa.text("status NOT IN ('ERROR', 'TERMINATED', 'CANCELLED')"),
         ),
@@ -895,7 +895,7 @@ class SessionRow(Base):  # type: ignore[misc]
             target_sgroup_names=session_data.target_sgroup_names,
             domain_name=session_data.domain_name,
             group_id=session_data.group_id,
-            owner_id=session_data.owner_id,
+            user_uuid=session_data.owner_id,
             images=session_data.images,
             tag=session_data.tag,
             occupying_slots=session_data.occupying_slots,
@@ -939,7 +939,7 @@ class SessionRow(Base):  # type: ignore[misc]
             target_sgroup_names=self.target_sgroup_names,
             domain_name=self.domain_name,
             group_id=self.group_id,
-            owner_id=self.owner_id,
+            owner_id=self.user_uuid,
             images=self.images,
             tag=self.tag,
             occupying_slots=self.occupying_slots,
@@ -987,7 +987,7 @@ class SessionRow(Base):  # type: ignore[misc]
             target_sgroup_names=info.resource.target_sgroup_names,
             domain_name=info.metadata.domain_name,
             group_id=info.metadata.group_id,
-            owner_id=info.metadata.owner_id,
+            user_uuid=info.metadata.owner_id,
             images=info.image.images,
             tag=info.image.tag or info.metadata.tag,
             occupying_slots=info.resource.occupying_slots,
@@ -1028,7 +1028,7 @@ class SessionRow(Base):  # type: ignore[misc]
                 name=self.name or "",
                 domain_name=self.domain_name,
                 group_id=self.group_id,
-                owner_id=self.owner_id,
+                owner_id=self.user_uuid,
                 session_type=self.session_type,
                 priority=self.priority,
                 created_at=self.created_at,
@@ -1253,14 +1253,14 @@ class SessionRow(Base):  # type: ignore[misc]
             self.status_info = _status_info
 
     def delegate_ownership(self, owner_id: UUID) -> None:
-        self.owner_id = owner_id
+        self.user_uuid = owner_id
         for kernel_row in self.kernels:
             kernel_row.delegate_ownership(owner_id)
 
     @staticmethod
     async def delete_by_owner_id(owner_id: UUID, *, db_session: SASession) -> None:
-        await db_session.execute(sa.delete(KernelRow).where(KernelRow.owner_id == owner_id))
-        await db_session.execute(sa.delete(SessionRow).where(SessionRow.owner_id == owner_id))
+        await db_session.execute(sa.delete(KernelRow).where(KernelRow.user_uuid == owner_id))
+        await db_session.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == owner_id))
 
     @staticmethod
     async def set_session_status(
@@ -1592,7 +1592,7 @@ def by_user_id(user_id: UUID) -> QueryCondition:
     def _by_user_id(
         query_stmt: sa.sql.Select[Any],
     ) -> sa.sql.Select[Any]:
-        return query_stmt.where(SessionRow.owner_id == user_id)
+        return query_stmt.where(SessionRow.user_uuid == user_id)
 
     return _by_user_id
 
@@ -1719,7 +1719,7 @@ class ComputeSessionPermissionContext(
 
         if self.user_id_to_permission_map:
             cond = _OR_coalesce(
-                cond, SessionRow.owner_id.in_(self.user_id_to_permission_map.keys())
+                cond, SessionRow.user_uuid.in_(self.user_id_to_permission_map.keys())
             )
         if self.project_id_to_permission_map:
             cond = _OR_coalesce(
@@ -1758,7 +1758,7 @@ class ComputeSessionPermissionContext(
             permissions = overriding_perm
         else:
             permissions |= self.object_id_to_additional_permission_map.get(session_id, set())
-            permissions |= self.user_id_to_permission_map.get(session_row.owner_id, set())
+            permissions |= self.user_id_to_permission_map.get(session_row.user_uuid, set())
             permissions |= self.project_id_to_permission_map.get(session_row.group_id, set())
             permissions |= self.domain_name_to_permission_map.get(session_row.domain_name, set())
         return permissions
@@ -1852,7 +1852,7 @@ class ComputeSessionPermissionContextBuilder(
 
         _vfolder_stmt = (
             sa.select(SessionRow)
-            .where((SessionRow.owner_id == user_id) & (SessionRow.domain_name == domain_name))
+            .where((SessionRow.user_uuid == user_id) & (SessionRow.domain_name == domain_name))
             .options(load_only(SessionRow.id))
         )
         own_folder_map = {
@@ -1872,7 +1872,7 @@ class ComputeSessionPermissionContextBuilder(
 
         _vfolder_stmt = (
             sa.select(SessionRow)
-            .where((SessionRow.owner_id == user_id) & (SessionRow.group_id == project_id))
+            .where((SessionRow.user_uuid == user_id) & (SessionRow.group_id == project_id))
             .options(load_only(SessionRow.id))
         )
         own_folder_map = {

@@ -450,7 +450,7 @@ class SessionAdapter(BaseAdapter):
         orders = self._convert_session_orders(input.order) if input.order else []
 
         def _by_user_uuid() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.owner_id == user.user_id
+            return SessionRow.user_uuid == user.user_id
 
         querier = self._build_querier(
             conditions=conditions,

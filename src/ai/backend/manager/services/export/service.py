@@ -308,7 +308,7 @@ class ExportService:
         Returns:
             Action result containing field names, row iterator, and filename
         """
-        scope_condition: QueryCondition = lambda: SessionRow.owner_id == action.user_uuid
+        scope_condition: QueryCondition = lambda: SessionRow.user_uuid == action.user_uuid
         scoped_query = replace(
             action.query,
             conditions=[scope_condition, *action.query.conditions],

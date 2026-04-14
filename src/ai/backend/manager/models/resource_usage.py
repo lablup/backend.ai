@@ -522,7 +522,7 @@ async def parse_resource_usage_groups(
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map.get(kern.id),
-            user_id=kern.session.owner_id,
+            user_id=kern.session.user_uuid,
             user_email=kern.session.user.email if kern.session.user is not None else None,
             # TODO(BA-5609 phase D): resolve access_key from owner via
             # users.main_access_key. SessionRow.access_key has been removed.
@@ -552,7 +552,7 @@ async def parse_resource_usage_groups(
 
 SESSION_RESOURCE_SELECT_COLS = (
     SessionRow.created_at,
-    SessionRow.owner_id,
+    SessionRow.user_uuid,
     SessionRow.name,
     SessionRow.domain_name,
     SessionRow.id,

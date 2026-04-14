@@ -68,9 +68,9 @@ class DRFScheduler(AbstractScheduler):
 
         # Find who has the least dominant share among the pending session.
         users_with_pending_session: set[uuid.UUID] = {
-            pending_sess.owner_id
+            pending_sess.user_uuid
             for pending_sess in pending_sessions
-            if pending_sess.owner_id is not None
+            if pending_sess.user_uuid is not None
         }
         if not users_with_pending_session:
             return None
@@ -83,7 +83,7 @@ class DRFScheduler(AbstractScheduler):
         # Pick the first pending session of the user
         # who has the lowest dominant share.
         for pending_sess in pending_sessions:
-            if pending_sess.owner_id == least_dominant_share_user:
+            if pending_sess.user_uuid == least_dominant_share_user:
                 return SessionId(pending_sess.id)
 
         return None
@@ -95,7 +95,7 @@ class DRFScheduler(AbstractScheduler):
     ) -> None:
         # In such case, we just skip updating self.per_user_dominant_share state
         # and the scheduler continues to pick another session within the same scaling group.
-        owner_id = scheduled_session_or_kernel.owner_id
+        owner_id = scheduled_session_or_kernel.user_uuid
         requested_slots = scheduled_session_or_kernel.requested_slots
 
         # Update the dominant share.

@@ -138,7 +138,7 @@ class SessionLifecycleManager:
                 async with self.db.begin_readonly_session() as db_sess:
                     session_main_access_key = await db_sess.scalar(
                         sa.select(UserRow.main_access_key).where(
-                            UserRow.uuid == session_row.owner_id
+                            UserRow.uuid == session_row.user_uuid
                         )
                     )
                 await self.hook_plugin_ctx.notify(

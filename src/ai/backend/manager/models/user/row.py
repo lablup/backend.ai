@@ -81,7 +81,7 @@ INACTIVE_USER_STATUSES = (
 def _get_session_row_join_condition() -> Any:
     from ai.backend.manager.models.session import SessionRow
 
-    return UserRow.uuid == foreign(SessionRow.owner_id)
+    return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
 def _get_kernel_row_join_condition() -> Any:
@@ -243,7 +243,7 @@ class UserRow(Base):  # type: ignore[misc]
         "SessionRow",
         back_populates="user",
         primaryjoin=_get_session_row_join_condition,
-        foreign_keys="SessionRow.owner_id",
+        foreign_keys="SessionRow.user_uuid",
     )
     kernels: Mapped[list[KernelRow]] = relationship(
         "KernelRow",

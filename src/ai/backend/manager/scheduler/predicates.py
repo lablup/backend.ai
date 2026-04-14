@@ -311,7 +311,7 @@ async def check_pending_session_count_limit(
     query = (
         sa.select(SessionRow)
         .where(
-            (SessionRow.owner_id == sess_ctx.owner_id)
+            (SessionRow.user_uuid == sess_ctx.owner_id)
             & (SessionRow.status == SessionStatus.PENDING)
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))
@@ -373,7 +373,7 @@ async def check_pending_session_resource_limit(
     query = (
         sa.select(SessionRow)
         .where(
-            (SessionRow.owner_id == sess_ctx.owner_id)
+            (SessionRow.user_uuid == sess_ctx.owner_id)
             & (SessionRow.status == SessionStatus.PENDING)
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))

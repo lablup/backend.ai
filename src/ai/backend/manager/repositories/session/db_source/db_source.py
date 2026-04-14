@@ -52,7 +52,7 @@ class SessionDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(UserRow)
-                .join(SessionRow, SessionRow.owner_id == UserRow.uuid)
+                .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
                 .where(SessionRow.id == session_id)
             )
             user = await db_sess.scalar(query)
@@ -305,13 +305,13 @@ class SessionDBSource:
             if session_row is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
-            if session_name and session_row.owner_id is not None:
+            if session_name and session_row.user_uuid is not None:
                 # Check the owner of the target session has any session with the same name
                 try:
                     sess = await SessionRow.get_session(
                         db_session,
                         session_name,
-                        owner_id=session_row.owner_id,
+                        owner_id=session_row.user_uuid,
                     )
                 except SessionNotFound:
                     pass

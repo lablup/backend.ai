@@ -366,8 +366,8 @@ class SessionConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.negated:
-                return SessionRow.owner_id != spec.value
-            return SessionRow.owner_id == spec.value
+                return SessionRow.user_uuid != spec.value
+            return SessionRow.user_uuid == spec.value
 
         return inner
 
@@ -377,8 +377,8 @@ class SessionConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.negated:
-                return SessionRow.owner_id.notin_(spec.values)
-            return SessionRow.owner_id.in_(spec.values)
+                return SessionRow.user_uuid.notin_(spec.values)
+            return SessionRow.user_uuid.in_(spec.values)
 
         return inner
 

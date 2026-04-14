@@ -60,7 +60,7 @@ PROJECT_POLICY_JOINS = (PROJECT_JOIN, PROJECT_RESOURCE_POLICY_JOIN)
 # User JOIN (N:1, no duplication)
 USER_JOIN = JoinDef(
     table=UserRow.__table__,
-    condition=SessionRow.owner_id == UserRow.uuid,
+    condition=SessionRow.user_uuid == UserRow.uuid,
 )
 
 # All Kernels JOIN (1:N, causes duplication)

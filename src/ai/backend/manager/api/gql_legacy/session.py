@@ -1267,7 +1267,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
-            .join(UserRow, SessionRow.owner_id == UserRow.uuid)
+            .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
             .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
         query = sa.select(sa.func.count(sa.distinct(SessionRow.id))).select_from(j)
@@ -1308,7 +1308,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-                UserRow, SessionRow.owner_id == UserRow.uuid
+                UserRow, SessionRow.user_uuid == UserRow.uuid
             )
         )
         query = (
@@ -1356,7 +1356,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         access_key: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            UserRow, SessionRow.owner_id == UserRow.uuid
+            UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = (
             sa.select(
