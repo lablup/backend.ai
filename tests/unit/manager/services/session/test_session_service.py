@@ -245,10 +245,7 @@ def sample_session_data(
         agent_ids=["i-ubuntu"],
         domain_name="default",
         group_id=sample_group_id,
-<<<<<<< HEAD
         owner_id=sample_user_id,
-=======
->>>>>>> d59487b17 (refactor(BA-5650-I): test and remaining ORM updates)
         images=["cr.backend.ai/stable/python:latest"],
         tag=None,
         occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
@@ -349,10 +346,7 @@ class TestMatchSessions:
                 agent_ids=[],
                 domain_name="default",
                 group_id=sample_group_id,
-<<<<<<< HEAD
                 owner_id=sample_user_id,
-=======
->>>>>>> d59487b17 (refactor(BA-5650-I): test and remaining ORM updates)
                 images=["python:latest"],
                 tag=None,
                 occupying_slots=ResourceSlot({}),
