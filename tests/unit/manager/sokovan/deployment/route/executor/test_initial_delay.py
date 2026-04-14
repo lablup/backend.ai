@@ -69,17 +69,8 @@ class TestInitializeHealthRecordsInitialDelay:
         route = _make_route(created_at_ts=1000)
         route_id_str = str(route.route_id)
 
-        existing_record = RouteHealthRecord(
-            route_id=route_id_str,
-            created_at=1000,
-            initial_delay_until=0,
-            health_path="/health",
-            inference_port=8000,
-            replica_host="10.0.0.1",
-            running_at=5000,
-        )
-        mock_valkey_schedule.get_route_health_records_batch.return_value = {
-            route_id_str: existing_record,
+        mock_valkey_schedule.get_route_running_at_batch.return_value = {
+            route_id_str: 5000,
         }
         mock_valkey_schedule.get_redis_time.return_value = 5100
         mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
@@ -111,7 +102,7 @@ class TestInitializeHealthRecordsInitialDelay:
         """
         route = _make_route(created_at_ts=1000)
 
-        mock_valkey_schedule.get_route_health_records_batch.return_value = {}
+        mock_valkey_schedule.get_route_running_at_batch.return_value = {}
         mock_valkey_schedule.get_redis_time.return_value = 6000
         mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
             route.revision_id: ModelHealthCheck(path="/health", initial_delay=720.0),
@@ -145,17 +136,8 @@ class TestInitializeHealthRecordsInitialDelay:
         route = _make_route(created_at_ts=1000)
         route_id_str = str(route.route_id)
 
-        existing_record = RouteHealthRecord(
-            route_id=route_id_str,
-            created_at=1000,
-            initial_delay_until=0,
-            health_path="/health",
-            inference_port=8000,
-            replica_host="10.0.0.1",
-            running_at=5000,
-        )
-        mock_valkey_schedule.get_route_health_records_batch.return_value = {
-            route_id_str: existing_record,
+        mock_valkey_schedule.get_route_running_at_batch.return_value = {
+            route_id_str: 5000,
         }
         mock_valkey_schedule.get_redis_time.return_value = 1800
         mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {

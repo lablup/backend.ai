@@ -691,6 +691,37 @@ class ValkeyScheduleClient:
             await conn.expire(key, ROUTE_HEALTH_TTL_SEC)
 
     @valkey_schedule_resilience.apply()
+    async def get_route_running_at_batch(self, route_ids: Sequence[str]) -> dict[str, int | None]:
+        """
+        Batch read running_at field from route health hashes.
+        Works even on partial hashes (before full RouteHealthRecord is initialized).
+
+        :param route_ids: Route IDs to look up
+        :return: Mapping of route_id to running_at timestamp (None if not set)
+        """
+        if not route_ids:
+            return {}
+
+        batch = Batch(is_atomic=False)
+        for route_id in route_ids:
+            key = self._get_route_health_key(route_id)
+            batch.hget(key, "running_at")
+
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=False)
+        if results is None:
+            return dict.fromkeys(route_ids)
+
+        running_at_map: dict[str, int | None] = {}
+        for i, route_id in enumerate(route_ids):
+            raw = results[i] if len(results) > i else None
+            if raw and raw != b"0":
+                running_at_map[route_id] = int(raw)
+            else:
+                running_at_map[route_id] = None
+        return running_at_map
+
+    @valkey_schedule_resilience.apply()
     async def refresh_route_health_ttl(self, route_id: str) -> None:
         """
         Refresh TTL for a route health record without changing any data.

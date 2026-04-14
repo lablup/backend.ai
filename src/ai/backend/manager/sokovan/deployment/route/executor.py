@@ -261,8 +261,10 @@ class RouteExecutor:
         redis_time = await self._valkey_schedule.get_redis_time()
 
         # Read existing running_at values that were set when routes transitioned to RUNNING
-        route_id_strs = [str(r.route_id) for r in routes]
-        existing_records = await self._valkey_schedule.get_route_health_records_batch(route_id_strs)
+        # These may be in partial hashes (only running_at field), so read raw field directly
+        running_at_map = await self._valkey_schedule.get_route_running_at_batch([
+            str(r.route_id) for r in routes
+        ])
 
         records: list[RouteHealthRecord] = []
         for route in routes:
@@ -275,8 +277,7 @@ class RouteExecutor:
 
             # Use running_at from Valkey (set at RUNNING transition), fallback to redis_time
             route_id_str = str(route.route_id)
-            existing = existing_records.get(route_id_str)
-            running_at = existing.running_at if existing and existing.running_at else redis_time
+            running_at = running_at_map.get(route_id_str) or redis_time
             initial_delay_until = running_at + int(initial_delay)
 
             records.append(
