@@ -135,7 +135,7 @@ class CreateFromTemplateRequest(BaseRequestModel):
         default=None,
         validation_alias=AliasChoices("callback_url", "callbackUrl", "callbackURL"),
     )
-    owner_access_key: str | None = None
+    owner_id: UUID | None = None
 
 
 class CreateFromParamsRequest(BaseRequestModel):
@@ -214,7 +214,7 @@ class CreateFromParamsRequest(BaseRequestModel):
         default=None,
         validation_alias=AliasChoices("callback_url", "callbackUrl", "callbackURL"),
     )
-    owner_access_key: str | None = None
+    owner_id: UUID | None = None
 
 
 class CreateClusterRequest(BaseRequestModel):
@@ -252,7 +252,7 @@ class CreateClusterRequest(BaseRequestModel):
         ge=0,
         validation_alias=AliasChoices("max_wait_seconds", "maxWaitSeconds"),
     )
-    owner_access_key: str | None = None
+    owner_id: UUID | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -352,13 +352,13 @@ class DestroySessionRequest(BaseRequestModel):
 
     forced: bool = False
     recursive: bool = False
-    owner_access_key: str | None = None
+    owner_id: UUID | None = None
 
 
 class RestartSessionRequest(BaseRequestModel):
     """PATCH ``/{session_name}``"""
 
-    owner_access_key: str | None = None
+    owner_id: UUID | None = None
 
 
 class MatchSessionsRequest(BaseRequestModel):
@@ -419,9 +419,9 @@ class ListFilesRequest(BaseRequestModel):
 class GetContainerLogsRequest(BaseRequestModel):
     """GET ``/{session_name}/logs``"""
 
-    owner_access_key: str | None = Field(
+    owner_id: UUID | None = Field(
         default=None,
-        validation_alias=AliasChoices("owner_access_key", "ownerAccessKey"),
+        validation_alias=AliasChoices("owner_id", "ownerId"),
     )
     kernel_id: UUID | None = Field(
         default=None,
@@ -442,4 +442,4 @@ class GetTaskLogsRequest(BaseRequestModel):
 class GetStatusHistoryRequest(BaseRequestModel):
     """GET ``/{session_name}/status-history``"""
 
-    owner_access_key: str | None = None
+    owner_id: UUID | None = None
