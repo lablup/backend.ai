@@ -370,6 +370,15 @@ class RouteCoordinator:
                 batch_updaters, BulkCreator(specs=all_history_specs)
             )
 
+        # Record running_at in Valkey for routes that just transitioned to RUNNING
+        if (
+            transitions.success is not None
+            and transitions.success.status == RouteStatus.RUNNING
+            and result.successes
+        ):
+            for route in result.successes:
+                await self._valkey_schedule.mark_route_running_at(str(route.route_id))
+
     async def process_if_needed(self, lifecycle_type: RouteLifecycleType) -> None:
         """
         Process route lifecycle operation if needed (based on internal state).

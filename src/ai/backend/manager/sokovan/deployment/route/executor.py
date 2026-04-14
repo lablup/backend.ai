@@ -230,6 +230,12 @@ class RouteExecutor:
         health_configs = await self._deployment_repo.fetch_health_check_configs_by_revision_ids(
             revision_ids
         )
+        redis_time = await self._valkey_schedule.get_redis_time()
+
+        # Read existing running_at values that were set when routes transitioned to RUNNING
+        route_id_strs = [str(r.route_id) for r in routes]
+        existing_records = await self._valkey_schedule.get_route_health_records_batch(route_id_strs)
+
         records: list[RouteHealthRecord] = []
         for route in routes:
             host, port = replica_info[route.route_id]
@@ -238,16 +244,22 @@ class RouteExecutor:
             health_path = health_config.path if health_config else "/"
             initial_delay = health_config.initial_delay if health_config else 60.0
             created_at = int(route.created_at.timestamp())
-            initial_delay_until = created_at + int(initial_delay)
+
+            # Use running_at from Valkey (set at RUNNING transition), fallback to redis_time
+            route_id_str = str(route.route_id)
+            existing = existing_records.get(route_id_str)
+            running_at = existing.running_at if existing and existing.running_at else redis_time
+            initial_delay_until = running_at + int(initial_delay)
 
             records.append(
                 RouteHealthRecord(
-                    route_id=str(route.route_id),
+                    route_id=route_id_str,
                     created_at=created_at,
                     initial_delay_until=initial_delay_until,
                     health_path=health_path,
                     inference_port=port,
                     replica_host=host,
+                    running_at=running_at,
                 )
             )
 

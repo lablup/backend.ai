@@ -95,10 +95,13 @@ class RouteHealthRecord:
 
     route_id: str
     created_at: int  # Unix timestamp when route was created
-    initial_delay_until: int  # Unix timestamp = created_at + initial_delay
+    initial_delay_until: int  # Unix timestamp = running_at + initial_delay
     health_path: str  # extracted from model_definition
     inference_port: int  # extracted from kernel
     replica_host: str  # extracted from kernel
+
+    # Timestamp when route entered RUNNING state (set by coordinator)
+    running_at: int | None = None
 
     # Agent check results
     agent_healthy: bool = False
@@ -128,7 +131,7 @@ class RouteHealthRecord:
 
     def to_valkey_hash(self) -> Mapping[str, str]:
         """Serialize to Valkey hash fields."""
-        return {
+        data: dict[str, str] = {
             "route_id": self.route_id,
             "created_at": str(self.created_at),
             "initial_delay_until": str(self.initial_delay_until),
@@ -140,6 +143,9 @@ class RouteHealthRecord:
             "manager_healthy": "1" if self.manager_healthy else "0",
             "manager_last_check": str(self.manager_last_check),
         }
+        if self.running_at is not None:
+            data["running_at"] = str(self.running_at)
+        return data
 
     @classmethod
     def from_valkey_hash(cls, data: Mapping[str, str]) -> RouteHealthRecord:
@@ -151,6 +157,7 @@ class RouteHealthRecord:
             health_path=data["health_path"],
             inference_port=int(data["inference_port"]),
             replica_host=data["replica_host"],
+            running_at=int(raw) if (raw := data.get("running_at")) and raw != "0" else None,
             agent_healthy=data.get("agent_healthy", "0") == "1",
             agent_last_check=int(data.get("agent_last_check", "0")),
             manager_healthy=data.get("manager_healthy", "0") == "1",
@@ -667,6 +674,21 @@ class ValkeyScheduleClient:
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
+
+    @valkey_schedule_resilience.apply()
+    async def mark_route_running_at(self, route_id: str) -> None:
+        """
+        Record the RUNNING transition timestamp for a route.
+        Called when a route transitions to RUNNING status.
+        Uses Redis time for consistency with health check comparisons.
+
+        :param route_id: The route ID that entered RUNNING state
+        """
+        key = self._get_route_health_key(route_id)
+        current_time = str(await self._get_redis_time())
+        async with self._client.client() as conn:
+            await conn.hset(key, {"running_at": current_time})
+            await conn.expire(key, ROUTE_HEALTH_TTL_SEC)
 
     @valkey_schedule_resilience.apply()
     async def refresh_route_health_ttl(self, route_id: str) -> None:
