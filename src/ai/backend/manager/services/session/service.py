@@ -288,16 +288,17 @@ class SessionService:
     ) -> AccessKey:
         """Resolve a delegated owner UUID to that user's main access key.
 
-        Loads the target user via the user repository and returns the main
-        access key. Raises ``InternalServerError`` if the target user has no
-        main access key configured.
+        Uses the narrower ``UserRepository.get_main_access_key_by_id`` helper
+        so we only fetch the single scalar column we need. Raises
+        ``InternalServerError`` if the target user has no main access key
+        configured.
         """
-        user_data = await self._user_repository.get_user_by_uuid(owner_id)
-        if user_data.main_access_key is None:
+        main_access_key = await self._user_repository.get_main_access_key_by_id(owner_id)
+        if main_access_key is None:
             raise InternalServerError(
                 f"Delegated owner {owner_id} has no main access key configured"
             )
-        return AccessKey(user_data.main_access_key)
+        return AccessKey(main_access_key)
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name

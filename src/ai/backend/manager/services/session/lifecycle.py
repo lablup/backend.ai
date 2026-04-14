@@ -23,6 +23,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
 )
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
+    AccessKey,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -136,18 +137,29 @@ class SessionLifecycleManager:
                     SessionStartedAnycastEvent(session_row.id, creation_id)
                 )
                 # BA-5609: resolve main_access_key from owner_id; external
-                # hook plugins still receive the resolved access key.
+                # hook plugins still receive the resolved access key. If the
+                # owner has no main_access_key configured, skip the hook —
+                # calling it with ``None`` would likely break plugins that
+                # assume a non-null keypair identifier.
                 session_main_access_key = await self._user_repository.get_main_access_key_by_id(
                     session_row.user_uuid
                 )
-                await self.hook_plugin_ctx.notify(
-                    "POST_START_SESSION",
-                    (
+                if session_main_access_key is not None:
+                    await self.hook_plugin_ctx.notify(
+                        "POST_START_SESSION",
+                        (
+                            session_row.id,
+                            session_row.name,
+                            AccessKey(session_main_access_key),
+                        ),
+                    )
+                else:
+                    log.warning(
+                        "POST_START_SESSION skipped: owner {} has no main_access_key"
+                        " (session {})",
+                        session_row.user_uuid,
                         session_row.id,
-                        session_row.name,
-                        session_main_access_key,
-                    ),
-                )
+                    )
                 match session_row.session_type:
                     case SessionTypes.BATCH:
                         await self.registry.trigger_batch_execution(session_row)
