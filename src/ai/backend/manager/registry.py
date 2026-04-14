@@ -254,7 +254,6 @@ class AgentRegistry:
             event_producer,
             hook_plugin_ctx,
             self,
-            user_repository,
         )
         self._client_pool = ClientPool(tcp_client_session_factory)
 

@@ -674,11 +674,14 @@ class UserDBSource:
         target_user_uuid: UUID,
         target_main_access_key: AccessKey,
     ) -> None:
-        """Delegate endpoint ownership to another user."""
+        """Delegate endpoint ownership to another user.
+
+        ``target_main_access_key`` is kept on the facade for caller compatibility
+        but is no longer required by ``EndpointRow.delegate_endpoint_ownership``.
+        """
+        del target_main_access_key  # unused
         async with self._db.begin_session() as session:
-            await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, target_main_access_key
-            )
+            await EndpointRow.delegate_endpoint_ownership(session, user_uuid, target_user_uuid)
 
     async def delete_endpoints(
         self,

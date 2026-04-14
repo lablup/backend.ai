@@ -495,15 +495,24 @@ def _build_session_fetch_query(
     base_cond: Any,
     *,
     owner_id: UUID | None = None,
+    owner_access_key: Any = None,
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
     max_matches: int | None = None,
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> sa.sql.Select[Any]:
+    from ai.backend.manager.models.user import UserRow as _UserRow
+
     cond = base_cond
     if owner_id is not None:
         cond = cond & (SessionRow.user_uuid == owner_id)
+    if owner_access_key is not None:
+        # Resolve the access key to its user via the users table so sessions
+        # filtered by the caller's main_access_key continue to work while the
+        # DB-level ``sessions.access_key`` column is being phased out.
+        owner_subq = sa.select(_UserRow.uuid).where(_UserRow.main_access_key == owner_access_key)
+        cond = cond & SessionRow.user_uuid.in_(owner_subq)
     if not allow_stale:
         cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
     query = (
@@ -529,6 +538,7 @@ async def _match_sessions_by_id(
     session_id_or_list: SessionId | list[SessionId],
     *,
     owner_id: UUID | None = None,
+    owner_access_key: Any = None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
@@ -546,6 +556,7 @@ async def _match_sessions_by_id(
     query = _build_session_fetch_query(
         cond,
         owner_id=owner_id,
+        owner_access_key=owner_access_key,
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
@@ -561,6 +572,7 @@ async def _match_sessions_by_name(
     session_name: str,
     *,
     owner_id: UUID | None = None,
+    owner_access_key: Any = None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
@@ -575,6 +587,7 @@ async def _match_sessions_by_name(
     query = _build_session_fetch_query(
         cond,
         owner_id=owner_id,
+        owner_access_key=owner_access_key,
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
@@ -1325,6 +1338,7 @@ class SessionRow(Base):  # type: ignore[misc]
         session_reference: str | UUID | list[UUID],
         *,
         owner_id: UUID | None = None,
+        owner_access_key: Any = None,
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
@@ -1380,6 +1394,7 @@ class SessionRow(Base):  # type: ignore[misc]
             rows = await fetch_func(
                 db_session,
                 owner_id=owner_id,
+                owner_access_key=owner_access_key,
                 allow_stale=allow_stale,
                 for_update=for_update,
                 max_matches=max_matches,
@@ -1397,6 +1412,7 @@ class SessionRow(Base):  # type: ignore[misc]
         session_name_or_id: str | UUID,
         *,
         owner_id: UUID | None = None,
+        owner_access_key: Any = None,
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
@@ -1442,6 +1458,7 @@ class SessionRow(Base):  # type: ignore[misc]
             db_session,
             session_name_or_id,
             owner_id=owner_id,
+            owner_access_key=owner_access_key,
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,

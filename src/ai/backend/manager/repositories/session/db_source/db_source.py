@@ -73,7 +73,7 @@ class SessionDBSource:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
-                owner_access_key,
+                owner_access_key=owner_access_key,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
                 eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
@@ -88,7 +88,7 @@ class SessionDBSource:
             return await SessionRow.match_sessions(
                 db_sess,
                 id_or_name_prefix,
-                owner_access_key,
+                owner_access_key=owner_access_key,
             )
 
     async def get_session_to_determine_status(
@@ -140,7 +140,7 @@ class SessionDBSource:
                 await SessionRow.get_session(
                     db_session,
                     new_name,
-                    owner_access_key,
+                    owner_access_key=owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.NONE,
                 )
                 raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
@@ -151,7 +151,7 @@ class SessionDBSource:
             session_row = await SessionRow.get_session(
                 db_session,
                 session_name_or_id,
-                owner_access_key,
+                owner_access_key=owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
             )
 
@@ -311,7 +311,7 @@ class SessionDBSource:
                     sess = await SessionRow.get_session(
                         db_session,
                         session_name,
-                        AccessKey(session_row.access_key),
+                        owner_access_key=AccessKey(session_row.access_key),
                     )
                 except SessionNotFound:
                     pass
@@ -401,7 +401,7 @@ class SessionDBSource:
         root_session = await SessionRow.get_session(
             db_sess,
             root_session_name_or_id,
-            access_key=access_key,
+            owner_access_key=access_key,
             allow_stale=allow_stale,
         )
         root_session_id = cast(uuid.UUID, root_session.id)
@@ -441,7 +441,7 @@ class SessionDBSource:
                     session = await SessionRow.get_session(
                         db_sess,
                         session_name_or_id,
-                        access_key,
+                        owner_access_key=access_key,
                         kernel_loading_strategy=KernelLoadingStrategy.NONE,
                         allow_stale=True,
                     )
@@ -475,7 +475,7 @@ class SessionDBSource:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
-                owner_access_key,
+                owner_access_key=owner_access_key,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
                 eager_loading_op=[selectinload(SessionRow.group)],
@@ -491,7 +491,7 @@ class SessionDBSource:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
-                owner_access_key,
+                owner_access_key=owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 eager_loading_op=[
                     selectinload(SessionRow.routing).options(noload("*")),

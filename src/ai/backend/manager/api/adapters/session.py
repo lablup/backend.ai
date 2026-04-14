@@ -933,13 +933,13 @@ class SessionAdapter(BaseAdapter):
         return SessionNode(
             id=data.id,
             domain_name=data.domain_name,
-            user_id=data.user_uuid,
+            user_id=data.owner_id,
             project_id=data.group_id,
             metadata=SessionMetadataInfoGQLDTO(
                 creation_id=data.creation_id or "",
                 name=data.name or "",
                 session_type=data.session_type.value,
-                access_key=str(data.access_key) if data.access_key else "",
+                access_key="",
                 cluster_mode=data.cluster_mode.name,
                 cluster_size=data.cluster_size,
                 priority=data.priority,

@@ -13,6 +13,7 @@ import aiotools
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
@@ -22,12 +23,15 @@ from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 async def _find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
-    owner_id: UUID,
+    owner: UUID | AccessKey,
 ) -> dict[str, list[Any] | str]:
+    owner_id: UUID | None = owner if isinstance(owner, UUID) else None
+    owner_access_key = owner if not isinstance(owner, UUID) else None
     sessions = await SessionRow.match_sessions(
         db_session,
         session_name_or_id,
         owner_id=owner_id,
+        owner_access_key=owner_access_key,
     )
 
     if len(sessions) < 1:
@@ -65,7 +69,7 @@ async def _find_dependency_sessions(
         "status": str(kernel_query_result[0]),
         "status_changed": str(kernel_query_result[1]),
         "depends_on": [
-            await _find_dependency_sessions(dependency_session_id, db_session, owner_id)
+            await _find_dependency_sessions(dependency_session_id, db_session, owner)
             for dependency_session_id in dependency_session_ids
         ],
     }
@@ -76,9 +80,9 @@ async def _find_dependency_sessions(
 async def find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
-    owner_id: UUID,
+    owner: UUID | AccessKey,
 ) -> dict[str, list[Any] | str]:
-    return await _find_dependency_sessions(session_name_or_id, db_session, owner_id)
+    return await _find_dependency_sessions(session_name_or_id, db_session, owner)
 
 
 async def find_dependent_sessions(
