@@ -3816,23 +3816,20 @@ class TestDeploymentRepositoryDuplicateName:
         assert result.metadata.name == "reusable-endpoint"
         assert result.metadata.project == test_group.id
 
-    async def test_destroy_endpoint_with_destroying_sibling_does_not_conflict(
+    @pytest.fixture
+    async def coexisting_active_and_destroying_endpoints(
         self,
-        deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_group: GroupRow,
         test_scaling_group: ScalingGroupRow,
-    ) -> None:
-        """Regression for BA-5698.
+    ) -> tuple[uuid.UUID, uuid.UUID]:
+        """Seed two endpoints sharing (name, domain, project) — one CREATED and
+        one already in DESTROYING — bypassing the application-level uniqueness
+        check to reproduce the corrupt state described in BA-5698.
 
-        Two endpoint rows can legitimately coexist with the same
-        (name, domain, project) when one is already in DESTROYING — for example
-        when a stuck DESTROYING row was reached via a non-standard path or
-        survived a prior incident. Transitioning the active sibling to
-        DESTROYING must not collide on the partial unique index. The narrowed
-        predicate (which excludes DESTROYING/DESTROYED) keeps the destroy UPDATE
-        from re-inserting an index entry that races with the sibling.
+        Returns (target_id, sibling_id) where target is the active row to be
+        destroyed and sibling is the DESTROYING row.
         """
         duplicate_name = f"dup-destroy-{uuid.uuid4().hex[:8]}"
         target_id = uuid.uuid4()
@@ -3870,6 +3867,26 @@ class TestDeploymentRepositoryDuplicateName:
             )
             db_sess.add_all([target, sibling])
             await db_sess.commit()
+
+        return target_id, sibling_id
+
+    async def test_destroy_endpoint_with_destroying_sibling_does_not_conflict(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        coexisting_active_and_destroying_endpoints: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """Regression for BA-5698.
+
+        Two endpoint rows can legitimately coexist with the same
+        (name, domain, project) when one is already in DESTROYING — for example
+        when a stuck DESTROYING row was reached via a non-standard path or
+        survived a prior incident. Transitioning the active sibling to
+        DESTROYING must not collide on the partial unique index. The narrowed
+        predicate (which excludes DESTROYING/DESTROYED) keeps the destroy UPDATE
+        from re-inserting an index entry that races with the sibling.
+        """
+        target_id, _ = coexisting_active_and_destroying_endpoints
 
         succeeded = await deployment_repository.destroy_endpoint(target_id)
         assert succeeded is True
