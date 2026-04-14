@@ -39,7 +39,7 @@ def _create_session_data(
         cluster_size=1,
         domain_name="default",
         group_id=uuid4(),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         occupying_slots={},
         requested_slots={"cpu": Decimal("1"), "mem": Decimal("1073741824")},
         use_host_network=False,
@@ -49,7 +49,7 @@ def _create_session_data(
         num_queries=0,
         creation_id="test-creation-id",
         name=name,
-        access_key=None,
+        
         scaling_group_name="default",
         target_sgroup_names=None,
         agent_ids=None,
@@ -123,7 +123,7 @@ class TestSessionDataToNode:
         data = _create_session_data()
         node = SessionAdapter._session_data_to_node(data)
         assert node.domain_name == "default"
-        assert node.user_id == data.user_uuid
+        assert node.user_id == data.owner_id
         assert node.project_id == data.group_id
 
     def test_network_host_network_false(self) -> None:
