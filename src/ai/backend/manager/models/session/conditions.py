@@ -34,13 +34,14 @@ class SessionConditions:
     def _owners_where_main_access_key(
         condition: sa.sql.expression.ColumnElement[bool],
     ) -> sa.sql.expression.ColumnElement[bool]:
-        """Return a predicate matching SessionRow.user_uuid against users whose main_access_key satisfies ``condition``."""
-        return SessionRow.user_uuid.in_(
-            sa.select(UserRow.uuid).where(
-                UserRow.main_access_key.is_not(None),
-                condition,
-            )
-        )
+        """Return a predicate matching ``SessionRow.user_uuid`` against users whose ``main_access_key`` satisfies ``condition``.
+
+        The subquery selects ``users.uuid`` (non-null PK) so ``NOT IN`` is
+        well-defined. NULL ``main_access_key`` fails ``condition`` (evaluates
+        to NULL, not TRUE), so such users are excluded from the subquery
+        without needing an explicit ``IS NOT NULL`` guard.
+        """
+        return SessionRow.user_uuid.in_(sa.select(UserRow.uuid).where(condition))
 
     @staticmethod
     def by_ids(session_ids: Collection[SessionId]) -> QueryCondition:
