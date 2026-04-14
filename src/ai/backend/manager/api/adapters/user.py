@@ -1067,6 +1067,18 @@ class UserAdapter(BaseAdapter):
             conditions.append(
                 UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.in_])
             )
+        if sf.not_equals is not None:
+            conditions.append(
+                negate_conditions([
+                    UserConditions.by_status_equals(DataUserStatus(sf.not_equals.value))
+                ])
+            )
+        if sf.not_in is not None:
+            conditions.append(
+                negate_conditions([
+                    UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.not_in])
+                ])
+            )
         return conditions
 
     @staticmethod
@@ -1076,6 +1088,18 @@ class UserAdapter(BaseAdapter):
             conditions.append(UserConditions.by_role_equals(DataUserRole(rf.equals.value)))
         if rf.in_ is not None:
             conditions.append(UserConditions.by_role_in([DataUserRole(r.value) for r in rf.in_]))
+        if rf.not_equals is not None:
+            conditions.append(
+                negate_conditions([
+                    UserConditions.by_role_equals(DataUserRole(rf.not_equals.value))
+                ])
+            )
+        if rf.not_in is not None and len(rf.not_in) > 0:
+            conditions.append(
+                negate_conditions([
+                    UserConditions.by_role_in([DataUserRole(r.value) for r in rf.not_in])
+                ])
+            )
         return conditions
 
     def _convert_domain_nested_filter(
