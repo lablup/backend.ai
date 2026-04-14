@@ -1144,6 +1144,7 @@ class DeploymentRepository:
                 "Failed to get health check config for endpoint {} during termination, "
                 "proceeding without it",
                 endpoint_id,
+                exc_info=True,
             )
             health_check_config = None
 
