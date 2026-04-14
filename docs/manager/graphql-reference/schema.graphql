@@ -1836,6 +1836,7 @@ type Routing implements Item {
   endpoint: String
   session: UUID
   status: String
+  health_status: String
   traffic_ratio: Float
   created_at: DateTime
   error_data: JSONString
