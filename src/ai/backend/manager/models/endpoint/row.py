@@ -174,7 +174,10 @@ class EndpointRow(Base):  # type: ignore[misc]
             "domain",
             "project",
             unique=True,
-            postgresql_where=sa.text("lifecycle_stage NOT IN ('destroying', 'destroyed')"),
+            postgresql_where=sa.column("lifecycle_stage").notin_([
+                EndpointLifecycle.DESTROYING.value,
+                EndpointLifecycle.DESTROYED.value,
+            ]),
         ),
         sa.Index(
             "ix_endpoints_lifecycle_sub_step",
