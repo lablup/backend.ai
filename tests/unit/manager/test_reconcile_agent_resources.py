@@ -104,6 +104,7 @@ class TestReconcileAgentResources:
                 hook_plugin_ctx=MagicMock(),
                 network_plugin_ctx=MagicMock(),
                 scheduling_controller=MagicMock(),
+                user_repository=MagicMock(),
                 manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
                 manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
             )
@@ -498,6 +499,7 @@ class TestOrphanedAllocationCleanup:
                 hook_plugin_ctx=MagicMock(),
                 network_plugin_ctx=MagicMock(),
                 scheduling_controller=MagicMock(),
+                user_repository=MagicMock(),
                 manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
                 manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
             )

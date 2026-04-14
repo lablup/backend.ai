@@ -1146,6 +1146,9 @@ class ScheduleDBSource:
                     for kernel in session_row.kernels
                 ]
 
+                owner_main_ak = (
+                    session_row.user.main_access_key if session_row.user else None
+                )
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
@@ -1183,11 +1186,12 @@ class ScheduleDBSource:
                 sa.select(
                     SessionRow.id,
                     SessionRow.creation_id,
-                    SessionRow.access_key,
+                    UserRow.main_access_key,
                     SessionRow.created_at,
                     ScalingGroupRow.scheduler_opts,
                 )
                 .select_from(SessionRow)
+                .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
                 .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
                 .where(
                     SessionRow.id.in_(session_ids),
@@ -1843,16 +1847,23 @@ class ScheduleDBSource:
             # First, fetch session data to get creation_id and access_key
             session_ids = {alloc.session_id for alloc in allocation_batch.allocations}
             if session_ids:
-                query = sa.select(
-                    SessionRow.id, SessionRow.creation_id, SessionRow.access_key
-                ).where(SessionRow.id.in_(session_ids))
+                query = (
+                    sa.select(
+                        SessionRow.id, SessionRow.creation_id, UserRow.main_access_key
+                    )
+                    .select_from(SessionRow)
+                    .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
+                    .where(SessionRow.id.in_(session_ids))
+                )
                 result = await db_sess.execute(query)
-                session_data_map = {row.id: (row.creation_id, row.access_key) for row in result}
+                session_data_map = {
+                    row.id: (row.creation_id, row.main_access_key) for row in result
+                }
 
                 # Create SessionEventData for each allocated session
                 for allocation in allocation_batch.allocations:
                     if session_data := session_data_map.get(allocation.session_id):
-                        creation_id, access_key = session_data
+                        creation_id, main_access_key = session_data
                         scheduled_sessions.append(
                             ScheduledSessionData(
                                 session_id=allocation.session_id,

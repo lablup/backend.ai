@@ -112,9 +112,9 @@ def basic_session_workload() -> SessionWorkload:
     """Basic SessionWorkload instance with default values."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -134,9 +134,9 @@ def batch_session_workload() -> SessionWorkload:
     """Batch SessionWorkload instance."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -156,9 +156,9 @@ def inference_session_workload() -> SessionWorkload:
     """Inference SessionWorkload instance."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -178,9 +178,9 @@ def minimal_resource_workload() -> SessionWorkload:
     """SessionWorkload with minimal resource requirements (1 CPU, 1 mem)."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -200,9 +200,9 @@ def small_resource_workload() -> SessionWorkload:
     """SessionWorkload with small resource requirements."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(2), "mem": Decimal(2)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -222,9 +222,9 @@ def medium_resource_workload() -> SessionWorkload:
     """SessionWorkload with medium resource requirements."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(5), "mem": Decimal(5)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -244,9 +244,9 @@ def large_resource_workload() -> SessionWorkload:
     """SessionWorkload with large resource requirements."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(100), "mem": Decimal(100)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -272,9 +272,9 @@ def test_domain_small_resource_workload(test_domain_name: str) -> SessionWorkloa
     """SessionWorkload with small resources for domain testing."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(2), "mem": Decimal(2)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name=test_domain_name,
         scaling_group="default",
@@ -294,9 +294,9 @@ def test_domain_medium_resource_workload(test_domain_name: str) -> SessionWorklo
     """SessionWorkload with medium resources for domain testing."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(5), "mem": Decimal(5)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name=test_domain_name,
         scaling_group="default",
@@ -316,9 +316,9 @@ def test_domain_large_resource_workload(test_domain_name: str) -> SessionWorkloa
     """SessionWorkload with large resources for domain testing."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(100), "mem": Decimal(100)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name=test_domain_name,
         scaling_group="default",
@@ -338,9 +338,9 @@ def user1_minimal_workload() -> SessionWorkload:
     """Minimal workload for user1."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -366,9 +366,9 @@ def user_specific_small_workload(test_user_id: uuid.UUID) -> SessionWorkload:
     """Small workload for a specific user."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(2), "mem": Decimal(2)}),
-        user_uuid=test_user_id,
+        owner_id=test_user_id,
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -388,9 +388,9 @@ def user_specific_medium_workload(test_user_id: uuid.UUID) -> SessionWorkload:
     """Medium workload for a specific user."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(5), "mem": Decimal(5)}),
-        user_uuid=test_user_id,
+        owner_id=test_user_id,
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -410,9 +410,9 @@ def user_specific_minimal_workload(test_user_id: uuid.UUID) -> SessionWorkload:
     """Minimal workload for a specific user."""
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("user1"),
+        main_access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
-        user_uuid=test_user_id,
+        owner_id=test_user_id,
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -433,9 +433,9 @@ def batch_session_past_start_time() -> SessionWorkload:
     past_time = datetime.now(tzutc()) - timedelta(hours=1)
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
@@ -456,9 +456,9 @@ def batch_session_future_start_time() -> SessionWorkload:
     future_time = datetime.now(tzutc()) + timedelta(hours=1)
     return SessionWorkload(
         session_id=SessionId(uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         group_id=uuid4(),
         domain_name="default",
         scaling_group="default",
