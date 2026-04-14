@@ -64,9 +64,9 @@ class PendingSessionData:
         kernel_workloads = [k.to_kernel_workload() for k in self.kernels]
         return SessionWorkload(
             session_id=self.id,
-            main_access_key=self.main_access_key,
+            access_key=self.main_access_key,
             requested_slots=self.requested_slots,
-            owner_id=self.owner_id,
+            user_uuid=self.owner_id,
             group_id=self.group_id,
             domain_name=self.domain_name,
             scaling_group=self.scaling_group_name,
