@@ -231,9 +231,18 @@ class UserService:
 
         # Handle endpoint ownership delegation
         if action.delegate_endpoint_ownership.optional_value():
+            target_main_ak = await self._user_repository.get_main_access_key_by_id(
+                action.user_info_ctx.uuid
+            )
+            if target_main_ak is None:
+                raise UserPurgeFailure(
+                    f"Cannot delegate endpoint ownership: target user "
+                    f"{action.user_info_ctx.uuid} has no main_access_key"
+                )
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=action.user_info_ctx.uuid,
+                target_main_access_key=AccessKey(target_main_ak),
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -303,9 +312,18 @@ class UserService:
 
         # Handle endpoint ownership delegation
         if action.delegate_endpoint_ownership.optional_value():
+            target_main_ak = await self._user_repository.get_main_access_key_by_id(
+                user_info_ctx.uuid
+            )
+            if target_main_ak is None:
+                raise UserPurgeFailure(
+                    f"Cannot delegate endpoint ownership: target user "
+                    f"{user_info_ctx.uuid} has no main_access_key"
+                )
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
+                target_main_access_key=AccessKey(target_main_ak),
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,

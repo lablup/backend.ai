@@ -44,7 +44,6 @@ class ModelRevisionCreator:
     model_definition: ModelDefinition | None
     revision_preset_id: UUID | None = None
     preset_values: list[PresetValueData] = field(default_factory=list)
-    auto_activate: bool = False
 
 
 @dataclass

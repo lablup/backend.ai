@@ -755,6 +755,7 @@ async def redis_ctx(
     redis_storage = RedisStorage(
         valkey_session_client,
         max_age=config.session.max_age,
+        secure=config.service.ssl_enabled,
     )
     setup_session(app, redis_storage)
     try:

@@ -334,7 +334,20 @@ class DeploymentPolicyPathParam(BaseRequestModel):
     )
 
 
+class AddRevisionOptions(BaseRequestModel):
+    """Options for the add revision operation."""
+
+    auto_activate: bool = Field(
+        default=False,
+        description="When true, automatically activate the newly added revision immediately after creation.",
+    )
+
+
 class AddRevisionRequest(BaseRequestModel):
     """Request to add a new revision to an existing deployment."""
 
     revision: RevisionInput = Field(description="Revision configuration")
+    options: AddRevisionOptions = Field(
+        default_factory=AddRevisionOptions,
+        description="Additional options for the add revision operation.",
+    )

@@ -39,6 +39,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    AddRevisionOptions as AddRevisionOptionsDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ClusterConfigInput as ClusterConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -838,6 +841,20 @@ class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
     extra_mounts: list[ExtraVFolderMountInput] | None = gql_field(
         description="Extra vfolder mounts",
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Options for the add_model_revision mutation.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="AddRevisionOptions",
+)
+class AddRevisionOptionsGQL(PydanticInputMixin[AddRevisionOptionsDTO]):
+    auto_activate: bool = gql_field(
+        default=False,
+        description="When true, automatically activate the newly added revision immediately after creation.",
     )
 
 

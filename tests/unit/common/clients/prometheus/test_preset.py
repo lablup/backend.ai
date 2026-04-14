@@ -2,14 +2,14 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.clients.prometheus import MetricPreset
+from ai.backend.common.clients.prometheus import LabelMatcher, MetricPreset
 
 
 @dataclass
 class RenderTestCase:
     id: str
     template: str
-    labels: dict[str, str]
+    labels: dict[str, LabelMatcher]
     group_by: frozenset[str]
     window: str
     expected: str
@@ -32,7 +32,7 @@ class TestMetricPresetRender:
             RenderTestCase(
                 id="multiple_group_by_sorted",
                 template="sum(my_metric{{{labels}}}) by ({group_by})",
-                labels={"job": "test"},
+                labels={"job": LabelMatcher.exact("test")},
                 group_by=frozenset({"value_type", "kernel_id", "session_id"}),
                 window="",
                 expected='sum(my_metric{job="test"}) by (kernel_id,session_id,value_type)',
@@ -52,7 +52,7 @@ class TestMetricPresetRender:
             RenderTestCase(
                 id="with_window",
                 template="sum(rate(my_metric{{{labels}}}[{window}])) by ({group_by})",
-                labels={"job": "test"},
+                labels={"job": LabelMatcher.exact("test")},
                 group_by=frozenset({"instance"}),
                 window="5m",
                 expected='sum(rate(my_metric{job="test"}[5m])) by (instance)',
@@ -60,7 +60,7 @@ class TestMetricPresetRender:
             RenderTestCase(
                 id="escapes_double_quotes_in_label_value",
                 template="my_metric{{{labels}}}",
-                labels={"key": 'value with "quotes"'},
+                labels={"key": LabelMatcher.exact('value with "quotes"')},
                 group_by=frozenset(),
                 window="",
                 expected='my_metric{key="value with \\"quotes\\""}',
@@ -68,7 +68,7 @@ class TestMetricPresetRender:
             RenderTestCase(
                 id="escapes_backslash_in_label_value",
                 template="my_metric{{{labels}}}",
-                labels={"path": "C:\\Users\\test"},
+                labels={"path": LabelMatcher.exact("C:\\Users\\test")},
                 group_by=frozenset(),
                 window="",
                 expected='my_metric{path="C:\\\\Users\\\\test"}',
@@ -76,7 +76,7 @@ class TestMetricPresetRender:
             RenderTestCase(
                 id="escapes_newline_in_label_value",
                 template="my_metric{{{labels}}}",
-                labels={"msg": "line1\nline2"},
+                labels={"msg": LabelMatcher.exact("line1\nline2")},
                 group_by=frozenset(),
                 window="",
                 expected='my_metric{msg="line1\\nline2"}',
@@ -84,10 +84,18 @@ class TestMetricPresetRender:
             RenderTestCase(
                 id="escapes_mixed_special_chars",
                 template="my_metric{{{labels}}}",
-                labels={"data": 'path\\to\\"file"\nend'},
+                labels={"data": LabelMatcher.exact('path\\to\\"file"\nend')},
                 group_by=frozenset(),
                 window="",
                 expected='my_metric{data="path\\\\to\\\\\\"file\\"\\nend"}',
+            ),
+            RenderTestCase(
+                id="regex_matcher",
+                template="my_metric{{{labels}}}",
+                labels={"kernel_id": LabelMatcher.regex("kernel-1|kernel-2")},
+                group_by=frozenset(),
+                window="",
+                expected='my_metric{kernel_id=~"kernel-1|kernel-2"}',
             ),
         ],
         ids=lambda c: c.id,
