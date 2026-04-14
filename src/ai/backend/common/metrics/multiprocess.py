@@ -20,9 +20,12 @@ import os
 import shutil
 from pathlib import Path
 
-from prometheus_client import CollectorRegistry, generate_latest
-from prometheus_client.multiprocess import MultiProcessCollector
-from prometheus_client.multiprocess import mark_process_dead as _mark_dead
+# NOTE: prometheus_client MUST NOT be imported at module level. Its
+# `values.ValueClass` is bound at import time based on the current value of
+# ``PROMETHEUS_MULTIPROC_DIR``; importing it before
+# ``setup_prometheus_multiprocess_dir`` has set that env var freezes the
+# registry into single-process mode, which silently drops all metrics written
+# by fork-based worker processes.
 
 log = logging.getLogger(__spec__.name)
 
@@ -101,6 +104,9 @@ def generate_latest_multiprocess() -> bytes:
 
     This should be used by multi-worker components (manager, agent, storage, etc.).
     """
+    from prometheus_client import CollectorRegistry, generate_latest
+    from prometheus_client.multiprocess import MultiProcessCollector
+
     try:
         registry = CollectorRegistry()
         MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
@@ -135,6 +141,8 @@ def generate_latest_singleprocess() -> bytes:
     This should be used by single-process components that do not need
     multiprocess aggregation.
     """
+    from prometheus_client import generate_latest
+
     return generate_latest()
 
 
@@ -164,6 +172,8 @@ def mark_process_dead(pid: int) -> None:
     Args:
         pid: Process ID of the dead worker
     """
+    from prometheus_client.multiprocess import mark_process_dead as _mark_dead
+
     try:
         _mark_dead(pid)  # type: ignore[no-untyped-call]
     except Exception:
