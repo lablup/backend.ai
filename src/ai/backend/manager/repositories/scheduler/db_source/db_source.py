@@ -2897,7 +2897,8 @@ class ScheduleDBSource:
                         KernelRow.status,
                         KernelRow.status_changed,
                     )
-                )
+                ),
+                selectinload(SessionRow.user).options(load_only(UserRow.main_access_key)),
             )
         )
         result = await db_sess.execute(stmt)
@@ -2922,12 +2923,16 @@ class ScheduleDBSource:
                 )
                 kernels_data.append(kernel_data)
 
+            owner_main_ak = session.user.main_access_key if session.user else None
             scheduled_session = ScheduledSessionData(
                 session_id=session.id,
                 creation_id=session.creation_id or "",
                 main_access_key=AccessKey(session.access_key)
                 if session.access_key
                 else AccessKey(""),
+=======
+                main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
+>>>>>>> 4ac120c73 (refactor(BA-5650-I): drop stray non-BA-5650 changes from slice)
                 reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
@@ -2954,10 +2959,11 @@ class ScheduleDBSource:
                         KernelRow.architecture,
                     )
                 ),
+                selectinload(SessionRow.user).options(load_only(UserRow.main_access_key)),
                 load_only(
                     SessionRow.id,
                     SessionRow.creation_id,
-                    SessionRow.access_key,
+                    SessionRow.user_uuid,
                     SessionRow.session_type,
                     SessionRow.name,
                 ),
@@ -2968,6 +2974,7 @@ class ScheduleDBSource:
 
         scheduled_sessions: list[ScheduledSessionData] = []
         for session in sessions:
+            owner_main_ak = session.user.main_access_key if session.user else None
             scheduled_sessions.append(
                 ScheduledSessionData(
                     session_id=session.id,
@@ -2975,6 +2982,9 @@ class ScheduleDBSource:
                     main_access_key=AccessKey(session.access_key)
                     if session.access_key
                     else AccessKey(""),
+=======
+                    main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
+>>>>>>> 4ac120c73 (refactor(BA-5650-I): drop stray non-BA-5650 changes from slice)
                     reason="triggered-by-scheduler",
                 )
             )

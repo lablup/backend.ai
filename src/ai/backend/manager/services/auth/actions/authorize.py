@@ -20,7 +20,7 @@ class AuthorizeAction(AuthAction):
     password: str
     stoken: str | None
     otp: str | None
-    client_type_id: UUID
+    client_type_id: UUID | None
     force: bool = False
 
     @override

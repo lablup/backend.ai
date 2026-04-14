@@ -201,8 +201,17 @@ class CreateRevisionInputDTO(BaseRequestModel):
     )
 
 
+class AddRevisionOptions(BaseRequestModel):
+    """Options for the add revision operation."""
+
+    auto_activate: bool = Field(
+        default=False,
+        description="When true, automatically activate the newly added revision immediately after creation.",
+    )
+
+
 class AddRevisionGQLInputDTO(BaseRequestModel):
-    """Input for adding a revision via GQL (flat structure matching GQL AddRevisionInput)."""
+    """Input for adding a revision. Used by both GQL and REST v2 APIs."""
 
     name: str | None = Field(default=None, description="Revision name")
     revision_preset_id: UUID | None = Field(
@@ -222,9 +231,9 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
     )
-    auto_activate: bool = Field(
-        default=False,
-        description="If true, automatically activate this revision after creation.",
+    options: AddRevisionOptions | None = Field(
+        default=None,
+        description="Additional options for the add revision operation.",
     )
 
 

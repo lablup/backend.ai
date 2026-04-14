@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from ai.backend.common.clients.prometheus import ContainerMetricQuerier, ValueType
+from ai.backend.common.clients.prometheus import ContainerMetricQuerier, LabelMatcher, ValueType
 
 
 class TestContainerMetricQuerier:
@@ -15,8 +15,8 @@ class TestContainerMetricQuerier:
         result = querier.labels()
 
         assert result == {
-            "container_metric_name": "cpu_util",
-            "value_type": "current",
+            "container_metric_name": LabelMatcher.exact("cpu_util"),
+            "value_type": LabelMatcher.exact("current"),
         }
 
     async def test_labels_all_fields(self) -> None:
@@ -38,13 +38,13 @@ class TestContainerMetricQuerier:
         result = querier.labels()
 
         assert result == {
-            "container_metric_name": "net_rx",
-            "value_type": "current",
-            "kernel_id": str(kernel_id),
-            "session_id": str(session_id),
-            "agent_id": "agent-001",
-            "user_id": str(user_id),
-            "project_id": str(project_id),
+            "container_metric_name": LabelMatcher.exact("net_rx"),
+            "value_type": LabelMatcher.exact("current"),
+            "kernel_id": LabelMatcher.exact(str(kernel_id)),
+            "session_id": LabelMatcher.exact(str(session_id)),
+            "agent_id": LabelMatcher.exact("agent-001"),
+            "user_id": LabelMatcher.exact(str(user_id)),
+            "project_id": LabelMatcher.exact(str(project_id)),
         }
 
     async def test_group_by_required_only(self) -> None:

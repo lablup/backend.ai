@@ -468,7 +468,6 @@ class ModelCardAdapter(BaseAdapter):
                 execution=ExecutionSpec(runtime_variant=RuntimeVariant("custom")),
                 model_definition=None,
                 revision_preset_id=input.revision_preset_id,
-                auto_activate=True,
             ),
             policy=policy,
         )

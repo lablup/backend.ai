@@ -39,6 +39,9 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateAutoScalingRulePayload as UpdateAutoScalingRulePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    AutoScalingRuleOrderField,
+)
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
@@ -54,9 +57,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.deployment.types import (
-    AutoScalingRuleOrderField,
-)
 
 
 @gql_enum(

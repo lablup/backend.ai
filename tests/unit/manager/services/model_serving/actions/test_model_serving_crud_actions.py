@@ -124,6 +124,8 @@ class ModelServingCRUDBaseFixtures:
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
         mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_endpoint_info = AsyncMock(return_value=MagicMock(current_revision_id=None))
+        mock.fetch_model_definition = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
@@ -228,7 +230,9 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             ),
         )
 
-    def _make_updater_spec(self, *, replicas: int | None = None) -> MagicMock:
+    def _make_updater_spec(
+        self, *, replicas: int | None = None, has_revision_changes: bool = False
+    ) -> MagicMock:
         spec = MagicMock(spec=EndpointUpdaterSpec)
         if replicas is not None:
             spec.replicas = OptionalState.update(replicas)
@@ -236,6 +240,7 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         else:
             spec.replicas = OptionalState[int].nop()
             spec.replica_count_modified.return_value = False
+        spec.has_revision_changes.return_value = has_revision_changes
         return spec
 
     async def test_replica_count_change_marks_check_replica(
@@ -261,7 +266,34 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
 
         assert result.success is True
         assert result.data == mock_endpoint_data
-        mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
+        mock_deployment_controller.mark_lifecycle_needed.assert_awaited_once_with(
+            DeploymentLifecycleType.CHECK_REPLICA
+        )
+
+    async def test_revision_change_marks_check_replica(
+        self,
+        model_serving_processors: ModelServingProcessors,
+        mock_modify_endpoint: AsyncMock,
+        mock_deployment_controller: MagicMock,
+        endpoint_id: uuid.UUID,
+    ) -> None:
+        """Revision-level field change triggers CHECK_REPLICA to auto-activate the new revision."""
+        updater_spec = self._make_updater_spec(replicas=None, has_revision_changes=True)
+        mock_updater = MagicMock()
+        mock_updater.spec = updater_spec
+
+        mock_endpoint_data = MagicMock()
+        mock_endpoint_data.id = endpoint_id
+        mock_modify_endpoint.return_value = MutationResult(
+            success=True, message="ok", data=mock_endpoint_data
+        )
+
+        action = ModifyEndpointAction(endpoint_id=endpoint_id, updater=mock_updater)
+        result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
+
+        assert result.success is True
+        assert result.data == mock_endpoint_data
+        mock_deployment_controller.mark_lifecycle_needed.assert_awaited_once_with(
             DeploymentLifecycleType.CHECK_REPLICA
         )
 
