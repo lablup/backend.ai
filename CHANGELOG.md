@@ -16,6 +16,61 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.2 (2026-04-15)
+
+### Features
+* Add optional `activate` flag to `add_model_revision` API ([#10468](https://github.com/lablup/backend.ai/issues/10468))
+* Add TCP appproxy worker installation support in dev installer ([#10650](https://github.com/lablup/backend.ai/issues/10650))
+* Add the `login_client_types` table, model, data dataclass, and repository so administrators can register and manage login client types at runtime. ([#10822](https://github.com/lablup/backend.ai/issues/10822))
+* Add `owner_id` (delegated user UUID) to `EnqueueSessionInput` for delegated session ownership when enqueuing v2 sessions. ([#10845](https://github.com/lablup/backend.ai/issues/10845))
+* Expose the `login_client_types` entity via the Strawberry GraphQL schema: `loginClientType(id)` single query, `loginClientTypes` Connection query with filter/order/pagination, and `createLoginClientType` / `updateLoginClientType` / `deleteLoginClientType` mutations. ([#10876](https://github.com/lablup/backend.ai/issues/10876))
+* Add `./bai` CLI v2 commands for `login_client_types`: `./bai login-client-type list/get` (any authenticated user) and `./bai admin login-client-type create/update/delete` (super admin only). ([#10878](https://github.com/lablup/backend.ai/issues/10878))
+* Add `--otel-endpoint` and `--metric-access-cidr` options to TUI installer, configure announce-addr for manager/agent/storage-proxy, and add `[otel]` blocks to app-proxy halfstack configs ([#10880](https://github.com/lablup/backend.ai/issues/10880))
+* Add vLLM runtime variant preset fixtures with automatic runtime_variant_name FK resolution in fixture populate ([#10889](https://github.com/lablup/backend.ai/issues/10889))
+* Add the `login_client_type` service layer, v2 DTOs, and an admin-only search path (`LoginClientTypeAdminRepository` / `LoginClientTypeAdminService` / `LoginClientTypeAdminProcessors`) with filtering, ordering, and pagination support via `BatchQuerier`. ([#10923](https://github.com/lablup/backend.ai/issues/10923))
+* Add REST v2 CRUD endpoints for the `login_client_types` entity at `/v2/login-client-types/`, including a `/v2/login-client-types/search` endpoint with filtering, ordering, and pagination support. ([#10924](https://github.com/lablup/backend.ai/issues/10924))
+* Replace the hard-coded `LoginClientType` enum with a foreign-key reference to the `login_client_types` table in login sessions, allowing administrators to manage client types dynamically. ([#10925](https://github.com/lablup/backend.ai/issues/10925))
+* Add Client SDK v2 domain client and CLI v2 commands for the `login_client_types` entity: `./bai login-client-type get`, `./bai admin login-client-type search/create/update/delete`. ([#10942](https://github.com/lablup/backend.ai/issues/10942))
+* Add PROMETHEUS auto-scaling metric source that queries Prometheus directly via query presets, with bidirectional scaling support (scale-out/in thresholds in a single rule). ([#10993](https://github.com/lablup/backend.ai/issues/10993))
+* Add `user_id` filter to login session admin search and `admin_unblock_user` API to clear failed-login rate limit blocks ([#11011](https://github.com/lablup/backend.ai/issues/11011))
+* Add `creator_id` column to vfolders and wire VFolder ownership GQL resolvers (user, project, creator) to DataLoaders for proper entity resolution. ([#11018](https://github.com/lablup/backend.ai/issues/11018))
+* Add deployment-scoped Prometheus query presets with category system, description, rank, and vLLM example fixtures ([#11072](https://github.com/lablup/backend.ai/issues/11072))
+
+### Improvements
+* Delete login session rows on termination and record full session lifecycle events in login history ([#11013](https://github.com/lablup/backend.ai/issues/11013))
+* Add explicit LabelMatcher to Prometheus query presets to support regex matching operators ([#11025](https://github.com/lablup/backend.ai/issues/11025))
+
+### Fixes
+* Rename `TooManyConcurrentLoginSessions` error type from `too-many-concurrent-logins` to `active-login-session-exists` to match actual error semantics ([#5691](https://github.com/lablup/backend.ai/issues/5691))
+* Fix imagify API handler that incorrectly parsed POST body as query parameters by switching from QueryParam to BodyParam ([#5694](https://github.com/lablup/backend.ai/issues/5694))
+* Return HTTP 409 (Conflict) instead of 429 (Too Many Requests) for `TooManyConcurrentLoginSessions` error ([#10992](https://github.com/lablup/backend.ai/issues/10992))
+* Re-read model definition from vfolder when legacy `modify_endpoint` creates a new revision, so on-disk file changes are reflected. Also trigger `CHECK_REPLICA` lifecycle on revision-level field changes to notify the deployment controller. ([#10994](https://github.com/lablup/backend.ai/issues/10994))
+* Fix OIDC AUTHORIZE hook to read sToken from hook params before falling back to cookies, enabling token-login flow via JSON body. ([#11002](https://github.com/lablup/backend.ai/issues/11002))
+* Fix `GET /stream/session/{name}/execute` 500 error by sharing a single `PrivateContext` between the stream handler and its lifecycle hook, so `stream_execute_handlers` is initialized on the instance the handler reads at request time. ([#11003](https://github.com/lablup/backend.ai/issues/11003))
+* Fix per-container CUDA metric collection failing due to missing `container.show()` call in `gather_container_measures` ([#11006](https://github.com/lablup/backend.ai/issues/11006))
+* Fix double /func/ prefix in session-mode GQL path causing HTTP 404 ([#11007](https://github.com/lablup/backend.ai/issues/11007))
+* Fix 500 Internal Server Error when creating a session with an invalid or non-member project group by replacing plain `ValueError` with proper `BackendAIError` subclasses in `query_userinfo()`. ([#11012](https://github.com/lablup/backend.ai/issues/11012))
+* Fix RBAC action validators silently bypassing permission denials; legacy processor paths now observe denials via log and metric instead of raising. ([#11014](https://github.com/lablup/backend.ai/issues/11014))
+* Fix TERMINATED transition hook blocking session termination when model-definition.yaml is missing from storage for custom-runtime inference sessions. ([#11019](https://github.com/lablup/backend.ai/issues/11019))
+* Fix endpoint destroy failing with `UniqueViolationError` on `ix_endpoints_unique_name_when_not_destroyed` by narrowing the partial unique index predicate to exclude DESTROYING/DESTROYED states. ([#11020](https://github.com/lablup/backend.ai/issues/11020))
+* Make `client_type_id` optional in `AuthorizeRequest` so clients that do not specify a login client type (e.g., WebUI) can still authenticate, and add the missing migration for the `login_client_type_id` column on the `login_sessions` table. ([#11022](https://github.com/lablup/backend.ai/issues/11022))
+* Fix GQL user adapter to handle `not_equals` and `not_in` operations in status and role filter conversion, which were previously silently ignored. ([#11024](https://github.com/lablup/backend.ai/issues/11024))
+* Fix route health initial_delay calculation to use running_at instead of route creation time, preventing premature session termination for custom runtime variants with long model loading times. ([#11029](https://github.com/lablup/backend.ai/issues/11029))
+* Add missing `server_default` to `images.last_used_at` column so that new image rows without an explicit `last_used_at` value no longer violate the NOT NULL constraint. ([#11031](https://github.com/lablup/backend.ai/issues/11031))
+* Fix endpoint status to reflect route health check results instead of only lifecycle status ([#11033](https://github.com/lablup/backend.ai/issues/11033))
+* Set Secure flag on session cookie when SSL is enabled. ([#11035](https://github.com/lablup/backend.ai/issues/11035))
+* Fix Pydantic validation error when using `orderBy` in deployment-related GraphQL queries (`autoScalingRules`, `deployments`, `replicas`, `accessTokens`) ([#11037](https://github.com/lablup/backend.ai/issues/11037))
+* Fix Prometheus metrics silently missing on Linux by separating the multiprocess setup module to prevent import-time `ValueClass` misfire. ([#11038](https://github.com/lablup/backend.ai/issues/11038))
+* Fix orphan `login_sessions` rows after WebUI logout when authenticated via the keypair (sToken) login flow. ([#11042](https://github.com/lablup/backend.ai/issues/11042))
+* Fix `TypeError` in TOTP hook during stoken login by using attribute access on the user Row object. ([#11064](https://github.com/lablup/backend.ai/issues/11064))
+* Handle null `HostConfig.DeviceRequests` from Docker API in CUDA container measures to prevent `TypeError`. ([#11070](https://github.com/lablup/backend.ai/issues/11070))
+* Bypass RBAC permission checks for superadmin users in all action validators so superadmin operations (e.g. project creation) no longer fail with `NotEnoughPermission`. ([#11071](https://github.com/lablup/backend.ai/issues/11071))
+* Add RBAC validation to deployment get/update/destroy, fix keypair resource policy lookup by wrong column, and move resource-group CLI commands to admin scope ([#11076](https://github.com/lablup/backend.ai/issues/11076))
+
+### Test Updates
+* Add component test verifying that exceeding `max_concurrent_logins` returns HTTP 409 Conflict ([#10997](https://github.com/lablup/backend.ai/issues/10997))
+
+
 ## 26.4.1 (2026-04-10)
 
 ### Fixes

@@ -12,7 +12,6 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     ProjectResourcePolicyNode,
     UserResourcePolicyNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -32,7 +31,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Keypair resource policy defining session and storage limits for API keypairs.",
     ),
     name="KeypairResourcePolicyV2",
@@ -72,7 +71,7 @@ KeypairResourcePolicyV2Edge = Edge[KeypairResourcePolicyV2GQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated connection for keypair resource policies.",
     )
 )
@@ -89,7 +88,7 @@ class KeypairResourcePolicyV2Connection(Connection[KeypairResourcePolicyV2GQL]):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="User resource policy defining vfolder and quota limits per user.",
     ),
     name="UserResourcePolicyV2",
@@ -101,7 +100,7 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
     max_concurrent_logins: int | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             description=(
                 "Maximum number of concurrent authenticated login sessions per user."
                 " Null means unlimited."
@@ -124,7 +123,7 @@ UserResourcePolicyV2Edge = Edge[UserResourcePolicyV2GQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated connection for user resource policies.",
     )
 )
@@ -141,7 +140,7 @@ class UserResourcePolicyV2Connection(Connection[UserResourcePolicyV2GQL]):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Project resource policy defining vfolder, quota, and network limits per project.",
     ),
     name="ProjectResourcePolicyV2",
@@ -162,7 +161,7 @@ ProjectResourcePolicyV2Edge = Edge[ProjectResourcePolicyV2GQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated connection for project resource policies.",
     )
 )

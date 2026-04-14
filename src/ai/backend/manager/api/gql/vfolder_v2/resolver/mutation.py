@@ -6,7 +6,6 @@ from uuid import UUID
 
 from strawberry import Info
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
@@ -39,7 +38,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new virtual folder.",
     )
 )  # type: ignore[misc]
@@ -53,7 +52,7 @@ async def create_vfolder_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Soft-delete a virtual folder (move to trash).",
     )
 )  # type: ignore[misc]
@@ -67,7 +66,7 @@ async def delete_vfolder_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Permanently purge a virtual folder.",
     )
 )  # type: ignore[misc]
@@ -81,7 +80,7 @@ async def purge_vfolder_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Deploy a deployment directly from a model VFolder.",
     )
 )  # type: ignore[misc]
@@ -96,7 +95,7 @@ async def deploy_vfolder_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Clone a virtual folder.",
     )
 )  # type: ignore[misc]
@@ -111,7 +110,7 @@ async def clone_vfolder_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List files in a virtual folder.",
     )
 )  # type: ignore[misc]
@@ -126,7 +125,7 @@ async def vfolder_list_files_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create directories inside a virtual folder.",
     )
 )  # type: ignore[misc]
@@ -141,7 +140,7 @@ async def vfolder_mkdir_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Move a file within a virtual folder.",
     )
 )  # type: ignore[misc]
@@ -156,7 +155,7 @@ async def vfolder_move_file_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete files inside a virtual folder.",
     )
 )  # type: ignore[misc]
@@ -171,7 +170,7 @@ async def vfolder_delete_files_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create an upload session for a virtual folder.",
     )
 )  # type: ignore[misc]
@@ -188,7 +187,7 @@ async def vfolder_create_upload_session_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a download session for a virtual folder.",
     )
 )  # type: ignore[misc]
@@ -205,7 +204,7 @@ async def vfolder_create_download_session_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Soft-delete multiple virtual folders.",
     )
 )  # type: ignore[misc]
@@ -230,7 +229,7 @@ async def bulk_delete_vfolders_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Permanently purge multiple virtual folders.",
     )
 )  # type: ignore[misc]

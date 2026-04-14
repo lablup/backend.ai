@@ -8,7 +8,6 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -27,7 +26,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderEdge
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search all virtual folders (superadmin only).",
     )
 )  # type: ignore[misc]
@@ -72,7 +71,7 @@ async def admin_vfolders_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single virtual folder by ID.",
     )
 )  # type: ignore[misc]
@@ -87,7 +86,7 @@ async def vfolder_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List virtual folders within a specific project.",
     )
 )  # type: ignore[misc]
@@ -133,7 +132,7 @@ async def project_vfolders(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search virtual folders accessible to the current user with pagination and filtering.",
     )
 )  # type: ignore[misc]

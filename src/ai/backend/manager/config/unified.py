@@ -206,7 +206,6 @@ from ai.backend.common.data.storage.types import ArtifactStorageImportStep, Name
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -522,7 +521,7 @@ class AuthConfig(BaseConfigSchema):
                 "Default is 604800 (7 days). "
                 "Sessions older than this are considered expired."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             example=ConfigExample(local="604800", prod="604800"),
         ),
     ]
@@ -801,7 +800,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Only proxies in this list are trusted to set forwarding headers. "
                 "If empty (default), the manager falls back to manual X-Forwarded-For parsing."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
         ),
     ]

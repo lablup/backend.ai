@@ -8,7 +8,6 @@ from ai.backend.common.dto.manager.v2.login_session.response import (
 from ai.backend.common.dto.manager.v2.login_session.response import (
     UnblockUserPayload as UnblockUserPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_pydantic_type,
@@ -18,7 +17,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after revoking a login session.",
     ),
     model=RevokeLoginSessionPayloadDTO,
@@ -31,7 +30,7 @@ class RevokeLoginSessionPayloadGQL(PydanticOutputMixin[RevokeLoginSessionPayload
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after clearing a user's failed-login block.",
     ),
     model=UnblockUserPayloadDTO,

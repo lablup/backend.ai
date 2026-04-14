@@ -1837,7 +1837,7 @@ type Routing implements Item {
   session: UUID
   status: String
 
-  """Added in 26.4.1."""
+  """Added in 26.4.2."""
   health_status: String
   traffic_ratio: Float
   created_at: DateTime

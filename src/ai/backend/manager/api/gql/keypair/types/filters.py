@@ -6,7 +6,6 @@ from enum import StrEnum
 from typing import Self
 
 from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter, KeypairOrderBy
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum, gql_pydantic_input
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -19,7 +18,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
             "Supports filtering by active state, admin flag, and access key. "
             "Multiple filters can be combined using AND, OR, and NOT logical operators."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="KeypairFilter",
 )
@@ -39,7 +38,7 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilter]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Fields available for ordering keypair query results. "
             "CREATED_AT: Order by creation timestamp. "
@@ -61,7 +60,7 @@ class KeypairOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for keypair query results. Default direction is DESC.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="KeypairOrderBy",
 )

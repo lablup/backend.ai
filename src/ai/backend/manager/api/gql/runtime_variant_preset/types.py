@@ -51,7 +51,6 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption as UIOptionDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -68,7 +67,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Target for applying a preset value: environment variable or command-line argument.",
     ),
     name="PresetTarget",
@@ -80,7 +79,7 @@ class PresetTargetGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Data type for preset value validation.",
     ),
     name="PresetValueType",
@@ -95,7 +94,7 @@ class PresetValueTypeGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Order fields for runtime variant presets.",
     ),
     name="RuntimeVariantPresetOrderField",
@@ -107,7 +106,7 @@ class RuntimeVariantPresetOrderFieldGQL(StrEnum):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Slider UI config."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Slider UI config."),
     model=SliderOptionDTO,
     name="SliderOption",
 )
@@ -118,7 +117,7 @@ class SliderOptionGQL(PydanticOutputMixin[SliderOptionDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Number input UI config."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Number input UI config."),
     model=NumberOptionDTO,
     name="NumberOption",
 )
@@ -128,7 +127,7 @@ class NumberOptionGQL(PydanticOutputMixin[NumberOptionDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Choice item."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Choice item."),
     model=ChoiceItemDTO,
     name="ChoiceItem",
 )
@@ -138,7 +137,7 @@ class ChoiceItemGQL(PydanticOutputMixin[ChoiceItemDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Select/radio UI config."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Select/radio UI config."),
     model=ChoiceOptionDTO,
     name="ChoiceOption",
 )
@@ -147,7 +146,7 @@ class ChoiceOptionGQL(PydanticOutputMixin[ChoiceOptionDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Text input UI config."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Text input UI config."),
     model=TextOptionDTO,
     name="TextOption",
 )
@@ -156,7 +155,7 @@ class TextOptionGQL(PydanticOutputMixin[TextOptionDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="UI rendering options."),
+    BackendAIGQLMeta(added_version="26.4.2", description="UI rendering options."),
     model=UIOptionDTO,
     name="UIOption",
 )
@@ -170,7 +169,7 @@ class UIOptionGQL(PydanticOutputMixin[UIOptionDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Specifies how a runtime variant preset value is applied to the inference container, either as an environment variable or a command-line argument.",
     ),
     model=PresetTargetSpecDTO,
@@ -193,7 +192,7 @@ class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Defines a configurable parameter for a runtime variant. Each preset maps a user-facing setting (e.g., tensor parallelism, quantization) to either an environment variable or a command-line argument that is applied to the inference container.",
     ),
     name="RuntimeVariantPreset",
@@ -228,7 +227,7 @@ RuntimeVariantPresetEdge = Edge[RuntimeVariantPresetGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated list of runtime variant presets.",
     )
 )
@@ -241,7 +240,7 @@ class RuntimeVariantPresetConnection(Connection[RuntimeVariantPresetGQL]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter for presets."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Filter for presets."),
     name="RuntimeVariantPresetFilter",
 )
 class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
@@ -250,7 +249,7 @@ class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Order specification."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Order specification."),
     name="RuntimeVariantPresetOrderBy",
 )
 class RuntimeVariantPresetOrderByGQL(PydanticInputMixin[OrderDTO]):
@@ -259,7 +258,7 @@ class RuntimeVariantPresetOrderByGQL(PydanticInputMixin[OrderDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Create preset input."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Create preset input."),
     name="CreateRuntimeVariantPresetInput",
 )
 class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
@@ -283,7 +282,7 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Update preset input."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Update preset input."),
     name="UpdateRuntimeVariantPresetInput",
 )
 class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
@@ -298,7 +297,7 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Create preset payload."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Create preset payload."),
     model=CreatePayloadDTO,
 )
 class CreateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
@@ -306,7 +305,7 @@ class CreateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Update preset payload."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Update preset payload."),
     model=UpdatePayloadDTO,
 )
 class UpdateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
@@ -314,7 +313,7 @@ class UpdateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Delete preset payload."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Delete preset payload."),
     model=DeletePayloadDTO,
 )
 class DeleteRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):

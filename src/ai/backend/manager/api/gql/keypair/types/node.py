@@ -9,7 +9,6 @@ from uuid import UUID
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.keypair.response import KeypairNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -21,7 +20,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Keypair entity representing an API access key. "
             "The access_key field serves as the unique identifier. "
@@ -60,7 +59,7 @@ KeyPairEdge = Edge[KeyPairGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Paginated connection for keypair records. "
             "Provides relay-style cursor-based pagination. "

@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.common import (
     VFolderHostPermissionEntryInfo,
     VFolderHostPermissionEntryInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -34,7 +33,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Binary size input accepting bytes integer or human-readable string.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="BinarySizeInput",
 )
@@ -48,7 +47,7 @@ class BinarySizeInputGQL(PydanticInputMixin[BinarySizeInput]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Binary size with both raw bytes and human-readable format.",
     ),
     model=BinarySizeInfo,
@@ -61,7 +60,7 @@ class BinarySizeInfoGQL(PydanticOutputMixin[BinarySizeInfo]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A resource limit entry that may be unlimited.",
     ),
     model=ResourceLimitEntryInfo,
@@ -133,7 +132,7 @@ class ResourceSlotEntryInputGQL(PydanticInputMixin[ResourceSlotEntryInput]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for a vfolder host with its permissions.",
     ),
     name="VFolderHostPermissionEntryInput",

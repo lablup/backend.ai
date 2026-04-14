@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.common.dto.manager.v2.container_registry.types import (
     ContainerRegistryTypeFilter as ContainerRegistryTypeFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -30,7 +29,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Filter by container registry type.",
     ),
     name="ContainerRegistryTypeFilter",
@@ -44,7 +43,7 @@ class ContainerRegistryTypeFilterGQL(PydanticInputMixin[ContainerRegistryTypeFil
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Filter for container registries.",
     ),
     name="ContainerRegistryV2Filter",
@@ -57,7 +56,7 @@ class ContainerRegistryV2Filter(PydanticInputMixin[ContainerRegistryFilterDTO]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering container registries.",
     ),
     name="ContainerRegistryV2OrderField",
@@ -71,7 +70,7 @@ class ContainerRegistryV2OrderField(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Ordering specification for container registries.",
     ),
     name="ContainerRegistryV2OrderBy",

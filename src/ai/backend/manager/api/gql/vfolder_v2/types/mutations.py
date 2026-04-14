@@ -79,7 +79,6 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     PurgeVFolderPayload as PurgePayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -100,7 +99,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a new virtual folder.",
     ),
     name="CreateVFolderV2Input",
@@ -122,7 +121,7 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for cloning a virtual folder.",
     ),
     name="CloneVFolderV2Input",
@@ -138,7 +137,7 @@ class CloneVFolderInputGQL(PydanticInputMixin[CloneInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for listing files in a virtual folder.",
     ),
     name="ListFilesV2Input",
@@ -149,7 +148,7 @@ class ListFilesInputGQL(PydanticInputMixin[ListFilesInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating directories inside a virtual folder.",
     ),
     name="MkdirV2Input",
@@ -162,7 +161,7 @@ class MkdirInputGQL(PydanticInputMixin[MkdirInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for moving a file inside a virtual folder.",
     ),
     name="MoveFileV2Input",
@@ -174,7 +173,7 @@ class MoveFileInputGQL(PydanticInputMixin[MoveFileInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for deleting files inside a virtual folder.",
     ),
     name="DeleteFilesV2Input",
@@ -188,7 +187,7 @@ class DeleteFilesInputGQL(PydanticInputMixin[DeleteFilesInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a file upload session.",
     ),
     name="CreateUploadSessionV2Input",
@@ -200,7 +199,7 @@ class UploadSessionInputGQL(PydanticInputMixin[UploadInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a file download session.",
     ),
     name="CreateDownloadSessionV2Input",
@@ -219,7 +218,7 @@ class DownloadSessionInputGQL(PydanticInputMixin[DownloadInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A file or directory entry inside a virtual folder.",
     ),
     model=FileEntryNodeDTO,
@@ -241,7 +240,7 @@ class FileEntryNodeGQL(PydanticOutputMixin[FileEntryNodeDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after creating a virtual folder.",
     ),
     model=CreatePayloadDTO,
@@ -253,7 +252,7 @@ class CreateVFolderPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after soft-deleting a virtual folder.",
     ),
     model=DeletePayloadDTO,
@@ -265,7 +264,7 @@ class DeleteVFolderPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after permanently purging a virtual folder.",
     ),
     model=PurgePayloadDTO,
@@ -277,7 +276,7 @@ class PurgeVFolderPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after cloning a virtual folder.",
     ),
     model=ClonePayloadDTO,
@@ -290,7 +289,7 @@ class CloneVFolderPayloadGQL(PydanticOutputMixin[ClonePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after listing files in a virtual folder.",
     ),
     model=ListFilesPayloadDTO,
@@ -302,7 +301,7 @@ class ListFilesPayloadGQL(PydanticOutputMixin[ListFilesPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after creating directories in a virtual folder.",
     ),
     model=MkdirPayloadDTO,
@@ -314,7 +313,7 @@ class MkdirPayloadGQL(PydanticOutputMixin[MkdirPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after moving a file in a virtual folder.",
     ),
     model=MoveFilePayloadDTO,
@@ -327,7 +326,7 @@ class MoveFilePayloadGQL(PydanticOutputMixin[MoveFilePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after deleting files in a virtual folder.",
     ),
     model=DeleteFilesPayloadDTO,
@@ -339,7 +338,7 @@ class DeleteFilesPayloadGQL(PydanticOutputMixin[DeleteFilesPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after creating an upload session.",
     ),
     model=UploadPayloadDTO,
@@ -352,7 +351,7 @@ class UploadSessionPayloadGQL(PydanticOutputMixin[UploadPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after creating a download session.",
     ),
     model=DownloadPayloadDTO,
@@ -370,7 +369,7 @@ class DownloadSessionPayloadGQL(PydanticOutputMixin[DownloadPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for soft-deleting multiple virtual folders.",
     ),
     name="BulkDeleteVFoldersV2Input",
@@ -381,7 +380,7 @@ class BulkDeleteVFoldersInputGQL(PydanticInputMixin[BulkDeleteInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for bulk virtual folder soft-deletion.",
     ),
     model=BulkDeletePayloadDTO,
@@ -395,7 +394,7 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for permanently purging multiple virtual folders.",
     ),
     name="BulkPurgeVFoldersV2Input",
@@ -406,7 +405,7 @@ class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for bulk virtual folder purge.",
     ),
     model=BulkPurgePayloadDTO,
@@ -418,7 +417,7 @@ class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for deploying a model VFolder as a new deployment.",
     ),
     name="DeployVFolderV2Input",
@@ -448,7 +447,7 @@ class DeployVFolderInputGQL(PydanticInputMixin[DeployInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for deploying a model VFolder.",
     ),
     model=DeployPayloadDTO,

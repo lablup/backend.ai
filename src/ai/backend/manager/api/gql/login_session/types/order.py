@@ -5,7 +5,6 @@ from __future__ import annotations
 from enum import StrEnum
 
 from ai.backend.common.dto.manager.v2.login_session.request import LoginSessionOrder
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -17,7 +16,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering login sessions.",
     ),
     name="LoginSessionOrderField",
@@ -31,7 +30,7 @@ class LoginSessionOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Ordering specification for login sessions.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="LoginSessionOrderBy",
 )

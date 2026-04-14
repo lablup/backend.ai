@@ -56,7 +56,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.common.types import ResourceOptsEntryGQL as ResourceOptsEntryInfoGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -93,7 +92,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Order fields for deployment revision presets.",
     ),
     name="DeploymentRevisionPresetOrderField",
@@ -106,7 +105,7 @@ class DeploymentRevisionPresetOrderFieldGQL(StrEnum):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A single environment variable key-value pair injected into the inference container when a deployment revision preset is applied.",
     ),
     model=EnvironEntryInfoDTO,
@@ -121,7 +120,7 @@ class EnvironEntryGQL(PydanticOutputMixin[EnvironEntryInfoDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.",
     ),
     model=PresetValueInfoDTO,
@@ -138,7 +137,7 @@ class PresetValueEntryGQL(PydanticOutputMixin[PresetValueInfoDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Cluster topology settings for the deployment, defining whether the inference workload runs on a single node or is distributed across multiple nodes.",
     ),
     model=PresetClusterSpecDTO,
@@ -155,7 +154,7 @@ class PresetClusterSpecGQL(PydanticOutputMixin[PresetClusterSpecDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Compute resource allocation for the deployment, specifying CPU, memory, and accelerator requirements along with additional resource options.",
     ),
     model=PresetResourceAllocationDTO,
@@ -169,7 +168,7 @@ class PresetResourceAllocationGQL(PydanticOutputMixin[PresetResourceAllocationDT
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Container execution configuration for the deployment, including the inference server image, startup commands, and environment variables.",
     ),
     model=PresetExecutionSpecDTO,
@@ -192,7 +191,7 @@ class PresetExecutionSpecGQL(PydanticOutputMixin[PresetExecutionSpecDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Deployment-level defaults stored on the preset. Any null field "
         "means the preset does not specify a default and callers should fall back to "
         "user input or the system default.",
@@ -225,7 +224,7 @@ class PresetDeploymentDefaultsGQL(PydanticOutputMixin[PresetDeploymentDefaultsDT
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A reusable deployment configuration template. Users select a preset when deploying a model to automatically populate resource allocation, execution settings, and runtime-specific parameters. Each preset is designed for a specific runtime variant and captures the full configuration needed to launch an inference service.",
     ),
     name="DeploymentRevisionPreset",
@@ -274,7 +273,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             description="Resource slot allocations for this preset.",
         )
     )  # type: ignore[misc]
@@ -328,7 +327,7 @@ DeploymentRevisionPresetEdge = Edge[DeploymentRevisionPresetGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated list of deployment revision presets.",
     )
 )
@@ -342,7 +341,7 @@ class DeploymentRevisionPresetConnection(Connection[DeploymentRevisionPresetGQL]
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Filter for deployment revision presets.",
     ),
     name="DeploymentRevisionPresetFilter",
@@ -354,7 +353,7 @@ class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Order specification for deployment revision presets.",
     ),
     name="DeploymentRevisionPresetOrderBy",
@@ -366,7 +365,7 @@ class DeploymentRevisionPresetOrderByGQL(PydanticInputMixin[OrderDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Deployment strategy input for a revision preset, used to "
         "establish a default deployment strategy applied to any deployment "
         "created from this preset.",
@@ -387,7 +386,7 @@ class PresetDeploymentStrategyInputGQL(PydanticInputMixin[DeploymentStrategyInpu
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create deployment revision preset input.",
     ),
     name="CreateDeploymentRevisionPresetInput",
@@ -415,7 +414,7 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update deployment revision preset input.",
     ),
     name="UpdateDeploymentRevisionPresetInput",
@@ -449,7 +448,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create deployment revision preset payload.",
     ),
     model=CreatePayloadDTO,
@@ -460,7 +459,7 @@ class CreateDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[CreatePayload
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update deployment revision preset payload.",
     ),
     model=UpdatePayloadDTO,
@@ -471,7 +470,7 @@ class UpdateDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[UpdatePayload
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete deployment revision preset payload.",
     ),
     model=DeletePayloadDTO,

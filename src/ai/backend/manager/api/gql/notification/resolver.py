@@ -15,7 +15,6 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     SearchNotificationChannelsInput,
     SearchNotificationRulesInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -88,7 +87,7 @@ class NotificationRuleConnection(Connection[NotificationRule]):
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a notification channel by ID (admin only)",
     )
 )  # type: ignore[misc]
@@ -101,9 +100,7 @@ async def admin_notification_channel(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Get a notification channel by ID"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Get a notification channel by ID"),
     deprecation_reason="Use admin_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_channel(
@@ -114,9 +111,7 @@ async def notification_channel(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="List notification channels (admin only)"
-    )
+    BackendAIGQLMeta(added_version="26.4.2", description="List notification channels (admin only)")
 )  # type: ignore[misc]
 async def admin_notification_channels(
     info: Info[StrawberryGQLContext],
@@ -164,7 +159,7 @@ async def admin_notification_channels(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="List notification channels"),
+    BackendAIGQLMeta(added_version="26.4.2", description="List notification channels"),
     deprecation_reason="Use admin_notification_channels instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_channels(
@@ -212,7 +207,7 @@ async def notification_channels(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Get a notification rule by ID (admin only)"
+        added_version="26.4.2", description="Get a notification rule by ID (admin only)"
     )
 )  # type: ignore[misc]
 async def admin_notification_rule(
@@ -224,9 +219,7 @@ async def admin_notification_rule(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Get a notification rule by ID"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Get a notification rule by ID"),
     deprecation_reason="Use admin_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> NotificationRule | None:
@@ -235,9 +228,7 @@ async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> Notific
 
 
 @gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="List notification rules (admin only)"
-    )
+    BackendAIGQLMeta(added_version="26.4.2", description="List notification rules (admin only)")
 )  # type: ignore[misc]
 async def admin_notification_rules(
     info: Info[StrawberryGQLContext],
@@ -283,7 +274,7 @@ async def admin_notification_rules(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="List notification rules"),
+    BackendAIGQLMeta(added_version="26.4.2", description="List notification rules"),
     deprecation_reason="Use admin_notification_rules instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_rules(
@@ -328,9 +319,7 @@ async def notification_rules(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="List available notification rule types"
-    )
+    BackendAIGQLMeta(added_version="26.4.2", description="List available notification rule types")
 )  # type: ignore[misc]
 async def notification_rule_types() -> list[NotificationRuleTypeGQL] | None:
     """Return all available notification rule types."""
@@ -339,7 +328,7 @@ async def notification_rule_types() -> list[NotificationRuleTypeGQL] | None:
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get JSON schema for a notification rule type's message format",
     )
 )  # type: ignore[misc]
@@ -358,7 +347,7 @@ async def notification_rule_type_schema(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new notification channel (admin only)",
     )
 )  # type: ignore[misc]
@@ -376,9 +365,7 @@ async def admin_create_notification_channel(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Create a new notification channel"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Create a new notification channel"),
     deprecation_reason="Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def create_notification_channel(
@@ -395,7 +382,7 @@ async def create_notification_channel(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Update a notification channel (admin only)"
+        added_version="26.4.2", description="Update a notification channel (admin only)"
     )
 )  # type: ignore[misc]
 async def admin_update_notification_channel(
@@ -410,9 +397,7 @@ async def admin_update_notification_channel(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Update a notification channel"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Update a notification channel"),
     deprecation_reason="Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def update_notification_channel(
@@ -427,7 +412,7 @@ async def update_notification_channel(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Delete a notification channel (admin only)"
+        added_version="26.4.2", description="Delete a notification channel (admin only)"
     )
 )  # type: ignore[misc]
 async def admin_delete_notification_channel(
@@ -439,9 +424,7 @@ async def admin_delete_notification_channel(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Delete a notification channel"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Delete a notification channel"),
     deprecation_reason="Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def delete_notification_channel(
@@ -453,7 +436,7 @@ async def delete_notification_channel(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new notification rule (admin only)",
     )
 )  # type: ignore[misc]
@@ -469,9 +452,7 @@ async def admin_create_notification_rule(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Create a new notification rule"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Create a new notification rule"),
     deprecation_reason="Use admin_create_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def create_notification_rule(
@@ -485,9 +466,7 @@ async def create_notification_rule(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Update a notification rule (admin only)"
-    )
+    BackendAIGQLMeta(added_version="26.4.2", description="Update a notification rule (admin only)")
 )  # type: ignore[misc]
 async def admin_update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
@@ -499,7 +478,7 @@ async def admin_update_notification_rule(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Update a notification rule"),
+    BackendAIGQLMeta(added_version="26.4.2", description="Update a notification rule"),
     deprecation_reason="Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def update_notification_rule(
@@ -511,9 +490,7 @@ async def update_notification_rule(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Delete a notification rule (admin only)"
-    )
+    BackendAIGQLMeta(added_version="26.4.2", description="Delete a notification rule (admin only)")
 )  # type: ignore[misc]
 async def admin_delete_notification_rule(
     input: DeleteNotificationRuleInput, info: Info[StrawberryGQLContext]
@@ -524,7 +501,7 @@ async def admin_delete_notification_rule(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Delete a notification rule"),
+    BackendAIGQLMeta(added_version="26.4.2", description="Delete a notification rule"),
     deprecation_reason="Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def delete_notification_rule(
@@ -536,7 +513,7 @@ async def delete_notification_rule(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Validate a notification channel (admin only)",
     )
 )  # type: ignore[misc]
@@ -549,9 +526,7 @@ async def admin_validate_notification_channel(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Validate a notification channel"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Validate a notification channel"),
     deprecation_reason="Use admin_validate_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def validate_notification_channel(
@@ -563,7 +538,7 @@ async def validate_notification_channel(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Validate a notification rule (admin only)"
+        added_version="26.4.2", description="Validate a notification rule (admin only)"
     )
 )  # type: ignore[misc]
 async def admin_validate_notification_rule(
@@ -575,9 +550,7 @@ async def admin_validate_notification_rule(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Validate a notification rule"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Validate a notification rule"),
     deprecation_reason="Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def validate_notification_rule(

@@ -10,7 +10,6 @@ from uuid import UUID
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -22,7 +21,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 
 @gql_enum(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Status of a login session."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Status of a login session."),
     name="LoginSessionStatus",
 )
 class LoginSessionStatusGQL(StrEnum):
@@ -33,7 +32,7 @@ class LoginSessionStatusGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Represents a login session entry tracking user authentication sessions.",
     ),
     name="LoginSessionV2",
@@ -58,7 +57,7 @@ LoginSessionV2EdgeGQL = Edge[LoginSessionV2GQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Connection type for paginated login session results.",
     ),
     name="LoginSessionV2Connection",

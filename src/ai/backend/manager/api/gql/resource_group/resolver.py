@@ -10,7 +10,6 @@ from strawberry.relay import Connection, Edge, PageInfo
 
 from ai.backend.common.dto.manager.v2.resource_group.request import AdminSearchResourceGroupsInput
 from ai.backend.common.dto.manager.v2.resource_group.response import DeleteResourceGroupPayload
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -220,7 +219,7 @@ async def admin_update_resource_group(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single resource group by name (admin only).",
     )
 )  # type: ignore[misc]
@@ -235,7 +234,7 @@ async def admin_resource_group_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new resource group (admin only).",
     )
 )  # type: ignore[misc]
@@ -250,7 +249,7 @@ async def admin_create_resource_group_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete a resource group (admin only).",
     )
 )  # type: ignore[misc]
@@ -269,7 +268,7 @@ async def admin_delete_resource_group_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get allowed resource groups for a domain (admin only).",
     )
 )  # type: ignore[misc]
@@ -286,7 +285,7 @@ async def admin_allowed_resource_groups_for_domain_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get allowed resource groups for a project (admin only).",
     )
 )  # type: ignore[misc]
@@ -303,7 +302,7 @@ async def admin_allowed_resource_groups_for_project_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get allowed domains for a resource group (admin only).",
     )
 )  # type: ignore[misc]
@@ -320,7 +319,7 @@ async def admin_allowed_domains_for_resource_group_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get allowed projects for a resource group (admin only).",
     )
 )  # type: ignore[misc]
@@ -340,7 +339,7 @@ async def admin_allowed_projects_for_resource_group_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update allowed resource groups for a domain (admin only).",
     )
 )  # type: ignore[misc]
@@ -357,7 +356,7 @@ async def admin_update_allowed_resource_groups_for_domain_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update allowed resource groups for a project (admin only).",
     )
 )  # type: ignore[misc]
@@ -374,7 +373,7 @@ async def admin_update_allowed_resource_groups_for_project_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update allowed domains for a resource group (admin only).",
     )
 )  # type: ignore[misc]
@@ -391,7 +390,7 @@ async def admin_update_allowed_domains_for_resource_group_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update allowed projects for a resource group (admin only).",
     )
 )  # type: ignore[misc]

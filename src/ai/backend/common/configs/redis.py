@@ -5,7 +5,6 @@ from typing import Annotated, Any
 from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_validator
 
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -170,7 +169,7 @@ class SingleRedisConfig(BaseModel):
                 "If None, falls back to the master password. "
                 "Set explicitly when Sentinel nodes use a different password than the master."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             secret=True,
             example=ConfigExample(local="", prod="REDIS_SENTINEL_PASSWORD"),
         ),

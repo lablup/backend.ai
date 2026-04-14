@@ -12,7 +12,6 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserRoleFilter,
     UserStatusFilter,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -112,7 +111,7 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     domain_name: StringFilter | None = None
     integration_name: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             description="Filter by external integration identifier.",
         ),
         default=None,

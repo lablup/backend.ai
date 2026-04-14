@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     TerminateSessionsInProjectInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -79,7 +78,7 @@ async def admin_sessions_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List sessions within a specific project. Requires project membership or higher privileges.",
     )
 )  # type: ignore[misc]
@@ -126,7 +125,7 @@ async def project_sessions_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Enqueue a new compute session.",
     ),
 )  # type: ignore[misc]
@@ -154,7 +153,7 @@ async def enqueue_session(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Terminate sessions within a project scope.",
     ),
 )  # type: ignore[misc]

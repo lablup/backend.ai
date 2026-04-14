@@ -68,7 +68,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -553,7 +552,7 @@ class UpdateResourceGroupPayload(PydanticOutputMixin[UpdateResourceGroupConfigPa
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for creating a new resource group.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="CreateResourceGroupInput",
 )
@@ -565,7 +564,7 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for resource group creation.",
     ),
     model=CreateResourceGroupPayloadDTO,
@@ -576,7 +575,7 @@ class CreateResourceGroupPayloadGQL(PydanticOutputMixin[CreateResourceGroupPaylo
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for resource group deletion.",
     ),
     model=DeleteResourceGroupPayloadDTO,
@@ -591,7 +590,7 @@ class DeleteResourceGroupPayloadGQL(PydanticOutputMixin[DeleteResourceGroupPaylo
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for updating allowed resource groups for a domain.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="UpdateAllowedResourceGroupsForDomainInput",
 )
@@ -608,7 +607,7 @@ class UpdateAllowedResourceGroupsForDomainInputGQL(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for updating allowed resource groups for a project.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="UpdateAllowedResourceGroupsForProjectInput",
 )
@@ -625,7 +624,7 @@ class UpdateAllowedResourceGroupsForProjectInputGQL(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for updating allowed domains for a resource group.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="UpdateAllowedDomainsForResourceGroupInput",
 )
@@ -640,7 +639,7 @@ class UpdateAllowedDomainsForResourceGroupInputGQL(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for updating allowed projects for a resource group.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="UpdateAllowedProjectsForResourceGroupInput",
 )
@@ -654,7 +653,7 @@ class UpdateAllowedProjectsForResourceGroupInputGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload containing allowed resource group names.",
     ),
     model=AllowedResourceGroupsPayloadDTO,
@@ -667,7 +666,7 @@ class AllowedResourceGroupsPayloadGQL(PydanticOutputMixin[AllowedResourceGroupsP
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload containing allowed domain names.",
     ),
     model=AllowedDomainsPayloadDTO,
@@ -680,7 +679,7 @@ class AllowedDomainsPayloadGQL(PydanticOutputMixin[AllowedDomainsPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload containing allowed project IDs.",
     ),
     model=AllowedProjectsPayloadDTO,

@@ -22,7 +22,6 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -134,7 +133,7 @@ class BackgroundTaskEventPayloadGQL:
 
 @gql_subscription(  # type: ignore[misc]
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Subscribe to real-time events for a specific background task. "
             "Streams progress updates and completion events (done/cancelled/failed) "

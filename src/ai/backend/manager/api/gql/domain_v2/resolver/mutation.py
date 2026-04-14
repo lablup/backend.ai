@@ -7,7 +7,6 @@ from strawberry import Info
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.domain.request import DeleteDomainInput, PurgeDomainInput
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -37,7 +36,7 @@ def _get_user_info() -> UserInfo:
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new domain (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -54,7 +53,7 @@ async def admin_create_domain_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.",
     )
 )  # type: ignore[misc]
@@ -74,7 +73,7 @@ async def admin_update_domain_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Soft-delete a domain (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -93,7 +92,7 @@ async def admin_delete_domain_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]

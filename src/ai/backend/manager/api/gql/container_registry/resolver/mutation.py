@@ -7,7 +7,6 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     DeleteContainerRegistryInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.container_registry.mutations import (
     CreateContainerRegistryInputGQL,
     CreateContainerRegistryPayloadGQL,
@@ -25,7 +24,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new container registry (admin only).",
     )
 )  # type: ignore[misc]
@@ -40,7 +39,7 @@ async def admin_create_container_registry_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a container registry (admin only).",
     )
 )  # type: ignore[misc]
@@ -55,7 +54,7 @@ async def admin_update_container_registry_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete a container registry (admin only).",
     )
 )  # type: ignore[misc]

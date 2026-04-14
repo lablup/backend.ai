@@ -36,7 +36,6 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload as UpdateRuntimeVariantPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -52,9 +51,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 
 
 @gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Order fields for runtime variants."
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Order fields for runtime variants."),
     name="RuntimeVariantOrderField",
 )
 class RuntimeVariantOrderFieldGQL(StrEnum):
@@ -64,7 +61,7 @@ class RuntimeVariantOrderFieldGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Represents an inference runtime engine definition (e.g., vLLM, SGLang, NIM, TGI). Previously hardcoded as an enum, runtime variants are now managed as dynamic database entities to allow administrators to register and configure new inference runtimes without code changes.",
     ),
     name="RuntimeVariant",
@@ -90,9 +87,7 @@ RuntimeVariantEdge = Edge[RuntimeVariantGQL]
 
 
 @gql_connection_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Paginated list of runtime variants."
-    )
+    BackendAIGQLMeta(added_version="26.4.2", description="Paginated list of runtime variants.")
 )
 class RuntimeVariantConnection(Connection[RuntimeVariantGQL]):
     count: int
@@ -103,9 +98,7 @@ class RuntimeVariantConnection(Connection[RuntimeVariantGQL]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Filter for runtime variants."
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Filter for runtime variants."),
     name="RuntimeVariantFilter",
 )
 class RuntimeVariantFilterGQL(PydanticInputMixin[RuntimeVariantFilterDTO]):
@@ -113,7 +106,7 @@ class RuntimeVariantFilterGQL(PydanticInputMixin[RuntimeVariantFilterDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Order specification."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Order specification."),
     name="RuntimeVariantOrderBy",
 )
 class RuntimeVariantOrderByGQL(PydanticInputMixin[RuntimeVariantOrderDTO]):
@@ -122,9 +115,7 @@ class RuntimeVariantOrderByGQL(PydanticInputMixin[RuntimeVariantOrderDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Input for creating a runtime variant."
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Input for creating a runtime variant."),
     name="CreateRuntimeVariantInput",
 )
 class CreateRuntimeVariantInputGQL(PydanticInputMixin[CreateRuntimeVariantInputDTO]):
@@ -137,9 +128,7 @@ class CreateRuntimeVariantInputGQL(PydanticInputMixin[CreateRuntimeVariantInputD
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Input for updating a runtime variant."
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Input for updating a runtime variant."),
     name="UpdateRuntimeVariantInput",
 )
 class UpdateRuntimeVariantInputGQL(PydanticInputMixin[UpdateRuntimeVariantInputDTO]):
@@ -149,9 +138,7 @@ class UpdateRuntimeVariantInputGQL(PydanticInputMixin[UpdateRuntimeVariantInputD
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Payload for runtime variant creation."
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Payload for runtime variant creation."),
     model=CreateRuntimeVariantPayloadDTO,
 )
 class CreateRuntimeVariantPayloadGQL(PydanticOutputMixin[CreateRuntimeVariantPayloadDTO]):
@@ -159,9 +146,7 @@ class CreateRuntimeVariantPayloadGQL(PydanticOutputMixin[CreateRuntimeVariantPay
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Payload for runtime variant update."
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Payload for runtime variant update."),
     model=UpdateRuntimeVariantPayloadDTO,
 )
 class UpdateRuntimeVariantPayloadGQL(PydanticOutputMixin[UpdateRuntimeVariantPayloadDTO]):
@@ -169,9 +154,7 @@ class UpdateRuntimeVariantPayloadGQL(PydanticOutputMixin[UpdateRuntimeVariantPay
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Payload for runtime variant deletion."
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="Payload for runtime variant deletion."),
     model=DeleteRuntimeVariantPayloadDTO,
 )
 class DeleteRuntimeVariantPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantPayloadDTO]):
@@ -180,7 +163,7 @@ class DeleteRuntimeVariantPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantPay
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for deleting multiple runtime variants.",
     ),
     name="DeleteRuntimeVariantsInput",
@@ -191,7 +174,7 @@ class DeleteRuntimeVariantsInputGQL(PydanticInputMixin[DeleteRuntimeVariantsInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for bulk runtime variant deletion.",
     ),
     model=DeleteRuntimeVariantsPayloadDTO,

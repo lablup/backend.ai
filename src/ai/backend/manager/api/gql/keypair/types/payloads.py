@@ -35,7 +35,6 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     UpdateMyKeypairPayload as UpdateMyKeypairPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -100,7 +99,7 @@ class UpdateMyKeypairPayloadGQL(PydanticOutputMixin[UpdateMyKeypairPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after admin creates a keypair. The secret_key is only shown once.",
     ),
     model=AdminCreateKeypairPayloadDTO,
@@ -113,7 +112,7 @@ class AdminCreateKeypairPayloadGQL(PydanticOutputMixin[AdminCreateKeypairPayload
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after admin updates a keypair.",
     ),
     model=AdminUpdateKeypairPayloadDTO,
@@ -125,7 +124,7 @@ class AdminUpdateKeypairPayloadGQL(PydanticOutputMixin[AdminUpdateKeypairPayload
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after admin deletes a keypair.",
     ),
     model=AdminDeleteKeypairPayloadDTO,
@@ -138,7 +137,7 @@ class AdminDeleteKeypairPayloadGQL(PydanticOutputMixin[AdminDeleteKeypairPayload
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="SSH keypair read model. Never includes the private key.",
     ),
     model=SSHKeypairNodeDTO,
@@ -151,7 +150,7 @@ class SSHKeypairNodeGQL(PydanticOutputMixin[SSHKeypairNodeDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after admin registers a user's SSH keypair.",
     ),
     model=AdminRegisterSSHKeypairPayloadDTO,
@@ -164,7 +163,7 @@ class AdminRegisterSSHKeypairPayloadGQL(PydanticOutputMixin[AdminRegisterSSHKeyp
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after admin clears a user's SSH keypair.",
     ),
     model=AdminDeleteSSHKeypairPayloadDTO,
@@ -177,7 +176,7 @@ class AdminDeleteSSHKeypairPayloadGQL(PydanticOutputMixin[AdminDeleteSSHKeypairP
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned by admin SSH keypair lookup.",
     ),
     model=AdminGetSSHKeypairPayloadDTO,

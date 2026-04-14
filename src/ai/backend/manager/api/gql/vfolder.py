@@ -4,7 +4,6 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -19,7 +18,7 @@ from ai.backend.manager.api.gql_legacy.gql_relay import AsyncNode
 
 @gql_federation_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Federation stub for legacy VirtualFolderNode.",
     ),
     name="VirtualFolderNode",

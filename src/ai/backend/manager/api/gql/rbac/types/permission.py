@@ -47,7 +47,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
@@ -302,7 +301,7 @@ class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo])
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Information about a single RBAC operation.",
     ),
     model=OperationInfo,
@@ -316,7 +315,7 @@ class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Valid entity-operation combination for RBAC actions.",
     ),
     model=EntityOperationCombinationInfo,
@@ -329,7 +328,7 @@ class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinati
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Entity with its allowed actions within a scope.",
     ),
     model=EntityActionInfo,
@@ -342,7 +341,7 @@ class EntityActionInfoGQL(PydanticOutputMixin[EntityActionInfo]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Scope-entity-operation combination for RBAC permission matrix.",
     ),
     model=ScopeEntityOperationCombinationInfo,

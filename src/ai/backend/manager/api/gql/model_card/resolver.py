@@ -21,7 +21,6 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 )
 from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -54,7 +53,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search all model cards (superadmin only).",
     )
 )  # type: ignore[misc]
@@ -77,7 +76,7 @@ async def admin_model_cards_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search model cards within a MODEL_STORE project.",
     )
 )  # type: ignore[misc]
@@ -100,7 +99,7 @@ async def project_model_cards_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single model card by ID.",
     )
 )  # type: ignore[misc]
@@ -114,7 +113,7 @@ async def model_card_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a model card (admin only).",
     )
 )  # type: ignore[misc]
@@ -130,7 +129,7 @@ async def admin_create_model_card_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a model card (admin only).",
     )
 )  # type: ignore[misc]
@@ -146,7 +145,7 @@ async def admin_update_model_card_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete a model card (admin only).",
     )
 )  # type: ignore[misc]
@@ -161,7 +160,7 @@ async def admin_delete_model_card_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete multiple model cards (admin only).",
     )
 )  # type: ignore[misc]
@@ -187,7 +186,7 @@ async def admin_delete_model_cards_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.",
     )
 )  # type: ignore[misc]
@@ -201,7 +200,7 @@ async def scan_project_model_cards_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Deploy a model card by creating a deployment with a revision preset.",
     )
 )  # type: ignore[misc]
@@ -248,7 +247,7 @@ def _build_search_input(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search deployment revision presets that satisfy a model card's minimum resource requirements.",
     )
 )  # type: ignore[misc]

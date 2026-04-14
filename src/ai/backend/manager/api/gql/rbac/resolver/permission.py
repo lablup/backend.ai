@@ -10,7 +10,6 @@ from ai.backend.common.data.permission.scope_entity_combinations import (
 )
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -112,7 +111,7 @@ async def rbac_scope_entity_combinations(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List valid RBAC entity-operation combinations.",
     )
 )  # type: ignore[misc]
@@ -142,7 +141,7 @@ async def rbac_entity_operation_combinations(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List complete RBAC scope-entity-operation combinations (permission matrix).",
     )
 )  # type: ignore[misc]

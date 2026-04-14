@@ -32,7 +32,6 @@ from ai.backend.common.dto.manager.v2.resource_preset.response import (
 from ai.backend.common.dto.manager.v2.resource_preset.response import (
     UpdateResourcePresetPayload as UpdateResourcePresetPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
@@ -68,7 +67,7 @@ __all__ = (
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering resource presets.",
     ),
     name="ResourcePresetOrderField",
@@ -81,7 +80,7 @@ class ResourcePresetOrderFieldGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Resource preset with resource slot allocations.",
     ),
     name="ResourcePresetV2",
@@ -106,9 +105,7 @@ class ResourcePresetGQL(PydanticNodeMixin[ResourcePresetNode]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter for resource presets.", added_version=NEXT_RELEASE_VERSION
-    ),
+    BackendAIGQLMeta(description="Filter for resource presets.", added_version="26.4.2"),
     name="ResourcePresetFilter",
 )
 class ResourcePresetFilterGQL(PydanticInputMixin[ResourcePresetFilterDTO]):
@@ -123,7 +120,7 @@ class ResourcePresetFilterGQL(PydanticInputMixin[ResourcePresetFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Order by specification for resource presets.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="ResourcePresetOrderBy",
 )
@@ -138,7 +135,7 @@ class ResourcePresetOrderByGQL(PydanticInputMixin[ResourcePresetOrderDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for creating a new resource preset.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="CreateResourcePresetV2Input",
 )
@@ -159,7 +156,7 @@ class CreateResourcePresetInputGQL(PydanticInputMixin[CreateResourcePresetInputD
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for resource preset creation.",
     ),
     model=CreateResourcePresetPayloadDTO,
@@ -171,7 +168,7 @@ class CreateResourcePresetPayloadGQL(PydanticOutputMixin[CreateResourcePresetPay
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for updating a resource preset. All fields optional for partial update.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="UpdateResourcePresetV2Input",
 )
@@ -193,7 +190,7 @@ class UpdateResourcePresetInputGQL(PydanticInputMixin[UpdateResourcePresetInputD
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for resource preset update.",
     ),
     model=UpdateResourcePresetPayloadDTO,
@@ -204,7 +201,7 @@ class UpdateResourcePresetPayloadGQL(PydanticOutputMixin[UpdateResourcePresetPay
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for resource preset deletion.",
     ),
     model=DeleteResourcePresetPayloadDTO,
@@ -221,7 +218,7 @@ ResourcePresetEdge = Edge[ResourcePresetGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Resource preset connection.",
     )
 )
