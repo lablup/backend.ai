@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload as PurgeDomainPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -35,7 +34,7 @@ UNSET = None
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a new domain.",
     )
 )
@@ -55,7 +54,7 @@ class CreateDomainInputGQL(PydanticInputMixin[CreateDomainInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for updating domain information. All fields optional.",
     )
 )
@@ -78,7 +77,7 @@ class UpdateDomainInputGQL(PydanticInputMixin[UpdateDomainInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for domain mutation responses.",
     ),
     model=DomainPayloadDTO,
@@ -91,7 +90,7 @@ class DomainPayloadGQL(PydanticOutputMixin[DomainPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for domain deletion mutation.",
     ),
     model=DeleteDomainPayloadDTO,
@@ -104,7 +103,7 @@ class DeleteDomainPayloadGQL(PydanticOutputMixin[DeleteDomainPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for domain permanent deletion mutation.",
     ),
     model=PurgeDomainPayloadDTO,

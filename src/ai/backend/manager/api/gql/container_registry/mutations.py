@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload as UpdateContainerRegistryPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.container_registry.types import (
     ContainerRegistryGQL,
     ContainerRegistryTypeGQL,
@@ -37,7 +36,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, Pydan
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a container registry.",
     )
 )
@@ -55,7 +54,7 @@ class CreateContainerRegistryInputGQL(PydanticInputMixin[CreateContainerRegistry
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for updating a container registry. All fields optional except id.",
     )
 )
@@ -77,7 +76,7 @@ class UpdateContainerRegistryInputGQL(PydanticInputMixin[UpdateContainerRegistry
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for container registry create/update mutations.",
     ),
     model=CreateContainerRegistryPayloadDTO,
@@ -88,7 +87,7 @@ class CreateContainerRegistryPayloadGQL(PydanticOutputMixin[CreateContainerRegis
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for container registry update mutation.",
     ),
     model=UpdateContainerRegistryPayloadDTO,
@@ -99,7 +98,7 @@ class UpdateContainerRegistryPayloadGQL(PydanticOutputMixin[UpdateContainerRegis
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for container registry deletion.",
     ),
     model=DeleteContainerRegistryPayloadDTO,

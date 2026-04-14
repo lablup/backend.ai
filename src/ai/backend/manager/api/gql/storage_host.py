@@ -8,7 +8,6 @@ from ai.backend.common.dto.manager.v2.storage_host.response import (
     MyStorageHostPermissionsPayload,
     StorageHostPermissionNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import VFolderHostPermissionEnum
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -22,7 +21,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A single storage host together with the permissions granted to a user.",
     ),
     model=StorageHostPermissionNode,
@@ -39,7 +38,7 @@ class StorageHostPermissionGQL(PydanticOutputMixin[StorageHostPermissionNode]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload listing storage hosts the current user is allowed to use.",
     ),
     model=MyStorageHostPermissionsPayload,
@@ -55,7 +54,7 @@ class MyStorageHostPermissionsPayloadGQL(PydanticOutputMixin[MyStorageHostPermis
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "List storage hosts the current user is allowed to mount, with the union "
             "of permissions inherited from domain, project, and keypair resource policies."

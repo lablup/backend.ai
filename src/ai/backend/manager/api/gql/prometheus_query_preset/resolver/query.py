@@ -10,7 +10,6 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     SearchQueryDefinitionsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -31,7 +30,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.",
     )
 )  # type: ignore[misc]
@@ -47,7 +46,7 @@ async def prometheus_query_preset(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List prometheus query presets with filtering and pagination. Available to any authenticated user since presets are a shared catalog of metric query templates.",
     )
 )  # type: ignore[misc]
@@ -87,7 +86,7 @@ async def prometheus_query_presets(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.",
     )
 )  # type: ignore[misc]

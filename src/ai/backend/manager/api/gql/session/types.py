@@ -51,7 +51,6 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -168,7 +167,7 @@ class SessionV2OrderByGQL(PydanticInputMixin[SessionOrder]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Scope for session operations within a specific project.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="ProjectSessionV2Scope",
 )
@@ -437,7 +436,7 @@ class SessionV2ConnectionGQL(Connection[SessionV2GQL]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Session types allowed for user-initiated creation.",
     ),
     name="CreateSessionType",
@@ -449,7 +448,7 @@ class CreateSessionTypeGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Cluster networking modes for session creation.",
     ),
     name="SessionClusterMode",
@@ -462,7 +461,7 @@ class SessionClusterModeGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="A single resource slot allocation entry.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="SessionResourceSlotEntryInput",
 )
@@ -474,7 +473,7 @@ class SessionResourceSlotEntryInputGQL(PydanticInputMixin[ResourceSlotEntryInput
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Additional resource options for session creation.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="SessionResourceOptsInput",
 )
@@ -487,7 +486,7 @@ class SessionResourceOptsInputGQL(PydanticInputMixin[ResourceOptsInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="A virtual folder mount specification.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="SessionMountItemInput",
 )
@@ -500,7 +499,7 @@ class SessionMountItemInputGQL(PydanticInputMixin[MountItemInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Batch session specific configuration.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="SessionBatchConfigInput",
 )
@@ -513,7 +512,7 @@ class SessionBatchConfigInputGQL(PydanticInputMixin[BatchConfigInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for creating a new compute session.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="EnqueueSessionInput",
 )
@@ -564,7 +563,7 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after creating a session.",
     ),
     model=EnqueueSessionPayloadDTO,
@@ -576,7 +575,7 @@ class EnqueueSessionPayloadGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after terminating sessions.",
     ),
     model=TerminateSessionsPayloadDTO,

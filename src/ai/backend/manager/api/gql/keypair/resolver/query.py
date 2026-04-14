@@ -9,7 +9,6 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminSearchKeypairsInput,
     SearchMyKeypairsRequest,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -24,7 +23,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.",
     )
 )  # type: ignore[misc]
@@ -67,7 +66,7 @@ async def my_keypairs(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List all keypairs with filtering and pagination (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -111,7 +110,7 @@ async def admin_keypairs_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single keypair by access key (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -126,7 +125,7 @@ async def admin_keypair_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a user's SSH public key (admin only). The private key is never returned.",
     )
 )  # type: ignore[misc]

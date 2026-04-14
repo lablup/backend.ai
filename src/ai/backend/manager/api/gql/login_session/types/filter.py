@@ -8,7 +8,6 @@ from ai.backend.common.dto.manager.v2.login_session.request import (
     LoginSessionFilter,
     LoginSessionStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -23,7 +22,7 @@ from .node import LoginSessionStatusGQL
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for login session status field.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="LoginSessionStatusFilter",
 )
@@ -38,7 +37,7 @@ class LoginSessionStatusFilterGQL(PydanticInputMixin[LoginSessionStatusFilter]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter criteria for querying login sessions.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="LoginSessionFilter",
 )

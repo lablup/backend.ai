@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RBACElementTypeDTO,
     ScopeInputDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -36,7 +35,7 @@ RBACElementTypeGQL: type[RBACElementTypeDTO] = gql_enum(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Scope reference for associating an entity with a scope.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="ScopeInput",
 )

@@ -8,7 +8,6 @@ from typing import Any
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -27,7 +26,7 @@ from .nested import (
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Virtual folder entity with structured field groups. "
             "Provides comprehensive vfolder information organized "
@@ -84,7 +83,7 @@ VFolderEdge = Edge[VFolderGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Paginated connection for virtual folder records. "
             "Provides relay-style cursor-based pagination for efficient traversal of vfolder data. "

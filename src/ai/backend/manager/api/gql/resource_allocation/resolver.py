@@ -6,7 +6,6 @@ from uuid import UUID
 
 from strawberry import Info
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -29,7 +28,7 @@ from .types import (
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get my keypair resource allocation (current user).",
     )
 )  # type: ignore[misc]
@@ -42,7 +41,7 @@ async def my_keypair_resource_allocation_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get project resource allocation (project usage).",
     )
 )  # type: ignore[misc]
@@ -58,7 +57,7 @@ async def project_resource_allocation_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get domain resource allocation (admin only).",
     )
 )  # type: ignore[misc]
@@ -75,7 +74,7 @@ async def admin_domain_resource_allocation_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get resource group resource allocation.",
     )
 )  # type: ignore[misc]
@@ -91,7 +90,7 @@ async def resource_group_resource_allocation_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get effective resource allocation for the current user.",
     )
 )  # type: ignore[misc]
@@ -107,7 +106,7 @@ async def effective_resource_allocation_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get effective resource allocation for a specific user (admin only).",
     )
 )  # type: ignore[misc]
@@ -124,7 +123,7 @@ async def admin_effective_resource_allocation_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Check which resource presets are available for session creation.",
     )
 )  # type: ignore[misc]

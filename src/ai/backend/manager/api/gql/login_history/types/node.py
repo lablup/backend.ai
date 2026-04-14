@@ -10,7 +10,6 @@ from uuid import UUID
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_history.response import LoginHistoryNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -22,7 +21,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 
 @gql_enum(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Result of a login attempt."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Result of a login attempt."),
     name="LoginAttemptResult",
 )
 class LoginAttemptResultGQL(StrEnum):
@@ -42,7 +41,7 @@ class LoginAttemptResultGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Represents a login history entry tracking user authentication attempts.",
     ),
     name="LoginHistoryV2",
@@ -62,7 +61,7 @@ LoginHistoryV2EdgeGQL = Edge[LoginHistoryV2GQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Connection type for paginated login history results.",
     ),
     name="LoginHistoryV2Connection",

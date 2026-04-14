@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UserStatusInfo as UserStatusInfoDTO,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -55,7 +54,7 @@ class UserBasicInfoGQL:
     description: str | None = gql_field(description="Optional description or notes about the user.")
     integration_name: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             description="External system integration identifier.",
         ),
         default=None,

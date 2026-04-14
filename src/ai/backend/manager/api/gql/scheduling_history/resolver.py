@@ -15,7 +15,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -90,7 +89,7 @@ class RouteHistoryConnection(Connection[RouteHistory]):
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List session scheduling history (admin only)",
     )
 )  # type: ignore[misc]
@@ -137,7 +136,7 @@ async def admin_session_scheduling_histories(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List session scheduling history (superadmin only)",
     ),
     deprecation_reason="Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
@@ -186,9 +185,7 @@ async def session_scheduling_histories(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="List deployment history (admin only)"
-    )
+    BackendAIGQLMeta(added_version="26.4.2", description="List deployment history (admin only)")
 )  # type: ignore[misc]
 async def admin_deployment_histories(
     info: Info[StrawberryGQLContext],
@@ -230,7 +227,7 @@ async def admin_deployment_histories(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="List deployment history (superadmin only)"
+        added_version="26.4.2", description="List deployment history (superadmin only)"
     ),
     deprecation_reason="Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
@@ -275,9 +272,7 @@ async def deployment_histories(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="List route history (admin only)"
-    )
+    BackendAIGQLMeta(added_version="26.4.2", description="List route history (admin only)")
 )  # type: ignore[misc]
 async def admin_route_histories(
     info: Info[StrawberryGQLContext],
@@ -318,9 +313,7 @@ async def admin_route_histories(
 
 
 @gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="List route history (superadmin only)"
-    ),
+    BackendAIGQLMeta(added_version="26.4.2", description="List route history (superadmin only)"),
     deprecation_reason="Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def route_histories(

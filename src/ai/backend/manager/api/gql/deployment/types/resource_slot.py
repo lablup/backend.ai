@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AllocatedResourceSlotNode as AllocatedResourceSlotNodeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -36,7 +35,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Represents a single allocated resource slot entry for a deployment revision or preset.",
     ),
     name="AllocatedResourceSlot",
@@ -66,7 +65,7 @@ AllocatedResourceSlotEdge = Edge[AllocatedResourceSlotNodeGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Connection type for paginated allocated resource slot results.",
     )
 )
@@ -82,7 +81,7 @@ class AllocatedResourceSlotConnection(Connection[AllocatedResourceSlotNodeGQL]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering allocated resource slots.",
     ),
     name="AllocatedResourceSlotOrderField",
@@ -96,7 +95,7 @@ class AllocatedResourceSlotOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for allocated resource slots.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="AllocatedResourceSlotFilter",
 )
@@ -111,7 +110,7 @@ class AllocatedResourceSlotFilterGQL(PydanticInputMixin[AllocatedResourceSlotFil
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Order by specification for allocated resource slots.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="AllocatedResourceSlotOrderBy",
 )

@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -36,7 +35,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search deployment revision presets.",
     )
 )  # type: ignore[misc]
@@ -93,7 +92,7 @@ async def deployment_revision_presets(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single deployment revision preset by ID.",
     )
 )  # type: ignore[misc]
@@ -107,7 +106,7 @@ async def deployment_revision_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a deployment revision preset (admin only).",
     )
 )  # type: ignore[misc]
@@ -123,7 +122,7 @@ async def admin_create_deployment_revision_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a deployment revision preset (admin only).",
     )
 )  # type: ignore[misc]
@@ -139,7 +138,7 @@ async def admin_update_deployment_revision_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete a deployment revision preset (admin only).",
     )
 )  # type: ignore[misc]

@@ -10,7 +10,6 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     SearchLoginClientTypesInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -36,7 +35,7 @@ from .types import (
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single login client type by id.",
     )
 )  # type: ignore[misc]
@@ -50,7 +49,7 @@ async def login_client_type(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=("Search login client types with filtering, ordering, and pagination."),
     )
 )  # type: ignore[misc]
@@ -90,7 +89,7 @@ async def login_client_types(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new login client type (super admin only).",
     )
 )  # type: ignore[misc]
@@ -105,7 +104,7 @@ async def admin_create_login_client_type(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a login client type (super admin only).",
     )
 )  # type: ignore[misc]
@@ -121,7 +120,7 @@ async def admin_update_login_client_type(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete a login client type (super admin only).",
     )
 )  # type: ignore[misc]

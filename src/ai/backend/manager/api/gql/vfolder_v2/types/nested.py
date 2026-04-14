@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderOwnershipInfo as VFolderOwnershipInfoDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -38,7 +37,7 @@ if TYPE_CHECKING:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Descriptive metadata for a virtual folder. "
             "Includes the folder name, usage mode, quota scope, "
@@ -69,7 +68,7 @@ class VFolderMetadataInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Access control information for a virtual folder. "
             "Includes the mount permission level (read-only, read-write, read-write-delete) "
@@ -92,7 +91,7 @@ class VFolderAccessControlInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Ownership context for a virtual folder. "
             "Provides both scalar IDs (userId, projectId, creatorEmail) for lightweight access "

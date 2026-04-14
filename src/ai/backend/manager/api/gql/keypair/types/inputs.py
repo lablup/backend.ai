@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
 from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput as UpdateMyKeypairInputDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -74,7 +73,7 @@ class UpdateMyKeypairInputGQL(PydanticInputMixin[UpdateMyKeypairInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Admin input for creating a keypair for a user.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="AdminCreateKeypairInput",
 )
@@ -91,7 +90,7 @@ class AdminCreateKeypairInputGQL(PydanticInputMixin[AdminCreateKeypairInputDTO])
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Admin input for updating a keypair.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="AdminUpdateKeypairInput",
 )
@@ -106,7 +105,7 @@ class AdminUpdateKeypairInputGQL(PydanticInputMixin[AdminUpdateKeypairInputDTO])
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Admin input for registering (overwriting) a user's SSH keypair.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="AdminRegisterSSHKeypairInput",
 )

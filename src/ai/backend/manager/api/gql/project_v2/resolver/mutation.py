@@ -7,7 +7,6 @@ from uuid import UUID
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.group.request import DeleteProjectInput, PurgeProjectInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -27,7 +26,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new project (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -44,7 +43,7 @@ async def admin_create_project_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.",
     )
 )  # type: ignore[misc]
@@ -62,7 +61,7 @@ async def admin_update_project_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Soft-delete a project (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -79,7 +78,7 @@ async def admin_delete_project_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Permanently purge a project and all associated data (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -96,7 +95,7 @@ async def admin_purge_project_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Unassign users from a project. RBAC validates project admin permission.",
     )
 )  # type: ignore[misc]

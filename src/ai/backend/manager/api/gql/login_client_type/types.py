@@ -31,7 +31,6 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
     UpdateLoginClientTypePayload as UpdateLoginClientTypePayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -67,7 +66,7 @@ __all__ = (
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A registered login client type that the auth flow can attribute sessions to.",
     ),
     name="LoginClientType",
@@ -85,7 +84,7 @@ LoginClientTypeEdge = Edge[LoginClientTypeGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated connection for login client type records.",
     ),
 )
@@ -107,7 +106,7 @@ class LoginClientTypeConnection(Connection[LoginClientTypeGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying login client types.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="LoginClientTypeFilter",
 )
@@ -124,7 +123,7 @@ class LoginClientTypeFilterGQL(PydanticInputMixin[LoginClientTypeFilterDTO]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering login client type results.",
     ),
     name="LoginClientTypeOrderField",
@@ -138,7 +137,7 @@ class LoginClientTypeOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for login client type results.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="LoginClientTypeOrderBy",
 )
@@ -157,7 +156,7 @@ class LoginClientTypeOrderByGQL(PydanticInputMixin[LoginClientTypeOrderDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for creating a new login client type.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="CreateLoginClientTypeInput",
 )
@@ -170,7 +169,7 @@ class CreateLoginClientTypeInputGQL(PydanticInputMixin[CreateLoginClientTypeInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for login client type creation.",
     ),
     model=CreateLoginClientTypePayloadDTO,
@@ -185,7 +184,7 @@ class CreateLoginClientTypePayloadGQL(PydanticOutputMixin[CreateLoginClientTypeP
         description=(
             "Input for updating a login client type. Both fields are optional for partial update."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="UpdateLoginClientTypeInput",
 )
@@ -199,7 +198,7 @@ class UpdateLoginClientTypeInputGQL(PydanticInputMixin[UpdateLoginClientTypeInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for login client type update.",
     ),
     model=UpdateLoginClientTypePayloadDTO,
@@ -211,7 +210,7 @@ class UpdateLoginClientTypePayloadGQL(PydanticOutputMixin[UpdateLoginClientTypeP
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for login client type deletion.",
     ),
     model=DeleteLoginClientTypePayloadDTO,

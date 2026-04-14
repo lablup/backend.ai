@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UserResourcePolicyOrder as UserResourcePolicyOrderDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntFilter,
@@ -42,7 +41,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Filter for keypair resource policies.",
     ),
     name="KeypairResourcePolicyV2Filter",
@@ -60,7 +59,7 @@ class KeypairResourcePolicyV2Filter(PydanticInputMixin[KeypairResourcePolicyFilt
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering keypair resource policies.",
     ),
     name="KeypairResourcePolicyV2OrderField",
@@ -78,7 +77,7 @@ class KeypairResourcePolicyV2OrderField(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Ordering specification for keypair resource policies.",
     ),
     name="KeypairResourcePolicyV2OrderBy",
@@ -97,7 +96,7 @@ class KeypairResourcePolicyV2OrderBy(PydanticInputMixin[KeypairResourcePolicyOrd
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Filter for user resource policies.",
     ),
     name="UserResourcePolicyV2Filter",
@@ -114,7 +113,7 @@ class UserResourcePolicyV2Filter(PydanticInputMixin[UserResourcePolicyFilterDTO]
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering user resource policies.",
     ),
     name="UserResourcePolicyV2OrderField",
@@ -131,7 +130,7 @@ class UserResourcePolicyV2OrderField(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Ordering specification for user resource policies.",
     ),
     name="UserResourcePolicyV2OrderBy",
@@ -150,7 +149,7 @@ class UserResourcePolicyV2OrderBy(PydanticInputMixin[UserResourcePolicyOrderDTO]
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Filter for project resource policies.",
     ),
     name="ProjectResourcePolicyV2Filter",
@@ -165,7 +164,7 @@ class ProjectResourcePolicyV2Filter(PydanticInputMixin[ProjectResourcePolicyFilt
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering project resource policies.",
     ),
     name="ProjectResourcePolicyV2OrderField",
@@ -180,7 +179,7 @@ class ProjectResourcePolicyV2OrderField(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Ordering specification for project resource policies.",
     ),
     name="ProjectResourcePolicyV2OrderBy",

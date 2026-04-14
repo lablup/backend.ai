@@ -69,7 +69,6 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -97,7 +96,7 @@ if TYPE_CHECKING:
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Order fields for model cards.",
     ),
     name="ModelCardV2OrderField",
@@ -109,7 +108,7 @@ class ModelCardOrderFieldGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Access level for model cards.",
     ),
     name="ModelCardV2AccessLevel",
@@ -121,7 +120,7 @@ class ModelCardAccessLevelGQL(StrEnum):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A single resource requirement entry for a model card. The quantity is represented as a string because model card requirements are descriptive (display/matching) rather than arithmetic.",
     ),
     model=ResourceSlotEntryDTO,
@@ -138,7 +137,7 @@ class ModelCardResourceSlotEntryGQL(PydanticOutputMixin[ResourceSlotEntryDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Metadata extracted from the model-definition.yaml file in the model VFolder. Contains authorship, classification, and framework information used for discovery and compatibility checks.",
     ),
     model=ModelCardMetadataDTO,
@@ -177,7 +176,7 @@ class ModelCardMetadataGQL(PydanticOutputMixin[ModelCardMetadataDTO]):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Represents a registered AI model with metadata extracted from model-definition.yaml. A model card links to a VFolder containing the actual model files and belongs to a MODEL_STORE type project for access control scoping.",
     ),
     name="ModelCardV2",
@@ -274,7 +273,7 @@ ModelCardV2Edge = Edge[ModelCardGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated list of model cards.",
     )
 )
@@ -288,7 +287,7 @@ class ModelCardV2Connection(Connection[ModelCardGQL]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Scope for model card queries within a MODEL_STORE project.",
     ),
     name="ProjectModelCardV2Scope",
@@ -299,7 +298,7 @@ class ProjectModelCardScopeGQL(PydanticInputMixin[ProjectModelCardScopeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Scope for querying available presets that satisfy a model card's resource requirements.",
     ),
     name="ModelCardAvailablePresetsScope",
@@ -311,7 +310,7 @@ class ModelCardAvailablePresetsScopeGQL(PydanticInputMixin[AvailablePresetsScope
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter for model cards."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Filter for model cards."),
     name="ModelCardV2Filter",
 )
 class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
@@ -337,7 +336,7 @@ class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Order specification."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Order specification."),
     name="ModelCardV2OrderBy",
 )
 class ModelCardOrderByGQL(PydanticInputMixin[OrderDTO]):
@@ -346,7 +345,7 @@ class ModelCardOrderByGQL(PydanticInputMixin[OrderDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Create model card input."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Create model card input."),
     name="CreateModelCardV2Input",
 )
 class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
@@ -374,7 +373,7 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Update model card input."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Update model card input."),
     name="UpdateModelCardV2Input",
 )
 class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
@@ -397,7 +396,7 @@ class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Create model card payload."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Create model card payload."),
     model=CreatePayloadDTO,
 )
 class CreateModelCardPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
@@ -405,7 +404,7 @@ class CreateModelCardPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Update model card payload."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Update model card payload."),
     model=UpdatePayloadDTO,
 )
 class UpdateModelCardPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
@@ -413,7 +412,7 @@ class UpdateModelCardPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Delete model card payload."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Delete model card payload."),
     model=DeletePayloadDTO,
 )
 class DeleteModelCardPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
@@ -422,7 +421,7 @@ class DeleteModelCardPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Result of scanning a MODEL_STORE project for model cards.",
     ),
     model=ScanPayloadDTO,
@@ -436,7 +435,7 @@ class ScanProjectModelCardsPayloadGQL(PydanticOutputMixin[ScanPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for deploying a model card as a new deployment.",
     ),
     name="DeployModelCardV2Input",
@@ -466,7 +465,7 @@ class DeployModelCardInputGQL(PydanticInputMixin[DeployInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Result of deploying a model card.",
     ),
     model=DeployPayloadDTO,
@@ -479,7 +478,7 @@ class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for deleting multiple model cards.",
     ),
     name="DeleteModelCardsV2Input",
@@ -490,7 +489,7 @@ class DeleteModelCardsInputGQL(PydanticInputMixin[DeleteCardsInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for bulk model card deletion.",
     ),
     model=DeleteCardsPayloadDTO,

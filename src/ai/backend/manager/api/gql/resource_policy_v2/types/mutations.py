@@ -47,7 +47,6 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
     UpdateUserResourcePolicyPayload as UpdateUserResourcePolicyPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInputGQL,
     ResourceSlotEntryInputGQL,
@@ -76,7 +75,7 @@ UNSET = None
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a keypair resource policy.",
     )
 )
@@ -108,7 +107,7 @@ class CreateKeypairResourcePolicyInputGQL(PydanticInputMixin[CreateKeypairResour
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for updating a keypair resource policy. All fields optional.",
     )
 )
@@ -148,7 +147,7 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a user resource policy.",
     )
 )
@@ -157,7 +156,7 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
     max_concurrent_logins: int | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             description=(
                 "Maximum number of concurrent authenticated login sessions per user."
                 " Null means unlimited."
@@ -180,7 +179,7 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for updating a user resource policy. All fields optional.",
     )
 )
@@ -190,7 +189,7 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
     )
     max_concurrent_logins: int | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             description=(
                 "Updated maximum number of concurrent authenticated login sessions per user."
                 " Set to null to clear (unlimited)."
@@ -216,7 +215,7 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a project resource policy.",
     )
 )
@@ -233,7 +232,7 @@ class CreateProjectResourcePolicyInputGQL(PydanticInputMixin[CreateProjectResour
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for updating a project resource policy. All fields optional.",
     )
 )
@@ -254,7 +253,7 @@ class UpdateProjectResourcePolicyInputGQL(PydanticInputMixin[UpdateProjectResour
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for keypair resource policy create/update mutations.",
     ),
     model=CreateKeypairResourcePolicyPayloadDTO,
@@ -269,7 +268,7 @@ class CreateKeypairResourcePolicyPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for keypair resource policy update mutation.",
     ),
     model=UpdateKeypairResourcePolicyPayloadDTO,
@@ -284,7 +283,7 @@ class UpdateKeypairResourcePolicyPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for keypair resource policy deletion.",
     ),
     model=DeleteKeypairResourcePolicyPayloadDTO,
@@ -297,7 +296,7 @@ class DeleteKeypairResourcePolicyPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for user resource policy create/update mutations.",
     ),
     model=CreateUserResourcePolicyPayloadDTO,
@@ -310,7 +309,7 @@ class CreateUserResourcePolicyPayloadGQL(PydanticOutputMixin[CreateUserResourceP
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for user resource policy update mutation.",
     ),
     model=UpdateUserResourcePolicyPayloadDTO,
@@ -323,7 +322,7 @@ class UpdateUserResourcePolicyPayloadGQL(PydanticOutputMixin[UpdateUserResourceP
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for user resource policy deletion.",
     ),
     model=DeleteUserResourcePolicyPayloadDTO,
@@ -334,7 +333,7 @@ class DeleteUserResourcePolicyPayloadGQL(PydanticOutputMixin[DeleteUserResourceP
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for project resource policy create/update mutations.",
     ),
     model=CreateProjectResourcePolicyPayloadDTO,
@@ -349,7 +348,7 @@ class CreateProjectResourcePolicyPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for project resource policy update mutation.",
     ),
     model=UpdateProjectResourcePolicyPayloadDTO,
@@ -364,7 +363,7 @@ class UpdateProjectResourcePolicyPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for project resource policy deletion.",
     ),
     model=DeleteProjectResourcePolicyPayloadDTO,
