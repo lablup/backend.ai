@@ -206,7 +206,6 @@ def build_api_routes(
         model_serving_auto_scaling=processors.model_serving_auto_scaling,
     )
     session_handler = SessionHandler(
-        auth=processors.auth,
         session=processors.session,
         agent=processors.agent,
         vfolder=processors.vfolder,

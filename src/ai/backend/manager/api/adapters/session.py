@@ -223,8 +223,8 @@ class SessionAdapter(BaseAdapter):
 
         When ``input.owner_id`` is set, the session is created on behalf of the
         target user: their main access key, role, and domain are used in place
-        of the caller's. Resolution and authorization of the delegated user
-        are handled by the downstream session service, not by this adapter.
+        of the caller's. The target user must be loadable via the user
+        processor (RBAC enforced).
         """
         batch_spec: SessionBatchSpec | None = None
         if input.batch is not None:
@@ -849,7 +849,6 @@ class SessionAdapter(BaseAdapter):
         self,
         session_id: UUID,
         input: ShutdownSessionServiceInput,
-        access_key: str,
     ) -> None:
         """Shut down a service in a session."""
         action = ShutdownServiceAction(
@@ -865,7 +864,6 @@ class SessionAdapter(BaseAdapter):
     async def get_logs(
         self,
         session_id: UUID,
-        access_key: str,
         kernel_id: UUID | None = None,
     ) -> SessionLogsPayload:
         """Get container logs for a session."""
@@ -885,7 +883,6 @@ class SessionAdapter(BaseAdapter):
         self,
         session_id: UUID,
         input: UpdateSessionInput,
-        access_key: str,
     ) -> UpdateSessionPayload:
         """Update session fields (currently supports rename only)."""
         if input.name is not None:

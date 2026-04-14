@@ -341,13 +341,12 @@ class TestDestroySessionRequest:
         req = DestroySessionRequest()
         assert req.forced is False
         assert req.recursive is False
-        assert req.owner_access_key is None
 
 
 class TestRestartSessionRequest:
     def test_defaults(self) -> None:
         req = RestartSessionRequest()
-        assert req.owner_access_key is None
+        assert req is not None
 
 
 class TestMatchSessionsRequest:
@@ -413,16 +412,13 @@ class TestListFilesRequest:
 class TestGetContainerLogsRequest:
     def test_defaults(self) -> None:
         req = GetContainerLogsRequest()
-        assert req.owner_access_key is None
         assert req.kernel_id is None
 
     def test_aliases(self) -> None:
         kid = uuid4()
         req = GetContainerLogsRequest.model_validate({
-            "ownerAccessKey": "AKIAEXAMPLE",
             "kernelId": str(kid),
         })
-        assert req.owner_access_key == "AKIAEXAMPLE"
         assert req.kernel_id == kid
 
 
@@ -446,4 +442,4 @@ class TestGetTaskLogsRequest:
 class TestGetStatusHistoryRequest:
     def test_defaults(self) -> None:
         req = GetStatusHistoryRequest()
-        assert req.owner_access_key is None
+        assert req is not None
