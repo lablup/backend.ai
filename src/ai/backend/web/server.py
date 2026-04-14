@@ -61,6 +61,7 @@ from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.web.session import (
+    Session,
     extra_config_headers,
     get_session,
     get_time,
@@ -277,6 +278,17 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
+def _bind_session_to_manager_token(session: Session, session_token: str | None) -> None:
+    # Use Manager's session_token as session identity so the aiohttp session cookie
+    # matches the login_sessions row, allowing logout to delete the correct row.
+    # Bypass set_new_identity() since the session may not be new (e.g., browser has
+    # a cookie from a previous failed attempt).
+    if not session_token:
+        return
+    session._identity = session_token
+    session._new = True
+
+
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
     stats: WebStats = request.app["stats"]
@@ -435,13 +447,7 @@ async def login_handler(request: web.Request) -> web.Response:
                         "role": token.role,
                         "status": token.status,
                     }
-                    # Use Manager's session_token as session identity
-                    # so Valkey key matches DB session_token.
-                    # Bypass set_new_identity() since session may not be new
-                    # (e.g., browser has a cookie from a previous failed attempt).
-                    if token.session_token:
-                        session._identity = token.session_token
-                        session._new = True
+                    _bind_session_to_manager_token(session, token.session_token)
                     session["authenticated"] = True
                     session["token"] = stored_token  # store full token
                     result["authenticated"] = True
@@ -667,6 +673,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
                 "role": token.role,
                 "status": token.status,
             }
+            _bind_session_to_manager_token(session, token.session_token)
             session["authenticated"] = True
             session["token"] = stored_token  # store full token
             result["authenticated"] = True
