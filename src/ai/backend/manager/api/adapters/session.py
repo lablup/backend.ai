@@ -933,9 +933,7 @@ class SessionAdapter(BaseAdapter):
                 creation_id=data.creation_id or "",
                 name=data.name or "",
                 session_type=data.session_type.value,
-                access_key=data.owner.main_access_key
-                if data.owner and data.owner.main_access_key
-                else "",
+                access_key=data.owner.main_access_key if data.owner else None,
                 cluster_mode=data.cluster_mode.name,
                 cluster_size=data.cluster_size,
                 priority=data.priority,

@@ -588,8 +588,6 @@ COMPUTE_CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
 SYSTEM_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
 
 
-# compute/system concurrency key builders removed; callers must resolve
-# main_access_key from owner_id before building the Redis key.
 @dataclass
 class ConcurrencyUsed:
     access_key: AccessKey
@@ -1259,9 +1257,9 @@ class SessionRow(Base):  # type: ignore[misc]
             kernel_row.delegate_ownership(owner_id)
 
     @staticmethod
-    async def delete_by_owner_id(owner_id: UUID, *, db_session: SASession) -> None:
-        await db_session.execute(sa.delete(KernelRow).where(KernelRow.user_uuid == owner_id))
-        await db_session.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == owner_id))
+    async def delete_by_user_id(user_uuid: UUID, *, db_session: SASession) -> None:
+        await db_session.execute(sa.delete(KernelRow).where(KernelRow.user_uuid == user_uuid))
+        await db_session.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
 
     @staticmethod
     async def set_session_status(
