@@ -53,6 +53,9 @@ class TestPrometheusQueryPresetService:
         return PrometheusQueryPresetData(
             id=uuid4(),
             name="cpu_usage",
+            description=None,
+            rank=0,
+            category_id=None,
             metric_name="backendai_container_cpu_util",
             query_template="rate(container_cpu_usage_seconds_total{{{labels}}}[{window}])",
             time_window="5m",

@@ -78,6 +78,13 @@ class PrometheusQueryPresetConditions:
     by_name_in = staticmethod(make_string_in_factory(PrometheusQueryPresetRow.name))
 
     @staticmethod
+    def by_category_id(category_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            return PrometheusQueryPresetRow.category_id == category_id
+
+        return inner
+
+    @staticmethod
     def by_metric_name_equals(metric_name: str) -> QueryCondition:
         def inner() -> sa.ColumnElement[bool]:
             return PrometheusQueryPresetRow.metric_name == metric_name

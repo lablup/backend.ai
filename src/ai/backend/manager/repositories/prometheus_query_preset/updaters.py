@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, override
+from uuid import UUID
 
 from ai.backend.manager.models.prometheus_query_preset.row import (
     PresetOptions,
@@ -18,6 +19,9 @@ class PrometheusQueryPresetUpdaterSpec(UpdaterSpec[PrometheusQueryPresetRow]):
     """UpdaterSpec for prometheus query preset updates."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    description: TriState[str] = field(default_factory=TriState[str].nop)
+    rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    category_id: TriState[UUID] = field(default_factory=TriState[UUID].nop)
     metric_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     query_template: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     time_window: TriState[str] = field(default_factory=TriState[str].nop)
@@ -33,6 +37,9 @@ class PrometheusQueryPresetUpdaterSpec(UpdaterSpec[PrometheusQueryPresetRow]):
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
+        self.description.update_dict(to_update, "description")
+        self.rank.update_dict(to_update, "rank")
+        self.category_id.update_dict(to_update, "category_id")
         self.metric_name.update_dict(to_update, "metric_name")
         self.query_template.update_dict(to_update, "query_template")
         self.time_window.update_dict(to_update, "time_window")

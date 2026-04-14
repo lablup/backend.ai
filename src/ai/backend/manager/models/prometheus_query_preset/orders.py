@@ -22,6 +22,12 @@ class PrometheusQueryPresetOrders:
         return PrometheusQueryPresetRow.created_at.desc()
 
     @staticmethod
+    def rank(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PrometheusQueryPresetRow.rank.asc()
+        return PrometheusQueryPresetRow.rank.desc()
+
+    @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return PrometheusQueryPresetRow.updated_at.asc()

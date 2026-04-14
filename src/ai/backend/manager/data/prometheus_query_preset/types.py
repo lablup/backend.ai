@@ -22,6 +22,9 @@ class PrometheusQueryPresetData:
 
     id: UUID
     name: str
+    description: str | None
+    rank: int
+    category_id: UUID | None
     metric_name: str
     query_template: str
     time_window: str | None
@@ -36,6 +39,9 @@ class PrometheusQueryPresetModifier(PartialModifier):
     """Modifier for prometheus query preset."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    description: TriState[str] = field(default_factory=TriState[str].nop)
+    rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    category_id: TriState[UUID] = field(default_factory=TriState[UUID].nop)
     metric_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     query_template: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     time_window: TriState[str] = field(default_factory=TriState[str].nop)
@@ -46,6 +52,9 @@ class PrometheusQueryPresetModifier(PartialModifier):
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
+        self.description.update_dict(to_update, "description")
+        self.rank.update_dict(to_update, "rank")
+        self.category_id.update_dict(to_update, "category_id")
         self.metric_name.update_dict(to_update, "metric_name")
         self.query_template.update_dict(to_update, "query_template")
         self.time_window.update_dict(to_update, "time_window")

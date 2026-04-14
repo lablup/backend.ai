@@ -36,6 +36,16 @@ class PrometheusQueryPresetRow(Base):  # type: ignore[misc]
     time_window: Mapped[str | None] = mapped_column(
         "time_window", sa.String(length=32), nullable=True
     )
+    description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
+    rank: Mapped[int] = mapped_column(
+        "rank", sa.Integer, nullable=False, server_default=sa.text("0")
+    )
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
+        "category_id",
+        GUID,
+        sa.ForeignKey("prometheus_query_preset_categories.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     options: Mapped[PresetOptions] = mapped_column(
         "options",
         PydanticColumn(PresetOptions),
@@ -61,6 +71,9 @@ class PrometheusQueryPresetRow(Base):  # type: ignore[misc]
         return PrometheusQueryPresetData(
             id=self.id,
             name=self.name,
+            description=self.description,
+            rank=self.rank,
+            category_id=self.category_id,
             metric_name=self.metric_name,
             query_template=self.query_template,
             time_window=self.time_window,
