@@ -707,7 +707,7 @@ class TestMarkTerminatingSchedulingHistory:
                 requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 domain_name=domain_name,
                 group_id=group_id,
-                owner_id=owner_id,
+                user_uuid=owner_id,
                 mounts=[],
                 environ={},
                 vfolder_mounts=[],

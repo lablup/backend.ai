@@ -107,7 +107,7 @@ class TestDelegatedSessionCreation:
             session_type=SessionTypes.INTERACTIVE,
             domain=domain_fixture,
             group=group_name_for_fixture,
-            owner_access_key=regular_user_fixture.keypair.access_key,
+            owner_id=regular_user_fixture.user_uuid,
             # ``reuse=False`` skips the existing-session lookup branch in
             # ``AgentRegistry.create_session`` so we exercise the new
             # session creation path.

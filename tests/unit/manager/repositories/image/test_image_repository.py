@@ -633,7 +633,7 @@ class TestImageRepositoryLastUsedAt:
                 session = SessionRow(
                     id=session_id,
                     name=f"sess-{uuid4()}",
-                    owner_id=user.uuid,
+                    user_uuid=user.uuid,
                     group_id=group.id,
                     domain_name=domain.name,
                     occupying_slots=ResourceSlot(),
@@ -650,7 +650,7 @@ class TestImageRepositoryLastUsedAt:
                     architecture=image.architecture,
                     domain_name=domain.name,
                     group_id=group.id,
-                    owner_id=user.uuid,
+                    user_uuid=user.uuid,
                     occupied_slots=ResourceSlot(),
                     requested_slots=ResourceSlot(),
                     repl_in_port=0,

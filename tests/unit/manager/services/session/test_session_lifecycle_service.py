@@ -1044,6 +1044,9 @@ class TestCreateFromParams:
         delegated_owner_access_key: AccessKey,
         delegated_session_action: CreateFromParamsAction,
     ) -> None:
+        session_service._user_repository.get_user_by_uuid = AsyncMock(  # type: ignore[attr-defined]
+            return_value=MagicMock(main_access_key=str(delegated_owner_access_key))
+        )
         """
         Regression test for BA-5608.
 
@@ -1425,7 +1428,7 @@ class TestMatchSessions:
         )
         await session_service.match_sessions(action)
 
-        mock_session_repository.match_sessions.assert_called_once_with("test", sample_access_key)
+        mock_session_repository.match_sessions.assert_called_once_with("test", sample_user_id)
 
 
 # ==================== GetAbusingReport Tests ====================

@@ -210,7 +210,7 @@ class TestReconcileAgentResources:
                     id=session_id,
                     domain_name=domain_name,
                     group_id=project_id,
-                    owner_id=uuid4(),
+                    user_uuid=uuid4(),
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -222,7 +222,7 @@ class TestReconcileAgentResources:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=project_id,
-                    owner_id=uuid4(),
+                    user_uuid=uuid4(),
                     status=status,
                     occupied_slots=empty_slots,
                     requested_slots=empty_slots,

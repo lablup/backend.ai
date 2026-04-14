@@ -34,7 +34,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
@@ -138,7 +137,6 @@ def vfolder_processors_mock() -> VFolderProcessors:
 def server_module_registries(
     route_deps: RouteDeps,
     config_provider: ManagerConfigProvider,
-    auth_processors: AuthProcessors,
     session_processors: SessionProcessors,
     agent_processors_mock: AgentProcessors,
     vfolder_processors_mock: VFolderProcessors,
@@ -147,7 +145,6 @@ def server_module_registries(
     return [
         register_session_routes(
             SessionHandler(
-                auth=auth_processors,
                 session=session_processors,
                 agent=agent_processors_mock,
                 vfolder=vfolder_processors_mock,

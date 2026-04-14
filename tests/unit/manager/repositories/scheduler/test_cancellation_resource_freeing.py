@@ -366,7 +366,6 @@ class TestCancelFreesResourceAllocations:
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
-                    access_key=access_key,
                     mounts=[],
                     environ={},
                     vfolder_mounts=[],

@@ -711,6 +711,7 @@ class SessionRow(Base):  # type: ignore[misc]
         back_populates="sessions",
         foreign_keys=[user_uuid],
     )
+    access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20))
 
     # `image` column is identical to kernels `image` column.
     images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
