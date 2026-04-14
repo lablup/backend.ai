@@ -1,5 +1,6 @@
 from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
+from typing import Self
 
 
 @dataclass(frozen=True)
@@ -10,11 +11,11 @@ class LabelMatcher:
     operator: str = "="
 
     @classmethod
-    def exact(cls, value: str) -> "LabelMatcher":
+    def exact(cls, value: str) -> Self:
         return cls(value=value, operator="=")
 
     @classmethod
-    def regex(cls, value: str) -> "LabelMatcher":
+    def regex(cls, value: str) -> Self:
         return cls(value=value, operator="=~")
 
 
