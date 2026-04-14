@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
 
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.routing import RoutingRow
@@ -31,7 +32,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
     endpoint = graphene.String()
     session = graphene.UUID()
     status = graphene.String()
-    health_status = graphene.String()
+    health_status = graphene.String(description=f"Added in {NEXT_RELEASE_VERSION}.")
     traffic_ratio = graphene.Float()
     created_at = GQLDateTime()
     error = InferenceSessionError()
