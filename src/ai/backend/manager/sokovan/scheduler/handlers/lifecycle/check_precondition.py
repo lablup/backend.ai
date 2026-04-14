@@ -116,7 +116,9 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         )
 
         # BA-5609: source resolved main_access_key from SessionDataForPull.
-        access_key_by_id = {s.session_id: s.main_access_key for s in sessions_for_pull_data.sessions}
+        access_key_by_id = {
+            s.session_id: s.main_access_key for s in sessions_for_pull_data.sessions
+        }
 
         # Mark all sessions as success for status transition
         for session in sessions:

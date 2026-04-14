@@ -412,12 +412,20 @@ class SessionProvisioner:
         # 2. Update concurrency counts
         if workload.is_private:
             # Increment SFTP session count
-            current_sftp = snapshot.concurrency.sftp_sessions_by_keypair.get(workload.main_access_key, 0)
-            snapshot.concurrency.sftp_sessions_by_keypair[workload.main_access_key] = current_sftp + 1
+            current_sftp = snapshot.concurrency.sftp_sessions_by_keypair.get(
+                workload.main_access_key, 0
+            )
+            snapshot.concurrency.sftp_sessions_by_keypair[workload.main_access_key] = (
+                current_sftp + 1
+            )
         else:
             # Increment regular session count
-            current_sessions = snapshot.concurrency.sessions_by_keypair.get(workload.main_access_key, 0)
-            snapshot.concurrency.sessions_by_keypair[workload.main_access_key] = current_sessions + 1
+            current_sessions = snapshot.concurrency.sessions_by_keypair.get(
+                workload.main_access_key, 0
+            )
+            snapshot.concurrency.sessions_by_keypair[workload.main_access_key] = (
+                current_sessions + 1
+            )
 
     async def _allocate_workload(
         self,

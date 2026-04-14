@@ -2917,7 +2917,9 @@ class ScheduleDBSource:
             scheduled_session = ScheduledSessionData(
                 session_id=session.id,
                 creation_id=session.creation_id or "",
-                main_access_key=AccessKey(session.main_access_key) if session.main_access_key else AccessKey(""),
+                main_access_key=AccessKey(session.main_access_key)
+                if session.main_access_key
+                else AccessKey(""),
                 reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
