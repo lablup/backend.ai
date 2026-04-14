@@ -67,6 +67,7 @@ def sample_vfolder_data(sample_vfolder_uuid: uuid.UUID) -> VFolderData:
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
         last_used=None,
         creator="test@example.com",
+        creator_id=sample_vfolder_uuid,
         unmanaged_path=None,
         ownership_type=VFolderOwnershipType.USER,
         user=sample_vfolder_uuid,

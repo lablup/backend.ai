@@ -61,7 +61,10 @@ def _make_access_control_info() -> VFolderAccessControlInfo:
 
 def _make_owner_info() -> VFolderOwnershipInfo:
     return VFolderOwnershipInfo(
-        user_id=uuid.uuid4(), project_id=None, creator_email="owner@example.com"
+        user_id=(uid := uuid.uuid4()),
+        project_id=None,
+        creator_id=uid,
+        creator_email="owner@example.com",
     )
 
 
