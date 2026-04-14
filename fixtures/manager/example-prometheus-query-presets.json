@@ -74,6 +74,76 @@
           "value_type"
         ]
       }
+    },
+    {
+      "name": "vllm_requests_running",
+      "metric_name": "vllm:num_requests_running",
+      "query_template": "sum by ({group_by})(vllm:num_requests_running{{{labels}}})",
+      "time_window": null,
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "vllm_requests_waiting",
+      "metric_name": "vllm:num_requests_waiting",
+      "query_template": "sum by ({group_by})(vllm:num_requests_waiting{{{labels}}})",
+      "time_window": null,
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "vllm_gpu_cache_usage",
+      "metric_name": "vllm:gpu_cache_usage_perc",
+      "query_template": "avg by ({group_by})(vllm:gpu_cache_usage_perc{{{labels}}})",
+      "time_window": null,
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "vllm_request_throughput",
+      "metric_name": "vllm:request_success_total",
+      "query_template": "sum by ({group_by})(rate(vllm:request_success_total{{{labels}}}[{window}]))",
+      "time_window": "5m",
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "vllm_avg_latency",
+      "metric_name": "vllm:e2e_request_latency_seconds",
+      "query_template": "avg by ({group_by})(rate(vllm:e2e_request_latency_seconds_sum{{{labels}}}[{window}]) / rate(vllm:e2e_request_latency_seconds_count{{{labels}}}[{window}]))",
+      "time_window": "5m",
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
     }
   ]
 }
