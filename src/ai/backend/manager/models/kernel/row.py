@@ -439,7 +439,9 @@ class KernelRow(Base):  # type: ignore[misc]
         "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
     )
     user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False)
-    access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20), nullable=True)
+    access_key: Mapped[str | None] = mapped_column(
+        "access_key", sa.String(length=20), nullable=True
+    )
     # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
     image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
     # ForeignKeyIDColumn("image_id", "images.id")

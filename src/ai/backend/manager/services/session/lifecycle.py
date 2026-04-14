@@ -32,11 +32,11 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_txn_retry,
 )
+from ai.backend.manager.repositories.user.repository import UserRepository
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -63,6 +63,7 @@ class SessionLifecycleManager:
         self.event_producer = event_producer
         self.hook_plugin_ctx = hook_plugin_ctx
         self.registry = registry
+        self._user_repository = UserRepository(db)
 
         def _encode(sid: SessionId) -> bytes:
             return sid.bytes
@@ -135,12 +136,9 @@ class SessionLifecycleManager:
                 )
                 # BA-5609: resolve main_access_key from owner_id; external
                 # hook plugins still receive the resolved access key.
-                async with self.db.begin_readonly_session() as db_sess:
-                    session_main_access_key = await db_sess.scalar(
-                        sa.select(UserRow.main_access_key).where(
-                            UserRow.uuid == session_row.user_uuid
-                        )
-                    )
+                session_main_access_key = await self._user_repository.get_main_access_key_by_uuid(
+                    session_row.user_uuid
+                )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
                     (

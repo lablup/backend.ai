@@ -137,6 +137,13 @@ class UserDBSource:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
             return user_row.to_data()
 
+    async def get_main_access_key_by_uuid(self, user_uuid: UUID) -> str | None:
+        """Return the user's ``main_access_key`` or ``None`` if unset/missing."""
+        async with self._db.begin_readonly_session() as db_session:
+            return await db_session.scalar(
+                sa.select(UserRow.main_access_key).where(UserRow.uuid == user_uuid)
+            )
+
     async def get_by_email_validated(
         self,
         email: str,
