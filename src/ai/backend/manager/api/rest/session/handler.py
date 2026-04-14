@@ -1181,12 +1181,11 @@ class SessionHandler:
         params = query.parsed
         session_name: str = request.match_info["session_name"]
         requester_access_key = AccessKey(request["keypair"]["access_key"])
-        owner_id = params.owner_id if params.owner_id is not None else request["user"]["uuid"]
+        owner_id = request["user"]["uuid"]
         kernel_id = KernelId(params.kernel_id) if params.kernel_id is not None else None
         log.info(
-            "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
+            "GET_CONTAINER_LOG (ak:{}, s:{}, k:{})",
             requester_access_key,
-            owner_id,
             session_name,
             kernel_id,
         )
@@ -1200,9 +1199,8 @@ class SessionHandler:
             )
         except BackendAIError:
             log.exception(
-                "GET_CONTAINER_LOG(ak:{}/{}, kernel_id: {}, s:{}): unexpected error",
+                "GET_CONTAINER_LOG(ak:{}, kernel_id: {}, s:{}): unexpected error",
                 requester_access_key,
-                owner_id,
                 kernel_id,
                 session_name,
             )

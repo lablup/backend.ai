@@ -868,17 +868,11 @@ class SessionAdapter(BaseAdapter):
         session_id: UUID,
         user_id: UUID,
         kernel_id: UUID | None = None,
-        owner_id: UUID | None = None,
     ) -> SessionLogsPayload:
-        """Get container logs for a session.
-
-        When ``owner_id`` is provided, the logs are fetched on behalf of the
-        delegated owner. Otherwise the caller's own user_id is used.
-        """
-        effective_owner = owner_id if owner_id is not None else user_id
+        """Get container logs for a session."""
         action = GetContainerLogsAction(
             session_name=str(session_id),
-            owner_id=effective_owner,
+            owner_id=user_id,
             kernel_id=KernelId(kernel_id) if kernel_id else None,
         )
         result = await self._processors.session.get_container_logs.wait_for_complete(action)

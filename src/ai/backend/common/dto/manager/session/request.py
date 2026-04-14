@@ -419,10 +419,6 @@ class ListFilesRequest(BaseRequestModel):
 class GetContainerLogsRequest(BaseRequestModel):
     """GET ``/{session_name}/logs``"""
 
-    owner_id: UUID | None = Field(
-        default=None,
-        validation_alias=AliasChoices("owner_id", "ownerId"),
-    )
     kernel_id: UUID | None = Field(
         default=None,
         validation_alias=AliasChoices("kernel_id", "kernelId"),

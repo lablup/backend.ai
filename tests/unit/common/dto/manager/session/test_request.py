@@ -413,17 +413,13 @@ class TestListFilesRequest:
 class TestGetContainerLogsRequest:
     def test_defaults(self) -> None:
         req = GetContainerLogsRequest()
-        assert req.owner_id is None
         assert req.kernel_id is None
 
     def test_aliases(self) -> None:
         kid = uuid4()
-        owner = uuid4()
         req = GetContainerLogsRequest.model_validate({
-            "ownerId": str(owner),
             "kernelId": str(kid),
         })
-        assert req.owner_id == owner
         assert req.kernel_id == kid
 
 
