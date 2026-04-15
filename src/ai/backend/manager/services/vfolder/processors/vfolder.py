@@ -174,9 +174,11 @@ class VFolderProcessors(AbstractProcessorPackage):
         single_entity_rbac_validators = [validators.rbac.single_entity]
 
         # Scope actions with RBAC validation
-        self.create_vfolder = ScopeActionProcessor(
-            service.create, action_monitors, validators=scope_rbac_validators
-        )
+        # NOTE: RBAC validation is temporarily disabled for create_vfolder
+        # because the project member role does not yet grant vfolder:create.
+        # The service layer still enforces the legacy admin-only check for
+        # group-owned folders.
+        self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
         self.list_vfolder = ScopeActionProcessor(
             service.list, action_monitors, validators=scope_rbac_validators
         )
