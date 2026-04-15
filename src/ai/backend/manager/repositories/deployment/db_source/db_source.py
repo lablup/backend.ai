@@ -2963,42 +2963,24 @@ class DeploymentDBSource:
     ) -> list[RevisionWithVFolderInfo]:
         """Get all deployment revisions joined with their model vfolder info."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = (
-                await db_sess.execute(
-                    sa.select(
-                        DeploymentRevisionRow.id,
-                        DeploymentRevisionRow.model_definition,
-                        DeploymentRevisionRow.model_definition_path,
-                        VFolderRow.id.label("vf_id"),
-                        VFolderRow.quota_scope_id.label("vf_quota_scope_id"),
-                        VFolderRow.host.label("vf_host"),
-                        VFolderRow.ownership_type.label("vf_ownership_type"),
-                        VFolderRow.usage_mode.label("vf_usage_mode"),
-                    )
-                    .select_from(
-                        sa.join(
-                            DeploymentRevisionRow.__table__,
-                            VFolderRow.__table__,
-                            DeploymentRevisionRow.model == VFolderRow.id,
-                        )
-                    )
-                    .where(
-                        DeploymentRevisionRow.model.is_not(None),
-                    )
-                )
-            ).all()
+            query = (
+                sa.select(DeploymentRevisionRow, VFolderRow)
+                .join(VFolderRow, DeploymentRevisionRow.model == VFolderRow.id)
+                .where(DeploymentRevisionRow.model.is_not(None))
+            )
+            result = await db_sess.execute(query)
             return [
                 RevisionWithVFolderInfo(
-                    revision_id=row.id,
-                    model_definition=row.model_definition,
-                    model_definition_path=row.model_definition_path,
-                    vfolder_id=row.vf_id,
-                    vfolder_quota_scope_id=row.vf_quota_scope_id,
-                    vfolder_host=row.vf_host,
-                    vfolder_ownership_type=row.vf_ownership_type,
-                    vfolder_usage_mode=row.vf_usage_mode,
+                    revision_id=rev.id,
+                    model_definition=rev.model_definition,
+                    model_definition_path=rev.model_definition_path,
+                    vfolder_id=vf.id,
+                    vfolder_quota_scope_id=vf.quota_scope_id,
+                    vfolder_host=vf.host,
+                    vfolder_ownership_type=vf.ownership_type,
+                    vfolder_usage_mode=vf.usage_mode,
                 )
-                for row in rows
+                for rev, vf in result.all()
             ]
 
     async def batch_update_model_definitions(
