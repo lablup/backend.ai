@@ -254,6 +254,24 @@ class Context(metaclass=ABCMeta):
         ) as etcd:
             yield etcd
 
+    async def wait_for_etcd(self, max_retries: int = 30, interval: float = 2.0) -> None:
+        self.log_header("Waiting for etcd readiness...")
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with self.etcd_ctx() as etcd:
+                    await etcd.ping()
+                self.log.write(f"etcd is ready (attempt {attempt}/{max_retries})")
+                return
+            except Exception as e:
+                if attempt == max_retries:
+                    raise RuntimeError(
+                        f"etcd did not become ready after {max_retries} attempts"
+                    ) from e
+                self.log.write(
+                    f"etcd not ready yet, retrying in {interval}s... ({attempt}/{max_retries})"
+                )
+                await asyncio.sleep(interval)
+
     async def etcd_put_json(self, key: str, value: Any) -> None:
         async with self.etcd_ctx() as etcd:
             await etcd.put_prefix(key, value, scope=ConfigScopes.GLOBAL)
@@ -414,7 +432,7 @@ class Context(metaclass=ABCMeta):
             f"""
         {sudo} docker compose pull && \\
         {sudo} docker compose up -d --wait backendai-half-db && \\
-        {sudo} docker compose up -d && \\
+        {sudo} docker compose up -d --wait && \\
         {sudo} docker compose ps
         """,
             cwd=self.install_info.base_path,
@@ -1429,6 +1447,7 @@ class DevContext(Context):
         shutil.copy(src, dst)
 
     async def configure(self) -> None:
+        await self.wait_for_etcd()
         self.log_header("Configuring manager...")
         await self.configure_manager()
 
@@ -1719,6 +1738,7 @@ class PackageContext(Context):
         shutil.copy(src, dst)
 
     async def configure(self) -> None:
+        await self.wait_for_etcd()
         self.log_header("Configuring manager...")
         await self.configure_manager()
         self.log_header("Configuring agent...")
