@@ -118,6 +118,12 @@ class ReplicaStatusFilter(PydanticInputMixin[ReplicaStatusFilterDTO]):
         description="The in  field.", name="in", default=None
     )
     equals: ReplicaStatus | None = None
+    not_in: list[ReplicaStatus] | None = gql_field(
+        description="Excludes statuses in the list.", name="notIn", default=None
+    )
+    not_equals: ReplicaStatus | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
+    )
 
 
 @gql_pydantic_input(
@@ -128,6 +134,12 @@ class TrafficStatusFilter(PydanticInputMixin[ReplicaTrafficStatusFilterDTO]):
         description="The in  field.", name="in", default=None
     )
     equals: TrafficStatus | None = None
+    not_in: list[TrafficStatus] | None = gql_field(
+        description="Excludes traffic statuses in the list.", name="notIn", default=None
+    )
+    not_equals: TrafficStatus | None = gql_field(
+        description="Excludes exact traffic status match.", name="notEquals", default=None
+    )
 
 
 # ========== ModelReplica Types ==========

@@ -447,6 +447,12 @@ class DeploymentStatusFilter(PydanticInputMixin[DeploymentStatusFilterDTO]):
         description="The in  field.", name="in", default=None
     )
     equals: DeploymentStatusGQL | None = None
+    not_in: list[DeploymentStatusGQL] | None = gql_field(
+        description="Excludes statuses in the list.", name="notIn", default=None
+    )
+    not_equals: DeploymentStatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
+    )
 
 
 @gql_pydantic_input(

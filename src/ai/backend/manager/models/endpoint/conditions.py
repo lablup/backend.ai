@@ -10,7 +10,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
@@ -84,6 +83,8 @@ class DeploymentConditions:
 
     by_name_in = staticmethod(make_string_in_factory(EndpointRow.name))
     by_domain_name_in = staticmethod(make_string_in_factory(EndpointRow.domain))
+    by_tag_in = staticmethod(make_string_in_factory(EndpointRow.tag))
+    by_url_in = staticmethod(make_string_in_factory(EndpointRow.url))
 
     @staticmethod
     def by_project_id(project_id: uuid.UUID) -> QueryCondition:
@@ -145,16 +146,30 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
-    def by_status_equals(status: ModelDeploymentStatus) -> QueryCondition:
+    def by_status_equals(lifecycle: EndpointLifecycle) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage == status
+            return EndpointRow.lifecycle_stage == lifecycle
 
         return inner
 
     @staticmethod
-    def by_status_in(statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+    def by_status_in(lifecycles: Collection[EndpointLifecycle]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage.in_(statuses)
+            return EndpointRow.lifecycle_stage.in_(lifecycles)
+
+        return inner
+
+    @staticmethod
+    def by_status_not_equals(lifecycle: EndpointLifecycle) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage != lifecycle
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(lifecycles: Collection[EndpointLifecycle]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage.not_in(lifecycles)
 
         return inner
 
@@ -332,18 +347,58 @@ class AccessTokenConditions:
 
     # Token string conditions
     @staticmethod
-    def by_token_equals(value: str) -> QueryCondition:
+    def by_token_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointTokenRow.token == value
+            if spec.case_insensitive:
+                condition = sa.func.lower(EndpointTokenRow.token) == spec.value.lower()
+            else:
+                condition = EndpointTokenRow.token == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_token_contains(value: str) -> QueryCondition:
+    def by_token_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointTokenRow.token.contains(value)
+            if spec.case_insensitive:
+                condition = EndpointTokenRow.token.ilike(f"%{spec.value}%")
+            else:
+                condition = EndpointTokenRow.token.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
+
+    @staticmethod
+    def by_token_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointTokenRow.token.ilike(f"{spec.value}%")
+            else:
+                condition = EndpointTokenRow.token.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_token_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointTokenRow.token.ilike(f"%{spec.value}")
+            else:
+                condition = EndpointTokenRow.token.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_token_in = staticmethod(make_string_in_factory(EndpointTokenRow.token))
 
     # expires_at datetime conditions
     @staticmethod

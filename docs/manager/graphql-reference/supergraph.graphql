@@ -1538,8 +1538,13 @@ enum AuditLogStatus
 input AuditLogStatusFilter
   @join__type(graph: STRAWBERRY)
 {
+  equals: AuditLogStatus = null
+
   """The in  field."""
   in: [AuditLogStatus!] = null
+
+  """Excludes exact status match."""
+  notEquals: AuditLogStatus = null
   notIn: [AuditLogStatus!] = null
 }
 
@@ -4880,6 +4885,12 @@ input DeploymentStatusFilter
   """The in  field."""
   in: [DeploymentStatus!] = null
   equals: DeploymentStatus = null
+
+  """Excludes statuses in the list."""
+  notIn: [DeploymentStatus!] = null
+
+  """Excludes exact status match."""
+  notEquals: DeploymentStatus = null
 }
 
 """
@@ -7448,8 +7459,13 @@ enum KernelV2Status
 input KernelV2StatusFilter
   @join__type(graph: STRAWBERRY)
 {
+  equals: KernelV2Status = null
+
   """The in  field."""
   in: [KernelV2Status!] = null
+
+  """Excludes exact status match."""
+  notEquals: KernelV2Status = null
   notIn: [KernelV2Status!] = null
 }
 
@@ -8035,6 +8051,9 @@ input LoginHistoryResultFilter
 
   """The in field."""
   in: [LoginAttemptResult!] = null
+
+  """Excludes exact result match."""
+  notEquals: LoginAttemptResult = null
   notIn: [LoginAttemptResult!] = null
 }
 
@@ -8137,6 +8156,9 @@ input LoginSessionStatusFilter
 
   """The in field."""
   in: [LoginSessionStatus!] = null
+
+  """Excludes exact status match."""
+  notEquals: LoginSessionStatus = null
   notIn: [LoginSessionStatus!] = null
 }
 
@@ -13681,6 +13703,12 @@ input ReplicaStatusFilter
   """The in  field."""
   in: [ReplicaStatus!] = null
   equals: ReplicaStatus = null
+
+  """Excludes statuses in the list."""
+  notIn: [ReplicaStatus!] = null
+
+  """Excludes exact status match."""
+  notEquals: ReplicaStatus = null
 }
 
 """Added in 25.4.0."""
@@ -16106,8 +16134,13 @@ enum SessionV2Status
 input SessionV2StatusFilter
   @join__type(graph: STRAWBERRY)
 {
+  equals: SessionV2Status = null
+
   """The in  field."""
   in: [SessionV2Status!] = null
+
+  """Excludes exact status match."""
+  notEquals: SessionV2Status = null
   notIn: [SessionV2Status!] = null
 }
 
@@ -16450,6 +16483,12 @@ input TrafficStatusFilter
   """The in  field."""
   in: [TrafficStatus!] = null
   equals: TrafficStatus = null
+
+  """Excludes traffic statuses in the list."""
+  notIn: [TrafficStatus!] = null
+
+  """Excludes exact traffic status match."""
+  notEquals: TrafficStatus = null
 }
 
 """Added in 26.4.2. UI rendering options."""
@@ -18896,8 +18935,13 @@ Added in 26.4.2. Filter for VFolder operation status enum fields. Supports in an
 input VFolderOperationStatusFilter
   @join__type(graph: STRAWBERRY)
 {
+  equals: VFolderOperationStatus = null
+
   """The in field."""
   in: [VFolderOperationStatus!] = null
+
+  """Excludes exact status match."""
+  notEquals: VFolderOperationStatus = null
 
   """Exclude statuses not in this list."""
   notIn: [VFolderOperationStatus!] = null
@@ -18979,8 +19023,13 @@ Added in 26.4.2. Filter for VFolder usage mode enum fields. Supports in and not_
 input VFolderUsageModeFilter
   @join__type(graph: STRAWBERRY)
 {
+  equals: VFolderUsageMode = null
+
   """The in field."""
   in: [VFolderUsageMode!] = null
+
+  """Excludes exact usage mode match."""
+  notEquals: VFolderUsageMode = null
 
   """Exclude usage modes not in this list."""
   notIn: [VFolderUsageMode!] = null

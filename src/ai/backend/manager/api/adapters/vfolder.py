@@ -635,16 +635,36 @@ class VFolderAdapter(BaseAdapter):
             if c is not None:
                 conditions.append(c)
         if f.status is not None:
+            if f.status.equals is not None:
+                conditions.append(
+                    VFolderConditions.by_status_equals(VFolderOperationStatus(f.status.equals))
+                )
             if f.status.in_ is not None:
                 status_values = [VFolderOperationStatus(s) for s in f.status.in_]
                 conditions.append(VFolderConditions.by_status_in(status_values))
+            if f.status.not_equals is not None:
+                conditions.append(
+                    VFolderConditions.by_status_not_equals(
+                        VFolderOperationStatus(f.status.not_equals)
+                    )
+                )
             if f.status.not_in is not None:
                 status_values = [VFolderOperationStatus(s) for s in f.status.not_in]
                 conditions.append(VFolderConditions.by_status_not_in(status_values))
         if f.usage_mode is not None:
+            if f.usage_mode.equals is not None:
+                conditions.append(
+                    VFolderConditions.by_usage_mode_equals(VFolderUsageMode(f.usage_mode.equals))
+                )
             if f.usage_mode.in_ is not None:
                 mode_values = [VFolderUsageMode(m) for m in f.usage_mode.in_]
                 conditions.append(VFolderConditions.by_usage_mode_in(mode_values))
+            if f.usage_mode.not_equals is not None:
+                conditions.append(
+                    VFolderConditions.by_usage_mode_not_equals(
+                        VFolderUsageMode(f.usage_mode.not_equals)
+                    )
+                )
             if f.usage_mode.not_in is not None:
                 mode_values = [VFolderUsageMode(m) for m in f.usage_mode.not_in]
                 conditions.append(VFolderConditions.by_usage_mode_not_in(mode_values))

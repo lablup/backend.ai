@@ -174,6 +174,8 @@ class EntityTypeFilter(BaseRequestModel):
 
     equals: str | None = None
     in_: list[str] | None = None
+    not_equals: str | None = None
+    not_in: list[str] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):

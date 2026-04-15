@@ -126,8 +126,12 @@ class SessionV2OrderFieldGQL(StrEnum):
     name="SessionV2StatusFilter",
 )
 class SessionV2StatusFilterGQL(PydanticInputMixin[SessionStatusFilter]):
+    equals: SessionV2StatusGQL | None = None
     in_: list[SessionV2StatusGQL] | None = gql_field(
         description="The in  field.", name="in", default=None
+    )
+    not_equals: SessionV2StatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
     )
     not_in: list[SessionV2StatusGQL] | None = None
 

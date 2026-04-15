@@ -36,8 +36,12 @@ from .enum import VFolderOperationStatusGQL, VFolderUsageModeGQL
 class VFolderOperationStatusFilterGQL(PydanticInputMixin[VFolderStatusFilter]):
     """Filter for vfolder operation status enum fields."""
 
+    equals: VFolderOperationStatusGQL | None = None
     in_: list[VFolderOperationStatusGQL] | None = gql_field(
         description="The in field.", name="in", default=None
+    )
+    not_equals: VFolderOperationStatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
     )
     not_in: list[VFolderOperationStatusGQL] | None = gql_field(
         description="Exclude statuses not in this list.", default=None
@@ -54,8 +58,12 @@ class VFolderOperationStatusFilterGQL(PydanticInputMixin[VFolderStatusFilter]):
 class VFolderUsageModeFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
     """Filter for vfolder usage mode enum fields."""
 
+    equals: VFolderUsageModeGQL | None = None
     in_: list[VFolderUsageModeGQL] | None = gql_field(
         description="The in field.", name="in", default=None
+    )
+    not_equals: VFolderUsageModeGQL | None = gql_field(
+        description="Excludes exact usage mode match.", name="notEquals", default=None
     )
     not_in: list[VFolderUsageModeGQL] | None = gql_field(
         description="Exclude usage modes not in this list.", default=None
