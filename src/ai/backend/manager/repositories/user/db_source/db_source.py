@@ -25,7 +25,7 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
     KeyPairData,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -51,7 +51,6 @@ from ai.backend.manager.models.group import (
     GroupRow,
     ProjectType,
     association_groups_users,
-    groups,
 )
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -63,6 +62,10 @@ from ai.backend.manager.models.keypair import (
     generate_keypair_data,
     keypairs,
 )
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.session import (
@@ -87,14 +90,30 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreatorError, Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    BulkCreatorError,
+    Creator,
+    execute_bulk_creator,
+    execute_creator,
+)
 from ai.backend.manager.repositories.base.purger import execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.rbac.scope_binder import (
+    RBACScopeBinder,
+    RBACScopeBindingPair,
+    execute_rbac_scope_binder,
+)
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    execute_rbac_scope_entity_unbinder,
+)
 from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater, execute_updater
+from ai.backend.manager.repositories.group.creators import AssocGroupUserCreatorSpec
+from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
@@ -381,15 +400,15 @@ class UserDBSource:
         """
         updater_spec = cast(UserUpdaterSpec, updater.spec)
         to_update = updater_spec.build_values()
-        async with self._db.begin() as conn:
+        async with self._db.begin_session() as session:
             # Get current user data for validation
-            current_user = await self._get_user_by_email_with_conn(conn, email)
+            current_user = await self._get_user_by_email_with_session(session, email)
 
             # Check if new username is already taken by another user
             new_username = updater_spec.username.optional_value()
             if new_username and new_username != current_user.username:
                 username_exists = await self._check_username_exists_for_other_user(
-                    conn, username=new_username, exclude_email=email
+                    session, username=new_username, exclude_email=email
                 )
                 if username_exists:
                     raise UserModificationBadRequest(
@@ -399,14 +418,16 @@ class UserDBSource:
             # Check if new domain_name exists
             new_domain_name = updater_spec.domain_name.optional_value()
             if new_domain_name and new_domain_name != current_user.domain_name:
-                domain_exists = await self._check_domain_exists(conn, new_domain_name)
+                domain_exists = await self._check_domain_exists(session, new_domain_name)
                 if not domain_exists:
                     raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
 
             # Check if new resource_policy exists
             new_resource_policy = updater_spec.resource_policy.optional_value()
             if new_resource_policy and new_resource_policy != current_user.resource_policy:
-                policy_exists = await self._check_resource_policy_exists(conn, new_resource_policy)
+                policy_exists = await self._check_resource_policy_exists(
+                    session, new_resource_policy
+                )
                 if not policy_exists:
                     raise UserModificationBadRequest(
                         f"Resource policy '{new_resource_policy}' does not exist."
@@ -415,7 +436,7 @@ class UserDBSource:
             # Handle main_access_key validation
             main_access_key = updater_spec.main_access_key.optional_value()
             if main_access_key:
-                await self._validate_and_update_main_access_key(conn, email, main_access_key)
+                await self._validate_and_update_main_access_key(session, email, main_access_key)
 
             # Update user
             if updater_spec.password.optional_value():
@@ -426,7 +447,7 @@ class UserDBSource:
             update_query = (
                 sa.update(users).where(users.c.email == email).values(to_update).returning(users)
             )
-            result = await conn.execute(update_query)
+            result = await session.execute(update_query)
             updated_user = result.first()
             if not updated_user:
                 raise UserModificationFailure("Failed to update user")
@@ -435,13 +456,13 @@ class UserDBSource:
             prev_role = current_user.role
             role = updater_spec.role.optional_value()
             if role is not None and role != prev_role:
-                await self._sync_keypair_roles(conn, updated_user.uuid, role)
+                await self._sync_keypair_roles(session, updated_user.uuid, role)
 
             # Handle group updates
             group_ids = updater_spec.group_ids_value
             if group_ids is not None:
                 await self._update_user_groups(
-                    conn, updated_user.uuid, updated_user.domain_name, group_ids
+                    session, updated_user.uuid, updated_user.domain_name, group_ids
                 )
             return UserData.from_row(updated_user)
 
@@ -463,12 +484,12 @@ class UserDBSource:
         successes: list[UserData] = []
         failures: list[BulkUpdaterError[UserRow]] = []
 
-        async with self._db.begin() as conn:
+        async with self._db.begin_session() as session:
             for idx, item in enumerate(items):
                 try:
-                    async with conn.begin_nested():
+                    async with session.begin_nested():
                         updated_user = await self._update_single_user_validated(
-                            conn, item.user_id, item.updater_spec
+                            session, item.user_id, item.updater_spec
                         )
                         successes.append(updated_user)
                 except Exception as e:
@@ -481,7 +502,7 @@ class UserDBSource:
 
     async def _update_single_user_validated(
         self,
-        conn: AsyncConnection,
+        session: SASession,
         user_id: UUID,
         updater_spec: UserUpdaterSpec,
     ) -> UserData:
@@ -493,13 +514,13 @@ class UserDBSource:
         to_update = updater_spec.build_values()
 
         # Get current user data for validation (by UUID)
-        current_user = await self._get_user_by_uuid_with_conn(conn, user_id)
+        current_user = await self._get_user_by_uuid_with_session(session, user_id)
 
         # Check if new username is already taken by another user
         new_username = updater_spec.username.optional_value()
         if new_username and new_username != current_user.username:
             username_exists = await self._check_username_exists_for_other_user(
-                conn, username=new_username, exclude_email=current_user.email
+                session, username=new_username, exclude_email=current_user.email
             )
             if username_exists:
                 raise UserModificationBadRequest(
@@ -509,14 +530,14 @@ class UserDBSource:
         # Check if new domain_name exists
         new_domain_name = updater_spec.domain_name.optional_value()
         if new_domain_name and new_domain_name != current_user.domain_name:
-            domain_exists = await self._check_domain_exists(conn, new_domain_name)
+            domain_exists = await self._check_domain_exists(session, new_domain_name)
             if not domain_exists:
                 raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
 
         # Check if new resource_policy exists
         new_resource_policy = updater_spec.resource_policy.optional_value()
         if new_resource_policy and new_resource_policy != current_user.resource_policy:
-            policy_exists = await self._check_resource_policy_exists(conn, new_resource_policy)
+            policy_exists = await self._check_resource_policy_exists(session, new_resource_policy)
             if not policy_exists:
                 raise UserModificationBadRequest(
                     f"Resource policy '{new_resource_policy}' does not exist."
@@ -526,7 +547,7 @@ class UserDBSource:
         main_access_key = updater_spec.main_access_key.optional_value()
         if main_access_key:
             await self._validate_and_update_main_access_key(
-                conn, current_user.email, main_access_key
+                session, current_user.email, main_access_key
             )
 
         # Update user
@@ -538,7 +559,7 @@ class UserDBSource:
         update_query = (
             sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
         )
-        result = await conn.execute(update_query)
+        result = await session.execute(update_query)
         updated_user = result.first()
         if not updated_user:
             raise UserModificationFailure("Failed to update user")
@@ -547,13 +568,13 @@ class UserDBSource:
         prev_role = current_user.role
         role = updater_spec.role.optional_value()
         if role is not None and role != prev_role:
-            await self._sync_keypair_roles(conn, updated_user.uuid, role)
+            await self._sync_keypair_roles(session, updated_user.uuid, role)
 
         # Handle group updates
         group_ids = updater_spec.group_ids_value
         if group_ids is not None:
             await self._update_user_groups(
-                conn, updated_user.uuid, updated_user.domain_name, group_ids
+                session, updated_user.uuid, updated_user.domain_name, group_ids
             )
         return UserData.from_row(updated_user)
 
@@ -564,8 +585,8 @@ class UserDBSource:
     ) -> UserData:
         """Update user by UUID with validation and handle role/group changes."""
         updater_spec = cast(UserUpdaterSpec, updater.spec)
-        async with self._db.begin() as conn:
-            return await self._update_single_user_validated(conn, user_uuid, updater_spec)
+        async with self._db.begin_session() as session:
+            return await self._update_single_user_validated(session, user_uuid, updater_spec)
 
     async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
         """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
@@ -801,13 +822,13 @@ class UserDBSource:
         return result is not None
 
     async def _check_username_exists_for_other_user(
-        self, conn: AsyncConnection, *, username: str, exclude_email: str
+        self, session: SASession, *, username: str, exclude_email: str
     ) -> bool:
         """Check if the username is already taken by another user."""
         query = sa.select(UserRow.uuid).where(
             sa.and_(UserRow.username == username, UserRow.email != exclude_email)
         )
-        result = await conn.scalar(query)
+        result = await session.scalar(query)
         return result is not None
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
@@ -824,17 +845,25 @@ class UserDBSource:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res
 
-    async def _get_user_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UserRow:
-        """Private method to get user by email using connection."""
-        result = await conn.execute(sa.select(users).where(users.c.email == email))
+    async def _get_user_by_email_with_session(self, session: SASession, email: str) -> UserRow:
+        """Private method to get user by email using a session.
+
+        Uses a Core-level select on the ``users`` table so that the returned
+        row exposes column attributes without requiring ORM mapping. Callers
+        treat the result as a read-only snapshot.
+        """
+        result = await session.execute(sa.select(users).where(users.c.email == email))
         res = result.first()
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
         return cast(UserRow, res)
 
-    async def _get_user_by_uuid_with_conn(self, conn: AsyncConnection, user_uuid: UUID) -> UserRow:
-        """Private method to get user by UUID using connection."""
-        result = await conn.execute(sa.select(users).where(users.c.uuid == user_uuid))
+    async def _get_user_by_uuid_with_session(self, session: SASession, user_uuid: UUID) -> UserRow:
+        """Private method to get user by UUID using a session.
+
+        See ``_get_user_by_email_with_session`` for the Core-level rationale.
+        """
+        result = await session.execute(sa.select(users).where(users.c.uuid == user_uuid))
         res = result.first()
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
@@ -874,10 +903,9 @@ class UserDBSource:
         return list(gids_to_join)
 
     async def _validate_and_update_main_access_key(
-        self, conn: AsyncConnection, email: str, main_access_key: str
+        self, session: SASession, email: str, main_access_key: str
     ) -> None:
         """Private method to validate and update main access key."""
-        session = SASession(conn)
         keypair_query = (
             sa.select(KeyPairRow)
             .where(KeyPairRow.access_key == main_access_key)
@@ -892,15 +920,15 @@ class UserDBSource:
         if keypair_row.user_row.email != email:
             raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
 
-        await conn.execute(
+        await session.execute(
             sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
         )
 
     async def _sync_keypair_roles(
-        self, conn: AsyncConnection, user_uuid: UUID, new_role: UserRole
+        self, session: SASession, user_uuid: UUID, new_role: UserRole
     ) -> None:
         """Private method to sync keypair roles with user role."""
-        result = await conn.execute(
+        result = await session.execute(
             sa.select(
                 keypairs.c.user,
                 keypairs.c.is_active,
@@ -924,7 +952,7 @@ class UserDBSource:
             if not kp.is_active:
                 kp_data["is_active"] = True
             if kp_data:
-                await conn.execute(
+                await session.execute(
                     sa.update(keypairs).values(kp_data).where(keypairs.c.user == user_uuid)
                 )
         else:
@@ -946,7 +974,7 @@ class UserDBSource:
                     kp_updates.append(kp_data)
 
             if kp_updates:
-                await conn.execute(
+                await session.execute(
                     sa.update(keypairs)
                     .values({
                         "is_admin": bindparam("is_admin"),
@@ -956,32 +984,129 @@ class UserDBSource:
                     kp_updates,
                 )
 
-    async def _clear_user_groups(self, conn: AsyncConnection, user_uuid: UUID) -> None:
-        """Private method to clear user's group associations."""
-        await conn.execute(
-            sa.delete(association_groups_users).where(
-                association_groups_users.c.user_id == user_uuid
+    async def _update_user_groups(
+        self,
+        session: SASession,
+        user_uuid: UUID,
+        domain_name: str,
+        group_ids: list[str],
+    ) -> None:
+        """Sync the user's project memberships to match ``group_ids``.
+
+        Produces the same business association + RBAC scope binding + member
+        role mapping as the modifyGroup path (BA-5745) so that membership
+        changes made through modify_user stay consistent with RBAC state.
+        Uses a diff-based approach: only projects entering or leaving the
+        target set are touched, preserving existing rows for unchanged
+        memberships.
+        """
+        # Expand target to include the domain's model-store project(s), matching
+        # the previous behavior of _get_project_scope_ids_for_user.
+        target_project_ids = set(
+            await self._get_project_scope_ids_for_user(
+                session, domain_name, [UUID(gid) for gid in group_ids]
             )
         )
 
-    async def _update_user_groups(
-        self, conn: AsyncConnection, user_uuid: UUID, domain_name: str, group_ids: list[str]
-    ) -> None:
-        """Private method to update user's group associations."""
-        # Clear existing groups
-        await self._clear_user_groups(conn, user_uuid)
+        current_rows = (
+            await session.scalars(
+                sa.select(AssocGroupUserRow.group_id).where(AssocGroupUserRow.user_id == user_uuid)
+            )
+        ).all()
+        current_project_ids = set(current_rows)
 
-        # Add to new groups
-        result = await conn.execute(
-            sa.select(groups.c.id)
-            .select_from(groups)
-            .where(groups.c.domain_name == domain_name)
-            .where(groups.c.id.in_(group_ids))
+        to_remove = current_project_ids - target_project_ids
+        to_add = target_project_ids - current_project_ids
+
+        for project_id in to_remove:
+            await self._remove_user_from_project_in_session(session, user_uuid, project_id)
+        for project_id in to_add:
+            await self._add_user_to_project_in_session(session, user_uuid, project_id)
+
+    async def _add_user_to_project_in_session(
+        self,
+        session: SASession,
+        user_uuid: UUID,
+        project_id: UUID,
+    ) -> None:
+        """Add a user to a project within an existing session.
+
+        Mirrors GroupDBSource._add_users_to_project_in_session for the
+        single-user case: inserts the business association, creates the RBAC
+        scope binding, and maps the user to the project's member role (only).
+        """
+        project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
+        pair = RBACScopeBindingPair(
+            spec=AssocGroupUserCreatorSpec(user_id=user_uuid, group_id=project_id),
+            entity_ref=RBACElementRef(RBACElementType.USER, str(user_uuid)),
+            scope_ref=project_scope_ref,
         )
-        grps = result.fetchall()
-        if grps:
-            values = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
-            await conn.execute(sa.insert(association_groups_users).values(values))
+        await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=[pair]))
+
+        # Locate the project's member role. Two naming conventions coexist:
+        # the runtime name `project-{id8}-member` used by GroupDBSource.create
+        # since BA-5746, and the legacy name `role_project_{id8}_member`
+        # created by alembic migration 430b1631804d for pre-existing projects.
+        runtime_member_name = f"project-{str(project_id)[:8]}-member"
+        legacy_member_name = f"role_project_{str(project_id)[:8]}_member"
+        member_role_id = await session.scalar(
+            sa.select(RoleRow.id)
+            .join(
+                AssociationScopesEntitiesRow,
+                sa.cast(AssociationScopesEntitiesRow.entity_id, sa.String)
+                == sa.cast(RoleRow.id, sa.String),
+            )
+            .where(
+                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                AssociationScopesEntitiesRow.scope_id == str(project_id),
+                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+                RoleRow.name.in_([runtime_member_name, legacy_member_name]),
+            )
+        )
+        if member_role_id is None:
+            log.warning(
+                "project {} has no member role bound at its scope; "
+                "skipping user-role mapping for modify_user group assignment",
+                project_id,
+            )
+            return
+
+        await execute_bulk_creator(
+            session,
+            BulkCreator(specs=[UserRoleCreatorSpec(user_id=user_uuid, role_id=member_role_id)]),
+        )
+
+    async def _remove_user_from_project_in_session(
+        self,
+        session: SASession,
+        user_uuid: UUID,
+        project_id: UUID,
+    ) -> None:
+        """Remove a user from a project within an existing session.
+
+        Mirrors GroupDBSource._remove_users_from_project_in_session for the
+        single-user case: deletes the business association, removes the RBAC
+        scope binding, and unmaps the user from any project-scoped roles.
+        """
+        unbinder = UserProjectEntityUnbinder(
+            user_uuids=[user_uuid],
+            project_id=project_id,
+        )
+        await execute_rbac_scope_entity_unbinder(session, unbinder)
+
+        project_role_ids_subq = sa.select(
+            AssociationScopesEntitiesRow.entity_id,
+        ).where(
+            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+            AssociationScopesEntitiesRow.scope_id == str(project_id),
+            AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+        )
+        await session.execute(
+            sa.delete(UserRoleRow).where(
+                UserRoleRow.user_id == user_uuid,
+                sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids_subq),
+            )
+        )
 
     async def _get_user_uuid_by_email(self, session: SASession, email: str) -> UUID:
         """Get user UUID by email."""

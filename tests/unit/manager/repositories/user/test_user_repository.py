@@ -252,8 +252,13 @@ class TestUserRepository:
         sample_domain: str,
         project_resource_policy: str,
     ) -> str:
-        """Create a test group and return its id as string."""
+        """Create a test group with both admin and member roles bound at
+        project scope, matching the runtime state produced by
+        ``GroupDBSource.create()`` after BA-5746.
+        """
         group_id = uuid.uuid4()
+        admin_role_id = uuid.uuid4()
+        member_role_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
             group = GroupRow(
                 id=group_id,
@@ -268,6 +273,24 @@ class TestUserRepository:
                 type=ProjectType.GENERAL,
             )
             session.add(group)
+            session.add(RoleRow(id=admin_role_id, name=f"project-{str(group_id)[:8]}-admin"))
+            session.add(RoleRow(id=member_role_id, name=f"project-{str(group_id)[:8]}-member"))
+            session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.ROLE,
+                    entity_id=str(admin_role_id),
+                )
+            )
+            session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.ROLE,
+                    entity_id=str(member_role_id),
+                )
+            )
             await session.commit()
         return str(group_id)
 
@@ -729,6 +752,158 @@ class TestUserRepository:
                 "If this fails, the bug where role changes delete groups has regressed."
             )
             assert str(final_group_list[0].group_id) == sample_user_with_group.group_id
+
+    async def test_update_user_validated_group_ids_syncs_rbac(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_repository: UserRepository,
+        sample_user_email: str,
+        sample_group_id: str,
+    ) -> None:
+        """Assigning a user to a new project via update_user_validated must
+        produce the same RBAC state as the modifyGroup path: business
+        association, (PROJECT, user) scope binding, and a user-role mapping
+        to the project member role (not the admin role).
+        """
+        updater_spec = UserUpdaterSpec(
+            group_ids=OptionalState.update([sample_group_id]),
+        )
+        updater = Updater(spec=updater_spec, pk_value=sample_user_email)
+
+        await user_repository.update_user_validated(
+            email=sample_user_email,
+            updater=updater,
+        )
+
+        project_id = uuid.UUID(sample_group_id)
+
+        async with db_with_cleanup.begin_session() as session:
+            user_uuid = await session.scalar(
+                sa.select(UserRow.uuid).where(UserRow.email == sample_user_email)
+            )
+            assert user_uuid is not None
+
+            business_assoc = await session.scalar(
+                sa.select(AssocGroupUserRow).where(
+                    AssocGroupUserRow.user_id == user_uuid,
+                    AssocGroupUserRow.group_id == project_id,
+                )
+            )
+            assert business_assoc is not None
+
+            scope_binding = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+                )
+            )
+            assert scope_binding is not None
+
+            member_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(project_id)[:8]}-member")
+            )
+            assert member_role_id is not None
+
+            member_mappings = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == user_uuid,
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(member_mappings) == 1
+
+            admin_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(project_id)[:8]}-admin")
+            )
+            assert admin_role_id is not None
+            admin_mappings = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == user_uuid,
+                        UserRoleRow.role_id == admin_role_id,
+                    )
+                )
+            ).all()
+            assert len(admin_mappings) == 0, (
+                "modify_user must not grant the project admin role to newly added members."
+            )
+
+    async def test_update_user_validated_group_ids_removal_revokes_rbac(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_repository: UserRepository,
+        sample_user_email: str,
+        sample_group_id: str,
+    ) -> None:
+        """Removing a user's project membership via update_user_validated
+        must also revoke the RBAC scope binding and the project member role
+        mapping, not just the business association.
+        """
+        # First add the user to the group via the (now-fixed) update path
+        setup_spec = UserUpdaterSpec(
+            group_ids=OptionalState.update([sample_group_id]),
+        )
+        await user_repository.update_user_validated(
+            email=sample_user_email,
+            updater=Updater(spec=setup_spec, pk_value=sample_user_email),
+        )
+
+        # Now remove all group memberships
+        removal_spec = UserUpdaterSpec(
+            group_ids=OptionalState.update([]),
+        )
+        await user_repository.update_user_validated(
+            email=sample_user_email,
+            updater=Updater(spec=removal_spec, pk_value=sample_user_email),
+        )
+
+        project_id = uuid.UUID(sample_group_id)
+
+        async with db_with_cleanup.begin_session() as session:
+            user_uuid = await session.scalar(
+                sa.select(UserRow.uuid).where(UserRow.email == sample_user_email)
+            )
+            assert user_uuid is not None
+
+            business_assocs = (
+                await session.scalars(
+                    sa.select(AssocGroupUserRow).where(
+                        AssocGroupUserRow.user_id == user_uuid,
+                        AssocGroupUserRow.group_id == project_id,
+                    )
+                )
+            ).all()
+            assert len(business_assocs) == 0
+
+            scope_bindings = (
+                await session.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(project_id),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+                    )
+                )
+            ).all()
+            assert len(scope_bindings) == 0
+
+            member_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(project_id)[:8]}-member")
+            )
+            assert member_role_id is not None
+            member_mappings = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == user_uuid,
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(member_mappings) == 0
 
     async def test_update_user_validated_not_found(
         self,
