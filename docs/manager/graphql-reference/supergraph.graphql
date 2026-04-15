@@ -14489,7 +14489,7 @@ type RestoreArtifactsPayload
 }
 
 """Added in UNRELEASED. Status of a single revision sync operation."""
-type RevisionSyncStatus
+type RevisionSyncResult
   @join__type(graph: STRAWBERRY)
 {
   """Revision ID"""
@@ -16536,7 +16536,7 @@ type SyncModelDefinitionsPayload
   @join__type(graph: STRAWBERRY)
 {
   """Per-revision sync statuses"""
-  results: [RevisionSyncStatus!]!
+  results: [RevisionSyncResult!]!
 }
 
 """Added in 25.19.0. """

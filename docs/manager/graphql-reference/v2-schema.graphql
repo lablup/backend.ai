@@ -9561,7 +9561,7 @@ type RestoreArtifactsPayload {
 }
 
 """Added in UNRELEASED. Status of a single revision sync operation."""
-type RevisionSyncStatus {
+type RevisionSyncResult {
   """Revision ID"""
   revisionId: UUID!
 
@@ -11031,7 +11031,7 @@ type SwitchMyMainAccessKeyPayload {
 """Added in UNRELEASED. Payload for model_definition sync result."""
 type SyncModelDefinitionsPayload {
   """Per-revision sync statuses"""
-  results: [RevisionSyncStatus!]!
+  results: [RevisionSyncResult!]!
 }
 
 """Added in 25.19.0. """
