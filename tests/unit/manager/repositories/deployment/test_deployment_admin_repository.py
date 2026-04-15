@@ -192,9 +192,9 @@ class TestDeploymentAdminRepository:
         mock_db: MagicMock,
     ) -> None:
         yaml_content = b"models:\n  - name: test\n    model_path: /models\n"
-        existing_def = ModelDefinition.model_validate(
-            {"models": [{"name": "test", "model_path": "/models"}]}
-        ).model_dump(exclude_none=True, by_alias=True)
+        existing_def = ModelDefinition.model_validate({
+            "models": [{"name": "test", "model_path": "/models"}]
+        }).model_dump(exclude_none=True, by_alias=True)
         row = self._make_revision_row(model_definition=existing_def)
 
         mock_readonly_session = AsyncMock()
