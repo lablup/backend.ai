@@ -78,13 +78,13 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     GetDeploymentPolicyPayload,
     ReplicaNode,
     RevisionNode,
-    RevisionSyncResultDTO,
     RouteNode,
     SearchAccessTokensPayload,
     SearchAutoScalingRulesPayload,
     SearchDeploymentPoliciesPayload,
     SearchReplicasPayload,
     SearchRoutesPayload,
+    SingleRevisionSyncResultDTO,
     SyncModelDefinitionsPayload,
     SyncReplicaPayload,
     UpdateAutoScalingRulePayload,
@@ -818,7 +818,7 @@ class DeploymentAdapter(BaseAdapter):
         )
         return SyncModelDefinitionsPayload(
             results=[
-                RevisionSyncResultDTO(
+                SingleRevisionSyncResultDTO(
                     revision_id=r.revision_id,
                     success=r.success,
                     failure_reason=r.failure_reason,

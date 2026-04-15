@@ -63,7 +63,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
-    RevisionSyncResultDTO,
+    SingleRevisionSyncResultDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncModelDefinitionsPayload as SyncModelDefinitionsPayloadDTO,
@@ -727,10 +727,10 @@ class SyncReplicaPayload:
         added_version=NEXT_RELEASE_VERSION,
         description="Status of a single revision sync operation.",
     ),
-    model=RevisionSyncResultDTO,
-    name="RevisionSyncResult",
+    model=SingleRevisionSyncResultDTO,
+    name="SingleRevisionSyncResult",
 )
-class RevisionSyncResultGQL:
+class SingleRevisionSyncResultGQL:
     """Result of syncing model_definition for a single deployment revision."""
 
     revision_id: strawberry.auto

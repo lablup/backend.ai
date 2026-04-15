@@ -11,7 +11,7 @@ from ai.backend.common.config import ModelDefinition
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RevisionModelDefinitionUpdate,
-    RevisionSyncResult,
+    SingleRevisionSyncResult,
 )
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.repositories.deployment.storage_source import DeploymentStorageSource
@@ -35,7 +35,7 @@ class DeploymentAdminRepository:
         self._db_source = db_source
         self._storage_source = storage_source
 
-    async def sync_model_definitions(self) -> list[RevisionSyncResult]:
+    async def sync_model_definitions(self) -> list[SingleRevisionSyncResult]:
         """Sync model_definition from vfolder storage for all revisions with a model vfolder.
 
         Compares the stored model_definition with the current vfolder file content
@@ -45,7 +45,7 @@ class DeploymentAdminRepository:
             List of per-revision sync results
         """
         yaml = YAML()
-        results: list[RevisionSyncResult] = []
+        results: list[SingleRevisionSyncResult] = []
 
         rows = await self._db_source.get_revisions_with_vfolder_info()
 
@@ -78,7 +78,7 @@ class DeploymentAdminRepository:
                     exc_info=True,
                 )
                 results.append(
-                    RevisionSyncResult(
+                    SingleRevisionSyncResult(
                         revision_id=row.revision_id, success=False, failure_reason=str(e)
                     )
                 )
@@ -101,6 +101,8 @@ class DeploymentAdminRepository:
         if batch_updates:
             await self._db_source.batch_update_model_definitions(batch_updates)
             for update in batch_updates:
-                results.append(RevisionSyncResult(revision_id=update.revision_id, success=True))
+                results.append(
+                    SingleRevisionSyncResult(revision_id=update.revision_id, success=True)
+                )
 
         return results

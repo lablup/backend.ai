@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     ModelDeploymentConnection,
     ModelDeploymentEdge,
     ProjectDeploymentScopeGQL,
-    RevisionSyncResultGQL,
+    SingleRevisionSyncResultGQL,
     SyncModelDefinitionsPayload,
     SyncReplicaInput,
     SyncReplicaPayload,
@@ -254,7 +254,7 @@ async def admin_sync_model_definitions(
     dto_payload = await info.context.adapters.deployment.admin_sync_model_definitions()
     return SyncModelDefinitionsPayload(
         results=[
-            RevisionSyncResultGQL(
+            SingleRevisionSyncResultGQL(
                 revision_id=r.revision_id,
                 success=r.success,
                 failure_reason=r.failure_reason,

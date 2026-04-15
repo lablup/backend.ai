@@ -14488,20 +14488,6 @@ type RestoreArtifactsPayload
   artifacts: [Artifact!]!
 }
 
-"""Added in UNRELEASED. Status of a single revision sync operation."""
-type RevisionSyncResult
-  @join__type(graph: STRAWBERRY)
-{
-  """Revision ID"""
-  revisionId: UUID!
-
-  """Whether the sync succeeded"""
-  success: Boolean!
-
-  """Failure reason if not successful"""
-  failureReason: String
-}
-
 """Added in 26.4.2. Payload returned after revoking a login session."""
 type RevokeLoginSessionPayload
   @join__type(graph: STRAWBERRY)
@@ -16275,6 +16261,20 @@ type SetQuotaScope
   quota_scope: QuotaScope
 }
 
+"""Added in UNRELEASED. Status of a single revision sync operation."""
+type SingleRevisionSyncResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Revision ID"""
+  revisionId: UUID!
+
+  """Whether the sync succeeded"""
+  success: Boolean!
+
+  """Failure reason if not successful"""
+  failureReason: String
+}
+
 """Added in 26.4.2. Slider UI config."""
 type SliderOption
   @join__type(graph: STRAWBERRY)
@@ -16536,7 +16536,7 @@ type SyncModelDefinitionsPayload
   @join__type(graph: STRAWBERRY)
 {
   """Per-revision sync statuses"""
-  results: [RevisionSyncResult!]!
+  results: [SingleRevisionSyncResult!]!
 }
 
 """Added in 25.19.0. """

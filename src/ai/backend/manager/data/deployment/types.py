@@ -994,7 +994,7 @@ class RevisionModelDefinitionUpdate:
 
 
 @dataclass(frozen=True)
-class RevisionSyncResult:
+class SingleRevisionSyncResult:
     """Result of syncing model_definition for a single deployment revision."""
 
     revision_id: UUID

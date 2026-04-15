@@ -4,7 +4,7 @@ from typing import override
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.types import RevisionSyncResult
+from ai.backend.manager.data.deployment.types import SingleRevisionSyncResult
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class SyncModelDefinitionsAction(BaseAction):
 
 @dataclass(frozen=True)
 class SyncModelDefinitionsActionResult(BaseActionResult):
-    results: list[RevisionSyncResult] = field(default_factory=list)
+    results: list[SingleRevisionSyncResult] = field(default_factory=list)
 
     @override
     def entity_id(self) -> str | None:

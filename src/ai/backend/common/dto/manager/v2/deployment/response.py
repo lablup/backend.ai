@@ -168,7 +168,7 @@ class SyncReplicaPayload(BaseResponseModel):
     success: bool = Field(description="Whether the sync succeeded")
 
 
-class RevisionSyncResultDTO(BaseResponseModel):
+class SingleRevisionSyncResultDTO(BaseResponseModel):
     """Status of a single revision sync operation."""
 
     revision_id: UUID = Field(description="Revision ID")
@@ -179,7 +179,7 @@ class RevisionSyncResultDTO(BaseResponseModel):
 class SyncModelDefinitionsPayload(BaseResponseModel):
     """Payload for model_definition sync result."""
 
-    results: list[RevisionSyncResultDTO] = Field(description="Per-revision sync statuses")
+    results: list[SingleRevisionSyncResultDTO] = Field(description="Per-revision sync statuses")
 
 
 class ScaleDeploymentPayload(BaseResponseModel):
