@@ -14499,7 +14499,7 @@ type RevisionSyncStatus
   success: Boolean!
 
   """Failure reason if not successful"""
-  reason: String
+  failureReason: String
 }
 
 """Added in 26.4.2. Payload returned after revoking a login session."""
