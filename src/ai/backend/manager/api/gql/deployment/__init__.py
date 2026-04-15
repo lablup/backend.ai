@@ -20,6 +20,7 @@ from .resolver import (
     admin_create_deployment_revision_preset,
     admin_delete_deployment_revision_preset,
     admin_deployments,
+    admin_sync_model_definitions,
     admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
@@ -147,6 +148,7 @@ from .types import (
     RouteOrderField,
     RouteStatusGQL,
     RouteTrafficStatusGQL,
+    SyncModelDefinitionsPayload,
     SyncReplicaInput,
     SyncReplicaPayload,
     TrafficStatus,
@@ -205,6 +207,7 @@ __all__ = [
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
     "ReplicaState",
+    "SyncModelDefinitionsPayload",
     "SyncReplicaInput",
     "SyncReplicaPayload",
     "UpdateDeploymentInput",
@@ -285,6 +288,7 @@ __all__ = [
     "my_deployments",
     "project_deployments",
     "sync_replicas",
+    "admin_sync_model_definitions",
     "update_model_deployment",
     # Resolvers - Policy
     "update_deployment_policy",
