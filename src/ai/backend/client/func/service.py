@@ -5,12 +5,14 @@ from warnings import deprecated
 
 from faker import Faker
 
+from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.output.fields import service_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
 from ai.backend.client.utils import dedent as _d
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
@@ -386,18 +388,18 @@ class Service(BaseFunction):
     async def modify(
         self,
         *,
-        name: str | None = None,
-        replicas: int | None = None,
-        image: str | None = None,
-        resource_group: str | None = None,
-        resource_slots: Mapping[str, str] | None = None,
-        resource_opts: Mapping[str, str] | None = None,
-        cluster_mode: str | None = None,
-        cluster_size: int | None = None,
-        model_definition_path: str | None = None,
-        open_to_public: bool | None = None,
-        environ: Mapping[str, str] | None = None,
-        runtime_variant: str | None = None,
+        name: str | Undefined = undefined,
+        replicas: int | Undefined = undefined,
+        image: str | Undefined = undefined,
+        resource_group: str | Undefined = undefined,
+        resource_slots: Mapping[str, str] | Undefined = undefined,
+        resource_opts: Mapping[str, str] | Undefined = undefined,
+        cluster_mode: str | Undefined = undefined,
+        cluster_size: int | Undefined = undefined,
+        model_definition_path: str | Undefined = undefined,
+        open_to_public: bool | Undefined = undefined,
+        environ: Mapping[str, str] | Undefined = undefined,
+        runtime_variant: str | Undefined = undefined,
     ) -> dict[str, Any]:
         query = _d("""\
             mutation($endpoint_id: UUID!, $props: ModifyEndpointInput!) {
@@ -407,30 +409,18 @@ class Service(BaseFunction):
             }
         """)
         props: dict[str, Any] = {}
-        if name is not None:
-            props["name"] = name
-        if replicas is not None:
-            props["replicas"] = replicas
-        if image is not None:
-            props["image"] = image
-        if resource_group is not None:
-            props["resource_group"] = resource_group
-        if resource_slots is not None:
-            props["resource_slots"] = resource_slots
-        if resource_opts is not None:
-            props["resource_opts"] = resource_opts
-        if cluster_mode is not None:
-            props["cluster_mode"] = cluster_mode
-        if cluster_size is not None:
-            props["cluster_size"] = cluster_size
-        if model_definition_path is not None:
-            props["model_definition_path"] = model_definition_path
-        if open_to_public is not None:
-            props["open_to_public"] = open_to_public
-        if environ is not None:
-            props["environ"] = environ
-        if runtime_variant is not None:
-            props["runtime_variant"] = runtime_variant
+        set_if_set(props, "name", name)
+        set_if_set(props, "replicas", replicas)
+        set_if_set(props, "image", image)
+        set_if_set(props, "resource_group", resource_group)
+        set_if_set(props, "resource_slots", resource_slots)
+        set_if_set(props, "resource_opts", resource_opts)
+        set_if_set(props, "cluster_mode", cluster_mode)
+        set_if_set(props, "cluster_size", cluster_size)
+        set_if_set(props, "model_definition_path", model_definition_path)
+        set_if_set(props, "open_to_public", open_to_public)
+        set_if_set(props, "environ", environ)
+        set_if_set(props, "runtime_variant", runtime_variant)
         variables = {"endpoint_id": str(self.id), "props": props}
         data = await api_session.get().Admin._query(query, variables)
         return cast(dict[str, Any], data["modify_endpoint"])
