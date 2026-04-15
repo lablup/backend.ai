@@ -248,6 +248,7 @@ def sample_session_data(
         user_uuid=sample_user_id,
         access_key=sample_access_key,
         images=["cr.backend.ai/stable/python:latest"],
+        image_ids=None,
         tag=None,
         occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
         requested_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
@@ -352,6 +353,7 @@ class TestMatchSessions:
                 user_uuid=sample_user_id,
                 access_key=sample_access_key,
                 images=["python:latest"],
+                image_ids=None,
                 tag=None,
                 occupying_slots=ResourceSlot({}),
                 requested_slots=ResourceSlot({}),
@@ -1721,6 +1723,7 @@ class TestSearchKernels:
                 gids=[1000],
             ),
             image=ImageInfo(
+                image_id=None,
                 identifier=None,
                 registry="cr.backend.ai",
                 tag="latest",

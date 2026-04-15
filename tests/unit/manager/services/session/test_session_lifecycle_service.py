@@ -223,6 +223,7 @@ def _make_session_data(
         user_uuid=user_id,
         access_key=access_key,
         images=["cr.backend.ai/stable/python:latest"],
+        image_ids=None,
         tag=None,
         occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
         requested_slots=ResourceSlot({"cpu": 1, "mem": 1024}),

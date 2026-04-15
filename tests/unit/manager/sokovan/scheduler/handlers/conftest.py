@@ -169,6 +169,7 @@ def _create_session(
                 gids=None,
             ),
             image=ImageInfo(
+                image_id=None,
                 identifier=None,
                 registry="docker.io",
                 tag="latest",
@@ -270,6 +271,7 @@ def _create_kernel(
             gids=None,
         ),
         image=ImageInfo(
+            image_id=None,
             identifier=None,
             registry="docker.io",
             tag="latest",
@@ -572,6 +574,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                         agent_addr=k.resource.agent_addr,
                         scaling_group=s.session_info.resource.scaling_group_name or "default",
                         image="test-image:latest",
+                        image_id=None,
                         architecture=k.image.architecture or "x86_64",
                     )
                     for k in s.kernel_infos
@@ -579,10 +582,12 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
             )
             for s in sessions
         ]
+        _image_id = uuid4()
         return SessionsForPullWithImages(
             sessions=sessions_for_pull,
             image_configs={
-                "test-image:latest": ImageConfigData(
+                _image_id: ImageConfigData(
+                    id=_image_id,
                     canonical="test-image:latest",
                     architecture="x86_64",
                     project=None,
@@ -620,6 +625,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                         agent_addr=k.resource.agent_addr,
                         scaling_group=s.session_info.resource.scaling_group_name or "default",
                         image="test-image:latest",
+                        image_id=None,
                         architecture=k.image.architecture or "x86_64",
                     )
                     for k in s.kernel_infos
@@ -631,10 +637,12 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
             )
             for s in sessions
         ]
+        _image_id = uuid4()
         return SessionsForStartWithImages(
             sessions=sessions_for_start,
             image_configs={
-                "test-image:latest": ImageConfigData(
+                _image_id: ImageConfigData(
+                    id=_image_id,
                     canonical="test-image:latest",
                     architecture="x86_64",
                     project=None,

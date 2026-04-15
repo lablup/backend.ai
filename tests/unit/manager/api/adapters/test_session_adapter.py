@@ -54,6 +54,7 @@ def _create_session_data(
         target_sgroup_names=None,
         agent_ids=None,
         images=None,
+        image_ids=None,
         tag=None,
         terminated_at=None,
         starts_at=None,

@@ -146,6 +146,7 @@ class TestSingleKernelSession:
             ],
             image_infos={
                 "python:3.9": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="python:3.9",
                     architecture="x86_64",
                     registry="docker.io",
@@ -241,6 +242,7 @@ class TestSingleKernelSession:
             ],
             image_infos={
                 "python:3.9": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="python:3.9",
                     architecture="x86_64",
                     registry="docker.io",
@@ -333,6 +335,7 @@ class TestMultiContainerSession:
             ],
             image_infos={
                 "tensorflow:2.0": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="tensorflow:2.0",
                     architecture="x86_64",
                     registry="docker.io",
@@ -430,6 +433,7 @@ class TestMultiContainerSession:
             ],
             image_infos={
                 "nginx:latest": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="nginx:latest",
                     architecture="x86_64",
                     registry="docker.io",
@@ -440,6 +444,7 @@ class TestMultiContainerSession:
                     },
                 ),
                 "python:3.9": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="python:3.9",
                     architecture="x86_64",
                     registry="docker.io",
@@ -450,6 +455,7 @@ class TestMultiContainerSession:
                     },
                 ),
                 "redis:6": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="redis:6",
                     architecture="x86_64",
                     registry="docker.io",
@@ -538,6 +544,7 @@ class TestEdgeCases:
             ],
             image_infos={
                 "python:3.9": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="python:3.9",
                     architecture="x86_64",
                     registry="docker.io",
@@ -600,6 +607,7 @@ class TestEdgeCases:
             ],
             image_infos={
                 "python:3.9": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="python:3.9",
                     architecture="x86_64",
                     registry="docker.io",
@@ -631,6 +639,7 @@ class TestEdgeCases:
             ],
             image_infos={
                 "python:3.9": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="python:3.9",
                     architecture="x86_64",
                     registry="docker.io",
@@ -708,6 +717,7 @@ class TestEdgeCases:
             ],
             image_infos={
                 "python:3.9": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="python:3.9",
                     architecture="x86_64",
                     registry="docker.io",
@@ -776,6 +786,7 @@ class TestMultiClusterScenarios:
             ],
             image_infos={
                 "pytorch:2.0": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="pytorch:2.0",
                     architecture="x86_64",
                     registry="docker.io",
@@ -891,6 +902,7 @@ class TestMultiClusterScenarios:
             ],
             image_infos={
                 "spark:master": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="spark:master",
                     architecture="x86_64",
                     registry="docker.io",
@@ -903,6 +915,7 @@ class TestMultiClusterScenarios:
                     },
                 ),
                 "spark:worker": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="spark:worker",
                     architecture="x86_64",
                     registry="docker.io",
@@ -915,6 +928,7 @@ class TestMultiClusterScenarios:
                     },
                 ),
                 "jupyter:notebook": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="jupyter:notebook",
                     architecture="x86_64",
                     registry="docker.io",
@@ -1000,6 +1014,7 @@ class TestMultiClusterScenarios:
             ],
             image_infos={
                 "llm:server": ImageInfo(
+                    id=uuid.uuid4(),
                     canonical="llm:server",
                     architecture="x86_64",
                     registry="docker.io",
