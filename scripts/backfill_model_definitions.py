@@ -1,7 +1,7 @@
 """
 Backfill model_definition in deployment_revisions for pre-26.4.2 endpoints.
 
-Calls modify_endpoint (no-op) for every endpoint so the server resolves
+Calls Service.modify() (no-op) for every endpoint so the server resolves
 model_definition for revisions that still have NULL.
 
 Usage:
@@ -15,7 +15,6 @@ import asyncio
 import logging
 import sys
 
-from ai.backend.client.func.admin import Admin
 from ai.backend.client.func.service import Service
 from ai.backend.client.output.fields import service_fields
 from ai.backend.client.session import AsyncSession
@@ -26,14 +25,6 @@ logging.basicConfig(
     stream=sys.stderr,
 )
 log = logging.getLogger(__name__)
-
-MODIFY_ENDPOINT_MUTATION = """\
-mutation($endpoint_id: UUID!, $props: ModifyEndpointInput!) {
-    modify_endpoint(endpoint_id: $endpoint_id, props: $props) {
-        ok msg
-    }
-}
-"""
 
 
 async def main(dry_run: bool = False) -> None:
@@ -66,15 +57,12 @@ async def main(dry_run: bool = False) -> None:
                 continue
 
             try:
-                data = await Admin._query(
-                    MODIFY_ENDPOINT_MUTATION,
-                    {"endpoint_id": eid, "props": {}},
-                )
-                if data["modify_endpoint"]["ok"]:
+                data = await Service(eid).modify()
+                if data["ok"]:
                     log.info(f"[{i}/{total}] {eid} — ok")
                     succeeded += 1
                 else:
-                    log.warning(f"[{i}/{total}] {eid} — {data['modify_endpoint']['msg']}")
+                    log.warning(f"[{i}/{total}] {eid} — {data['msg']}")
                     failed += 1
             except Exception as e:
                 log.warning(f"[{i}/{total}] {eid} — error: {e}")

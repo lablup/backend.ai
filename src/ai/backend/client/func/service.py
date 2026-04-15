@@ -381,3 +381,56 @@ class Service(BaseFunction):
             result: dict[str, Any] = await resp.json()
 
             return result
+
+    @api_function
+    async def modify(
+        self,
+        *,
+        name: str | None = None,
+        replicas: int | None = None,
+        image: str | None = None,
+        resource_group: str | None = None,
+        resource_slots: Mapping[str, str] | None = None,
+        resource_opts: Mapping[str, str] | None = None,
+        cluster_mode: str | None = None,
+        cluster_size: int | None = None,
+        model_definition_path: str | None = None,
+        open_to_public: bool | None = None,
+        environ: Mapping[str, str] | None = None,
+        runtime_variant: str | None = None,
+    ) -> dict[str, Any]:
+        query = _d("""\
+            mutation($endpoint_id: UUID!, $props: ModifyEndpointInput!) {
+                modify_endpoint(endpoint_id: $endpoint_id, props: $props) {
+                    ok msg
+                }
+            }
+        """)
+        props: dict[str, Any] = {}
+        if name is not None:
+            props["name"] = name
+        if replicas is not None:
+            props["replicas"] = replicas
+        if image is not None:
+            props["image"] = image
+        if resource_group is not None:
+            props["resource_group"] = resource_group
+        if resource_slots is not None:
+            props["resource_slots"] = resource_slots
+        if resource_opts is not None:
+            props["resource_opts"] = resource_opts
+        if cluster_mode is not None:
+            props["cluster_mode"] = cluster_mode
+        if cluster_size is not None:
+            props["cluster_size"] = cluster_size
+        if model_definition_path is not None:
+            props["model_definition_path"] = model_definition_path
+        if open_to_public is not None:
+            props["open_to_public"] = open_to_public
+        if environ is not None:
+            props["environ"] = environ
+        if runtime_variant is not None:
+            props["runtime_variant"] = runtime_variant
+        variables = {"endpoint_id": str(self.id), "props": props}
+        data = await api_session.get().Admin._query(query, variables)
+        return cast(dict[str, Any], data["modify_endpoint"])
