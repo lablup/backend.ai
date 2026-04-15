@@ -31,6 +31,9 @@ class LoginSessionStatusFilterGQL(PydanticInputMixin[LoginSessionStatusFilter]):
     in_: list[LoginSessionStatusGQL] | None = gql_field(
         description="The in field.", name="in", default=None
     )
+    not_equals: LoginSessionStatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
+    )
     not_in: list[LoginSessionStatusGQL] | None = None
 
 

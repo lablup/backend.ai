@@ -65,14 +65,18 @@ class VFolderInvitationState(StrEnum):
 class VFolderStatusFilter(BaseRequestModel):
     """Filter for vfolder operation status values."""
 
+    equals: VFolderOperationStatusField | None = None
     in_: list[VFolderOperationStatusField] | None = None
+    not_equals: VFolderOperationStatusField | None = None
     not_in: list[VFolderOperationStatusField] | None = None
 
 
 class VFolderUsageModeFilter(BaseRequestModel):
     """Filter for vfolder usage mode values."""
 
+    equals: VFolderUsageMode | None = None
     in_: list[VFolderUsageMode] | None = None
+    not_equals: VFolderUsageMode | None = None
     not_in: list[VFolderUsageMode] | None = None
 
 

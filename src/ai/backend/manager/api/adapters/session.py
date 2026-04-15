@@ -584,9 +584,7 @@ class SessionAdapter(BaseAdapter):
             if c is not None:
                 conditions.append(c)
         if f.status is not None:
-            c = self._convert_session_status_filter(f.status)
-            if c is not None:
-                conditions.append(c)
+            conditions.extend(self._convert_session_status_filter(f.status))
         if f.created_at is not None:
             c = f.created_at.build_query_condition(
                 before_factory=SessionConditions.by_created_at_before,
@@ -613,12 +611,23 @@ class SessionAdapter(BaseAdapter):
         return conditions
 
     @staticmethod
-    def _convert_session_status_filter(f: SessionStatusFilter) -> QueryCondition | None:
+    def _convert_session_status_filter(f: SessionStatusFilter) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if f.equals is not None:
+            conditions.append(SessionConditions.by_status_equals(SessionStatus(f.equals.value)))
         if f.in_:
-            return SessionConditions.by_status_in([SessionStatus(s.value) for s in f.in_])
+            conditions.append(
+                SessionConditions.by_status_in([SessionStatus(s.value) for s in f.in_])
+            )
+        if f.not_equals is not None:
+            conditions.append(
+                SessionConditions.by_status_not_equals(SessionStatus(f.not_equals.value))
+            )
         if f.not_in:
-            return SessionConditions.by_status_not_in([SessionStatus(s.value) for s in f.not_in])
-        return None
+            conditions.append(
+                SessionConditions.by_status_not_in([SessionStatus(s.value) for s in f.not_in])
+            )
+        return conditions
 
     @staticmethod
     def _convert_session_orders(orders: list[SessionOrder]) -> list[QueryOrder]:
@@ -743,9 +752,7 @@ class SessionAdapter(BaseAdapter):
             if c is not None:
                 conditions.append(c)
         if f.status is not None:
-            c = self._convert_kernel_status_filter(f.status)
-            if c is not None:
-                conditions.append(c)
+            conditions.extend(self._convert_kernel_status_filter(f.status))
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_kernel_filter(sub))
@@ -764,22 +771,35 @@ class SessionAdapter(BaseAdapter):
         return conditions
 
     @staticmethod
-    def _convert_kernel_status_filter(f: KernelStatusFilter) -> QueryCondition | None:
+    def _convert_kernel_status_filter(f: KernelStatusFilter) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if f.equals is not None:
+            conditions.append(
+                KernelConditions.by_status_filter_in(
+                    KernelStatusInMatchSpec(values=[KernelStatus(f.equals)], negated=False)
+                )
+            )
         if f.in_:
-            return KernelConditions.by_status_filter_in(
-                KernelStatusInMatchSpec(
-                    values=[KernelStatus(s) for s in f.in_],
-                    negated=False,
+            conditions.append(
+                KernelConditions.by_status_filter_in(
+                    KernelStatusInMatchSpec(values=[KernelStatus(s) for s in f.in_], negated=False)
+                )
+            )
+        if f.not_equals is not None:
+            conditions.append(
+                KernelConditions.by_status_filter_in(
+                    KernelStatusInMatchSpec(values=[KernelStatus(f.not_equals)], negated=True)
                 )
             )
         if f.not_in:
-            return KernelConditions.by_status_filter_in(
-                KernelStatusInMatchSpec(
-                    values=[KernelStatus(s) for s in f.not_in],
-                    negated=True,
+            conditions.append(
+                KernelConditions.by_status_filter_in(
+                    KernelStatusInMatchSpec(
+                        values=[KernelStatus(s) for s in f.not_in], negated=True
+                    )
                 )
             )
-        return None
+        return conditions
 
     @staticmethod
     def _convert_kernel_orders(orders: list[KernelOrder]) -> list[QueryOrder]:

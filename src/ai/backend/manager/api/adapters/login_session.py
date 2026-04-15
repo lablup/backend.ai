@@ -208,9 +208,11 @@ class LoginSessionAdapter(BaseAdapter):
     def _apply_status_filter(s: LoginSessionStatusFilter, conditions: list[QueryCondition]) -> None:
         if s.equals is not None:
             conditions.append(LoginSessionConditions.by_status_in([s.equals]))
-        elif s.in_ is not None:
+        if s.in_ is not None:
             conditions.append(LoginSessionConditions.by_status_in(list(s.in_)))
-        elif s.not_in is not None:
+        if s.not_equals is not None:
+            conditions.append(LoginSessionConditions.by_status_not_in([s.not_equals]))
+        if s.not_in is not None:
             conditions.append(LoginSessionConditions.by_status_not_in(list(s.not_in)))
 
     @staticmethod

@@ -161,9 +161,23 @@ class VFolderConditions:
     # ── enum filter factories ──
 
     @staticmethod
+    def by_status_equals(status: VFolderOperationStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.status == status
+
+        return inner
+
+    @staticmethod
     def by_status_in(statuses: Collection[VFolderOperationStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return VFolderRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_status_not_equals(status: VFolderOperationStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.status != status
 
         return inner
 
@@ -175,9 +189,23 @@ class VFolderConditions:
         return inner
 
     @staticmethod
+    def by_usage_mode_equals(mode: VFolderUsageMode) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.usage_mode == mode
+
+        return inner
+
+    @staticmethod
     def by_usage_mode_in(modes: Collection[VFolderUsageMode]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return VFolderRow.usage_mode.in_(modes)
+
+        return inner
+
+    @staticmethod
+    def by_usage_mode_not_equals(mode: VFolderUsageMode) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.usage_mode != mode
 
         return inner
 

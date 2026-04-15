@@ -24,6 +24,9 @@ class AuditLogStatusFilter(BaseRequestModel):
     in_: list[AuditLogStatus] | None = Field(
         default=None, alias="in", description="Status is in list"
     )
+    not_equals: AuditLogStatus | None = Field(
+        default=None, description="Excludes exact status match"
+    )
     not_in: list[AuditLogStatus] | None = Field(default=None, description="Status is not in list")
 
 

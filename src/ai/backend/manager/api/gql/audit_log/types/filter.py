@@ -24,8 +24,12 @@ from .node import AuditLogStatusGQL
     name="AuditLogStatusFilter",
 )
 class AuditLogStatusFilterGQL(PydanticInputMixin[AuditLogStatusFilter]):
+    equals: AuditLogStatusGQL | None = None
     in_: list[AuditLogStatusGQL] | None = gql_field(
         description="The in  field.", name="in", default=None
+    )
+    not_equals: AuditLogStatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
     )
     not_in: list[AuditLogStatusGQL] | None = None
 

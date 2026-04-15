@@ -31,6 +31,9 @@ class LoginHistoryResultFilterGQL(PydanticInputMixin[LoginHistoryResultFilter]):
     in_: list[LoginAttemptResultGQL] | None = gql_field(
         description="The in field.", name="in", default=None
     )
+    not_equals: LoginAttemptResultGQL | None = gql_field(
+        description="Excludes exact result match.", name="notEquals", default=None
+    )
     not_in: list[LoginAttemptResultGQL] | None = None
 
 
