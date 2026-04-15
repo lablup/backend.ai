@@ -139,6 +139,12 @@ def register_v2_deployment_routes(
         handler.sync_replicas,
         middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/revisions/sync-model-definitions",
+        handler.admin_sync_model_definitions,
+        middlewares=[superadmin_required],
+    )
 
     # ------------------------------------------------------------------
     # Route operations

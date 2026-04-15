@@ -84,6 +84,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     SearchDeploymentPoliciesPayload,
     SearchReplicasPayload,
     SearchRoutesPayload,
+    SyncModelDefinitionsPayload,
     SyncReplicaPayload,
     UpdateAutoScalingRulePayload,
     UpdateDeploymentPayload,
@@ -292,6 +293,9 @@ from ai.backend.manager.services.deployment.actions.search_deployments import (
     SearchDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import SearchReplicasAction
+from ai.backend.manager.services.deployment.actions.sync_model_definitions import (
+    SyncModelDefinitionsAction,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -805,6 +809,13 @@ class DeploymentAdapter(BaseAdapter):
             SyncReplicaAction(deployment_id=input.model_deployment_id)
         )
         return SyncReplicaPayload(success=True)
+
+    async def admin_sync_model_definitions(self) -> SyncModelDefinitionsPayload:
+        """Sync model_definition from vfolder storage for all revisions with NULL model_definition."""
+        result = await self._processors.deployment.sync_model_definitions.wait_for_complete(
+            SyncModelDefinitionsAction()
+        )
+        return SyncModelDefinitionsPayload(updated=result.updated, failed=result.failed)
 
     async def activate_revision(self, input: ActivateRevisionInput) -> ActivateRevisionPayload:
         """Activate a specific revision as the current revision."""

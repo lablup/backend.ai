@@ -168,6 +168,13 @@ class SyncReplicaPayload(BaseResponseModel):
     success: bool = Field(description="Whether the sync succeeded")
 
 
+class SyncModelDefinitionsPayload(BaseResponseModel):
+    """Payload for model_definition sync result."""
+
+    updated: int = Field(description="Number of revisions updated")
+    failed: int = Field(description="Number of revisions that failed to sync")
+
+
 class ScaleDeploymentPayload(BaseResponseModel):
     """Payload for deployment scale mutation result."""
 

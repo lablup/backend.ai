@@ -120,6 +120,10 @@ from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
 )
+from ai.backend.manager.services.deployment.actions.sync_model_definitions import (
+    SyncModelDefinitionsAction,
+    SyncModelDefinitionsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
     SyncReplicaActionResult,
@@ -175,6 +179,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
 
     # Route operations
     sync_replicas: ActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
+    sync_model_definitions: ActionProcessor[
+        SyncModelDefinitionsAction, SyncModelDefinitionsActionResult
+    ]
     search_routes: ActionProcessor[SearchRoutesAction, SearchRoutesActionResult]
     update_route_traffic_status: ActionProcessor[
         UpdateRouteTrafficStatusAction, UpdateRouteTrafficStatusActionResult
@@ -257,6 +264,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
 
         # Route operations
         self.sync_replicas = ActionProcessor(service.sync_replicas, action_monitors)
+        self.sync_model_definitions = ActionProcessor(
+            service.sync_model_definitions, action_monitors
+        )
         self.search_routes = ActionProcessor(service.search_routes, action_monitors)
         self.update_route_traffic_status = ActionProcessor(
             service.update_route_traffic_status, action_monitors
