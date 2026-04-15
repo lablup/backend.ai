@@ -755,6 +755,7 @@ async def admin_user_fixture(
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
+                main_access_key=data.keypair.access_key,
             )
         )
         await conn.execute(
@@ -835,6 +836,7 @@ async def regular_user_fixture(
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                main_access_key=data.keypair.access_key,
             )
         )
         await conn.execute(

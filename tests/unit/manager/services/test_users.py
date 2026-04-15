@@ -542,6 +542,9 @@ class TestPurgeUser:
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
+        mock_user_repository.get_main_access_key_by_id = AsyncMock(
+            return_value=str(admin_user_info_ctx.main_access_key)
+        )
         mock_user_repository.delegate_endpoint_ownership = AsyncMock(return_value=None)
         mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
         mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
