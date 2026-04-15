@@ -1679,6 +1679,11 @@ type AutoScalingRule implements Node
   prometheusQueryPresetId: ID
   createdAt: DateTime!
   lastTriggeredAt: DateTime
+
+  """
+  Added in UNRELEASED. The Prometheus query preset used for metric-based auto-scaling.
+  """
+  queryPreset: QueryDefinition
 }
 
 """Added in 25.19.0. Connection for auto-scaling rules."""
@@ -4626,6 +4631,9 @@ type DeploymentHistory implements Node
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
+
+  """Added in UNRELEASED. The deployment this history record belongs to."""
+  deployment: ModelDeployment
 }
 
 """Added in 26.3.0. Deployment history connection."""
@@ -4774,6 +4782,9 @@ type DeploymentRevisionPreset implements Node
 
   """Timestamp of the last modification to this deployment preset."""
   updatedAt: DateTime
+
+  """Added in UNRELEASED. The runtime variant this preset is designed for."""
+  runtimeVariant: RuntimeVariant
 
   """Added in 26.4.2. Resource slot allocations for this preset."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
@@ -7593,6 +7604,9 @@ type KeyPairGQL implements Node
 
   """UUID of the user who owns this keypair."""
   userId: UUID!
+
+  """Added in UNRELEASED. The user who owns this keypair."""
+  user: UserV2
 }
 
 """An edge in a connection."""
@@ -8084,6 +8098,12 @@ type LoginHistoryV2 implements Node
 
   """Timestamp when the login attempt occurred."""
   createdAt: DateTime!
+
+  """Added in UNRELEASED. The user who attempted to log in."""
+  user: UserV2
+
+  """Added in UNRELEASED. The domain at the time of the login attempt."""
+  domain: DomainV2
 }
 
 """Added in 26.4.2. Connection type for paginated login history results."""
@@ -8192,6 +8212,9 @@ type LoginSessionV2 implements Node
 
   """Timestamp when the session was invalidated."""
   invalidatedAt: DateTime
+
+  """Added in UNRELEASED. The user who owns this login session."""
+  user: UserV2
 }
 
 """Added in 26.4.2. Connection type for paginated login session results."""
@@ -8414,6 +8437,15 @@ type ModelCardV2 implements Node
   """
   vfolder: VFolder
 
+  """Added in UNRELEASED. The domain this model card belongs to."""
+  domain: DomainV2
+
+  """Added in UNRELEASED. The project this model card belongs to."""
+  project: ProjectV2
+
+  """Added in UNRELEASED. The user who created this model card."""
+  creator: UserV2
+
   """
   Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card.
   """
@@ -8603,8 +8635,18 @@ type ModelDeployment implements Node
   replicaState: ReplicaState!
   createdUserId: ID!
 
+  """
+  Added in UNRELEASED. The current active revision of this deployment, resolved via DataLoader.
+  """
+  currentRevision: ModelRevision
+
   """The created user of this entity."""
-  createdUser: UserNode!
+  createdUser: UserNode! @deprecated(reason: "Use created_user_v2 instead.")
+
+  """
+  Added in UNRELEASED. The user who created this deployment, resolved via DataLoader.
+  """
+  createdUserV2: UserV2
 
   """Added in 25.19.0. Deployment policy configuration."""
   deploymentPolicy: DeploymentPolicy
@@ -8652,10 +8694,20 @@ type ModelDeploymentMetadata
   @join__type(graph: STRAWBERRY)
 {
   """The project of this entity."""
-  project: GroupNode!
+  project: GroupNode! @deprecated(reason: "Use project_v2 instead.")
+
+  """
+  Added in UNRELEASED. The project this deployment belongs to, resolved via DataLoader.
+  """
+  projectV2: ProjectV2
 
   """The domain of this entity."""
-  domain: DomainNode!
+  domain: DomainNode! @deprecated(reason: "Use domain_v2 instead.")
+
+  """
+  Added in UNRELEASED. The domain this deployment belongs to, resolved via DataLoader.
+  """
+  domainV2: DomainV2
   projectId: ID!
   domainName: String!
   name: String!
@@ -8879,7 +8931,12 @@ type ModelReplica implements Node
   """
   The session ID associated with the replica. This can be null right after replica creation.
   """
-  session: ComputeSessionNode!
+  session: ComputeSessionNode! @deprecated(reason: "Use session_v2 instead.")
+
+  """
+  Added in UNRELEASED. The compute session running this replica, resolved via DataLoader.
+  """
+  sessionV2: SessionV2
 
   """The revision of this entity."""
   revision: ModelRevision!
@@ -8946,7 +9003,12 @@ type ModelRevision implements Node
   createdAt: DateTime!
 
   """The image of this entity."""
-  image: ImageNode!
+  image: ImageNode! @deprecated(reason: "Use image_v2 instead.")
+
+  """
+  Added in UNRELEASED. The container image used by this revision, resolved via DataLoader.
+  """
+  imageV2: ImageV2
 
   """Added in 26.4.2. Resource slot allocations for this revision."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
@@ -14218,6 +14280,9 @@ type ResourcePresetV2 implements Node
 
   """Resource group name. Null means global preset."""
   resourceGroupName: String
+
+  """Added in UNRELEASED. The resource group this preset belongs to."""
+  resourceGroup: ResourceGroup
 }
 
 """An edge in a connection."""
@@ -14591,6 +14656,9 @@ type RoleAssignment implements Node
 
   """The assigned user."""
   user: UserV2
+
+  """Added in UNRELEASED. The user who granted this role assignment."""
+  grantedByUser: UserV2
 }
 
 """Added in 26.3.0. Role assignment connection."""
@@ -14815,7 +14883,12 @@ type Route implements Node
   """
   The session associated with the route. Can be null if the route is still provisioning.
   """
-  session: ID
+  session: ID @deprecated(reason: "Use session_v2 instead.")
+
+  """
+  Added in UNRELEASED. The compute session associated with this route, resolved via DataLoader.
+  """
+  sessionV2: SessionV2
 
   """The revision associated with the route."""
   revision: ModelRevision
@@ -14888,6 +14961,12 @@ type RouteHistory implements Node
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
+
+  """Added in UNRELEASED. The route this history record belongs to."""
+  route: Route
+
+  """Added in UNRELEASED. The deployment this history record belongs to."""
+  deployment: ModelDeployment
 }
 
 """Added in 26.3.0. Route history connection."""
@@ -15829,6 +15908,9 @@ type SessionSchedulingHistory implements Node
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
+
+  """Added in UNRELEASED. The session this history record belongs to."""
+  session: SessionV2
 }
 
 """Added in 26.3.0. Session scheduling history connection."""

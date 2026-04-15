@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 from strawberry.scalars import JSON
@@ -56,6 +58,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.common.types import ResourceOptsEntryGQL as ResourceOptsEntryInfoGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -88,6 +91,9 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.runtime_variant.types import RuntimeVariantGQL
 
 
 @gql_enum(
@@ -270,6 +276,24 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this deployment preset."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The runtime variant this preset is designed for.",
+        )
+    )  # type: ignore[misc]
+    async def runtime_variant(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            RuntimeVariantGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.runtime_variant.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
 
     @gql_added_field(
         BackendAIGQLMeta(

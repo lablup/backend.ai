@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
+import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -34,6 +35,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
@@ -41,6 +43,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -58,6 +61,9 @@ from ai.backend.manager.data.deployment.types import (
 )
 
 from .revision import ModelRevision
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
 # ========== Enums ==========
 
@@ -188,7 +194,8 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 
     @gql_field(
-        description="The session ID associated with the replica. This can be null right after replica creation."
+        description="The session ID associated with the replica. This can be null right after replica creation.",
+        deprecation_reason="Use session_v2 instead.",
     )  # type: ignore[misc]
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
@@ -196,11 +203,34 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         )
         return Session(id=ID(session_global_id))
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The compute session running this replica, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def session_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            SessionV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.session.types"),
+        ]
+        | None
+    ):
+        from ai.backend.common.types import SessionId
+
+        return await info.context.data_loaders.session_loader.load(
+            SessionId(UUID(str(self.session_id)))
+        )
+
     @gql_field(description="The revision of this entity.")  # type: ignore[misc]
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
-        """Resolve revision by ID."""
-        node = await info.context.adapters.deployment.get_revision(UUID(str(self.revision_id)))
-        return ModelRevision.from_pydantic(node)
+        """Resolve revision by ID using DataLoader."""
+        result = await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
+        if result is None:
+            raise ValueError(f"Revision not found: {self.revision_id}")
+        return result
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

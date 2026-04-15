@@ -59,6 +59,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import (  # pants: no-infer-dep
         ProjectV2GQL,
     )
+    from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (  # pants: no-infer-dep
+        QueryDefinitionGQL,
+    )
     from ai.backend.manager.api.gql.rbac.types.entity import EntityRefGQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.rbac.types.permission import (  # pants: no-infer-dep
         PermissionGQL,
@@ -72,6 +75,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
         ResourceGroupGQL,
+    )
+    from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
+        RuntimeVariantGQL,
     )
     from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
         DeploymentHistory,
@@ -765,5 +771,37 @@ class DataLoaders:
             return [
                 [RAG.from_pydantic(dto) for dto in role_assignments] for role_assignments in dtos
             ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def runtime_variant_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, RuntimeVariantGQL | None]:
+        adapter = self._adapters.runtime_variant
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantGQL | None]:
+            from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
+                RuntimeVariantGQL as RV,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [RV.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def query_definition_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, QueryDefinitionGQL | None]:
+        adapter = self._adapters.prometheus_query_preset
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[QueryDefinitionGQL | None]:
+            from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (  # pants: no-infer-dep
+                QueryDefinitionGQL as QD,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [QD.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)

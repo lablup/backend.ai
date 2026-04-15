@@ -88,6 +88,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -427,6 +428,26 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     ):
         # DataLoader already returns UserV2GQL | None via from_pydantic conversion
         return await info.context.data_loaders.user_loader.load(self.user_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The user who granted this role assignment.",
+        )
+    )  # type: ignore[misc]
+    async def granted_by_user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.granted_by is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(self.granted_by)
 
 
 # ==================== Filter Types ====================

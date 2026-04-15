@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -78,6 +78,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -145,6 +146,11 @@ from ai.backend.manager.data.deployment.types import (
     RevisionSearchScope,
 )
 
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
 DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
     BackendAIGQLMeta(
         added_version="25.19.0",
@@ -193,19 +199,59 @@ class ModelDeploymentMetadata:
     created_at: datetime
     updated_at: datetime
 
-    @gql_field(description="The project of this entity.")  # type: ignore[misc]
+    @gql_field(
+        description="The project of this entity.",
+        deprecation_reason="Use project_v2 instead.",
+    )  # type: ignore[misc]
     async def project(self, info: Info[StrawberryGQLContext]) -> Project:
         project_global_id = to_global_id(
             GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
         )
         return Project(id=ID(project_global_id))
 
-    @gql_field(description="The domain of this entity.")  # type: ignore[misc]
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The project this deployment belongs to, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def project_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ProjectV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.project_loader.load(UUID(str(self.project_id)))
+
+    @gql_field(
+        description="The domain of this entity.",
+        deprecation_reason="Use domain_v2 instead.",
+    )  # type: ignore[misc]
     async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
         domain_global_id = to_global_id(
             DomainNode, self.domain_name, is_target_graphene_object=True
         )
         return Domain(id=ID(domain_global_id))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The domain this deployment belongs to, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def domain_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.domain_loader.load(self.domain_name)
 
 
 @gql_pydantic_type(
@@ -237,12 +283,45 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     replica_state: ReplicaState
     created_user_id: ID
 
-    @gql_field(description="The created user of this entity.")  # type: ignore[misc]
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The current active revision of this deployment, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def current_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
+        if self.current_revision_id is None:
+            return None
+        return await info.context.data_loaders.revision_loader.load(
+            UUID(str(self.current_revision_id))
+        )
+
+    @gql_field(
+        description="The created user of this entity.",
+        deprecation_reason="Use created_user_v2 instead.",
+    )  # type: ignore[misc]
     async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
         user_global_id = to_global_id(
             UserNode, UUID(str(self.created_user_id)), is_target_graphene_object=True
         )
         return User(id=strawberry.ID(user_global_id))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The user who created this deployment, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def created_user_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.user_loader.load(UUID(str(self.created_user_id)))
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration.")

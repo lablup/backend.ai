@@ -101,6 +101,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
@@ -142,6 +143,8 @@ from .resource_slot import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.image.types import ImageV2GQL
+
     from .deployment import ModelDeployment
     from .policy import DeploymentPolicyGQL
 
@@ -439,12 +442,34 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     )
     created_at: datetime = gql_field(description="Timestamp when the revision was created.")
 
-    @gql_field(description="The image of this entity.")  # type: ignore[misc]
+    @gql_field(
+        description="The image of this entity.",
+        deprecation_reason="Use image_v2 instead.",
+    )  # type: ignore[misc]
     async def image(self, info: Info[StrawberryGQLContext]) -> Image:
         image_global_id = to_global_id(
             ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
         )
         return Image(id=ID(image_global_id))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The container image used by this revision, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def image_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ImageV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.image.types"),
+        ]
+        | None
+    ):
+        from ai.backend.common.types import ImageID
+
+        return await info.context.data_loaders.image_loader.load(ImageID(UUID(str(self.image_id))))
 
     @gql_added_field(
         BackendAIGQLMeta(

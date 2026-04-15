@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
@@ -25,7 +26,13 @@ from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
 from ai.backend.manager.models.runtime_variant.orders import RuntimeVariantOrders
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, combine_conditions_or
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    OffsetPagination,
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.runtime_variant.creators import RuntimeVariantCreatorSpec
@@ -50,6 +57,19 @@ def _runtime_variant_pagination_spec() -> PaginationSpec:
 
 
 class RuntimeVariantAdapter(BaseAdapter):
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantNode | None]:
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[RuntimeVariantConditions.by_ids(ids)],
+        )
+        result = await self._processors.runtime_variant.search.wait_for_complete(
+            SearchRuntimeVariantsAction(querier=querier)
+        )
+        variant_map = {item.id: self._data_to_node(item) for item in result.items}
+        return [variant_map.get(variant_id) for variant_id in ids]
+
     async def search(
         self,
         input: SearchRuntimeVariantsInput,
