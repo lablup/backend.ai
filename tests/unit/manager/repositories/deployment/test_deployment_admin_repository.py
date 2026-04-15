@@ -109,7 +109,7 @@ class TestDeploymentAdminRepository:
         assert len(results) == 1
         assert results[0].revision_id == rev_id
         assert results[0].success is False
-        assert "storage unreachable" in results[0].reason
+        assert results[0].reason is not None and "storage unreachable" in results[0].reason
 
     async def test_sync_mixed_success_and_failure(
         self,

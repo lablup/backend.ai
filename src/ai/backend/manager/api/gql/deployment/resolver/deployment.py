@@ -30,6 +30,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     ModelDeploymentConnection,
     ModelDeploymentEdge,
     ProjectDeploymentScopeGQL,
+    RevisionSyncStatusGQL,
     SyncModelDefinitionsPayload,
     SyncReplicaInput,
     SyncReplicaPayload,
@@ -249,9 +250,18 @@ async def sync_replicas(
 async def admin_sync_model_definitions(
     info: Info[StrawberryGQLContext],
 ) -> SyncModelDefinitionsPayload:
-    check_admin_only(info)
+    check_admin_only()
     payload = await info.context.adapters.deployment.admin_sync_model_definitions()
-    return SyncModelDefinitionsPayload.from_pydantic(payload)
+    return SyncModelDefinitionsPayload(
+        results=[
+            RevisionSyncStatusGQL(
+                revision_id=r.revision_id,
+                success=r.success,
+                reason=r.reason,
+            )
+            for r in payload.results
+        ],
+    )
 
 
 # Subscription resolvers

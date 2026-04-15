@@ -29,7 +29,7 @@ class DeploymentAdminService:
     async def sync_model_definitions(
         self, action: SyncModelDefinitionsAction
     ) -> SyncModelDefinitionsActionResult:
-        """Sync model_definition from vfolder storage for all revisions with NULL model_definition."""
+        """Sync model_definition from vfolder storage for all revisions where it differs from the vfolder file."""
         results = await self._repository.sync_model_definitions()
         updated = sum(1 for r in results if r.success)
         failed = sum(1 for r in results if not r.success)

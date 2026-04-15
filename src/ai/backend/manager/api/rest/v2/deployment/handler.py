@@ -249,9 +249,8 @@ class V2DeploymentHandler:
 
     async def admin_sync_model_definitions(
         self,
-        request: web.Request,
     ) -> APIResponse:
-        """Sync model_definition from vfolder storage for all revisions with NULL model_definition."""
+        """Sync model_definition from vfolder storage for all deployment revisions."""
         result = await self._adapter.admin_sync_model_definitions()
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
