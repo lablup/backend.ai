@@ -32,12 +32,8 @@ def upgrade() -> None:
             ),
         )
 
-    has_fk = any(
-        fk["constrained_columns"] == ["login_client_type_id"]
-        and fk["referred_table"] == "login_client_types"
-        for fk in inspector.get_foreign_keys("login_sessions")
-    )
-    if not has_fk:
+    fks = [fk["name"] for fk in inspector.get_foreign_keys("login_sessions")]
+    if "fk_login_sessions_login_client_type_id" not in fks:
         op.create_foreign_key(
             "fk_login_sessions_login_client_type_id",
             "login_sessions",
@@ -47,11 +43,8 @@ def upgrade() -> None:
             ondelete="SET NULL",
         )
 
-    has_index = any(
-        idx["column_names"] == ["login_client_type_id"]
-        for idx in inspector.get_indexes("login_sessions")
-    )
-    if not has_index:
+    indexes = [idx["name"] for idx in inspector.get_indexes("login_sessions")]
+    if "ix_login_sessions_login_client_type_id" not in indexes:
         op.create_index(
             "ix_login_sessions_login_client_type_id",
             "login_sessions",
