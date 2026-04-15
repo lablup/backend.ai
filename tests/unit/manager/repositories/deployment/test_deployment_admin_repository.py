@@ -42,10 +42,12 @@ class TestDeploymentAdminRepository:
         revision_id: uuid.UUID | None = None,
         vfolder_id: uuid.UUID | None = None,
         model_definition_path: str | None = "model-definition.yaml",
+        model_definition: dict[str, Any] | None = None,
     ) -> MagicMock:
         row = MagicMock()
         row.id = revision_id or uuid.uuid4()
         row.model = vfolder_id or uuid.uuid4()
+        row.model_definition = model_definition
         row.model_definition_path = model_definition_path
         row.vf_id = vfolder_id or row.model
         row.vf_quota_scope_id = uuid.uuid4()
@@ -182,3 +184,75 @@ class TestDeploymentAdminRepository:
 
         assert updated == 1
         assert failed == 1
+
+    async def test_sync_skips_when_already_in_sync(
+        self,
+        admin_repository: DeploymentAdminRepository,
+        mock_db: MagicMock,
+    ) -> None:
+        existing_def: dict[str, Any] = {"models": [{"name": "test", "model_path": "/models"}]}
+        row = self._make_revision_row(model_definition=existing_def)
+        yaml_content = b"models:\n  - name: test\n    model_path: /models\n"
+
+        mock_readonly_session = AsyncMock()
+        mock_query_result = MagicMock()
+        mock_query_result.all.return_value = [row]
+        mock_readonly_session.execute = AsyncMock(return_value=mock_query_result)
+
+        mock_write_session = AsyncMock()
+
+        mock_db.begin_readonly_session = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_readonly_session))
+        )
+        mock_db.begin_session = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_write_session))
+        )
+
+        with patch(
+            "ai.backend.manager.repositories.deployment.admin_repository.DeploymentStorageSource"
+        ) as mock_storage_cls:
+            mock_storage = AsyncMock()
+            mock_storage.fetch_definition_file = AsyncMock(return_value=yaml_content)
+            mock_storage_cls.return_value = mock_storage
+
+            updated, failed = await admin_repository.sync_model_definitions()
+
+        assert updated == 0
+        assert failed == 0
+        mock_write_session.execute.assert_not_awaited()
+
+    async def test_sync_updates_when_content_differs(
+        self,
+        admin_repository: DeploymentAdminRepository,
+        mock_db: MagicMock,
+    ) -> None:
+        old_def: dict[str, Any] = {"models": [{"name": "old-model", "model_path": "/models"}]}
+        row = self._make_revision_row(model_definition=old_def)
+        yaml_content = b"models:\n  - name: new-model\n    model_path: /models\n"
+
+        mock_readonly_session = AsyncMock()
+        mock_query_result = MagicMock()
+        mock_query_result.all.return_value = [row]
+        mock_readonly_session.execute = AsyncMock(return_value=mock_query_result)
+
+        mock_write_session = AsyncMock()
+
+        mock_db.begin_readonly_session = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_readonly_session))
+        )
+        mock_db.begin_session = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_write_session))
+        )
+
+        with patch(
+            "ai.backend.manager.repositories.deployment.admin_repository.DeploymentStorageSource"
+        ) as mock_storage_cls:
+            mock_storage = AsyncMock()
+            mock_storage.fetch_definition_file = AsyncMock(return_value=yaml_content)
+            mock_storage_cls.return_value = mock_storage
+
+            updated, failed = await admin_repository.sync_model_definitions()
+
+        assert updated == 1
+        assert failed == 0
+        mock_write_session.execute.assert_awaited_once()

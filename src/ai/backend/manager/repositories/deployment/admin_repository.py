@@ -35,7 +35,10 @@ class DeploymentAdminRepository:
         self._storage_manager = storage_manager
 
     async def sync_model_definitions(self) -> tuple[int, int]:
-        """Sync model_definition from vfolder storage for all revisions where it is NULL.
+        """Sync model_definition from vfolder storage for all revisions with a model vfolder.
+
+        Compares the stored model_definition with the current vfolder file content
+        and updates the DB when they differ (including NULL -> populated).
 
         Returns:
             Tuple of (updated_count, failed_count)
@@ -51,6 +54,7 @@ class DeploymentAdminRepository:
                     sa.select(
                         DeploymentRevisionRow.id,
                         DeploymentRevisionRow.model,
+                        DeploymentRevisionRow.model_definition,
                         DeploymentRevisionRow.model_definition_path,
                         VFolderRow.id.label("vf_id"),
                         VFolderRow.quota_scope_id.label("vf_quota_scope_id"),
@@ -66,7 +70,6 @@ class DeploymentAdminRepository:
                         )
                     )
                     .where(
-                        DeploymentRevisionRow.model_definition.is_(None),
                         DeploymentRevisionRow.model.is_not(None),
                     )
                 )
@@ -96,6 +99,9 @@ class DeploymentAdminRepository:
                     row.vf_id,
                 )
                 failed += 1
+                continue
+
+            if row.model_definition == parsed:
                 continue
 
             async with self._db.begin_session() as session:
