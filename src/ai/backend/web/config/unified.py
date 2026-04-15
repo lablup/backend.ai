@@ -24,6 +24,7 @@ from ai.backend.common.configs import (
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
@@ -857,6 +858,24 @@ class SecurityConfig(BaseConfigSchema):
     request/response middleware policies, and other browser security headers.
     """
 
+    cookie_secure: Annotated[
+        bool,
+        Field(
+            default=True,
+            validation_alias=AliasChoices("cookie_secure", "cookie-secure"),
+            serialization_alias="cookie-secure",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Set the Secure flag on session cookies. When enabled, browsers will only "
+                "send session cookies over HTTPS connections. Should be true for production "
+                "environments where HTTPS is terminated at a reverse proxy or load balancer. "
+                "Set to false only for local development without HTTPS."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
     request_policies: Annotated[
         list[str],
         Field(
