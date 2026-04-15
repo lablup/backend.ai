@@ -39,6 +39,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelMountConfigData,
     ModelReplicaData,
     ModelRevisionData,
+    ModelRevisionSpecDraft,
     ModelRuntimeConfigData,
     MountMetadata,
     ReplicaSpec,
@@ -526,7 +527,12 @@ class DeploymentService:
             CreateLegacyDeploymentActionResult: Result containing the created deployment info
         """
         log.info("Creating deployment with name: {}", action.draft.name)
-        deployment_info = await self._deployment_controller.create_deployment(action.draft)
+        draft_revision = action.draft.draft_model_revision
+        model_definition = await self._resolve_model_definition_from_draft(draft_revision)
+        deployment_info = await self._deployment_controller.create_deployment(
+            action.draft,
+            model_definition=model_definition,
+        )
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.CHECK_PENDING
         )
@@ -926,6 +932,22 @@ class DeploymentService:
             ),
             execution=revision_creator.execution,
             model_definition=revision_creator.model_definition,
+        )
+        return await self._model_definition_generator_registry.generate_model_definition(context)
+
+    async def _resolve_model_definition_from_draft(
+        self,
+        draft_revision: ModelRevisionSpecDraft,
+    ) -> ModelDefinition:
+        """Generate the final model definition from a legacy draft revision.
+
+        Same as _resolve_model_definition but works with ModelRevisionSpecDraft
+        (used by the legacy create_endpoint_legacy flow).
+        """
+        context = ModelDefinitionContext(
+            mounts=draft_revision.mounts,
+            execution=draft_revision.execution,
+            model_definition=None,
         )
         return await self._model_definition_generator_registry.generate_model_definition(context)
 

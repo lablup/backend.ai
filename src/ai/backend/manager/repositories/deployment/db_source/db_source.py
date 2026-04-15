@@ -338,6 +338,9 @@ class DeploymentDBSource:
                 model=spec.model,
                 model_mount_destination=spec.model_mount_destination,
                 model_definition_path=spec.model_definition_path,
+                model_definition=spec.model_definition.model_dump(exclude_none=True, by_alias=True)
+                if spec.model_definition
+                else None,
                 resource_group=spec.resource_group,
                 resource_opts=dict(spec.resource_opts) if spec.resource_opts else {},
                 cluster_mode=spec.cluster_mode.value,

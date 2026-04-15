@@ -5,6 +5,7 @@ import uuid
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -81,12 +82,15 @@ class DeploymentController:
     async def create_deployment(
         self,
         draft: DeploymentCreationDraft,
+        model_definition: ModelDefinition | None = None,
     ) -> DeploymentInfo:
         """
         Create a new deployment based on the provided specification.
 
         Args:
             draft: Deployment creation specification
+            model_definition: Pre-resolved model definition content.
+                If provided, stored in the revision row for use by the executor.
 
         Returns:
             DeploymentInfo: Information about the created deployment
@@ -108,6 +112,10 @@ class DeploymentController:
             vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
             default_architecture=default_architecture,
         )
+        if model_definition is not None:
+            model_revision = model_revision.model_copy(
+                update={"model_definition": model_definition}
+            )
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )

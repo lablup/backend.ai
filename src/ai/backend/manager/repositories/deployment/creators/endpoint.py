@@ -9,6 +9,7 @@ from uuid import UUID
 
 import yarl
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
@@ -71,6 +72,9 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
     environ: Mapping[str, str] | None
     callback_url: yarl.URL | None
 
+    # Model definition (resolved content from vfolder or auto-generated)
+    model_definition: ModelDefinition | None
+
     policy: DeploymentPolicyCreatorSpec | None
 
     @classmethod
@@ -125,6 +129,8 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
             bootstrap_script=creator.model_revision.execution.bootstrap_script,
             environ=creator.model_revision.execution.environ,
             callback_url=creator.model_revision.execution.callback_url,
+            # Model definition
+            model_definition=creator.model_revision.model_definition,
             # Policy
             policy=None,
         )
