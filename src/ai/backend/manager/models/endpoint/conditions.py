@@ -175,29 +175,11 @@ class DeploymentConditions:
         return expanded
 
     @classmethod
-    def by_status_equals(cls, status: ModelDeploymentStatus) -> QueryCondition:
-        lifecycles = cls._status_to_lifecycles(status)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage.in_(lifecycles)
-
-        return inner
-
-    @classmethod
     def by_status_in(cls, statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
         lifecycles = cls._expand_statuses(statuses)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.lifecycle_stage.in_(lifecycles)
-
-        return inner
-
-    @classmethod
-    def by_status_not_equals(cls, status: ModelDeploymentStatus) -> QueryCondition:
-        lifecycles = cls._status_to_lifecycles(status)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage.notin_(lifecycles)
 
         return inner
 

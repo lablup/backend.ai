@@ -16,6 +16,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
+    ModelDeploymentStatus,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
@@ -448,10 +449,16 @@ class AddRevisionInput(BaseRequestModel):
 class DeploymentStatusFilter(BaseRequestModel):
     """Filter for deployment status."""
 
-    equals: str | None = Field(default=None, description="Exact status match")
-    in_: list[str] | None = Field(default=None, alias="in", description="Status is in list")
-    not_equals: str | None = Field(default=None, description="Excludes exact status match")
-    not_in: list[str] | None = Field(default=None, description="Status is not in list")
+    equals: ModelDeploymentStatus | None = Field(default=None, description="Exact status match")
+    in_: list[ModelDeploymentStatus] | None = Field(
+        default=None, alias="in", description="Status is in list"
+    )
+    not_equals: ModelDeploymentStatus | None = Field(
+        default=None, description="Excludes exact status match"
+    )
+    not_in: list[ModelDeploymentStatus] | None = Field(
+        default=None, description="Status is not in list"
+    )
 
 
 class RouteStatusFilter(BaseRequestModel):
