@@ -4531,6 +4531,9 @@ type KernelV2 implements Node {
   """User and ownership information."""
   userInfo: KernelV2UserInfo!
 
+  """Added in UNRELEASED. Container image identity for this kernel."""
+  imageInfo: KernelV2ImageInfo!
+
   """Network configuration and exposed ports."""
   network: KernelV2NetworkInfo!
 
@@ -4554,6 +4557,9 @@ type KernelV2 implements Node {
 
   """Added in 26.2.0. The domain this kernel belongs to."""
   domain: DomainV2
+
+  """Added in UNRELEASED. The container image used by this kernel."""
+  image: ImageV2
 
   """Added in 26.2.0. The resource group this kernel is assigned to."""
   resourceGroup: ResourceGroup
@@ -4609,6 +4615,19 @@ input KernelV2Filter {
   AND: [KernelV2Filter!] = null
   OR: [KernelV2Filter!] = null
   NOT: [KernelV2Filter!] = null
+}
+
+"""
+Added in UNRELEASED. Container image identity for a kernel (canonical name + architecture).
+"""
+type KernelV2ImageInfo {
+  """Canonical name of the container image used by this kernel."""
+  canonical: String
+
+  """
+  Architecture of the container image used by this kernel (e.g., x86_64, aarch64).
+  """
+  architecture: String
 }
 
 """Added in 26.2.0. Lifecycle and status information for a kernel."""
