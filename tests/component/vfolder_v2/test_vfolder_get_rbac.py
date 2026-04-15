@@ -44,7 +44,16 @@ class TestVFolderGetV2RBAC:
     ) -> None:
         """Superadmin bypasses RBAC and can GET their own vfolder."""
         result = await admin_v2_registry.vfolder.get(vfolder_owned_by_admin.id)
-        assert result.id == str(vfolder_owned_by_admin.id)
+        assert result.id == vfolder_owned_by_admin.id
+
+    async def test_superadmin_querying_other_users_vfolder_bypasses_rbac(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        vfolder_owned_by_regular_user: VFolderFixtureData,
+    ) -> None:
+        """Superadmin bypasses RBAC and can GET other users' vfolders."""
+        result = await admin_v2_registry.vfolder.get(vfolder_owned_by_regular_user.id)
+        assert result.id == vfolder_owned_by_regular_user.id
 
     async def test_superadmin_querying_nonexistent_vfolder_gets_404(
         self,
