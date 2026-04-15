@@ -4880,6 +4880,8 @@ input DeploymentStatusFilter
   """The in  field."""
   in: [DeploymentStatus!] = null
   equals: DeploymentStatus = null
+  notEquals: DeploymentStatus = null
+  notIn: [DeploymentStatus!] = null
 }
 
 """
