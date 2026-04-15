@@ -24,6 +24,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
@@ -36,8 +37,8 @@ from ai.backend.manager.repositories.deployment.db_source import DeploymentDBSou
 from ai.backend.manager.repositories.deployment.storage_source import DeploymentStorageSource
 from ai.backend.testutils.db import with_tables
 
-YAML_CONTENT = b"models:\n  - name: test\n    model_path: /models\n"
-YAML_EXPECTED_STORED = ModelDefinition.model_validate({
+_YAML_CONTENT = b"models:\n  - name: test\n    model_path: /models\n"
+_YAML_EXPECTED_STORED = ModelDefinition.model_validate({
     "models": [{"name": "test", "model_path": "/models"}]
 }).model_dump(exclude_none=True, by_alias=True)
 
@@ -162,7 +163,7 @@ class TestDeploymentAdminRepositorySyncModelDefinitions:
         mock_storage_source: AsyncMock,
     ) -> None:
         revision_id, _ = await self._insert_revision(db_with_cleanup, model_definition=None)
-        mock_storage_source.fetch_definition_file.return_value = YAML_CONTENT
+        mock_storage_source.fetch_definition_file.return_value = _YAML_CONTENT
 
         results = await admin_repository.sync_model_definitions()
 
@@ -170,7 +171,7 @@ class TestDeploymentAdminRepositorySyncModelDefinitions:
         assert results[0].revision_id == revision_id
         assert results[0].success is True
         stored = await self._fetch_model_definition(db_with_cleanup, revision_id)
-        assert stored == YAML_EXPECTED_STORED
+        assert stored == _YAML_EXPECTED_STORED
 
     async def test_sync_skips_when_already_in_sync(
         self,
@@ -179,15 +180,15 @@ class TestDeploymentAdminRepositorySyncModelDefinitions:
         mock_storage_source: AsyncMock,
     ) -> None:
         revision_id, _ = await self._insert_revision(
-            db_with_cleanup, model_definition=YAML_EXPECTED_STORED
+            db_with_cleanup, model_definition=_YAML_EXPECTED_STORED
         )
-        mock_storage_source.fetch_definition_file.return_value = YAML_CONTENT
+        mock_storage_source.fetch_definition_file.return_value = _YAML_CONTENT
 
         results = await admin_repository.sync_model_definitions()
 
         assert results == []
         stored = await self._fetch_model_definition(db_with_cleanup, revision_id)
-        assert stored == YAML_EXPECTED_STORED
+        assert stored == _YAML_EXPECTED_STORED
 
     async def test_sync_updates_when_content_differs(
         self,
@@ -197,7 +198,7 @@ class TestDeploymentAdminRepositorySyncModelDefinitions:
     ) -> None:
         outdated = {"models": [{"name": "old-model", "model_path": "/models"}]}
         revision_id, _ = await self._insert_revision(db_with_cleanup, model_definition=outdated)
-        mock_storage_source.fetch_definition_file.return_value = YAML_CONTENT
+        mock_storage_source.fetch_definition_file.return_value = _YAML_CONTENT
 
         results = await admin_repository.sync_model_definitions()
 
@@ -205,7 +206,7 @@ class TestDeploymentAdminRepositorySyncModelDefinitions:
         assert results[0].revision_id == revision_id
         assert results[0].success is True
         stored = await self._fetch_model_definition(db_with_cleanup, revision_id)
-        assert stored == YAML_EXPECTED_STORED
+        assert stored == _YAML_EXPECTED_STORED
 
     async def test_sync_reports_fetch_failure_and_leaves_db_untouched(
         self,
@@ -214,7 +215,9 @@ class TestDeploymentAdminRepositorySyncModelDefinitions:
         mock_storage_source: AsyncMock,
     ) -> None:
         revision_id, _ = await self._insert_revision(db_with_cleanup, model_definition=None)
-        mock_storage_source.fetch_definition_file.side_effect = Exception("storage unreachable")
+        mock_storage_source.fetch_definition_file.side_effect = DefinitionFileNotFound(
+            "storage unreachable"
+        )
 
         results = await admin_repository.sync_model_definitions()
 
@@ -241,8 +244,8 @@ class TestDeploymentAdminRepositorySyncModelDefinitions:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return YAML_CONTENT
-            raise Exception("file not found")
+                return _YAML_CONTENT
+            raise DefinitionFileNotFound("file not found")
 
         mock_storage_source.fetch_definition_file.side_effect = fetch_side_effect
 
@@ -257,7 +260,7 @@ class TestDeploymentAdminRepositorySyncModelDefinitions:
 
         stored_ok = await self._fetch_model_definition(db_with_cleanup, rev_ok)
         stored_fail = await self._fetch_model_definition(db_with_cleanup, rev_fail)
-        assert stored_ok == YAML_EXPECTED_STORED
+        assert stored_ok == _YAML_EXPECTED_STORED
         assert stored_fail is None
 
     async def test_sync_ignores_revisions_without_model_vfolder(
