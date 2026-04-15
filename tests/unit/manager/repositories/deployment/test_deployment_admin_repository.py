@@ -45,7 +45,7 @@ class TestDeploymentAdminRepository:
         *,
         revision_id: uuid.UUID,
         model_definition_path: str | None = "model-definition.yaml",
-        model_definition: dict[str, Any] | None = None,
+        model_definition: ModelDefinition | None = None,
     ) -> RevisionWithVFolderInfo:
         return RevisionWithVFolderInfo(
             revision_id=revision_id,
@@ -152,7 +152,7 @@ class TestDeploymentAdminRepository:
         yaml_content = b"models:\n  - name: test\n    model_path: /models\n"
         existing_def = ModelDefinition.model_validate({
             "models": [{"name": "test", "model_path": "/models"}]
-        }).model_dump(exclude_none=True, by_alias=True)
+        })
         revision_id = uuid.uuid4()
         row = self._make_revision_info(revision_id=revision_id, model_definition=existing_def)
 
@@ -171,7 +171,9 @@ class TestDeploymentAdminRepository:
         mock_storage_source: AsyncMock,
     ) -> None:
         revision_id = uuid.uuid4()
-        old_def: dict[str, Any] = {"models": [{"name": "old-model", "model_path": "/models"}]}
+        old_def = ModelDefinition.model_validate({
+            "models": [{"name": "old-model", "model_path": "/models"}]
+        })
         row = self._make_revision_info(revision_id=revision_id, model_definition=old_def)
         yaml_content = b"models:\n  - name: new-model\n    model_path: /models\n"
 
