@@ -144,6 +144,15 @@ FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
             lookup_referenced_column="id",
         ),
     ),
+    "prometheus_query_presets": (
+        FixtureReferenceSpec(
+            fixture_alias_column="category_name",
+            fixture_fk_column="category_id",
+            lookup_table="prometheus_query_preset_categories",
+            lookup_match_column="name",
+            lookup_referenced_column="id",
+        ),
+    ),
 }
 
 
