@@ -108,9 +108,9 @@ class DeploymentController:
             vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
             default_architecture=default_architecture,
         )
-        if draft.model_definition is not None:
+        if draft.draft_model_revision.model_definition is not None:
             model_revision = model_revision.model_copy(
-                update={"model_definition": draft.model_definition}
+                update={"model_definition": draft.draft_model_revision.model_definition}
             )
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)

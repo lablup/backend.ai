@@ -402,6 +402,7 @@ class ModelRevisionSpecDraft(ConfiguredModel):
     resource_spec: ResourceSpecDraft
     mounts: MountMetadata
     execution: ExecutionSpec
+    model_definition: ModelDefinition | None = None
 
 
 @dataclass

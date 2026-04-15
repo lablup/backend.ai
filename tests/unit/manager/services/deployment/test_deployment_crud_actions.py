@@ -264,13 +264,13 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
                 ),
             ),
         )
-        assert draft.model_definition is None
+        assert draft.draft_model_revision.model_definition is None
 
         action = CreateLegacyDeploymentAction(draft=draft)
         await deployment_service.create_legacy_deployment(action)
 
-        # model_definition should be resolved and set on the draft
-        assert draft.model_definition == expected_definition
+        # model_definition should be resolved and set on the draft revision
+        assert draft.draft_model_revision.model_definition == expected_definition
         mock_model_definition_generator_registry.generate_model_definition.assert_called_once()
         mock_deployment_controller.create_deployment.assert_called_once_with(draft)
 

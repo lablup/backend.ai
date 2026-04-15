@@ -82,7 +82,6 @@ class DeploymentCreationDraft:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     draft_model_revision: ModelRevisionSpecDraft
-    model_definition: ModelDefinition | None = None
 
     # Accessor properties for backward compatibility
     @property
