@@ -15,6 +15,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.kernel.request import KernelFilter, KernelOrder
 from ai.backend.common.dto.manager.v2.kernel.response import (
     KernelClusterInfoGQLDTO,
+    KernelImageInfoGQLDTO,
     KernelLifecycleInfoGQLDTO,
     KernelNetworkInfoGQLDTO,
     KernelNode,
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
@@ -56,11 +58,13 @@ from ai.backend.manager.api.gql.common.types import (
 )
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
+from ai.backend.manager.api.gql.image.types import ImageV2GQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+from ai.backend.manager.data.image.types import ImageIdentifier
 
 
 @gql_enum(
@@ -199,6 +203,23 @@ class KernelV2UserInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Container image identity for a kernel (canonical name + architecture).",
+    ),
+    model=KernelImageInfoGQLDTO,
+    name="KernelV2ImageInfo",
+)
+class KernelV2ImageInfoGQL:
+    canonical: str | None = gql_field(
+        description="Canonical name of the container image used by this kernel."
+    )
+    architecture: str | None = gql_field(
+        description="Architecture of the container image used by this kernel (e.g., x86_64, aarch64)."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.2.0",
         description="Resource allocation with requested and used slots.",
     ),
@@ -309,6 +330,12 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         description="Information about the session this kernel belongs to."
     )
     user_info: KernelV2UserInfoGQL = gql_field(description="User and ownership information.")
+    image_info: KernelV2ImageInfoGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Container image identity for this kernel.",
+        )
+    )
     network: KernelV2NetworkInfoGQL = gql_field(
         description="Network configuration and exposed ports."
     )
@@ -362,6 +389,21 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         if self.user_info.domain_name is None:
             return None
         return await info.context.data_loaders.domain_loader.load(self.user_info.domain_name)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The container image used by this kernel.",
+        )
+    )  # type: ignore[misc]
+    async def image(self, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
+        canonical = self.image_info.canonical
+        architecture = self.image_info.architecture
+        if canonical is None or architecture is None:
+            return None
+        return await info.context.data_loaders.image_by_identifier_loader.load(
+            ImageIdentifier(canonical=canonical, architecture=architecture)
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(

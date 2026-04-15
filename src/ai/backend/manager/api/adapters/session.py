@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.kernel.request import (
 from ai.backend.common.dto.manager.v2.kernel.response import (
     AdminSearchKernelsPayload,
     KernelClusterInfoGQLDTO,
+    KernelImageInfoGQLDTO,
     KernelLifecycleInfoGQLDTO,
     KernelNetworkInfoGQLDTO,
     KernelNode,
@@ -1021,9 +1022,21 @@ class SessionAdapter(BaseAdapter):
             if info.resource.resource_opts
             else None
         )
+        image_canonical = (
+            info.image.identifier.canonical if info.image.identifier is not None else None
+        )
+        architecture = (
+            info.image.identifier.architecture
+            if info.image.identifier is not None
+            else info.image.architecture
+        )
         return KernelNode(
             id=info.id,
             startup_command=info.runtime.startup_command,
+            image=KernelImageInfoGQLDTO(
+                canonical=image_canonical,
+                architecture=architecture,
+            ),
             session_info=KernelSessionInfoGQLDTO(
                 session_id=UUID(info.session.session_id),
                 creation_id=info.session.creation_id,

@@ -14,6 +14,7 @@ __all__ = (
     "AdminSearchKernelsPayload",
     "KernelClusterInfo",
     "KernelClusterInfoGQLDTO",
+    "KernelImageInfoGQLDTO",
     "KernelLifecycleInfo",
     "KernelLifecycleInfoGQLDTO",
     "KernelNetworkInfoGQLDTO",
@@ -148,6 +149,9 @@ class KernelNode(BaseResponseModel):
         description="Information about the session this kernel belongs to."
     )
     user_info: KernelUserInfoGQLDTO = Field(description="User and ownership information.")
+    image: KernelImageInfoGQLDTO = Field(
+        description="Container image identity (canonical name, architecture)."
+    )
     network: KernelNetworkInfoGQLDTO = Field(description="Network configuration and exposed ports.")
     cluster: KernelClusterInfoGQLDTO = Field(
         description="Cluster configuration for distributed computing."
@@ -228,6 +232,22 @@ class KernelUserInfoGQLDTO(BaseResponseModel):
     domain_name: str | None = Field(default=None, description="The domain this kernel belongs to.")
     group_id: UUID | None = Field(
         default=None, description="The group (project) ID this kernel belongs to."
+    )
+
+
+class KernelImageInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for KernelV2ImageInfoGQL.
+
+    Identifies the container image used by a kernel by its canonical name and architecture.
+    """
+
+    canonical: str | None = Field(
+        default=None,
+        description="Canonical name of the container image used by this kernel.",
+    )
+    architecture: str | None = Field(
+        default=None,
+        description="Architecture of the container image used by this kernel (e.g., x86_64, aarch64).",
     )
 
 

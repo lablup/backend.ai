@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from strawberry.dataloader import DataLoader
 
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.permission.id import ObjectId
 
 if TYPE_CHECKING:
@@ -410,6 +411,24 @@ class DataLoaders:
             )
 
             dtos = await adapter.batch_load_by_ids(image_ids)
+            return [IG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def image_by_identifier_loader(
+        self,
+    ) -> DataLoader[ImageIdentifier, ImageV2GQL | None]:
+        adapter = self._adapters.image
+
+        async def load_fn(
+            identifiers: list[ImageIdentifier],
+        ) -> list[ImageV2GQL | None]:
+            from ai.backend.manager.api.gql.image.types import (  # pants: no-infer-dep
+                ImageV2GQL as IG,
+            )
+
+            dtos = await adapter.batch_load_by_identifiers(identifiers)
             return [IG.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)

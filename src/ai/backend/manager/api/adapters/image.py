@@ -44,7 +44,12 @@ from ai.backend.common.dto.manager.v2.image.types import (
     OrderDirection,
 )
 from ai.backend.common.types import ImageID
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
+from ai.backend.manager.data.image.types import (
+    ImageAliasData,
+    ImageData,
+    ImageIdentifier,
+    ImageStatus,
+)
 from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.models.image.conditions import (
     ImageAliasConditions,
@@ -124,6 +129,32 @@ class ImageAdapter(BaseAdapter):
             ImageID(item.id): self._data_to_dto(item) for item in action_result.data
         }
         return [image_map.get(image_id) for image_id in image_ids]
+
+    async def batch_load_by_identifiers(
+        self,
+        identifiers: Sequence[ImageIdentifier],
+    ) -> list[ImageNode | None]:
+        """Batch load images by ImageIdentifier (canonical + architecture) for DataLoader use.
+
+        Returns ImageNode DTOs in the same order as the input identifiers list.
+        """
+        if not identifiers:
+            return []
+        unique_identifiers = set(identifiers)
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ImageConditions.by_image_identifiers(unique_identifiers)],
+        )
+        action_result = await self._processors.image.search_images.wait_for_complete(
+            SearchImagesAction(querier=querier)
+        )
+        image_map: dict[ImageIdentifier, ImageNode] = {
+            ImageIdentifier(
+                canonical=str(item.name), architecture=item.architecture
+            ): self._data_to_dto(item)
+            for item in action_result.data
+        }
+        return [image_map.get(identifier) for identifier in identifiers]
 
     async def batch_load_aliases_by_ids(
         self, alias_ids: Sequence[uuid.UUID]

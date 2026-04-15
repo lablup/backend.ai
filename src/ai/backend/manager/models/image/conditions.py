@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.common.types import ImageID
-from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.repositories.base import QueryCondition
@@ -30,6 +30,17 @@ class ImageConditions:
     def by_canonicals(canonicals: Collection[str]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ImageRow.name.in_(canonicals)
+
+        return inner
+
+    @staticmethod
+    def by_image_identifiers(
+        identifiers: Collection[ImageIdentifier],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.tuple_(ImageRow.name, ImageRow.architecture).in_([
+                (identifier.canonical, identifier.architecture) for identifier in identifiers
+            ])
 
         return inner
 

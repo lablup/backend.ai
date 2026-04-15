@@ -72,7 +72,11 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL
+from ai.backend.manager.api.gql.image.types import (
+    ImageV2ConnectionGQL,
+    ImageV2EdgeGQL,
+    ImageV2GQL,
+)
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
     KernelV2EdgeGQL,
@@ -84,6 +88,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.errors.user import UserNotFound
 
 
@@ -368,8 +373,45 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
         )
     )  # type: ignore[misc]
-    async def images(self) -> ImageV2ConnectionGQL:
-        raise NotImplementedError
+    async def images(self, info: Info[StrawberryGQLContext]) -> ImageV2ConnectionGQL:
+        session_id = SessionId(UUID(str(self.id)))
+        kernels_payload = await info.context.adapters.session.search_kernels_by_session(
+            session_id, AdminSearchKernelsInput()
+        )
+
+        seen: set[ImageIdentifier] = set()
+        identifiers: list[ImageIdentifier] = []
+        for kernel in kernels_payload.items:
+            canonical = kernel.image.canonical
+            architecture = kernel.image.architecture
+            if canonical is None or architecture is None:
+                continue
+            identifier = ImageIdentifier(canonical=canonical, architecture=architecture)
+            if identifier in seen:
+                continue
+            seen.add(identifier)
+            identifiers.append(identifier)
+
+        images: list[ImageV2GQL] = []
+        if identifiers:
+            loaded = await info.context.data_loaders.image_by_identifier_loader.load_many(
+                identifiers
+            )
+            images = [image for image in loaded if image is not None]
+
+        edges = [
+            ImageV2EdgeGQL(node=image, cursor=encode_cursor(str(image.id))) for image in images
+        ]
+        return ImageV2ConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=len(images),
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
