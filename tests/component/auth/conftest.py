@@ -147,6 +147,7 @@ async def auth_user_fixture(
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                main_access_key=data.access_key,
             )
         )
         await conn.execute(
@@ -242,6 +243,7 @@ async def _create_auth_user(
         "domain_name": domain_name,
         "resource_policy": resource_policy,
         "role": UserRole.USER,
+        "main_access_key": data.access_key,
     }
     if extra_user_values:
         user_values.update(extra_user_values)

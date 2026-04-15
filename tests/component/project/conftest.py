@@ -212,6 +212,7 @@ async def assigned_users(
                     domain_name=domain_fixture,
                     resource_policy=resource_policy_fixture,
                     role=UserRole.USER,
+                    main_access_key=ak,
                 )
             )
             await conn.execute(
