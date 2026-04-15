@@ -6070,6 +6070,11 @@ type EntityRef implements Node
 
   """The resolved entity object."""
   entity: EntityNode
+
+  """
+  Added in UNRELEASED. The resolved scope object in which the entity is registered.
+  """
+  scope: EntityNode
 }
 
 """An edge in a connection."""
