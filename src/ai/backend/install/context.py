@@ -414,7 +414,7 @@ class Context(metaclass=ABCMeta):
             f"""
         {sudo} docker compose pull && \\
         {sudo} docker compose up -d --wait backendai-half-db && \\
-        {sudo} docker compose up -d && \\
+        {sudo} docker compose up -d --wait && \\
         {sudo} docker compose ps
         """,
             cwd=self.install_info.base_path,
