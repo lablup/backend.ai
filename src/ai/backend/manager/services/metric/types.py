@@ -1,6 +1,6 @@
 import enum
 from dataclasses import dataclass
-from typing import Self
+from typing import Final, Self
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -16,6 +16,7 @@ class ValueType(enum.StrEnum):
 
     CURRENT = "current"
     CAPACITY = "capacity"
+    PCT = "pct"
 
 
 class MetricQueryParameter(BaseModel):
@@ -80,6 +81,38 @@ class ContainerMetricResult:
     values: list[MetricResultValue]
 
 
+@dataclass(frozen=True)
+class KernelMetricValue:
+    """A single (current|capacity) value for one metric of one kernel."""
+
+    metric_name: str
+    value_type: ValueType
+    value: str
+
+
+@dataclass(frozen=True)
+class KernelLiveStatEntry:
+    """All live_stat samples belonging to a single kernel.
+
+    An empty ``values`` list represents "no Prometheus samples yet" — callers
+    do not need to handle ``None``; the entry is always present.
+    """
+
+    kernel_id: UUID
+    values: list[KernelMetricValue]
+
+
+@dataclass(frozen=True)
+class KernelLiveStatBatchResult:
+    """Per-kernel batch result for ``query_kernel_live_stat_batch``.
+
+    Always contains one entry per requested ``kernel_id``. Missing data is
+    represented as an empty ``KernelLiveStatEntry.values`` list, never ``None``.
+    """
+
+    entries: dict[UUID, KernelLiveStatEntry]
+
+
 class UtilizationMetricType(enum.Enum):
     """
     Specifies the type of a metric value.
@@ -100,3 +133,10 @@ class UtilizationMetricType(enum.Enum):
     Represents a difference of changes calculated from underlying gauge/accumulation values
     (e.g., Utilization msec from CPU usage)
     """
+
+
+# Metric-name → UtilizationMetricType classification rules.
+# TODO: Refactor to query metric metadata from the repository layer once
+#       the metadata persistence is available.
+DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
+RATE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})

@@ -5,6 +5,7 @@ from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import MetricPreset
 from ai.backend.common.clients.prometheus.querier import ContainerMetricQuerier
 from ai.backend.common.clients.prometheus.types import ValueType as PrometheusValueType
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     UTILIZATION_METRIC_INTERVAL,
@@ -18,6 +19,8 @@ from .actions.container import (
     ContainerMetricMetadataActionResult,
 )
 from .types import (
+    DIFF_METRICS,
+    RATE_METRICS,
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
     ContainerMetricResult,
@@ -53,14 +56,13 @@ class ContainerUtilizationMetricService:
         metric_name: str,
         label: ContainerMetricOptionalLabel,
     ) -> UtilizationMetricType:
-        # TODO: Refactor metric type detection to query metric metadata from the repository layer
-        match metric_name:
-            case "cpu_util" if label.value_type == "current":
-                return UtilizationMetricType.DIFF
-            case "net_rx" | "net_tx":
-                return UtilizationMetricType.RATE
-            case _:
-                return UtilizationMetricType.GAUGE
+        # TODO: Refactor to query metric metadata from the repository layer
+        #       once the metadata persistence is available.
+        if metric_name in DIFF_METRICS and label.value_type == "current":
+            return UtilizationMetricType.DIFF
+        if metric_name in RATE_METRICS:
+            return UtilizationMetricType.RATE
+        return UtilizationMetricType.GAUGE
 
     def _build_preset(
         self,
@@ -98,7 +100,7 @@ class ContainerUtilizationMetricService:
                     + "{{{labels}}}[{window}]))"
                 )
             case _:
-                raise ValueError(f"Unknown metric type: {metric_type}")
+                raise UnreachableError(f"Unknown metric type: {metric_type}")
         return MetricPreset(
             template=template,
             labels=querier.labels(),

@@ -97,6 +97,7 @@ class EntityType(enum.StrEnum):
     AUDIT_LOG = "audit_log"
     CONTAINER_METRIC = "container_metric"
     CONTAINER_METRIC_METADATA = "container_metric_metadata"
+    CONTAINER_LIVE_STAT = "container_live_stat"
     CONTAINER_REGISTRY = "container_registry"
     DEPLOYMENT = "deployment"
     ERROR_LOG = "error_log"
