@@ -30,6 +30,8 @@ class DeploymentAdminService:
         self, action: SyncModelDefinitionsAction
     ) -> SyncModelDefinitionsActionResult:
         """Sync model_definition from vfolder storage for all revisions with NULL model_definition."""
-        updated, failed = await self._repository.sync_model_definitions()
+        results = await self._repository.sync_model_definitions()
+        updated = sum(1 for r in results if r.success)
+        failed = sum(1 for r in results if not r.success)
         log.info("Model definition sync complete: updated={}, failed={}", updated, failed)
-        return SyncModelDefinitionsActionResult(updated=updated, failed=failed)
+        return SyncModelDefinitionsActionResult(results=results)

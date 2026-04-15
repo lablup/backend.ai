@@ -17,6 +17,9 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.deployment.storage_source import DeploymentStorageSource
+from ai.backend.manager.services.deployment.actions.sync_model_definitions import (
+    RevisionSyncStatus,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -35,19 +38,18 @@ class DeploymentAdminRepository:
         self._db = db
         self._storage_manager = storage_manager
 
-    async def sync_model_definitions(self) -> tuple[int, int]:
+    async def sync_model_definitions(self) -> list[RevisionSyncStatus]:
         """Sync model_definition from vfolder storage for all revisions with a model vfolder.
 
         Compares the stored model_definition with the current vfolder file content
         and updates the DB when they differ (including NULL -> populated).
 
         Returns:
-            Tuple of (updated_count, failed_count)
+            List of per-revision sync statuses
         """
         storage_source = DeploymentStorageSource(self._storage_manager)
         yaml = YAML()
-        updated = 0
-        failed = 0
+        results: list[RevisionSyncStatus] = []
 
         async with self._db.begin_readonly_session() as session:
             rows = (
@@ -96,14 +98,16 @@ class DeploymentAdminRepository:
                 raw_bytes = await storage_source.fetch_definition_file(vfolder_location, candidates)
                 raw_dict: dict[str, Any] = cast(dict[str, Any], yaml.load(raw_bytes))
                 model_def = ModelDefinition.model_validate(raw_dict)
-            except Exception:
+            except Exception as e:
                 log.warning(
                     "Failed to fetch model definition for revision {} (vfolder {})",
                     revision_id,
                     row.vf_id,
                     exc_info=True,
                 )
-                failed += 1
+                results.append(
+                    RevisionSyncStatus(revision_id=revision_id, success=False, reason=str(e))
+                )
                 continue
 
             model_def_dict = model_def.model_dump(exclude_none=True, by_alias=True)
@@ -120,6 +124,6 @@ class DeploymentAdminRepository:
                         .where(DeploymentRevisionRow.id == revision_id)
                         .values(model_definition=model_def_dict)
                     )
-                    updated += 1
+                    results.append(RevisionSyncStatus(revision_id=revision_id, success=True))
 
-        return updated, failed
+        return results

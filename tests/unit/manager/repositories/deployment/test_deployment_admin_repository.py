@@ -70,26 +70,24 @@ class TestDeploymentAdminRepository:
             return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_session))
         )
 
-        updated, failed = await admin_repository.sync_model_definitions()
+        results = await admin_repository.sync_model_definitions()
 
-        assert updated == 0
-        assert failed == 0
+        assert results == []
 
     async def test_sync_successful_update(
         self,
         admin_repository: DeploymentAdminRepository,
         mock_db: MagicMock,
     ) -> None:
-        row = self._make_revision_row()
+        rev_id = uuid.uuid4()
+        row = self._make_revision_row(revision_id=rev_id)
         yaml_content = b"models:\n  - name: test\n    model_path: /models\n"
 
-        # Mock readonly session for query
         mock_readonly_session = AsyncMock()
         mock_query_result = MagicMock()
         mock_query_result.all.return_value = [row]
         mock_readonly_session.execute = AsyncMock(return_value=mock_query_result)
 
-        # Mock write session for update
         mock_write_session = AsyncMock()
 
         mock_db.begin_readonly_session = MagicMock(
@@ -106,18 +104,20 @@ class TestDeploymentAdminRepository:
             mock_storage.fetch_definition_file = AsyncMock(return_value=yaml_content)
             mock_storage_cls.return_value = mock_storage
 
-            updated, failed = await admin_repository.sync_model_definitions()
+            results = await admin_repository.sync_model_definitions()
 
-        assert updated == 1
-        assert failed == 0
-        mock_write_session.execute.assert_awaited_once()
+        assert len(results) == 1
+        assert results[0].revision_id == rev_id
+        assert results[0].success is True
+        assert results[0].reason is None
 
-    async def test_sync_fetch_failure_skips_revision(
+    async def test_sync_fetch_failure_returns_error_with_reason(
         self,
         admin_repository: DeploymentAdminRepository,
         mock_db: MagicMock,
     ) -> None:
-        row = self._make_revision_row()
+        rev_id = uuid.uuid4()
+        row = self._make_revision_row(revision_id=rev_id)
 
         mock_readonly_session = AsyncMock()
         mock_query_result = MagicMock()
@@ -137,18 +137,22 @@ class TestDeploymentAdminRepository:
             )
             mock_storage_cls.return_value = mock_storage
 
-            updated, failed = await admin_repository.sync_model_definitions()
+            results = await admin_repository.sync_model_definitions()
 
-        assert updated == 0
-        assert failed == 1
+        assert len(results) == 1
+        assert results[0].revision_id == rev_id
+        assert results[0].success is False
+        assert "storage unreachable" in results[0].reason
 
     async def test_sync_mixed_success_and_failure(
         self,
         admin_repository: DeploymentAdminRepository,
         mock_db: MagicMock,
     ) -> None:
-        row_ok = self._make_revision_row()
-        row_fail = self._make_revision_row()
+        rev_ok = uuid.uuid4()
+        rev_fail = uuid.uuid4()
+        row_ok = self._make_revision_row(revision_id=rev_ok)
+        row_fail = self._make_revision_row(revision_id=rev_fail)
         yaml_content = b"models:\n  - name: test\n    model_path: /models\n"
 
         mock_readonly_session = AsyncMock()
@@ -181,10 +185,14 @@ class TestDeploymentAdminRepository:
             mock_storage.fetch_definition_file = AsyncMock(side_effect=fetch_side_effect)
             mock_storage_cls.return_value = mock_storage
 
-            updated, failed = await admin_repository.sync_model_definitions()
+            results = await admin_repository.sync_model_definitions()
 
-        assert updated == 1
-        assert failed == 1
+        succeeded = [r for r in results if r.success]
+        failed = [r for r in results if not r.success]
+        assert len(succeeded) == 1
+        assert succeeded[0].revision_id == rev_ok
+        assert len(failed) == 1
+        assert failed[0].revision_id == rev_fail
 
     async def test_sync_skips_when_already_in_sync(
         self,
@@ -218,10 +226,9 @@ class TestDeploymentAdminRepository:
             mock_storage.fetch_definition_file = AsyncMock(return_value=yaml_content)
             mock_storage_cls.return_value = mock_storage
 
-            updated, failed = await admin_repository.sync_model_definitions()
+            results = await admin_repository.sync_model_definitions()
 
-        assert updated == 0
-        assert failed == 0
+        assert results == []
         mock_write_session.execute.assert_not_awaited()
 
     async def test_sync_updates_when_content_differs(
@@ -229,8 +236,9 @@ class TestDeploymentAdminRepository:
         admin_repository: DeploymentAdminRepository,
         mock_db: MagicMock,
     ) -> None:
+        rev_id = uuid.uuid4()
         old_def: dict[str, Any] = {"models": [{"name": "old-model", "model_path": "/models"}]}
-        row = self._make_revision_row(model_definition=old_def)
+        row = self._make_revision_row(revision_id=rev_id, model_definition=old_def)
         yaml_content = b"models:\n  - name: new-model\n    model_path: /models\n"
 
         mock_readonly_session = AsyncMock()
@@ -254,8 +262,8 @@ class TestDeploymentAdminRepository:
             mock_storage.fetch_definition_file = AsyncMock(return_value=yaml_content)
             mock_storage_cls.return_value = mock_storage
 
-            updated, failed = await admin_repository.sync_model_definitions()
+            results = await admin_repository.sync_model_definitions()
 
-        assert updated == 1
-        assert failed == 0
-        mock_write_session.execute.assert_awaited_once()
+        assert len(results) == 1
+        assert results[0].revision_id == rev_id
+        assert results[0].success is True

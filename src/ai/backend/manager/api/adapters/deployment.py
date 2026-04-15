@@ -78,6 +78,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     GetDeploymentPolicyPayload,
     ReplicaNode,
     RevisionNode,
+    RevisionSyncStatusDTO,
     RouteNode,
     SearchAccessTokensPayload,
     SearchAutoScalingRulesPayload,
@@ -815,7 +816,16 @@ class DeploymentAdapter(BaseAdapter):
         result = await self._processors.deployment_admin.sync_model_definitions.wait_for_complete(
             SyncModelDefinitionsAction()
         )
-        return SyncModelDefinitionsPayload(updated=result.updated, failed=result.failed)
+        return SyncModelDefinitionsPayload(
+            results=[
+                RevisionSyncStatusDTO(
+                    revision_id=r.revision_id,
+                    success=r.success,
+                    reason=r.reason,
+                )
+                for r in result.results
+            ],
+        )
 
     async def activate_revision(self, input: ActivateRevisionInput) -> ActivateRevisionPayload:
         """Activate a specific revision as the current revision."""
