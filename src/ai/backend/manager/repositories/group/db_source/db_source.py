@@ -205,11 +205,12 @@ class GroupDBSource:
     ) -> None:
         """Add users to a project within an existing session.
 
-        Creates the business association (association_groups_users) together with
-        the RBAC scope binding and user-role mappings for the project's system roles,
-        so that membership changes made via `modify_group` stay consistent with
-        `assign_users_to_project`. Already-assigned users are skipped to avoid
-        unique-constraint conflicts.
+        Creates the business association (association_groups_users), the RBAC
+        scope binding, and a user-role mapping to the project's member role.
+        Admin roles are intentionally NOT granted here; the modifyGroup
+        add path represents "make this user a project member", not
+        "make this user a project admin". Already-assigned users are
+        filtered out to avoid unique-constraint conflicts.
         """
         project_domain_subq = (
             sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
@@ -243,22 +244,36 @@ class GroupDBSource:
         ]
         await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
 
-        project_role_ids = (
-            await session.scalars(
-                sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(project_id),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
-                )
+        # Locate the project's member role. Two naming conventions coexist:
+        # the runtime name `project-{id8}-member` used by GroupDBSource.create
+        # since BA-5746, and the legacy name `role_project_{id8}_member`
+        # created by alembic migration 430b1631804d for pre-existing projects.
+        runtime_member_name = f"project-{str(project_id)[:8]}-member"
+        legacy_member_name = f"role_project_{str(project_id)[:8]}_member"
+        member_role_id = await session.scalar(
+            sa.select(RoleRow.id)
+            .join(
+                AssociationScopesEntitiesRow,
+                sa.cast(AssociationScopesEntitiesRow.entity_id, sa.String)
+                == sa.cast(RoleRow.id, sa.String),
             )
-        ).all()
-        if not project_role_ids:
+            .where(
+                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                AssociationScopesEntitiesRow.scope_id == str(project_id),
+                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+                RoleRow.name.in_([runtime_member_name, legacy_member_name]),
+            )
+        )
+        if member_role_id is None:
+            log.warning(
+                "project {} has no member role bound at its scope; "
+                "skipping user-role mapping for modifyGroup add",
+                project_id,
+            )
             return
 
         user_role_specs = [
-            UserRoleCreatorSpec(user_id=row.uuid, role_id=uuid.UUID(role_id))
-            for row in new_user_rows
-            for role_id in project_role_ids
+            UserRoleCreatorSpec(user_id=row.uuid, role_id=member_role_id) for row in new_user_rows
         ]
         await execute_bulk_creator(session, BulkCreator(specs=user_role_specs))
 

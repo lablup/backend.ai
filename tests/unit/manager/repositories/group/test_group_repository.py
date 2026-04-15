@@ -406,8 +406,12 @@ class TestGroupRepository:
         test_domain: str,
         default_project_resource_policy: str,
     ) -> uuid.UUID:
-        """Create test group"""
+        """Create test group together with a SYSTEM-sourced member role bound
+        at the project scope, matching the runtime state produced by
+        GroupDBSource.create() after BA-5746.
+        """
         group_id = uuid.uuid4()
+        member_role_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as session:
             group = GroupRow(
@@ -423,6 +427,18 @@ class TestGroupRepository:
                 type=ProjectType.GENERAL,
             )
             session.add(group)
+            member_role = RoleRow(
+                id=member_role_id,
+                name=f"project-{str(group_id)[:8]}-member",
+            )
+            session.add(member_role)
+            scope_binding = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_id),
+                entity_type=EntityType.ROLE,
+                entity_id=str(member_role_id),
+            )
+            session.add(scope_binding)
             await session.commit()
 
         return group_id
@@ -902,7 +918,12 @@ class TestGroupRepository:
         test_group: uuid.UUID,
         test_users_for_group: list[uuid.UUID],
     ) -> None:
-        """Test adding users to group with user_update_mode='add'"""
+        """Test adding users to group with user_update_mode='add'.
+
+        Verifies that modifyGroup add produces the business association, the
+        RBAC scope binding, and a user-role mapping to the project's member
+        role only (not to an admin role).
+        """
         updater_spec = GroupUpdaterSpec()
         updater = Updater(spec=updater_spec, pk_value=test_group)
 
@@ -912,7 +933,6 @@ class TestGroupRepository:
             user_uuids=test_users_for_group[:2],
         )
 
-        # Verify users were added
         async with db_with_cleanup.begin_session() as session:
             assoc_result = await session.execute(
                 sa.select(association_groups_users).where(
@@ -924,6 +944,21 @@ class TestGroupRepository:
             added_user_ids = {a.user_id for a in associations}
             assert test_users_for_group[0] in added_user_ids
             assert test_users_for_group[1] in added_user_ids
+
+            member_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(test_group)[:8]}-member")
+            )
+            assert member_role_id is not None
+
+            user_role_rows = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id.in_(test_users_for_group[:2]),
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(user_role_rows) == 2
 
     async def test_modify_validated_remove_users(
         self,
@@ -950,7 +985,6 @@ class TestGroupRepository:
             user_uuids=test_users_for_group[:1],
         )
 
-        # Verify user was removed
         async with db_with_cleanup.begin_session() as session:
             assoc_result = await session.execute(
                 sa.select(association_groups_users).where(
@@ -963,6 +997,31 @@ class TestGroupRepository:
             assert test_users_for_group[0] not in remaining_user_ids
             assert test_users_for_group[1] in remaining_user_ids
             assert test_users_for_group[2] in remaining_user_ids
+
+            member_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(test_group)[:8]}-member")
+            )
+            assert member_role_id is not None
+
+            removed_user_role_rows = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == test_users_for_group[0],
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(removed_user_role_rows) == 0
+
+            remaining_user_role_rows = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id.in_(test_users_for_group[1:3]),
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(remaining_user_role_rows) == 2
 
     # ===========================================
     # Tests for mark_inactive method
