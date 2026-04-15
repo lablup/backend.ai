@@ -528,11 +528,10 @@ class DeploymentService:
         """
         log.info("Creating deployment with name: {}", action.draft.name)
         draft_revision = action.draft.draft_model_revision
-        model_definition = await self._resolve_model_definition_from_draft(draft_revision)
-        deployment_info = await self._deployment_controller.create_deployment(
-            action.draft,
-            model_definition=model_definition,
+        action.draft.model_definition = await self._resolve_model_definition_from_draft(
+            draft_revision
         )
+        deployment_info = await self._deployment_controller.create_deployment(action.draft)
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.CHECK_PENDING
         )
