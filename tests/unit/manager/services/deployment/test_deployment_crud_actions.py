@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -26,6 +27,7 @@ from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACVali
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     ClusterConfigData,
@@ -33,12 +35,17 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
+    ExecutionSpec,
+    ImageIdentifierDraft,
     ModelDeploymentAccessTokenData,
     ModelMountConfigData,
     ModelRevisionData,
+    ModelRevisionSpecDraft,
     ModelRuntimeConfigData,
+    MountMetadata,
     ReplicaSpec,
     ResourceConfigData,
+    ResourceSpecDraft,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
@@ -93,17 +100,24 @@ class DeploymentCRUDBaseFixtures:
         return MagicMock(spec=RevisionGeneratorRegistry)
 
     @pytest.fixture
+    def mock_model_definition_generator_registry(self) -> AsyncMock:
+        registry = AsyncMock()
+        registry.generate_model_definition.return_value = ModelDefinition()
+        return registry
+
+    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
         mock_revision_generator_registry: MagicMock,
+        mock_model_definition_generator_registry: AsyncMock,
     ) -> DeploymentService:
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
             revision_generator_registry=mock_revision_generator_registry,
-            model_definition_generator_registry=MagicMock(),
+            model_definition_generator_registry=mock_model_definition_generator_registry,
         )
 
     @pytest.fixture
@@ -201,6 +215,64 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
             DeploymentLifecycleType.CHECK_PENDING
         )
+
+    async def test_model_definition_resolved_and_set_on_draft(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_controller: MagicMock,
+        mock_model_definition_generator_registry: AsyncMock,
+        endpoint_info: DeploymentInfo,
+    ) -> None:
+        """model_definition is resolved from vfolder and set on the draft before controller call."""
+        expected_definition = ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "test-model",
+                    "model-path": "/models",
+                    "service": {"start-command": "serve", "port": 8000},
+                }
+            ]
+        })
+        mock_model_definition_generator_registry.generate_model_definition.return_value = (
+            expected_definition
+        )
+        mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
+        mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
+
+        vfolder_id = uuid.uuid4()
+        draft = DeploymentCreationDraft(
+            metadata=endpoint_info.metadata,
+            replica_spec=ReplicaSpec(replica_count=1),
+            network=DeploymentNetworkSpec(open_to_public=False),
+            draft_model_revision=ModelRevisionSpecDraft(
+                image_identifier=ImageIdentifierDraft(
+                    canonical="test:latest", architecture="x86_64"
+                ),
+                resource_spec=ResourceSpecDraft(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    resource_slots={"cpu": "1", "mem": "1g"},
+                ),
+                mounts=MountMetadata(
+                    model_vfolder_id=vfolder_id,
+                    model_definition_path="model-definition.yaml",
+                    model_mount_destination="/models",
+                ),
+                execution=ExecutionSpec(
+                    runtime_variant=RuntimeVariant("custom"),
+                    startup_command=None,
+                ),
+            ),
+        )
+        assert draft.model_definition is None
+
+        action = CreateLegacyDeploymentAction(draft=draft)
+        await deployment_service.create_legacy_deployment(action)
+
+        # model_definition should be resolved and set on the draft
+        assert draft.model_definition == expected_definition
+        mock_model_definition_generator_registry.generate_model_definition.assert_called_once()
+        mock_deployment_controller.create_deployment.assert_called_once_with(draft)
 
     async def test_non_existent_domain_raises(
         self,
