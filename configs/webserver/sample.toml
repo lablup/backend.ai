@@ -196,6 +196,12 @@
 # Policy (CSP) configuration.
 # Added in 25.12.0
 [security]
+  # Set the Secure flag on session cookies. When true, browsers only send session
+  # cookies over HTTPS. Should be true for production (even when HTTPS is
+  # terminated at a reverse proxy). Set to false for local development without HTTPS.
+  # Added in 25.12.0
+  # cookie-secure = true
+
   # List of request security policy names to apply. These policies are processed
   # as middleware on incoming requests. Common policies include CORS handling,
   # request size limits, and rate limiting. Empty list means no additional
