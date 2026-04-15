@@ -115,6 +115,7 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
     MkdirV2Action,
     MoveFileV2Action,
 )
+from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
 )
@@ -377,20 +378,11 @@ class VFolderAdapter(BaseAdapter):
         return CreateUploadSessionPayload(token=result.token, url=result.url)
 
     async def get(self, vfolder_id: UUID) -> VFolderNode:
-        """Get a single vfolder by ID."""
-        conditions: list[QueryCondition] = [VFolderConditions.by_id(vfolder_id)]
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_VFOLDER_PAGINATION_SPEC,
-            limit=1,
+        """Get a single vfolder by ID with RBAC validation."""
+        result = await self._processors.vfolder.get_v2.wait_for_complete(
+            GetVFolderV2Action(vfolder_uuid=vfolder_id)
         )
-        result = await self._processors.vfolder_admin.admin_search_vfolders.wait_for_complete(
-            AdminSearchVFoldersAction(querier=querier)
-        )
-        if not result.data:
-            raise VFolderNotFound()
-        return self._vfolder_data_to_node(result.data[0])
+        return self._vfolder_data_to_node(result.vfolder)
 
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash)."""
