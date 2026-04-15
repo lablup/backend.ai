@@ -6,9 +6,10 @@ from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
+import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -42,6 +43,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, NullableDateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -56,6 +58,9 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.prometheus_query_preset.types.node import QueryDefinitionGQL
 
 
 @gql_enum(
@@ -125,6 +130,28 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
 
     created_at: datetime
     last_triggered_at: datetime | None
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The Prometheus query preset used for metric-based auto-scaling.",
+        )
+    )  # type: ignore[misc]
+    async def query_preset(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            QueryDefinitionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.prometheus_query_preset.types.node"),
+        ]
+        | None
+    ):
+        if self.prometheus_query_preset_id is None:
+            return None
+        return await info.context.data_loaders.query_definition_loader.load(
+            UUID(str(self.prometheus_query_preset_id))
+        )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

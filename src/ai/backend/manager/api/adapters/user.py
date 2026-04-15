@@ -1281,6 +1281,37 @@ class UserAdapter(BaseAdapter):
                     ])
                 )
 
+        if filter_req.created_at is not None:
+            condition = filter_req.created_at.build_query_condition(
+                before_factory=UserConditions.by_created_at_before,
+                after_factory=UserConditions.by_created_at_after,
+                equals_factory=UserConditions.by_created_at_equals,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.domain is not None:
+            conditions.extend(self._convert_domain_nested_filter(filter_req.domain))
+
+        if filter_req.project is not None:
+            conditions.extend(self._convert_project_nested_filter(filter_req.project))
+
+        if filter_req.AND:
+            for sub_filter in filter_req.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter_req.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter_req.OR:
+                or_sub_conditions.extend(self._convert_filter(sub_filter))
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+        if filter_req.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter_req.NOT:
+                not_sub_conditions.extend(self._convert_filter(sub_filter))
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions
 
     def _convert_orders(self, orders: list[UserOrder]) -> list[QueryOrder]:

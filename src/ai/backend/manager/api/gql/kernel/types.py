@@ -383,6 +383,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     )  # type: ignore[misc]
     async def session(
         self,
+        info: Info[StrawberryGQLContext],
     ) -> (
         Annotated[
             SessionV2GQL,
@@ -390,7 +391,11 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         ]
         | None
     ):
-        raise NotImplementedError
+        from ai.backend.common.types import SessionId
+
+        return await info.context.data_loaders.session_loader.load(
+            SessionId(self.session_info.session_id)
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
