@@ -396,11 +396,25 @@ class SessionConditions:
         return inner
 
     @staticmethod
+    def by_status_equals(status: SessionStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.status == status
+
+        return inner
+
+    @staticmethod
     def by_status_in(statuses: Collection[SessionStatus]) -> QueryCondition:
         """Factory for status IN filter."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_status_not_equals(status: SessionStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.status != status
 
         return inner
 

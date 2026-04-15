@@ -450,6 +450,8 @@ class DeploymentStatusFilter(BaseRequestModel):
 
     equals: str | None = Field(default=None, description="Exact status match")
     in_: list[str] | None = Field(default=None, alias="in", description="Status is in list")
+    not_equals: str | None = Field(default=None, description="Excludes exact status match")
+    not_in: list[str] | None = Field(default=None, description="Status is not in list")
 
 
 class RouteStatusFilter(BaseRequestModel):
@@ -481,6 +483,8 @@ class ReplicaStatusFilter(BaseRequestModel):
 
     equals: RouteStatus | None = Field(default=None, description="Exact status match")
     in_: list[RouteStatus] | None = Field(default=None, alias="in", description="Status is in list")
+    not_equals: RouteStatus | None = Field(default=None, description="Excludes exact status match")
+    not_in: list[RouteStatus] | None = Field(default=None, description="Status is not in list")
 
 
 class ReplicaTrafficStatusFilter(BaseRequestModel):
@@ -491,6 +495,12 @@ class ReplicaTrafficStatusFilter(BaseRequestModel):
     )
     in_: list[RouteTrafficStatus] | None = Field(
         default=None, alias="in", description="Traffic status is in list"
+    )
+    not_equals: RouteTrafficStatus | None = Field(
+        default=None, description="Excludes exact traffic status match"
+    )
+    not_in: list[RouteTrafficStatus] | None = Field(
+        default=None, description="Traffic status is not in list"
     )
 
 

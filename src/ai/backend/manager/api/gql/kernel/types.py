@@ -99,8 +99,12 @@ class KernelV2OrderFieldGQL(StrEnum):
     name="KernelV2StatusFilter",
 )
 class KernelV2StatusFilterGQL(PydanticInputMixin[KernelStatusFilter]):
+    equals: KernelV2StatusGQL | None = None
     in_: list[KernelV2StatusGQL] | None = gql_field(
         description="The in  field.", name="in", default=None
+    )
+    not_equals: KernelV2StatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
     )
     not_in: list[KernelV2StatusGQL] | None = None
 

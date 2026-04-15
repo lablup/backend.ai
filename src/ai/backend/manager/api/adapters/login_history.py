@@ -154,9 +154,11 @@ class LoginHistoryAdapter(BaseAdapter):
     def _apply_result_filter(r: LoginHistoryResultFilter, conditions: list[QueryCondition]) -> None:
         if r.equals is not None:
             conditions.append(LoginHistoryConditions.by_result_in([r.equals]))
-        elif r.in_ is not None:
+        if r.in_ is not None:
             conditions.append(LoginHistoryConditions.by_result_in(list(r.in_)))
-        elif r.not_in is not None:
+        if r.not_equals is not None:
+            conditions.append(LoginHistoryConditions.by_result_not_in([r.not_equals]))
+        if r.not_in is not None:
             conditions.append(LoginHistoryConditions.by_result_not_in(list(r.not_in)))
 
     @staticmethod

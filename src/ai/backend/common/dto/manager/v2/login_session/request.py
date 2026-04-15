@@ -30,6 +30,9 @@ class LoginSessionStatusFilter(BaseRequestModel):
     in_: list[LoginSessionStatus] | None = Field(
         default=None, alias="in", description="Status is in list"
     )
+    not_equals: LoginSessionStatus | None = Field(
+        default=None, description="Excludes exact status match"
+    )
     not_in: list[LoginSessionStatus] | None = Field(
         default=None, description="Status is not in list"
     )
