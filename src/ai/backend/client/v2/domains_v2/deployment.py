@@ -55,6 +55,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     SearchDeploymentPoliciesPayload,
     SearchReplicasPayload,
     SearchRoutesPayload,
+    SyncModelDefinitionsPayload,
     SyncReplicaPayload,
     UpdateAutoScalingRulePayload,
     UpdateDeploymentPayload,
@@ -493,4 +494,12 @@ class V2DeploymentClient(BaseDomainClient):
             _PATH + "/policies/upsert",
             request=body,
             response_model=UpsertDeploymentPolicyPayload,
+        )
+
+    async def admin_sync_model_definitions(self) -> SyncModelDefinitionsPayload:
+        """Sync model_definition from vfolder storage for all deployment revisions (superadmin only)."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/revisions/sync-model-definitions",
+            response_model=SyncModelDefinitionsPayload,
         )

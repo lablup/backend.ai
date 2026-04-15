@@ -404,8 +404,8 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         deployment_admin=DeploymentAdminService(
             repository=DeploymentAdminRepository(
-                db=args.db,
-                storage_manager=args.storage_manager,
+                db_source=args.deployment_controller._deployment_repository._db_source,
+                storage_source=args.deployment_controller._deployment_repository._storage_source,
             ),
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),

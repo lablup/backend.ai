@@ -336,6 +336,21 @@ def policy_search(
     asyncio.run(_run())
 
 
+@deployment.command(name="sync-model-definitions")
+def sync_model_definitions() -> None:
+    """Sync model_definition from vfolder storage for all deployment revisions (superadmin only)."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.deployment.admin_sync_model_definitions()
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 # -- Sub-group: revision-preset --
 
 

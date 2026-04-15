@@ -58,6 +58,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RevisionWithVFolderInfo,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
@@ -2956,3 +2957,63 @@ class DeploymentDBSource:
                 for row in result.rows
             ]
             return items, result.total_count, result.has_next_page, result.has_previous_page
+
+    async def get_revisions_with_vfolder_info(
+        self,
+    ) -> list[RevisionWithVFolderInfo]:
+        """Get all deployment revisions joined with their model vfolder info."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            rows = (
+                await db_sess.execute(
+                    sa.select(
+                        DeploymentRevisionRow.id,
+                        DeploymentRevisionRow.model_definition,
+                        DeploymentRevisionRow.model_definition_path,
+                        VFolderRow.id.label("vf_id"),
+                        VFolderRow.quota_scope_id.label("vf_quota_scope_id"),
+                        VFolderRow.host.label("vf_host"),
+                        VFolderRow.ownership_type.label("vf_ownership_type"),
+                        VFolderRow.usage_mode.label("vf_usage_mode"),
+                    )
+                    .select_from(
+                        sa.join(
+                            DeploymentRevisionRow.__table__,
+                            VFolderRow.__table__,
+                            DeploymentRevisionRow.model == VFolderRow.id,
+                        )
+                    )
+                    .where(
+                        DeploymentRevisionRow.model.is_not(None),
+                    )
+                )
+            ).all()
+            return [
+                RevisionWithVFolderInfo(
+                    revision_id=row.id,
+                    model_definition=row.model_definition,
+                    model_definition_path=row.model_definition_path,
+                    vfolder_id=row.vf_id,
+                    vfolder_quota_scope_id=row.vf_quota_scope_id,
+                    vfolder_host=row.vf_host,
+                    vfolder_ownership_type=row.vf_ownership_type,
+                    vfolder_usage_mode=row.vf_usage_mode,
+                )
+                for row in rows
+            ]
+
+    async def batch_update_model_definitions(
+        self,
+        updates: list[tuple[uuid.UUID, dict[str, Any]]],
+    ) -> None:
+        """Update model_definition for multiple revisions in a single transaction.
+
+        Args:
+            updates: List of (revision_id, model_definition_dict) tuples
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            for revision_id, model_def_dict in updates:
+                await db_sess.execute(
+                    sa.update(DeploymentRevisionRow.__table__)
+                    .where(DeploymentRevisionRow.id == revision_id)
+                    .values(model_definition=model_def_dict)
+                )

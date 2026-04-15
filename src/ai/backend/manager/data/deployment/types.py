@@ -966,3 +966,17 @@ class RevisionSearchScope:
     """Scope for searching revisions within a specific deployment."""
 
     deployment_id: UUID
+
+
+@dataclass(frozen=True)
+class RevisionWithVFolderInfo:
+    """Deployment revision joined with its model vfolder location info."""
+
+    revision_id: UUID
+    model_definition: dict[str, Any] | None
+    model_definition_path: str | None
+    vfolder_id: UUID
+    vfolder_quota_scope_id: Any
+    vfolder_host: str
+    vfolder_ownership_type: Any
+    vfolder_usage_mode: Any
