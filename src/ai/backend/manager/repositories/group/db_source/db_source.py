@@ -33,7 +33,7 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.group.row import (
     AssocGroupUserRow,
     GroupRow,
@@ -172,7 +172,7 @@ class GroupDBSource:
         user_uuids: list[uuid.UUID] | None = None,
     ) -> GroupData | None:
         """Modify a group with validation."""
-        group_id = updater.pk_value
+        group_id = cast(UUID, updater.pk_value)
 
         async with self._db.begin_session() as session:
             # First verify the group exists
@@ -185,17 +185,9 @@ class GroupDBSource:
             # Handle user addition/removal
             if user_uuids and user_update_mode:
                 if user_update_mode == "add":
-                    values = [{"user_id": uuid, "group_id": group_id} for uuid in user_uuids]
-                    await session.execute(
-                        sa.insert(association_groups_users).values(values),
-                    )
+                    await self._add_users_to_project_in_session(session, group_id, user_uuids)
                 elif user_update_mode == "remove":
-                    await session.execute(
-                        sa.delete(association_groups_users).where(
-                            (association_groups_users.c.user_id.in_(user_uuids))
-                            & (association_groups_users.c.group_id == group_id),
-                        ),
-                    )
+                    await self._remove_users_from_project_in_session(session, group_id, user_uuids)
 
             # Update group data (execute_updater returns None if no values to update)
             result = await execute_updater(session, updater)
@@ -204,6 +196,114 @@ class GroupDBSource:
 
             # No group updates or only user updates were performed
             return None
+
+    async def _add_users_to_project_in_session(
+        self,
+        session: SASession,
+        project_id: uuid.UUID,
+        user_uuids: list[uuid.UUID],
+    ) -> None:
+        """Add users to a project within an existing session.
+
+        Creates the business association (association_groups_users) together with
+        the RBAC scope binding and user-role mappings for the project's system roles,
+        so that membership changes made via `modify_group` stay consistent with
+        `assign_users_to_project`. Already-assigned users are skipped to avoid
+        unique-constraint conflicts.
+        """
+        project_domain_subq = (
+            sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
+        )
+        new_user_rows = (
+            await session.scalars(
+                sa.select(UserRow)
+                .outerjoin(
+                    AssocGroupUserRow,
+                    (UserRow.uuid == AssocGroupUserRow.user_id)
+                    & (AssocGroupUserRow.group_id == project_id),
+                )
+                .where(
+                    UserRow.uuid.in_(user_uuids)
+                    & (UserRow.domain_name == project_domain_subq)
+                    & AssocGroupUserRow.user_id.is_(None)
+                )
+            )
+        ).all()
+        if not new_user_rows:
+            return
+
+        project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
+        pairs = [
+            RBACScopeBindingPair(
+                spec=AssocGroupUserCreatorSpec(user_id=row.uuid, group_id=project_id),
+                entity_ref=RBACElementRef(RBACElementType.USER, str(row.uuid)),
+                scope_ref=project_scope_ref,
+            )
+            for row in new_user_rows
+        ]
+        await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
+
+        project_role_ids = (
+            await session.scalars(
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+                )
+            )
+        ).all()
+        if not project_role_ids:
+            return
+
+        user_role_specs = [
+            UserRoleCreatorSpec(user_id=row.uuid, role_id=uuid.UUID(role_id))
+            for row in new_user_rows
+            for role_id in project_role_ids
+        ]
+        await execute_bulk_creator(session, BulkCreator(specs=user_role_specs))
+
+    async def _remove_users_from_project_in_session(
+        self,
+        session: SASession,
+        project_id: uuid.UUID,
+        user_uuids: list[uuid.UUID],
+    ) -> None:
+        """Remove users from a project within an existing session.
+
+        Deletes the business N:N association, the RBAC scope binding, and any
+        user-role mappings for roles scoped to this project, mirroring
+        `unassign_users_from_project`.
+        """
+        assigned_user_ids = (
+            await session.scalars(
+                sa.select(AssocGroupUserRow.user_id).where(
+                    AssocGroupUserRow.user_id.in_(user_uuids),
+                    AssocGroupUserRow.group_id == project_id,
+                )
+            )
+        ).all()
+        if not assigned_user_ids:
+            return
+
+        unbinder = UserProjectEntityUnbinder(
+            user_uuids=list(assigned_user_ids),
+            project_id=project_id,
+        )
+        await execute_rbac_scope_entity_unbinder(session, unbinder)
+
+        project_role_ids_subq = sa.select(
+            AssociationScopesEntitiesRow.entity_id,
+        ).where(
+            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+            AssociationScopesEntitiesRow.scope_id == str(project_id),
+            AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+        )
+        await session.execute(
+            sa.delete(UserRoleRow).where(
+                UserRoleRow.user_id.in_(assigned_user_ids),
+                sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids_subq),
+            )
+        )
 
     async def mark_inactive(self, group_id: uuid.UUID) -> None:
         """Mark a group as inactive (soft delete)."""
