@@ -42,7 +42,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
 )
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
+from ai.backend.manager.api.gql.base import DateTimeFilter, NullableDateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -75,7 +75,7 @@ class AutoScalingRuleFilter(PydanticInputMixin[AutoScalingRuleFilterDTO]):
     """Filter for auto-scaling rules."""
 
     created_at: DateTimeFilter | None = None
-    last_triggered_at: DateTimeFilter | None = None
+    last_triggered_at: NullableDateTimeFilter | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -124,7 +124,7 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     )
 
     created_at: datetime
-    last_triggered_at: datetime
+    last_triggered_at: datetime | None
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

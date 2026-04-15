@@ -117,6 +117,24 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
             conditions.append(
                 AutoScalingRuleConditions.by_deployment_id(filter.model_deployment_id)
             )
+        if filter.created_at is not None:
+            condition = filter.created_at.build_query_condition(
+                before_factory=AutoScalingRuleConditions.by_created_at_before,
+                after_factory=AutoScalingRuleConditions.by_created_at_after,
+                equals_factory=AutoScalingRuleConditions.by_created_at_equals,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if filter.last_triggered_at is not None:
+            condition = filter.last_triggered_at.build_query_condition(
+                before_factory=AutoScalingRuleConditions.by_last_triggered_at_before,
+                after_factory=AutoScalingRuleConditions.by_last_triggered_at_after,
+                equals_factory=AutoScalingRuleConditions.by_last_triggered_at_equals,
+                is_null_factory=AutoScalingRuleConditions.by_last_triggered_at_is_null,
+                is_not_null_factory=AutoScalingRuleConditions.by_last_triggered_at_is_not_null,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         return conditions
 

@@ -211,7 +211,7 @@ class AutoScalingRuleNode(BaseResponseModel):
         default=None, description="Prometheus query preset ID"
     )
     created_at: datetime = Field(description="Creation timestamp")
-    last_triggered_at: datetime = Field(description="Last triggered timestamp")
+    last_triggered_at: datetime | None = Field(default=None, description="Last triggered timestamp")
 
 
 class DeploymentPolicyNode(BaseResponseModel):

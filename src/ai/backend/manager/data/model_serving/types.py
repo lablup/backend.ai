@@ -121,7 +121,7 @@ class EndpointAutoScalingRuleData:
     min_replicas: int
     max_replicas: int
     created_at: datetime
-    last_triggered_at: datetime
+    last_triggered_at: datetime | None
     endpoint: uuid.UUID
 
 

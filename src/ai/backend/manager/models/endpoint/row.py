@@ -7,7 +7,7 @@ from collections.abc import (
     Iterable,
     Sequence,
 )
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import (
@@ -231,11 +231,11 @@ class EndpointRow(Base):  # type: ignore[misc]
     retries: Mapped[int] = mapped_column(
         "retries", sa.Integer, nullable=False, default=0, server_default="0"
     )
-    created_at: Mapped[datetime | None] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.text("now()"),
-        nullable=True,
+        nullable=False,
     )
     destroyed_at: Mapped[datetime | None] = mapped_column(
         "destroyed_at",
@@ -702,7 +702,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             ),
             cluster_size=current_rev.cluster_size if current_rev else 1,
             open_to_public=self.open_to_public if self.open_to_public is not None else False,
-            created_at=self.created_at or datetime.now(UTC),
+            created_at=self.created_at,
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
@@ -821,8 +821,8 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
     expires_at: Mapped[datetime | None] = mapped_column(
         "expires_at", sa.DateTime(timezone=True), nullable=True
     )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
     )
 
     endpoint_row: Mapped[EndpointRow | None] = relationship(
@@ -914,7 +914,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
             domain=self.domain,
             project=self.project,
             session_owner=self.session_owner,
-            created_at=self.created_at or datetime.now(UTC),
+            created_at=self.created_at,
         )
 
 
@@ -949,11 +949,11 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    created_at: Mapped[datetime | None] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.text("now()"),
-        nullable=True,
+        nullable=False,
     )
     last_triggered_at: Mapped[datetime | None] = mapped_column(
         "last_triggered_at",
@@ -1029,8 +1029,8 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             cooldown_seconds=self.cooldown_seconds,
             min_replicas=self.min_replicas or 0,
             max_replicas=self.max_replicas or 0,
-            created_at=self.created_at or datetime.now(UTC),
-            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
+            created_at=self.created_at,
+            last_triggered_at=self.last_triggered_at,
             endpoint=self.endpoint,
         )
 
@@ -1066,7 +1066,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
                 min_replicas=self.min_replicas,
                 max_replicas=self.max_replicas,
             ),
-            created_at=self.created_at or datetime.now(UTC),
+            created_at=self.created_at,
             last_triggered_at=self.last_triggered_at,
         )
 
@@ -1102,8 +1102,8 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             time_window=self.cooldown_seconds,
             min_replicas=self.min_replicas,
             max_replicas=self.max_replicas,
-            created_at=self.created_at or datetime.now(UTC),
-            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
+            created_at=self.created_at,
+            last_triggered_at=self.last_triggered_at,
             prometheus_query_preset_id=self.prometheus_query_preset_id,
         )
 

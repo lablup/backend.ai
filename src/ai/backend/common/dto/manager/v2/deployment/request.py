@@ -20,7 +20,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, NullableDateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
@@ -576,7 +576,7 @@ class AutoScalingRuleFilter(BaseRequestModel):
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
-    last_triggered_at: DateTimeFilter | None = Field(
+    last_triggered_at: NullableDateTimeFilter | None = Field(
         default=None, description="Last triggered datetime filter"
     )
     AND: list[AutoScalingRuleFilter] | None = Field(default=None, description="AND conjunction")

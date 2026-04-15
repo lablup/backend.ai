@@ -1705,6 +1705,8 @@ class DeploymentAdapter(BaseAdapter):
                     before_factory=AutoScalingRuleConditions.by_last_triggered_at_before,
                     after_factory=AutoScalingRuleConditions.by_last_triggered_at_after,
                     equals_factory=AutoScalingRuleConditions.by_last_triggered_at_equals,
+                    is_null_factory=AutoScalingRuleConditions.by_last_triggered_at_is_null,
+                    is_not_null_factory=AutoScalingRuleConditions.by_last_triggered_at_is_not_null,
                 )
                 if condition is not None:
                     conditions.append(condition)

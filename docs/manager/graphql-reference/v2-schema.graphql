@@ -1152,7 +1152,7 @@ type AutoScalingRule implements Node {
   """
   prometheusQueryPresetId: ID
   createdAt: DateTime!
-  lastTriggeredAt: DateTime!
+  lastTriggeredAt: DateTime
 }
 
 """Added in 25.19.0. Connection for auto-scaling rules."""
@@ -1177,7 +1177,7 @@ type AutoScalingRuleEdge {
 """Added in 25.19.0. """
 input AutoScalingRuleFilter {
   createdAt: DateTimeFilter = null
-  lastTriggeredAt: DateTimeFilter = null
+  lastTriggeredAt: NullableDateTimeFilter = null
   AND: [AutoScalingRuleFilter!] = null
   OR: [AutoScalingRuleFilter!] = null
   NOT: [AutoScalingRuleFilter!] = null
@@ -6842,6 +6842,17 @@ input NotificationRuleTypeFilter {
 
   """Excludes rules whose type is in this list."""
   notIn: [NotificationRuleType!] = null
+}
+
+"""
+Added in UNRELEASED. Filter for nullable datetime fields with IS NULL / IS NOT NULL support.
+"""
+input NullableDateTimeFilter {
+  before: DateTime = null
+  after: DateTime = null
+  equals: DateTime = null
+  notEquals: DateTime = null
+  isNull: Boolean = null
 }
 
 """
