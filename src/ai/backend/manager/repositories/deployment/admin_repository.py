@@ -9,6 +9,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 from ruamel.yaml import YAML
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
@@ -91,7 +92,8 @@ class DeploymentAdminRepository:
             )
             try:
                 raw_bytes = await storage_source.fetch_definition_file(vfolder_location, candidates)
-                parsed: dict[str, Any] = cast(dict[str, Any], yaml.load(raw_bytes))
+                raw_dict: dict[str, Any] = cast(dict[str, Any], yaml.load(raw_bytes))
+                model_def = ModelDefinition.model_validate(raw_dict)
             except Exception:
                 log.warning(
                     "Failed to fetch model definition for revision {} (vfolder {})",
@@ -101,14 +103,15 @@ class DeploymentAdminRepository:
                 failed += 1
                 continue
 
-            if row.model_definition == parsed:
+            model_def_dict = model_def.model_dump(exclude_none=True, by_alias=True)
+            if row.model_definition == model_def_dict:
                 continue
 
             async with self._db.begin_session() as session:
                 await session.execute(
                     sa.update(DeploymentRevisionRow.__table__)
                     .where(DeploymentRevisionRow.id == revision_id)
-                    .values(model_definition=parsed)
+                    .values(model_definition=model_def_dict)
                 )
             updated += 1
 
