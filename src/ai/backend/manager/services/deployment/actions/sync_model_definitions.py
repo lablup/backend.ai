@@ -1,18 +1,23 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import EntityType
+from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
 @dataclass(frozen=True)
-class SyncModelDefinitionsAction(DeploymentBaseAction):
+class SyncModelDefinitionsAction(BaseAction):
     """Action to sync model_definition from vfolder storage for all deployment revisions."""
 
     @override
     def entity_id(self) -> str | None:
         return None
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.MODEL_DEPLOYMENT
 
     @override
     @classmethod
