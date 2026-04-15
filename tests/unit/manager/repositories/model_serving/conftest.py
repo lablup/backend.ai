@@ -459,7 +459,7 @@ def create_full_featured_endpoint(
 
     # Set attributes normally set by database
     endpoint_row.id = EndpointId(uuid.uuid4())
-    endpoint_row.created_at = None
+    endpoint_row.created_at = datetime.now(tz=UTC)
     endpoint_row.destroyed_at = None
     endpoint_row.lifecycle_stage = EndpointLifecycle.CREATED
     endpoint_row.retries = 0
