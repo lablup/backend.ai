@@ -1,6 +1,7 @@
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.repositories.deployment.admin_repository import DeploymentAdminRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -20,6 +21,8 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.deployment.admin_processors import DeploymentAdminProcessors
+from ai.backend.manager.services.deployment.admin_service import DeploymentAdminService
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.deployment_revision_preset.processors import (
@@ -399,6 +402,12 @@ def create_services(args: ServiceArgs) -> Services:
             deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
         ),
+        deployment_admin=DeploymentAdminService(
+            repository=DeploymentAdminRepository(
+                db=args.db,
+                storage_manager=args.storage_manager,
+            ),
+        ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),
         scheduling_history=SchedulingHistoryService(repositories.scheduling_history.repository),
@@ -520,6 +529,7 @@ def create_processors(
             services.artifact_revision, action_monitors, validators
         ),
         deployment=DeploymentProcessors(services.deployment, action_monitors, validators),
+        deployment_admin=DeploymentAdminProcessors(services.deployment_admin, action_monitors),
         storage_namespace=StorageNamespaceProcessors(
             services.storage_namespace, action_monitors, validators
         ),

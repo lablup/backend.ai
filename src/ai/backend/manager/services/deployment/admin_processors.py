@@ -5,7 +5,6 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.sync_model_definitions import (
     SyncModelDefinitionsAction,
@@ -25,7 +24,6 @@ class DeploymentAdminProcessors(AbstractProcessorPackage):
         self,
         service: DeploymentAdminService,
         action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
         self.sync_model_definitions = ActionProcessor(
             service.sync_model_definitions, action_monitors

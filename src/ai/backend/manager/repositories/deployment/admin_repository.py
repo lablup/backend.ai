@@ -76,6 +76,8 @@ class DeploymentAdminRepository:
                 )
             ).all()
 
+        pending_updates: list[tuple[uuid.UUID, dict[str, Any]]] = []
+
         for row in rows:
             revision_id: uuid.UUID = row.id
             vfolder_location = VFolderLocation(
@@ -99,6 +101,7 @@ class DeploymentAdminRepository:
                     "Failed to fetch model definition for revision {} (vfolder {})",
                     revision_id,
                     row.vf_id,
+                    exc_info=True,
                 )
                 failed += 1
                 continue
@@ -107,12 +110,16 @@ class DeploymentAdminRepository:
             if row.model_definition == model_def_dict:
                 continue
 
+            pending_updates.append((revision_id, model_def_dict))
+
+        if pending_updates:
             async with self._db.begin_session() as session:
-                await session.execute(
-                    sa.update(DeploymentRevisionRow.__table__)
-                    .where(DeploymentRevisionRow.id == revision_id)
-                    .values(model_definition=model_def_dict)
-                )
-            updated += 1
+                for revision_id, model_def_dict in pending_updates:
+                    await session.execute(
+                        sa.update(DeploymentRevisionRow.__table__)
+                        .where(DeploymentRevisionRow.id == revision_id)
+                        .values(model_definition=model_def_dict)
+                    )
+                    updated += 1
 
         return updated, failed
