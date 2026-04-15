@@ -1,18 +1,21 @@
-"""backfill project member roles
+"""backfill project member roles and promote legacy custom sources to system
 
-Creates a SYSTEM-sourced member role for every project that does not already
-have one at project scope. This fixes two historical gaps:
+Normalizes the project member role across all projects so that every project
+has exactly one SYSTEM-sourced member role at its scope. This fixes two
+historical gaps:
 
 1. Projects created after migration 430b1631804d had no member role at all,
-   because the runtime create path only creates a project admin role.
+   because the runtime create path only created a project admin role. For
+   these, a new SYSTEM-sourced member role is created together with its
+   scope binding and member permissions.
 2. Projects created before 430b1631804d received a member role from that
-   migration, but with source=CUSTOM. We intentionally leave those untouched
-   here (source normalization is out of scope); presence-based detection skips
-   them as "already has a member role".
+   migration, but with source=CUSTOM. For these, the existing role row is
+   promoted to source=SYSTEM in place; no new role is created and existing
+   permissions / user-role mappings are preserved.
 
 Runtime creation of the member role is introduced alongside this migration in
 GroupDBSource.create(), so new projects created after this migration lands
-will already have both roles and the backfill will be a no-op for them.
+will already have both roles and the migration will be a no-op for them.
 
 Revision ID: e3fb172166dc
 Revises: d8e4f2a1b3c7
@@ -228,20 +231,60 @@ def _create_member_permissions(
     insert_skip_on_conflict(db_conn, permissions_table, rows)
 
 
+def _promote_legacy_member_roles_to_system(db_conn: Connection) -> None:
+    """Promote legacy project member roles (``role_project_{id8}_member``) that
+    were created with ``source = custom`` by migration ``430b1631804d`` so that
+    every project member role has ``source = system``.
+
+    Only roles whose (a) name matches the legacy member role pattern and
+    (b) are bound in ``association_scopes_entities`` at PROJECT scope are
+    updated, to avoid touching any unrelated custom role. The filter is
+    idempotent: roles that are already ``system`` simply match zero rows.
+    """
+    roles_table = get_roles_table()
+    assoc_table = get_association_scopes_entities_table()
+
+    legacy_scope_subq = (
+        sa.select(sa.literal(1))
+        .select_from(assoc_table)
+        .where(
+            assoc_table.c.scope_type == ScopeType.PROJECT,
+            assoc_table.c.entity_type == "role",
+            sa.cast(assoc_table.c.entity_id, sa.String) == sa.cast(roles_table.c.id, sa.String),
+        )
+        .exists()
+    )
+
+    stmt = (
+        sa.update(roles_table)
+        .where(
+            roles_table.c.name.like("role_project_%_member"),
+            roles_table.c.source == RoleSource.CUSTOM,
+            legacy_scope_subq,
+        )
+        .values(source=RoleSource.SYSTEM)
+    )
+    db_conn.execute(stmt)
+
+
 def upgrade() -> None:
     conn = op.get_bind()
 
+    # 1. Backfill member roles for projects that have none.
     project_rows = _query_projects_missing_member_role(conn)
     project_ids: list[uuid.UUID] = [row.id for row in project_rows]
-    if not project_ids:
-        return
+    if project_ids:
+        project_to_role = _create_member_roles_for_projects(conn, project_ids)
+        _bind_roles_to_project_scopes(conn, project_to_role)
+        _create_member_permissions(conn, project_to_role)
 
-    project_to_role = _create_member_roles_for_projects(conn, project_ids)
-    _bind_roles_to_project_scopes(conn, project_to_role)
-    _create_member_permissions(conn, project_to_role)
+    # 2. Promote legacy CUSTOM member roles to SYSTEM so that all project
+    #    member roles have a consistent source across the database.
+    _promote_legacy_member_roles_to_system(conn)
 
 
 def downgrade() -> None:
     # We cannot safely distinguish backfilled member roles from those that
-    # existed beforehand, so downgrade is intentionally a no-op.
+    # existed beforehand, and the pre-upgrade source of legacy roles is not
+    # recorded anywhere, so downgrade is intentionally a no-op.
     pass
