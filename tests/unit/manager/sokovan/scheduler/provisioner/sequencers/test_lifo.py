@@ -71,9 +71,9 @@ class TestLIFOSequencer:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
+                main_access_key=AccessKey("user1"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -81,9 +81,9 @@ class TestLIFOSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),
+                main_access_key=AccessKey("user2"),
                 requested_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("20")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -91,9 +91,9 @@ class TestLIFOSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user3"),
+                main_access_key=AccessKey("user3"),
                 requested_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -115,9 +115,9 @@ class TestLIFOSequencer:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
+                main_access_key=AccessKey("user1"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -183,9 +183,9 @@ class TestLIFOSequencer:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),
+                main_access_key=AccessKey("user2"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -193,9 +193,9 @@ class TestLIFOSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
+                main_access_key=AccessKey("user1"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -203,9 +203,9 @@ class TestLIFOSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user3"),  # New user
+                main_access_key=AccessKey("user3"),  # New user
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",

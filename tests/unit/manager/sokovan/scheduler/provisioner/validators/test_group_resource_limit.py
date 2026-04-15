@@ -35,9 +35,9 @@ class TestGroupResourceLimitValidator:
     ) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("2"), mem=Decimal("2")),
-            user_uuid=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
@@ -73,9 +73,9 @@ class TestGroupResourceLimitValidator:
     ) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
-            user_uuid=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
@@ -112,9 +112,9 @@ class TestGroupResourceLimitValidator:
     ) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
-            user_uuid=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
@@ -153,9 +153,9 @@ class TestGroupResourceLimitValidator:
     ) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
-            user_uuid=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
