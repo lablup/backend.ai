@@ -15,6 +15,7 @@ from .auto_scaling import (
 )
 from .deployment import (
     admin_deployments,
+    admin_sync_model_definitions,
     create_model_deployment,
     delete_model_deployment,
     deployment,
@@ -70,6 +71,7 @@ __all__ = [
     "update_model_deployment",
     "delete_model_deployment",
     "sync_replicas",
+    "admin_sync_model_definitions",
     "deployment_status_changed",
     # Policy
     "update_deployment_policy",

@@ -63,6 +63,12 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    RevisionSyncStatusDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    SyncModelDefinitionsPayload as SyncModelDefinitionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncReplicaPayload as SyncReplicaPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
@@ -714,3 +720,31 @@ class SyncReplicaPayload:
     """Payload for replica sync mutation result."""
 
     success: strawberry.auto
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Status of a single revision sync operation.",
+    ),
+    model=RevisionSyncStatusDTO,
+)
+class RevisionSyncStatusGQL:
+    """Status of a single revision sync operation."""
+
+    revision_id: strawberry.auto
+    success: strawberry.auto
+    reason: strawberry.auto
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for model_definition sync result.",
+    ),
+    model=SyncModelDefinitionsPayloadDTO,
+)
+class SyncModelDefinitionsPayload:
+    """Payload for model_definition sync result."""
+
+    results: strawberry.auto

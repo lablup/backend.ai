@@ -10,6 +10,7 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -29,6 +30,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     ModelDeploymentConnection,
     ModelDeploymentEdge,
     ProjectDeploymentScopeGQL,
+    SyncModelDefinitionsPayload,
     SyncReplicaInput,
     SyncReplicaPayload,
     UpdateDeploymentInput,
@@ -236,6 +238,20 @@ async def sync_replicas(
 ) -> SyncReplicaPayload:
     payload = await info.context.adapters.deployment.sync_replicas(input.to_pydantic())
     return SyncReplicaPayload(success=payload.success)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Sync model_definition from vfolder storage for all deployment revisions (superadmin only).",
+    )
+)  # type: ignore[misc]
+async def admin_sync_model_definitions(
+    info: Info[StrawberryGQLContext],
+) -> SyncModelDefinitionsPayload:
+    check_admin_only(info)
+    payload = await info.context.adapters.deployment.admin_sync_model_definitions()
+    return SyncModelDefinitionsPayload.from_pydantic(payload)
 
 
 # Subscription resolvers

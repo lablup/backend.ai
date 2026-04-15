@@ -30,52 +30,48 @@ class TestDeploymentAdminService:
     def admin_service(self, mock_admin_repository: MagicMock) -> DeploymentAdminService:
         return DeploymentAdminService(repository=mock_admin_repository)
 
-    async def test_sync_returns_per_revision_results(
+    @pytest.mark.parametrize(
+        ("repo_result", "expected_count", "expected_all_success"),
+        [
+            pytest.param([], 0, True, id="no-revisions"),
+            pytest.param(
+                [RevisionSyncStatus(revision_id=uuid.uuid4(), success=True)],
+                1,
+                True,
+                id="single-success",
+            ),
+            pytest.param(
+                [RevisionSyncStatus(revision_id=uuid.uuid4(), success=False, reason="error")],
+                1,
+                False,
+                id="single-failure",
+            ),
+            pytest.param(
+                [
+                    RevisionSyncStatus(revision_id=uuid.uuid4(), success=True),
+                    RevisionSyncStatus(
+                        revision_id=uuid.uuid4(), success=False, reason="file not found"
+                    ),
+                    RevisionSyncStatus(revision_id=uuid.uuid4(), success=True),
+                ],
+                3,
+                False,
+                id="mixed-results",
+            ),
+        ],
+    )
+    async def test_sync_delegates_to_repository_and_returns_results(
         self,
         admin_service: DeploymentAdminService,
         mock_admin_repository: MagicMock,
+        repo_result: list[RevisionSyncStatus],
+        expected_count: int,
+        expected_all_success: bool,
     ) -> None:
-        rev1, rev2 = uuid.uuid4(), uuid.uuid4()
-        mock_admin_repository.sync_model_definitions = AsyncMock(
-            return_value=[
-                RevisionSyncStatus(revision_id=rev1, success=True),
-                RevisionSyncStatus(revision_id=rev2, success=False, reason="file not found"),
-            ]
-        )
+        mock_admin_repository.sync_model_definitions = AsyncMock(return_value=repo_result)
 
         result = await admin_service.sync_model_definitions(SyncModelDefinitionsAction())
 
-        assert len(result.results) == 2
-        assert result.results[0].revision_id == rev1
-        assert result.results[0].success is True
-        assert result.results[1].revision_id == rev2
-        assert result.results[1].success is False
-        assert result.results[1].reason == "file not found"
-
-    async def test_sync_with_no_revisions(
-        self,
-        admin_service: DeploymentAdminService,
-        mock_admin_repository: MagicMock,
-    ) -> None:
-        mock_admin_repository.sync_model_definitions = AsyncMock(return_value=[])
-
-        result = await admin_service.sync_model_definitions(SyncModelDefinitionsAction())
-
-        assert result.results == []
-
-    async def test_sync_with_all_failures(
-        self,
-        admin_service: DeploymentAdminService,
-        mock_admin_repository: MagicMock,
-    ) -> None:
-        revisions = [uuid.uuid4() for _ in range(3)]
-        mock_admin_repository.sync_model_definitions = AsyncMock(
-            return_value=[
-                RevisionSyncStatus(revision_id=r, success=False, reason="error") for r in revisions
-            ]
-        )
-
-        result = await admin_service.sync_model_definitions(SyncModelDefinitionsAction())
-
-        assert len(result.results) == 3
-        assert all(not r.success for r in result.results)
+        assert len(result.results) == expected_count
+        assert all(r.success for r in result.results) == expected_all_success
+        mock_admin_repository.sync_model_definitions.assert_awaited_once()
