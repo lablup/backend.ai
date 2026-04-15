@@ -63,7 +63,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
-    RevisionSyncStatusDTO,
+    RevisionSyncResultDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncModelDefinitionsPayload as SyncModelDefinitionsPayloadDTO,
@@ -727,7 +727,7 @@ class SyncReplicaPayload:
         added_version=NEXT_RELEASE_VERSION,
         description="Status of a single revision sync operation.",
     ),
-    model=RevisionSyncStatusDTO,
+    model=RevisionSyncResultDTO,
     name="RevisionSyncResult",
 )
 class RevisionSyncResultGQL:
