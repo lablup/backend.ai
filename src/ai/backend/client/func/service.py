@@ -5,14 +5,12 @@ from warnings import deprecated
 
 from faker import Faker
 
-from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.output.fields import service_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
-from ai.backend.client.types import set_if_set
 from ai.backend.client.utils import dedent as _d
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
@@ -383,44 +381,3 @@ class Service(BaseFunction):
             result: dict[str, Any] = await resp.json()
 
             return result
-
-    @api_function
-    async def modify(
-        self,
-        *,
-        name: str | Undefined = undefined,
-        replicas: int | Undefined = undefined,
-        image: str | Undefined = undefined,
-        resource_group: str | Undefined = undefined,
-        resource_slots: Mapping[str, str] | Undefined = undefined,
-        resource_opts: Mapping[str, str] | Undefined = undefined,
-        cluster_mode: str | Undefined = undefined,
-        cluster_size: int | Undefined = undefined,
-        model_definition_path: str | Undefined = undefined,
-        open_to_public: bool | Undefined = undefined,
-        environ: Mapping[str, str] | Undefined = undefined,
-        runtime_variant: str | Undefined = undefined,
-    ) -> dict[str, Any]:
-        query = _d("""\
-            mutation($endpoint_id: UUID!, $props: ModifyEndpointInput!) {
-                modify_endpoint(endpoint_id: $endpoint_id, props: $props) {
-                    ok msg
-                }
-            }
-        """)
-        props: dict[str, Any] = {}
-        set_if_set(props, "name", name)
-        set_if_set(props, "replicas", replicas)
-        set_if_set(props, "image", image)
-        set_if_set(props, "resource_group", resource_group)
-        set_if_set(props, "resource_slots", resource_slots)
-        set_if_set(props, "resource_opts", resource_opts)
-        set_if_set(props, "cluster_mode", cluster_mode)
-        set_if_set(props, "cluster_size", cluster_size)
-        set_if_set(props, "model_definition_path", model_definition_path)
-        set_if_set(props, "open_to_public", open_to_public)
-        set_if_set(props, "environ", environ)
-        set_if_set(props, "runtime_variant", runtime_variant)
-        variables = {"endpoint_id": str(self.id), "props": props}
-        data = await api_session.get().Admin._query(query, variables)
-        return cast(dict[str, Any], data["modify_endpoint"])
