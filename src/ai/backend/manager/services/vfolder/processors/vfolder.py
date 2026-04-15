@@ -196,8 +196,10 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.update_vfolder_attribute = SingleEntityActionProcessor(
             service.update_attribute, action_monitors, validators=single_entity_rbac_validators
         )
+        # NOTE: RBAC validation is temporarily disabled for move_to_trash_vfolder
+        # for the same reason as create_vfolder above (see note at create_vfolder).
         self.move_to_trash_vfolder = SingleEntityActionProcessor(
-            service.move_to_trash, action_monitors, validators=single_entity_rbac_validators
+            service.move_to_trash, action_monitors
         )
         self.restore_vfolder_from_trash = SingleEntityActionProcessor(
             service.restore, action_monitors, validators=single_entity_rbac_validators
