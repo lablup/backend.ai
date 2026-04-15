@@ -13132,21 +13132,6 @@ type Query
   rgUserFairShares(scope: ResourceGroupUserScope!, filter: RGUserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. List domain usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgDomainUsageBuckets(scope: ResourceGroupDomainScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0. List project usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgProjectUsageBuckets(scope: ResourceGroupProjectScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0. List user usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection @join__field(graph: STRAWBERRY)
-
-  """
   Added in 26.2.0. Query images within a specific container registry with optional filtering, ordering, and pagination. Returns container images that belong to the specified registry. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.
   """
   containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)

@@ -81,8 +81,7 @@ async def admin_create_user_v2(
     Returns:
         CreateUserPayloadGQL with the created user.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -176,8 +175,7 @@ async def admin_update_user_v2(
     Returns:
         UpdateUserPayloadGQL with the updated user.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -333,8 +331,7 @@ async def update_user_v2(
     Returns:
         UpdateUserPayloadGQL with the updated user.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     ctx = info.context
     me = current_user()
@@ -366,8 +363,7 @@ async def admin_delete_user_v2(
     Returns:
         DeleteUserPayloadGQL indicating success.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -394,8 +390,7 @@ async def admin_delete_users_v2(
     Returns:
         DeleteUsersPayloadGQL with count of deleted users.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -427,8 +422,7 @@ async def admin_purge_user_v2(
     Returns:
         PurgeUserPayloadGQL indicating success.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context

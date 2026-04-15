@@ -341,9 +341,6 @@ from .resource_usage import (
     admin_user_usage_buckets,
     domain_usage_buckets,
     project_usage_buckets,
-    rg_domain_usage_buckets,
-    rg_project_usage_buckets,
-    rg_user_usage_buckets,
     user_usage_buckets,
 )
 from .runtime_variant import (
@@ -537,9 +534,6 @@ class Query:
     rg_project_fair_shares = rg_project_fair_shares
     rg_user_fair_share = rg_user_fair_share
     rg_user_fair_shares = rg_user_fair_shares
-    rg_domain_usage_buckets = rg_domain_usage_buckets
-    rg_project_usage_buckets = rg_project_usage_buckets
-    rg_user_usage_buckets = rg_user_usage_buckets
     # Container Registry Scoped APIs
     container_registry_images_v2 = container_registry_images_v2
     # Image Scoped APIs
