@@ -1580,6 +1580,12 @@ class SessionService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def get_session(self, action: GetSessionAction) -> GetSessionActionResult:
+        session_data = await self._session_repository.get_session(SessionId(action.session_id))
+        if session_data is None:
+            raise SessionNotFound(f"Session not found (id:{action.session_id})")
+        return GetSessionActionResult(session_data=session_data)
+
     async def search_in_project(
         self, action: SearchSessionsInProjectAction
     ) -> SearchSessionsInProjectActionResult:

@@ -193,6 +193,45 @@ class SessionData:
     service_ports: str | None
 
 
+@dataclass(frozen=True)
+class SessionDetailData:
+    """Lightweight projection of a single session row.
+
+    Covers only the columns consumed by the v2 single-node GET path, so no
+    kernel eager-loading and no owner lookup are required.
+    """
+
+    id: SessionId
+    creation_id: str | None
+    name: str | None
+    session_type: SessionTypes
+    priority: int
+    is_preemptible: bool
+    cluster_mode: ClusterMode
+    cluster_size: int
+    domain_name: str
+    group_id: UUID
+    user_uuid: UUID
+    access_key: AccessKey | None
+    tag: str | None
+    scaling_group_name: str | None
+    occupying_slots: ResourceSlot
+    requested_slots: ResourceSlot
+    environ: dict[str, Any] | None
+    bootstrap_script: str | None
+    startup_command: str | None
+    callback_url: str | None
+    use_host_network: bool
+    batch_timeout: int | None
+    created_at: datetime | None
+    terminated_at: datetime | None
+    starts_at: datetime | None
+    status: SessionStatus
+    result: SessionResult
+    network_type: NetworkType | None
+    network_id: str | None
+
+
 @dataclass
 class SessionIdentity:
     id: SessionId

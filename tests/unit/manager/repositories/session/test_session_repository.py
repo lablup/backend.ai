@@ -399,6 +399,33 @@ class TestSessionRepository:
         assert result.has_next_page is False
         assert result.has_previous_page is False
 
+    # =========================================================================
+    # Tests - get_session(id) single-node fetch
+    # =========================================================================
+
+    async def test_get_session_returns_detail_data(
+        self,
+        repository: SessionRepository,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        """get_session(id) returns a SessionDetailData projection of the row."""
+        result = await repository.get_session(session_with_kernel.session_id)
+
+        assert result is not None
+        assert result.id == session_with_kernel.session_id
+        assert result.user_uuid == session_with_kernel.user_id
+        assert result.domain_name == session_with_kernel.domain_name
+        assert result.access_key == session_with_kernel.access_key
+
+    async def test_get_session_returns_none_when_missing(
+        self,
+        repository: SessionRepository,
+    ) -> None:
+        """get_session(id) returns None for an unknown session id."""
+        result = await repository.get_session(SessionId(uuid.uuid4()))
+
+        assert result is None
+
 
 class TestBatchPopulateSessionOccupiedSlots:
     """Test batch_populate_session_occupied_slots computes occupied_slots
