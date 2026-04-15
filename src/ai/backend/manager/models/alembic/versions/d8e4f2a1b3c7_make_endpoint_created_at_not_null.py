@@ -1,7 +1,7 @@
 """make endpoint created_at columns NOT NULL
 
 Revision ID: d8e4f2a1b3c7
-Revises: f7d3738a3cef
+Revises: a3b4c5d6e7f8
 Create Date: 2026-04-15
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "d8e4f2a1b3c7"
-down_revision = "f7d3738a3cef"
+down_revision = "a3b4c5d6e7f8"
 branch_labels = None
 depends_on = None
 
