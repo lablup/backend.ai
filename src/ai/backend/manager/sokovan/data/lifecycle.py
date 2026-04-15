@@ -37,6 +37,7 @@ class KernelBindingData:
     agent_addr: str | None
     scaling_group: str
     image: str
+    image_id: UUID | None
     architecture: str
     status: KernelStatus | None = None
     status_changed: float | None = None
@@ -111,7 +112,7 @@ class SessionsForPullWithImages:
     """Sessions for image pulling with their image configurations."""
 
     sessions: list[SessionDataForPull]
-    image_configs: dict[str, ImageConfigData]
+    image_configs: dict[UUID, ImageConfigData]
 
 
 @dataclass
@@ -119,7 +120,7 @@ class SessionsForStartWithImages:
     """Sessions for starting with their image configurations."""
 
     sessions: list[SessionDataForStart]
-    image_configs: dict[str, ImageConfigData]
+    image_configs: dict[UUID, ImageConfigData]
 
 
 @dataclass
@@ -127,7 +128,7 @@ class ScheduledSessionsWithImages:
     """Scheduled sessions with their image configurations."""
 
     sessions: list[ScheduledSessionData]
-    image_configs: dict[str, ImageConfigData]
+    image_configs: dict[UUID, ImageConfigData]
 
 
 @dataclass
@@ -139,6 +140,7 @@ class KernelStartData:
     agent_addr: str
     scaling_group: str
     image: str
+    image_id: UUID | None
     architecture: str
     cluster_role: str
     cluster_idx: int
@@ -174,7 +176,7 @@ class PreparedSessionsWithImages:
     """Prepared sessions with their image configurations."""
 
     sessions: list[PreparedSessionData]
-    image_configs: dict[str, ImageConfigData]
+    image_configs: dict[UUID, ImageConfigData]
 
 
 @dataclass

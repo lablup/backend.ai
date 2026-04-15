@@ -1322,6 +1322,7 @@ class ScheduleDBSource:
                 batch_timeout=session_data.batch_timeout,
                 callback_url=session_data.callback_url,
                 images=session_data.images,
+                image_ids=session_data.image_ids,
                 network_type=session_data.network_type,
                 network_id=session_data.network_id,
                 designated_agent_ids=session_data.designated_agent_list,
@@ -1352,6 +1353,7 @@ class ScheduleDBSource:
                     user_uuid=kernel.user_uuid,
                     access_key=kernel.access_key,
                     image=kernel.image,
+                    image_id=kernel.image_id,
                     architecture=kernel.architecture,
                     registry=kernel.registry,
                     tag=kernel.tag,
@@ -1612,6 +1614,7 @@ class ScheduleDBSource:
             image_row = await ImageRow.resolve(db_sess, [image_ref])
             if image_row:
                 image_infos[image_ref.canonical] = ImageInfo(
+                    id=image_row.id,
                     canonical=image_row.name,  # 'name' is the canonical reference in ImageRow
                     architecture=image_row.architecture,
                     registry=image_row.registry,
@@ -2597,7 +2600,11 @@ class ScheduleDBSource:
             return cast(CursorResult[Any], result).rowcount
 
     async def update_kernels_to_pulling_for_image(
-        self, agent_id: AgentId, image: str, image_ref: str | None = None
+        self,
+        agent_id: AgentId,
+        image: str,
+        image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> int:
         """
         Update kernel status from PREPARING to PULLING for the specified image on an agent.
@@ -2605,12 +2612,18 @@ class ScheduleDBSource:
         :param agent_id: The agent ID where kernels should be updated
         :param image: The image name to match kernels
         :param image_ref: Optional image reference (canonical format)
+        :param image_id: Optional image UUID; when provided, matches by image_id instead of name
         :return: Number of kernels updated
         """
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
-            # Use image_ref if provided (canonical format), otherwise use image
-            image_to_match = image_ref if image_ref else image
+            # Prefer image_id (UUID) for matching when available
+            if image_id is not None:
+                image_condition = KernelRow.image_id == image_id
+            else:
+                # Use image_ref if provided (canonical format), otherwise use image
+                image_to_match = image_ref if image_ref else image
+                image_condition = KernelRow.image == image_to_match
             # Find kernels on this agent with this image in SCHEDULED or PREPARING state.
             # SCHEDULED is included because image pulling can start before kernel
             # transitions to PREPARING (which happens in create_kernel RPC).
@@ -2619,7 +2632,7 @@ class ScheduleDBSource:
                 .where(
                     sa.and_(
                         KernelRow.agent == agent_id,
-                        KernelRow.image == image_to_match,
+                        image_condition,
                         KernelRow.status.in_([
                             KernelStatus.SCHEDULED,
                             KernelStatus.PREPARING,
@@ -2639,7 +2652,11 @@ class ScheduleDBSource:
             return cast(CursorResult[Any], result).rowcount
 
     async def update_kernels_to_prepared_for_image(
-        self, agent_id: AgentId, image: str, image_ref: str | None = None
+        self,
+        agent_id: AgentId,
+        image: str,
+        image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
@@ -2648,12 +2665,18 @@ class ScheduleDBSource:
         :param agent_id: The agent ID where kernels should be updated
         :param image: The image name to match kernels
         :param image_ref: Optional image reference (canonical format)
+        :param image_id: Optional image UUID; when provided, matches by image_id instead of name
         :return: Number of kernels updated
         """
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
-            # Use image_ref if provided (canonical format), otherwise use image
-            image_to_match = image_ref if image_ref else image
+            # Prefer image_id (UUID) for matching when available
+            if image_id is not None:
+                image_condition = KernelRow.image_id == image_id
+            else:
+                # Use image_ref if provided (canonical format), otherwise use image
+                image_to_match = image_ref if image_ref else image
+                image_condition = KernelRow.image == image_to_match
             # Find kernels on this agent with this image in SCHEDULED, PULLING or PREPARING state
             # and update them to PREPARED.
             # SCHEDULED is included because when image already exists, ImagePullFinishedEvent
@@ -2663,7 +2686,7 @@ class ScheduleDBSource:
                 .where(
                     sa.and_(
                         KernelRow.agent == agent_id,
-                        KernelRow.image == image_to_match,
+                        image_condition,
                         KernelRow.status.in_([
                             KernelStatus.SCHEDULED,
                             KernelStatus.PULLING,
@@ -2684,7 +2707,12 @@ class ScheduleDBSource:
             return cast(CursorResult[Any], result).rowcount
 
     async def cancel_kernels_for_failed_image(
-        self, agent_id: AgentId, image: str, error_msg: str, image_ref: str | None = None
+        self,
+        agent_id: AgentId,
+        image: str,
+        error_msg: str,
+        image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> set[SessionId]:
         """Cancel SCHEDULED/PULLING/PREPARING kernels of a failed-to-pull
         image on an agent and free their ``resource_allocations`` rows in
@@ -2692,7 +2720,12 @@ class ScheduleDBSource:
         """
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
-            image_to_match = image_ref if image_ref else image
+            # Prefer image_id (UUID) for matching when available
+            if image_id is not None:
+                image_condition = KernelRow.image_id == image_id
+            else:
+                image_to_match = image_ref if image_ref else image
+                image_condition = KernelRow.image == image_to_match
             # SCHEDULED is included because image pull failure can occur
             # before the kernel transitions to PREPARING.
             stmt = (
@@ -2700,7 +2733,7 @@ class ScheduleDBSource:
                 .where(
                     sa.and_(
                         KernelRow.agent == agent_id,
-                        KernelRow.image == image_to_match,
+                        image_condition,
                         KernelRow.status.in_([
                             KernelStatus.SCHEDULED,
                             KernelStatus.PULLING,
@@ -2814,7 +2847,7 @@ class ScheduleDBSource:
 
     async def _resolve_image_configs(
         self, db_sess: SASession, unique_images: set[ImageIdentifier]
-    ) -> dict[str, ImageConfigData]:
+    ) -> dict[UUID, ImageConfigData]:
         """
         Resolve image configurations for the given unique images.
 
@@ -2822,7 +2855,7 @@ class ScheduleDBSource:
 
         :param db_sess: Database session to use
         :param unique_images: Set of ImageIdentifier objects to resolve
-        :return: Dictionary mapping image names to ImageConfigData
+        :return: Dictionary mapping image UUIDs to ImageConfigData
         """
         if not unique_images:
             return {}
@@ -2838,13 +2871,14 @@ class ScheduleDBSource:
         image_rows = result.scalars().all()
 
         # Convert to ImageConfigData
-        image_configs: dict[str, ImageConfigData] = {}
+        image_configs: dict[UUID, ImageConfigData] = {}
         for image_row in image_rows:
             try:
                 img_ref = image_row.image_ref
                 registry_row = image_row.registry_row
 
                 image_config = ImageConfigData(
+                    id=image_row.id,
                     canonical=img_ref.canonical,
                     architecture=image_row.architecture,
                     project=image_row.project,
@@ -2856,8 +2890,8 @@ class ScheduleDBSource:
                     registry_username=registry_row.username,
                     registry_password=registry_row.password,
                 )
-                # Use the canonical name as key (which is what KernelRow.image contains)
-                image_configs[image_row.name] = image_config
+                # Use the image UUID as key for reliable matching
+                image_configs[image_row.id] = image_config
             except Exception as e:
                 log.error(f"Failed to process image {image_row.name}: {e}")
                 continue
@@ -2885,6 +2919,7 @@ class ScheduleDBSource:
                         KernelRow.agent_addr,
                         KernelRow.scaling_group,
                         KernelRow.image,
+                        KernelRow.image_id,
                         KernelRow.architecture,
                         KernelRow.status,
                         KernelRow.status_changed,
@@ -2906,6 +2941,7 @@ class ScheduleDBSource:
                     agent_addr=kernel.agent_addr,
                     scaling_group=kernel.scaling_group or "",
                     image=kernel.image or "",
+                    image_id=kernel.image_id,
                     architecture=kernel.architecture or "",
                     status=kernel.status,
                     status_changed=kernel.status_changed.timestamp()
@@ -2941,6 +2977,7 @@ class ScheduleDBSource:
                         KernelRow.agent_addr,
                         KernelRow.scaling_group,
                         KernelRow.image,
+                        KernelRow.image_id,
                         KernelRow.architecture,
                     )
                 ),
@@ -3060,6 +3097,7 @@ class ScheduleDBSource:
                 KernelRow.agent_addr,
                 KernelRow.scaling_group,
                 KernelRow.image,
+                KernelRow.image_id,
                 KernelRow.architecture,
                 KernelRow.cluster_role,
                 KernelRow.cluster_idx,
@@ -3114,6 +3152,7 @@ class ScheduleDBSource:
                     agent_addr=row.agent_addr,
                     scaling_group=row.scaling_group,
                     image=row.image,
+                    image_id=row.image_id,
                     architecture=row.architecture,
                     status=row.kernel_status,
                     status_changed=row.status_changed.timestamp() if row.status_changed else None,
@@ -3162,6 +3201,7 @@ class ScheduleDBSource:
                 KernelRow.agent_addr,
                 KernelRow.scaling_group,
                 KernelRow.image,
+                KernelRow.image_id,
                 KernelRow.architecture,
                 KernelRow.cluster_role,
                 KernelRow.cluster_idx,
@@ -3220,6 +3260,7 @@ class ScheduleDBSource:
                     "agent_addr": row.agent_addr,
                     "scaling_group": row.scaling_group,
                     "image": row.image,
+                    "image_id": row.image_id,
                     "architecture": row.architecture,
                     "kernel_status": row.kernel_status,
                     "status_changed": row.status_changed,
@@ -3269,6 +3310,7 @@ class ScheduleDBSource:
                     agent_addr=k["agent_addr"],
                     scaling_group=k["scaling_group"],
                     image=k["image"],
+                    image_id=k["image_id"],
                     architecture=k["architecture"],
                     status=k["kernel_status"],
                     status_changed=k["status_changed"].timestamp() if k["status_changed"] else None,
@@ -4037,6 +4079,7 @@ class ScheduleDBSource:
                 KernelRow.agent_addr,
                 KernelRow.scaling_group,
                 KernelRow.image,
+                KernelRow.image_id,
                 KernelRow.architecture,
                 KernelRow.cluster_role,
                 KernelRow.cluster_idx,
@@ -4086,6 +4129,7 @@ class ScheduleDBSource:
                     agent_addr=row.agent_addr,
                     scaling_group=row.scaling_group,
                     image=row.image,
+                    image_id=row.image_id,
                     architecture=row.architecture,
                     status=row.kernel_status,
                     status_changed=row.status_changed.timestamp() if row.status_changed else None,
@@ -4166,6 +4210,7 @@ class ScheduleDBSource:
                 KernelRow.agent_addr,
                 KernelRow.scaling_group,
                 KernelRow.image,
+                KernelRow.image_id,
                 KernelRow.architecture,
                 KernelRow.cluster_role,
                 KernelRow.cluster_idx,
@@ -4219,6 +4264,7 @@ class ScheduleDBSource:
                     "agent_addr": row.agent_addr,
                     "scaling_group": row.scaling_group,
                     "image": row.image,
+                    "image_id": row.image_id,
                     "architecture": row.architecture,
                     "kernel_status": row.kernel_status,
                     "status_changed": row.status_changed,
@@ -4268,6 +4314,7 @@ class ScheduleDBSource:
                     agent_addr=k["agent_addr"],
                     scaling_group=k["scaling_group"],
                     image=k["image"],
+                    image_id=k["image_id"],
                     architecture=k["architecture"],
                     status=k["kernel_status"],
                     status_changed=k["status_changed"].timestamp() if k["status_changed"] else None,
@@ -4382,6 +4429,7 @@ class ScheduleDBSource:
                     KernelRow.agent_addr,
                     KernelRow.scaling_group,
                     KernelRow.image,
+                    KernelRow.image_id,
                     KernelRow.architecture,
                     KernelRow.cluster_role,
                     KernelRow.cluster_idx,
@@ -4419,6 +4467,7 @@ class ScheduleDBSource:
                     agent_addr=row.agent_addr,
                     scaling_group=row.scaling_group,
                     image=row.image,
+                    image_id=row.image_id,
                     architecture=row.architecture,
                     status=row.status,
                     status_changed=(row.status_changed.timestamp() if row.status_changed else None),
@@ -4538,6 +4587,7 @@ class ScheduleDBSource:
                     KernelRow.agent_addr,
                     KernelRow.scaling_group,
                     KernelRow.image,
+                    KernelRow.image_id,
                     KernelRow.architecture,
                     KernelRow.cluster_role,
                     KernelRow.cluster_idx,
@@ -4575,6 +4625,7 @@ class ScheduleDBSource:
                     agent_addr=row.agent_addr,
                     scaling_group=row.scaling_group,
                     image=row.image,
+                    image_id=row.image_id,
                     architecture=row.architecture,
                     status=row.status,
                     status_changed=(row.status_changed.timestamp() if row.status_changed else None),

@@ -18,8 +18,10 @@ from ai.backend.manager.errors.resource_slot import (
     ResourceSlotTypeNotFound,
 )
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.resource_slot import (
@@ -214,6 +216,8 @@ class TestResourceAllocations:
                 ScalingGroupRow,
                 GroupRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,
@@ -257,6 +261,8 @@ class TestAggregation:
                 ScalingGroupRow,
                 GroupRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,
@@ -588,6 +594,8 @@ class TestComputeActualAgentResourceUsage:
                 ScalingGroupRow,
                 GroupRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,

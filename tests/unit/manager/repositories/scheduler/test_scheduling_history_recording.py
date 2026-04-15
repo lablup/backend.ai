@@ -31,8 +31,10 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import (
@@ -87,6 +89,8 @@ class TestEnqueueSessionSchedulingHistory:
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,
@@ -337,6 +341,7 @@ class TestEnqueueSessionSchedulingHistory:
             batch_timeout=None,
             callback_url=None,
             images=["python:3.8"],
+            image_ids=[],
             designated_agent_list=None,
             kernels=[
                 KernelEnqueueData(
@@ -357,6 +362,7 @@ class TestEnqueueSessionSchedulingHistory:
                     user_uuid=test_user_uuid,
                     access_key=test_access_key,
                     image="python:3.8",
+                    image_id=None,
                     architecture="x86_64",
                     registry="docker.io",
                     tag=None,
@@ -425,6 +431,8 @@ class TestMarkTerminatingSchedulingHistory:
                 KeyPairRow,
                 GroupRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,

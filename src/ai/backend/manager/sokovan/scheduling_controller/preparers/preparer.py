@@ -116,6 +116,7 @@ class SessionPreparer:
 
         # Collect images from kernels
         session_images = self._collect_session_images(kernel_data_list)
+        session_image_ids = self._collect_session_image_ids(kernel_data_list)
 
         # Use pre-calculated session total
         total_requested = calculated_resources.session_requested_slots
@@ -148,6 +149,7 @@ class SessionPreparer:
             batch_timeout=(int(spec.batch_timeout.total_seconds()) if spec.batch_timeout else None),
             callback_url=spec.callback_url,
             images=session_images,
+            image_ids=session_image_ids,
             network_type=network_type,
             network_id=network_id,
             bootstrap_script=bootstrap_script,
@@ -257,6 +259,7 @@ class SessionPreparer:
                 user_uuid=spec.user_scope.user_uuid,
                 access_key=spec.access_key,
                 image=image_info.canonical if image_info else self.DEFAULT_IMAGE_NAME,
+                image_id=image_info.id if image_info else None,
                 architecture=image_info.architecture if image_info else self.DEFAULT_ARCHITECTURE,
                 registry=image_info.registry if image_info else self.DEFAULT_REGISTRY,
                 tag=spec.session_tag,
@@ -321,3 +324,21 @@ class SessionPreparer:
                     session_images.append(kernel.image)
 
         return session_images
+
+    def _collect_session_image_ids(
+        self,
+        kernel_data_list: list[KernelEnqueueData],
+    ) -> list[uuid.UUID]:
+        """Collect unique image IDs from kernels, with main kernel first."""
+        session_image_ids: list[uuid.UUID] = []
+        seen: set[uuid.UUID] = set()
+
+        for kernel in kernel_data_list:
+            if kernel.image_id is not None and kernel.image_id not in seen:
+                seen.add(kernel.image_id)
+                if kernel.cluster_role == DEFAULT_ROLE:
+                    session_image_ids.insert(0, kernel.image_id)
+                else:
+                    session_image_ids.append(kernel.image_id)
+
+        return session_image_ids

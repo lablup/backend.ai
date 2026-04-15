@@ -152,6 +152,13 @@ class SessionNode(BaseResponseModel):
     """Node model representing a session entity with nested info sub-models."""
 
     id: UUID = Field(description="Session ID.")
+    image_ids: list[UUID] | None = Field(
+        default=None,
+        description=(
+            "UUIDs of the images used by this session. "
+            "Multiple images are possible in multi-kernel (cluster) sessions."
+        ),
+    )
     domain_name: str = Field(description="Domain name the session belongs to.")
     user_id: UUID = Field(description="UUID of the user who owns this session.")
     project_id: UUID = Field(description="Group (project) ID the session belongs to.")

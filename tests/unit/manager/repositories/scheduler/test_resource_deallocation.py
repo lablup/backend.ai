@@ -34,8 +34,10 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import (
@@ -85,6 +87,8 @@ class TestForceTerminateResourceDeallocation:
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,
@@ -630,6 +634,8 @@ class TestBulkTerminateResourceDeallocation:
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,
@@ -1060,6 +1066,8 @@ class TestNegativeValueGuard:
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,

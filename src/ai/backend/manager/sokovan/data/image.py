@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
 from ai.backend.common.types import AutoPullBehavior, ImageConfig
 
@@ -19,6 +20,7 @@ class ImageIdentifier:
 class ImageConfigData:
     """Image configuration data resolved from database."""
 
+    id: UUID
     canonical: str
     architecture: str
     project: str | None
