@@ -57,6 +57,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    RevisionModelDefinitionUpdate,
     RevisionSearchResult,
     RevisionWithVFolderInfo,
     RouteHealthStatus,
@@ -2985,17 +2986,13 @@ class DeploymentDBSource:
 
     async def batch_update_model_definitions(
         self,
-        updates: list[tuple[uuid.UUID, dict[str, Any]]],
+        updates: list[RevisionModelDefinitionUpdate],
     ) -> None:
-        """Update model_definition for multiple revisions in a single transaction.
-
-        Args:
-            updates: List of (revision_id, model_definition_dict) tuples
-        """
+        """Update model_definition for multiple revisions in a single transaction."""
         async with self._begin_session_read_committed() as db_sess:
-            for revision_id, model_def_dict in updates:
+            for update in updates:
                 await db_sess.execute(
                     sa.update(DeploymentRevisionRow.__table__)
-                    .where(DeploymentRevisionRow.id == revision_id)
-                    .values(model_definition=model_def_dict)
+                    .where(DeploymentRevisionRow.id == update.revision_id)
+                    .values(model_definition=update.model_definition)
                 )

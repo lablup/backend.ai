@@ -821,7 +821,7 @@ class DeploymentAdapter(BaseAdapter):
                 RevisionSyncStatusDTO(
                     revision_id=r.revision_id,
                     success=r.success,
-                    reason=r.reason,
+                    failure_reason=r.failure_reason,
                 )
                 for r in result.results
             ],

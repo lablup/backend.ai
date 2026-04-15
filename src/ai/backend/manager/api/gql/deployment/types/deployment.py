@@ -735,7 +735,7 @@ class RevisionSyncStatusGQL:
 
     revision_id: strawberry.auto
     success: strawberry.auto
-    reason: strawberry.auto
+    failure_reason: strawberry.auto
 
 
 @gql_pydantic_type(

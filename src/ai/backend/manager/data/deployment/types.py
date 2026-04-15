@@ -33,13 +33,16 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     MountPermission,
+    QuotaScopeID,
     ResourceSlot,
     RuntimeVariant,
     SessionId,
     VFolderMount,
+    VFolderUsageMode,
 )
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 
 
 class ImageEnvironment(BaseModel):
@@ -976,7 +979,15 @@ class RevisionWithVFolderInfo:
     model_definition: dict[str, Any] | None
     model_definition_path: str | None
     vfolder_id: UUID
-    vfolder_quota_scope_id: Any
+    vfolder_quota_scope_id: QuotaScopeID | None
     vfolder_host: str
-    vfolder_ownership_type: Any
-    vfolder_usage_mode: Any
+    vfolder_ownership_type: VFolderOwnershipType
+    vfolder_usage_mode: VFolderUsageMode
+
+
+@dataclass(frozen=True)
+class RevisionModelDefinitionUpdate:
+    """A pending model_definition update for a deployment revision."""
+
+    revision_id: UUID
+    model_definition: dict[str, Any]

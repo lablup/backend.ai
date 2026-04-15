@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Any, cast
 
 from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.deployment.types import RevisionModelDefinitionUpdate
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.repositories.deployment.storage_source import DeploymentStorageSource
 from ai.backend.manager.services.deployment.actions.sync_model_definitions import (
@@ -49,7 +49,7 @@ class DeploymentAdminRepository:
 
         rows = await self._db_source.get_revisions_with_vfolder_info()
 
-        pending_updates: list[tuple[uuid.UUID, dict[str, Any]]] = []
+        pending_updates: list[RevisionModelDefinitionUpdate] = []
 
         for row in rows:
             vfolder_location = VFolderLocation(
@@ -78,7 +78,9 @@ class DeploymentAdminRepository:
                     exc_info=True,
                 )
                 results.append(
-                    RevisionSyncStatus(revision_id=row.revision_id, success=False, reason=str(e))
+                    RevisionSyncStatus(
+                        revision_id=row.revision_id, success=False, failure_reason=str(e)
+                    )
                 )
                 continue
 
@@ -86,11 +88,15 @@ class DeploymentAdminRepository:
             if row.model_definition == model_def_dict:
                 continue
 
-            pending_updates.append((row.revision_id, model_def_dict))
+            pending_updates.append(
+                RevisionModelDefinitionUpdate(
+                    revision_id=row.revision_id, model_definition=model_def_dict
+                )
+            )
 
         if pending_updates:
             await self._db_source.batch_update_model_definitions(pending_updates)
-            for revision_id, _ in pending_updates:
-                results.append(RevisionSyncStatus(revision_id=revision_id, success=True))
+            for update in pending_updates:
+                results.append(RevisionSyncStatus(revision_id=update.revision_id, success=True))
 
         return results

@@ -11,7 +11,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 class RevisionSyncStatus:
     revision_id: UUID
     success: bool
-    reason: str | None = None
+    failure_reason: str | None = None
 
 
 @dataclass(frozen=True)

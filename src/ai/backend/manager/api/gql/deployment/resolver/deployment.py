@@ -257,7 +257,7 @@ async def admin_sync_model_definitions(
             RevisionSyncStatusGQL(
                 revision_id=r.revision_id,
                 success=r.success,
-                reason=r.reason,
+                failure_reason=r.failure_reason,
             )
             for r in payload.results
         ],

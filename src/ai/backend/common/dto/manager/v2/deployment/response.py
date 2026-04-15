@@ -173,7 +173,7 @@ class RevisionSyncStatusDTO(BaseResponseModel):
 
     revision_id: UUID = Field(description="Revision ID")
     success: bool = Field(description="Whether the sync succeeded")
-    reason: str | None = Field(default=None, description="Failure reason if not successful")
+    failure_reason: str | None = Field(default=None, description="Failure reason if not successful")
 
 
 class SyncModelDefinitionsPayload(BaseResponseModel):

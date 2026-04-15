@@ -43,19 +43,16 @@ class TestDeploymentAdminRepository:
     def _make_revision_info(
         self,
         *,
-        revision_id: uuid.UUID | None = None,
-        vfolder_id: uuid.UUID | None = None,
+        revision_id: uuid.UUID,
         model_definition_path: str | None = "model-definition.yaml",
         model_definition: dict[str, Any] | None = None,
     ) -> RevisionWithVFolderInfo:
-        rid = revision_id or uuid.uuid4()
-        vid = vfolder_id or uuid.uuid4()
         return RevisionWithVFolderInfo(
-            revision_id=rid,
+            revision_id=revision_id,
             model_definition=model_definition,
             model_definition_path=model_definition_path,
-            vfolder_id=vid,
-            vfolder_quota_scope_id=uuid.uuid4(),
+            vfolder_id=uuid.uuid4(),
+            vfolder_quota_scope_id=None,
             vfolder_host="local:volume1",
             vfolder_ownership_type=VFolderOwnershipType.USER,
             vfolder_usage_mode=VFolderUsageMode.MODEL,
@@ -78,8 +75,8 @@ class TestDeploymentAdminRepository:
         mock_db_source: AsyncMock,
         mock_storage_source: AsyncMock,
     ) -> None:
-        rev_id = uuid.uuid4()
-        row = self._make_revision_info(revision_id=rev_id)
+        revision_id = uuid.uuid4()
+        row = self._make_revision_info(revision_id=revision_id)
         yaml_content = b"models:\n  - name: test\n    model_path: /models\n"
 
         mock_db_source.get_revisions_with_vfolder_info.return_value = [row]
@@ -88,18 +85,18 @@ class TestDeploymentAdminRepository:
         results = await admin_repository.sync_model_definitions()
 
         assert len(results) == 1
-        assert results[0].revision_id == rev_id
+        assert results[0].revision_id == revision_id
         assert results[0].success is True
         mock_db_source.batch_update_model_definitions.assert_awaited_once()
 
-    async def test_sync_fetch_failure_returns_error_with_reason(
+    async def test_sync_fetch_failure_returns_error_with_failure_reason(
         self,
         admin_repository: DeploymentAdminRepository,
         mock_db_source: AsyncMock,
         mock_storage_source: AsyncMock,
     ) -> None:
-        rev_id = uuid.uuid4()
-        row = self._make_revision_info(revision_id=rev_id)
+        revision_id = uuid.uuid4()
+        row = self._make_revision_info(revision_id=revision_id)
 
         mock_db_source.get_revisions_with_vfolder_info.return_value = [row]
         mock_storage_source.fetch_definition_file.side_effect = Exception("storage unreachable")
@@ -107,9 +104,10 @@ class TestDeploymentAdminRepository:
         results = await admin_repository.sync_model_definitions()
 
         assert len(results) == 1
-        assert results[0].revision_id == rev_id
+        assert results[0].revision_id == revision_id
         assert results[0].success is False
-        assert results[0].reason is not None and "storage unreachable" in results[0].reason
+        assert results[0].failure_reason is not None
+        assert "storage unreachable" in results[0].failure_reason
 
     async def test_sync_mixed_success_and_failure(
         self,
@@ -155,7 +153,8 @@ class TestDeploymentAdminRepository:
         existing_def = ModelDefinition.model_validate({
             "models": [{"name": "test", "model_path": "/models"}]
         }).model_dump(exclude_none=True, by_alias=True)
-        row = self._make_revision_info(model_definition=existing_def)
+        revision_id = uuid.uuid4()
+        row = self._make_revision_info(revision_id=revision_id, model_definition=existing_def)
 
         mock_db_source.get_revisions_with_vfolder_info.return_value = [row]
         mock_storage_source.fetch_definition_file.return_value = yaml_content
@@ -171,9 +170,9 @@ class TestDeploymentAdminRepository:
         mock_db_source: AsyncMock,
         mock_storage_source: AsyncMock,
     ) -> None:
-        rev_id = uuid.uuid4()
+        revision_id = uuid.uuid4()
         old_def: dict[str, Any] = {"models": [{"name": "old-model", "model_path": "/models"}]}
-        row = self._make_revision_info(revision_id=rev_id, model_definition=old_def)
+        row = self._make_revision_info(revision_id=revision_id, model_definition=old_def)
         yaml_content = b"models:\n  - name: new-model\n    model_path: /models\n"
 
         mock_db_source.get_revisions_with_vfolder_info.return_value = [row]
@@ -182,5 +181,5 @@ class TestDeploymentAdminRepository:
         results = await admin_repository.sync_model_definitions()
 
         assert len(results) == 1
-        assert results[0].revision_id == rev_id
+        assert results[0].revision_id == revision_id
         assert results[0].success is True

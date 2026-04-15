@@ -7,6 +7,7 @@ Tests verify the sync_model_definitions admin operation.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -17,6 +18,13 @@ from ai.backend.manager.services.deployment.actions.sync_model_definitions impor
     SyncModelDefinitionsAction,
 )
 from ai.backend.manager.services.deployment.admin_service import DeploymentAdminService
+
+
+@dataclass
+class SyncTestCase:
+    repo_result: list[RevisionSyncStatus]
+    expected_count: int
+    expected_all_success: bool
 
 
 class TestDeploymentAdminService:
@@ -31,31 +39,48 @@ class TestDeploymentAdminService:
         return DeploymentAdminService(repository=mock_admin_repository)
 
     @pytest.mark.parametrize(
-        ("repo_result", "expected_count", "expected_all_success"),
+        "case",
         [
-            pytest.param([], 0, True, id="no-revisions"),
             pytest.param(
-                [RevisionSyncStatus(revision_id=uuid.uuid4(), success=True)],
-                1,
-                True,
+                SyncTestCase(repo_result=[], expected_count=0, expected_all_success=True),
+                id="no-revisions",
+            ),
+            pytest.param(
+                SyncTestCase(
+                    repo_result=[RevisionSyncStatus(revision_id=uuid.uuid4(), success=True)],
+                    expected_count=1,
+                    expected_all_success=True,
+                ),
                 id="single-success",
             ),
             pytest.param(
-                [RevisionSyncStatus(revision_id=uuid.uuid4(), success=False, reason="error")],
-                1,
-                False,
+                SyncTestCase(
+                    repo_result=[
+                        RevisionSyncStatus(
+                            revision_id=uuid.uuid4(),
+                            success=False,
+                            failure_reason="error",
+                        )
+                    ],
+                    expected_count=1,
+                    expected_all_success=False,
+                ),
                 id="single-failure",
             ),
             pytest.param(
-                [
-                    RevisionSyncStatus(revision_id=uuid.uuid4(), success=True),
-                    RevisionSyncStatus(
-                        revision_id=uuid.uuid4(), success=False, reason="file not found"
-                    ),
-                    RevisionSyncStatus(revision_id=uuid.uuid4(), success=True),
-                ],
-                3,
-                False,
+                SyncTestCase(
+                    repo_result=[
+                        RevisionSyncStatus(revision_id=uuid.uuid4(), success=True),
+                        RevisionSyncStatus(
+                            revision_id=uuid.uuid4(),
+                            success=False,
+                            failure_reason="file not found",
+                        ),
+                        RevisionSyncStatus(revision_id=uuid.uuid4(), success=True),
+                    ],
+                    expected_count=3,
+                    expected_all_success=False,
+                ),
                 id="mixed-results",
             ),
         ],
@@ -64,14 +89,12 @@ class TestDeploymentAdminService:
         self,
         admin_service: DeploymentAdminService,
         mock_admin_repository: MagicMock,
-        repo_result: list[RevisionSyncStatus],
-        expected_count: int,
-        expected_all_success: bool,
+        case: SyncTestCase,
     ) -> None:
-        mock_admin_repository.sync_model_definitions = AsyncMock(return_value=repo_result)
+        mock_admin_repository.sync_model_definitions = AsyncMock(return_value=case.repo_result)
 
         result = await admin_service.sync_model_definitions(SyncModelDefinitionsAction())
 
-        assert len(result.results) == expected_count
-        assert all(r.success for r in result.results) == expected_all_success
+        assert len(result.results) == case.expected_count
+        assert all(r.success for r in result.results) == case.expected_all_success
         mock_admin_repository.sync_model_definitions.assert_awaited_once()
