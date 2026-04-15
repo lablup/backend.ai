@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import AsyncGenerator
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -22,7 +23,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.group.types import GroupData, ProjectMemberRoleSpec, ProjectType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
@@ -884,6 +885,42 @@ class TestGroupRepository:
             assert scope_assoc.scope_type == ScopeType.DOMAIN
             assert scope_assoc.scope_id == test_domain
             assert scope_assoc.entity_id == str(result.id)
+
+    async def test_create_creates_admin_and_member_system_roles(
+        self,
+        group_repository_with_mock_role_manager: GroupRepository,
+        group_db_source_with_mock_role_manager: GroupDBSource,
+        test_domain: str,
+        default_project_resource_policy: str,
+    ) -> None:
+        """Project creation must request both an admin role (via GroupData) and a
+        member role (via ProjectMemberRoleSpec) from the RoleManager."""
+        creator_spec = GroupCreatorSpec(
+            name="test-roles-group",
+            domain_name=test_domain,
+            description="Test group for role creation",
+            resource_policy=default_project_resource_policy,
+        )
+        creator = Creator(spec=creator_spec)
+
+        result = await group_repository_with_mock_role_manager.create(creator)
+
+        mock_create = cast(
+            AsyncMock, group_db_source_with_mock_role_manager._role_manager.create_system_role
+        )
+        assert mock_create.call_count == 2
+
+        passed_specs = [call.args[1] for call in mock_create.call_args_list]
+        assert any(isinstance(spec, GroupData) and spec.id == result.id for spec in passed_specs)
+        assert any(
+            isinstance(spec, ProjectMemberRoleSpec) and spec.project_id == result.id
+            for spec in passed_specs
+        )
+
+        member_spec = next(spec for spec in passed_specs if isinstance(spec, ProjectMemberRoleSpec))
+        assert member_spec.role_name() == f"project-{str(result.id)[:8]}-member"
+        assert member_spec.scope_id().scope_type == ScopeType.PROJECT
+        assert member_spec.scope_id().scope_id == str(result.id)
 
     # ===========================================
     # Tests for modify_validated method

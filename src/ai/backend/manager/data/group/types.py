@@ -72,6 +72,28 @@ class GroupData:
         }
 
 
+@dataclass(frozen=True)
+class ProjectMemberRoleSpec:
+    """ScopeSystemRoleData implementation for the project-scoped member role."""
+
+    project_id: uuid.UUID
+
+    def scope_id(self) -> ScopeId:
+        return ScopeId(
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(self.project_id),
+        )
+
+    def role_name(self) -> str:
+        return f"project-{str(self.project_id)[:8]}-member"
+
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
+        return {
+            entity.to_element(): OperationType.member_operations()
+            for entity in EntityType.member_accessible_entity_types_in_project()
+        }
+
+
 @dataclass
 class GroupModifier(PartialModifier):
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)

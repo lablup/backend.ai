@@ -22,7 +22,12 @@ from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import GroupData, UnassignUserFailure, UnassignUsersResult
+from ai.backend.manager.data.group.types import (
+    GroupData,
+    ProjectMemberRoleSpec,
+    UnassignUserFailure,
+    UnassignUsersResult,
+)
 from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
@@ -160,8 +165,13 @@ class GroupDBSource:
             result = await execute_rbac_entity_creator(db_session, rbac_creator)
             row: GroupRow = result.row
             data = row.to_data()
-            # Create RBAC role and permissions for the group
+            # Create RBAC roles and permissions for the group.
+            # Each project gets two SYSTEM-sourced roles at its scope: an admin role
+            # (via GroupData) and a member role (read-only access for project members).
             await self._role_manager.create_system_role(db_session, data)
+            await self._role_manager.create_system_role(
+                db_session, ProjectMemberRoleSpec(project_id=data.id)
+            )
 
             return data
 
