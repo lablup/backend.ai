@@ -550,6 +550,20 @@ class AutoScalingRuleConditions:
         return inner
 
     @staticmethod
+    def by_last_triggered_at_is_null() -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.last_triggered_at.is_(None)
+
+        return inner
+
+    @staticmethod
+    def by_last_triggered_at_is_not_null() -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.last_triggered_at.isnot(None)
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 

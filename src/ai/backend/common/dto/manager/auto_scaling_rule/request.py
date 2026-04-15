@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import DateTimeFilter, NullableDateTimeFilter
 from ai.backend.common.types import AutoScalingMetricSource
 
 from .types import (
@@ -70,6 +71,10 @@ class AutoScalingRuleFilter(BaseRequestModel):
     """Filter for auto-scaling rules."""
 
     model_deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    last_triggered_at: NullableDateTimeFilter | None = Field(
+        default=None, description="Last triggered datetime filter"
+    )
 
 
 class AutoScalingRuleOrder(BaseRequestModel):

@@ -106,23 +106,39 @@ def create(
     multiple=True,
     help="Order by field:direction (e.g., created_at:desc).",
 )
+@click.option(
+    "--last-triggered-at-is-null",
+    type=bool,
+    default=None,
+    help="Filter by last_triggered_at null status (true=never triggered, false=triggered at least once).",
+)
 def search(
     deployment_id: uuid.UUID,
     limit: int,
     offset: int,
     order_by: tuple[str, ...],
+    last_triggered_at_is_null: bool | None,
 ) -> None:
     """Search auto-scaling rules for a deployment."""
-    from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    from ai.backend.common.dto.manager.query import NullableDateTimeFilter
+    from ai.backend.common.dto.manager.v2.deployment.request import (
         AutoScalingRuleFilter,
         AutoScalingRuleOrder,
         SearchAutoScalingRulesInput,
     )
-    from ai.backend.common.dto.manager.v2.auto_scaling_rule.types import (
+    from ai.backend.common.dto.manager.v2.deployment.types import (
         AutoScalingRuleOrderField,
     )
 
-    filter_dto = AutoScalingRuleFilter(model_deployment_id=deployment_id)
+    last_triggered_at_filter = (
+        NullableDateTimeFilter(is_null=last_triggered_at_is_null)
+        if last_triggered_at_is_null is not None
+        else None
+    )
+    filter_dto = AutoScalingRuleFilter(
+        deployment_id=deployment_id,
+        last_triggered_at=last_triggered_at_filter,
+    )
     orders = (
         parse_order_options(order_by, AutoScalingRuleOrderField, AutoScalingRuleOrder)
         if order_by

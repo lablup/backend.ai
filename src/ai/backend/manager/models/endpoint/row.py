@@ -1030,7 +1030,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             min_replicas=self.min_replicas or 0,
             max_replicas=self.max_replicas or 0,
             created_at=self.created_at or datetime.now(UTC),
-            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
+            last_triggered_at=self.last_triggered_at,
             endpoint=self.endpoint,
         )
 
@@ -1103,7 +1103,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             min_replicas=self.min_replicas,
             max_replicas=self.max_replicas,
             created_at=self.created_at or datetime.now(UTC),
-            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
+            last_triggered_at=self.last_triggered_at,
             prometheus_query_preset_id=self.prometheus_query_preset_id,
         )
 

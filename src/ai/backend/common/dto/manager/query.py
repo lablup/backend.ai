@@ -111,6 +111,34 @@ class DateTimeFilter(BaseRequestModel):
         return None
 
 
+class NullableDateTimeFilter(DateTimeFilter):
+    """Filter for nullable datetime fields.
+
+    Extends DateTimeFilter with is_null support for columns that allow NULL values
+    (e.g., last_triggered_at). Use DateTimeFilter for NOT NULL columns.
+    """
+
+    is_null: bool | None = Field(
+        default=None,
+        description="Filter by null status: true = IS NULL, false = IS NOT NULL",
+    )
+
+    def build_query_condition(
+        self,
+        before_factory: Callable[[datetime], _QC],
+        after_factory: Callable[[datetime], _QC],
+        equals_factory: Callable[[datetime], _QC],
+        is_null_factory: Callable[[], _QC] | None = None,
+        is_not_null_factory: Callable[[], _QC] | None = None,
+    ) -> _QC | None:
+        if self.is_null is not None:
+            if self.is_null and is_null_factory is not None:
+                return is_null_factory()
+            if not self.is_null and is_not_null_factory is not None:
+                return is_not_null_factory()
+        return super().build_query_condition(before_factory, after_factory, equals_factory)
+
+
 class DateTimeRangeFilter(BaseRequestModel):
     """
     Filters records by a datetime range.
