@@ -17,8 +17,10 @@ from ai.backend.manager.services.session.base import SessionScopeAction
 class SearchKernelsAction(SessionScopeAction):
     """Search kernels within a scope.
 
-    RBAC validation checks if the user has READ permission in USER scope.
-    Scope is always USER scope with user_id.
+    RBAC validation checks if the user has SESSION READ permission reachable from
+    the user's scope chain (project / domain). The scope chain CTE walks
+    upward from the USER element to find parent scopes where session-level
+    roles are bound.
     """
 
     querier: BatchQuerier
@@ -27,7 +29,7 @@ class SearchKernelsAction(SessionScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.SESSION_KERNEL
+        return EntityType.SESSION
 
     @override
     def entity_id(self) -> str | None:
