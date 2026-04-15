@@ -354,15 +354,6 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.image import ImageRow
-
-    return sa.and_(
-        KernelRow.image == ImageRow.name,
-        KernelRow.architecture == ImageRow.architecture,
-    )
-
-
 class KernelRow(Base):  # type: ignore[misc]
     __tablename__ = "kernels"
 
@@ -443,8 +434,15 @@ class KernelRow(Base):  # type: ignore[misc]
         "access_key", sa.String(length=20), nullable=True
     )
     # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
+    # Kept as historical audit data; active reference is `image_id`.
     image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
-    # ForeignKeyIDColumn("image_id", "images.id")
+    image_id: Mapped[uuid.UUID | None] = mapped_column(
+        "image_id",
+        GUID,
+        sa.ForeignKey("images.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     architecture: Mapped[str | None] = mapped_column(
         "architecture", sa.String(length=32), default="x86_64", nullable=True
     )
@@ -646,8 +644,7 @@ class KernelRow(Base):  # type: ignore[misc]
     session: Mapped[SessionRow] = relationship("SessionRow", back_populates="kernels")
     image_row: Mapped[ImageRow | None] = relationship(
         "ImageRow",
-        foreign_keys="KernelRow.image",
-        primaryjoin=_get_image_row_join_condition,
+        foreign_keys="KernelRow.image_id",
     )
     agent_row: Mapped[AgentRow | None] = relationship("AgentRow", back_populates="kernels")
     group_row: Mapped[GroupRow] = relationship("GroupRow", back_populates="kernels")
@@ -948,6 +945,7 @@ class KernelRow(Base):  # type: ignore[misc]
             user_uuid=info.user_permission.user_uuid,
             access_key=info.user_permission.access_key,
             image=info.image.identifier.canonical if info.image.identifier else None,
+            image_id=info.image.image_id,
             architecture=info.image.identifier.architecture if info.image.identifier else None,
             registry=info.image.registry,
             tag=info.image.tag,
@@ -1011,6 +1009,7 @@ class KernelRow(Base):  # type: ignore[misc]
                 gids=self.gids,
             ),
             image=ImageInfo(
+                image_id=self.image_id,
                 identifier=ImageIdentifier(
                     canonical=self.image,
                     architecture=self.architecture or "",

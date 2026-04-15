@@ -231,6 +231,7 @@ class ResourceInfo:
 
 @dataclass
 class ImageInfo:
+    image_id: UUID | None
     identifier: ImageIdentifier | None
     registry: str | None
     tag: str | None

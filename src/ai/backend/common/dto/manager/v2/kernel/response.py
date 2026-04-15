@@ -141,6 +141,10 @@ class KernelNode(BaseResponseModel):
     """Node model representing a kernel (compute container) entity."""
 
     id: UUID = Field(description="Kernel ID.")
+    image_id: UUID | None = Field(
+        default=None,
+        description="The UUID of the image used by this kernel. Null if the image has been purged.",
+    )
     startup_command: str | None = Field(
         default=None, description="Startup command executed when the kernel starts."
     )

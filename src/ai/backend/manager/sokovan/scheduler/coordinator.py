@@ -5,6 +5,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
+from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
@@ -1583,10 +1584,11 @@ class ScheduleCoordinator:
         agent_id: AgentId,
         image: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> None:
         """Update kernel status from PREPARING to PULLING for the specified image on an agent."""
         await self._kernel_state_engine.update_kernels_to_pulling_for_image(
-            agent_id, image, image_ref
+            agent_id, image, image_ref, image_id=image_id
         )
 
     async def update_kernels_to_prepared_for_image(
@@ -1594,10 +1596,11 @@ class ScheduleCoordinator:
         agent_id: AgentId,
         image: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> None:
         """Update kernel status to PREPARED for the specified image on an agent."""
         result = await self._kernel_state_engine.update_kernels_to_prepared_for_image(
-            agent_id, image, image_ref
+            agent_id, image, image_ref, image_id=image_id
         )
         if result > 0:
             log.info(
@@ -1617,10 +1620,11 @@ class ScheduleCoordinator:
         image: str,
         error_msg: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> None:
         """Cancel kernels for an image that failed to be available on an agent."""
         await self._kernel_state_engine.cancel_kernels_for_failed_image(
-            agent_id, image, error_msg, image_ref
+            agent_id, image, error_msg, image_ref, image_id=image_id
         )
         # No need to request scheduling for cancelled kernels
 

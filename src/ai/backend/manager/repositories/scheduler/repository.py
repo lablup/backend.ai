@@ -406,7 +406,11 @@ class SchedulerRepository:
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(
-        self, agent_id: AgentId, image: str, image_ref: str | None = None
+        self,
+        agent_id: AgentId,
+        image: str,
+        image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> int:
         """
         Update kernel status from PREPARING to PULLING for the specified image on an agent.
@@ -414,13 +418,20 @@ class SchedulerRepository:
         :param agent_id: The agent ID where kernels should be updated
         :param image: The image name to match kernels
         :param image_ref: Optional image reference
+        :param image_id: Optional image UUID; when provided, matches by image_id instead of name
         :return: Number of kernels updated
         """
-        return await self._db_source.update_kernels_to_pulling_for_image(agent_id, image, image_ref)
+        return await self._db_source.update_kernels_to_pulling_for_image(
+            agent_id, image, image_ref, image_id
+        )
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_prepared_for_image(
-        self, agent_id: AgentId, image: str, image_ref: str | None = None
+        self,
+        agent_id: AgentId,
+        image: str,
+        image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
@@ -429,15 +440,21 @@ class SchedulerRepository:
         :param agent_id: The agent ID where kernels should be updated
         :param image: The image name to match kernels
         :param image_ref: Optional image reference
+        :param image_id: Optional image UUID; when provided, matches by image_id instead of name
         :return: Number of kernels updated
         """
         return await self._db_source.update_kernels_to_prepared_for_image(
-            agent_id, image, image_ref
+            agent_id, image, image_ref, image_id
         )
 
     @scheduler_repository_resilience.apply()
     async def cancel_kernels_for_failed_image(
-        self, agent_id: AgentId, image: str, error_msg: str, image_ref: str | None = None
+        self,
+        agent_id: AgentId,
+        image: str,
+        error_msg: str,
+        image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> set[SessionId]:
         """
         Cancel kernels for an image that failed to be available on an agent.
@@ -447,10 +464,11 @@ class SchedulerRepository:
         :param image: The image name that failed
         :param error_msg: The error message to include in status
         :param image_ref: Optional image reference
+        :param image_id: Optional image UUID; when provided, matches by image_id instead of name
         :return: Set of affected session IDs
         """
         affected_session_ids = await self._db_source.cancel_kernels_for_failed_image(
-            agent_id, image, error_msg, image_ref
+            agent_id, image, error_msg, image_ref, image_id
         )
 
         # Check if any sessions need to be cancelled

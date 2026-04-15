@@ -740,8 +740,10 @@ class SessionRow(Base):  # type: ignore[misc]
         foreign_keys=[access_key],
     )
 
-    # `image` column is identical to kernels `image` column.
+    # `images` stores canonical image name strings for historical audit.
     images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
+    # `image_ids` stores active references to ImageRow; SET NULL cascades from kernels.
+    image_ids: Mapped[list[UUID] | None] = mapped_column("image_ids", sa.ARRAY(GUID), nullable=True)
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
@@ -926,6 +928,7 @@ class SessionRow(Base):  # type: ignore[misc]
             user_uuid=session_data.user_uuid,
             access_key=session_data.access_key,
             images=session_data.images,
+            image_ids=session_data.image_ids,
             tag=session_data.tag,
             occupying_slots=session_data.occupying_slots,
             requested_slots=session_data.requested_slots,
@@ -971,6 +974,7 @@ class SessionRow(Base):  # type: ignore[misc]
             user_uuid=self.user_uuid,
             access_key=AccessKey(self.access_key) if self.access_key else None,
             images=self.images,
+            image_ids=self.image_ids,
             tag=self.tag,
             occupying_slots=self.occupying_slots,
             requested_slots=self.requested_slots,

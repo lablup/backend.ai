@@ -168,6 +168,7 @@ class SessionData:
     access_key: AccessKey | None
     agent_ids: list[str] | None
     images: list[str] | None
+    image_ids: list[UUID] | None
     tag: str | None
     vfolder_mounts: list[VFolderMountData] | None
     environ: dict[str, Any] | None
