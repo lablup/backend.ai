@@ -197,10 +197,6 @@ from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
 )
-from ai.backend.manager.services.deployment.actions.sync_model_definitions import (
-    SyncModelDefinitionsAction,
-    SyncModelDefinitionsActionResult,
-)
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
     SyncReplicaActionResult,
@@ -1111,14 +1107,6 @@ class DeploymentService:
         log.info("Triggered replica sync for deployment {}", action.deployment_id)
 
         return SyncReplicaActionResult(success=True)
-
-    async def sync_model_definitions(
-        self, action: SyncModelDefinitionsAction
-    ) -> SyncModelDefinitionsActionResult:
-        """Sync model_definition from vfolder storage for all revisions with NULL model_definition."""
-        updated, failed = await self._deployment_repository.sync_model_definitions()
-        log.info("Model definition sync complete: updated={}, failed={}", updated, failed)
-        return SyncModelDefinitionsActionResult(updated=updated, failed=failed)
 
     async def search_routes(self, action: SearchRoutesAction) -> SearchRoutesActionResult:
         """Search routes with filtering and pagination.

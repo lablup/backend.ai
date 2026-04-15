@@ -491,31 +491,6 @@ class DeploymentRepository:
         yaml = YAML()
         return cast(dict[str, Any], yaml.load(model_definition_bytes))
 
-    @deployment_repository_resilience.apply()
-    async def sync_model_definitions(self) -> tuple[int, int]:
-        """Sync model_definition from vfolder storage for all revisions where it is NULL.
-
-        Returns:
-            Tuple of (updated_count, failed_count)
-        """
-        revisions = await self._db_source.get_revisions_with_null_model_definition()
-        updated = 0
-        failed = 0
-        for revision_id, vfolder_id, model_definition_path in revisions:
-            try:
-                model_def = await self.fetch_model_definition(vfolder_id, model_definition_path)
-            except Exception:
-                log.warning(
-                    "Failed to fetch model definition for revision {} (vfolder {})",
-                    revision_id,
-                    vfolder_id,
-                )
-                failed += 1
-                continue
-            await self._db_source.update_revision_model_definition(revision_id, model_def)
-            updated += 1
-        return updated, failed
-
     async def _try_fetch_config_file(
         self,
         vfolder_location: VFolderLocation,

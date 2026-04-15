@@ -2956,36 +2956,3 @@ class DeploymentDBSource:
                 for row in result.rows
             ]
             return items, result.total_count, result.has_next_page, result.has_previous_page
-
-    async def get_revisions_with_null_model_definition(
-        self,
-    ) -> list[tuple[uuid.UUID, uuid.UUID, str | None]]:
-        """Get deployment revisions where model_definition is NULL and model vfolder exists.
-
-        Returns:
-            List of (revision_id, vfolder_id, model_definition_path) tuples
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(
-                DeploymentRevisionRow.id,
-                DeploymentRevisionRow.model,
-                DeploymentRevisionRow.model_definition_path,
-            ).where(
-                DeploymentRevisionRow.model_definition.is_(None),
-                DeploymentRevisionRow.model.is_not(None),
-            )
-            result = await db_sess.execute(query)
-            return [(row.id, row.model, row.model_definition_path) for row in result.all()]
-
-    async def update_revision_model_definition(
-        self,
-        revision_id: uuid.UUID,
-        model_definition: dict[str, Any],
-    ) -> None:
-        """Update the model_definition column for a specific revision."""
-        async with self._begin_session_read_committed() as db_sess:
-            await db_sess.execute(
-                sa.update(DeploymentRevisionRow.__table__)
-                .where(DeploymentRevisionRow.id == revision_id)
-                .values(model_definition=model_definition)
-            )

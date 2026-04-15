@@ -826,16 +826,9 @@ class ModelServingRepository:
                     endpoint_row.project,
                 )
 
-                # Check if current revision needs model_definition backfill
-                current_rev = endpoint_row._find_current_revision()
-                needs_model_definition_backfill = (
-                    current_rev is not None
-                    and current_rev.model_definition is None
-                    and current_rev.model is not None
-                )
-
                 # If revision-level fields changed, create a new revision
-                if spec.has_revision_changes() or needs_model_definition_backfill:
+                if spec.has_revision_changes():
+                    current_rev = endpoint_row._find_current_revision()
                     if current_rev is None:
                         raise InvalidAPIParameters("Endpoint has no current revision")
 
