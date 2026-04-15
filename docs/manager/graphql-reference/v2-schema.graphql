@@ -6133,6 +6133,11 @@ type Mutation {
   """
   syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload!
 
+  """
+  Added in UNRELEASED. Sync model_definition from vfolder storage for all deployment revisions (superadmin only).
+  """
+  adminSyncModelDefinitions: SyncModelDefinitionsPayload!
+
   """Added in 25.16.0. Add model revision."""
   addModelRevision(input: AddRevisionInput!, options: AddRevisionOptions = null): AddRevisionPayload!
 
@@ -9555,6 +9560,18 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+"""Added in UNRELEASED. Status of a single revision sync operation."""
+type RevisionSyncStatusGQL {
+  """Revision ID"""
+  revisionId: UUID!
+
+  """Whether the sync succeeded"""
+  success: Boolean!
+
+  """Failure reason if not successful"""
+  reason: String
+}
+
 """Added in 26.4.2. Payload returned after revoking a login session."""
 type RevokeLoginSessionPayload {
   """Whether the revocation was successful"""
@@ -11009,6 +11026,12 @@ input SwitchMyMainAccessKeyInput {
 type SwitchMyMainAccessKeyPayload {
   """Whether the switch was successful."""
   success: Boolean!
+}
+
+"""Added in UNRELEASED. Payload for model_definition sync result."""
+type SyncModelDefinitionsPayload {
+  """Per-revision sync statuses"""
+  results: [RevisionSyncStatusGQL!]!
 }
 
 """Added in 25.19.0. """
