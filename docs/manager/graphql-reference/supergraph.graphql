@@ -7256,6 +7256,11 @@ type KernelV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """
+  The UUID of the image used by this kernel. Null if the image has been purged.
+  """
+  imageId: ID
+
   """Startup command executed when the kernel starts."""
   startupCommand: String
 
@@ -7279,6 +7284,9 @@ type KernelV2 implements Node
 
   """Added in 26.2.0. The agent running this kernel."""
   agent: AgentV2
+
+  """Added in UNRELEASED. The image used by this kernel."""
+  image: ImageV2
 
   """Added in 26.2.0. The user who owns this kernel."""
   user: UserV2
@@ -15984,6 +15992,11 @@ type SessionV2 implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """
+  UUIDs of the images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  """
+  imageIds: [ID!]
   domainName: String!
   userId: ID!
   projectId: ID!
@@ -16016,7 +16029,7 @@ type SessionV2 implements Node
   resourceGroup: ResourceGroup
 
   """
-  Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  Added in UNRELEASED. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
   """
   images: ImageV2Connection!
 
