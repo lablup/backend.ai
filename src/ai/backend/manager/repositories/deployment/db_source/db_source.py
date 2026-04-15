@@ -2973,7 +2973,9 @@ class DeploymentDBSource:
             return [
                 RevisionWithVFolderInfo(
                     revision_id=rev.id,
-                    model_definition=rev.model_definition,
+                    model_definition=ModelDefinition.model_validate(rev.model_definition)
+                    if rev.model_definition is not None
+                    else None,
                     model_definition_path=rev.model_definition_path,
                     vfolder_id=vf.id,
                     vfolder_quota_scope_id=vf.quota_scope_id,
@@ -2994,5 +2996,9 @@ class DeploymentDBSource:
                 await db_sess.execute(
                     sa.update(DeploymentRevisionRow.__table__)
                     .where(DeploymentRevisionRow.id == update.revision_id)
-                    .values(model_definition=update.model_definition)
+                    .values(
+                        model_definition=update.model_definition.model_dump(
+                            exclude_none=True, by_alias=True
+                        )
+                    )
                 )

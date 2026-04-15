@@ -976,7 +976,7 @@ class RevisionWithVFolderInfo:
     """Deployment revision joined with its model vfolder location info."""
 
     revision_id: UUID
-    model_definition: dict[str, Any] | None
+    model_definition: ModelDefinition | None
     model_definition_path: str | None
     vfolder_id: UUID
     vfolder_quota_scope_id: QuotaScopeID | None
@@ -990,4 +990,13 @@ class RevisionModelDefinitionUpdate:
     """A pending model_definition update for a deployment revision."""
 
     revision_id: UUID
-    model_definition: dict[str, Any]
+    model_definition: ModelDefinition
+
+
+@dataclass(frozen=True)
+class RevisionSyncResult:
+    """Result of syncing model_definition for a single deployment revision."""
+
+    revision_id: UUID
+    success: bool
+    failure_reason: str | None = None

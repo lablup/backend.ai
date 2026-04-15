@@ -812,7 +812,7 @@ class DeploymentAdapter(BaseAdapter):
         return SyncReplicaPayload(success=True)
 
     async def admin_sync_model_definitions(self) -> SyncModelDefinitionsPayload:
-        """Sync model_definition from vfolder storage for all revisions with NULL model_definition."""
+        """Sync model_definition from vfolder storage for all deployment revisions."""
         result = await self._processors.deployment_admin.sync_model_definitions.wait_for_complete(
             SyncModelDefinitionsAction()
         )

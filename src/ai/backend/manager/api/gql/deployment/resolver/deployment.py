@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     ModelDeploymentConnection,
     ModelDeploymentEdge,
     ProjectDeploymentScopeGQL,
-    RevisionSyncStatusGQL,
+    RevisionSyncResultGQL,
     SyncModelDefinitionsPayload,
     SyncReplicaInput,
     SyncReplicaPayload,
@@ -251,15 +251,15 @@ async def admin_sync_model_definitions(
     info: Info[StrawberryGQLContext],
 ) -> SyncModelDefinitionsPayload:
     check_admin_only()
-    payload = await info.context.adapters.deployment.admin_sync_model_definitions()
+    dto_payload = await info.context.adapters.deployment.admin_sync_model_definitions()
     return SyncModelDefinitionsPayload(
         results=[
-            RevisionSyncStatusGQL(
+            RevisionSyncResultGQL(
                 revision_id=r.revision_id,
                 success=r.success,
                 failure_reason=r.failure_reason,
             )
-            for r in payload.results
+            for r in dto_payload.results
         ],
     )
 

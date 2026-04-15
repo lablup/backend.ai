@@ -728,10 +728,10 @@ class SyncReplicaPayload:
         description="Status of a single revision sync operation.",
     ),
     model=RevisionSyncStatusDTO,
-    name="RevisionSyncStatus",
+    name="RevisionSyncResult",
 )
-class RevisionSyncStatusGQL:
-    """Status of a single revision sync operation."""
+class RevisionSyncResultGQL:
+    """Result of syncing model_definition for a single deployment revision."""
 
     revision_id: strawberry.auto
     success: strawberry.auto

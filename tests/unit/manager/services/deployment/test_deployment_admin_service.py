@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.data.deployment.types import RevisionSyncResult
 from ai.backend.manager.repositories.deployment.admin_repository import DeploymentAdminRepository
 from ai.backend.manager.services.deployment.actions.sync_model_definitions import (
-    RevisionSyncStatus,
     SyncModelDefinitionsAction,
 )
 from ai.backend.manager.services.deployment.admin_service import DeploymentAdminService
@@ -22,7 +22,7 @@ from ai.backend.manager.services.deployment.admin_service import DeploymentAdmin
 
 @dataclass
 class SyncTestCase:
-    repo_result: list[RevisionSyncStatus]
+    repo_result: list[RevisionSyncResult]
     expected_count: int
     expected_all_success: bool
 
@@ -47,7 +47,7 @@ class TestDeploymentAdminService:
             ),
             pytest.param(
                 SyncTestCase(
-                    repo_result=[RevisionSyncStatus(revision_id=uuid.uuid4(), success=True)],
+                    repo_result=[RevisionSyncResult(revision_id=uuid.uuid4(), success=True)],
                     expected_count=1,
                     expected_all_success=True,
                 ),
@@ -56,7 +56,7 @@ class TestDeploymentAdminService:
             pytest.param(
                 SyncTestCase(
                     repo_result=[
-                        RevisionSyncStatus(
+                        RevisionSyncResult(
                             revision_id=uuid.uuid4(),
                             success=False,
                             failure_reason="error",
@@ -70,13 +70,13 @@ class TestDeploymentAdminService:
             pytest.param(
                 SyncTestCase(
                     repo_result=[
-                        RevisionSyncStatus(revision_id=uuid.uuid4(), success=True),
-                        RevisionSyncStatus(
+                        RevisionSyncResult(revision_id=uuid.uuid4(), success=True),
+                        RevisionSyncResult(
                             revision_id=uuid.uuid4(),
                             success=False,
                             failure_reason="file not found",
                         ),
-                        RevisionSyncStatus(revision_id=uuid.uuid4(), success=True),
+                        RevisionSyncResult(revision_id=uuid.uuid4(), success=True),
                     ],
                     expected_count=3,
                     expected_all_success=False,

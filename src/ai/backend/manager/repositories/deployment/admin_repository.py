@@ -9,12 +9,12 @@ from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RevisionModelDefinitionUpdate
+from ai.backend.manager.data.deployment.types import (
+    RevisionModelDefinitionUpdate,
+    RevisionSyncResult,
+)
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.repositories.deployment.storage_source import DeploymentStorageSource
-from ai.backend.manager.services.deployment.actions.sync_model_definitions import (
-    RevisionSyncStatus,
-)
 
 from .db_source import DeploymentDBSource
 
@@ -35,21 +35,21 @@ class DeploymentAdminRepository:
         self._db_source = db_source
         self._storage_source = storage_source
 
-    async def sync_model_definitions(self) -> list[RevisionSyncStatus]:
+    async def sync_model_definitions(self) -> list[RevisionSyncResult]:
         """Sync model_definition from vfolder storage for all revisions with a model vfolder.
 
         Compares the stored model_definition with the current vfolder file content
         and updates the DB when they differ (including NULL -> populated).
 
         Returns:
-            List of per-revision sync statuses
+            List of per-revision sync results
         """
         yaml = YAML()
-        results: list[RevisionSyncStatus] = []
+        results: list[RevisionSyncResult] = []
 
         rows = await self._db_source.get_revisions_with_vfolder_info()
 
-        pending_updates: list[RevisionModelDefinitionUpdate] = []
+        batch_updates: list[RevisionModelDefinitionUpdate] = []
 
         for row in rows:
             vfolder_location = VFolderLocation(
@@ -78,25 +78,29 @@ class DeploymentAdminRepository:
                     exc_info=True,
                 )
                 results.append(
-                    RevisionSyncStatus(
+                    RevisionSyncResult(
                         revision_id=row.revision_id, success=False, failure_reason=str(e)
                     )
                 )
                 continue
 
-            model_def_dict = model_def.model_dump(exclude_none=True, by_alias=True)
-            if row.model_definition == model_def_dict:
+            stored = (
+                ModelDefinition.model_validate(row.model_definition)
+                if row.model_definition is not None
+                else None
+            )
+            if stored == model_def:
                 continue
 
-            pending_updates.append(
+            batch_updates.append(
                 RevisionModelDefinitionUpdate(
-                    revision_id=row.revision_id, model_definition=model_def_dict
+                    revision_id=row.revision_id, model_definition=model_def
                 )
             )
 
-        if pending_updates:
-            await self._db_source.batch_update_model_definitions(pending_updates)
-            for update in pending_updates:
-                results.append(RevisionSyncStatus(revision_id=update.revision_id, success=True))
+        if batch_updates:
+            await self._db_source.batch_update_model_definitions(batch_updates)
+            for update in batch_updates:
+                results.append(RevisionSyncResult(revision_id=update.revision_id, success=True))
 
         return results

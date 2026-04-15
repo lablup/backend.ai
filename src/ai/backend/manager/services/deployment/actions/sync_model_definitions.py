@@ -1,17 +1,10 @@
 from dataclasses import dataclass, field
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-
-
-@dataclass(frozen=True)
-class RevisionSyncStatus:
-    revision_id: UUID
-    success: bool
-    failure_reason: str | None = None
+from ai.backend.manager.data.deployment.types import RevisionSyncResult
 
 
 @dataclass(frozen=True)
@@ -35,7 +28,7 @@ class SyncModelDefinitionsAction(BaseAction):
 
 @dataclass(frozen=True)
 class SyncModelDefinitionsActionResult(BaseActionResult):
-    results: list[RevisionSyncStatus] = field(default_factory=list)
+    results: list[RevisionSyncResult] = field(default_factory=list)
 
     @override
     def entity_id(self) -> str | None:
