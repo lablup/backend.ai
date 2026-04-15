@@ -202,6 +202,7 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     Updater,
     combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
@@ -1367,6 +1368,43 @@ class DeploymentAdapter(BaseAdapter):
                         ModelDeploymentStatus(v) for v in s.not_in
                     ])
                 )
+        if f.tags is not None:
+            condition = self.convert_string_filter(
+                f.tags,
+                contains_factory=DeploymentConditions.by_tag_contains,
+                equals_factory=DeploymentConditions.by_tag_equals,
+                starts_with_factory=DeploymentConditions.by_tag_starts_with,
+                ends_with_factory=DeploymentConditions.by_tag_ends_with,
+                in_factory=DeploymentConditions.by_tag_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.endpoint_url is not None:
+            condition = self.convert_string_filter(
+                f.endpoint_url,
+                contains_factory=DeploymentConditions.by_url_contains,
+                equals_factory=DeploymentConditions.by_url_equals,
+                starts_with_factory=DeploymentConditions.by_url_starts_with,
+                ends_with_factory=DeploymentConditions.by_url_ends_with,
+                in_factory=DeploymentConditions.by_url_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._collect_deployment_filter_conditions(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._collect_deployment_filter_conditions(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._collect_deployment_filter_conditions(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     def _build_deployment_querier(self, input: AdminSearchDeploymentsInput) -> BatchQuerier:

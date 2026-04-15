@@ -84,6 +84,8 @@ class DeploymentConditions:
 
     by_name_in = staticmethod(make_string_in_factory(EndpointRow.name))
     by_domain_name_in = staticmethod(make_string_in_factory(EndpointRow.domain))
+    by_tag_in = staticmethod(make_string_in_factory(EndpointRow.tag))
+    by_url_in = staticmethod(make_string_in_factory(EndpointRow.url))
 
     @staticmethod
     def by_project_id(project_id: uuid.UUID) -> QueryCondition:
@@ -145,30 +147,66 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
-    def by_status_equals(status: ModelDeploymentStatus) -> QueryCondition:
+    def _status_to_lifecycles(status: ModelDeploymentStatus) -> list[EndpointLifecycle]:
+        """Reverse of _map_lifecycle_to_status: expand a public status into the
+        set of DB lifecycle_stage values that can produce it."""
+        match status:
+            case ModelDeploymentStatus.PENDING:
+                return [EndpointLifecycle.PENDING]
+            case ModelDeploymentStatus.READY:
+                return [EndpointLifecycle.READY, EndpointLifecycle.CREATED]
+            case ModelDeploymentStatus.SCALING:
+                return [EndpointLifecycle.SCALING]
+            case ModelDeploymentStatus.DEPLOYING:
+                return [EndpointLifecycle.DEPLOYING]
+            case ModelDeploymentStatus.DESTROYING | ModelDeploymentStatus.STOPPING:
+                return [EndpointLifecycle.DESTROYING]
+            case ModelDeploymentStatus.DESTROYED | ModelDeploymentStatus.STOPPED:
+                return [EndpointLifecycle.DESTROYED]
+        return []
+
+    @classmethod
+    def _expand_statuses(
+        cls, statuses: Collection[ModelDeploymentStatus]
+    ) -> list[EndpointLifecycle]:
+        expanded: list[EndpointLifecycle] = []
+        for s in statuses:
+            expanded.extend(cls._status_to_lifecycles(s))
+        return expanded
+
+    @classmethod
+    def by_status_equals(cls, status: ModelDeploymentStatus) -> QueryCondition:
+        lifecycles = cls._status_to_lifecycles(status)
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage == status
+            return EndpointRow.lifecycle_stage.in_(lifecycles)
 
         return inner
 
-    @staticmethod
-    def by_status_in(statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+    @classmethod
+    def by_status_in(cls, statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+        lifecycles = cls._expand_statuses(statuses)
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage.in_(statuses)
+            return EndpointRow.lifecycle_stage.in_(lifecycles)
 
         return inner
 
-    @staticmethod
-    def by_status_not_equals(status: ModelDeploymentStatus) -> QueryCondition:
+    @classmethod
+    def by_status_not_equals(cls, status: ModelDeploymentStatus) -> QueryCondition:
+        lifecycles = cls._status_to_lifecycles(status)
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage != status
+            return EndpointRow.lifecycle_stage.notin_(lifecycles)
 
         return inner
 
-    @staticmethod
-    def by_status_not_in(statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+    @classmethod
+    def by_status_not_in(cls, statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+        lifecycles = cls._expand_statuses(statuses)
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage.notin_(statuses)
+            return EndpointRow.lifecycle_stage.notin_(lifecycles)
 
         return inner
 
