@@ -159,6 +159,20 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
+    def by_status_not_equals(status: ModelDeploymentStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage != status
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage.notin_(statuses)
+
+        return inner
+
+    @staticmethod
     def by_lifecycle_stages(statuses: Collection[EndpointLifecycle]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.lifecycle_stage.in_(statuses)

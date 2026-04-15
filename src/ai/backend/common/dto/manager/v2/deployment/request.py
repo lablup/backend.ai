@@ -450,6 +450,8 @@ class DeploymentStatusFilter(BaseRequestModel):
 
     equals: str | None = Field(default=None, description="Exact status match")
     in_: list[str] | None = Field(default=None, alias="in", description="Status is in list")
+    not_equals: str | None = Field(default=None, description="Excludes exact status match")
+    not_in: list[str] | None = Field(default=None, description="Status is not in list")
 
 
 class RouteStatusFilter(BaseRequestModel):

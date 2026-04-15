@@ -14,6 +14,7 @@ from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
+    ModelDeploymentStatus,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
@@ -35,6 +36,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    DeploymentFilter,
     DeploymentOrder,
     ReplicaOrder,
     RevisionOrder,
@@ -518,20 +520,7 @@ class DeploymentAdapter(BaseAdapter):
             raise RuntimeError("No authenticated user in context")
         conditions: list[QueryCondition] = []
         if input.filter:
-            f = input.filter
-            if f.name is not None:
-                condition = self.convert_string_filter(
-                    f.name,
-                    contains_factory=DeploymentConditions.by_name_contains,
-                    equals_factory=DeploymentConditions.by_name_equals,
-                    starts_with_factory=DeploymentConditions.by_name_starts_with,
-                    ends_with_factory=DeploymentConditions.by_name_ends_with,
-                    in_factory=DeploymentConditions.by_name_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.open_to_public is not None:
-                conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
+            conditions.extend(self._collect_deployment_filter_conditions(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
@@ -569,20 +558,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search deployments within a specific project."""
         conditions: list[QueryCondition] = []
         if input.filter:
-            f = input.filter
-            if f.name is not None:
-                condition = self.convert_string_filter(
-                    f.name,
-                    contains_factory=DeploymentConditions.by_name_contains,
-                    equals_factory=DeploymentConditions.by_name_equals,
-                    starts_with_factory=DeploymentConditions.by_name_starts_with,
-                    ends_with_factory=DeploymentConditions.by_name_ends_with,
-                    in_factory=DeploymentConditions.by_name_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.open_to_public is not None:
-                conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
+            conditions.extend(self._collect_deployment_filter_conditions(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
@@ -1356,23 +1332,47 @@ class DeploymentAdapter(BaseAdapter):
     # Querier builders
     # ------------------------------------------------------------------
 
+    def _collect_deployment_filter_conditions(self, f: DeploymentFilter) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if f.name is not None:
+            condition = self.convert_string_filter(
+                f.name,
+                contains_factory=DeploymentConditions.by_name_contains,
+                equals_factory=DeploymentConditions.by_name_equals,
+                starts_with_factory=DeploymentConditions.by_name_starts_with,
+                ends_with_factory=DeploymentConditions.by_name_ends_with,
+                in_factory=DeploymentConditions.by_name_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.open_to_public is not None:
+            conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
+        if f.status is not None:
+            s = f.status
+            if s.equals is not None:
+                conditions.append(
+                    DeploymentConditions.by_status_equals(ModelDeploymentStatus(s.equals))
+                )
+            if s.in_ is not None:
+                conditions.append(
+                    DeploymentConditions.by_status_in([ModelDeploymentStatus(v) for v in s.in_])
+                )
+            if s.not_equals is not None:
+                conditions.append(
+                    DeploymentConditions.by_status_not_equals(ModelDeploymentStatus(s.not_equals))
+                )
+            if s.not_in is not None:
+                conditions.append(
+                    DeploymentConditions.by_status_not_in([
+                        ModelDeploymentStatus(v) for v in s.not_in
+                    ])
+                )
+        return conditions
+
     def _build_deployment_querier(self, input: AdminSearchDeploymentsInput) -> BatchQuerier:
         conditions: list[QueryCondition] = []
         if input.filter:
-            f = input.filter
-            if f.name is not None:
-                condition = self.convert_string_filter(
-                    f.name,
-                    contains_factory=DeploymentConditions.by_name_contains,
-                    equals_factory=DeploymentConditions.by_name_equals,
-                    starts_with_factory=DeploymentConditions.by_name_starts_with,
-                    ends_with_factory=DeploymentConditions.by_name_ends_with,
-                    in_factory=DeploymentConditions.by_name_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.open_to_public is not None:
-                conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
+            conditions.extend(self._collect_deployment_filter_conditions(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
