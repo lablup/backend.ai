@@ -728,6 +728,7 @@ class SyncReplicaPayload:
         description="Status of a single revision sync operation.",
     ),
     model=RevisionSyncStatusDTO,
+    name="RevisionSyncStatus",
 )
 class RevisionSyncStatusGQL:
     """Status of a single revision sync operation."""
