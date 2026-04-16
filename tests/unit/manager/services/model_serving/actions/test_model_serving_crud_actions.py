@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
@@ -253,11 +254,30 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         spec.runtime_variant = OptionalState.nop()
         return spec
 
+    def _mock_current_revision(self) -> MagicMock:
+        """Build a MagicMock shaped like ModelRevisionData for
+        `_build_revision_creator_from_spec`.
+        """
+        mock_current_rev = MagicMock()
+        mock_current_rev.image_id = uuid.uuid4()
+        mock_current_rev.cluster_config.mode = "SINGLE_NODE"
+        mock_current_rev.cluster_config.size = 1
+        mock_current_rev.resource_config.resource_slot = {}
+        mock_current_rev.resource_config.resource_opts = {}
+        mock_current_rev.model_mount_config.vfolder_id = uuid.uuid4()
+        mock_current_rev.model_mount_config.definition_path = "model-definition.yaml"
+        mock_current_rev.model_mount_config.mount_destination = "/models"
+        mock_current_rev.model_runtime_config.environ = None
+        mock_current_rev.model_runtime_config.runtime_variant = "custom"
+        mock_current_rev.model_definition = None
+        return mock_current_rev
+
     async def test_replica_count_change_marks_check_replica(
         self,
         model_serving_processors: ModelServingProcessors,
         mock_modify_endpoint: AsyncMock,
         mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
         """replica_count change (2->5) returns success=true with CHECK_REPLICA marking."""
@@ -269,6 +289,15 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         mock_endpoint_data.id = endpoint_id
         mock_modify_endpoint.return_value = MutationResult(
             success=True, message="ok", data=mock_endpoint_data
+        )
+
+        # has_revision_changes=False → modify_endpoint reads current_rev and
+        # fetches the vfolder YAML to compare. Stub the fetch to raise so the
+        # helper treats it as "no change" and falls through to CHECK_REPLICA.
+        mock_current_rev = self._mock_current_revision()
+        mock_deployment_repository.get_current_revision = AsyncMock(return_value=mock_current_rev)
+        mock_deployment_repository.fetch_model_definition = AsyncMock(
+            side_effect=Exception("no file"),
         )
 
         action = ModifyEndpointAction(endpoint_id=endpoint_id, updater=mock_updater)
@@ -334,9 +363,10 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         model_serving_processors: ModelServingProcessors,
         mock_modify_endpoint: AsyncMock,
         mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
-        """No replica change returns success without CHECK_REPLICA marking."""
+        """No replica change and unchanged YAML returns success with no side effects."""
         updater_spec = self._make_updater_spec(replicas=None)
         mock_updater = MagicMock()
         mock_updater.spec = updater_spec
@@ -347,10 +377,68 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             success=True, message="ok", data=mock_endpoint_data
         )
 
+        mock_current_rev = self._mock_current_revision()
+        mock_deployment_repository.get_current_revision = AsyncMock(return_value=mock_current_rev)
+        mock_deployment_repository.fetch_model_definition = AsyncMock(
+            side_effect=Exception("no file"),
+        )
+        mock_deployment_controller.add_revision = AsyncMock()
+        mock_deployment_controller.activate_revision = AsyncMock()
+
         action = ModifyEndpointAction(endpoint_id=endpoint_id, updater=mock_updater)
         result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
 
         assert result.success is True
+        mock_deployment_controller.mark_lifecycle_needed.assert_not_called()
+        mock_deployment_controller.add_revision.assert_not_called()
+        mock_deployment_controller.activate_revision.assert_not_called()
+
+    async def test_model_definition_yaml_change_triggers_revision(
+        self,
+        model_serving_processors: ModelServingProcessors,
+        mock_modify_endpoint: AsyncMock,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        endpoint_id: uuid.UUID,
+    ) -> None:
+        """Editing model-definition.yaml in the vfolder (with no other argument
+        changes) must create and activate a new revision.
+        """
+        updater_spec = self._make_updater_spec(replicas=None, has_revision_changes=False)
+        mock_updater = MagicMock()
+        mock_updater.spec = updater_spec
+
+        mock_endpoint_data = MagicMock()
+        mock_endpoint_data.id = endpoint_id
+        mock_modify_endpoint.return_value = MutationResult(
+            success=True, message="ok", data=mock_endpoint_data
+        )
+
+        # Stored vs. on-disk definitions differ → helper detects a change and
+        # forces a new revision.
+        mock_current_rev = self._mock_current_revision()
+        mock_current_rev.model_definition = ModelDefinition.model_validate({
+            "models": [{"name": "old", "model_path": "/models/old"}],
+        })
+        mock_deployment_repository.get_current_revision = AsyncMock(return_value=mock_current_rev)
+        mock_deployment_repository.fetch_model_definition = AsyncMock(
+            return_value={"models": [{"name": "new", "model_path": "/models/new"}]},
+        )
+
+        mock_revision = MagicMock()
+        mock_revision.id = uuid.uuid4()
+        mock_deployment_controller.add_revision = AsyncMock(return_value=mock_revision)
+        mock_deployment_controller.activate_revision = AsyncMock()
+
+        action = ModifyEndpointAction(endpoint_id=endpoint_id, updater=mock_updater)
+        result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
+
+        assert result.success is True
+        mock_deployment_repository.fetch_model_definition.assert_awaited_once()
+        mock_deployment_controller.add_revision.assert_awaited_once()
+        mock_deployment_controller.activate_revision.assert_awaited_once_with(
+            endpoint_id, mock_revision.id
+        )
         mock_deployment_controller.mark_lifecycle_needed.assert_not_called()
 
     async def test_non_existent_endpoint_raises(

@@ -526,7 +526,7 @@ class DeploymentController:
         """Generate the final model definition for a revision.
 
         Delegates to ModelDefinitionGeneratorRegistry for the full merge:
-        programmatic generation → user override → storage file override.
+        programmatic generation → vfolder file override → user override.
         """
         context = ModelDefinitionContext(
             mounts=MountMetadata(

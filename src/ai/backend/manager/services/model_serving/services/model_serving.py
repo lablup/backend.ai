@@ -13,6 +13,7 @@ from yarl import URL
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
@@ -902,10 +903,21 @@ class ModelServingService:
             self._config_provider.legacy_etcd_config_loader,
         )
 
-        # 2. If revision-level fields changed, create + activate via controller.
+        # 2. Decide whether a new revision is needed.
+        #    Revision-level spec changes always force a new revision. Otherwise
+        #    (short-circuit) compare the vfolder's model-definition.yaml with
+        #    the current revision's stored definition — this catches the case
+        #    where the user edited model-definition.yaml without changing any
+        #    other modify_endpoint argument.
+        needs_new_revision = (
+            spec.has_revision_changes()
+            or await self._model_definition_content_changed(action.endpoint_id, spec)
+        )
+
+        # 3. Create + activate via controller when needed.
         #    This ensures the same pipeline as v2: preset → merge → resolve → RBAC
         #    → deploying_revision guard → DEPLOYING strategy.
-        if spec.has_revision_changes():
+        if needs_new_revision:
             creator = await self._build_revision_creator_from_spec(action.endpoint_id, spec)
             revision = await self._deployment_controller.add_revision(action.endpoint_id, creator)
             await self._deployment_controller.activate_revision(action.endpoint_id, revision.id)
@@ -918,6 +930,37 @@ class ModelServingService:
         return ModifyEndpointActionResult(
             endpoint_id=action.endpoint_id, success=result.success, data=result.data
         )
+
+    async def _model_definition_content_changed(
+        self,
+        endpoint_id: uuid.UUID,
+        spec: EndpointUpdaterSpec,
+    ) -> bool:
+        """Return True if the vfolder's model-definition.yaml differs from the
+        current revision's stored definition.
+
+        Reads the YAML straight from storage and compares with the stored
+        ModelDefinition, avoiding the cost of building a full
+        ``ModelRevisionCreator`` solely for change detection. If the file is
+        missing or unreadable we treat it as "no change" (conservative).
+        """
+        current_rev = await self._deployment_repository.get_current_revision(endpoint_id)
+        vfolder_id = current_rev.model_mount_config.vfolder_id
+        if vfolder_id is None:
+            return False
+        path = (
+            spec.model_definition_path.optional_value()
+            or current_rev.model_mount_config.definition_path
+        )
+        try:
+            raw = await self._deployment_repository.fetch_model_definition(
+                vfolder_id=vfolder_id,
+                model_definition_path=path,
+            )
+        except Exception:
+            return False
+        fresh = ModelDefinition.model_validate(raw)
+        return fresh != current_rev.model_definition
 
     async def _build_revision_creator_from_spec(
         self,
@@ -993,7 +1036,11 @@ class ModelServingService:
                     or current_rev.model_runtime_config.runtime_variant
                 ),
             ),
-            model_definition=current_rev.model_definition,
+            # Legacy EndpointUpdaterSpec has no user-provided model_definition
+            # override; leaving this as None lets the resolve pipeline pick up
+            # the current vfolder YAML instead of re-merging the previous
+            # revision's already-resolved definition back on top of it.
+            model_definition=None,
         )
 
     async def validate_model_service(
