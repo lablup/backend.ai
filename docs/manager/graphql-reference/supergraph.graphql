@@ -9110,7 +9110,7 @@ type ModelRevisionEdge
 input ModelRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
-  name: StringFilter = null
+  revisionNumber: IntFilter = null
   deploymentId: ID = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
@@ -9129,7 +9129,7 @@ input ModelRevisionOrderBy
 enum ModelRevisionOrderField
   @join__type(graph: STRAWBERRY)
 {
-  NAME @join__enumValue(graph: STRAWBERRY)
+  REVISION_NUMBER @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 

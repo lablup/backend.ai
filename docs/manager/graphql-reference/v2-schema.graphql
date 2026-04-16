@@ -5946,7 +5946,7 @@ type ModelRevisionEdge {
 
 """Added in 25.19.0. """
 input ModelRevisionFilter {
-  name: StringFilter = null
+  revisionNumber: IntFilter = null
   deploymentId: ID = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
@@ -5961,7 +5961,7 @@ input ModelRevisionOrderBy {
 
 """Added in 25.19.0. Fields available for ordering model revisions."""
 enum ModelRevisionOrderField {
-  NAME
+  REVISION_NUMBER
   CREATED_AT
 }
 

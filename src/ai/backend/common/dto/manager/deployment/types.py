@@ -30,7 +30,7 @@ class DeploymentOrderField(enum.StrEnum):
 class RevisionOrderField(enum.StrEnum):
     """Fields that can be used for ordering revisions."""
 
-    NAME = "name"
+    REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
 
 

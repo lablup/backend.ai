@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection
-from typing import cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
+from ai.backend.manager.models.condition_utils import make_int_conditions
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -30,72 +29,7 @@ class RevisionConditions:
 
         return inner
 
-    @staticmethod
-    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = sa.func.lower(DeploymentRevisionRow.name) == spec.value.lower()
-            else:
-                condition = DeploymentRevisionRow.name == spec.value
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = DeploymentRevisionRow.name.ilike(f"%{spec.value}%")
-            else:
-                condition = DeploymentRevisionRow.name.like(f"%{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return cast(sa.sql.expression.ColumnElement[bool], condition)
-
-        return inner
-
-    @staticmethod
-    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = DeploymentRevisionRow.name.ilike(f"{spec.value}%")
-            else:
-                condition = DeploymentRevisionRow.name.like(f"{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return cast(sa.sql.expression.ColumnElement[bool], condition)
-
-        return inner
-
-    @staticmethod
-    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = DeploymentRevisionRow.name.ilike(f"%{spec.value}")
-            else:
-                condition = DeploymentRevisionRow.name.like(f"%{spec.value}")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return cast(sa.sql.expression.ColumnElement[bool], condition)
-
-        return inner
-
-    @staticmethod
-    def by_name_in(spec: StringInMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = sa.func.lower(DeploymentRevisionRow.name).in_([
-                    v.lower() for v in spec.values
-                ])
-            else:
-                condition = DeploymentRevisionRow.name.in_(spec.values)
-            if spec.negated:
-                condition = sa.not_(condition)
-            return cast(sa.sql.expression.ColumnElement[bool], condition)
-
-        return inner
+    by_revision_number = make_int_conditions(DeploymentRevisionRow.revision_number)
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:

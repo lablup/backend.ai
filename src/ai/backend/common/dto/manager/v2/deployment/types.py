@@ -87,7 +87,7 @@ class DeploymentOrderField(StrEnum):
 class RevisionOrderField(StrEnum):
     """Fields available for ordering deployment revisions."""
 
-    NAME = "name"
+    REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
 
 

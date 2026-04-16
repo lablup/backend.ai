@@ -1589,14 +1589,10 @@ class DeploymentAdapter(BaseAdapter):
 
     def _convert_revision_filter(self, f: RevisionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if f.name is not None:
-            condition = self.convert_string_filter(
-                f.name,
-                contains_factory=RevisionConditions.by_name_contains,
-                equals_factory=RevisionConditions.by_name_equals,
-                starts_with_factory=RevisionConditions.by_name_starts_with,
-                ends_with_factory=RevisionConditions.by_name_ends_with,
-                in_factory=RevisionConditions.by_name_in,
+        if f.revision_number is not None:
+            condition = self.convert_int_filter(
+                f.revision_number,
+                RevisionConditions.by_revision_number,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -2048,8 +2044,8 @@ class DeploymentAdapter(BaseAdapter):
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
             match o.field:
-                case RevisionOrderField.NAME:
-                    result.append(RevisionOrders.name(ascending))
+                case RevisionOrderField.REVISION_NUMBER:
+                    result.append(RevisionOrders.revision_number(ascending))
                 case RevisionOrderField.CREATED_AT:
                     result.append(RevisionOrders.created_at(ascending))
         return result

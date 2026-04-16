@@ -20,7 +20,12 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.query import DateTimeFilter, NullableDateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    IntFilter,
+    NullableDateTimeFilter,
+    StringFilter,
+)
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
@@ -523,7 +528,7 @@ DeploymentFilter.model_rebuild()
 class RevisionFilter(BaseRequestModel):
     """Filter for deployment revisions."""
 
-    name: StringFilter | None = Field(default=None, description="Name filter")
+    revision_number: IntFilter | None = Field(default=None, description="Filter by revision number")
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
     AND: list[RevisionFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[RevisionFilter] | None = Field(default=None, description="OR conjunction")
