@@ -3016,9 +3016,6 @@ input DeploymentFilter {
   """Added in UNRELEASED. Filter by the user who created the deployment."""
   createdUserId: UUID = null
 
-  """Added in UNRELEASED. Filter by the session owner of the deployment."""
-  sessionOwnerId: UUID = null
-
   """Added in UNRELEASED. Filter by deployment creation datetime."""
   createdAt: DateTimeFilter = null
 
