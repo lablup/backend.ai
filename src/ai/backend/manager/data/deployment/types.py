@@ -14,7 +14,7 @@ from uuid import UUID
 import yarl
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -433,8 +433,9 @@ class RevisionDraft:
     runtime_variant: RuntimeVariant | None = None
     callback_url: yarl.URL | None = None
     inference_runtime_config: Mapping[str, Any] | None = None
-    # Model definition
-    model_definition: ModelDefinition | None = None
+    # Model definition (draft form — partial fields allowed; merged then resolved
+    # to a strict ``ModelDefinition`` at the persistence boundary).
+    model_definition: ModelDefinitionDraft | None = None
     # Preset values (carried alongside; not field-merged)
     preset_values: list[PresetValueData] | None = None
 

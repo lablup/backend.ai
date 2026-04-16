@@ -330,11 +330,11 @@ class TestProcessDeploymentLifecycle:
     ) -> None:
         """History is recorded when handler returns success."""
         coordinator_with_pending_deployments._registry.handlers = {
-            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_success
+            (DeploymentLifecycleType.CHECK_REPLICA, None): mock_handler_with_success
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
-            DeploymentLifecycleType.CHECK_PENDING
+            DeploymentLifecycleType.CHECK_REPLICA
         )
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_called_once()
@@ -347,11 +347,11 @@ class TestProcessDeploymentLifecycle:
     ) -> None:
         """History is recorded when handler returns failure."""
         coordinator_with_pending_deployments._registry.handlers = {
-            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_failure
+            (DeploymentLifecycleType.CHECK_REPLICA, None): mock_handler_with_failure
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
-            DeploymentLifecycleType.CHECK_PENDING
+            DeploymentLifecycleType.CHECK_REPLICA
         )
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_called_once()
@@ -363,7 +363,7 @@ class TestProcessDeploymentLifecycle:
     ) -> None:
         """History is not recorded when no deployments to process."""
         await coordinator_without_deployments.process_deployment_lifecycle(
-            DeploymentLifecycleType.CHECK_PENDING
+            DeploymentLifecycleType.CHECK_REPLICA
         )
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_not_called()
@@ -376,11 +376,11 @@ class TestProcessDeploymentLifecycle:
     ) -> None:
         """History is not recorded when handler returns empty result."""
         coordinator_with_pending_deployments._registry.handlers = {
-            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_empty_result
+            (DeploymentLifecycleType.CHECK_REPLICA, None): mock_handler_with_empty_result
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
-            DeploymentLifecycleType.CHECK_PENDING
+            DeploymentLifecycleType.CHECK_REPLICA
         )
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_not_called()
@@ -413,11 +413,11 @@ class TestProcessDeploymentLifecycle:
         mock_handler.post_process = AsyncMock()
 
         coordinator_with_pending_deployments._registry.handlers = {
-            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler
+            (DeploymentLifecycleType.CHECK_REPLICA, None): mock_handler
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
-            DeploymentLifecycleType.CHECK_PENDING
+            DeploymentLifecycleType.CHECK_REPLICA
         )
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_called_once()
@@ -449,11 +449,11 @@ class TestProcessDeploymentLifecycle:
         mock_handler.post_process = AsyncMock()
 
         coordinator_with_pending_deployments._registry.handlers = {
-            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler
+            (DeploymentLifecycleType.CHECK_REPLICA, None): mock_handler
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
-            DeploymentLifecycleType.CHECK_PENDING
+            DeploymentLifecycleType.CHECK_REPLICA
         )
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_not_called()

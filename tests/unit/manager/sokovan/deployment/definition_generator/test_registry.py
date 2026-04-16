@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
@@ -43,7 +43,7 @@ class OverridePathCase:
 @dataclass(frozen=True)
 class InvalidModelDefinitionCase:
     description: str
-    value: ModelDefinition | None
+    value: ModelDefinitionDraft | None
 
 
 VARIANT_EXPECTATIONS: dict[RuntimeVariant, VariantExpectation] = {
@@ -71,7 +71,7 @@ VARIANTS_WITH_HEALTH_CHECK = [v for v in NON_CUSTOM_VARIANTS if v != RuntimeVari
 def create_context(
     variant: RuntimeVariant,
     model_definition_path: str | None = None,
-    model_definition: ModelDefinition | None = None,
+    model_definition: ModelDefinitionDraft | None = None,
 ) -> ModelDefinitionContext:
     return ModelDefinitionContext(
         mounts=MountMetadata(
@@ -136,10 +136,10 @@ def definition_generator_registry_with_override(
 
 
 @pytest.fixture
-def db_model_definition() -> ModelDefinition:
+def db_model_definition() -> ModelDefinitionDraft:
     """Model definition simulating user-provided override."""
     expected = VARIANT_EXPECTATIONS[RuntimeVariant("vllm")]
-    return ModelDefinition.model_validate({
+    return ModelDefinitionDraft.model_validate({
         "models": [
             {
                 "name": expected.name,
@@ -193,6 +193,7 @@ class TestModelDefinitionGeneratorRegistry:
         )
 
         mock_repo.fetch_model_definition.assert_not_called()
+        assert result.models is not None
         model = result.models[0]
         assert model.name == expected.name
         assert model.service is not None
@@ -220,6 +221,7 @@ class TestModelDefinitionGeneratorRegistry:
         )
 
         mock_repo.fetch_model_definition.assert_called_once()
+        assert result.models is not None
         assert result.models[0].name == "custom-model"
 
     @pytest.mark.parametrize(
@@ -244,6 +246,7 @@ class TestModelDefinitionGeneratorRegistry:
             create_context(RuntimeVariant("vllm"), model_definition_path=case.path)
         )
 
+        assert result.models is not None
         model = result.models[0]
         assert model.service is not None
         if case.expect_vfolder_fetch:
@@ -267,6 +270,7 @@ class TestModelDefinitionGeneratorRegistry:
             create_context(variant, model_definition_path="model.yaml")
         )
 
+        assert result.models is not None
         model = result.models[0]
         assert model.name == expected.name
         assert model.service is not None
@@ -294,6 +298,7 @@ class TestModelDefinitionGeneratorRegistry:
         )
 
         mock_repo.fetch_model_definition.assert_called_once()
+        assert result.models is not None
         model = result.models[0]
         assert model.name == expected.name
         assert model.service is not None
@@ -304,13 +309,14 @@ class TestModelDefinitionGeneratorRegistry:
         self,
         definition_generator_registry: ModelDefinitionGeneratorRegistry,
         variant: RuntimeVariant,
-        db_model_definition: ModelDefinition,
+        db_model_definition: ModelDefinitionDraft,
     ) -> None:
         """User-provided model_definition is merged on top of generated definition."""
         result = await definition_generator_registry.generate_model_definition(
             create_context(variant, model_definition=db_model_definition)
         )
 
+        assert result.models is not None
         model = result.models[0]
         assert model.service is not None
         assert model.service.start_command == "db-overridden-command"
@@ -319,7 +325,9 @@ class TestModelDefinitionGeneratorRegistry:
         "case",
         [
             InvalidModelDefinitionCase(description="not provided", value=None),
-            InvalidModelDefinitionCase(description="empty definition", value=ModelDefinition()),
+            InvalidModelDefinitionCase(
+                description="empty definition", value=ModelDefinitionDraft()
+            ),
         ],
         ids=lambda c: c.description,
     )
@@ -335,6 +343,7 @@ class TestModelDefinitionGeneratorRegistry:
             create_context(RuntimeVariant("vllm"), model_definition=case.value)
         )
 
+        assert result.models is not None
         model = result.models[0]
         assert model.name == expected.name
         assert model.service is not None
@@ -344,7 +353,7 @@ class TestModelDefinitionGeneratorRegistry:
         self,
         definition_generator_registry_with_override: ModelDefinitionGeneratorRegistry,
         mock_repo: MagicMock,
-        db_model_definition: ModelDefinition,
+        db_model_definition: ModelDefinitionDraft,
         storage_override_definition: dict[str, Any],
     ) -> None:
         """User-provided model_definition has higher priority than vfolder file."""
@@ -358,6 +367,7 @@ class TestModelDefinitionGeneratorRegistry:
             )
         )
 
+        assert result.models is not None
         model = result.models[0]
         assert model.service is not None
         assert model.service.start_command == "db-overridden-command"
@@ -383,9 +393,9 @@ class TestModelDefinitionGeneratorRegistry:
         }
 
     @pytest.fixture
-    def custom_user_override(self) -> ModelDefinition:
+    def custom_user_override(self) -> ModelDefinitionDraft:
         """User-provided override that changes port and health check for CUSTOM variant."""
-        return ModelDefinition.model_validate({
+        return ModelDefinitionDraft.model_validate({
             "models": [
                 {
                     "name": "test-model",
@@ -407,7 +417,7 @@ class TestModelDefinitionGeneratorRegistry:
         definition_generator_registry: ModelDefinitionGeneratorRegistry,
         mock_repo: MagicMock,
         custom_vfolder_definition: dict[str, Any],
-        custom_user_override: ModelDefinition,
+        custom_user_override: ModelDefinitionDraft,
     ) -> None:
         """CUSTOM variant: vfolder base + user override deep merged into DB."""
         mock_repo.fetch_model_definition = AsyncMock(return_value=custom_vfolder_definition)
@@ -420,6 +430,7 @@ class TestModelDefinitionGeneratorRegistry:
             )
         )
 
+        assert result.models is not None
         model = result.models[0]
         assert model.name == "test-model"
         assert model.model_path == "/models"  # preserved from vfolder
@@ -452,6 +463,7 @@ class TestModelDefinitionGeneratorRegistry:
             )
         )
 
+        assert result.models is not None
         model = result.models[0]
         assert model.name == "test-model"
         assert model.model_path == "/models"
@@ -484,10 +496,10 @@ class TestModelDefinitionGeneratorRegistry:
         }
 
     @pytest.fixture
-    def vllm_user_override(self) -> ModelDefinition:
+    def vllm_user_override(self) -> ModelDefinitionDraft:
         """User-provided override that changes start-command and port for VLLM variant.
         health-check is absent so vfolder's health-check fields are fully preserved in the merge."""
-        return ModelDefinition.model_validate({
+        return ModelDefinitionDraft.model_validate({
             "models": [
                 {
                     "name": "vllm-model",
@@ -505,7 +517,7 @@ class TestModelDefinitionGeneratorRegistry:
         definition_generator_registry_with_override: ModelDefinitionGeneratorRegistry,
         mock_repo: MagicMock,
         vllm_vfolder_definition: dict[str, Any],
-        vllm_user_override: ModelDefinition,
+        vllm_user_override: ModelDefinitionDraft,
     ) -> None:
         """Non-CUSTOM with override enabled: vfolder file and user override are both
         deep-merged on top of the generator-produced definition."""
@@ -519,6 +531,7 @@ class TestModelDefinitionGeneratorRegistry:
             )
         )
 
+        assert result.models is not None
         model = result.models[0]
         assert model.service is not None
         # from user override (overrode vfolder and generator — vfolder had "vfolder-command")

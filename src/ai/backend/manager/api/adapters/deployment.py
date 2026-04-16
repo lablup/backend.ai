@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection, Sequence
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import PurePosixPath
 from uuid import UUID
@@ -26,6 +27,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     DeleteAutoScalingRuleInput,
     UpdateAutoScalingRuleInput,
 )
+from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AccessTokenFilter,
     ActivateRevisionInput,
@@ -539,7 +541,12 @@ class DeploymentAdapter(BaseAdapter):
             policy=policy,
         )
         action_result = await self._processors.deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator)
+            CreateDeploymentAction(
+                creator=creator,
+                auto_activate=initial_revision.auto_activate
+                if initial_revision is not None
+                else False,
+            )
         )
         return CreateDeploymentPayload(deployment=self._deployment_data_to_dto(action_result.data))
 
@@ -1171,6 +1178,7 @@ class DeploymentAdapter(BaseAdapter):
             AddModelRevisionAction(
                 model_deployment_id=input.deployment_id,
                 adder=adder,
+                auto_activate=options.auto_activate,
             )
         )
         if options.auto_activate:
@@ -2274,6 +2282,12 @@ class DeploymentAdapter(BaseAdapter):
             ),
             resource_config=ResourceConfigInfoDTO(
                 resource_group_name=data.resource_config.resource_group_name,
+                resource_slots=ResourceSlotInfo(
+                    entries=[
+                        ResourceSlotEntryInfo(resource_type=str(k), quantity=Decimal(str(v)))
+                        for k, v in data.resource_config.resource_slot.items()
+                    ],
+                ),
                 resource_opts=(
                     ResourceOptsInfoDTO(
                         entries=[

@@ -176,24 +176,6 @@ class DeploymentRepository:
         return await self._db_source.create_endpoint(creator, policy_config)
 
     @deployment_repository_resilience.apply()
-    async def create_endpoint_legacy(
-        self,
-        creator: RBACEntityCreator[EndpointRow],
-    ) -> DeploymentInfo:
-        """Create a new endpoint using legacy DeploymentCreator.
-
-        This is for backward compatibility with legacy deployment creation flow.
-
-        Args:
-            creator: RBACEntityCreator with LegacyEndpointCreatorSpec.
-                The spec MUST be an instance of LegacyEndpointCreatorSpec.
-
-        Returns:
-            DeploymentInfo for the created endpoint
-        """
-        return await self._db_source.create_endpoint_legacy(creator)
-
-    @deployment_repository_resilience.apply()
     async def get_image_id(self, image: ImageIdentifier) -> uuid.UUID:
         """Get image ID from ImageIdentifier."""
         return await self._db_source.get_image_id(image)

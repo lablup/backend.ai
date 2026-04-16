@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.data.deployment.types import RevisionDraft
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
@@ -31,8 +31,8 @@ class PresetDraftGenerator:
         resource_slots = {slot_name: str(quantity) for slot_name, quantity in slot_entries}
         resource_opts = {o.name: o.value for o in preset_data.resource_opts}
         environ = {e.key: e.value for e in preset_data.environ}
-        model_definition: ModelDefinition | None = (
-            ModelDefinition(**preset_data.model_definition)
+        model_definition: ModelDefinitionDraft | None = (
+            ModelDefinitionDraft.model_validate(preset_data.model_definition)
             if preset_data.model_definition
             else None
         )

@@ -14,6 +14,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.common.dto.manager.v2.common import ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateDeploymentPayload,
     AddRevisionPayload,
@@ -55,6 +56,7 @@ def _make_cluster_config(**kwargs: object) -> ClusterConfigInfoDTO:
 def _make_resource_config(**kwargs: object) -> ResourceConfigInfoDTO:
     defaults: dict[str, Any] = {
         "resource_group_name": "default",
+        "resource_slots": ResourceSlotInfo(entries=[]),
         "resource_opts": None,
     }
     defaults.update(kwargs)

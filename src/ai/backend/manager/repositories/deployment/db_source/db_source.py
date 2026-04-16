@@ -72,7 +72,6 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
     DeploymentRevisionNotFound,
@@ -153,7 +152,6 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentPolicyCreatorSpec,
     DeploymentRevisionCreatorSpec,
 )
-from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
     ProjectDeploymentSearchScope,
     RouteData,
@@ -284,98 +282,6 @@ class DeploymentDBSource:
                 policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
             policy_creator = RBACEntityCreator(
                 spec=policy_creator_spec,
-                element_type=RBACElementType.DEPLOYMENT_POLICY,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.MODEL_DEPLOYMENT,
-                    element_id=str(endpoint.id),
-                ),
-            )
-            await execute_rbac_entity_creator(db_sess, policy_creator)
-            await db_sess.flush()
-
-            stmt = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.id == endpoint.id)
-                .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
-                    selectinload(EndpointRow.deployment_policy),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
-                )
-            )
-            result = await db_sess.execute(stmt)
-            endpoint_result: EndpointRow = result.scalar_one()
-            return endpoint_result.to_deployment_info()
-
-    async def create_endpoint_legacy(
-        self,
-        creator: RBACEntityCreator[EndpointRow],
-    ) -> DeploymentInfo:
-        """Create a new endpoint using legacy DeploymentCreator.
-
-        This is for backward compatibility with legacy deployment creation flow.
-
-        Args:
-            creator: RBACEntityCreator with LegacyEndpointCreatorSpec.
-                The spec MUST be an instance of LegacyEndpointCreatorSpec.
-
-        Returns:
-            DeploymentInfo for the created endpoint
-        """
-        spec = cast(LegacyEndpointCreatorSpec, creator.spec)
-        async with self._begin_session_read_committed() as db_sess:
-            await self._check_group_exists(db_sess, spec.domain, spec.project)
-            await self._check_endpoint_name_exists(db_sess, spec.domain, spec.project, spec.name)
-
-            # Create endpoint with RBAC scope association
-            rbac_result = await execute_rbac_entity_creator(db_sess, creator)
-            endpoint = rbac_result.row
-
-            # Create the initial deployment revision and link it to the endpoint
-            if spec.image_id is None:
-                raise InvalidAPIParameters("image_id is required for legacy endpoint creation")
-            initial_revision = DeploymentRevisionRow(
-                endpoint=endpoint.id,
-                revision_number=1,
-                image=spec.image_id,
-                model=spec.model,
-                model_mount_destination=spec.model_mount_destination,
-                model_definition_path=spec.model_definition_path,
-                model_definition=spec.model_definition.model_dump(exclude_none=True, by_alias=True)
-                if spec.model_definition is not None
-                else None,
-                resource_group=spec.resource_group,
-                resource_opts=dict(spec.resource_opts) if spec.resource_opts else {},
-                cluster_mode=spec.cluster_mode.value,
-                cluster_size=spec.cluster_size,
-                startup_command=spec.startup_command,
-                bootstrap_script=spec.bootstrap_script,
-                environ=dict(spec.environ) if spec.environ else {},
-                callback_url=spec.callback_url,
-                runtime_variant=spec.runtime_variant,
-                extra_mounts=list(spec.extra_mounts),
-            )
-            initial_revision.resource_slot_rows = [
-                DeploymentRevisionResourceSlotRow(
-                    slot_name=str(slot_name),
-                    quantity=quantity,
-                )
-                for slot_name, quantity in spec.resource_slots.items()
-            ]
-            db_sess.add(initial_revision)
-            await db_sess.flush()
-            endpoint.current_revision = initial_revision.id
-
-            # Create deployment policy if provided
-            if spec.policy is not None:
-                policy_spec = spec.policy
-            else:
-                policy_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
-            policy_creator = RBACEntityCreator(
-                spec=policy_spec,
                 element_type=RBACElementType.DEPLOYMENT_POLICY,
                 scope_ref=RBACElementRef(
                     element_type=RBACElementType.MODEL_DEPLOYMENT,
@@ -711,7 +617,8 @@ class DeploymentDBSource:
             EndpointNotFound: If the endpoint does not exist
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            # Fetch existing endpoint
+            # Fetch existing endpoint with all relationships needed by to_deployment_info()
+            # to avoid lazy-load attempts after apply_to_row dirties the row.
             query = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
@@ -719,9 +626,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             result = await db_sess.execute(query)

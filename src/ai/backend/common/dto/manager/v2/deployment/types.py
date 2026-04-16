@@ -20,7 +20,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
@@ -347,6 +347,7 @@ class ResourceConfigInfoDTO(BaseResponseModel):
     """Resource configuration backing DTO for ResourceConfig GQL type."""
 
     resource_group_name: str
+    resource_slots: ResourceSlotInfo
     resource_opts: ResourceOptsInfoDTO | None = None
 
 

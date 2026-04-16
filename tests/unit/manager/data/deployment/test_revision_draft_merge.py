@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import yarl
 
-from ai.backend.common.config import ModelConfig, ModelDefinition
+from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     RevisionDraft,
@@ -71,19 +71,22 @@ class TestMergeRevisionDrafts:
         assert merged.resource_opts == {"shmem": "2g", "extra": "v"}
 
     def test_model_definition_uses_merge_when_both_present(self) -> None:
-        base = ModelDefinition(models=[ModelConfig(name="m-base", model_path="/models/base")])
-        override = ModelDefinition(
-            models=[ModelConfig(name="m-override", model_path="/models/override")]
+        base = ModelDefinitionDraft(
+            models=[ModelConfigDraft(name="m-base", model_path="/models/base")]
+        )
+        override = ModelDefinitionDraft(
+            models=[ModelConfigDraft(name="m-override", model_path="/models/override")]
         )
         earlier = RevisionDraft(model_definition=base)
         later = RevisionDraft(model_definition=override)
         merged = merge_revision_drafts(earlier, later)
         assert merged.model_definition is not None
-        # Merge uses per-index merge of ModelConfig (model name is replaced).
+        assert merged.model_definition.models is not None
+        # Merge uses per-index merge of ModelConfigDraft (model name is replaced).
         assert merged.model_definition.models[0].name == "m-override"
 
     def test_model_definition_replaced_when_earlier_missing(self) -> None:
-        override = ModelDefinition(models=[ModelConfig(name="m", model_path="/models/m")])
+        override = ModelDefinitionDraft(models=[ModelConfigDraft(name="m", model_path="/models/m")])
         earlier = RevisionDraft()
         later = RevisionDraft(model_definition=override)
         merged = merge_revision_drafts(earlier, later)

@@ -12,7 +12,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -269,7 +269,7 @@ class RevisionInput(BaseRequestModel):
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Model runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    model_definition: ModelDefinition | None = Field(
+    model_definition: ModelDefinitionDraft | None = Field(
         default=None,
         description="Model definition to override the generated definition",
     )

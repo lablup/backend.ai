@@ -169,13 +169,18 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
     async def test_valid_draft_returns_deployment_info(
         self,
         processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
         draft: MagicMock,
     ) -> None:
         """Valid DeploymentCreationDraft returns DeploymentInfo with UUID/metadata/lifecycle."""
+        mock_deployment_controller.build_creator_from_legacy_draft = AsyncMock(
+            return_value=(MagicMock(), MagicMock())
+        )
         mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
-        mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
+        mock_deployment_controller.add_deployment_revision = AsyncMock()
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
 
         action = CreateLegacyDeploymentAction(draft=draft)
         result = await processors.create_legacy_deployment.wait_for_complete(action)
@@ -184,23 +189,29 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         assert result.data.id == endpoint_info.id
         assert result.data.metadata.name == "test-deployment"
 
-    async def test_lifecycle_marked_check_pending(
+    async def test_revision_auto_activated(
         self,
         processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
         draft: MagicMock,
     ) -> None:
-        """Creating a deployment marks lifecycle CHECK_PENDING."""
+        """Legacy create flow always adds the initial revision with auto_activate=True."""
+        mock_deployment_controller.build_creator_from_legacy_draft = AsyncMock(
+            return_value=(MagicMock(), MagicMock())
+        )
         mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
-        mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
+        mock_deployment_controller.add_deployment_revision = AsyncMock()
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
 
         action = CreateLegacyDeploymentAction(draft=draft)
         await processors.create_legacy_deployment.wait_for_complete(action)
 
-        mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
-            DeploymentLifecycleType.CHECK_PENDING
-        )
+        mock_deployment_controller.add_deployment_revision.assert_awaited_once()
+        kwargs = mock_deployment_controller.add_deployment_revision.await_args.kwargs
+        assert kwargs["deployment_id"] == endpoint_info.id
+        assert kwargs["auto_activate"] is True
 
     async def test_non_existent_domain_raises(
         self,
@@ -209,10 +220,9 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         draft: MagicMock,
     ) -> None:
         """Non-existent domain raises repository error."""
-        mock_deployment_controller.create_deployment = AsyncMock(
+        mock_deployment_controller.build_creator_from_legacy_draft = AsyncMock(
             side_effect=Exception("Domain not found")
         )
-        mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
         action = CreateLegacyDeploymentAction(draft=draft)
         with pytest.raises(Exception, match="Domain not found"):

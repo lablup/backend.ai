@@ -64,7 +64,6 @@ from ai.backend.manager.types import DistributedLockFactory
 from .deployment_controller import DeploymentController
 from .executor import DeploymentExecutor
 from .handlers import (
-    CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
     DeployingProvisioningHandler,
     DeployingRollingBackHandler,
@@ -272,13 +271,6 @@ class DeploymentCoordinator:
         Deploying handlers use sub-step keys for dispatching.
         """
         handler_list: list[tuple[HandlerKey, DeploymentHandler]] = [
-            (
-                (DeploymentLifecycleType.CHECK_PENDING, None),
-                CheckPendingDeploymentHandler(
-                    deployment_executor=executor,
-                    deployment_controller=self._deployment_controller,
-                ),
-            ),
             (
                 (DeploymentLifecycleType.CHECK_REPLICA, None),
                 CheckReplicaDeploymentHandler(
@@ -749,13 +741,6 @@ class DeploymentCoordinator:
         Lifecycles with sub-step handlers get one spec per sub-step.
         """
         specs: list[DeploymentTaskSpec] = [
-            # Check pending deployments frequently with both short and long cycles
-            DeploymentTaskSpec(
-                DeploymentLifecycleType.CHECK_PENDING,
-                short_interval=2.0,
-                long_interval=30.0,
-                initial_delay=10.0,
-            ),
             # Check replicas moderately with both short and long cycles
             DeploymentTaskSpec(
                 DeploymentLifecycleType.CHECK_REPLICA,
