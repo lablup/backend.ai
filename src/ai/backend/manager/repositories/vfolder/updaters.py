@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.vfolder import VFolderPermission, VFolderRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState
@@ -30,3 +31,16 @@ class VFolderAttributeUpdaterSpec(UpdaterSpec[VFolderRow]):
         self.cloneable.update_dict(to_update, "cloneable")
         self.mount_permission.update_dict(to_update, "permission")
         return to_update
+
+
+class VFolderTrashUpdaterSpec(UpdaterSpec[VFolderRow]):
+    """Set vfolder status to DELETE_PENDING (soft-delete / move to trash)."""
+
+    @property
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": VFolderOperationStatus.DELETE_PENDING}

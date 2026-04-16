@@ -33,6 +33,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     MkdirPayload,
     MoveFilePayload,
     PurgeVFolderPayload,
+    RestoreVFolderPayload,
     SearchVFoldersPayload,
     VFolderNode,
 )
@@ -124,6 +125,14 @@ class V2VFolderClient(BaseDomainClient):
             "POST",
             f"{_PATH}/{vfolder_id}/purge",
             response_model=PurgeVFolderPayload,
+        )
+
+    async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
+        """Restore a trashed vfolder."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{vfolder_id}/restore",
+            response_model=RestoreVFolderPayload,
         )
 
     async def deploy(

@@ -197,6 +197,22 @@ def purge(vfolder_id: UUID) -> None:
 
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
+def restore(vfolder_id: UUID) -> None:
+    """Restore a trashed vfolder."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.restore(vfolder_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
 @click.option(
     "--project-id",
     required=True,
