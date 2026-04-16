@@ -49,7 +49,7 @@ class DeploymentAdminRepository:
 
         rows = await self._db_source.get_revisions_with_vfolder_info()
 
-        batch_updates: list[RevisionModelDefinitionUpdate] = []
+        updates: list[RevisionModelDefinitionUpdate] = []
 
         for row in rows:
             vfolder_location = VFolderLocation(
@@ -92,15 +92,15 @@ class DeploymentAdminRepository:
             if stored == model_def:
                 continue
 
-            batch_updates.append(
+            updates.append(
                 RevisionModelDefinitionUpdate(
                     revision_id=row.revision_id, model_definition=model_def
                 )
             )
 
-        if batch_updates:
-            await self._db_source.batch_update_model_definitions(batch_updates)
-            for update in batch_updates:
+        if updates:
+            await self._db_source.update_model_definitions(updates)
+            for update in updates:
                 results.append(
                     SingleRevisionSyncResult(revision_id=update.revision_id, success=True)
                 )

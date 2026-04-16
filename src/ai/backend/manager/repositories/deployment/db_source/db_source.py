@@ -2986,7 +2986,7 @@ class DeploymentDBSource:
                 for rev, vf in result.all()
             ]
 
-    async def batch_update_model_definitions(
+    async def update_model_definitions(
         self,
         updates: list[RevisionModelDefinitionUpdate],
     ) -> None:
