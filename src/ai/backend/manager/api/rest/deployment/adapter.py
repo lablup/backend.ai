@@ -261,15 +261,11 @@ class RevisionAdapter(BaseFilterAdapter):
         """Convert revision filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        # Name filter
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=RevisionConditions.by_name_contains,
-                equals_factory=RevisionConditions.by_name_equals,
-                starts_with_factory=RevisionConditions.by_name_starts_with,
-                ends_with_factory=RevisionConditions.by_name_ends_with,
-                in_factory=RevisionConditions.by_name_in,
+        # Revision number filter
+        if filter.revision_number is not None:
+            condition = self.convert_int_filter(
+                filter.revision_number,
+                RevisionConditions.by_revision_number,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -284,8 +280,8 @@ class RevisionAdapter(BaseFilterAdapter):
         """Convert revision order specification to query order."""
         ascending = order.direction == OrderDirection.ASC
 
-        if order.field == RevisionOrderField.NAME:
-            return RevisionOrders.name(ascending=ascending)
+        if order.field == RevisionOrderField.REVISION_NUMBER:
+            return RevisionOrders.revision_number(ascending=ascending)
         if order.field == RevisionOrderField.CREATED_AT:
             return RevisionOrders.created_at(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")

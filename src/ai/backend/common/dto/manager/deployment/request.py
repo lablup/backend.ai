@@ -19,7 +19,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import IntFilter, StringFilter
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 from .types import DeploymentOrder, RevisionOrder, RouteOrder
@@ -76,7 +76,7 @@ class DeploymentFilter(BaseRequestModel):
 class RevisionFilter(BaseRequestModel):
     """Filter for revisions."""
 
-    name: StringFilter | None = Field(default=None, description="Filter by name")
+    revision_number: IntFilter | None = Field(default=None, description="Filter by revision number")
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
 
 

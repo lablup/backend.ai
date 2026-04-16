@@ -99,8 +99,8 @@ class TestDeploymentOrderField:
 class TestRevisionOrderField:
     """Tests for RevisionOrderField enum."""
 
-    def test_name_value(self) -> None:
-        assert RevisionOrderField.NAME.value == "name"
+    def test_revision_number_value(self) -> None:
+        assert RevisionOrderField.REVISION_NUMBER.value == "revision_number"
 
     def test_created_at_value(self) -> None:
         assert RevisionOrderField.CREATED_AT.value == "created_at"

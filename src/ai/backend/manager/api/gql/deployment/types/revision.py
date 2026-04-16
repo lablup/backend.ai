@@ -104,8 +104,8 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
+    IntFilter,
     OrderDirection,
-    StringFilter,
     to_global_id,
 )
 from ai.backend.manager.api.gql.common.types import (
@@ -542,7 +542,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     name="ModelRevisionOrderField",
 )
 class ModelRevisionOrderFieldGQL(StrEnum):
-    NAME = "name"
+    REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
 
 
@@ -552,7 +552,7 @@ class ModelRevisionOrderFieldGQL(StrEnum):
     name="ModelRevisionFilter",
 )
 class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
-    name: StringFilter | None = None
+    revision_number: IntFilter | None = None
     deployment_id: ID | None = None
 
     AND: list[Self] | None = None

@@ -97,18 +97,26 @@ def current(deployment_id: str) -> None:
 
 @revision.command()
 @click.argument("deployment_id", type=str)
-@click.option("--name-contains", type=str, default=None, help="Filter by revision name")
+@click.option(
+    "--revision-number", type=int, default=None, help="Filter by revision number (exact match)"
+)
 @click.option("--limit", type=int, default=20, help="Maximum number of results")
 @click.option("--offset", type=int, default=0, help="Offset for pagination")
-def search(deployment_id: str, name_contains: str | None, limit: int, offset: int) -> None:
+def search(deployment_id: str, revision_number: int | None, limit: int, offset: int) -> None:
     """Search revisions for a deployment."""
 
+    from ai.backend.common.dto.manager.query import IntFilter
     from ai.backend.common.dto.manager.v2.deployment.request import (
         AdminSearchRevisionsInput,
+        RevisionFilter,
     )
 
+    filter_dto: RevisionFilter | None = None
+    if revision_number is not None:
+        filter_dto = RevisionFilter(revision_number=IntFilter(equals=revision_number))
+
     body = AdminSearchRevisionsInput(
-        filter=f'name_contains: "{name_contains}"' if name_contains else None,
+        filter=filter_dto,
         limit=limit,
         offset=offset,
     )
