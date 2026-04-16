@@ -283,6 +283,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     current_revision_id: ID | None = None
+    deploying_revision_id: ID | None = None
     default_deployment_strategy: DeploymentStrategyGQL
     replica_state: ReplicaState
     created_user_id: ID
@@ -299,6 +300,20 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         return await info.context.data_loaders.revision_loader.load(
             UUID(str(self.current_revision_id))
         )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The revision currently being deployed (in progress, not yet active), resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def deploying_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
+        if self.deploying_revision_id is None:
+            return None
+        return await info.context.data_loaders.revision_loader.load(
+            UUID(str(self.deploying_revision_id))
+        )
+
 
     @gql_added_field(
         BackendAIGQLMeta(

@@ -120,6 +120,10 @@ class DeploymentNode(BaseResponseModel):
     current_revision_id: UUID | None = Field(
         default=None, description="ID of the currently active revision"
     )
+    deploying_revision_id: UUID | None = Field(
+        default=None,
+        description="ID of the revision currently being deployed (in progress, not yet active)",
+    )
     policy: DeploymentPolicyInfo | None = Field(
         default=None, description="Deployment update policy"
     )
