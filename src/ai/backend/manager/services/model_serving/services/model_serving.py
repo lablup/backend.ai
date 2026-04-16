@@ -219,16 +219,15 @@ class ModelServingService:
         vfolder_id: uuid.UUID,
         scaling_group: str,
     ) -> ModelRevisionSpec:
-        """Generate model revision using RevisionGenerator."""
+        """Resolve a final ModelRevisionSpec via DeploymentController's unified merge pipeline."""
+        del vfolder_id  # the vfolder id already lives on draft.mounts
         default_architecture = (
             await self._deployment_repository.get_default_architecture_from_scaling_group(
                 scaling_group
             )
         )
-        generator = self._revision_generator_registry.get(draft.execution.runtime_variant)
-        return await generator.generate_revision(
+        return await self._deployment_controller.resolve_legacy_revision_spec(
             draft_revision=draft,
-            vfolder_id=vfolder_id,
             default_architecture=default_architecture,
         )
 

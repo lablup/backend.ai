@@ -39,6 +39,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
+from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
 from ai.backend.manager.data.image.types import ImageIdentifier
 
 
@@ -408,28 +409,42 @@ class ModelRevisionSpecDraft(ConfiguredModel):
 class RevisionDraft:
     """Intermediate representation for revision creation with all fields optional.
 
-    Three drafts are created from different sources and merged with priority:
-    model_definition (base) → preset (override) → request (highest priority).
-    Only non-None fields participate in the merge.
+    Drafts are created independently from each source (deployment-config.yaml,
+    revision preset, model-definition.yaml, user request) and merged by
+    ``merge_revision_drafts`` with later drafts taking priority. Only non-None
+    fields participate in the merge. ``environ`` / ``resource_slots`` /
+    ``resource_opts`` are field-merged (dict merge); all other fields are
+    replaced by the latest non-None value.
     """
 
+    # Image
     image_id: UUID | None = None
+    image_canonical: str | None = None
+    image_architecture: str | None = None
+    # Resource
     resource_slots: Mapping[str, Any] | None = None
     resource_opts: Mapping[str, Any] | None = None
     cluster_mode: ClusterMode | None = None
     cluster_size: int | None = None
+    # Execution
     startup_command: str | None = None
     bootstrap_script: str | None = None
-    environ: dict[str, str] | None = None
+    environ: Mapping[str, str] | None = None
     runtime_variant: RuntimeVariant | None = None
+    callback_url: yarl.URL | None = None
+    inference_runtime_config: Mapping[str, Any] | None = None
+    # Model definition
     model_definition: ModelDefinition | None = None
+    # Preset values (carried alongside; not field-merged)
+    preset_values: list[PresetValueData] | None = None
 
 
 def merge_revision_drafts(*drafts: RevisionDraft) -> RevisionDraft:
     """Merge multiple RevisionDrafts with later drafts taking priority.
 
-    For most fields: later non-None value overwrites earlier.
-    For environ: dict merge (later keys overwrite earlier keys).
+    Replace semantics: later non-None value overwrites earlier for most fields.
+    Dict merge semantics: ``environ``, ``resource_slots``, ``resource_opts``
+    (later keys overwrite earlier keys within the dict).
     """
     result = RevisionDraft()
     merged_environ: dict[str, str] = {}
@@ -439,6 +454,10 @@ def merge_revision_drafts(*drafts: RevisionDraft) -> RevisionDraft:
     for draft in drafts:
         if draft.image_id is not None:
             result = dataclasses.replace(result, image_id=draft.image_id)
+        if draft.image_canonical is not None:
+            result = dataclasses.replace(result, image_canonical=draft.image_canonical)
+        if draft.image_architecture is not None:
+            result = dataclasses.replace(result, image_architecture=draft.image_architecture)
         if draft.resource_slots is not None:
             merged_resource_slots.update(draft.resource_slots)
         if draft.resource_opts is not None:
@@ -455,8 +474,22 @@ def merge_revision_drafts(*drafts: RevisionDraft) -> RevisionDraft:
             merged_environ.update(draft.environ)
         if draft.runtime_variant is not None:
             result = dataclasses.replace(result, runtime_variant=draft.runtime_variant)
+        if draft.callback_url is not None:
+            result = dataclasses.replace(result, callback_url=draft.callback_url)
+        if draft.inference_runtime_config is not None:
+            result = dataclasses.replace(
+                result, inference_runtime_config=draft.inference_runtime_config
+            )
         if draft.model_definition is not None:
-            result = dataclasses.replace(result, model_definition=draft.model_definition)
+            if result.model_definition is None:
+                result = dataclasses.replace(result, model_definition=draft.model_definition)
+            else:
+                result = dataclasses.replace(
+                    result,
+                    model_definition=result.model_definition.merge(draft.model_definition),
+                )
+        if draft.preset_values is not None:
+            result = dataclasses.replace(result, preset_values=list(draft.preset_values))
 
     if merged_resource_slots:
         result = dataclasses.replace(result, resource_slots=merged_resource_slots)
