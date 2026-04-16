@@ -30,7 +30,7 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("AutoScalingRuleAdapter",)
 
@@ -59,35 +59,42 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
     def build_modifier(
         self, request: UpdateAutoScalingRuleRequest
     ) -> ModelDeploymentAutoScalingRuleModifier:
-        """Convert update request to modifier."""
+        """Convert update request to modifier.
+
+        REST v1 requests do not carry the Sentinel/None/value tri-state that
+        the v2 DTO exposes; ``None`` here always means "no change". The
+        nullable fields still use ``TriState`` on the modifier side to match
+        the shared dataclass signature, but NULLIFY is never emitted from
+        this path.
+        """
         metric_source = OptionalState[AutoScalingMetricSource].nop()
         metric_name = OptionalState[str].nop()
-        min_threshold: OptionalState[Decimal] = OptionalState.nop()
-        max_threshold: OptionalState[Decimal] = OptionalState.nop()
+        min_threshold: TriState[Decimal] = TriState.nop()
+        max_threshold: TriState[Decimal] = TriState.nop()
         step_size = OptionalState[int].nop()
         time_window = OptionalState[int].nop()
-        min_replicas = OptionalState[int].nop()
-        max_replicas = OptionalState[int].nop()
-        prometheus_query_preset_id = OptionalState[UUID].nop()
+        min_replicas: TriState[int] = TriState.nop()
+        max_replicas: TriState[int] = TriState.nop()
+        prometheus_query_preset_id: TriState[UUID] = TriState.nop()
 
         if request.metric_source is not None:
             metric_source = OptionalState.update(request.metric_source)
         if request.metric_name is not None:
             metric_name = OptionalState.update(request.metric_name)
         if request.min_threshold is not None:
-            min_threshold = OptionalState.update(request.min_threshold)
+            min_threshold = TriState.update(request.min_threshold)
         if request.max_threshold is not None:
-            max_threshold = OptionalState.update(request.max_threshold)
+            max_threshold = TriState.update(request.max_threshold)
         if request.step_size is not None:
             step_size = OptionalState.update(request.step_size)
         if request.time_window is not None:
             time_window = OptionalState.update(request.time_window)
         if request.min_replicas is not None:
-            min_replicas = OptionalState.update(request.min_replicas)
+            min_replicas = TriState.update(request.min_replicas)
         if request.max_replicas is not None:
-            max_replicas = OptionalState.update(request.max_replicas)
+            max_replicas = TriState.update(request.max_replicas)
         if request.prometheus_query_preset_id is not None:
-            prometheus_query_preset_id = OptionalState.update(request.prometheus_query_preset_id)
+            prometheus_query_preset_id = TriState.update(request.prometheus_query_preset_id)
 
         return ModelDeploymentAutoScalingRuleModifier(
             metric_source=metric_source,
