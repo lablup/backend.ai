@@ -15,7 +15,7 @@
       "ui_option": {
         "ui_type": "text_input",
         "text": {
-          "placeholder": "meta-llama/Llama-3.3-70B"
+          "placeholder": "Qwen/Qwen3-0.6B"
         }
       }
     },
@@ -40,6 +40,10 @@
               "label": "Auto"
             },
             {
+              "value": "float",
+              "label": "Float"
+            },
+            {
               "value": "bfloat16",
               "label": "BFloat16"
             },
@@ -50,6 +54,10 @@
             {
               "value": "float32",
               "label": "Float32"
+            },
+            {
+              "value": "half",
+              "label": "Half"
             }
           ]
         }
@@ -76,16 +84,16 @@
               "label": "AWQ"
             },
             {
-              "value": "gptq",
-              "label": "GPTQ"
-            },
-            {
               "value": "fp8",
               "label": "FP8"
             },
             {
-              "value": "squeezellm",
-              "label": "SqueezeLLM"
+              "value": "bitsandbytes",
+              "label": "BitsAndBytes"
+            },
+            {
+              "value": "modelopt",
+              "label": "NVIDIA Model Optimizer"
             }
           ]
         }
@@ -263,6 +271,14 @@
             {
               "value": "fp8",
               "label": "FP8"
+            },
+            {
+              "value": "bfloat16",
+              "label": "BFloat16"
+            },
+            {
+              "value": "float16",
+              "label": "Float16"
             }
           ]
         }
@@ -460,6 +476,10 @@
               "label": "Llama 3 JSON"
             },
             {
+              "value": "llama4_pythonic",
+              "label": "Llama 4 Pythonic"
+            },
+            {
               "value": "llama4_json",
               "label": "Llama 4 JSON"
             },
@@ -472,12 +492,20 @@
               "label": "DeepSeek V3"
             },
             {
+              "value": "deepseek_v31",
+              "label": "DeepSeek V3.1"
+            },
+            {
               "value": "qwen3_coder",
               "label": "Qwen3 Coder"
             },
             {
               "value": "openai",
               "label": "OpenAI"
+            },
+            {
+              "value": "kimi_k2",
+              "label": "Kimi K2"
             }
           ]
         }
@@ -500,6 +528,10 @@
         "choices": {
           "items": [
             {
+              "value": "deepseek_r1",
+              "label": "DeepSeek R1"
+            },
+            {
               "value": "deepseek_v3",
               "label": "DeepSeek V3"
             },
@@ -508,8 +540,12 @@
               "label": "Qwen3"
             },
             {
-              "value": "gemma4",
-              "label": "Gemma 4"
+              "value": "mistral",
+              "label": "Mistral"
+            },
+            {
+              "value": "glm4_moe",
+              "label": "GLM 4 MoE"
             }
           ]
         }
@@ -691,12 +727,30 @@
         "ui_type": "select",
         "choices": {
           "items": [
-            {"value": "auto", "label": "Auto"},
-            {"value": "half", "label": "Half"},
-            {"value": "float", "label": "Float"},
-            {"value": "bfloat16", "label": "BFloat16"},
-            {"value": "float16", "label": "Float16"},
-            {"value": "float32", "label": "Float32"}
+            {
+              "value": "auto",
+              "label": "Auto"
+            },
+            {
+              "value": "half",
+              "label": "Half"
+            },
+            {
+              "value": "float",
+              "label": "Float"
+            },
+            {
+              "value": "bfloat16",
+              "label": "BFloat16"
+            },
+            {
+              "value": "float16",
+              "label": "Float16"
+            },
+            {
+              "value": "float32",
+              "label": "Float32"
+            }
           ]
         }
       }
@@ -809,10 +863,22 @@
         "ui_type": "select",
         "choices": {
           "items": [
-            {"value": "1", "label": "1"},
-            {"value": "2", "label": "2"},
-            {"value": "4", "label": "4"},
-            {"value": "8", "label": "8"}
+            {
+              "value": "1",
+              "label": "1"
+            },
+            {
+              "value": "2",
+              "label": "2"
+            },
+            {
+              "value": "4",
+              "label": "4"
+            },
+            {
+              "value": "8",
+              "label": "8"
+            }
           ]
         }
       }
@@ -873,11 +939,26 @@
         "ui_type": "select",
         "choices": {
           "items": [
-            {"value": "auto", "label": "Auto"},
-            {"value": "fp8_e5m2", "label": "FP8 E5M2"},
-            {"value": "fp8_e4m3", "label": "FP8 E4M3"},
-            {"value": "fp4_e2m1", "label": "FP4 E2M1"},
-            {"value": "bf16", "label": "BF16"}
+            {
+              "value": "auto",
+              "label": "Auto"
+            },
+            {
+              "value": "fp8_e5m2",
+              "label": "FP8 E5M2"
+            },
+            {
+              "value": "fp8_e4m3",
+              "label": "FP8 E4M3"
+            },
+            {
+              "value": "fp4_e2m1",
+              "label": "FP4 E2M1"
+            },
+            {
+              "value": "bf16",
+              "label": "BF16"
+            }
           ]
         }
       }
@@ -974,13 +1055,34 @@
         "ui_type": "select",
         "choices": {
           "items": [
-            {"value": "fcfs", "label": "FCFS"},
-            {"value": "lpm", "label": "LPM"},
-            {"value": "priority", "label": "Priority"},
-            {"value": "random", "label": "Random"},
-            {"value": "dfs-weight", "label": "DFS-Weight"},
-            {"value": "lof", "label": "LOF"},
-            {"value": "routing-key", "label": "Routing-Key"}
+            {
+              "value": "fcfs",
+              "label": "FCFS"
+            },
+            {
+              "value": "lpm",
+              "label": "LPM"
+            },
+            {
+              "value": "priority",
+              "label": "Priority"
+            },
+            {
+              "value": "random",
+              "label": "Random"
+            },
+            {
+              "value": "dfs-weight",
+              "label": "DFS-Weight"
+            },
+            {
+              "value": "lof",
+              "label": "LOF"
+            },
+            {
+              "value": "routing-key",
+              "label": "Routing-Key"
+            }
           ]
         }
       }
@@ -1020,14 +1122,38 @@
         "ui_type": "select",
         "choices": {
           "items": [
-            {"value": "deepseek-r1", "label": "DeepSeek R1"},
-            {"value": "deepseek-v3", "label": "DeepSeek V3"},
-            {"value": "qwen3", "label": "Qwen3"},
-            {"value": "qwen3-thinking", "label": "Qwen3 Thinking"},
-            {"value": "kimi", "label": "Kimi"},
-            {"value": "gpt-oss", "label": "GPT-OSS"},
-            {"value": "glm45", "label": "GLM 4.5"},
-            {"value": "step3", "label": "STEP3"}
+            {
+              "value": "deepseek-r1",
+              "label": "DeepSeek R1"
+            },
+            {
+              "value": "deepseek-v3",
+              "label": "DeepSeek V3"
+            },
+            {
+              "value": "qwen3",
+              "label": "Qwen3"
+            },
+            {
+              "value": "qwen3-thinking",
+              "label": "Qwen3 Thinking"
+            },
+            {
+              "value": "kimi",
+              "label": "Kimi"
+            },
+            {
+              "value": "gpt-oss",
+              "label": "GPT-OSS"
+            },
+            {
+              "value": "glm45",
+              "label": "GLM 4.5"
+            },
+            {
+              "value": "step3",
+              "label": "STEP3"
+            }
           ]
         }
       }
@@ -1087,10 +1213,22 @@
         "ui_type": "select",
         "choices": {
           "items": [
-            {"value": "debug", "label": "Debug"},
-            {"value": "info", "label": "Info"},
-            {"value": "warning", "label": "Warning"},
-            {"value": "error", "label": "Error"}
+            {
+              "value": "debug",
+              "label": "Debug"
+            },
+            {
+              "value": "info",
+              "label": "Info"
+            },
+            {
+              "value": "warning",
+              "label": "Warning"
+            },
+            {
+              "value": "error",
+              "label": "Error"
+            }
           ]
         }
       }
@@ -1127,10 +1265,22 @@
         "ui_type": "select",
         "choices": {
           "items": [
-            {"value": "0", "label": "0 - Metadata only"},
-            {"value": "1", "label": "1 - Metadata + sampling params"},
-            {"value": "2", "label": "2 - Metadata + sampling params + Partial input/output"},
-            {"value": "3", "label": "3 - Full input/output"}
+            {
+              "value": "0",
+              "label": "0 - Metadata only"
+            },
+            {
+              "value": "1",
+              "label": "1 - Metadata + sampling params"
+            },
+            {
+              "value": "2",
+              "label": "2 - Metadata + sampling params + Partial input/output"
+            },
+            {
+              "value": "3",
+              "label": "3 - Full input/output"
+            }
           ]
         }
       }
