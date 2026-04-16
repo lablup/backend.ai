@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 import pytest
@@ -24,7 +24,7 @@ async def prometheus_client(
     hostport = prometheus_container[1]
     pool = ClientPool(tcp_client_session_factory)
     client = PrometheusClient(
-        endpoint=f"http://{hostport.host}:{hostport.port}/api/v1",
+        endpoint=f"http://{hostport.host}:{hostport.port}/api/v1/",
         client_pool=pool,
     )
     try:
@@ -79,19 +79,19 @@ class TestQueryRangeTimestampFormats:
         with pytest.raises(FailedToGetMetric, match="cannot parse"):
             await prometheus_client.query_range(up_metric_preset, time_range)
 
-    async def test_naive_datetime_as_unix_timestamp_succeeds(
+    async def test_timezone_aware_datetime_isoformat_succeeds(
         self,
         prometheus_client: PrometheusClient,
         up_metric_preset: MetricPreset,
     ) -> None:
-        """Fix verification: converting naive datetime via .timestamp() produces
-        a valid Unix timestamp that Prometheus accepts."""
-        now = datetime.now(tz=UTC)
-        one_minute_ago = datetime.fromtimestamp(now.timestamp() - 60, tz=UTC)
+        """Timezone-aware RFC3339 datetimes should be accepted by Prometheus."""
+        kst = timezone(timedelta(hours=9))
+        end = datetime.now(tz=kst)
+        start = end - timedelta(minutes=1)
 
         time_range = QueryTimeRange(
-            start=str(one_minute_ago.timestamp()),
-            end=str(now.timestamp()),
+            start=start.isoformat(),
+            end=end.isoformat(),
             step="15s",
         )
 

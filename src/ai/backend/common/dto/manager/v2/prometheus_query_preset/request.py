@@ -5,7 +5,7 @@ Request DTOs for prometheus_query_preset DTO v2.
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import Field, field_validator
@@ -45,13 +45,6 @@ class QueryTimeRangeInputDTO(BaseRequestModel):
     start: datetime = Field(description="Start of the time range.")
     end: datetime = Field(description="End of the time range.")
     step: str = Field(description="Query resolution step (e.g., '60s').")
-
-    @field_validator("start", "end")
-    @classmethod
-    def ensure_timezone_aware(cls, v: datetime) -> datetime:
-        if v.tzinfo is None:
-            return v.replace(tzinfo=UTC)
-        return v
 
 
 class CreateQueryDefinitionOptionsInput(BaseRequestModel):

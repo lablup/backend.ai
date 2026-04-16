@@ -207,7 +207,7 @@ def prometheus_container() -> Iterator[tuple[str, HostPortPairModel]]:
         DockerContainer("prom/prometheus:v2.53.0")
         .with_name(f"test--prometheus-slot-{get_parallel_slot()}-{random_id}")
         .with_exposed_ports(9090)
-        .with_kwargs(tmpfs={"/prometheus": ""})
+        .with_kwargs(tmpfs={"/prometheus": "rw,uid=65534,gid=65534"})
         .with_command(
             "--config.file=/etc/prometheus/prometheus.yml "
             "--storage.tsdb.path=/prometheus "

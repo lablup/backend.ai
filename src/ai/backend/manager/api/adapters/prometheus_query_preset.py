@@ -176,8 +176,8 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         )
         qtr = (
             QueryTimeRange(
-                start=str(time_range.start.timestamp()),
-                end=str(time_range.end.timestamp()),
+                start=time_range.start.isoformat(),
+                end=time_range.end.isoformat(),
                 step=time_range.step,
             )
             if time_range is not None
