@@ -4669,6 +4669,29 @@ input DeploymentFilter
   openToPublic: Boolean = null
   tags: StringFilter = null
   endpointUrl: StringFilter = null
+
+  """Added in UNRELEASED. Filter by domain name."""
+  domainName: StringFilter = null
+
+  """Added in UNRELEASED. Filter by project ID."""
+  projectId: UUID = null
+
+  """Added in UNRELEASED. Filter by resource group name."""
+  resourceGroup: StringFilter = null
+
+  """Added in UNRELEASED. Filter by the user who created the deployment."""
+  createdUserId: UUID = null
+
+  """Added in UNRELEASED. Filter by the session owner of the deployment."""
+  sessionOwnerId: UUID = null
+
+  """Added in UNRELEASED. Filter by deployment creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """
+  Added in UNRELEASED. Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.
+  """
+  destroyedAt: NullableDateTimeFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -4768,7 +4791,7 @@ enum DeploymentOrderField
 {
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  DESTROYED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.19.0. Deployment policy configuration."""
@@ -9109,6 +9132,26 @@ input ModelRevisionFilter
 {
   revisionNumber: IntFilter = null
   deploymentId: ID = null
+
+  """Added in UNRELEASED. Filter by container image ID."""
+  imageId: UUID = null
+
+  """Added in UNRELEASED. Filter by model VFolder ID."""
+  modelId: UUID = null
+
+  """Added in UNRELEASED. Filter by resource group name."""
+  resourceGroup: StringFilter = null
+
+  """
+  Added in UNRELEASED. Filter by cluster mode (SINGLE_NODE / MULTI_NODE).
+  """
+  clusterMode: StringFilter = null
+
+  """Added in UNRELEASED. Filter by runtime variant."""
+  runtimeVariant: StringFilter = null
+
+  """Added in UNRELEASED. Filter by revision creation datetime."""
+  createdAt: DateTimeFilter = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
   NOT: [ModelRevisionFilter!] = null
