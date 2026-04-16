@@ -104,8 +104,11 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
     IntFilter,
     OrderDirection,
+    StringFilter,
+    UUIDFilter,
     to_global_id,
 )
 from ai.backend.manager.api.gql.common.types import (
@@ -544,6 +547,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 class ModelRevisionOrderFieldGQL(StrEnum):
     REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
+    RESOURCE_GROUP = "resource_group"
+    CLUSTER_MODE = "cluster_mode"
+    RUNTIME_VARIANT = "runtime_variant"
 
 
 # Filter and Order Types
@@ -554,6 +560,37 @@ class ModelRevisionOrderFieldGQL(StrEnum):
 class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
     revision_number: IntFilter | None = None
     deployment_id: ID | None = None
+    image_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by container image ID."
+        ),
+        default=None,
+    )
+    model_vfolder_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by model VFolder ID."
+        ),
+        default=None,
+    )
+    resource_group: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by resource group name."
+        ),
+        default=None,
+    )
+    cluster_mode: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by cluster mode (SINGLE_NODE / MULTI_NODE).",
+        ),
+        default=None,
+    )
+    created_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by revision creation datetime."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
