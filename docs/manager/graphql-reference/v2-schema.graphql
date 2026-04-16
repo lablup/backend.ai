@@ -6007,6 +6007,9 @@ input ModelRevisionOrderBy {
 enum ModelRevisionOrderField {
   REVISION_NUMBER
   CREATED_AT
+  RESOURCE_GROUP
+  CLUSTER_MODE
+  RUNTIME_VARIANT
 }
 
 """

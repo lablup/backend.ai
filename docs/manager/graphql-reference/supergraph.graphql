@@ -9175,6 +9175,9 @@ enum ModelRevisionOrderField
 {
   REVISION_NUMBER @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_MODE @join__enumValue(graph: STRAWBERRY)
+  RUNTIME_VARIANT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
