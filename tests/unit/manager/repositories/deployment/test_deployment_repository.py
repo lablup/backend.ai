@@ -33,6 +33,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    DeploymentLifecycleSubStep,
     DeploymentPolicyData,
     ModelRevisionData,
     RouteStatus,
@@ -3440,6 +3441,282 @@ class TestRouteOperations:
         result = await deployment_repository.update_route(updater)
 
         assert result is False
+
+
+class TestPromoteDeployment(TestRouteOperations):
+    """Test cases for DeploymentRepository.promote_deployment (blue-green)."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Override parent fixture to include KeyPairRow (UserRow FK dependency)."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ResourceSlotTypeRow,
+                AgentRow,
+                SessionRow,
+                KernelRow,
+                EndpointRow,
+                DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
+                RoutingRow,
+                AssociationScopesEntitiesRow,
+            ],
+        ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
+            yield database_connection
+
+    @pytest.fixture
+    async def test_current_revision_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    async def test_deploying_revision_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    async def promote_test_endpoint_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+        test_current_revision_id: uuid.UUID,
+        test_deploying_revision_id: uuid.UUID,
+    ) -> uuid.UUID:
+        """Create an endpoint in DEPLOYING/AWAITING_PROMOTION with deploying_revision set."""
+        endpoint_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"promote-endpoint-{uuid.uuid4().hex[:8]}",
+                created_user=test_user_uuid,
+                session_owner=test_user_uuid,
+                domain=test_domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group_name,
+                desired_replicas=1,
+                url=f"http://promote-{uuid.uuid4().hex[:8]}.example.com",
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                current_revision=test_current_revision_id,
+                deploying_revision=test_deploying_revision_id,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_AWAITING_PROMOTION,
+            )
+            db_sess.add(endpoint)
+            await db_sess.commit()
+        return endpoint_id
+
+    async def _create_route(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        endpoint_id: uuid.UUID,
+        revision_id: uuid.UUID,
+        user_uuid: uuid.UUID,
+        domain_name: str,
+        group_id: uuid.UUID,
+        status: RouteStatus,
+        traffic_status: RouteTrafficStatus,
+        traffic_ratio: float,
+    ) -> uuid.UUID:
+        route_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            route = RoutingRow(
+                id=route_id,
+                endpoint=endpoint_id,
+                session=None,
+                session_owner=user_uuid,
+                domain=domain_name,
+                project=group_id,
+                status=status,
+                traffic_ratio=traffic_ratio,
+                traffic_status=traffic_status,
+                revision=revision_id,
+            )
+            db_sess.add(route)
+            await db_sess.commit()
+        return route_id
+
+    async def test_promote_activates_green_drains_blue_and_swaps_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        promote_test_endpoint_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_domain_name: str,
+        test_group_id: uuid.UUID,
+        test_current_revision_id: uuid.UUID,
+        test_deploying_revision_id: uuid.UUID,
+    ) -> None:
+        """Promoting routes must flip green INACTIVE→ACTIVE, mark blue routes
+        TERMINATING+INACTIVE, and swap deploying_revision into current_revision."""
+        green_route_id = await self._create_route(
+            db_with_cleanup,
+            endpoint_id=promote_test_endpoint_id,
+            revision_id=test_deploying_revision_id,
+            user_uuid=test_user_uuid,
+            domain_name=test_domain_name,
+            group_id=test_group_id,
+            status=RouteStatus.RUNNING,
+            traffic_status=RouteTrafficStatus.INACTIVE,
+            traffic_ratio=0.0,
+        )
+        blue_route_id = await self._create_route(
+            db_with_cleanup,
+            endpoint_id=promote_test_endpoint_id,
+            revision_id=test_current_revision_id,
+            user_uuid=test_user_uuid,
+            domain_name=test_domain_name,
+            group_id=test_group_id,
+            status=RouteStatus.RUNNING,
+            traffic_status=RouteTrafficStatus.ACTIVE,
+            traffic_ratio=1.0,
+        )
+
+        swapped = await deployment_repository.promote_deployment(
+            deployment_id=promote_test_endpoint_id,
+            promote_route_ids=[green_route_id],
+            drain_route_ids=[blue_route_id],
+        )
+
+        assert swapped == 1
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            green_row = (
+                await db_sess.execute(sa.select(RoutingRow).where(RoutingRow.id == green_route_id))
+            ).scalar_one()
+            assert green_row.traffic_status == RouteTrafficStatus.ACTIVE
+            assert green_row.traffic_ratio == 1.0
+            assert green_row.status == RouteStatus.RUNNING
+
+            blue_row = (
+                await db_sess.execute(sa.select(RoutingRow).where(RoutingRow.id == blue_route_id))
+            ).scalar_one()
+            assert blue_row.status == RouteStatus.TERMINATING
+            assert blue_row.traffic_status == RouteTrafficStatus.INACTIVE
+            assert blue_row.traffic_ratio == 0.0
+
+            endpoint_row = (
+                await db_sess.execute(
+                    sa.select(EndpointRow).where(EndpointRow.id == promote_test_endpoint_id)
+                )
+            ).scalar_one()
+            assert endpoint_row.current_revision == test_deploying_revision_id
+            assert endpoint_row.deploying_revision is None
+            assert endpoint_row.sub_step is None
+
+    async def test_promote_with_only_green_routes_swaps_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        promote_test_endpoint_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_domain_name: str,
+        test_group_id: uuid.UUID,
+        test_deploying_revision_id: uuid.UUID,
+    ) -> None:
+        """Promoting with no drain routes (initial deployment) must still swap the
+        revision and activate the green route."""
+        green_route_id = await self._create_route(
+            db_with_cleanup,
+            endpoint_id=promote_test_endpoint_id,
+            revision_id=test_deploying_revision_id,
+            user_uuid=test_user_uuid,
+            domain_name=test_domain_name,
+            group_id=test_group_id,
+            status=RouteStatus.RUNNING,
+            traffic_status=RouteTrafficStatus.INACTIVE,
+            traffic_ratio=0.0,
+        )
+
+        swapped = await deployment_repository.promote_deployment(
+            deployment_id=promote_test_endpoint_id,
+            promote_route_ids=[green_route_id],
+            drain_route_ids=[],
+        )
+
+        assert swapped == 1
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            green_row = (
+                await db_sess.execute(sa.select(RoutingRow).where(RoutingRow.id == green_route_id))
+            ).scalar_one()
+            assert green_row.traffic_status == RouteTrafficStatus.ACTIVE
+            assert green_row.traffic_ratio == 1.0
+
+            endpoint_row = (
+                await db_sess.execute(
+                    sa.select(EndpointRow).where(EndpointRow.id == promote_test_endpoint_id)
+                )
+            ).scalar_one()
+            assert endpoint_row.current_revision == test_deploying_revision_id
+            assert endpoint_row.deploying_revision is None
+
+    async def test_promote_without_deploying_revision_does_not_swap(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+    ) -> None:
+        """If the endpoint has no deploying_revision, revision swap is a no-op
+        (returns 0) — the DB filter guards against mis-targeted promotions."""
+        endpoint_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"no-deploying-{uuid.uuid4().hex[:8]}",
+                created_user=test_user_uuid,
+                session_owner=test_user_uuid,
+                domain=test_domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group_name,
+                desired_replicas=1,
+                url=f"http://no-deploying-{uuid.uuid4().hex[:8]}.example.com",
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.READY,
+                current_revision=uuid.uuid4(),
+                deploying_revision=None,
+            )
+            db_sess.add(endpoint)
+            await db_sess.commit()
+
+        swapped = await deployment_repository.promote_deployment(
+            deployment_id=endpoint_id,
+            promote_route_ids=[],
+            drain_route_ids=[],
+        )
+
+        assert swapped == 0
 
 
 class TestDeploymentRepositoryDuplicateName:
