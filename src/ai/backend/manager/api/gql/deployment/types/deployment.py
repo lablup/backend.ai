@@ -314,7 +314,6 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             UUID(str(self.deploying_revision_id))
         )
 
-
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
