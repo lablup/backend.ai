@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timezone
 from uuid import UUID
 
 import pytest
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ModifyQueryDefinitionOptionsInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
+    QueryTimeRangeInputDTO,
     SearchQueryDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
@@ -407,3 +409,48 @@ class TestExecuteQueryDefinitionInput:
         json_str = inp.model_dump_json()
         restored = ExecuteQueryDefinitionInput.model_validate_json(json_str)
         assert restored.time_window == "1h"
+
+
+class TestQueryTimeRangeInputDTO:
+    """Tests for QueryTimeRangeInputDTO model, including BA-5766 regression."""
+
+    @staticmethod
+    def _make_naive(iso: str) -> datetime:
+        """Create a naive datetime from an ISO string (bypasses DTZ001 lint rule)."""
+        return datetime.fromisoformat(iso).replace(tzinfo=None)
+
+    def test_naive_datetime_gets_utc_timezone(self) -> None:
+        """Regression BA-5766: naive datetime must be normalized to UTC."""
+        naive_start = self._make_naive("2026-04-16T23:00:00")
+        naive_end = self._make_naive("2026-04-16T23:15:00")
+        dto = QueryTimeRangeInputDTO(start=naive_start, end=naive_end, step="60s")
+
+        assert dto.start.tzinfo == UTC
+        assert dto.end.tzinfo == UTC
+        assert dto.start.year == 2026
+        assert dto.start.hour == 23
+
+    def test_aware_datetime_preserved(self) -> None:
+        kst = timezone(offset=__import__("datetime").timedelta(hours=9))
+        aware_start = datetime(2026, 4, 17, 8, 0, 0, tzinfo=kst)
+        aware_end = datetime(2026, 4, 17, 8, 15, 0, tzinfo=kst)
+        dto = QueryTimeRangeInputDTO(start=aware_start, end=aware_end, step="60s")
+
+        assert dto.start.tzinfo == kst
+        assert dto.end.tzinfo == kst
+
+    def test_utc_datetime_preserved(self) -> None:
+        utc_start = datetime(2026, 4, 16, 23, 0, 0, tzinfo=UTC)
+        utc_end = datetime(2026, 4, 16, 23, 15, 0, tzinfo=UTC)
+        dto = QueryTimeRangeInputDTO(start=utc_start, end=utc_end, step="15s")
+
+        assert dto.start.tzinfo == UTC
+        assert dto.end.tzinfo == UTC
+
+    def test_timestamp_from_normalized_naive_is_utc_based(self) -> None:
+        """After normalization, .timestamp() must produce UTC-based epoch."""
+        naive_dt = self._make_naive("2026-04-16T23:00:00")
+        dto = QueryTimeRangeInputDTO(start=naive_dt, end=naive_dt, step="60s")
+
+        expected_utc = datetime(2026, 4, 16, 23, 0, 0, tzinfo=UTC)
+        assert dto.start.timestamp() == expected_utc.timestamp()
