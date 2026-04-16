@@ -35,6 +35,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    MountMetadata,
     ReplicaSpec,
     ReplicaStateData,
     ResourceConfigData,
@@ -197,6 +198,7 @@ from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
     ModelDefinitionGeneratorRegistry,
 )
+from ai.backend.manager.sokovan.deployment.revision_draft import revision_draft_from_creator
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -753,12 +755,23 @@ class DeploymentService:
     ) -> AddModelRevisionActionResult:
         """Add a new model revision to an existing deployment.
 
-        Delegates to DeploymentController.add_revision() which owns the full
-        pipeline: preset apply → config merge → model definition resolve →
-        revision create (with RBAC) → history pruning.
+        Delegates to ``DeploymentController.add_revision()`` which owns the full
+        pipeline (preset → base → config/yaml → request merge → RBAC-checked
+        revision create → history pruning). The v2 ``ModelRevisionCreator`` is
+        projected onto a flat ``RevisionDraft`` so the controller entry point
+        remains uniform across v2 and legacy flows.
         """
+        creator = action.adder
+        mounts = MountMetadata(
+            model_vfolder_id=creator.mounts.model_vfolder_id,
+            model_definition_path=creator.mounts.model_definition_path,
+            model_mount_destination=creator.mounts.model_mount_destination,
+        )
         revision_data = await self._deployment_controller.add_revision(
-            action.model_deployment_id, action.adder
+            endpoint_id=action.model_deployment_id,
+            overrides=revision_draft_from_creator(creator),
+            mounts=mounts,
+            preset_id=creator.revision_preset_id,
         )
         return AddModelRevisionActionResult(revision=revision_data)
 

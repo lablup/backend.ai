@@ -34,21 +34,19 @@ from ai.backend.common.types import (
     ImageAlias,
     KernelEnqueueingConfig,
     MountPermission,
-    ResourceSlot,
     SessionTypes,
     VFolderID,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ImageIdentifierDraft,
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountMetadata,
-    ResourceSpec,
     ResourceSpecDraft,
+    RevisionDraft,
     RouteHealthStatus,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -146,6 +144,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_draft import revision_draft_from_current
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -219,16 +218,15 @@ class ModelServingService:
         vfolder_id: uuid.UUID,
         scaling_group: str,
     ) -> ModelRevisionSpec:
-        """Generate model revision using RevisionGenerator."""
+        """Resolve a final ModelRevisionSpec via DeploymentController's unified merge pipeline."""
+        del vfolder_id  # the vfolder id already lives on draft.mounts
         default_architecture = (
             await self._deployment_repository.get_default_architecture_from_scaling_group(
                 scaling_group
             )
         )
-        generator = self._revision_generator_registry.get(draft.execution.runtime_variant)
-        return await generator.generate_revision(
+        return await self._deployment_controller.resolve_legacy_revision_spec(
             draft_revision=draft,
-            vfolder_id=vfolder_id,
             default_architecture=default_architecture,
         )
 
@@ -902,12 +900,36 @@ class ModelServingService:
             self._config_provider.legacy_etcd_config_loader,
         )
 
-        # 2. If revision-level fields changed, create + activate via controller.
-        #    This ensures the same pipeline as v2: preset → merge → resolve → RBAC
-        #    → deploying_revision guard → DEPLOYING strategy.
+        # 2. If revision-level fields changed, create + activate a new revision.
+        #    Revisions are immutable, so every mutation goes through the same
+        #    ``add_revision`` entry point as fresh creation — this legacy path
+        #    merely supplies the current revision as the caller-provided base
+        #    so that untouched fields survive while yaml stays authoritative.
         if spec.has_revision_changes():
-            creator = await self._build_revision_creator_from_spec(action.endpoint_id, spec)
-            revision = await self._deployment_controller.add_revision(action.endpoint_id, creator)
+            current_rev = await self._deployment_repository.get_current_revision(action.endpoint_id)
+            current_draft = revision_draft_from_current(current_rev)
+            overrides = await self._build_revision_overrides_from_spec(spec)
+
+            vfolder_id = current_rev.model_mount_config.vfolder_id
+            if vfolder_id is None:
+                raise InvalidAPIParameters("model vfolder id is missing on the current revision")
+            definition_path_override = spec.model_definition_path.optional_value()
+            mounts = MountMetadata(
+                model_vfolder_id=vfolder_id,
+                model_definition_path=(
+                    definition_path_override
+                    if definition_path_override is not None
+                    else current_rev.model_mount_config.definition_path
+                ),
+                model_mount_destination=current_rev.model_mount_config.mount_destination
+                or "/models",
+            )
+            revision = await self._deployment_controller.add_revision(
+                endpoint_id=action.endpoint_id,
+                overrides=overrides,
+                mounts=mounts,
+                base=current_draft,
+            )
             await self._deployment_controller.activate_revision(action.endpoint_id, revision.id)
         elif spec.replica_count_modified():
             # Replica-only change: trigger CHECK_REPLICA to reconcile
@@ -919,22 +941,20 @@ class ModelServingService:
             endpoint_id=action.endpoint_id, success=result.success, data=result.data
         )
 
-    async def _build_revision_creator_from_spec(
+    async def _build_revision_overrides_from_spec(
         self,
-        endpoint_id: uuid.UUID,
         spec: EndpointUpdaterSpec,
-    ) -> ModelRevisionCreator:
-        """Build a ModelRevisionCreator from EndpointUpdaterSpec and the current revision.
+    ) -> RevisionDraft:
+        """Convert ``EndpointUpdaterSpec`` overrides into a ``RevisionDraft``.
 
-        Reads the current revision as a base and applies spec overrides.
-        Image resolution (name → image_id) is handled here since the legacy
-        spec carries an ImageRef, not an image_id.
+        Only fields the user explicitly modified are populated. Fields left
+        untouched stay ``None`` so that the controller's merge pipeline can
+        fall through to (in priority order) the current revision base,
+        deployment-config.yaml, preset, and model-definition.yaml.
+        Image ref → image_id resolution happens here because legacy specs
+        carry an ``ImageRef`` rather than a pre-resolved id.
         """
-
-        current_rev = await self._deployment_repository.get_current_revision(endpoint_id)
-
-        # Resolve image_id: use spec override or keep current
-        image_id = current_rev.image_id
+        image_id: uuid.UUID | None = None
         image_ref = spec.image.optional_value()
         if image_ref is not None:
             arch = (
@@ -946,54 +966,24 @@ class ModelServingService:
                 ImageIdentifier(image_ref.name, arch)
             )
 
-        # Merge resource_slots
-        merged_slots = spec.resource_slots.optional_value() or ResourceSlot(
-            current_rev.resource_config.resource_slot
-        )
+        resource_slots_override = spec.resource_slots.optional_value()
+        resource_slots_mapping: dict[str, str] | None
+        if resource_slots_override is not None:
+            resource_slots_mapping = {k: str(v) for k, v in resource_slots_override.items()}
+        else:
+            resource_slots_mapping = None
 
-        return ModelRevisionCreator(
+        resource_opts_override = spec.resource_opts.optional_value()
+        environ_override = spec.environ.optional_value()
+
+        return RevisionDraft(
             image_id=image_id,
-            resource_spec=ResourceSpec(
-                cluster_mode=(
-                    spec.cluster_mode.value()
-                    if spec.cluster_mode.optional_value() is not None
-                    else current_rev.cluster_config.mode
-                ),
-                cluster_size=(
-                    spec.cluster_size.optional_value() or current_rev.cluster_config.size
-                ),
-                resource_slots=dict(merged_slots),
-                resource_opts=(
-                    spec.resource_opts.optional_value()
-                    if spec.resource_opts.optional_value() is not None
-                    else dict(current_rev.resource_config.resource_opts)
-                ),
-            ),
-            mounts=VFolderMountsCreator(
-                model_vfolder_id=current_rev.model_mount_config.vfolder_id or uuid.UUID(int=0),
-                model_definition_path=(
-                    spec.model_definition_path.optional_value()
-                    if spec.model_definition_path.optional_value() is not None
-                    else current_rev.model_mount_config.definition_path
-                ),
-                model_mount_destination=(
-                    current_rev.model_mount_config.mount_destination or "/models"
-                ),
-            ),
-            execution=ExecutionSpec(
-                startup_command=None,
-                bootstrap_script=None,
-                environ=(
-                    spec.environ.optional_value()
-                    if spec.environ.optional_value() is not None
-                    else (current_rev.model_runtime_config.environ or None)
-                ),
-                runtime_variant=(
-                    spec.runtime_variant.optional_value()
-                    or current_rev.model_runtime_config.runtime_variant
-                ),
-            ),
-            model_definition=current_rev.model_definition,
+            resource_slots=resource_slots_mapping,
+            resource_opts=dict(resource_opts_override) if resource_opts_override else None,
+            cluster_mode=spec.cluster_mode.optional_value(),
+            cluster_size=spec.cluster_size.optional_value(),
+            environ=dict(environ_override) if environ_override else None,
+            runtime_variant=spec.runtime_variant.optional_value(),
         )
 
     async def validate_model_service(
