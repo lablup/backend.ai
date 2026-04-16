@@ -102,15 +102,14 @@ class TestUpdatePermissionScopeValidation:
             await adapter.update_permission(input_)
 
     async def test_skips_validation_when_scope_type_is_none(self, adapter: RBACAdapter) -> None:
-        """When scope_type is None, validation is skipped."""
+        """When scope_type is None, validation is skipped and processor is called."""
         input_ = UpdatePermissionInput(
             id=uuid.uuid4(),
             scope_type=None,
             scope_id="alice@example.com",
         )
-        try:
+        # Processor mock is not wired, so it will raise AttributeError/TypeError
+        # — but NOT InvalidScope, which proves the validation was skipped.
+        with pytest.raises(Exception) as exc_info:
             await adapter.update_permission(input_)
-        except InvalidScope:
-            pytest.fail("InvalidScope raised when scope_type is None")
-        except Exception:
-            pass
+        assert not isinstance(exc_info.value, InvalidScope)
