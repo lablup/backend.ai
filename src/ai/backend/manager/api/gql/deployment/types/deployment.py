@@ -51,6 +51,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateDeploymentInput as UpdateDeploymentInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    AdminRefreshDeploymentRevisionsPayload as AdminRefreshDeploymentRevisionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     CreateDeploymentPayload as CreateDeploymentPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
@@ -61,6 +64,9 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    RevisionRefreshResultInfo as RevisionRefreshResultInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncReplicaPayload as SyncReplicaPayloadDTO,
@@ -714,3 +720,32 @@ class SyncReplicaPayload:
     """Payload for replica sync mutation result."""
 
     success: strawberry.auto
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Per-deployment result of an admin bulk revision refresh.",
+    ),
+    model=RevisionRefreshResultInfoDTO,
+)
+class RevisionRefreshResult:
+    """Per-deployment result of an admin bulk revision refresh."""
+
+    deployment_id: strawberry.auto
+    new_revision_id: strawberry.auto
+    success: strawberry.auto
+    failure_reason: strawberry.auto
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for admin bulk revision refresh mutation result.",
+    ),
+    model=AdminRefreshDeploymentRevisionsPayloadDTO,
+)
+class AdminRefreshDeploymentRevisionsPayload:
+    """Payload for admin bulk revision refresh mutation result."""
+
+    results: strawberry.auto

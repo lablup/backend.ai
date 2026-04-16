@@ -20,6 +20,7 @@ from .resolver import (
     admin_create_deployment_revision_preset,
     admin_delete_deployment_revision_preset,
     admin_deployments,
+    admin_refresh_deployment_revisions,
     admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
@@ -68,6 +69,8 @@ from .types import (
     ActivenessStatus,
     AddRevisionInput,
     AddRevisionPayload,
+    # Admin refresh revisions
+    AdminRefreshDeploymentRevisionsPayload,
     # Auto Scaling
     AutoScalingMetricSource,
     AutoScalingRule,
@@ -136,6 +139,7 @@ from .types import (
     ResourceConfig,
     ResourceConfigInput,
     ResourceGroupInput,
+    RevisionRefreshResult,
     RollingUpdateConfigInputGQL,
     RollingUpdateStrategySpecGQL,
     # Route
@@ -186,6 +190,7 @@ __all__ = [
     "UpdateAutoScalingRuleInput",
     "UpdateAutoScalingRulePayload",
     # Deployment Types
+    "AdminRefreshDeploymentRevisionsPayload",
     "CreateDeploymentInput",
     "CreateDeploymentPayload",
     "DeleteDeploymentInput",
@@ -205,6 +210,7 @@ __all__ = [
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
     "ReplicaState",
+    "RevisionRefreshResult",
     "SyncReplicaInput",
     "SyncReplicaPayload",
     "UpdateDeploymentInput",
@@ -282,6 +288,7 @@ __all__ = [
     "deployment",
     "deployment_status_changed",
     "admin_deployments",
+    "admin_refresh_deployment_revisions",
     "my_deployments",
     "project_deployments",
     "sync_replicas",

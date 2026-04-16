@@ -966,3 +966,13 @@ class RevisionSearchScope:
     """Scope for searching revisions within a specific deployment."""
 
     deployment_id: UUID
+
+
+@dataclass(frozen=True)
+class RevisionRefreshResult:
+    """Per-deployment result of an admin bulk revision refresh."""
+
+    deployment_id: UUID
+    new_revision_id: UUID | None
+    success: bool
+    failure_reason: str | None

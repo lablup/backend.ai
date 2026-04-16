@@ -59,6 +59,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ModelRevisionSpec,
     RevisionSearchResult,
     RouteHealthStatus,
     RouteInfo,
@@ -2471,6 +2472,43 @@ class DeploymentDBSource:
                     f"Deployment revision {current_revision_id} not found"
                 )
             return row.to_data()
+
+    async def get_current_revision_spec(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Get the current revision of a deployment as a ModelRevisionSpec.
+
+        Used by operations that need to rebuild a ModelRevisionCreator from
+        an existing revision (e.g. admin revision refresh).
+
+        Raises:
+            DeploymentRevisionNotFound: If the endpoint has no current revision.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            endpoint_query = sa.select(EndpointRow.current_revision).where(
+                EndpointRow.id == endpoint_id
+            )
+            result = await db_sess.execute(endpoint_query)
+            current_revision_id = result.scalar_one_or_none()
+            if current_revision_id is None:
+                raise DeploymentRevisionNotFound(f"Endpoint {endpoint_id} has no current revision")
+
+            revision_query = (
+                sa.select(DeploymentRevisionRow)
+                .where(DeploymentRevisionRow.id == current_revision_id)
+                .options(
+                    selectinload(DeploymentRevisionRow.image_row),
+                    selectinload(DeploymentRevisionRow.resource_slot_rows),
+                )
+            )
+            revision_result = await db_sess.execute(revision_query)
+            row = revision_result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentRevisionNotFound(
+                    f"Deployment revision {current_revision_id} not found"
+                )
+            return row.to_model_revision_spec()
 
     async def search_revisions(
         self,

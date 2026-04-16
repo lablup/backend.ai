@@ -64,6 +64,7 @@ from .deployment import (
     admin_create_deployment_revision_preset,
     admin_delete_deployment_revision_preset,
     admin_deployments,
+    admin_refresh_deployment_revisions,
     admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
@@ -657,6 +658,7 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
+    admin_refresh_deployment_revisions = admin_refresh_deployment_revisions
     update_deployment_policy = update_deployment_policy
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
