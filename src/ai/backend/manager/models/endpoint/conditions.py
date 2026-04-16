@@ -102,13 +102,6 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
-    def by_session_owner_id(user_id: uuid.UUID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.session_owner == user_id
-
-        return inner
-
-    @staticmethod
     def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:

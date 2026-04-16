@@ -1577,8 +1577,6 @@ class DeploymentAdapter(BaseAdapter):
                 conditions.append(condition)
         if f.created_user_id is not None:
             conditions.append(DeploymentConditions.by_created_user_id(f.created_user_id))
-        if f.session_owner_id is not None:
-            conditions.append(DeploymentConditions.by_session_owner_id(f.session_owner_id))
         if f.created_at is not None:
             dt_condition = f.created_at.build_query_condition(
                 before_factory=DeploymentConditions.by_created_at_before,

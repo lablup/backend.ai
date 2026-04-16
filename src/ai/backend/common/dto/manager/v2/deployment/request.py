@@ -525,9 +525,6 @@ class DeploymentFilter(BaseRequestModel):
     created_user_id: UUID | None = Field(
         default=None, description="Filter by the user who created the deployment"
     )
-    session_owner_id: UUID | None = Field(
-        default=None, description="Filter by the session owner of the deployment"
-    )
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
     destroyed_at: NullableDateTimeFilter | None = Field(
         default=None, description="Destruction datetime filter (supports is_null)"

@@ -572,13 +572,6 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         ),
         default=None,
     )
-    session_owner_id: UUID | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Filter by the session owner of the deployment.",
-        ),
-        default=None,
-    )
     created_at: DateTimeFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
