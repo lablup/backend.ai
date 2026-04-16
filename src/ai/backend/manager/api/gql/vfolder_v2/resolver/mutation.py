@@ -247,6 +247,26 @@ async def bulk_delete_vfolders_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Create a virtual folder owned by the specified project. "
+            "Requires project-scoped CREATE permission."
+        ),
+    ),
+    name="createProjectVFolder",
+)  # type: ignore[misc]
+async def create_project_vfolder_v2(
+    info: Info[StrawberryGQLContext],
+    project_id: UUID,
+    input: CreateVFolderInputGQL,
+) -> CreateVFolderPayloadGQL:
+    """Create a new virtual folder scoped to a project."""
+    payload = await info.context.adapters.vfolder.create_in_project(project_id, input.to_pydantic())
+    return CreateVFolderPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Permanently purge multiple virtual folders.",
     )

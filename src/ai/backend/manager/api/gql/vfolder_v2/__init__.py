@@ -9,6 +9,7 @@ from .resolver import (
     bulk_delete_vfolders_v2,
     bulk_purge_vfolders_v2,
     clone_vfolder_v2,
+    create_project_vfolder_v2,
     create_vfolder_v2,
     delete_vfolder_v2,
     deploy_vfolder_v2,
@@ -48,6 +49,7 @@ __all__ = [
     # Mutations
     "bulk_delete_vfolders_v2",
     "bulk_purge_vfolders_v2",
+    "create_project_vfolder_v2",
     "create_vfolder_v2",
     "delete_vfolder_v2",
     "deploy_vfolder_v2",

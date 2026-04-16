@@ -106,6 +106,15 @@ class V2VFolderHandler:
         result = await self._adapter.restore(path.parsed.vfolder_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def project_create(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[CreateVFolderInput],
+    ) -> APIResponse:
+        """Create a vfolder owned by a project."""
+        result = await self._adapter.create_in_project(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
     async def deploy(
         self,
         path: PathParam[VFolderIdPathParam],

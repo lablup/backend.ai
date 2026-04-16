@@ -415,6 +415,7 @@ from .vfolder_v2 import (
     bulk_delete_vfolders_v2,
     bulk_purge_vfolders_v2,
     clone_vfolder_v2,
+    create_project_vfolder_v2,
     create_vfolder_v2,
     delete_vfolder_v2,
     deploy_vfolder_v2,
@@ -841,6 +842,7 @@ class Mutation:
     deploy_model_card_v2 = deploy_model_card_v2
     # VFolder V2 mutations
     create_vfolder_v2 = create_vfolder_v2
+    create_project_vfolder_v2 = create_project_vfolder_v2
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
     restore_vfolder_v2 = restore_vfolder_v2

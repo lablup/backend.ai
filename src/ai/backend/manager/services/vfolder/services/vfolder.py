@@ -158,6 +158,10 @@ from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
     CreateUploadSessionV2ActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
+    CreateVFolderInProjectAction,
+    CreateVFolderInProjectActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     DeleteVFolderV2ActionResult,
@@ -1626,6 +1630,107 @@ class VFolderService:
         """Get a single vfolder by ID (v2). RBAC is enforced at the processor level."""
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         return GetVFolderV2ActionResult(vfolder=vfolder_data)
+
+    async def create_in_project(
+        self, action: CreateVFolderInProjectAction
+    ) -> CreateVFolderInProjectActionResult:
+        """Create a vfolder owned by a project.
+
+        RBAC is enforced by the ScopeActionProcessor at the processor level.
+        Unlike ``create_v2`` this method does NOT check ``UserRole`` — project
+        CREATE permission is validated by the scope RBAC validator.
+        """
+        user_uuid = action.user_id
+        domain_name = action.domain_name
+        project_id = action.project_id
+
+        # Resolve host
+        folder_host = action.host
+        if not folder_host:
+            folder_host = self._config_provider.config.volumes.default_host
+            if not folder_host:
+                raise VFolderInvalidParameter(
+                    "You must specify the vfolder host because the default host is not configured."
+                )
+
+        if action.name.startswith(".") and action.name != ".local":
+            raise VFolderInvalidParameter("dot-prefixed vfolders cannot be a group folder.")
+
+        # Resolve project info
+        group_info = await self._vfolder_repository.get_group_resource_info(project_id, domain_name)
+        if not group_info:
+            raise ProjectNotFound(f"Project with {project_id} not found.")
+        group_uuid, max_vfolder_count, max_quota_scope_size, group_type = group_info
+
+        quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, group_uuid)
+
+        if group_type == ProjectType.MODEL_STORE:
+            if action.usage_mode != VFolderUsageMode.MODEL:
+                raise VFolderInvalidParameter(
+                    "Only Model VFolder can be created under the model store project"
+                )
+
+        # Host permission check
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            folder_host,
+            permission=VFolderHostPermission.CREATE,
+            user_uuid=user_uuid,
+            group_id=group_uuid,
+        )
+
+        # Quota check
+        if max_vfolder_count > 0:
+            current_count = await self._vfolder_repository.count_vfolders_by_group(group_uuid)
+            if current_count >= max_vfolder_count:
+                raise VFolderInvalidParameter("You cannot create more vfolders.")
+
+        # Create in storage
+        folder_id = uuid.uuid4()
+        mount_permission = action.permission
+        if group_type == ProjectType.MODEL_STORE:
+            mount_permission = VFolderPermission.READ_ONLY
+
+        try:
+            vfid = VFolderID(quota_scope_id, folder_id)
+            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host, False)
+            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.create_folder(volume_name, str(vfid), max_quota_scope_size, None)
+        except aiohttp.ClientResponseError as e:
+            raise VFolderCreationFailure from e
+
+        # Create in DB
+        params = VFolderCreateParams(
+            id=folder_id,
+            name=action.name,
+            domain_name=domain_name,
+            quota_scope_id=str(quota_scope_id),
+            usage_mode=action.usage_mode,
+            permission=mount_permission,
+            host=folder_host,
+            creator=str(user_uuid),
+            creator_id=user_uuid,
+            ownership_type=VFolderOwnershipType.GROUP,
+            user=None,
+            group=group_uuid,
+            unmanaged_path=None,
+            cloneable=action.cloneable,
+            status=VFolderOperationStatus.READY,
+        )
+
+        try:
+            create_owner_permission = group_type == ProjectType.MODEL_STORE
+            await self._vfolder_repository.create_vfolder_with_permission(
+                params, create_owner_permission=create_owner_permission
+            )
+        except sa_exc.DataError as e:
+            raise VFolderInvalidParameter from e
+
+        # Fetch created vfolder data for response
+        vfolder_data = await self._vfolder_repository.get_by_id(folder_id)
+        return CreateVFolderInProjectActionResult(
+            project_id=action.project_id,
+            vfolder=vfolder_data,
+        )
 
     async def delete_v2(self, action: DeleteVFolderV2Action) -> DeleteVFolderV2ActionResult:
         """Soft-delete a vfolder by ID. RBAC enforced at processor level."""

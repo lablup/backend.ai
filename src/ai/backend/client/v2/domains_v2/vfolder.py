@@ -78,6 +78,19 @@ class V2VFolderClient(BaseDomainClient):
             response_model=CreateVFolderPayload,
         )
 
+    async def create_in_project(
+        self,
+        project_id: UUID,
+        request: CreateVFolderInput,
+    ) -> CreateVFolderPayload:
+        """Create a vfolder owned by a project."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/projects/{project_id}",
+            request=request,
+            response_model=CreateVFolderPayload,
+        )
+
     async def create_upload_session(
         self,
         vfolder_id: UUID,
