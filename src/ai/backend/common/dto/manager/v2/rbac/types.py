@@ -94,9 +94,9 @@ class RBACElementTypeDTO(StrEnum):
     SESSION_TEMPLATE = "session_template"
     APP_CONFIG = "app_config"
     MODEL_CARD = "model_card"
+    PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
 
     # Root-query-enabled entities (superadmin-only)
-    PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
     USER_RESOURCE_POLICY = "user_resource_policy"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
