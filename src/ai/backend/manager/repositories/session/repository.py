@@ -16,11 +16,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
-from ai.backend.manager.data.session.types import (
-    SessionData,
-    SessionDetailData,
-    SessionListResult,
-)
+from ai.backend.manager.data.session.types import SessionData, SessionListResult
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
@@ -178,10 +174,6 @@ class SessionRepository:
         session_id: str | SessionId,
     ) -> SessionRow | None:
         return await self._db_source.get_session_by_id(session_id)
-
-    @session_repository_resilience.apply()
-    async def get_session(self, session_id: SessionId) -> SessionDetailData | None:
-        return await self._db_source.get_session(session_id)
 
     @session_repository_resilience.apply()
     async def modify_session(

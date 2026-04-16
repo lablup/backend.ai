@@ -40,12 +40,7 @@ from ai.backend.manager.data.kernel.types import (
     RuntimeConfig,
     UserPermission,
 )
-from ai.backend.manager.data.session.types import (
-    SessionData,
-    SessionDetailData,
-    SessionListResult,
-    SessionStatus,
-)
+from ai.backend.manager.data.session.types import SessionData, SessionListResult, SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.models.network import NetworkType
@@ -81,7 +76,6 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
     GetDirectAccessInfoActionResult,
 )
-from ai.backend.manager.services.session.actions.get_session import GetSessionAction
 from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
@@ -1695,82 +1689,6 @@ class TestSearch:
         assert result.total_count == 25
         assert result.has_next_page is True
         assert result.has_previous_page is True
-
-
-# ==================== GetSession Tests ====================
-
-
-class TestGetSession:
-    """Test cases for SessionService.get_session"""
-
-    @pytest.fixture
-    def sample_session_detail_data(
-        self,
-        sample_session_id: SessionId,
-        sample_access_key: AccessKey,
-        sample_user_id: UUID,
-        sample_group_id: UUID,
-    ) -> SessionDetailData:
-        return SessionDetailData(
-            id=sample_session_id,
-            creation_id="test-creation-id",
-            name="test-session",
-            session_type=SessionTypes.INTERACTIVE,
-            priority=0,
-            is_preemptible=True,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=1,
-            domain_name="default",
-            group_id=sample_group_id,
-            user_uuid=sample_user_id,
-            access_key=sample_access_key,
-            tag=None,
-            scaling_group_name="default",
-            occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
-            requested_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
-            environ={},
-            bootstrap_script=None,
-            startup_command=None,
-            callback_url=None,
-            use_host_network=False,
-            batch_timeout=None,
-            created_at=datetime.now(tzutc()),
-            terminated_at=None,
-            starts_at=None,
-            status=SessionStatus.RUNNING,
-            result=SessionResult.UNDEFINED,
-            network_type=NetworkType.VOLATILE,
-            network_id=None,
-        )
-
-    async def test_get_session_success(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        sample_session_detail_data: SessionDetailData,
-        sample_session_id: SessionId,
-    ) -> None:
-        """Returns session data when the repository finds the session."""
-        mock_session_repository.get_session = AsyncMock(return_value=sample_session_detail_data)
-
-        action = GetSessionAction(session_id=sample_session_id)
-        result = await session_service.get_session(action)
-
-        assert result.session_data is sample_session_detail_data
-        mock_session_repository.get_session.assert_called_once_with(sample_session_id)
-
-    async def test_get_session_not_found(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        sample_session_id: SessionId,
-    ) -> None:
-        """Raises SessionNotFound when the repository returns None."""
-        mock_session_repository.get_session = AsyncMock(return_value=None)
-
-        action = GetSessionAction(session_id=sample_session_id)
-        with pytest.raises(SessionNotFound):
-            await session_service.get_session(action)
 
 
 # ==================== SearchKernels Tests ====================

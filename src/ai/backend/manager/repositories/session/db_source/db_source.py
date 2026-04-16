@@ -11,14 +11,10 @@ from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.types import AccessKey, ClusterMode, ImageAlias, SessionId
+from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
-from ai.backend.manager.data.session.types import (
-    SessionData,
-    SessionDetailData,
-    SessionListResult,
-)
+from ai.backend.manager.data.session.types import SessionData, SessionListResult
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
@@ -295,47 +291,6 @@ class SessionDBSource:
                 )
             )
             return cast(SessionRow | None, await db_session.scalar(stmt))
-
-    async def get_session(
-        self,
-        session_id: SessionId,
-    ) -> SessionDetailData | None:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            session_row = cast(SessionRow | None, await db_session.scalar(stmt))
-            if session_row is None:
-                return None
-            return SessionDetailData(
-                id=session_row.id,
-                creation_id=session_row.creation_id,
-                name=session_row.name,
-                session_type=session_row.session_type,
-                priority=session_row.priority,
-                is_preemptible=session_row.is_preemptible,
-                cluster_mode=ClusterMode(session_row.cluster_mode),
-                cluster_size=session_row.cluster_size,
-                domain_name=session_row.domain_name,
-                group_id=session_row.group_id,
-                user_uuid=session_row.user_uuid,
-                access_key=AccessKey(session_row.access_key) if session_row.access_key else None,
-                tag=session_row.tag,
-                scaling_group_name=session_row.scaling_group_name,
-                occupying_slots=session_row.occupying_slots,
-                requested_slots=session_row.requested_slots,
-                environ=session_row.environ,
-                bootstrap_script=session_row.bootstrap_script,
-                startup_command=session_row.startup_command,
-                callback_url=str(session_row.callback_url) if session_row.callback_url else None,
-                use_host_network=session_row.use_host_network,
-                batch_timeout=session_row.batch_timeout,
-                created_at=session_row.created_at,
-                terminated_at=session_row.terminated_at,
-                starts_at=session_row.starts_at,
-                status=session_row.status,
-                result=session_row.result,
-                network_type=session_row.network_type,
-                network_id=session_row.network_id,
-            )
 
     async def modify_session(
         self,

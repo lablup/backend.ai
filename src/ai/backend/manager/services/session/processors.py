@@ -193,7 +193,6 @@ class SessionProcessors(AbstractProcessorPackage):
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     modify_session: SingleEntityActionProcessor[ModifySessionAction, ModifySessionActionResult]
-    get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     check_and_transit_status: ActionProcessor[
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
     ]
@@ -297,11 +296,6 @@ class SessionProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=rbac_single_entity_validators,
         )
-        self.get_session = SingleEntityActionProcessor(
-            service.get_session,
-            action_monitors,
-            validators=rbac_single_entity_validators,
-        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -339,6 +333,5 @@ class SessionProcessors(AbstractProcessorPackage):
             UploadFilesAction.spec(),
             GetSessionAction.spec(),
             ModifySessionAction.spec(),
-            GetSessionAction.spec(),
             CheckAndTransitStatusAction.spec(),
         ]
