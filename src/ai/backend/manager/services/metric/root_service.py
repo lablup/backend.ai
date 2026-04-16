@@ -3,11 +3,9 @@ import logging
 import re
 from collections.abc import Sequence
 from typing import Final
-from uuid import UUID
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
-from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
@@ -27,8 +25,7 @@ from .types import (
     DIFF_METRICS,
     RATE_METRICS,
     KernelLiveStatBatchResult,
-    KernelLiveStatEntry,
-    KernelMetricValue,
+    KernelMetricValuesByKernel,
     UtilizationMetricType,
     ValueType,
 )
@@ -68,105 +65,58 @@ class UtilizationMetricService:
         action: KernelLiveStatAction,
     ) -> KernelLiveStatActionResult:
         if not action.kernel_ids:
-            return KernelLiveStatActionResult(stats=KernelLiveStatBatchResult(entries={}))
+            return KernelLiveStatActionResult(
+                stats=KernelLiveStatBatchResult.empty(action.kernel_ids)
+            )
         try:
             gauge, diff, rate = await asyncio.gather(
-                self._query_gauge_kernel_live_stat(action.kernel_ids),
-                self._query_diff_kernel_live_stat(action.kernel_ids),
-                self._query_rate_kernel_live_stat(action.kernel_ids),
+                self._query_kernel_live_stat(
+                    action.kernel_ids,
+                    metric_type=UtilizationMetricType.GAUGE,
+                ),
+                self._query_kernel_live_stat(
+                    action.kernel_ids,
+                    metric_type=UtilizationMetricType.DIFF,
+                    metric_name_filter=DIFF_METRICS,
+                    value_type_filter=ValueType.CURRENT,
+                ),
+                self._query_kernel_live_stat(
+                    action.kernel_ids,
+                    metric_type=UtilizationMetricType.RATE,
+                    metric_name_filter=RATE_METRICS,
+                    value_type_filter=ValueType.CURRENT,
+                ),
             )
         except (PrometheusConnectionError, FailedToGetMetric):
             log.warning("Failed to query Prometheus for kernel live stats, returning empty results")
             return KernelLiveStatActionResult(
-                stats=KernelLiveStatBatchResult(
-                    entries={
-                        kid: KernelLiveStatEntry(kernel_id=kid, values=[])
-                        for kid in action.kernel_ids
-                    }
-                )
+                stats=KernelLiveStatBatchResult.empty(action.kernel_ids)
             )
 
-        merged: dict[KernelId, list[KernelMetricValue]] = {}
-        for partial in (gauge, diff, rate):
-            for kid, values in partial.items():
-                merged.setdefault(kid, []).extend(values)
-
-        entries: dict[UUID, KernelLiveStatEntry] = {}
-        for kid in action.kernel_ids:
-            values = merged.get(kid, [])
-            entries[kid] = KernelLiveStatEntry(kernel_id=kid, values=values)
-        return KernelLiveStatActionResult(stats=KernelLiveStatBatchResult(entries=entries))
-
-    async def _query_gauge_kernel_live_stat(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> dict[KernelId, list[KernelMetricValue]]:
-        """Raw gauge values (both current + capacity) for metrics not derived via rate()."""
-        preset = self._build_live_stat_preset(
-            kernel_ids,
-            metric_type=UtilizationMetricType.GAUGE,
-        )
-        response = await self._prometheus_client.query_instant(preset)
-        return self._collect_metric_values(response)
-
-    async def _query_diff_kernel_live_stat(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> dict[KernelId, list[KernelMetricValue]]:
-        """cpu_util.current via rate() only (no division)."""
-        preset = self._build_live_stat_preset(
-            kernel_ids,
-            metric_type=UtilizationMetricType.DIFF,
-            metric_name_filter=DIFF_METRICS,
-            value_type_filter=ValueType.CURRENT,
-        )
-        response = await self._prometheus_client.query_instant(preset)
-        return self._collect_metric_values(response)
-
-    async def _query_rate_kernel_live_stat(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> dict[KernelId, list[KernelMetricValue]]:
-        """net_rx/net_tx.current via rate() / UTILIZATION_METRIC_INTERVAL."""
-        preset = self._build_live_stat_preset(
-            kernel_ids,
-            metric_type=UtilizationMetricType.RATE,
-            metric_name_filter=RATE_METRICS,
-            value_type_filter=ValueType.CURRENT,
-        )
-        response = await self._prometheus_client.query_instant(preset)
-        return self._collect_metric_values(response)
-
-    def _collect_metric_values(
-        self,
-        response: PrometheusResponse,
-    ) -> dict[KernelId, list[KernelMetricValue]]:
-        """Parse a Prometheus response and group metric values by kernel_id."""
-        result: dict[KernelId, list[KernelMetricValue]] = {}
-        for metric_result in response.data.result:
-            info = metric_result.metric
-            if (
-                info.kernel_id is None
-                or info.container_metric_name is None
-                or info.value_type is None
-            ):
-                continue
-            if not metric_result.values:
-                continue
-            try:
-                value_type = ValueType(info.value_type)
-            except ValueError:
-                continue
-            _, raw_value = metric_result.values[-1]
-            kid = KernelId(UUID(info.kernel_id))
-            result.setdefault(kid, []).append(
-                KernelMetricValue(
-                    metric_name=info.container_metric_name,
-                    value_type=value_type,
-                    value=raw_value,
-                )
+        merged = gauge.merged_with(diff).merged_with(rate)
+        return KernelLiveStatActionResult(
+            stats=KernelLiveStatBatchResult.from_metric_values(
+                action.kernel_ids,
+                merged.values_by_kernel,
             )
-        return result
+        )
+
+    async def _query_kernel_live_stat(
+        self,
+        kernel_ids: Sequence[KernelId],
+        *,
+        metric_type: UtilizationMetricType,
+        metric_name_filter: frozenset[str] | None = None,
+        value_type_filter: ValueType | None = None,
+    ) -> KernelMetricValuesByKernel:
+        preset = self._build_live_stat_preset(
+            kernel_ids,
+            metric_type=metric_type,
+            metric_name_filter=metric_name_filter,
+            value_type_filter=value_type_filter,
+        )
+        response = await self._prometheus_client.query_instant(preset)
+        return KernelMetricValuesByKernel.from_prometheus_response(response)
 
     def _build_live_stat_preset(
         self,
