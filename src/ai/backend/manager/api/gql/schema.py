@@ -382,6 +382,7 @@ from .session.resolver import (
     admin_sessions_v2,
     enqueue_session,
     project_sessions_v2,
+    session_v2,
     terminate_project_sessions_v2,
 )
 from .storage_host import my_storage_host_permissions
@@ -499,6 +500,7 @@ class Query:
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
+    session_v2 = session_v2
     project_deployments = project_deployments
     my_deployments = my_deployments
     resource_slot_type = resource_slot_type
