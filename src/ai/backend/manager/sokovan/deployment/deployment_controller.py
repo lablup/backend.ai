@@ -13,7 +13,6 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import (
     DeploymentCreationDraft,
-    ModelRevisionCreator,
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -60,8 +59,6 @@ from ai.backend.manager.sokovan.deployment.revision_draft import (
     DeploymentConfigDraftGenerator,
     ModelDefinitionDraftGenerator,
     PresetDraftGenerator,
-    revision_draft_from_creator,
-    revision_draft_from_current,
     revision_draft_from_spec,
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
@@ -276,151 +273,60 @@ class DeploymentController:
 
     async def add_revision(
         self,
-        deployment_id: uuid.UUID,
-        creator: ModelRevisionCreator,
-    ) -> ModelRevisionData:
-        """Add a new revision to a deployment.
-
-        Builds a RevisionDraft from each independent source and merges them:
-        deployment-config.yaml → preset → model-definition.yaml → request.
-
-        This is the single authority for revision creation — all API paths
-        (v2 GQL, legacy GQL) must go through this method.
-        """
-        log.info("Adding model revision to deployment {}", deployment_id)
-
-        endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
-
-        mounts = MountMetadata(
-            model_vfolder_id=creator.mounts.model_vfolder_id,
-            model_definition_path=creator.mounts.model_definition_path,
-            model_mount_destination=creator.mounts.model_mount_destination,
-        )
-        request_draft = revision_draft_from_creator(creator)
-        merged = await self._build_revision_draft(
-            request_draft=request_draft,
-            mounts=mounts,
-            execution=creator.execution,
-            preset_id=creator.revision_preset_id,
-            default_architecture=None,
-        )
-
-        runtime_variant = merged.runtime_variant or creator.execution.runtime_variant
-        spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=deployment_id,
-            image_id=merged.image_id or creator.image_id,
-            resource_group=endpoint_info.metadata.resource_group,
-            resource_slots=ResourceSlot(merged.resource_slots or {}),
-            resource_opts=dict(merged.resource_opts) if merged.resource_opts else {},
-            cluster_mode=(merged.cluster_mode or ClusterMode.SINGLE_NODE).value,
-            cluster_size=merged.cluster_size or 1,
-            model_id=creator.mounts.model_vfolder_id,
-            model_mount_destination=creator.mounts.model_mount_destination,
-            model_definition_path=creator.mounts.model_definition_path,
-            model_definition=merged.model_definition,
-            startup_command=merged.startup_command,
-            bootstrap_script=merged.bootstrap_script,
-            environ=dict(merged.environ) if merged.environ else {},
-            callback_url=str(merged.callback_url) if merged.callback_url else None,
-            runtime_variant=runtime_variant,
-            extra_mounts=(),
-            preset_values=[
-                PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
-                for pv in (merged.preset_values or [])
-            ],
-        )
-        rbac_creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.DEPLOYMENT_REVISION,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(deployment_id),
-            ),
-        )
-        revision_data = await self._deployment_repository.create_revision_with_next_number(
-            rbac_creator, deployment_id
-        )
-
-        await self._prune_revision_history(
-            deployment_id, endpoint_info.metadata.revision_history_limit
-        )
-
-        return revision_data
-
-    async def modify_revision(
-        self,
         endpoint_id: uuid.UUID,
         overrides: RevisionDraft,
-        model_definition_path_override: str | None = None,
+        mounts: MountMetadata,
+        preset_id: uuid.UUID | None = None,
+        base: RevisionDraft | None = None,
     ) -> ModelRevisionData:
-        """Create a successor revision by running the unified merge pipeline on top
-        of the current revision.
+        """Create a new immutable revision on an existing deployment.
+
+        Revisions are immutable — every mutation (legacy ModifyEndpoint included)
+        must go through this single entry point. Callers control the base by
+        passing ``base`` (``None`` for fresh add, a current-revision draft for
+        modify). ``mounts`` carries the vfolder context required by file-based
+        draft generators and is not part of the merged RevisionDraft — mount
+        identity is not a merge candidate.
 
         Merge order (low → high):
-            1. current revision  (base — fields the user did not touch survive)
-            2. deployment-config.yaml
-            3. revision preset (if overrides.preset-applicable — currently not wired)
-            4. model-definition.yaml
-            5. user overrides (only fields explicitly set by the caller)
-
-        Unlike ``add_revision`` which receives a fully-formed ``ModelRevisionCreator``,
-        this method accepts a ``RevisionDraft`` of partial overrides — appropriate for
-        modify flows that only carry the changed fields.
+            1. preset (if ``preset_id`` is supplied)
+            2. base (caller-provided — e.g. current revision on modify)
+            3. deployment-config.yaml
+            4. model-definition.yaml (``model_definition`` field only)
+            5. overrides (highest — explicit user input)
         """
-        log.info("Modifying revision on deployment {}", endpoint_id)
+        log.info("Adding revision to deployment {}", endpoint_id)
 
-        endpoint_info = await self._deployment_repository.get_endpoint_info(endpoint_id)
-        current = await self._deployment_repository.get_current_revision(endpoint_id)
-        current_draft = revision_draft_from_current(current)
-
-        runtime_variant = overrides.runtime_variant or current_draft.runtime_variant
+        runtime_variant = overrides.runtime_variant or (
+            base.runtime_variant if base is not None else None
+        )
         if runtime_variant is None:
-            raise InvalidAPIParameters("runtime_variant is required to modify a revision")
-        vfolder_id = current.model_mount_config.vfolder_id
-        if vfolder_id is None:
-            raise InvalidAPIParameters("model vfolder id is missing on the current revision")
-
-        model_definition_path = (
-            model_definition_path_override
-            if model_definition_path_override is not None
-            else current.model_mount_config.definition_path
-        )
-        mounts = MountMetadata(
-            model_vfolder_id=vfolder_id,
-            model_definition_path=model_definition_path,
-            model_mount_destination=current.model_mount_config.mount_destination or "/models",
-        )
-        context_environ: dict[str, str] | None
-        if overrides.environ is not None:
-            context_environ = dict(overrides.environ)
-        elif current_draft.environ is not None:
-            context_environ = dict(current_draft.environ)
-        else:
-            context_environ = None
+            raise InvalidAPIParameters("runtime_variant is required to add a revision")
+        context_environ = overrides.environ or (base.environ if base is not None else None)
         context_execution = ExecutionSpec(
             runtime_variant=runtime_variant,
-            environ=context_environ,
+            environ=dict(context_environ) if context_environ else None,
         )
 
-        pipeline_merged = await self._build_revision_draft(
+        merged = await self._build_revision_draft(
             request_draft=overrides,
             mounts=mounts,
             execution=context_execution,
-            preset_id=None,
+            preset_id=preset_id,
             default_architecture=None,
+            base=base,
         )
-        merged = merge_revision_drafts(current_draft, pipeline_merged)
 
-        image_id = merged.image_id or current.image_id
+        endpoint_info = await self._deployment_repository.get_endpoint_info(endpoint_id)
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=endpoint_id,
-            image_id=image_id,
+            image_id=merged.image_id,
             resource_group=endpoint_info.metadata.resource_group,
             resource_slots=ResourceSlot(merged.resource_slots or {}),
             resource_opts=dict(merged.resource_opts) if merged.resource_opts else {},
             cluster_mode=(merged.cluster_mode or ClusterMode.SINGLE_NODE).value,
             cluster_size=merged.cluster_size or 1,
-            model_id=vfolder_id,
+            model_id=mounts.model_vfolder_id,
             model_mount_destination=mounts.model_mount_destination,
             model_definition_path=mounts.model_definition_path,
             model_definition=merged.model_definition,
@@ -446,11 +352,9 @@ class DeploymentController:
         revision_data = await self._deployment_repository.create_revision_with_next_number(
             rbac_creator, endpoint_id
         )
-
         await self._prune_revision_history(
             endpoint_id, endpoint_info.metadata.revision_history_limit
         )
-
         return revision_data
 
     async def activate_revision(
@@ -553,26 +457,30 @@ class DeploymentController:
         execution: ExecutionSpec,
         preset_id: uuid.UUID | None,
         default_architecture: str | None,
+        base: RevisionDraft | None = None,
     ) -> RevisionDraft:
         """Collect RevisionDrafts from each independent source and merge them.
 
         Merge order (later overrides earlier):
-            1. default architecture (lowest priority)
-            2. deployment-config.yaml in the model vfolder
-            3. revision preset (optional)
-            4. model-definition.yaml in the model vfolder (model_definition only)
-            5. request (highest priority)
+            1. default architecture (legacy create fallback; lowest)
+            2. revision preset (optional)
+            3. caller-provided base (e.g. current revision on modify)
+            4. deployment-config.yaml in the model vfolder
+            5. model-definition.yaml in the model vfolder (model_definition only)
+            6. request (highest priority)
         """
         drafts: list[RevisionDraft] = []
         if default_architecture is not None:
             drafts.append(RevisionDraft(image_architecture=default_architecture))
+        if preset_id is not None and self._preset_draft_generator is not None:
+            drafts.append(await self._preset_draft_generator.generate(preset_id))
+        if base is not None:
+            drafts.append(base)
         drafts.append(
             await self._deployment_config_draft_generator.generate(
                 mounts.model_vfolder_id, execution.runtime_variant
             )
         )
-        if preset_id is not None and self._preset_draft_generator is not None:
-            drafts.append(await self._preset_draft_generator.generate(preset_id))
         drafts.append(await self._model_definition_draft_generator.generate(mounts, execution))
         drafts.append(request_draft)
         return merge_revision_drafts(*drafts)

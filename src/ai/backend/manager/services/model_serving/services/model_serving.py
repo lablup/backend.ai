@@ -144,6 +144,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_draft import revision_draft_from_current
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -899,18 +900,35 @@ class ModelServingService:
             self._config_provider.legacy_etcd_config_loader,
         )
 
-        # 2. If revision-level fields changed, create + activate via controller.
-        #    modify_revision runs the same unified merge pipeline as creation,
-        #    with the current revision as the lowest-priority base so fields
-        #    the user did not touch are preserved while yaml/preset remain
-        #    authoritative for their respective sources.
+        # 2. If revision-level fields changed, create + activate a new revision.
+        #    Revisions are immutable, so every mutation goes through the same
+        #    ``add_revision`` entry point as fresh creation — this legacy path
+        #    merely supplies the current revision as the caller-provided base
+        #    so that untouched fields survive while yaml stays authoritative.
         if spec.has_revision_changes():
+            current_rev = await self._deployment_repository.get_current_revision(action.endpoint_id)
+            current_draft = revision_draft_from_current(current_rev)
             overrides = await self._build_revision_overrides_from_spec(spec)
-            model_definition_path = spec.model_definition_path.optional_value()
-            revision = await self._deployment_controller.modify_revision(
-                action.endpoint_id,
-                overrides,
-                model_definition_path_override=model_definition_path,
+
+            vfolder_id = current_rev.model_mount_config.vfolder_id
+            if vfolder_id is None:
+                raise InvalidAPIParameters("model vfolder id is missing on the current revision")
+            definition_path_override = spec.model_definition_path.optional_value()
+            mounts = MountMetadata(
+                model_vfolder_id=vfolder_id,
+                model_definition_path=(
+                    definition_path_override
+                    if definition_path_override is not None
+                    else current_rev.model_mount_config.definition_path
+                ),
+                model_mount_destination=current_rev.model_mount_config.mount_destination
+                or "/models",
+            )
+            revision = await self._deployment_controller.add_revision(
+                endpoint_id=action.endpoint_id,
+                overrides=overrides,
+                mounts=mounts,
+                base=current_draft,
             )
             await self._deployment_controller.activate_revision(action.endpoint_id, revision.id)
         elif spec.replica_count_modified():

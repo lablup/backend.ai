@@ -3666,6 +3666,7 @@ class TestDeploymentRepositoryDuplicateName:
             bootstrap_script=None,
             environ=None,
             callback_url=None,
+            model_definition=None,
             policy=None,
         )
         return RBACEntityCreator(

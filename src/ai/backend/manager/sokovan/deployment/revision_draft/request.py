@@ -14,7 +14,12 @@ from ai.backend.manager.data.deployment.types import ModelRevisionSpecDraft, Rev
 
 
 def revision_draft_from_spec(spec: ModelRevisionSpecDraft) -> RevisionDraft:
-    """Build a RevisionDraft from a legacy request (pre-resolve image)."""
+    """Build a RevisionDraft from a legacy request (pre-resolve image).
+
+    Mount-identifying fields (vfolder, destination, definition_path) are not
+    part of RevisionDraft — they live on ``MountMetadata`` and are passed
+    alongside into ``add_revision``.
+    """
     return RevisionDraft(
         image_canonical=spec.image_identifier.canonical,
         image_architecture=spec.image_identifier.architecture,
@@ -32,7 +37,10 @@ def revision_draft_from_spec(spec: ModelRevisionSpecDraft) -> RevisionDraft:
 
 
 def revision_draft_from_creator(creator: ModelRevisionCreator) -> RevisionDraft:
-    """Build a RevisionDraft from a v2 request (image already resolved)."""
+    """Build a RevisionDraft from a v2 request (image already resolved).
+
+    Mount-identifying fields are excluded — see ``revision_draft_from_spec``.
+    """
     return RevisionDraft(
         image_id=creator.image_id,
         resource_slots=creator.resource_spec.resource_slots,
