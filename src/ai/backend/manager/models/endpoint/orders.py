@@ -31,6 +31,30 @@ class DeploymentOrders:
             return EndpointRow.destroyed_at.asc()
         return EndpointRow.destroyed_at.desc()
 
+    @staticmethod
+    def domain(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.domain.asc()
+        return EndpointRow.domain.desc()
+
+    @staticmethod
+    def project(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.project.asc()
+        return EndpointRow.project.desc()
+
+    @staticmethod
+    def resource_group(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.resource_group.asc()
+        return EndpointRow.resource_group.desc()
+
+    @staticmethod
+    def tag(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.tag.asc()
+        return EndpointRow.tag.desc()
+
 
 class AccessTokenOrders:
     """Query orders for access tokens."""

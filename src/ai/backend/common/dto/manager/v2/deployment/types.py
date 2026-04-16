@@ -82,6 +82,10 @@ class DeploymentOrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
     DESTROYED_AT = "destroyed_at"
+    DOMAIN = "domain"
+    PROJECT = "project"
+    RESOURCE_GROUP = "resource_group"
+    TAG = "tag"
 
 
 class RevisionOrderField(StrEnum):
@@ -89,6 +93,9 @@ class RevisionOrderField(StrEnum):
 
     REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
+    RESOURCE_GROUP = "resource_group"
+    CLUSTER_MODE = "cluster_mode"
+    RUNTIME_VARIANT = "runtime_variant"
 
 
 class RouteOrderField(StrEnum):

@@ -78,9 +78,21 @@ class TestDeploymentOrderField:
     def test_destroyed_at_value(self) -> None:
         assert DeploymentOrderField.DESTROYED_AT.value == "destroyed_at"
 
+    def test_domain_value(self) -> None:
+        assert DeploymentOrderField.DOMAIN.value == "domain"
+
+    def test_project_value(self) -> None:
+        assert DeploymentOrderField.PROJECT.value == "project"
+
+    def test_resource_group_value(self) -> None:
+        assert DeploymentOrderField.RESOURCE_GROUP.value == "resource_group"
+
+    def test_tag_value(self) -> None:
+        assert DeploymentOrderField.TAG.value == "tag"
+
     def test_enum_members_count(self) -> None:
         members = list(DeploymentOrderField)
-        assert len(members) == 3
+        assert len(members) == 7
 
     def test_all_values_are_strings(self) -> None:
         for member in DeploymentOrderField:
@@ -105,9 +117,18 @@ class TestRevisionOrderField:
     def test_created_at_value(self) -> None:
         assert RevisionOrderField.CREATED_AT.value == "created_at"
 
+    def test_resource_group_value(self) -> None:
+        assert RevisionOrderField.RESOURCE_GROUP.value == "resource_group"
+
+    def test_cluster_mode_value(self) -> None:
+        assert RevisionOrderField.CLUSTER_MODE.value == "cluster_mode"
+
+    def test_runtime_variant_value(self) -> None:
+        assert RevisionOrderField.RUNTIME_VARIANT.value == "runtime_variant"
+
     def test_enum_members_count(self) -> None:
         members = list(RevisionOrderField)
-        assert len(members) == 2
+        assert len(members) == 5
 
     def test_all_values_are_strings(self) -> None:
         for member in RevisionOrderField:

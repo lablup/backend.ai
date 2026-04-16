@@ -2127,6 +2127,14 @@ class DeploymentAdapter(BaseAdapter):
                     result.append(DeploymentOrders.created_at(ascending))
                 case DeploymentOrderField.DESTROYED_AT:
                     result.append(DeploymentOrders.destroyed_at(ascending))
+                case DeploymentOrderField.DOMAIN:
+                    result.append(DeploymentOrders.domain(ascending))
+                case DeploymentOrderField.PROJECT:
+                    result.append(DeploymentOrders.project(ascending))
+                case DeploymentOrderField.RESOURCE_GROUP:
+                    result.append(DeploymentOrders.resource_group(ascending))
+                case DeploymentOrderField.TAG:
+                    result.append(DeploymentOrders.tag(ascending))
         return result
 
     @staticmethod
@@ -2139,6 +2147,12 @@ class DeploymentAdapter(BaseAdapter):
                     result.append(RevisionOrders.revision_number(ascending))
                 case RevisionOrderField.CREATED_AT:
                     result.append(RevisionOrders.created_at(ascending))
+                case RevisionOrderField.RESOURCE_GROUP:
+                    result.append(RevisionOrders.resource_group(ascending))
+                case RevisionOrderField.CLUSTER_MODE:
+                    result.append(RevisionOrders.cluster_mode(ascending))
+                case RevisionOrderField.RUNTIME_VARIANT:
+                    result.append(RevisionOrders.runtime_variant(ascending))
         return result
 
     @staticmethod

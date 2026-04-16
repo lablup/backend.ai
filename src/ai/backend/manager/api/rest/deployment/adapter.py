@@ -205,6 +205,14 @@ class DeploymentAdapter(BaseFilterAdapter):
             return DeploymentOrders.created_at(ascending=ascending)
         if order.field == DeploymentOrderField.DESTROYED_AT:
             return DeploymentOrders.destroyed_at(ascending=ascending)
+        if order.field == DeploymentOrderField.DOMAIN:
+            return DeploymentOrders.domain(ascending=ascending)
+        if order.field == DeploymentOrderField.PROJECT:
+            return DeploymentOrders.project(ascending=ascending)
+        if order.field == DeploymentOrderField.RESOURCE_GROUP:
+            return DeploymentOrders.resource_group(ascending=ascending)
+        if order.field == DeploymentOrderField.TAG:
+            return DeploymentOrders.tag(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
@@ -286,6 +294,12 @@ class RevisionAdapter(BaseFilterAdapter):
             return RevisionOrders.revision_number(ascending=ascending)
         if order.field == RevisionOrderField.CREATED_AT:
             return RevisionOrders.created_at(ascending=ascending)
+        if order.field == RevisionOrderField.RESOURCE_GROUP:
+            return RevisionOrders.resource_group(ascending=ascending)
+        if order.field == RevisionOrderField.CLUSTER_MODE:
+            return RevisionOrders.cluster_mode(ascending=ascending)
+        if order.field == RevisionOrderField.RUNTIME_VARIANT:
+            return RevisionOrders.runtime_variant(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
