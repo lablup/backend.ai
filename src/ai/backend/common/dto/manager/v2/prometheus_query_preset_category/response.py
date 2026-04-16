@@ -17,6 +17,7 @@ __all__ = (
     "DeleteCategoryPayload",
     "GetCategoryPayload",
     "SearchCategoriesPayload",
+    "CreateCategoryGQLPayload",
 )
 
 
@@ -46,6 +47,12 @@ class GetCategoryPayload(BaseResponseModel):
     """Payload for getting a single category."""
 
     item: CategoryNode | None = Field(default=None, description="Category data")
+
+
+class CreateCategoryGQLPayload(BaseResponseModel):
+    """GQL-layer payload returned after creating a category."""
+
+    category: CategoryNode = Field(description="Created category.")
 
 
 class SearchCategoriesPayload(BaseResponseModel):

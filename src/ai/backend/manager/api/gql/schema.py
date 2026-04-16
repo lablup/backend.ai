@@ -245,9 +245,13 @@ from .project_v2 import (
 )
 from .prometheus_query_preset import (
     admin_create_prometheus_query_preset,
+    admin_create_prometheus_query_preset_category,
     admin_delete_prometheus_query_preset,
+    admin_delete_prometheus_query_preset_category,
     admin_modify_prometheus_query_preset,
     prometheus_query_preset,
+    prometheus_query_preset_categories,
+    prometheus_query_preset_category,
     prometheus_query_preset_result,
     prometheus_query_presets,
 )
@@ -503,6 +507,9 @@ class Query:
     prometheus_query_preset = prometheus_query_preset
     prometheus_query_presets = prometheus_query_presets
     prometheus_query_preset_result = prometheus_query_preset_result
+    # Prometheus Query Preset Category APIs (read available to any authenticated user)
+    prometheus_query_preset_category = prometheus_query_preset_category
+    prometheus_query_preset_categories = prometheus_query_preset_categories
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
@@ -774,6 +781,9 @@ class Mutation:
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
     admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
+    # Prometheus Query Preset Category - Admin APIs
+    admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
+    admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role
