@@ -593,22 +593,9 @@ class PermissionDBSource:
         self,
         querier: BatchQuerier,
     ) -> RoleListResult:
-        """Searches roles with pagination and filtering.
-
-        Uses LEFT JOIN with ObjectPermissionRow to support
-        entity-based filtering. The JOIN is always performed to
-        simplify the implementation, with distinct() used to prevent duplicates.
-        """
+        """Searches roles with pagination and filtering."""
         async with self._db.begin_readonly_session() as db_sess:
-            # Build query with LEFT JOIN to support entity filtering
-            query = (
-                sa.select(RoleRow)
-                .outerjoin(
-                    ObjectPermissionRow,
-                    RoleRow.id == ObjectPermissionRow.role_id,
-                )
-                .distinct()
-            )
+            query = sa.select(RoleRow)
 
             result = await execute_batch_querier(
                 db_sess,
