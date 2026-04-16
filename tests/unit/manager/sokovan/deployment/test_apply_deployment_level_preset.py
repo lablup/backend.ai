@@ -1,4 +1,4 @@
-"""Unit tests for DeploymentService._apply_deployment_level_preset.
+"""Unit tests for DeploymentController._apply_deployment_level_preset.
 
 Verifies that deployment-level fields on a NewDeploymentCreator are correctly
 resolved against the revision preset defaults using the priority:
@@ -34,14 +34,12 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
 )
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentRevisionPresetRepository,
 )
-from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
+from ai.backend.manager.sokovan.deployment.deployment_controller import (
+    DeploymentController,
+    DeploymentControllerArgs,
 )
 
 
@@ -123,25 +121,37 @@ def mock_preset_repository() -> MagicMock:
 
 
 @pytest.fixture
-def deployment_service(mock_preset_repository: MagicMock) -> DeploymentService:
-    return DeploymentService(
-        deployment_controller=MagicMock(spec=DeploymentController),
-        deployment_repository=MagicMock(spec=DeploymentRepository),
-        revision_generator_registry=MagicMock(spec=RevisionGeneratorRegistry),
-        model_definition_generator_registry=AsyncMock(),
-        deployment_revision_preset_repository=mock_preset_repository,
+def deployment_controller(mock_preset_repository: MagicMock) -> DeploymentController:
+    """Build a controller with mocked dependencies.
+
+    ``_apply_deployment_level_preset`` only consumes
+    ``_deployment_revision_preset_repository``; the remaining args are
+    populated with mocks to satisfy the constructor.
+    """
+    return DeploymentController(
+        DeploymentControllerArgs(
+            scheduling_controller=MagicMock(),
+            deployment_repository=MagicMock(),
+            config_provider=MagicMock(),
+            storage_manager=MagicMock(),
+            event_producer=MagicMock(),
+            valkey_schedule=MagicMock(),
+            revision_generator_registry=MagicMock(),
+            model_definition_generator_registry=AsyncMock(),
+            deployment_revision_preset_repository=mock_preset_repository,
+        )
     )
 
 
 class TestApplyDeploymentLevelPreset:
     async def test_no_preset_id_falls_back_to_system_defaults(
         self,
-        deployment_service: DeploymentService,
+        deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
         """When the creator does not reference any preset, system defaults are used."""
         creator = _make_creator(preset_id=None)
-        resolved = await deployment_service._apply_deployment_level_preset(creator)
+        resolved = await deployment_controller._apply_deployment_level_preset(creator)
 
         assert resolved.metadata.revision_history_limit == 10
         assert resolved.replica_spec is not None
@@ -153,7 +163,7 @@ class TestApplyDeploymentLevelPreset:
 
     async def test_preset_provides_all_defaults(
         self,
-        deployment_service: DeploymentService,
+        deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
         """All five preset fields are applied when the caller leaves them unset."""
@@ -169,7 +179,7 @@ class TestApplyDeploymentLevelPreset:
         )
         creator = _make_creator(preset_id=preset_id)
 
-        resolved = await deployment_service._apply_deployment_level_preset(creator)
+        resolved = await deployment_controller._apply_deployment_level_preset(creator)
 
         assert resolved.metadata.revision_history_limit == 20
         assert resolved.replica_spec is not None
@@ -185,7 +195,7 @@ class TestApplyDeploymentLevelPreset:
 
     async def test_caller_input_wins_over_preset(
         self,
-        deployment_service: DeploymentService,
+        deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
         """When the caller specifies a value, the preset default is ignored."""
@@ -210,7 +220,7 @@ class TestApplyDeploymentLevelPreset:
             policy=explicit_policy,
         )
 
-        resolved = await deployment_service._apply_deployment_level_preset(creator)
+        resolved = await deployment_controller._apply_deployment_level_preset(creator)
 
         assert resolved.metadata.revision_history_limit == 7
         assert resolved.replica_spec is not None
@@ -221,7 +231,7 @@ class TestApplyDeploymentLevelPreset:
 
     async def test_partial_preset_falls_back_per_field(
         self,
-        deployment_service: DeploymentService,
+        deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
         """Each preset field falls back to system default independently when null."""
@@ -234,7 +244,7 @@ class TestApplyDeploymentLevelPreset:
         )
         creator = _make_creator(preset_id=preset_id)
 
-        resolved = await deployment_service._apply_deployment_level_preset(creator)
+        resolved = await deployment_controller._apply_deployment_level_preset(creator)
 
         # Specified by preset.
         assert resolved.network is not None
@@ -247,7 +257,7 @@ class TestApplyDeploymentLevelPreset:
 
     async def test_preset_rolling_strategy_with_int_or_percent_spec(
         self,
-        deployment_service: DeploymentService,
+        deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
         """Rolling-update strategy_spec is reconstructed from JSON dict."""
@@ -264,7 +274,7 @@ class TestApplyDeploymentLevelPreset:
         )
         creator = _make_creator(preset_id=preset_id)
 
-        resolved = await deployment_service._apply_deployment_level_preset(creator)
+        resolved = await deployment_controller._apply_deployment_level_preset(creator)
 
         assert resolved.policy is not None
         assert resolved.policy.strategy == DeploymentStrategy.ROLLING
@@ -274,7 +284,7 @@ class TestApplyDeploymentLevelPreset:
 
     async def test_preset_strategy_without_spec_uses_default_spec(
         self,
-        deployment_service: DeploymentService,
+        deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
         """When the preset stores strategy without spec, the default spec is built."""
@@ -287,7 +297,7 @@ class TestApplyDeploymentLevelPreset:
         )
         creator = _make_creator(preset_id=preset_id)
 
-        resolved = await deployment_service._apply_deployment_level_preset(creator)
+        resolved = await deployment_controller._apply_deployment_level_preset(creator)
 
         assert resolved.policy is not None
         assert isinstance(resolved.policy.strategy_spec, RollingUpdateSpec)

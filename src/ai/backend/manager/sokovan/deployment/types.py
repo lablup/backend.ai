@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
 
 class DeploymentLifecycleType(StrEnum):
-    CHECK_PENDING = "check_pending"
     CHECK_REPLICA = "check_replica"
     SCALING = "scaling"
     RECONCILE = "reconcile"

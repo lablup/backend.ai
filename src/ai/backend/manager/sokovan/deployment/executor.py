@@ -118,28 +118,6 @@ class DeploymentExecutor:
         self._prometheus_client = prometheus_client
         self._preset_repo = preset_repo
 
-    async def check_pending_deployments(
-        self, deployments: Sequence[DeploymentWithHistory]
-    ) -> DeploymentExecutionResult:
-        """Register endpoints in appproxy for deployments that need it."""
-        entries: list[tuple[DeploymentWithHistory, UUID]] = []
-        pre_skipped: list[DeploymentWithHistory] = []
-        for deployment in deployments:
-            revision_id = deployment.deployment_info.current_revision_id
-            if revision_id is None:
-                pre_skipped.append(deployment)
-                continue
-            entries.append((deployment, revision_id))
-
-        result = await self.register_endpoints_bulk(entries)
-        if pre_skipped:
-            result = DeploymentExecutionResult(
-                successes=result.successes,
-                failures=result.failures,
-                skipped=[*pre_skipped, *result.skipped],
-            )
-        return result
-
     async def register_endpoints_bulk(
         self,
         entries: Sequence[tuple[DeploymentWithHistory, UUID]],

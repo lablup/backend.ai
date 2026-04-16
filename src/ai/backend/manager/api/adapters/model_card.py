@@ -473,7 +473,7 @@ class ModelCardAdapter(BaseAdapter):
         )
 
         result = await self._processors.deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator)
+            CreateDeploymentAction(creator=creator, auto_activate=True)
         )
         return DeployModelCardPayload(
             deployment_id=result.data.id,

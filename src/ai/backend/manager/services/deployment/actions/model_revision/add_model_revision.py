@@ -15,6 +15,7 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 class AddModelRevisionAction(ModelRevisionBaseAction):
     model_deployment_id: UUID
     adder: ModelRevisionCreator
+    auto_activate: bool
 
     @override
     def entity_id(self) -> str | None:

@@ -133,7 +133,7 @@ class DeploymentAPIHandler:
 
         # Call service action
         action_result = await self._deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator)
+            CreateDeploymentAction(creator=creator, auto_activate=True)
         )
 
         # Build response
@@ -253,6 +253,7 @@ class DeploymentAPIHandler:
             AddModelRevisionAction(
                 model_deployment_id=path.parsed.deployment_id,
                 adder=revision_creator,
+                auto_activate=body.parsed.options.auto_activate,
             )
         )
         if body.parsed.options.auto_activate:

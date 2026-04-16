@@ -466,20 +466,22 @@ class TestAddModelRevision(ModelRevisionFixtures):
         revision_creator: ModelRevisionCreator,
         revision_data: ModelRevisionData,
     ) -> None:
-        """add_model_revision should delegate to controller.add_revision.
+        """add_model_revision should delegate to controller.add_deployment_revision.
 
-        The service projects ``ModelRevisionCreator`` onto ``RevisionDraft`` +
-        ``MountMetadata`` + ``preset_id`` before calling the controller; we
-        verify the delegation by inspecting the forwarded kwargs.
+        The service forwards the ``ModelRevisionCreator`` and ``auto_activate``
+        flag directly; the controller owns the projection onto ``RevisionDraft``
+        + ``MountMetadata`` + ``preset_id`` and the optional activation step.
         """
-        mock_deployment_controller.add_revision = AsyncMock(return_value=revision_data)
+        mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
 
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
+        action = AddModelRevisionAction(
+            model_deployment_id=deployment_id, adder=revision_creator, auto_activate=False
+        )
         result = await processors.add_model_revision.wait_for_complete(action)
 
         assert result.revision == revision_data
-        mock_deployment_controller.add_revision.assert_awaited_once()
-        kwargs = mock_deployment_controller.add_revision.await_args.kwargs
-        assert kwargs["endpoint_id"] == deployment_id
-        assert kwargs["preset_id"] == revision_creator.revision_preset_id
-        assert kwargs["mounts"].model_vfolder_id == revision_creator.mounts.model_vfolder_id
+        mock_deployment_controller.add_deployment_revision.assert_awaited_once_with(
+            deployment_id=deployment_id,
+            revision=revision_creator,
+            auto_activate=False,
+        )
