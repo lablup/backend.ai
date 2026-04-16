@@ -84,7 +84,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -218,7 +217,7 @@ class ModelDeploymentMetadata:
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The project this deployment belongs to, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -245,7 +244,7 @@ class ModelDeploymentMetadata:
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The domain this deployment belongs to, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -293,7 +292,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The current active revision of this deployment, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -306,7 +305,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The revision currently being deployed (in progress, not yet active), resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -319,7 +318,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The user who created this deployment, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -567,36 +566,34 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     tags: StringFilter | None = None
     endpoint_url: StringFilter | None = None
     domain_name: StringFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by domain name."),
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by domain name."),
         default=None,
     )
     project_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by project ID."),
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by project ID."),
         default=None,
     )
     resource_group: StringFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by resource group name."
-        ),
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by resource group name."),
         default=None,
     )
     created_user_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="Filter by the user who created the deployment.",
         ),
         default=None,
     )
     created_at: DateTimeFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="Filter by deployment creation datetime.",
         ),
         default=None,
     )
     destroyed_at: NullableDateTimeFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.",
         ),
         default=None,
@@ -764,7 +761,7 @@ class SyncReplicaPayload:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.3",
         description="Per-deployment result of an admin bulk revision refresh.",
     ),
     model=RevisionRefreshResultInfoDTO,
@@ -780,7 +777,7 @@ class RevisionRefreshResult:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.3",
         description="Payload for admin bulk revision refresh mutation result.",
     ),
     model=AdminRefreshDeploymentRevisionsPayloadDTO,

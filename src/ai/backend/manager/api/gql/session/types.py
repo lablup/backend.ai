@@ -51,7 +51,6 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -373,7 +372,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
         )
     )  # type: ignore[misc]

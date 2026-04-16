@@ -16,6 +16,58 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.3 (2026-04-17)
+
+### Features
+* Add `scope` resolver on `EntityRefGQL` so RBAC role scope connections can resolve the scope target (e.g., project, domain) directly in GraphQL. ([#11107](https://github.com/lablup/backend.ai/issues/11107))
+* Add `session_v2(id)` GraphQL single-node query with RBAC-enforced single-session reads across GraphQL, REST v2, SDK, and CLI. ([#11124](https://github.com/lablup/backend.ai/issues/11124))
+* Add image_id FK to kernels and image_ids to sessions for UUID-based image references ([#11125](https://github.com/lablup/backend.ai/issues/11125))
+* Add sglang runtime variant presets ([#11129](https://github.com/lablup/backend.ai/issues/11129))
+* Add admin API to refresh revisions for all active deployments, rebuilding each revision through `DeploymentController` so preset, deployment-config, and model_definition are re-resolved. Partial success is reported per deployment. ([#11134](https://github.com/lablup/backend.ai/issues/11134))
+* Add missing filter and order fields to deployment and revision search APIs, and fix `DeploymentOrders.updated_at` crash. ([#11154](https://github.com/lablup/backend.ai/issues/11154))
+* Expose `deploying_revision` on the `ModelDeployment` GraphQL node so clients can observe the revision currently being rolled out alongside `current_revision`. ([#11156](https://github.com/lablup/backend.ai/issues/11156))
+* Support partial `model_definition` input from preset, vfolder `model-definition.yaml`, and request override via the new `ModelDefinitionDraft` type; the merged draft is resolved into the strict `ModelDefinition` only at the persistence boundary. ([#11167](https://github.com/lablup/backend.ai/issues/11167))
+
+### Improvements
+* Add lazy resolver fields for FK references across GQL Node types and deprecate legacy Graphene stub resolvers with v2 dataloader-based alternatives. ([#11120](https://github.com/lablup/backend.ai/issues/11120))
+* Make DeploymentController the single authority for revision creation and activation, ensuring consistent preset application, RBAC, deployment strategy, and concurrency guards across all API paths (v2 and legacy). ([#11126](https://github.com/lablup/backend.ai/issues/11126))
+* Unify legacy and v2 deployment creation through `DeploymentController`, removing the `current_revision`-direct-assignment bug that bypassed the DEPLOYING strategy lifecycle on initial deploy and dropping the now-redundant `CHECK_PENDING` lifecycle stage. ([#11167](https://github.com/lablup/backend.ai/issues/11167))
+
+### Fixes
+* Add retry logic to `etcd_put_json` in TUI installer to handle etcd not being ready after halfstack startup ([#10905](https://github.com/lablup/backend.ai/issues/10905))
+* Add RBAC validation to v2 vfolder GET endpoint ([#11062](https://github.com/lablup/backend.ai/issues/11062))
+* Grant `project_admin_page:read` / `domain_admin_page:read` permissions to the auto-generated admin role when a new project or domain is created. ([#11074](https://github.com/lablup/backend.ai/issues/11074))
+* Add `--wait` flag to halfstack `docker compose up` to ensure etcd passes its healthcheck before the installer proceeds to configuration, preventing a gRPC race condition during `configure_manager()` ([#11081](https://github.com/lablup/backend.ai/issues/11081))
+* Fix prometheus query preset fixture failing with "Unconsumed column names: category" by using category_name alias with FixtureReferenceSpec ([#11086](https://github.com/lablup/backend.ai/issues/11086))
+* Fix missing enum filter handling across deployment, session, kernel, vfolder, audit-log, login-session, and login-history domains, and standardize all enum filters to support equals/in/not_equals/not_in operators consistently. ([#11092](https://github.com/lablup/backend.ai/issues/11092))
+* Fix auto-scaling rule `last_triggered_at` returning fake timestamps instead of null, and add `NullableDateTimeFilter` for filtering nullable datetime columns ([#11102](https://github.com/lablup/backend.ai/issues/11102))
+* Add independent `cookie_secure` config under `[security]` to set the Secure flag on session cookies, decoupled from `ssl_enabled` for reverse proxy SSL termination environments. ([#11105](https://github.com/lablup/backend.ai/issues/11105))
+* Increase default health check initial delay from 5 minutes to 30 minutes for all runtime variant generators to prevent premature failures during large model loading. ([#11108](https://github.com/lablup/backend.ai/issues/11108))
+* Automatically sync RBAC project-member role bindings when users are added to or removed from a project via `modifyGroup` or `modifyUser`. ([#11116](https://github.com/lablup/backend.ai/issues/11116))
+* Fix project creation to also create the member system role and backfill member roles for existing projects that were missing one. ([#11118](https://github.com/lablup/backend.ai/issues/11118))
+* Fix GQL serialization error for AgentStatus enum in agentsV2 query. ([#11127](https://github.com/lablup/backend.ai/issues/11127))
+* Correct category_id type to UUID in QueryDefinitionGQL and add GQL query/mutation support for prometheus query preset categories. ([#11130](https://github.com/lablup/backend.ai/issues/11130))
+* Fix alembic merge migration declaring non-head ancestors as parents, which caused `alembic upgrade head` to fail. ([#11131](https://github.com/lablup/backend.ai/issues/11131))
+* Fix inflated `total_count` in the `admin_roles` GraphQL query caused by an unused LEFT JOIN on `ObjectPermissionRow`. ([#11132](https://github.com/lablup/backend.ai/issues/11132))
+* Allow auto scaling rule updates to clear nullable fields (`min_threshold`, `max_threshold`, `min_replicas`, `max_replicas`, `prometheus_query_preset_id`) by sending an explicit `null`, while keeping omitted fields unchanged. ([#11137](https://github.com/lablup/backend.ai/issues/11137))
+* Validate that scope_id is a valid UUID for USER/PROJECT scope types in RBAC adapter, preventing email addresses from being stored as scope_id ([#11138](https://github.com/lablup/backend.ai/issues/11138))
+* Add RBAC validation to v2 session GET endpoint using SingleEntityActionProcessor ([#11143](https://github.com/lablup/backend.ai/issues/11143))
+* Fix incorrect vLLM default values in runtime variant preset fixture to match upstream defaults ([#11144](https://github.com/lablup/backend.ai/issues/11144))
+* Populate `deployment_revisions.model_definition` on both legacy endpoint creation (`POST /func/services`) and modify flows by running them through the unified revision merge pipeline so all sources — `deployment-config.yaml`, revision preset, `model-definition.yaml`, and request — flow through `RevisionDraft`. On modify, the current revision is used as the lowest-priority base so untouched fields are preserved while yaml/preset refreshes remain authoritative. ([#11145](https://github.com/lablup/backend.ai/issues/11145))
+* Fix `./bai admin deployment revision refresh` failing with a `TypeError` on every deployment after the revision-merge pipeline refactor. ([#11148](https://github.com/lablup/backend.ai/issues/11148))
+* Replace the non-existent `name` filter on deployment revisions with a `revision_number` filter and ordering across the DTO, GraphQL, REST, and CLI layers (`./bai deployment revision search --name-contains` is replaced by `--revision-number`). ([#11150](https://github.com/lablup/backend.ai/issues/11150))
+* Rename the `ModelDeployment.createdUser`/`createdUserV2` GraphQL fields to a single `creator` field. ([#11152](https://github.com/lablup/backend.ai/issues/11152))
+* Backfill missing role-to-scope mappings in `association_scopes_entities` for migration-created SYSTEM roles so that GraphQL scope resolution no longer returns null ([#11159](https://github.com/lablup/backend.ai/issues/11159))
+* Fix Prometheus range query 502 errors by accepting timezone-aware datetimes or Unix timestamps in CLI execute inputs ([#11163](https://github.com/lablup/backend.ai/issues/11163))
+* Populate revision-level fields on the legacy GQL endpoint response during the initial DEPLOYING phase by falling back to `deploying_revision` when `current_revision` is unset, expose `resource_slots` on the v2 revision response, and stop hard-coding cluster mode / size / runtime variant in the model-card and vfolder `deploy` adapters so the revision preset's values are no longer silently overridden. ([#11167](https://github.com/lablup/backend.ai/issues/11167))
+
+### Documentation Updates
+* Add data migration testing guideline to alembic CLAUDE.md. ([#10936](https://github.com/lablup/backend.ai/issues/10936))
+
+### Miscellaneous
+* Add a convenience script (`scripts/refresh-graphql-gateway.sh`) to regenerate the GraphQL schema, copy it to the project root, and optionally restart the Apollo Router gateway in one step. ([#11091](https://github.com/lablup/backend.ai/issues/11091))
+
+
 ## 26.4.2 (2026-04-15)
 
 ### Features

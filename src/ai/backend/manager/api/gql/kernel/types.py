@@ -48,7 +48,6 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
@@ -341,7 +340,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The image used by this kernel.",
         )
     )  # type: ignore[misc]

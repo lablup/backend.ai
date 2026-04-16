@@ -21,7 +21,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -113,7 +112,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The resolved scope object in which the entity is registered.",
         )
     )  # type: ignore[misc]

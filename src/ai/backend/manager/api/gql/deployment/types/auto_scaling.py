@@ -43,7 +43,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, NullableDateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -133,7 +132,7 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The Prometheus query preset used for metric-based auto-scaling.",
         )
     )  # type: ignore[misc]

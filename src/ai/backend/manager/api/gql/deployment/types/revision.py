@@ -101,7 +101,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -457,7 +456,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The container image used by this revision, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -561,33 +560,27 @@ class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
     revision_number: IntFilter | None = None
     deployment_id: ID | None = None
     image_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by container image ID."
-        ),
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by container image ID."),
         default=None,
     )
     model_vfolder_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by model VFolder ID."
-        ),
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by model VFolder ID."),
         default=None,
     )
     resource_group: StringFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by resource group name."
-        ),
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by resource group name."),
         default=None,
     )
     cluster_mode: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="Filter by cluster mode (SINGLE_NODE / MULTI_NODE).",
         ),
         default=None,
     )
     created_at: DateTimeFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by revision creation datetime."
+            added_version="26.4.3", description="Filter by revision creation datetime."
         ),
         default=None,
     )
