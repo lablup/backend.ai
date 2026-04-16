@@ -6403,7 +6403,9 @@ type Mutation {
   """
   activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload!
 
-  """Added in UNRELEASED. Manually promote a blue-green deployment."""
+  """
+  Added in UNRELEASED. Manually promote a blue-green deployment awaiting promotion. When `auto_promote=false`, the deployment stays in AWAITING_PROMOTION once all Green routes are healthy until an operator triggers this mutation, which atomically switches traffic (Green→ACTIVE, Blue→INACTIVE→TERMINATING).
+  """
   promoteDeployment(input: PromoteDeploymentInput!): PromoteDeploymentPayload!
 
   """Added in 25.19.0. Update the traffic status of a route"""

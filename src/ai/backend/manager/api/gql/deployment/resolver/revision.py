@@ -189,7 +189,12 @@ async def activate_deployment_revision(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Manually promote a blue-green deployment.",
+        description=(
+            "Manually promote a blue-green deployment awaiting promotion. "
+            "When `auto_promote=false`, the deployment stays in AWAITING_PROMOTION "
+            "once all Green routes are healthy until an operator triggers this mutation, "
+            "which atomically switches traffic (Green→ACTIVE, Blue→INACTIVE→TERMINATING)."
+        ),
     )
 )  # type: ignore[misc]
 async def promote_deployment(
