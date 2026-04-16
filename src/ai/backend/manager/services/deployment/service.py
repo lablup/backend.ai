@@ -294,6 +294,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         network_access=info.network,
         revision_history_ids=[info.current_revision_id] if info.current_revision_id else [],
         revision=revision,
+        deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
             desired_replica_count=desired_count,

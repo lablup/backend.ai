@@ -733,6 +733,7 @@ class ModelDeploymentData:
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkSpec
     revision: ModelRevisionData | None
+    deploying_revision_id: UUID | None
     revision_history_ids: list[UUID]
     scaling_rule_ids: list[UUID]
     replica_state: ReplicaStateData

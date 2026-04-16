@@ -8700,6 +8700,7 @@ type ModelDeployment implements Node
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   currentRevisionId: ID
+  deployingRevisionId: ID
   defaultDeploymentStrategy: DeploymentStrategyGQL!
   replicaState: ReplicaState!
   createdUserId: ID!
@@ -8708,6 +8709,11 @@ type ModelDeployment implements Node
   Added in UNRELEASED. The current active revision of this deployment, resolved via DataLoader.
   """
   currentRevision: ModelRevision
+
+  """
+  Added in UNRELEASED. The revision currently being deployed (in progress, not yet active), resolved via DataLoader.
+  """
+  deployingRevision: ModelRevision
 
   """
   Added in UNRELEASED. The user who created this deployment, resolved via DataLoader.
