@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.events.dispatcher import EventProducer
@@ -20,6 +21,12 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+)
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    RegistryArgs as ModelDefinitionRegistryArgs,
+)
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
@@ -28,6 +35,11 @@ from ai.backend.manager.sokovan.deployment.route.route_controller import RouteCo
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.deployment_revision_preset.repository import (
+        DeploymentRevisionPresetRepository,
+    )
 
 from .agent_client_pool import AgentClientPoolDependency, AgentClientPoolInput
 from .appproxy_client_pool import AppProxyClientPoolDependency
@@ -61,6 +73,7 @@ class AgentsInput:
     network_plugin_ctx: NetworkPluginContext
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
+    deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
 
 
 @dataclass
@@ -72,6 +85,7 @@ class AgentsResources:
 
     scheduling_controller: SchedulingController
     revision_generator_registry: RevisionGeneratorRegistry
+    model_definition_generator_registry: ModelDefinitionGeneratorRegistry
     deployment_controller: DeploymentController
     route_controller: RouteController
     agent_client_pool: AgentClientPool
@@ -135,6 +149,14 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
             ),
         )
 
+        # 2.5. Model definition generator registry
+        model_definition_generator_registry = ModelDefinitionGeneratorRegistry(
+            ModelDefinitionRegistryArgs(
+                deployment_repository=setup_input.deployment_repository,
+                enable_model_definition_override=setup_input.config_provider.config.deployment.enable_model_definition_override,
+            )
+        )
+
         # 3. Deployment controller (depends on scheduling controller + revision generator registry)
         deployment_controller = await stack.enter_dependency(
             DeploymentControllerDependency(),
@@ -146,6 +168,8 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 event_producer=setup_input.event_producer,
                 valkey_schedule=valkey_schedule,
                 revision_generator_registry=revision_generator_registry,
+                model_definition_generator_registry=model_definition_generator_registry,
+                deployment_revision_preset_repository=setup_input.deployment_revision_preset_repository,
             ),
         )
 
@@ -197,6 +221,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
         yield AgentsResources(
             scheduling_controller=scheduling_controller,
             revision_generator_registry=revision_generator_registry,
+            model_definition_generator_registry=model_definition_generator_registry,
             deployment_controller=deployment_controller,
             route_controller=route_controller,
             agent_client_pool=agent_client_pool,

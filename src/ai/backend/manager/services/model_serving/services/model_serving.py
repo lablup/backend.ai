@@ -34,17 +34,20 @@ from ai.backend.common.types import (
     ImageAlias,
     KernelEnqueueingConfig,
     MountPermission,
+    ResourceSlot,
     SessionTypes,
     VFolderID,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ImageIdentifierDraft,
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountMetadata,
+    ResourceSpec,
     ResourceSpecDraft,
     RouteHealthStatus,
 )
@@ -889,22 +892,108 @@ class ModelServingService:
         return ForceSyncActionResult(success=True)
 
     async def modify_endpoint(self, action: ModifyEndpointAction) -> ModifyEndpointActionResult:
-        result = await self._repository.modify_endpoint(
+        spec = cast(EndpointUpdaterSpec, action.updater.spec)
+
+        # 1. Apply endpoint-level changes (name, resource_group, replicas)
+        #    via the existing repository method (which only writes endpoint columns).
+        result = await self._repository.modify_endpoint_fields(
             action,
             self._agent_registry,
             self._config_provider.legacy_etcd_config_loader,
-            self._storage_manager,
         )
-        spec = cast(EndpointUpdaterSpec, action.updater.spec)
-        if spec.replica_count_modified() or spec.has_revision_changes():
-            # Trigger CHECK_REPLICA for both cases:
-            # - replica count change: reconcile running session count
-            # - revision change: rotate sessions to use the newly activated revision
+
+        # 2. If revision-level fields changed, create + activate via controller.
+        #    This ensures the same pipeline as v2: preset → merge → resolve → RBAC
+        #    → deploying_revision guard → DEPLOYING strategy.
+        if spec.has_revision_changes():
+            creator = await self._build_revision_creator_from_spec(action.endpoint_id, spec)
+            revision = await self._deployment_controller.add_revision(action.endpoint_id, creator)
+            await self._deployment_controller.activate_revision(action.endpoint_id, revision.id)
+        elif spec.replica_count_modified():
+            # Replica-only change: trigger CHECK_REPLICA to reconcile
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.CHECK_REPLICA,
             )
+
         return ModifyEndpointActionResult(
             endpoint_id=action.endpoint_id, success=result.success, data=result.data
+        )
+
+    async def _build_revision_creator_from_spec(
+        self,
+        endpoint_id: uuid.UUID,
+        spec: EndpointUpdaterSpec,
+    ) -> ModelRevisionCreator:
+        """Build a ModelRevisionCreator from EndpointUpdaterSpec and the current revision.
+
+        Reads the current revision as a base and applies spec overrides.
+        Image resolution (name → image_id) is handled here since the legacy
+        spec carries an ImageRef, not an image_id.
+        """
+
+        current_rev = await self._deployment_repository.get_current_revision(endpoint_id)
+
+        # Resolve image_id: use spec override or keep current
+        image_id = current_rev.image_id
+        image_ref = spec.image.optional_value()
+        if image_ref is not None:
+            arch = (
+                image_ref.architecture.value()
+                if image_ref.architecture.optional_value()
+                else "x86_64"
+            )
+            image_id = await self._deployment_repository.get_image_id(
+                ImageIdentifier(image_ref.name, arch)
+            )
+
+        # Merge resource_slots
+        merged_slots = spec.resource_slots.optional_value() or ResourceSlot(
+            current_rev.resource_config.resource_slot
+        )
+
+        return ModelRevisionCreator(
+            image_id=image_id,
+            resource_spec=ResourceSpec(
+                cluster_mode=(
+                    spec.cluster_mode.value()
+                    if spec.cluster_mode.optional_value() is not None
+                    else current_rev.cluster_config.mode
+                ),
+                cluster_size=(
+                    spec.cluster_size.optional_value() or current_rev.cluster_config.size
+                ),
+                resource_slots=dict(merged_slots),
+                resource_opts=(
+                    spec.resource_opts.optional_value()
+                    if spec.resource_opts.optional_value() is not None
+                    else dict(current_rev.resource_config.resource_opts)
+                ),
+            ),
+            mounts=VFolderMountsCreator(
+                model_vfolder_id=current_rev.model_mount_config.vfolder_id or uuid.UUID(int=0),
+                model_definition_path=(
+                    spec.model_definition_path.optional_value()
+                    if spec.model_definition_path.optional_value() is not None
+                    else current_rev.model_mount_config.definition_path
+                ),
+                model_mount_destination=(
+                    current_rev.model_mount_config.mount_destination or "/models"
+                ),
+            ),
+            execution=ExecutionSpec(
+                startup_command=None,
+                bootstrap_script=None,
+                environ=(
+                    spec.environ.optional_value()
+                    if spec.environ.optional_value() is not None
+                    else (current_rev.model_runtime_config.environ or None)
+                ),
+                runtime_variant=(
+                    spec.runtime_variant.optional_value()
+                    or current_rev.model_runtime_config.runtime_variant
+                ),
+            ),
+            model_definition=current_rev.model_definition,
         )
 
     async def validate_model_service(

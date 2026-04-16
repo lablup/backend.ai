@@ -52,7 +52,7 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class ModelServingCRUDBaseFixtures:
@@ -225,7 +225,7 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             AsyncMock,
             mocker.patch.object(
                 mock_repositories.repository,
-                "modify_endpoint",
+                "modify_endpoint_fields",
                 new_callable=AsyncMock,
             ),
         )
@@ -241,6 +241,16 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             spec.replicas = OptionalState[int].nop()
             spec.replica_count_modified.return_value = False
         spec.has_revision_changes.return_value = has_revision_changes
+        # Set default nop values for revision-level fields used by
+        # _build_revision_creator_from_spec
+        spec.image = TriState.nop()
+        spec.resource_slots = OptionalState.nop()
+        spec.resource_opts = TriState.nop()
+        spec.cluster_mode = OptionalState.nop()
+        spec.cluster_size = OptionalState.nop()
+        spec.model_definition_path = TriState.nop()
+        spec.environ = TriState.nop()
+        spec.runtime_variant = OptionalState.nop()
         return spec
 
     async def test_replica_count_change_marks_check_replica(
@@ -270,14 +280,15 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             DeploymentLifecycleType.CHECK_REPLICA
         )
 
-    async def test_revision_change_marks_check_replica(
+    async def test_revision_change_calls_add_and_activate_revision(
         self,
         model_serving_processors: ModelServingProcessors,
         mock_modify_endpoint: AsyncMock,
         mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
-        """Revision-level field change triggers CHECK_REPLICA to auto-activate the new revision."""
+        """Revision-level field change delegates to controller.add_revision + activate_revision."""
         updater_spec = self._make_updater_spec(replicas=None, has_revision_changes=True)
         mock_updater = MagicMock()
         mock_updater.spec = updater_spec
@@ -288,13 +299,34 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             success=True, message="ok", data=mock_endpoint_data
         )
 
+        # Mock current revision data for _build_revision_creator_from_spec
+        mock_current_rev = MagicMock()
+        mock_current_rev.image_id = uuid.uuid4()
+        mock_current_rev.cluster_config.mode = "SINGLE_NODE"
+        mock_current_rev.cluster_config.size = 1
+        mock_current_rev.resource_config.resource_slot = {}
+        mock_current_rev.resource_config.resource_opts = {}
+        mock_current_rev.model_mount_config.vfolder_id = uuid.uuid4()
+        mock_current_rev.model_mount_config.definition_path = "model-definition.yaml"
+        mock_current_rev.model_mount_config.mount_destination = "/models"
+        mock_current_rev.model_runtime_config.environ = None
+        mock_current_rev.model_runtime_config.runtime_variant = "custom"
+        mock_current_rev.model_definition = None
+        mock_deployment_repository.get_current_revision = AsyncMock(return_value=mock_current_rev)
+
+        # Mock revision returned by add_revision
+        mock_revision = MagicMock()
+        mock_revision.id = uuid.uuid4()
+        mock_deployment_controller.add_revision = AsyncMock(return_value=mock_revision)
+        mock_deployment_controller.activate_revision = AsyncMock()
+
         action = ModifyEndpointAction(endpoint_id=endpoint_id, updater=mock_updater)
         result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
 
         assert result.success is True
-        assert result.data == mock_endpoint_data
-        mock_deployment_controller.mark_lifecycle_needed.assert_awaited_once_with(
-            DeploymentLifecycleType.CHECK_REPLICA
+        mock_deployment_controller.add_revision.assert_awaited_once()
+        mock_deployment_controller.activate_revision.assert_awaited_once_with(
+            endpoint_id, mock_revision.id
         )
 
     async def test_no_replica_change_no_marking(

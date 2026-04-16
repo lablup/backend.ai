@@ -149,12 +149,6 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-)
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    RegistryArgs as ModelDefinitionRegistryArgs,
-)
 
 
 def create_services(args: ServiceArgs) -> Services:
@@ -316,7 +310,7 @@ def create_services(args: ServiceArgs) -> Services:
             config_provider=args.config_provider,
             valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
-            deployment_repository=args.deployment_controller._deployment_repository,
+            deployment_repository=repositories.deployment.repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
             revision_generator_registry=args.revision_generator_registry,
@@ -388,14 +382,9 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         deployment=DeploymentService(
             args.deployment_controller,
-            args.deployment_controller._deployment_repository,
+            repositories.deployment.repository,
             args.revision_generator_registry,
-            ModelDefinitionGeneratorRegistry(
-                ModelDefinitionRegistryArgs(
-                    deployment_repository=args.deployment_controller._deployment_repository,
-                    enable_model_definition_override=args.config_provider.config.deployment.enable_model_definition_override,
-                )
-            ),
+            args.model_definition_generator_registry,
             deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
         ),

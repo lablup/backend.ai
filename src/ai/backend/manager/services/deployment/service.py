@@ -5,7 +5,6 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -17,21 +16,17 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import (
-    ClusterMode,
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
-    ModelRevisionCreator,
     NewDeploymentCreator,
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
-    DeploymentLifecycleSubStep,
     DeploymentNetworkSpec,
-    ExecutionSpec,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
@@ -40,21 +35,16 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    MountMetadata,
     ReplicaSpec,
     ReplicaStateData,
     ResourceConfigData,
-    ResourceSpec,
-    RevisionDraft,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
-    merge_revision_drafts,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
-    PresetValueData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
@@ -63,7 +53,6 @@ from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
     RollingUpdateSpec,
 )
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
@@ -76,7 +65,6 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentNetworkFields,
     DeploymentReplicaFields,
     DeploymentResourceFields,
-    DeploymentRevisionCreatorSpec,
     EndpointTokenCreatorSpec,
     ModelRevisionFields,
 )
@@ -206,13 +194,8 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentActionResult,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.manager.sokovan.deployment.definition_generator.base import ModelDefinitionContext
 from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
     ModelDefinitionGeneratorRegistry,
-)
-from ai.backend.manager.sokovan.deployment.exceptions import (
-    DeploymentAlreadyInProgress,
-    InvalidEndpointState,
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
@@ -641,7 +624,7 @@ class DeploymentService:
         Raises:
             DeploymentPolicyNotFound: If the policy does not exist
         """
-        data = await self._deployment_controller.get_deployment_policy(action.endpoint_id)
+        data = await self._deployment_repository.get_deployment_policy(action.endpoint_id)
         return GetDeploymentPolicyActionResult(data=data)
 
     async def search_deployment_policies(
@@ -671,92 +654,6 @@ class DeploymentService:
         return UpsertDeploymentPolicyActionResult(data=result.data, created=result.created)
 
     # ========== Revision Operations ==========
-
-    async def _apply_preset(
-        self,
-        creator: ModelRevisionCreator,
-    ) -> ModelRevisionCreator:
-        """Apply DeploymentRevisionPreset values to the creator if revision_preset_id is specified.
-
-        Creates a RevisionDraft from the preset, another from the request (creator),
-        and merges them with request taking priority over preset.
-        Returns a new ModelRevisionCreator with merged values.
-        """
-        if not creator.revision_preset_id or not self._deployment_revision_preset_repository:
-            return creator
-
-        preset_data = await self._deployment_revision_preset_repository.get_by_id(
-            creator.revision_preset_id,
-        )
-        preset_slots = await self._deployment_revision_preset_repository.get_resource_slots(
-            creator.revision_preset_id,
-        )
-
-        preset_draft = RevisionDraft(
-            image_id=preset_data.image_id,
-            resource_slots={slot_name: str(quantity) for slot_name, quantity in preset_slots},
-            resource_opts={o.name: o.value for o in preset_data.resource_opts},
-            cluster_mode=ClusterMode(preset_data.cluster_mode)
-            if preset_data.cluster_mode
-            else None,
-            cluster_size=preset_data.cluster_size,
-            startup_command=preset_data.startup_command,
-            bootstrap_script=preset_data.bootstrap_script,
-            environ={e.key: e.value for e in preset_data.environ},
-            model_definition=(
-                ModelDefinition(**preset_data.model_definition)
-                if preset_data.model_definition
-                else None
-            ),
-        )
-
-        request_draft = RevisionDraft(
-            image_id=creator.image_id,
-            resource_slots=(
-                dict(creator.resource_spec.resource_slots)
-                if creator.resource_spec.resource_slots
-                else None
-            ),
-            resource_opts=(
-                dict(creator.resource_spec.resource_opts)
-                if creator.resource_spec.resource_opts
-                else None
-            ),
-            cluster_mode=creator.resource_spec.cluster_mode,
-            cluster_size=creator.resource_spec.cluster_size,
-            startup_command=creator.execution.startup_command,
-            bootstrap_script=creator.execution.bootstrap_script,
-            environ=creator.execution.environ,
-            runtime_variant=creator.execution.runtime_variant,
-            model_definition=creator.model_definition,
-        )
-
-        merged = merge_revision_drafts(preset_draft, request_draft)
-
-        return ModelRevisionCreator(
-            image_id=merged.image_id or creator.image_id,
-            resource_spec=ResourceSpec(
-                cluster_mode=merged.cluster_mode or creator.resource_spec.cluster_mode,
-                cluster_size=merged.cluster_size or creator.resource_spec.cluster_size,
-                resource_slots=merged.resource_slots or creator.resource_spec.resource_slots,
-                resource_opts=merged.resource_opts,
-            ),
-            mounts=creator.mounts,
-            execution=ExecutionSpec(
-                startup_command=merged.startup_command,
-                bootstrap_script=merged.bootstrap_script,
-                environ=merged.environ,
-                runtime_variant=merged.runtime_variant or creator.execution.runtime_variant,
-                callback_url=creator.execution.callback_url,
-                inference_runtime_config=creator.execution.inference_runtime_config,
-            ),
-            model_definition=merged.model_definition,
-            revision_preset_id=creator.revision_preset_id,
-            preset_values=[
-                PresetValueData(preset_id=pv.preset_id, value=pv.value)
-                for pv in preset_data.preset_values
-            ],
-        )
 
     # System defaults used when neither the caller input nor the preset provides a value.
     _DEFAULT_REVISION_HISTORY_LIMIT = 10
@@ -851,146 +748,18 @@ class DeploymentService:
             strategy_spec=strategy_spec,
         )
 
-    async def _merge_deployment_config(
-        self,
-        revision_creator: ModelRevisionCreator,
-    ) -> ModelRevisionCreator:
-        """Merge deployment-config.yaml defaults into the revision creator.
-
-        Loads the deployment config from the model vfolder and merges
-        environ and resource_slots. The creator's values take precedence
-        over deployment config defaults.
-
-        If loading the deployment config fails (e.g. network error, malformed file),
-        the creator is returned as-is since deployment configs are optional defaults.
-        """
-        generator = self._revision_generator_registry.get(
-            revision_creator.execution.runtime_variant
-        )
-        try:
-            deployment_config = await generator.load_deployment_config(
-                vfolder_id=revision_creator.mounts.model_vfolder_id,
-                runtime_variant=revision_creator.execution.runtime_variant,
-            )
-        except Exception:
-            log.warning(
-                "Failed to load deployment config for vfolder {}, proceeding without it",
-                revision_creator.mounts.model_vfolder_id,
-                exc_info=True,
-            )
-            return revision_creator
-        if deployment_config is None:
-            return revision_creator
-
-        merged_environ = revision_creator.execution.environ
-        if deployment_config.environ:
-            merged_environ = {
-                **deployment_config.environ,
-                **(revision_creator.execution.environ or {}),
-            }
-
-        merged_resource_slots = revision_creator.resource_spec.resource_slots
-        if deployment_config.resource_slots:
-            merged_resource_slots = {
-                **deployment_config.resource_slots,
-                **revision_creator.resource_spec.resource_slots,
-            }
-
-        return ModelRevisionCreator(
-            image_id=revision_creator.image_id,
-            resource_spec=revision_creator.resource_spec.model_copy(
-                update={"resource_slots": merged_resource_slots},
-            ),
-            mounts=revision_creator.mounts,
-            execution=revision_creator.execution.model_copy(
-                update={"environ": merged_environ},
-            ),
-            model_definition=revision_creator.model_definition,
-        )
-
-    async def _resolve_model_definition(
-        self,
-        revision_creator: ModelRevisionCreator,
-    ) -> ModelDefinition:
-        """Generate the final model definition for a revision.
-
-        Builds a ModelDefinitionContext from the creator data and delegates to
-        ModelDefinitionGeneratorRegistry, which performs the full merge:
-        programmatic generation → user override → storage file override.
-        """
-        context = ModelDefinitionContext(
-            mounts=MountMetadata(
-                model_vfolder_id=revision_creator.mounts.model_vfolder_id,
-                model_definition_path=revision_creator.mounts.model_definition_path,
-                model_mount_destination=revision_creator.mounts.model_mount_destination,
-            ),
-            execution=revision_creator.execution,
-            model_definition=revision_creator.model_definition,
-        )
-        return await self._model_definition_generator_registry.generate_model_definition(context)
-
     async def add_model_revision(
         self, action: AddModelRevisionAction
     ) -> AddModelRevisionActionResult:
         """Add a new model revision to an existing deployment.
 
-        Resolves the final model definition before creating the revision,
-        so the DB row contains the fully-merged definition from the start.
-        Subsequent PROVISIONING uses the stored value directly.
-
-        Uses an atomic read-then-write operation for revision_number
-        assignment to prevent race conditions from concurrent requests.
-        The revision_number placeholder (0) is replaced atomically
-        inside the repository.
+        Delegates to DeploymentController.add_revision() which owns the full
+        pipeline: preset apply → config merge → model definition resolve →
+        revision create (with RBAC) → history pruning.
         """
-        deployment_id = action.model_deployment_id
-        log.info("Adding model revision to deployment {}", deployment_id)
-
-        endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
-        preset_applied = await self._apply_preset(action.adder)
-        merged_creator = await self._merge_deployment_config(preset_applied)
-        resolved_model_definition = await self._resolve_model_definition(merged_creator)
-
-        spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=deployment_id,
-            image_id=merged_creator.image_id,
-            resource_group=endpoint_info.metadata.resource_group,
-            resource_slots=ResourceSlot(merged_creator.resource_spec.resource_slots),
-            # TODO: None and {} have different semantics (not provided vs empty options). CreatorSpec should accept Optional.
-            resource_opts=merged_creator.resource_spec.resource_opts or {},
-            cluster_mode=merged_creator.resource_spec.cluster_mode.value,
-            cluster_size=merged_creator.resource_spec.cluster_size,
-            model_id=merged_creator.mounts.model_vfolder_id,
-            model_mount_destination=merged_creator.mounts.model_mount_destination,
-            model_definition_path=merged_creator.mounts.model_definition_path,
-            model_definition=resolved_model_definition,
-            startup_command=merged_creator.execution.startup_command,
-            bootstrap_script=merged_creator.execution.bootstrap_script,
-            # TODO: None and {} have different semantics (not provided vs empty environ). CreatorSpec should accept Optional.
-            environ=merged_creator.execution.environ or {},
-            callback_url=str(merged_creator.execution.callback_url)
-            if merged_creator.execution.callback_url
-            else None,
-            runtime_variant=merged_creator.execution.runtime_variant,
-            # TODO: Convert merged_creator.mounts.extra_mounts (list[MountInfo]) to Sequence[VFolderMount] instead of discarding.
-            extra_mounts=(),
-            preset_values=[
-                PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
-                for pv in merged_creator.preset_values
-            ],
+        revision_data = await self._deployment_controller.add_revision(
+            action.model_deployment_id, action.adder
         )
-        creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.DEPLOYMENT_REVISION,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(deployment_id),
-            ),
-        )
-        revision_data = await self._deployment_repository.create_revision_with_next_number(
-            creator, deployment_id
-        )
-
         return AddModelRevisionActionResult(revision=revision_data)
 
     async def get_revision_by_id(
@@ -1021,68 +790,18 @@ class DeploymentService:
     ) -> ActivateRevisionActionResult:
         """Activate a specific revision by initiating the deployment strategy.
 
-        Sets deploying_revision and transitions the deployment to DEPLOYING state.
-        The coordinator will execute the configured deployment strategy (rolling update,
-        blue-green, etc.) and swap deploying_revision → current_revision on completion.
-
-        Args:
-            action: Action containing deployment and revision IDs
-
-        Returns:
-            ActivateRevisionActionResult: Result containing the updated deployment
+        Delegates to DeploymentController.activate_revision() which validates
+        state, sets deploying_revision atomically, and triggers the DEPLOYING
+        lifecycle for strategy execution.
         """
-        # 1. Validate revision exists (raises exception if not found)
-        _revision = await self._deployment_repository.get_revision(action.revision_id)
-
-        # 2. Validate deployment state
-        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
-        if deployment_info.deploying_revision_id is not None:
-            raise DeploymentAlreadyInProgress(
-                f"Deployment {action.deployment_id} already has deploying_revision "
-                f"{deployment_info.deploying_revision_id} in progress."
-            )
-        if deployment_info.current_revision_id == action.revision_id:
-            raise InvalidEndpointState(
-                f"Revision {action.revision_id} is already the current revision "
-                f"of deployment {action.deployment_id}."
-            )
-
-        # 3. Set deploying_revision and transition to DEPLOYING lifecycle.
-        # The DB WHERE clause includes ``deploying_revision IS NULL`` to guard
-        # against concurrent activations; updated=False means the guard fired.
-        previous_revision_id, updated = await self._deployment_repository.set_deploying_revision(
+        result = await self._deployment_controller.activate_revision(
             action.deployment_id, action.revision_id
         )
-        if not updated:
-            raise DeploymentAlreadyInProgress(
-                f"Deployment {action.deployment_id} already has a deploying revision in progress "
-                f"(concurrent activation detected)."
-            )
-
-        # 4. Trigger DEPLOYING lifecycle to start strategy execution
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING,
-            sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
-        )
-
-        log.info(
-            "Started deploying revision {} for deployment {} (current: {})",
-            action.revision_id,
-            action.deployment_id,
-            previous_revision_id,
-        )
-
-        # 5. Get updated deployment info and policy
-        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
-        deployment_policy = await self._deployment_controller.get_deployment_policy(
-            action.deployment_id
-        )
-
         return ActivateRevisionActionResult(
-            deployment=_convert_deployment_info_to_data(deployment_info),
-            previous_revision_id=previous_revision_id,
-            activated_revision_id=action.revision_id,
-            deployment_policy=deployment_policy,
+            deployment=_convert_deployment_info_to_data(result.deployment_info),
+            previous_revision_id=result.previous_revision_id,
+            activated_revision_id=result.activated_revision_id,
+            deployment_policy=result.deployment_policy,
         )
 
     # ========== Route Operations ==========
