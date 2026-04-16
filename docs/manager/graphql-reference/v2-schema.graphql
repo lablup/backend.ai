@@ -3109,6 +3109,10 @@ enum DeploymentOrderField {
   NAME
   CREATED_AT
   DESTROYED_AT
+  DOMAIN
+  PROJECT
+  RESOURCE_GROUP
+  TAG
 }
 
 """Added in 25.19.0. Deployment policy configuration."""

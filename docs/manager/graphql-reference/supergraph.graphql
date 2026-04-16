@@ -4792,6 +4792,10 @@ enum DeploymentOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   DESTROYED_AT @join__enumValue(graph: STRAWBERRY)
+  DOMAIN @join__enumValue(graph: STRAWBERRY)
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+  RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
+  TAG @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.19.0. Deployment policy configuration."""
