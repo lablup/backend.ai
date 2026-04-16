@@ -69,7 +69,6 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -234,7 +233,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The domain this model card belongs to.",
         )
     )  # type: ignore[misc]
@@ -252,7 +251,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The project this model card belongs to.",
         )
     )  # type: ignore[misc]
@@ -270,7 +269,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The user who created this model card.",
         )
     )  # type: ignore[misc]

@@ -12,7 +12,6 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_history.response import LoginHistoryNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -66,7 +65,7 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The user who attempted to log in.",
         )
     )  # type: ignore[misc]
@@ -84,7 +83,7 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The domain at the time of the login attempt.",
         )
     )  # type: ignore[misc]

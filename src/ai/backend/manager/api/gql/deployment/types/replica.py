@@ -35,7 +35,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
@@ -205,7 +204,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The compute session running this replica, resolved via DataLoader.",
         )
     )  # type: ignore[misc]

@@ -204,7 +204,7 @@ type AdminGetSSHKeypairPayload {
 }
 
 """
-Added in UNRELEASED. Payload for admin bulk revision refresh mutation result.
+Added in 26.4.3. Payload for admin bulk revision refresh mutation result.
 """
 type AdminRefreshDeploymentRevisionsPayload {
   """Per-deployment refresh outcomes (partial success by design)"""
@@ -1156,7 +1156,7 @@ type AutoScalingRule implements Node {
   lastTriggeredAt: DateTime
 
   """
-  Added in UNRELEASED. The Prometheus query preset used for metric-based auto-scaling.
+  Added in 26.4.3. The Prometheus query preset used for metric-based auto-scaling.
   """
   queryPreset: QueryDefinition
 }
@@ -3004,23 +3004,23 @@ input DeploymentFilter {
   tags: StringFilter = null
   endpointUrl: StringFilter = null
 
-  """Added in UNRELEASED. Filter by domain name."""
+  """Added in 26.4.3. Filter by domain name."""
   domainName: StringFilter = null
 
-  """Added in UNRELEASED. Filter by project ID."""
+  """Added in 26.4.3. Filter by project ID."""
   projectId: UUIDFilter = null
 
-  """Added in UNRELEASED. Filter by resource group name."""
+  """Added in 26.4.3. Filter by resource group name."""
   resourceGroup: StringFilter = null
 
-  """Added in UNRELEASED. Filter by the user who created the deployment."""
+  """Added in 26.4.3. Filter by the user who created the deployment."""
   createdUserId: UUIDFilter = null
 
-  """Added in UNRELEASED. Filter by deployment creation datetime."""
+  """Added in 26.4.3. Filter by deployment creation datetime."""
   createdAt: DateTimeFilter = null
 
   """
-  Added in UNRELEASED. Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.
+  Added in 26.4.3. Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.
   """
   destroyedAt: NullableDateTimeFilter = null
   AND: [DeploymentFilter!] = null
@@ -3044,7 +3044,7 @@ type DeploymentHistory implements Node {
   createdAt: DateTime!
   updatedAt: DateTime!
 
-  """Added in UNRELEASED. The deployment this history record belongs to."""
+  """Added in 26.4.3. The deployment this history record belongs to."""
   deployment: ModelDeployment
 }
 
@@ -3179,7 +3179,7 @@ type DeploymentRevisionPreset implements Node {
   """Timestamp of the last modification to this deployment preset."""
   updatedAt: DateTime
 
-  """Added in UNRELEASED. The runtime variant this preset is designed for."""
+  """Added in 26.4.3. The runtime variant this preset is designed for."""
   runtimeVariant: RuntimeVariant
 
   """Added in 26.4.2. Resource slot allocations for this preset."""
@@ -3956,7 +3956,7 @@ type EntityRef implements Node {
   entity: EntityNode
 
   """
-  Added in UNRELEASED. The resolved scope object in which the entity is registered.
+  Added in 26.4.3. The resolved scope object in which the entity is registered.
   """
   scope: EntityNode
 }
@@ -4635,7 +4635,7 @@ type KernelV2 implements Node {
   """Added in 26.2.0. The agent running this kernel."""
   agent: AgentV2
 
-  """Added in UNRELEASED. The image used by this kernel."""
+  """Added in 26.4.3. The image used by this kernel."""
   image: ImageV2
 
   """Added in 26.2.0. The user who owns this kernel."""
@@ -4886,7 +4886,7 @@ type KeyPairGQL implements Node {
   """UUID of the user who owns this keypair."""
   userId: UUID!
 
-  """Added in UNRELEASED. The user who owns this keypair."""
+  """Added in 26.4.3. The user who owns this keypair."""
   user: UserV2
 }
 
@@ -5206,10 +5206,10 @@ type LoginHistoryV2 implements Node {
   """Timestamp when the login attempt occurred."""
   createdAt: DateTime!
 
-  """Added in UNRELEASED. The user who attempted to log in."""
+  """Added in 26.4.3. The user who attempted to log in."""
   user: UserV2
 
-  """Added in UNRELEASED. The domain at the time of the login attempt."""
+  """Added in 26.4.3. The domain at the time of the login attempt."""
   domain: DomainV2
 }
 
@@ -5303,7 +5303,7 @@ type LoginSessionV2 implements Node {
   """Timestamp when the session was invalidated."""
   invalidatedAt: DateTime
 
-  """Added in UNRELEASED. The user who owns this login session."""
+  """Added in 26.4.3. The user who owns this login session."""
   user: UserV2
 }
 
@@ -5433,13 +5433,13 @@ type ModelCardV2 implements Node {
   """
   vfolder: VFolder
 
-  """Added in UNRELEASED. The domain this model card belongs to."""
+  """Added in 26.4.3. The domain this model card belongs to."""
   domain: DomainV2
 
-  """Added in UNRELEASED. The project this model card belongs to."""
+  """Added in 26.4.3. The project this model card belongs to."""
   project: ProjectV2
 
-  """Added in UNRELEASED. The user who created this model card."""
+  """Added in 26.4.3. The user who created this model card."""
   creator: UserV2
 
   """
@@ -5606,17 +5606,17 @@ type ModelDeployment implements Node {
   createdUserId: ID!
 
   """
-  Added in UNRELEASED. The current active revision of this deployment, resolved via DataLoader.
+  Added in 26.4.3. The current active revision of this deployment, resolved via DataLoader.
   """
   currentRevision: ModelRevision
 
   """
-  Added in UNRELEASED. The revision currently being deployed (in progress, not yet active), resolved via DataLoader.
+  Added in 26.4.3. The revision currently being deployed (in progress, not yet active), resolved via DataLoader.
   """
   deployingRevision: ModelRevision
 
   """
-  Added in UNRELEASED. The user who created this deployment, resolved via DataLoader.
+  Added in 26.4.3. The user who created this deployment, resolved via DataLoader.
   """
   creator: UserV2
 
@@ -5663,7 +5663,7 @@ type ModelDeploymentMetadata {
   project: GroupNode! @deprecated(reason: "Use project_v2 instead.")
 
   """
-  Added in UNRELEASED. The project this deployment belongs to, resolved via DataLoader.
+  Added in 26.4.3. The project this deployment belongs to, resolved via DataLoader.
   """
   projectV2: ProjectV2
 
@@ -5671,7 +5671,7 @@ type ModelDeploymentMetadata {
   domain: DomainNode! @deprecated(reason: "Use domain_v2 instead.")
 
   """
-  Added in UNRELEASED. The domain this deployment belongs to, resolved via DataLoader.
+  Added in 26.4.3. The domain this deployment belongs to, resolved via DataLoader.
   """
   domainV2: DomainV2
   projectId: ID!
@@ -5879,7 +5879,7 @@ type ModelReplica implements Node {
   session: ComputeSessionNode! @deprecated(reason: "Use session_v2 instead.")
 
   """
-  Added in UNRELEASED. The compute session running this replica, resolved via DataLoader.
+  Added in 26.4.3. The compute session running this replica, resolved via DataLoader.
   """
   sessionV2: SessionV2
 
@@ -5944,7 +5944,7 @@ type ModelRevision implements Node {
   image: ImageNode! @deprecated(reason: "Use image_v2 instead.")
 
   """
-  Added in UNRELEASED. The container image used by this revision, resolved via DataLoader.
+  Added in 26.4.3. The container image used by this revision, resolved via DataLoader.
   """
   imageV2: ImageV2
 
@@ -5976,21 +5976,19 @@ input ModelRevisionFilter {
   revisionNumber: IntFilter = null
   deploymentId: ID = null
 
-  """Added in UNRELEASED. Filter by container image ID."""
+  """Added in 26.4.3. Filter by container image ID."""
   imageId: UUIDFilter = null
 
-  """Added in UNRELEASED. Filter by model VFolder ID."""
+  """Added in 26.4.3. Filter by model VFolder ID."""
   modelVfolderId: UUIDFilter = null
 
-  """Added in UNRELEASED. Filter by resource group name."""
+  """Added in 26.4.3. Filter by resource group name."""
   resourceGroup: StringFilter = null
 
-  """
-  Added in UNRELEASED. Filter by cluster mode (SINGLE_NODE / MULTI_NODE).
-  """
+  """Added in 26.4.3. Filter by cluster mode (SINGLE_NODE / MULTI_NODE)."""
   clusterMode: StringFilter = null
 
-  """Added in UNRELEASED. Filter by revision creation datetime."""
+  """Added in 26.4.3. Filter by revision creation datetime."""
   createdAt: DateTimeFilter = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
@@ -6233,7 +6231,7 @@ type Mutation {
   addModelRevision(input: AddRevisionInput!, options: AddRevisionOptions = null): AddRevisionPayload!
 
   """
-  Added in UNRELEASED. Rebuild and activate a fresh revision for every active deployment (superadmin). Used to repair deployments whose current revision has stale or missing model_definition after backing store migrations.
+  Added in 26.4.3. Rebuild and activate a fresh revision for every active deployment (superadmin). Used to repair deployments whose current revision has stale or missing model_definition after backing store migrations.
   """
   adminRefreshDeploymentRevisions: AdminRefreshDeploymentRevisionsPayload!
 
@@ -7027,7 +7025,7 @@ input NotificationRuleTypeFilter {
 }
 
 """
-Added in UNRELEASED. Filter for nullable datetime fields with IS NULL / IS NOT NULL support.
+Added in 26.4.3. Filter for nullable datetime fields with IS NULL / IS NOT NULL support.
 """
 input NullableDateTimeFilter {
   before: DateTime = null
@@ -8331,7 +8329,7 @@ type Query {
   projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 
   """
-  Added in UNRELEASED. Query a single session by ID. Returns an error if not found.
+  Added in 26.4.3. Query a single session by ID. Returns an error if not found.
   """
   sessionV2(id: UUID!): SessionV2
 
@@ -8801,7 +8799,7 @@ type QueryDefinition implements Node {
   """Last update timestamp."""
   updatedAt: DateTime!
 
-  """Added in UNRELEASED. Resolved category entity."""
+  """Added in 26.4.3. Resolved category entity."""
   category: QueryPresetCategory
 }
 
@@ -9520,7 +9518,7 @@ type ResourcePresetV2 implements Node {
   """Resource group name. Null means global preset."""
   resourceGroupName: String
 
-  """Added in UNRELEASED. The resource group this preset belongs to."""
+  """Added in 26.4.3. The resource group this preset belongs to."""
   resourceGroup: ResourceGroup
 }
 
@@ -9699,7 +9697,7 @@ type RestoreArtifactsPayload {
 }
 
 """
-Added in UNRELEASED. Per-deployment result of an admin bulk revision refresh.
+Added in 26.4.3. Per-deployment result of an admin bulk revision refresh.
 """
 type RevisionRefreshResult {
   """Deployment ID"""
@@ -9786,7 +9784,7 @@ type RoleAssignment implements Node {
   """The assigned user."""
   user: UserV2
 
-  """Added in UNRELEASED. The user who granted this role assignment."""
+  """Added in 26.4.3. The user who granted this role assignment."""
   grantedByUser: UserV2
 }
 
@@ -9980,7 +9978,7 @@ type Route implements Node {
   session: ID @deprecated(reason: "Use session_v2 instead.")
 
   """
-  Added in UNRELEASED. The compute session associated with this route, resolved via DataLoader.
+  Added in 26.4.3. The compute session associated with this route, resolved via DataLoader.
   """
   sessionV2: SessionV2
 
@@ -10045,10 +10043,10 @@ type RouteHistory implements Node {
   createdAt: DateTime!
   updatedAt: DateTime!
 
-  """Added in UNRELEASED. The route this history record belongs to."""
+  """Added in 26.4.3. The route this history record belongs to."""
   route: Route
 
-  """Added in UNRELEASED. The deployment this history record belongs to."""
+  """Added in 26.4.3. The deployment this history record belongs to."""
   deployment: ModelDeployment
 }
 
@@ -10696,7 +10694,7 @@ type SessionSchedulingHistory implements Node {
   createdAt: DateTime!
   updatedAt: DateTime!
 
-  """Added in UNRELEASED. The session this history record belongs to."""
+  """Added in 26.4.3. The session this history record belongs to."""
   session: SessionV2
 }
 
@@ -10806,7 +10804,7 @@ type SessionV2 implements Node {
   resourceGroup: ResourceGroup
 
   """
-  Added in UNRELEASED. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  Added in 26.4.3. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
   """
   images: ImageV2Connection!
 

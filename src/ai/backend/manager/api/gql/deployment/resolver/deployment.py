@@ -10,7 +10,6 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -243,7 +242,7 @@ async def sync_replicas(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.3",
         description=(
             "Rebuild and activate a fresh revision for every active deployment (superadmin). "
             "Used to repair deployments whose current revision has stale or missing "

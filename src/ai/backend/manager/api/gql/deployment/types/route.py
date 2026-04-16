@@ -29,7 +29,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateRouteTrafficStatusPayload as UpdateRouteTrafficStatusPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
@@ -145,7 +144,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The compute session associated with this route, resolved via DataLoader.",
         )
     )  # type: ignore[misc]

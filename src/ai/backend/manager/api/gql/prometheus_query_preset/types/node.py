@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -59,9 +58,7 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
     @gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Resolved category entity."
-        )
+        BackendAIGQLMeta(added_version="26.4.3", description="Resolved category entity.")
     )  # type: ignore[misc]
     async def category(self, info: Info[StrawberryGQLContext]) -> CategoryGQL | None:
         if self.category_id is None:

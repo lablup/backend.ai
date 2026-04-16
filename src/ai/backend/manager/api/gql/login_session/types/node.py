@@ -12,7 +12,6 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -61,7 +60,7 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The user who owns this login session.",
         )
     )  # type: ignore[misc]

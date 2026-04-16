@@ -58,7 +58,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.common.types import ResourceOptsEntryGQL as ResourceOptsEntryInfoGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -279,7 +278,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The runtime variant this preset is designed for.",
         )
     )  # type: ignore[misc]

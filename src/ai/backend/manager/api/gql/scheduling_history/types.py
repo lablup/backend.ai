@@ -44,7 +44,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -190,7 +189,7 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The session this history record belongs to.",
         )
     )  # type: ignore[misc]
@@ -242,7 +241,7 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The deployment this history record belongs to.",
         )
     )  # type: ignore[misc]
@@ -292,7 +291,7 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The route this history record belongs to.",
         )
     )  # type: ignore[misc]
@@ -310,7 +309,7 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.3",
             description="The deployment this history record belongs to.",
         )
     )  # type: ignore[misc]
