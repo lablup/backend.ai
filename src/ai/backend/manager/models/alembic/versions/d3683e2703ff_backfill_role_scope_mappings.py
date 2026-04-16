@@ -9,7 +9,9 @@ This migration backfills the missing entries by:
 1. Matching role_domain_*_admin roles to their domain via name parsing.
 2. Matching role_project_*_admin roles to their project via the 8-char UUID
    prefix in the role name.
-3. Matching role_user_* roles to their user via the user_roles join table.
+3. Matching role_user_* and user-* roles to their user via the user_roles
+   join table. The former were created by earlier RBAC migrations; the
+   latter by 2c9000848b6e which uses the runtime naming convention.
 4. Skipping role_superadmin and role_monitor (global roles with no entity
    scope).
 
@@ -214,13 +216,16 @@ def _backfill_project_admin_roles(db_conn: Connection) -> None:
 
 
 def _backfill_user_roles(db_conn: Connection) -> None:
-    """Backfill role→scope for role_user_* roles.
+    """Backfill role→scope for user system roles.
 
-    Role name pattern: ``role_user_{username}``
+    Two naming conventions exist:
+    - ``role_user_{username}`` — created by earlier RBAC migrations
+    - ``user-{uuid[:8]}`` — created by migration 2c9000848b6e
+
     Scope: (user, user_id)
 
     We resolve user_id via the user_roles join table — the user_roles mapping
-    was created by the original migration, only the association_scopes_entities
+    was created by the original migrations, only the association_scopes_entities
     entry was missed.
     """
     roles = _get_roles_table()
@@ -244,8 +249,13 @@ def _backfill_user_roles(db_conn: Connection) -> None:
         )
         .select_from(roles.join(user_roles, user_roles.c.role_id == roles.c.id))
         .where(
-            roles.c.name.like("role_user_%"),
+            sa.or_(
+                roles.c.name.like("role_user_%"),
+                roles.c.name.like("user-%"),
+            ),
             roles.c.source == "system",
+            # Exclude global roles that happen to start with "role_user_"
+            roles.c.name.notin_(["role_superadmin", "role_monitor"]),
             sa.not_(already_mapped),
         )
     )
