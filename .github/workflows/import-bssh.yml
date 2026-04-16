@@ -38,19 +38,21 @@ jobs:
               run: |
                   TAG="${{ steps.get-tag.outputs.tag }}"
                   for ARCH in aarch64 x86_64; do
-                    URL="https://github.com/lablup/bssh/releases/download/${TAG}/bssh-linux-${ARCH}-musl.tar.gz"
-                    echo "Downloading from: $URL"
-                    curl -fL -o bssh.tar.gz "$URL"
-                    tar -xzf bssh.tar.gz
-                    if [ -f "bssh" ]; then
-                      mv bssh "bssh.${ARCH}.bin"
-                      chmod +x "bssh.${ARCH}.bin"
-                      echo "Binary extracted and renamed to bssh.${ARCH}.bin"
-                    else
-                      echo "Error: bssh binary not found in the archive for $ARCH"
-                      exit 1
-                    fi
-                    rm -f bssh.tar.gz
+                    for TOOL in bssh bssh-server; do
+                      URL="https://github.com/lablup/bssh/releases/download/${TAG}/${TOOL}-linux-${ARCH}-musl.tar.gz"
+                      echo "Downloading from: $URL"
+                      curl -fL -o tool.tar.gz "$URL"
+                      tar -xzf tool.tar.gz
+                      if [ -f "${TOOL}" ]; then
+                        mv "${TOOL}" "${TOOL}.${ARCH}.bin"
+                        chmod +x "${TOOL}.${ARCH}.bin"
+                        echo "Binary extracted and renamed to ${TOOL}.${ARCH}.bin"
+                      else
+                        echo "Error: ${TOOL} binary not found in the archive for $ARCH"
+                        exit 1
+                      fi
+                      rm -f tool.tar.gz
+                    done
                   done
 
             - name: Move binaries to target location
@@ -59,26 +61,33 @@ jobs:
                   mkdir -p "${TARGET_DIR}"
                   # Move executable binaries
                   for ARCH in aarch64 x86_64; do
-                    mv "bssh.${ARCH}.bin" "${TARGET_DIR}/"
-                    echo "Binary moved to ${TARGET_DIR}/bssh.${ARCH}.bin"
-                    ls -la "${TARGET_DIR}/bssh.${ARCH}.bin"
+                    for TOOL in bssh bssh-server; do
+                      mv "${TOOL}.${ARCH}.bin" "${TARGET_DIR}/"
+                      echo "Binary moved to ${TARGET_DIR}/${TOOL}.${ARCH}.bin"
+                      ls -la "${TARGET_DIR}/${TOOL}.${ARCH}.bin"
+                    done
                   done
-                  # Move manpages
-                  mv bssh.1 "${TARGET_DIR}/"
+                  # Move manpages (only bssh currently ships a manpage)
+                  for MAN in bssh.1 bssh-server.1; do
+                    if [ -f "${MAN}" ]; then
+                      mv "${MAN}" "${TARGET_DIR}/"
+                      echo "Manpage moved to ${TARGET_DIR}/${MAN}"
+                    fi
+                  done
 
             - name: Add news fragment
               run: |
-                  echo "Update bssh binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.md
+                  echo "Update bssh and bssh-server binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.md
 
             - name: Create pull request
               uses: peter-evans/create-pull-request@v7
               with:
                   token: ${{ secrets.OCTODOG }}
-                  commit-message: "chore: Update bssh binaries to ${{ steps.get-tag.outputs.tag }}"
-                  title: "deps: Update bssh binaries to ${{ steps.get-tag.outputs.tag }}"
+                  commit-message: "chore: Update bssh and bssh-server binaries to ${{ steps.get-tag.outputs.tag }}"
+                  title: "deps: Update bssh and bssh-server binaries to ${{ steps.get-tag.outputs.tag }}"
                   author: "Lablup Octodog <mu001@lablup.com>"
                   body: |
-                      This PR updates the bssh binaries (musl variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
+                      This PR updates the bssh and bssh-server binaries (musl variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
 
                       Source: https://github.com/lablup/bssh/releases/tag/${{ steps.get-tag.outputs.tag }}
 
