@@ -1,6 +1,6 @@
-"""Component tests for v2 VFolder RBAC-enforced delete and restore mutations via SDK.
+"""Component tests for v2 VFolder RBAC-enforced delete, restore, and purge mutations via SDK.
 
-Exercises delete and restore mutations through the real HTTP server +
+Exercises delete, restore, and purge mutations through the real HTTP server +
 V2ClientRegistry SDK.
 """
 
@@ -225,3 +225,15 @@ class TestRestoreVFolderRBAC:
         await admin_v2_registry.vfolder.delete(project_vfolder.id)
         payload = await admin_v2_registry.vfolder.restore(project_vfolder.id)
         assert payload.id == project_vfolder.id
+
+
+class TestPurgeVFolderRBAC:
+    """POST /v2/vfolders/{id}/purge -- SingleEntityActionProcessor RBAC."""
+
+    async def test_regular_user_denied(
+        self,
+        user_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_v2_registry.vfolder.purge(project_vfolder.id)

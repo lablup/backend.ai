@@ -405,12 +405,9 @@ class VFolderAdapter(BaseAdapter):
         return RestoreVFolderPayload(id=vfolder_id)
 
     async def purge(self, vfolder_id: UUID) -> PurgeVFolderPayload:
-        """Permanently delete a vfolder."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        action = PurgeVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
-        await self._processors.vfolder.purge_v2.wait_for_complete(action)
+        """Permanently delete a vfolder. RBAC enforced."""
+        action = PurgeVFolderV2RBACAction(vfolder_id=vfolder_id)
+        await self._processors.vfolder.purge_v2_rbac.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
 
     async def deploy(
