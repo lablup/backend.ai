@@ -147,6 +147,10 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
     GetDirectAccessInfoActionResult,
 )
+from ai.backend.manager.services.session.actions.get_session import (
+    GetSessionAction,
+    GetSessionActionResult,
+)
 from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
@@ -1469,6 +1473,13 @@ class SessionService:
                 ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
         return UploadFilesActionResult(result=None, session_data=session.to_dataclass())
+
+    async def get_session(self, action: GetSessionAction) -> GetSessionActionResult:
+        """Get a single session by ID with RBAC validation."""
+        session_data = await self._session_repository.get_session_data_by_id(
+            action.session_id,
+        )
+        return GetSessionActionResult(session_data=session_data)
 
     async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
