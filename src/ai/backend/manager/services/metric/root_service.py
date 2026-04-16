@@ -16,7 +16,7 @@ from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 
-from .actions.live_stat import KernelLiveStatAction, KernelLiveStatActionResult
+from .actions.live_stat import QueryKernelLiveStatAction, QueryKernelLiveStatActionResult
 from .container_metric import (
     CONTAINER_UTILIZATION_METRIC_NAME,
     ContainerUtilizationMetricService,
@@ -62,10 +62,10 @@ class UtilizationMetricService:
 
     async def query_kernel_live_stat_batch(
         self,
-        action: KernelLiveStatAction,
-    ) -> KernelLiveStatActionResult:
+        action: QueryKernelLiveStatAction,
+    ) -> QueryKernelLiveStatActionResult:
         if not action.kernel_ids:
-            return KernelLiveStatActionResult(
+            return QueryKernelLiveStatActionResult(
                 stats=KernelLiveStatBatchResult.empty(action.kernel_ids)
             )
         try:
@@ -89,12 +89,12 @@ class UtilizationMetricService:
             )
         except (PrometheusConnectionError, FailedToGetMetric):
             log.warning("Failed to query Prometheus for kernel live stats, returning empty results")
-            return KernelLiveStatActionResult(
+            return QueryKernelLiveStatActionResult(
                 stats=KernelLiveStatBatchResult.empty(action.kernel_ids)
             )
 
         merged = gauge.merged_with(diff).merged_with(rate)
-        return KernelLiveStatActionResult(
+        return QueryKernelLiveStatActionResult(
             stats=KernelLiveStatBatchResult.from_metric_values(
                 action.kernel_ids,
                 merged.values_by_kernel,

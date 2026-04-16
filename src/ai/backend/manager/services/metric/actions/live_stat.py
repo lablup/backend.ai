@@ -6,11 +6,11 @@ from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import KernelId
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.metric.types import KernelLiveStatBatchResult
+from ai.backend.manager.data.metric.types import KernelLiveStatBatchResult
 
 
 @dataclass(frozen=True)
-class KernelLiveStatAction(BaseAction):
+class QueryKernelLiveStatAction(BaseAction):
     kernel_ids: Sequence[KernelId]
 
     @override
@@ -25,7 +25,7 @@ class KernelLiveStatAction(BaseAction):
 
 
 @dataclass(frozen=True)
-class KernelLiveStatActionResult(BaseActionResult):
+class QueryKernelLiveStatActionResult(BaseActionResult):
     stats: KernelLiveStatBatchResult
 
     @override

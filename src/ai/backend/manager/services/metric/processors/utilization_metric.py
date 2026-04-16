@@ -11,8 +11,8 @@ from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricMetadataActionResult,
 )
 from ai.backend.manager.services.metric.actions.live_stat import (
-    KernelLiveStatAction,
-    KernelLiveStatActionResult,
+    QueryKernelLiveStatAction,
+    QueryKernelLiveStatActionResult,
 )
 from ai.backend.manager.services.metric.root_service import UtilizationMetricService
 
@@ -22,7 +22,9 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
     query_container_metadata: ActionProcessor[
         ContainerMetricMetadataAction, ContainerMetricMetadataActionResult
     ]
-    query_kernel_live_stat: ActionProcessor[KernelLiveStatAction, KernelLiveStatActionResult]
+    query_kernel_live_stat: ActionProcessor[
+        QueryKernelLiveStatAction, QueryKernelLiveStatActionResult
+    ]
 
     def __init__(
         self,
@@ -43,5 +45,5 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
         return [
             ContainerMetricAction.spec(),
             ContainerMetricMetadataAction.spec(),
-            KernelLiveStatAction.spec(),
+            QueryKernelLiveStatAction.spec(),
         ]

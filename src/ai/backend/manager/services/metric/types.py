@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final, Self
 from uuid import UUID
@@ -14,16 +13,18 @@ from ai.backend.common.dto.clients.prometheus.response import (
 )
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import KernelId
-
-
-class ValueType(enum.StrEnum):
-    """
-    Specifies the type of a metric value.
-    """
-
-    CURRENT = "current"
-    CAPACITY = "capacity"
-    PCT = "pct"
+from ai.backend.manager.data.metric.types import (
+    KernelLiveStatBatchResult as KernelLiveStatBatchResult,
+)
+from ai.backend.manager.data.metric.types import (
+    KernelLiveStatEntry as KernelLiveStatEntry,
+)
+from ai.backend.manager.data.metric.types import (
+    KernelMetricValue,
+)
+from ai.backend.manager.data.metric.types import (
+    ValueType as ValueType,
+)
 
 
 class MetricQueryParameter(BaseModel):
@@ -89,58 +90,6 @@ class ContainerMetricResult:
 
 
 @dataclass(frozen=True)
-class KernelMetricValue:
-    """A single (current|capacity) value for one metric of one kernel."""
-
-    metric_name: str
-    value_type: ValueType
-    value: str
-
-
-@dataclass(frozen=True)
-class KernelLiveStatEntry:
-    """All live_stat samples belonging to a single kernel.
-
-    An empty ``values`` list represents "no Prometheus samples yet" — callers
-    do not need to handle ``None``; the entry is always present.
-    """
-
-    kernel_id: UUID
-    values: list[KernelMetricValue]
-
-
-@dataclass(frozen=True)
-class KernelLiveStatBatchResult:
-    """Per-kernel batch result for ``query_kernel_live_stat_batch``.
-
-    Always contains one entry per requested ``kernel_id``. Missing data is
-    represented as an empty ``KernelLiveStatEntry.values`` list, never ``None``.
-    """
-
-    entries: dict[UUID, KernelLiveStatEntry]
-
-    @classmethod
-    def empty(cls, kernel_ids: Sequence[KernelId]) -> Self:
-        return cls.from_metric_values(kernel_ids, {})
-
-    @classmethod
-    def from_metric_values(
-        cls,
-        kernel_ids: Sequence[KernelId],
-        values_by_kernel: Mapping[KernelId, Sequence[KernelMetricValue]],
-    ) -> Self:
-        return cls(
-            entries={
-                kid: KernelLiveStatEntry(
-                    kernel_id=kid,
-                    values=list(values_by_kernel.get(kid, [])),
-                )
-                for kid in kernel_ids
-            }
-        )
-
-
-@dataclass(frozen=True)
 class KernelMetricValuesByKernel:
     values_by_kernel: dict[KernelId, list[KernelMetricValue]]
 
@@ -158,12 +107,13 @@ class KernelMetricValuesByKernel:
                 continue
             try:
                 value_type = ValueType(info.value_type)
+                kernel_id = KernelId(UUID(info.kernel_id))
             except ValueError:
                 continue
             # Instant queries are normalized into a one-element list, and range
             # queries are ordered by time, so the last sample is the newest one.
             _, raw_value = metric.values[-1]
-            grouped.setdefault(KernelId(UUID(info.kernel_id)), []).append(
+            grouped.setdefault(kernel_id, []).append(
                 KernelMetricValue(
                     metric_name=info.container_metric_name,
                     value_type=value_type,
@@ -201,7 +151,7 @@ class UtilizationMetricType(enum.Enum):
     """
 
 
-# Metric-name → UtilizationMetricType classification rules.
+# Metric-name -> UtilizationMetricType classification rules.
 # TODO: Refactor to query metric metadata from the repository layer once
 #       the metadata persistence is available.
 DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
