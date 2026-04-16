@@ -135,6 +135,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
+from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -284,6 +285,20 @@ class RBACAdapter(BaseAdapter):
     assign/revoke/bulk operations require specialized inputs not
     yet bridged through this adapter.
     """
+
+    def _validate_scope_id(self, scope_type: RBACElementType, scope_id: str) -> None:
+        """Raise InvalidScope if scope_id is not a valid UUID for scope types that require one."""
+        match scope_type:
+            case RBACElementType.USER | RBACElementType.PROJECT:
+                try:
+                    uuid.UUID(scope_id)
+                except ValueError:
+                    raise InvalidScope(
+                        f"scope_id must be a valid UUID for scope_type '{scope_type.value}', "
+                        f"got '{scope_id}'"
+                    ) from None
+            case _:
+                pass
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -527,6 +542,8 @@ class RBACAdapter(BaseAdapter):
 
     async def create(self, input: CreateRoleInput) -> CreateRolePayload:
         """Create a new role."""
+        for s in input.scopes or []:
+            self._validate_scope_id(RBACElementType(s.scope_type), s.scope_id)
         scope_refs = [
             RBACElementRef(
                 element_type=RBACElementType(s.scope_type),
@@ -795,10 +812,12 @@ class RBACAdapter(BaseAdapter):
 
     async def create_permission(self, input: CreatePermissionInputDTO) -> PermissionNode:
         """Create a new scoped permission."""
+        scope_type = RBACElementType(input.scope_type)
+        self._validate_scope_id(scope_type, input.scope_id)
         creator: Creator[PermissionRow] = Creator(
             spec=PermissionCreatorSpec(
                 role_id=input.role_id,
-                scope_type=RBACElementType(input.scope_type),
+                scope_type=scope_type,
                 scope_id=input.scope_id,
                 entity_type=RBACElementType(input.entity_type),
                 operation=InternalOperationType(input.operation),
@@ -813,6 +832,8 @@ class RBACAdapter(BaseAdapter):
 
     async def update_permission(self, input: UpdatePermissionInputDTO) -> PermissionNode:
         """Update an existing scoped permission."""
+        if input.scope_type is not None and input.scope_id is not None:
+            self._validate_scope_id(RBACElementType(input.scope_type), input.scope_id)
         spec = PermissionUpdaterSpec(
             scope_type=(
                 OptionalState.update(RBACElementType(input.scope_type))
