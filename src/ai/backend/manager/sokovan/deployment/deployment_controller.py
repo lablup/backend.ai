@@ -276,6 +276,8 @@ class DeploymentController:
             model_revision=None,
             policy=None,
         )
+        # Carry the merged draft form forward; ``add_deployment_revision``
+        # re-merges and resolves at its own persistence boundary.
         revision = ModelRevisionCreator(
             image_id=image_id,
             resource_spec=model_revision_spec.resource_spec,
@@ -285,7 +287,7 @@ class DeploymentController:
                 model_mount_destination=model_revision_spec.mounts.model_mount_destination,
             ),
             execution=model_revision_spec.execution,
-            model_definition=model_revision_spec.model_definition,
+            model_definition=merged.model_definition,
             revision_preset_id=None,
         )
         return creator, revision
@@ -421,7 +423,13 @@ class DeploymentController:
             model_id=mounts.model_vfolder_id,
             model_mount_destination=mounts.model_mount_destination,
             model_definition_path=mounts.model_definition_path,
-            model_definition=merged.model_definition,
+            # Resolve the merged draft into a strict ModelDefinition; this is
+            # the single point where required-field validation runs.
+            model_definition=(
+                merged.model_definition.to_resolved()
+                if merged.model_definition is not None
+                else None
+            ),
             startup_command=merged.startup_command,
             bootstrap_script=merged.bootstrap_script,
             environ=dict(merged.environ) if merged.environ else {},
@@ -644,7 +652,13 @@ class DeploymentController:
                 callback_url=merged.callback_url,
                 inference_runtime_config=merged.inference_runtime_config,
             ),
-            model_definition=merged.model_definition,
+            # Resolve the merged draft into a strict ModelDefinition (legacy
+            # ``ModelRevisionSpec`` carries the strict type).
+            model_definition=(
+                merged.model_definition.to_resolved()
+                if merged.model_definition is not None
+                else None
+            ),
         )
 
     async def _prune_revision_history(

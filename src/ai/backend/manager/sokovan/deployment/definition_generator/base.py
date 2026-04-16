@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     MountMetadata,
@@ -19,13 +19,21 @@ class ModelDefinitionContext:
 
     mounts: MountMetadata
     execution: ExecutionSpec
-    model_definition: ModelDefinition | None
+    model_definition: ModelDefinitionDraft | None
 
 
 class ModelDefinitionGenerator(ABC):
-    """Abstract base class for generating model definitions."""
+    """Abstract base class for generating model definitions.
+
+    Generators emit a ``ModelDefinitionDraft`` so partial overlays from
+    multiple sources (preset, vfolder yaml, request override) can be merged
+    before being resolved to a strict ``ModelDefinition`` at the persistence
+    boundary.
+    """
 
     @abstractmethod
-    async def generate_model_definition(self, context: ModelDefinitionContext) -> ModelDefinition:
-        """Generate a model definition based on the provided context."""
+    async def generate_model_definition(
+        self, context: ModelDefinitionContext
+    ) -> ModelDefinitionDraft:
+        """Generate a model definition draft based on the provided context."""
         raise NotImplementedError
