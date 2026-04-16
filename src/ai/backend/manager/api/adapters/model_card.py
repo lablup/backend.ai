@@ -41,7 +41,6 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardOrderField,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapters.deployment_revision_preset import (
     DeploymentRevisionPresetAdapter,
 )
@@ -55,9 +54,7 @@ from ai.backend.manager.data.deployment.creator import (
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
-    ExecutionSpec,
     ReplicaSpec,
-    ResourceSpec,
 )
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -455,18 +452,15 @@ class ModelCardAdapter(BaseAdapter):
             ),
             replica_spec=replica_spec,
             network=network_spec,
+            # ``resource_spec`` and ``execution`` are intentionally omitted so
+            # the revision preset drives image / resource_slots / cluster /
+            # runtime_variant. Hard-coding values here would silently override
+            # the preset.
             model_revision=ModelRevisionCreator(
                 image_id=None,
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots={},
-                ),
                 mounts=VFolderMountsCreator(
                     model_vfolder_id=model_card.vfolder_id,
                 ),
-                execution=ExecutionSpec(runtime_variant=RuntimeVariant("custom")),
-                model_definition=None,
                 revision_preset_id=input.revision_preset_id,
             ),
             policy=policy,

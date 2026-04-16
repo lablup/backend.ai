@@ -53,7 +53,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import BinarySize, ClusterMode, RuntimeVariant, VFolderUsageMode
+from ai.backend.common.types import BinarySize, VFolderUsageMode
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
@@ -64,9 +64,7 @@ from ai.backend.manager.data.deployment.creator import (
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
-    ExecutionSpec,
     ReplicaSpec,
-    ResourceSpec,
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -456,18 +454,15 @@ class VFolderAdapter(BaseAdapter):
             ),
             replica_spec=replica_spec,
             network=network_spec,
+            # ``resource_spec`` and ``execution`` are intentionally omitted so
+            # the revision preset drives image / resource_slots / cluster /
+            # runtime_variant. Hard-coding values here would silently override
+            # the preset.
             model_revision=ModelRevisionCreator(
                 image_id=None,
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots={},
-                ),
                 mounts=VFolderMountsCreator(
                     model_vfolder_id=vfolder.id,
                 ),
-                execution=ExecutionSpec(runtime_variant=RuntimeVariant("custom")),
-                model_definition=None,
                 revision_preset_id=input.revision_preset_id,
             ),
             policy=policy,

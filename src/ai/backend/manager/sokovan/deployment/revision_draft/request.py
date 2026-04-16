@@ -40,18 +40,23 @@ def revision_draft_from_creator(creator: ModelRevisionCreator) -> RevisionDraft:
     """Build a RevisionDraft from a v2 request (image already resolved).
 
     Mount-identifying fields are excluded — see ``revision_draft_from_spec``.
+    Optional ``resource_spec`` / ``execution`` are projected only when set;
+    leaving them ``None`` lets preset (or other lower-priority sources)
+    supply the missing fields without being overridden.
     """
+    rs = creator.resource_spec
+    ex = creator.execution
     return RevisionDraft(
         image_id=creator.image_id,
-        resource_slots=creator.resource_spec.resource_slots,
-        resource_opts=creator.resource_spec.resource_opts,
-        cluster_mode=creator.resource_spec.cluster_mode,
-        cluster_size=creator.resource_spec.cluster_size,
-        startup_command=creator.execution.startup_command,
-        bootstrap_script=creator.execution.bootstrap_script,
-        environ=creator.execution.environ,
-        runtime_variant=creator.execution.runtime_variant,
-        callback_url=creator.execution.callback_url,
-        inference_runtime_config=creator.execution.inference_runtime_config,
+        resource_slots=rs.resource_slots if rs is not None else None,
+        resource_opts=rs.resource_opts if rs is not None else None,
+        cluster_mode=rs.cluster_mode if rs is not None else None,
+        cluster_size=rs.cluster_size if rs is not None else None,
+        startup_command=ex.startup_command if ex is not None else None,
+        bootstrap_script=ex.bootstrap_script if ex is not None else None,
+        environ=ex.environ if ex is not None else None,
+        runtime_variant=ex.runtime_variant if ex is not None else None,
+        callback_url=ex.callback_url if ex is not None else None,
+        inference_runtime_config=ex.inference_runtime_config if ex is not None else None,
         model_definition=creator.model_definition,
     )

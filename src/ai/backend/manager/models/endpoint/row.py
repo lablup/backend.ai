@@ -631,6 +631,24 @@ class EndpointRow(Base):  # type: ignore[misc]
                 return rev
         return None
 
+    def _find_active_revision(self) -> DeploymentRevisionRow | None:
+        """Return the revision representing the deployment's active spec.
+
+        Falls back to ``deploying_revision`` when ``current_revision`` is
+        unset (e.g. during the initial DEPLOYING phase before strategy
+        completion). Used by display/serialization paths that should reflect
+        the spec being deployed rather than rendering empty fields.
+        """
+        current = self._find_current_revision()
+        if current is not None:
+            return current
+        if not self.deploying_revision:
+            return None
+        for rev in self.revisions:
+            if rev.id == self.deploying_revision:
+                return rev
+        return None
+
     def to_summary_data(self) -> DeploymentSummaryData:
         return DeploymentSummaryData(
             id=self.id,
@@ -657,9 +675,12 @@ class EndpointRow(Base):  # type: ignore[misc]
         """Convert to EndpointData.
 
         Requires revisions and revisions.image_row to be eagerly loaded
-        via selectinload for revision field population.
+        via selectinload for revision field population. During the initial
+        DEPLOYING phase ``current_revision`` is unset, so the fields fall
+        back to ``deploying_revision`` so callers see the spec being
+        deployed instead of empty values.
         """
-        current_rev = self._find_current_revision()
+        current_rev = self._find_active_revision()
         return EndpointData(
             id=self.id,
             name=self.name,

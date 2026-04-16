@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
@@ -88,7 +88,7 @@ class DeploymentServiceBaseFixtures:
     def mock_model_definition_generator_registry(self) -> AsyncMock:
         """Mock ModelDefinitionGeneratorRegistry."""
         registry = AsyncMock()
-        registry.generate_model_definition.return_value = ModelDefinition()
+        registry.generate_model_definition.return_value = ModelDefinitionDraft()
         return registry
 
     @pytest.fixture
@@ -403,7 +403,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 runtime_variant=RuntimeVariant("vllm"),
                 callback_url=None,
             ),
-            model_definition=ModelDefinition(),
+            model_definition=ModelDefinitionDraft(),
         )
 
     @pytest.fixture
@@ -451,7 +451,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 runtime_variant=RuntimeVariant("vllm"),
                 environ=None,
             ),
-            model_definition=ModelDefinition(),
+            model_definition=ModelDefinitionDraft(),
         )
 
 

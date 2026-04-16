@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection, Sequence
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import PurePosixPath
 from uuid import UUID
@@ -26,6 +27,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     DeleteAutoScalingRuleInput,
     UpdateAutoScalingRuleInput,
 )
+from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AccessTokenFilter,
     ActivateRevisionInput,
@@ -2164,6 +2166,12 @@ class DeploymentAdapter(BaseAdapter):
             ),
             resource_config=ResourceConfigInfoDTO(
                 resource_group_name=data.resource_config.resource_group_name,
+                resource_slots=ResourceSlotInfo(
+                    entries=[
+                        ResourceSlotEntryInfo(resource_type=str(k), quantity=Decimal(str(v)))
+                        for k, v in data.resource_config.resource_slot.items()
+                    ],
+                ),
                 resource_opts=(
                     ResourceOptsInfoDTO(
                         entries=[

@@ -10,7 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateDeploymentInput,
@@ -49,7 +49,7 @@ def _make_revision_input(**kwargs: object) -> RevisionInput:
         "resource_slots": {"cpu": "2", "mem": "4g"},
         "model_vfolder_id": uuid.uuid4(),
         "model_definition_path": "/models/model.yaml",
-        "model_definition": ModelDefinition(),
+        "model_definition": ModelDefinitionDraft(),
     }
     defaults.update(kwargs)
     return RevisionInput(**defaults)
@@ -74,7 +74,7 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
             mount_destination="/models",
             definition_path="/models/model.yaml",
         ),
-        "model_definition": ModelDefinition(),
+        "model_definition": ModelDefinitionDraft(),
     }
     defaults.update(kwargs)
     return CreateRevisionInputDTO(**defaults)
@@ -93,7 +93,7 @@ class TestRevisionInput:
             resource_slots={"cpu": "2"},
             model_vfolder_id=model_id,
             model_definition_path="/models/def.yaml",
-            model_definition=ModelDefinition(),
+            model_definition=ModelDefinitionDraft(),
         )
         assert rev.image_id == image_id
         assert rev.cluster_mode == ClusterMode.SINGLE_NODE
