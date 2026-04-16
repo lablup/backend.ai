@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 import click
@@ -27,6 +27,51 @@ from ai.backend.client.cli.v2.helpers import (
     parse_order_options,
     print_result,
 )
+
+_DATETIME_FORMATS = (
+    "%Y-%m-%dT%H:%M:%S%z",
+    "%Y-%m-%d %H:%M:%S%z",
+)
+
+
+class PrometheusTimestampParamType(click.ParamType):
+    """Parse timezone-aware ISO8601 values or Unix timestamps for Prometheus."""
+
+    name = "prometheus-timestamp"
+
+    def __init__(self) -> None:
+        self._datetime_parser = click.DateTime(formats=_DATETIME_FORMATS)
+
+    def convert(
+        self,
+        value: object,
+        param: click.Parameter | None,
+        ctx: click.Context | None,
+    ) -> datetime:
+        if isinstance(value, datetime):
+            return value
+
+        if isinstance(value, str):
+            try:
+                return datetime.fromtimestamp(float(value), tz=UTC)
+            except ValueError:
+                pass
+
+        try:
+            parsed = self._datetime_parser.convert(value, param, ctx)
+        except click.BadParameter:
+            self.fail(
+                "must be a timezone-aware ISO8601 datetime "
+                "(for example: 2026-04-16T23:00:00+09:00 or 2026-04-16T14:00:00Z) "
+                "or a Unix timestamp (for example: 1713372000)",
+                param,
+                ctx,
+            )
+
+        return cast("datetime", parsed)
+
+
+prometheus_timestamp = PrometheusTimestampParamType()
 
 
 @click.group(name="prometheus-query-definition")
@@ -138,8 +183,18 @@ def _parse_label_filters(labels: tuple[str, ...]) -> list[MetricLabelEntry]:
 
 @prometheus_query_preset.command()
 @click.argument("preset_id", type=click.UUID)
-@click.option("--start", type=click.DateTime(), default=None, help="Start time (ISO8601).")
-@click.option("--end", type=click.DateTime(), default=None, help="End time (ISO8601).")
+@click.option(
+    "--start",
+    type=prometheus_timestamp,
+    default=None,
+    help="Start time (timezone-aware ISO8601 or Unix timestamp).",
+)
+@click.option(
+    "--end",
+    type=prometheus_timestamp,
+    default=None,
+    help="End time (timezone-aware ISO8601 or Unix timestamp).",
+)
 @click.option("--step", type=str, default=None, help="Step duration (e.g. 60s).")
 @click.option(
     "--label",
