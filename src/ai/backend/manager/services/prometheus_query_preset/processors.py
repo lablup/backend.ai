@@ -2,6 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.prometheus_query_preset.actions import (
@@ -25,7 +26,7 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 
 class PrometheusQueryPresetProcessors(AbstractProcessorPackage):
     create_preset: ActionProcessor[CreatePresetAction, CreatePresetActionResult]
-    get_preset: ActionProcessor[GetPresetAction, GetPresetActionResult]
+    get_preset: SingleEntityActionProcessor[GetPresetAction, GetPresetActionResult]
     search_presets: ActionProcessor[SearchPresetsAction, SearchPresetsActionResult]
     modify_preset: ActionProcessor[ModifyPresetAction, ModifyPresetActionResult]
     delete_preset: ActionProcessor[DeletePresetAction, DeletePresetActionResult]
@@ -37,8 +38,11 @@ class PrometheusQueryPresetProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        rbac_single_entity_validators = [validators.rbac.single_entity]
         self.create_preset = ActionProcessor(service.create_preset, action_monitors)
-        self.get_preset = ActionProcessor(service.get_preset, action_monitors)
+        self.get_preset = SingleEntityActionProcessor(
+            service.get_preset, action_monitors, validators=rbac_single_entity_validators
+        )
         self.search_presets = ActionProcessor(service.search_presets, action_monitors)
         self.modify_preset = ActionProcessor(service.modify_preset, action_monitors)
         self.delete_preset = ActionProcessor(service.delete_preset, action_monitors)

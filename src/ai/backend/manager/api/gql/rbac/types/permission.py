@@ -186,6 +186,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.DEPLOYMENT_REVISION
                 | RBACElementType.IMAGE_ALIAS
                 | RBACElementType.MODEL_CARD
+                | RBACElementType.PROMETHEUS_QUERY_PRESET
                 | RBACElementType.PROJECT_ADMIN_PAGE
                 | RBACElementType.DOMAIN_ADMIN_PAGE
             ):

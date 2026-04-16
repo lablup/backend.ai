@@ -337,6 +337,7 @@ class ScopeType(enum.StrEnum):
     ROLE = "role"
     NOTIFICATION_CHANNEL = "notification_channel"
     KEYPAIR = "keypair"
+    PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError
@@ -387,6 +388,7 @@ class RBACElementType(enum.StrEnum):
     MODEL_CARD = "model_card"
 
     # === Root-query-enabled entities (superadmin-only) ===
+    PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
     USER_RESOURCE_POLICY = "user_resource_policy"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
