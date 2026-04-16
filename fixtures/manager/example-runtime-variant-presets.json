@@ -723,7 +723,7 @@
     {
       "runtime_variant_name": "sglang",
       "name": "context-length",
-      "description": "Model's Maximum context length.",
+      "description": "Maximum context length.",
       "rank": 400,
       "preset_target": "args",
       "value_type": "int",
@@ -743,7 +743,7 @@
     {
       "runtime_variant_name": "sglang",
       "name": "served-model-name",
-      "description": "Overrided Model name returned by the v1/models endpoint in OpenAI API server.",
+      "description": "Overridden model name returned by the v1/models endpoint in the OpenAI API server.",
       "rank": 500,
       "preset_target": "args",
       "value_type": "str",
@@ -877,7 +877,7 @@
             {"value": "fp8_e5m2", "label": "FP8 E5M2"},
             {"value": "fp8_e4m3", "label": "FP8 E4M3"},
             {"value": "fp4_e2m1", "label": "FP4 E2M1"},
-            {"value": "bf16", "label": "bf16"}          
+            {"value": "bf16", "label": "BF16"}
           ]
         }
       }
@@ -1072,69 +1072,69 @@
       }
     },
     {
-  "runtime_variant_name": "sglang",
-  "name": "log-level",
-  "description": "The logging level of all loggers.",
-  "rank": 2400,
-  "preset_target": "args",
-  "value_type": "str",
-  "default_value": "info",
-  "key": "--log-level",
-  "category": "monitoring",
-  "ui_type": "select",
-  "display_name": "Log Level",
-  "ui_option": {
-    "ui_type": "select",
-    "choices": {
-      "items": [
-        { "value": "debug", "label": "Debug" },
-        { "value": "info", "label": "Info" },
-        { "value": "warning", "label": "Warning" },
-        { "value": "error", "label": "Error" }
-      ]
-    }
-  }
-},
-{
-  "runtime_variant_name": "sglang",
-  "name": "log-requests",
-  "description": "Log metadata, inputs, outputs of all requests. The verbosity is decided by –log-requests-level",
-  "rank": 2100,
-  "preset_target": "args",
-  "value_type": "flag",
-  "default_value": null,
-  "key": "--log-requests",
-  "category": "monitoring",
-  "ui_type": "checkbox",
-  "display_name": "Log Requests",
-  "ui_option": {
-    "ui_type": "checkbox"
-  }
-},
-{
-  "runtime_variant_name": "sglang",
-  "name": "log-requests-level",
-  "description": "Request logging verbosity. 0: metadata only, 1: metadata and sampling parameters, 2: partial input/output, 3: full input/output.",
-  "rank": 2200,
-  "preset_target": "args",
-  "value_type": "int",
-  "default_value": null,
-  "key": "--log-requests-level",
-  "category": "monitoring",
-  "ui_type": "select",
-  "display_name": "Log Requests Level",
-  "ui_option": {
-    "ui_type": "select",
-    "choices": {
-      "items": [
-        { "value": "0", "label": "0 - Metadata only" },
-        { "value": "1", "label": "1 - Metadata + sampling params" },
-        { "value": "2", "label": "2 - Metadata + sampling params + Partial input/output" },
-        { "value": "3", "label": "3 - Full input/output" }
-      ]
-    }
-  }
-},
+      "runtime_variant_name": "sglang",
+      "name": "log-level",
+      "description": "The logging level of all loggers.",
+      "rank": 2400,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "info",
+      "key": "--log-level",
+      "category": "monitoring",
+      "ui_type": "select",
+      "display_name": "Log Level",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {"value": "debug", "label": "Debug"},
+            {"value": "info", "label": "Info"},
+            {"value": "warning", "label": "Warning"},
+            {"value": "error", "label": "Error"}
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "log-requests",
+      "description": "Log metadata, inputs, outputs of all requests. The verbosity is decided by --log-requests-level.",
+      "rank": 2100,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--log-requests",
+      "category": "monitoring",
+      "ui_type": "checkbox",
+      "display_name": "Log Requests",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "log-requests-level",
+      "description": "Request logging verbosity. 0: metadata only, 1: metadata and sampling parameters, 2: partial input/output, 3: full input/output.",
+      "rank": 2200,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--log-requests-level",
+      "category": "monitoring",
+      "ui_type": "select",
+      "display_name": "Log Requests Level",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {"value": "0", "label": "0 - Metadata only"},
+            {"value": "1", "label": "1 - Metadata + sampling params"},
+            {"value": "2", "label": "2 - Metadata + sampling params + Partial input/output"},
+            {"value": "3", "label": "3 - Full input/output"}
+          ]
+        }
+      }
+    },
     {
       "runtime_variant_name": "sglang",
       "name": "enable-lora",
