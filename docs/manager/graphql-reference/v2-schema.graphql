@@ -3008,13 +3008,13 @@ input DeploymentFilter {
   domainName: StringFilter = null
 
   """Added in UNRELEASED. Filter by project ID."""
-  projectId: UUID = null
+  projectId: UUIDFilter = null
 
   """Added in UNRELEASED. Filter by resource group name."""
   resourceGroup: StringFilter = null
 
   """Added in UNRELEASED. Filter by the user who created the deployment."""
-  createdUserId: UUID = null
+  createdUserId: UUIDFilter = null
 
   """Added in UNRELEASED. Filter by deployment creation datetime."""
   createdAt: DateTimeFilter = null
