@@ -8709,13 +8709,10 @@ type ModelDeployment implements Node
   """
   currentRevision: ModelRevision
 
-  """The created user of this entity."""
-  createdUser: UserNode! @deprecated(reason: "Use created_user_v2 instead.")
-
   """
   Added in UNRELEASED. The user who created this deployment, resolved via DataLoader.
   """
-  createdUserV2: UserV2
+  creator: UserV2
 
   """Added in 25.19.0. Deployment policy configuration."""
   deploymentPolicy: DeploymentPolicy
@@ -18246,57 +18243,56 @@ type UserList implements PaginatedList
 type UserNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
-  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
 
   """Unique username of the user."""
-  username: String @join__field(graph: GRAPHENE)
+  username: String
 
   """Unique email of the user."""
-  email: String @join__field(graph: GRAPHENE)
-  need_password_change: Boolean @join__field(graph: GRAPHENE)
-  full_name: String @join__field(graph: GRAPHENE)
-  description: String @join__field(graph: GRAPHENE)
-  is_active: Boolean @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 24.03.0. Recommend to use `status` field.")
+  email: String
+  need_password_change: Boolean
+  full_name: String
+  description: String
+  is_active: Boolean @deprecated(reason: "Deprecated since 24.03.0. Recommend to use `status` field.")
 
   """
   The status is one of `active`, `inactive`, `deleted` or `before-verification`.
   """
-  status: String @join__field(graph: GRAPHENE)
+  status: String
 
   """Additional information of user status."""
-  status_info: String @join__field(graph: GRAPHENE)
-  created_at: DateTime @join__field(graph: GRAPHENE)
-  modified_at: DateTime @join__field(graph: GRAPHENE)
-  domain_name: String @join__field(graph: GRAPHENE)
+  status_info: String
+  created_at: DateTime
+  modified_at: DateTime
+  domain_name: String
 
   """The role is one of `user`, `admin`, `superadmin` or `monitor`."""
-  role: String @join__field(graph: GRAPHENE)
-  resource_policy: String @join__field(graph: GRAPHENE)
-  allowed_client_ip: [String] @join__field(graph: GRAPHENE)
-  totp_activated: Boolean @join__field(graph: GRAPHENE)
-  totp_activated_at: DateTime @join__field(graph: GRAPHENE)
-  sudo_session_enabled: Boolean @join__field(graph: GRAPHENE)
+  role: String
+  resource_policy: String
+  allowed_client_ip: [String]
+  totp_activated: Boolean
+  totp_activated_at: DateTime
+  sudo_session_enabled: Boolean
 
   """
   Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
   """
-  container_uid: Int @join__field(graph: GRAPHENE)
+  container_uid: Int
 
   """
   Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
   """
-  container_main_gid: Int @join__field(graph: GRAPHENE)
+  container_main_gid: Int
 
   """
   Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
   """
-  container_gids: [Int] @join__field(graph: GRAPHENE)
+  container_gids: [Int]
 
   """Added in 25.5.0."""
-  project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection @join__field(graph: GRAPHENE)
+  project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
 """

@@ -141,10 +141,8 @@ from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.user_federation import User
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
-from ai.backend.manager.api.gql_legacy.user import UserNode
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchScope,
     AutoScalingRuleSearchScope,
@@ -302,23 +300,13 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             UUID(str(self.current_revision_id))
         )
 
-    @gql_field(
-        description="The created user of this entity.",
-        deprecation_reason="Use created_user_v2 instead.",
-    )  # type: ignore[misc]
-    async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
-        user_global_id = to_global_id(
-            UserNode, UUID(str(self.created_user_id)), is_target_graphene_object=True
-        )
-        return User(id=strawberry.ID(user_global_id))
-
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="The user who created this deployment, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
-    async def created_user_v2(
+    async def creator(
         self, info: Info[StrawberryGQLContext]
     ) -> (
         Annotated[
