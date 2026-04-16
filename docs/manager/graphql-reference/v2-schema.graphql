@@ -6788,6 +6788,11 @@ type Mutation {
   """Added in 26.4.2. Create a new virtual folder."""
   createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload!
 
+  """
+  Added in UNRELEASED. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
+  """
+  createProjectVFolder(projectId: UUID!, input: CreateVFolderV2Input!): CreateVFolderV2Payload!
+
   """Added in 26.4.2. Soft-delete a virtual folder (move to trash)."""
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!
 
