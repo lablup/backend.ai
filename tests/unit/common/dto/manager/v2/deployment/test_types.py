@@ -75,8 +75,8 @@ class TestDeploymentOrderField:
     def test_created_at_value(self) -> None:
         assert DeploymentOrderField.CREATED_AT.value == "created_at"
 
-    def test_updated_at_value(self) -> None:
-        assert DeploymentOrderField.UPDATED_AT.value == "updated_at"
+    def test_destroyed_at_value(self) -> None:
+        assert DeploymentOrderField.DESTROYED_AT.value == "destroyed_at"
 
     def test_enum_members_count(self) -> None:
         members = list(DeploymentOrderField)
@@ -92,8 +92,8 @@ class TestDeploymentOrderField:
     def test_from_string_created_at(self) -> None:
         assert DeploymentOrderField("created_at") is DeploymentOrderField.CREATED_AT
 
-    def test_from_string_updated_at(self) -> None:
-        assert DeploymentOrderField("updated_at") is DeploymentOrderField.UPDATED_AT
+    def test_from_string_destroyed_at(self) -> None:
+        assert DeploymentOrderField("destroyed_at") is DeploymentOrderField.DESTROYED_AT
 
 
 class TestRevisionOrderField:

@@ -203,6 +203,8 @@ class DeploymentAdapter(BaseFilterAdapter):
             return DeploymentOrders.name(ascending=ascending)
         if order.field == DeploymentOrderField.CREATED_AT:
             return DeploymentOrders.created_at(ascending=ascending)
+        if order.field == DeploymentOrderField.DESTROYED_AT:
+            return DeploymentOrders.destroyed_at(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

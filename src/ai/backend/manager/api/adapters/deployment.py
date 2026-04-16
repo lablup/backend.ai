@@ -1551,6 +1551,52 @@ class DeploymentAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if f.domain_name is not None:
+            condition = self.convert_string_filter(
+                f.domain_name,
+                contains_factory=DeploymentConditions.by_domain_name_contains,
+                equals_factory=DeploymentConditions.by_domain_name_equals,
+                starts_with_factory=DeploymentConditions.by_domain_name_starts_with,
+                ends_with_factory=DeploymentConditions.by_domain_name_ends_with,
+                in_factory=DeploymentConditions.by_domain_name_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.project_id is not None:
+            conditions.append(DeploymentConditions.by_project_id(f.project_id))
+        if f.resource_group is not None:
+            condition = self.convert_string_filter(
+                f.resource_group,
+                contains_factory=DeploymentConditions.by_resource_group_contains,
+                equals_factory=DeploymentConditions.by_resource_group_equals,
+                starts_with_factory=DeploymentConditions.by_resource_group_starts_with,
+                ends_with_factory=DeploymentConditions.by_resource_group_ends_with,
+                in_factory=DeploymentConditions.by_resource_group_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.created_user_id is not None:
+            conditions.append(DeploymentConditions.by_created_user_id(f.created_user_id))
+        if f.session_owner_id is not None:
+            conditions.append(DeploymentConditions.by_session_owner_id(f.session_owner_id))
+        if f.created_at is not None:
+            dt_condition = f.created_at.build_query_condition(
+                before_factory=DeploymentConditions.by_created_at_before,
+                after_factory=DeploymentConditions.by_created_at_after,
+                equals_factory=DeploymentConditions.by_created_at_equals,
+            )
+            if dt_condition is not None:
+                conditions.append(dt_condition)
+        if f.destroyed_at is not None:
+            dt_condition = f.destroyed_at.build_query_condition(
+                before_factory=DeploymentConditions.by_destroyed_at_before,
+                after_factory=DeploymentConditions.by_destroyed_at_after,
+                equals_factory=DeploymentConditions.by_destroyed_at_equals,
+                is_null_factory=DeploymentConditions.by_destroyed_at_is_null,
+                is_not_null_factory=DeploymentConditions.by_destroyed_at_is_not_null,
+            )
+            if dt_condition is not None:
+                conditions.append(dt_condition)
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_deployment_filter(sub))
@@ -1596,6 +1642,51 @@ class DeploymentAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if f.image_id is not None:
+            conditions.append(RevisionConditions.by_image_id(f.image_id))
+        if f.model_id is not None:
+            conditions.append(RevisionConditions.by_model_id(f.model_id))
+        if f.resource_group is not None:
+            condition = self.convert_string_filter(
+                f.resource_group,
+                contains_factory=RevisionConditions.by_resource_group_contains,
+                equals_factory=RevisionConditions.by_resource_group_equals,
+                starts_with_factory=RevisionConditions.by_resource_group_starts_with,
+                ends_with_factory=RevisionConditions.by_resource_group_ends_with,
+                in_factory=RevisionConditions.by_resource_group_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.cluster_mode is not None:
+            condition = self.convert_string_filter(
+                f.cluster_mode,
+                contains_factory=RevisionConditions.by_cluster_mode_contains,
+                equals_factory=RevisionConditions.by_cluster_mode_equals,
+                starts_with_factory=RevisionConditions.by_cluster_mode_starts_with,
+                ends_with_factory=RevisionConditions.by_cluster_mode_ends_with,
+                in_factory=RevisionConditions.by_cluster_mode_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.runtime_variant is not None:
+            condition = self.convert_string_filter(
+                f.runtime_variant,
+                contains_factory=RevisionConditions.by_runtime_variant_contains,
+                equals_factory=RevisionConditions.by_runtime_variant_equals,
+                starts_with_factory=RevisionConditions.by_runtime_variant_starts_with,
+                ends_with_factory=RevisionConditions.by_runtime_variant_ends_with,
+                in_factory=RevisionConditions.by_runtime_variant_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.created_at is not None:
+            dt_condition = f.created_at.build_query_condition(
+                before_factory=RevisionConditions.by_created_at_before,
+                after_factory=RevisionConditions.by_created_at_after,
+                equals_factory=RevisionConditions.by_created_at_equals,
+            )
+            if dt_condition is not None:
+                conditions.append(dt_condition)
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_revision_filter(sub))
@@ -2034,8 +2125,8 @@ class DeploymentAdapter(BaseAdapter):
                     result.append(DeploymentOrders.name(ascending))
                 case DeploymentOrderField.CREATED_AT:
                     result.append(DeploymentOrders.created_at(ascending))
-                case DeploymentOrderField.UPDATED_AT:
-                    result.append(DeploymentOrders.updated_at(ascending))
+                case DeploymentOrderField.DESTROYED_AT:
+                    result.append(DeploymentOrders.destroyed_at(ascending))
         return result
 
     @staticmethod

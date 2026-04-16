@@ -517,6 +517,21 @@ class DeploymentFilter(BaseRequestModel):
     open_to_public: bool | None = Field(default=None, description="Public access filter")
     tags: StringFilter | None = Field(default=None, description="Tags filter")
     endpoint_url: StringFilter | None = Field(default=None, description="Endpoint URL filter")
+    domain_name: StringFilter | None = Field(default=None, description="Domain name filter")
+    project_id: UUID | None = Field(default=None, description="Filter by project ID")
+    resource_group: StringFilter | None = Field(
+        default=None, description="Resource group name filter"
+    )
+    created_user_id: UUID | None = Field(
+        default=None, description="Filter by the user who created the deployment"
+    )
+    session_owner_id: UUID | None = Field(
+        default=None, description="Filter by the session owner of the deployment"
+    )
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    destroyed_at: NullableDateTimeFilter | None = Field(
+        default=None, description="Destruction datetime filter (supports is_null)"
+    )
     AND: list[DeploymentFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[DeploymentFilter] | None = Field(default=None, description="OR conjunction")
     NOT: list[DeploymentFilter] | None = Field(default=None, description="NOT negation")
@@ -530,6 +545,14 @@ class RevisionFilter(BaseRequestModel):
 
     revision_number: IntFilter | None = Field(default=None, description="Filter by revision number")
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    image_id: UUID | None = Field(default=None, description="Filter by container image ID")
+    model_id: UUID | None = Field(default=None, description="Filter by model VFolder ID")
+    resource_group: StringFilter | None = Field(
+        default=None, description="Resource group name filter"
+    )
+    cluster_mode: StringFilter | None = Field(default=None, description="Cluster mode filter")
+    runtime_variant: StringFilter | None = Field(default=None, description="Runtime variant filter")
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
     AND: list[RevisionFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[RevisionFilter] | None = Field(default=None, description="OR conjunction")
     NOT: list[RevisionFilter] | None = Field(default=None, description="NOT negation")

@@ -86,6 +86,8 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
     encode_cursor,
@@ -549,6 +551,48 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     open_to_public: bool | None = None
     tags: StringFilter | None = None
     endpoint_url: StringFilter | None = None
+    domain_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by domain name."),
+        default=None,
+    )
+    project_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by project ID."),
+        default=None,
+    )
+    resource_group: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by resource group name."
+        ),
+        default=None,
+    )
+    created_user_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the user who created the deployment.",
+        ),
+        default=None,
+    )
+    session_owner_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the session owner of the deployment.",
+        ),
+        default=None,
+    )
+    created_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by deployment creation datetime.",
+        ),
+        default=None,
+    )
+    destroyed_at: NullableDateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

@@ -81,7 +81,7 @@ class DeploymentOrderField(StrEnum):
 
     NAME = "name"
     CREATED_AT = "created_at"
-    UPDATED_AT = "updated_at"
+    DESTROYED_AT = "destroyed_at"
 
 
 class RevisionOrderField(StrEnum):
