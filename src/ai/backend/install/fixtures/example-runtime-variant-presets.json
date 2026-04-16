@@ -15,7 +15,7 @@
       "ui_option": {
         "ui_type": "text_input",
         "text": {
-          "placeholder": "meta-llama/Llama-3.3-70B"
+          "placeholder": "Qwen/Qwen3-0.6B"
         }
       }
     },
@@ -40,6 +40,10 @@
               "label": "Auto"
             },
             {
+              "value": "float",
+              "label": "Float"
+            },
+            {
               "value": "bfloat16",
               "label": "BFloat16"
             },
@@ -50,6 +54,10 @@
             {
               "value": "float32",
               "label": "Float32"
+            },
+            {
+              "value": "half",
+              "label": "Half"
             }
           ]
         }
@@ -76,16 +84,16 @@
               "label": "AWQ"
             },
             {
-              "value": "gptq",
-              "label": "GPTQ"
-            },
-            {
               "value": "fp8",
               "label": "FP8"
             },
             {
-              "value": "squeezellm",
-              "label": "SqueezeLLM"
+              "value": "bitsandbytes",
+              "label": "BitsAndBytes"
+            },
+            {
+              "value": "modelopt",
+              "label": "NVIDIA Model Optimizer"
             }
           ]
         }
@@ -263,6 +271,14 @@
             {
               "value": "fp8",
               "label": "FP8"
+            },
+            {
+              "value": "bfloat16",
+              "label": "BFloat16"
+            },
+            {
+              "value": "float16",
+              "label": "Float16"
             }
           ]
         }
@@ -460,6 +476,10 @@
               "label": "Llama 3 JSON"
             },
             {
+              "value": "llama4_pythonic",
+              "label": "Llama 4 Pythonic"
+            },
+            {
               "value": "llama4_json",
               "label": "Llama 4 JSON"
             },
@@ -472,12 +492,20 @@
               "label": "DeepSeek V3"
             },
             {
+              "value": "deepseek_v31",
+              "label": "DeepSeek V3.1"
+            },
+            {
               "value": "qwen3_coder",
               "label": "Qwen3 Coder"
             },
             {
               "value": "openai",
               "label": "OpenAI"
+            },
+            {
+              "value": "kimi_k2",
+              "label": "Kimi K2"
             }
           ]
         }
@@ -500,6 +528,10 @@
         "choices": {
           "items": [
             {
+              "value": "deepseek_r1",
+              "label": "DeepSeek R1"
+            },
+            {
               "value": "deepseek_v3",
               "label": "DeepSeek V3"
             },
@@ -508,8 +540,12 @@
               "label": "Qwen3"
             },
             {
-              "value": "gemma4",
-              "label": "Gemma 4"
+              "value": "mistral",
+              "label": "Mistral"
+            },
+            {
+              "value": "glm4_moe",
+              "label": "GLM 4 MoE"
             }
           ]
         }
