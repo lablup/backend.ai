@@ -7,7 +7,6 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -30,7 +29,6 @@ from ai.backend.manager.data.deployment.creator import (
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
-    DeploymentConfig,
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -458,225 +456,23 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
 
 
 class TestAddModelRevision(ModelRevisionFixtures):
-    """Tests for DeploymentService.add_model_revision"""
+    """Tests for DeploymentService.add_model_revision — now delegates to controller."""
 
-    async def test_add_model_revision_first_revision(
+    async def test_add_model_revision_delegates_to_controller(
         self,
         processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
+        mock_deployment_controller: MagicMock,
         deployment_id: uuid.UUID,
-        endpoint_info: DeploymentInfo,
         revision_creator: ModelRevisionCreator,
         revision_data: ModelRevisionData,
     ) -> None:
-        """Adding the first revision should delegate to create_revision_with_next_number."""
+        """add_model_revision should delegate to controller.add_revision."""
+        mock_deployment_controller.add_revision = AsyncMock(return_value=revision_data)
+
         action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
         result = await processors.add_model_revision.wait_for_complete(action)
 
         assert result.revision == revision_data
-        mock_deployment_repository.get_endpoint_info.assert_called_once_with(deployment_id)
-        mock_deployment_repository.create_revision_with_next_number.assert_called_once()
-
-        call_args = mock_deployment_repository.create_revision_with_next_number.call_args
-        creator_arg = call_args[0][0]
-        endpoint_id_arg = call_args[0][1]
-        spec = creator_arg.spec
-        assert endpoint_id_arg == deployment_id
-        assert spec.image_id == revision_creator.image_id
-        assert spec.resource_group == endpoint_info.metadata.resource_group
-        assert spec.model_id == revision_creator.mounts.model_vfolder_id
-        assert spec.runtime_variant == RuntimeVariant("vllm")
-
-    async def test_add_model_revision_maps_resource_fields(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-    ) -> None:
-        """All fields from ModelRevisionCreator should be mapped to the spec correctly."""
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
-
-        creator_arg = mock_deployment_repository.create_revision_with_next_number.call_args[0][0]
-        spec = creator_arg.spec
-        assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)
-        assert spec.resource_opts == revision_creator.resource_spec.resource_opts
-        assert spec.cluster_mode == revision_creator.resource_spec.cluster_mode.value
-        assert spec.cluster_size == revision_creator.resource_spec.cluster_size
-        assert spec.model_mount_destination == revision_creator.mounts.model_mount_destination
-        assert spec.model_definition_path == revision_creator.mounts.model_definition_path
-        assert spec.model_definition == revision_creator.model_definition
-        assert spec.startup_command == revision_creator.execution.startup_command
-        assert spec.bootstrap_script == revision_creator.execution.bootstrap_script
-        assert spec.environ == revision_creator.execution.environ
-        assert spec.callback_url is None
-        assert spec.extra_mounts == ()
-
-    async def test_add_model_revision_with_none_environ(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator_with_none_environ: ModelRevisionCreator,
-    ) -> None:
-        """None environ and resource_opts should be converted to empty dict."""
-        action = AddModelRevisionAction(
-            model_deployment_id=deployment_id, adder=revision_creator_with_none_environ
+        mock_deployment_controller.add_revision.assert_awaited_once_with(
+            deployment_id, revision_creator
         )
-        await processors.add_model_revision.wait_for_complete(action)
-
-        creator_arg = mock_deployment_repository.create_revision_with_next_number.call_args[0][0]
-        spec = creator_arg.spec
-        assert spec.environ == {}
-        assert spec.resource_opts == {}
-
-    @pytest.fixture
-    def sample_model_definition(self) -> ModelDefinition:
-        return ModelDefinition.model_validate({
-            "models": [
-                {
-                    "name": "test-model",
-                    "model-path": "/models",
-                    "service": {"start-command": "serve", "port": 8000},
-                }
-            ]
-        })
-
-    @pytest.fixture
-    def revision_creator_with_model_definition(
-        self,
-        image_id: uuid.UUID,
-        model_vfolder_id: uuid.UUID,
-        sample_model_definition: ModelDefinition,
-    ) -> ModelRevisionCreator:
-        return ModelRevisionCreator(
-            image_id=image_id,
-            resource_spec=ResourceSpec(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots={"cpu": "4"},
-            ),
-            mounts=VFolderMountsCreator(model_vfolder_id=model_vfolder_id),
-            execution=ExecutionSpec(runtime_variant=RuntimeVariant("vllm")),
-            model_definition=sample_model_definition,
-        )
-
-    async def test_add_model_revision_stores_resolved_model_definition(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        mock_model_definition_generator_registry: AsyncMock,
-        deployment_id: uuid.UUID,
-        revision_creator_with_model_definition: ModelRevisionCreator,
-        sample_model_definition: ModelDefinition,
-    ) -> None:
-        """Resolved model_definition (from generator registry) should be stored in the DB spec."""
-        mock_model_definition_generator_registry.generate_model_definition.return_value = (
-            sample_model_definition
-        )
-
-        action = AddModelRevisionAction(
-            model_deployment_id=deployment_id, adder=revision_creator_with_model_definition
-        )
-        await processors.add_model_revision.wait_for_complete(action)
-
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        assert spec.model_definition is not None
-        assert spec.model_definition == sample_model_definition
-
-
-class TestDeploymentConfigMerge(ModelRevisionFixtures):
-    """Tests for deployment config merging in revision creation."""
-
-    @pytest.fixture
-    def setup_mock_deployment_config(
-        self, mock_revision_generator_registry: MagicMock
-    ) -> Callable[[DeploymentConfig], None]:
-        """Factory fixture to inject a deployment config into the mock generator registry."""
-
-        def _setup(deployment_config: DeploymentConfig) -> None:
-            mock_generator = MagicMock()
-            mock_generator.load_deployment_config = AsyncMock(return_value=deployment_config)
-            mock_revision_generator_registry.get.return_value = mock_generator
-
-        return _setup
-
-    async def test_merge_environ_from_deployment_config(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
-    ) -> None:
-        """Deployment config environ should be merged with creator environ as base."""
-        setup_mock_deployment_config(
-            DeploymentConfig(
-                environ={"SERVICE_VAR": "from_def", "CUDA_VISIBLE_DEVICES": "1"},
-            )
-        )
-
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
-
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        # Creator value overrides deployment config for overlapping keys
-        assert spec.environ["CUDA_VISIBLE_DEVICES"] == "0"
-        # Deployment config provides new keys
-        assert spec.environ["SERVICE_VAR"] == "from_def"
-
-    async def test_merge_resource_slots_from_deployment_config(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
-    ) -> None:
-        """Deployment config resource_slots should be merged with creator slots as base."""
-        setup_mock_deployment_config(
-            DeploymentConfig(
-                resource_slots={"cpu": "2", "mem": "4g", "cuda.shares": "1.0"},
-            )
-        )
-
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
-
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        expected = ResourceSlot({"cpu": "4", "mem": "8g", "cuda.shares": "1.0"})
-        assert spec.resource_slots == expected
-
-    async def test_no_deployment_config_uses_creator_values_as_is(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-    ) -> None:
-        """When no deployment config exists, creator values are used unchanged."""
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
-
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        assert spec.environ == revision_creator.execution.environ
-        assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)
-
-    async def test_deployment_config_with_empty_fields_no_effect(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
-    ) -> None:
-        """Deployment config with None environ/resource_slots should not affect creator."""
-        setup_mock_deployment_config(DeploymentConfig(environ=None, resource_slots=None))
-
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
-
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        assert spec.environ == revision_creator.execution.environ
-        assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)

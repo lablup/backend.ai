@@ -117,6 +117,8 @@ def deployment_processors(
     revision_generator_registry = RevisionGeneratorRegistry(
         RevisionGeneratorRegistryArgs(deployment_repository=repo)
     )
+    model_definition_generator_registry = AsyncMock()
+    model_definition_generator_registry.generate_model_definition.return_value = ModelDefinition()
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(
             scheduling_controller=scheduling_controller,
@@ -126,10 +128,10 @@ def deployment_processors(
             event_producer=event_producer,
             valkey_schedule=valkey_clients.schedule,
             revision_generator_registry=revision_generator_registry,
+            model_definition_generator_registry=model_definition_generator_registry,
+            deployment_revision_preset_repository=None,
         )
     )
-    model_definition_generator_registry = AsyncMock()
-    model_definition_generator_registry.generate_model_definition.return_value = ModelDefinition()
     service = DeploymentService(
         deployment_controller,
         repo,

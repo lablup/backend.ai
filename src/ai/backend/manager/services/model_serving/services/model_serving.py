@@ -4,7 +4,7 @@ import logging
 import secrets
 import uuid
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import aiohttp
 from pydantic import HttpUrl
@@ -40,7 +40,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.creator import VFolderMountsCreator
+from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ImageIdentifierDraft,
@@ -152,9 +152,6 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import MountOptionModel, UserScope
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

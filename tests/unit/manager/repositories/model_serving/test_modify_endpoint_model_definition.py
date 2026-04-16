@@ -335,15 +335,15 @@ class TestModifyEndpointModelDefinitionRefresh:
     # Tests
     # =========================================================================
 
-    async def test_new_revision_uses_refreshed_model_definition(
+    async def test_modify_endpoint_fields_does_not_create_revision(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         repository: ModelServingRepository,
         endpoint_and_revision: tuple[uuid.UUID, uuid.UUID],
         user_context: UserData,
     ) -> None:
-        """The new revision created by modify_endpoint must carry the model
-        definition re-read from the vfolder, not the old revision's copy."""
+        """modify_endpoint_fields only applies endpoint-level changes;
+        revision creation is now handled by DeploymentController.add_revision."""
 
         endpoint_id, _ = endpoint_and_revision
         spec = EndpointUpdaterSpec(environ=TriState.update({"NEW_VAR": "1"}))
@@ -354,27 +354,20 @@ class TestModifyEndpointModelDefinitionRefresh:
 
         with (
             with_user(user_context),
-            patch.object(
-                repository,
-                "_fetch_model_definition_from_vfolder",
-                new_callable=AsyncMock,
-                return_value=NEW_MODEL_DEF,
-            ),
             patch(
                 "ai.backend.manager.repositories.model_serving.repository.ModelServiceHelper",
                 check_scaling_group=AsyncMock(),
             ),
         ):
-            result = await repository.modify_endpoint(
+            result = await repository.modify_endpoint_fields(
                 action,
                 agent_registry=MagicMock(),
                 legacy_etcd_config_loader=MagicMock(),
-                storage_manager=MagicMock(),
             )
 
         assert result.success is True
 
-        # Verify the new revision in DB has the refreshed model_definition
+        # Verify no new revision was created — revision count stays at 1
         async with db_with_cleanup.begin_readonly_session() as sess:
             rows = (
                 (
@@ -388,9 +381,5 @@ class TestModifyEndpointModelDefinitionRefresh:
                 .all()
             )
 
-        assert len(rows) == 2
+        assert len(rows) == 1
         assert rows[0].model_definition == OLD_MODEL_DEF
-        assert rows[1].model_definition == NEW_MODEL_DEF, (
-            "New revision must use model_definition freshly read from vfolder, "
-            f"got {rows[1].model_definition!r}"
-        )
