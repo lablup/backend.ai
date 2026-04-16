@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    PromoteDeploymentInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -49,6 +50,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     GetAccessTokenPayload,
     GetAutoScalingRulePayload,
     GetDeploymentPolicyPayload,
+    PromoteDeploymentPayload,
     ReplicaNode,
     RevisionNode,
     SearchAccessTokensPayload,
@@ -232,6 +234,17 @@ class V2DeploymentClient(BaseDomainClient):
             _PATH + f"/{body.deployment_id}/revisions/activate",
             request=body,
             response_model=ActivateRevisionPayload,
+        )
+
+    async def promote(
+        self,
+        body: PromoteDeploymentInput,
+    ) -> PromoteDeploymentPayload:
+        """Manually promote a blue-green deployment awaiting promotion."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + f"/{body.deployment_id}/promote",
+            response_model=PromoteDeploymentPayload,
         )
 
     # ------------------------------------------------------------------

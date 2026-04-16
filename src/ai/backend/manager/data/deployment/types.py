@@ -181,7 +181,6 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     """Clearing deploying_revision and transitioning to READY."""
     DEPLOYING_COMPLETED = "deploying_completed"
     """All strategy conditions satisfied; triggers revision swap."""
-
     DEPLOYING_AWAITING_PROMOTION = "deploying_awaiting_promotion"
     """All new routes healthy; waiting for manual approval or delay timer."""
 

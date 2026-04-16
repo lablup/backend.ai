@@ -107,6 +107,12 @@ def register_v2_deployment_routes(
     )
     registry.add(
         "POST",
+        "/{deployment_id}/promote",
+        handler.promote,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/revisions/{revision_id}/resource-slots/search",
         handler.search_revision_resource_slots,
         middlewares=[auth_required],

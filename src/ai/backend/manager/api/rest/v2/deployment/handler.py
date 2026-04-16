@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    PromoteDeploymentInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -193,6 +194,15 @@ class V2DeploymentHandler:
     ) -> APIResponse:
         """Activate a specific revision as the current revision."""
         result = await self._adapter.activate_revision(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def promote(
+        self,
+        path: PathParam[DeploymentIdPathParam],
+    ) -> APIResponse:
+        """Manually promote a blue-green deployment awaiting promotion."""
+        input_dto = PromoteDeploymentInput(deployment_id=path.parsed.deployment_id)
+        result = await self._adapter.promote_deployment(input_dto)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_revision_resource_slots(
