@@ -875,7 +875,16 @@ class DeploymentService:
             try:
                 spec = await self._deployment_repository.get_current_revision_spec(endpoint_id)
                 creator = _build_creator_from_revision_spec(spec)
-                new_revision = await self._deployment_controller.add_revision(endpoint_id, creator)
+                mounts = MountMetadata(
+                    model_vfolder_id=creator.mounts.model_vfolder_id,
+                    model_definition_path=creator.mounts.model_definition_path,
+                    model_mount_destination=creator.mounts.model_mount_destination,
+                )
+                new_revision = await self._deployment_controller.add_revision(
+                    endpoint_id=endpoint_id,
+                    overrides=revision_draft_from_creator(creator),
+                    mounts=mounts,
+                )
                 await self._deployment_controller.activate_revision(endpoint_id, new_revision.id)
                 results.append(
                     RevisionRefreshResult(
