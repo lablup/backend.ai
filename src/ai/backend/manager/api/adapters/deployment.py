@@ -302,6 +302,20 @@ from .pagination import PaginationSpec
 DEFAULT_PAGINATION_LIMIT = 10
 
 
+def _tristate_from_input[T](value: T | Sentinel | None) -> TriState[T]:
+    """Map a DTO-style optional value (Sentinel / None / value) to TriState.
+
+    - ``Sentinel`` → NOP (field was not provided; leave the attribute unchanged)
+    - ``None`` → NULLIFY (field was provided as ``null``; clear the attribute)
+    - otherwise → UPDATE (replace with the given value)
+    """
+    if isinstance(value, Sentinel):
+        return TriState[T].nop()
+    if value is None:
+        return TriState[T].nullify()
+    return TriState[T].update(value)
+
+
 @lru_cache(maxsize=1)
 def _get_deployment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
@@ -975,16 +989,8 @@ class DeploymentAdapter(BaseAdapter):
                 if input.metric_name is not None
                 else OptionalState.nop()
             ),
-            min_threshold=(
-                OptionalState.update(input.min_threshold)
-                if not isinstance(input.min_threshold, Sentinel) and input.min_threshold is not None
-                else OptionalState.nop()
-            ),
-            max_threshold=(
-                OptionalState.update(input.max_threshold)
-                if not isinstance(input.max_threshold, Sentinel) and input.max_threshold is not None
-                else OptionalState.nop()
-            ),
+            min_threshold=_tristate_from_input(input.min_threshold),
+            max_threshold=_tristate_from_input(input.max_threshold),
             step_size=(
                 OptionalState.update(input.step_size)
                 if input.step_size is not None
@@ -995,22 +1001,9 @@ class DeploymentAdapter(BaseAdapter):
                 if input.time_window is not None
                 else OptionalState.nop()
             ),
-            min_replicas=(
-                OptionalState.update(input.min_replicas)
-                if not isinstance(input.min_replicas, Sentinel) and input.min_replicas is not None
-                else OptionalState.nop()
-            ),
-            max_replicas=(
-                OptionalState.update(input.max_replicas)
-                if not isinstance(input.max_replicas, Sentinel) and input.max_replicas is not None
-                else OptionalState.nop()
-            ),
-            prometheus_query_preset_id=(
-                OptionalState.update(input.prometheus_query_preset_id)
-                if not isinstance(input.prometheus_query_preset_id, Sentinel)
-                and input.prometheus_query_preset_id is not None
-                else OptionalState.nop()
-            ),
+            min_replicas=_tristate_from_input(input.min_replicas),
+            max_replicas=_tristate_from_input(input.max_replicas),
+            prometheus_query_preset_id=_tristate_from_input(input.prometheus_query_preset_id),
         )
         action_result = (
             await self._processors.deployment.update_auto_scaling_rule.wait_for_complete(

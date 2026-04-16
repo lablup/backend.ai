@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import uuid4
 
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
-from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
+from ai.backend.manager.api.adapters.deployment import (
+    DeploymentAdapter,
+    _tristate_from_input,
+)
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     ModelMountConfigData,
@@ -15,6 +20,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRuntimeConfigData,
     ResourceConfigData,
 )
+from ai.backend.manager.types import TriState
 
 
 class TestRevisionDataToDTO:
@@ -63,3 +69,31 @@ class TestRevisionDataToDTO:
         assert dto.model_definition.models[0].name == "demo-model"
         assert dto.model_definition.models[0].service is not None
         assert dto.model_definition.models[0].service.port == 8000
+
+
+class TestTriStateFromInput:
+    """Tests for _tristate_from_input(): Sentinel/None/value → NOP/NULLIFY/UPDATE."""
+
+    def test_sentinel_yields_nop(self) -> None:
+        result: TriState[Decimal] = _tristate_from_input(SENTINEL)
+        assert result.is_nop()
+
+    def test_none_yields_nullify(self) -> None:
+        result: TriState[Decimal] = _tristate_from_input(None)
+        assert result.is_nullify()
+
+    def test_decimal_value_yields_update(self) -> None:
+        result = _tristate_from_input(Decimal("0.5"))
+        assert result.is_update()
+        assert result.value() == Decimal("0.5")
+
+    def test_uuid_value_yields_update(self) -> None:
+        preset_id = uuid4()
+        result = _tristate_from_input(preset_id)
+        assert result.is_update()
+        assert result.value() == preset_id
+
+    def test_int_value_yields_update(self) -> None:
+        result = _tristate_from_input(3)
+        assert result.is_update()
+        assert result.value() == 3

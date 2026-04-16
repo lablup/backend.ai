@@ -1112,30 +1112,14 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     ) -> None:
         """Apply ModelDeploymentAutoScalingRuleModifier to update fields.
 
-        Uses OptionalState pattern where optional_value() returns the value to update
-        or None if no update should be performed.
+        Uses fields_to_update() which honours both OptionalState (NOP/UPDATE)
+        and TriState (NOP/UPDATE/NULLIFY). Dict keys match DB column names so
+        each entry can be applied directly via setattr, preserving NULLIFY
+        semantics for nullable columns (min/max_threshold, min/max_replicas,
+        prometheus_query_preset_id).
         """
-        if (metric_source := modifier.metric_source.optional_value()) is not None:
-            self.metric_source = metric_source
-        if (metric_name := modifier.metric_name.optional_value()) is not None:
-            self.metric_name = metric_name
-        if (step_size := modifier.step_size.optional_value()) is not None:
-            self.step_size = step_size
-        if (time_window := modifier.time_window.optional_value()) is not None:
-            self.cooldown_seconds = time_window
-        if (min_replicas := modifier.min_replicas.optional_value()) is not None:
-            self.min_replicas = min_replicas
-        if (max_replicas := modifier.max_replicas.optional_value()) is not None:
-            self.max_replicas = max_replicas
-
-        if (max_threshold := modifier.max_threshold.optional_value()) is not None:
-            self.max_threshold = max_threshold
-        if (min_threshold := modifier.min_threshold.optional_value()) is not None:
-            self.min_threshold = min_threshold
-        if (
-            prometheus_query_preset_id := modifier.prometheus_query_preset_id.optional_value()
-        ) is not None:
-            self.prometheus_query_preset_id = prometheus_query_preset_id
+        for column_name, value in modifier.fields_to_update().items():
+            setattr(self, column_name, value)
 
 
 class ModelServiceHelper:
