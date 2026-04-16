@@ -61,6 +61,7 @@ from ai.backend.manager.sokovan.deployment.revision_draft import (
     ModelDefinitionDraftGenerator,
     PresetDraftGenerator,
     revision_draft_from_creator,
+    revision_draft_from_current,
     revision_draft_from_spec,
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
@@ -342,6 +343,112 @@ class DeploymentController:
 
         await self._prune_revision_history(
             deployment_id, endpoint_info.metadata.revision_history_limit
+        )
+
+        return revision_data
+
+    async def modify_revision(
+        self,
+        endpoint_id: uuid.UUID,
+        overrides: RevisionDraft,
+        model_definition_path_override: str | None = None,
+    ) -> ModelRevisionData:
+        """Create a successor revision by running the unified merge pipeline on top
+        of the current revision.
+
+        Merge order (low → high):
+            1. current revision  (base — fields the user did not touch survive)
+            2. deployment-config.yaml
+            3. revision preset (if overrides.preset-applicable — currently not wired)
+            4. model-definition.yaml
+            5. user overrides (only fields explicitly set by the caller)
+
+        Unlike ``add_revision`` which receives a fully-formed ``ModelRevisionCreator``,
+        this method accepts a ``RevisionDraft`` of partial overrides — appropriate for
+        modify flows that only carry the changed fields.
+        """
+        log.info("Modifying revision on deployment {}", endpoint_id)
+
+        endpoint_info = await self._deployment_repository.get_endpoint_info(endpoint_id)
+        current = await self._deployment_repository.get_current_revision(endpoint_id)
+        current_draft = revision_draft_from_current(current)
+
+        runtime_variant = overrides.runtime_variant or current_draft.runtime_variant
+        if runtime_variant is None:
+            raise InvalidAPIParameters("runtime_variant is required to modify a revision")
+        vfolder_id = current.model_mount_config.vfolder_id
+        if vfolder_id is None:
+            raise InvalidAPIParameters("model vfolder id is missing on the current revision")
+
+        model_definition_path = (
+            model_definition_path_override
+            if model_definition_path_override is not None
+            else current.model_mount_config.definition_path
+        )
+        mounts = MountMetadata(
+            model_vfolder_id=vfolder_id,
+            model_definition_path=model_definition_path,
+            model_mount_destination=current.model_mount_config.mount_destination or "/models",
+        )
+        context_environ: dict[str, str] | None
+        if overrides.environ is not None:
+            context_environ = dict(overrides.environ)
+        elif current_draft.environ is not None:
+            context_environ = dict(current_draft.environ)
+        else:
+            context_environ = None
+        context_execution = ExecutionSpec(
+            runtime_variant=runtime_variant,
+            environ=context_environ,
+        )
+
+        pipeline_merged = await self._build_revision_draft(
+            request_draft=overrides,
+            mounts=mounts,
+            execution=context_execution,
+            preset_id=None,
+            default_architecture=None,
+        )
+        merged = merge_revision_drafts(current_draft, pipeline_merged)
+
+        image_id = merged.image_id or current.image_id
+        spec = DeploymentRevisionCreatorSpec(
+            endpoint_id=endpoint_id,
+            image_id=image_id,
+            resource_group=endpoint_info.metadata.resource_group,
+            resource_slots=ResourceSlot(merged.resource_slots or {}),
+            resource_opts=dict(merged.resource_opts) if merged.resource_opts else {},
+            cluster_mode=(merged.cluster_mode or ClusterMode.SINGLE_NODE).value,
+            cluster_size=merged.cluster_size or 1,
+            model_id=vfolder_id,
+            model_mount_destination=mounts.model_mount_destination,
+            model_definition_path=mounts.model_definition_path,
+            model_definition=merged.model_definition,
+            startup_command=merged.startup_command,
+            bootstrap_script=merged.bootstrap_script,
+            environ=dict(merged.environ) if merged.environ else {},
+            callback_url=str(merged.callback_url) if merged.callback_url else None,
+            runtime_variant=merged.runtime_variant or runtime_variant,
+            extra_mounts=(),
+            preset_values=[
+                PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
+                for pv in (merged.preset_values or [])
+            ],
+        )
+        rbac_creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(endpoint_id),
+            ),
+        )
+        revision_data = await self._deployment_repository.create_revision_with_next_number(
+            rbac_creator, endpoint_id
+        )
+
+        await self._prune_revision_history(
+            endpoint_id, endpoint_info.metadata.revision_history_limit
         )
 
         return revision_data

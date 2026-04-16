@@ -1,6 +1,9 @@
 from ai.backend.manager.sokovan.deployment.revision_draft.config import (
     DeploymentConfigDraftGenerator,
 )
+from ai.backend.manager.sokovan.deployment.revision_draft.current import (
+    revision_draft_from_current,
+)
 from ai.backend.manager.sokovan.deployment.revision_draft.model_definition import (
     ModelDefinitionDraftGenerator,
 )
@@ -17,5 +20,6 @@ __all__ = (
     "ModelDefinitionDraftGenerator",
     "PresetDraftGenerator",
     "revision_draft_from_creator",
+    "revision_draft_from_current",
     "revision_draft_from_spec",
 )
