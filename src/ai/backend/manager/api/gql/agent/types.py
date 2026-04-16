@@ -40,7 +40,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.agent.types import AgentStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (
@@ -167,7 +166,7 @@ class AgentStatsGQL:
     name="AgentStatusInfo",
 )
 class AgentStatusInfoGQL:
-    status: AgentStatus = gql_field(
+    status: AgentStatusEnum = gql_field(
         description="Current operational status of the agent. Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable), TERMINATED (intentionally stopped), or RESTARTING (in recovery process)."
     )
     status_changed: datetime | None = gql_field(
