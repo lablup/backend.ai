@@ -111,7 +111,7 @@ class V2SessionHandler:
         path: PathParam[SessionIdPathParamDTO],
     ) -> APIResponse:
         """Get a single session by ID."""
-        result = await self._adapter.get(path.parsed.session_id)
+        result = await self._adapter.get(SessionId(path.parsed.session_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def my_search(

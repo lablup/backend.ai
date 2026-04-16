@@ -315,7 +315,7 @@ class SessionAdapter(BaseAdapter):
     # Get single session
     # -------------------------------------------------------------------------
 
-    async def get(self, session_id: UUID) -> SessionNode:
+    async def get(self, session_id: SessionId) -> SessionNode:
         """Get a single session by ID with RBAC validation."""
         action_result = await self._processors.session.get_session.wait_for_complete(
             GetSessionAction(session_id=session_id)
@@ -912,7 +912,7 @@ class SessionAdapter(BaseAdapter):
             result = await self._processors.session.rename_session.wait_for_complete(action)
             return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
         # If no fields to update, just return the current session
-        session_node = await self.get(session_id)
+        session_node = await self.get(SessionId(session_id))
         return UpdateSessionPayload(session=session_node)
 
     # -------------------------------------------------------------------------

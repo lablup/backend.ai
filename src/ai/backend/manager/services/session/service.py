@@ -1477,7 +1477,7 @@ class SessionService:
     async def get_session(self, action: GetSessionAction) -> GetSessionActionResult:
         """Get a single session by ID with RBAC validation."""
         session_data = await self._session_repository.get_session_data_by_id(
-            SessionId(action.session_id),
+            action.session_id,
         )
         return GetSessionActionResult(session_data=session_data)
 

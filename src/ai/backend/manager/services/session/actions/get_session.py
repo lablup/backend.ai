@@ -1,8 +1,8 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData
@@ -14,7 +14,7 @@ from ai.backend.manager.services.session.base import (
 
 @dataclass
 class GetSessionAction(SessionSingleEntityAction):
-    session_id: uuid.UUID
+    session_id: SessionId
 
     @override
     @classmethod
