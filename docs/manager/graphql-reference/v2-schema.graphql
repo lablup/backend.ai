@@ -383,13 +383,6 @@ type AgentStats {
   totalResource: AgentResource!
 }
 
-enum AgentStatus {
-  ALIVE
-  LOST
-  RESTARTING
-  TERMINATED
-}
-
 enum AgentStatusEnum {
   ALIVE
   LOST
@@ -412,7 +405,7 @@ type AgentStatusInfo {
   """
   Current operational status of the agent. One of: ALIVE, LOST, TERMINATED, RESTARTING.
   """
-  status: AgentStatus!
+  status: AgentStatusEnum!
 
   """Timestamp when the agent last changed its status."""
   statusChanged: DateTime

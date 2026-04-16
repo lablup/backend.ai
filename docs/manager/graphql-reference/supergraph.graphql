@@ -591,15 +591,6 @@ type AgentStats
   totalResource: AgentResource!
 }
 
-enum AgentStatus
-  @join__type(graph: STRAWBERRY)
-{
-  ALIVE @join__enumValue(graph: STRAWBERRY)
-  LOST @join__enumValue(graph: STRAWBERRY)
-  RESTARTING @join__enumValue(graph: STRAWBERRY)
-  TERMINATED @join__enumValue(graph: STRAWBERRY)
-}
-
 enum AgentStatusEnum
   @join__type(graph: STRAWBERRY)
 {
@@ -628,7 +619,7 @@ type AgentStatusInfo
   """
   Current operational status of the agent. One of: ALIVE, LOST, TERMINATED, RESTARTING.
   """
-  status: AgentStatus!
+  status: AgentStatusEnum!
 
   """Timestamp when the agent last changed its status."""
   statusChanged: DateTime
