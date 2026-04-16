@@ -1642,8 +1642,8 @@ class DeploymentAdapter(BaseAdapter):
                 conditions.append(condition)
         if f.image_id is not None:
             conditions.append(RevisionConditions.by_image_id(f.image_id))
-        if f.model_id is not None:
-            conditions.append(RevisionConditions.by_model_id(f.model_id))
+        if f.model_vfolder_id is not None:
+            conditions.append(RevisionConditions.by_model_vfolder_id(f.model_vfolder_id))
         if f.resource_group is not None:
             condition = self.convert_string_filter(
                 f.resource_group,
@@ -1663,17 +1663,6 @@ class DeploymentAdapter(BaseAdapter):
                 starts_with_factory=RevisionConditions.by_cluster_mode_starts_with,
                 ends_with_factory=RevisionConditions.by_cluster_mode_ends_with,
                 in_factory=RevisionConditions.by_cluster_mode_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.runtime_variant is not None:
-            condition = self.convert_string_filter(
-                f.runtime_variant,
-                contains_factory=RevisionConditions.by_runtime_variant_contains,
-                equals_factory=RevisionConditions.by_runtime_variant_equals,
-                starts_with_factory=RevisionConditions.by_runtime_variant_starts_with,
-                ends_with_factory=RevisionConditions.by_runtime_variant_ends_with,
-                in_factory=RevisionConditions.by_runtime_variant_in,
             )
             if condition is not None:
                 conditions.append(condition)

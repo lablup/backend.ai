@@ -543,12 +543,11 @@ class RevisionFilter(BaseRequestModel):
     revision_number: IntFilter | None = Field(default=None, description="Filter by revision number")
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
     image_id: UUID | None = Field(default=None, description="Filter by container image ID")
-    model_id: UUID | None = Field(default=None, description="Filter by model VFolder ID")
+    model_vfolder_id: UUID | None = Field(default=None, description="Filter by model VFolder ID")
     resource_group: StringFilter | None = Field(
         default=None, description="Resource group name filter"
     )
     cluster_mode: StringFilter | None = Field(default=None, description="Cluster mode filter")
-    runtime_variant: StringFilter | None = Field(default=None, description="Runtime variant filter")
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
     AND: list[RevisionFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[RevisionFilter] | None = Field(default=None, description="OR conjunction")

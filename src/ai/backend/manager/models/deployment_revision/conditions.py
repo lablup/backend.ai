@@ -44,9 +44,9 @@ class RevisionConditions:
         return inner
 
     @staticmethod
-    def by_model_id(model_id: uuid.UUID) -> QueryCondition:
+    def by_model_vfolder_id(model_vfolder_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DeploymentRevisionRow.model == model_id
+            return DeploymentRevisionRow.model == model_vfolder_id
 
         return inner
 
@@ -54,9 +54,6 @@ class RevisionConditions:
         make_string_in_factory(DeploymentRevisionRow.resource_group)
     )
     by_cluster_mode_in = staticmethod(make_string_in_factory(DeploymentRevisionRow.cluster_mode))
-    by_runtime_variant_in = staticmethod(
-        make_string_in_factory(DeploymentRevisionRow.runtime_variant)
-    )
 
     @staticmethod
     def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
@@ -158,60 +155,6 @@ class RevisionConditions:
                 condition = DeploymentRevisionRow.cluster_mode.ilike(f"%{spec.value}")
             else:
                 condition = DeploymentRevisionRow.cluster_mode.like(f"%{spec.value}")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_runtime_variant_equals(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = (
-                    sa.func.lower(DeploymentRevisionRow.runtime_variant) == spec.value.lower()
-                )
-            else:
-                condition = DeploymentRevisionRow.runtime_variant == spec.value
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_runtime_variant_contains(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = DeploymentRevisionRow.runtime_variant.ilike(f"%{spec.value}%")
-            else:
-                condition = DeploymentRevisionRow.runtime_variant.like(f"%{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_runtime_variant_starts_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = DeploymentRevisionRow.runtime_variant.ilike(f"{spec.value}%")
-            else:
-                condition = DeploymentRevisionRow.runtime_variant.like(f"{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_runtime_variant_ends_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = DeploymentRevisionRow.runtime_variant.ilike(f"%{spec.value}")
-            else:
-                condition = DeploymentRevisionRow.runtime_variant.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition

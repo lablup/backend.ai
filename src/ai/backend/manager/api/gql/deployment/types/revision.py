@@ -565,7 +565,7 @@ class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
         ),
         default=None,
     )
-    model_id: UUID | None = gql_added_field(
+    model_vfolder_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION, description="Filter by model VFolder ID."
         ),
@@ -581,12 +581,6 @@ class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Filter by cluster mode (SINGLE_NODE / MULTI_NODE).",
-        ),
-        default=None,
-    )
-    runtime_variant: StringFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by runtime variant."
         ),
         default=None,
     )
