@@ -5585,13 +5585,10 @@ type ModelDeployment implements Node {
   """
   currentRevision: ModelRevision
 
-  """The created user of this entity."""
-  createdUser: UserNode! @deprecated(reason: "Use created_user_v2 instead.")
-
   """
   Added in UNRELEASED. The user who created this deployment, resolved via DataLoader.
   """
-  createdUserV2: UserV2
+  creator: UserV2
 
   """Added in 25.19.0. Deployment policy configuration."""
   deploymentPolicy: DeploymentPolicy
