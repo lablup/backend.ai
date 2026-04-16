@@ -546,6 +546,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 class ModelRevisionOrderFieldGQL(StrEnum):
     REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
+    RESOURCE_GROUP = "resource_group"
+    CLUSTER_MODE = "cluster_mode"
+    RUNTIME_VARIANT = "runtime_variant"
 
 
 # Filter and Order Types
