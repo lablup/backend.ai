@@ -59,6 +59,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import (  # pants: no-infer-dep
         ProjectV2GQL,
     )
+    from ai.backend.manager.api.gql.prometheus_query_preset.types.category import (  # pants: no-infer-dep
+        CategoryGQL,
+    )
     from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (  # pants: no-infer-dep
         QueryDefinitionGQL,
     )
@@ -803,5 +806,21 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [QD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def category_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, CategoryGQL | None]:
+        adapter = self._adapters.prometheus_query_preset_category
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[CategoryGQL | None]:
+            from ai.backend.manager.api.gql.prometheus_query_preset.types.category import (  # pants: no-infer-dep
+                CategoryGQL as CG,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [CG.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)

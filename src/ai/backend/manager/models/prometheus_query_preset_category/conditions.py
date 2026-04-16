@@ -19,7 +19,7 @@ class PrometheusQueryPresetCategoryConditions:
     """QueryCondition factories for prometheus query preset category filtering."""
 
     @staticmethod
-    def by_ids(category_ids: Collection[str]) -> QueryCondition:
+    def by_ids(category_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.ColumnElement[bool]:
             return PrometheusQueryPresetCategoryRow.id.in_(category_ids)
 

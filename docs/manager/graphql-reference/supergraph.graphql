@@ -2161,6 +2161,35 @@ type CancelImportArtifactPayload
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 26.3.0. Filter input for querying query preset categories."""
+input CategoryFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by name."""
+  name: StringFilter = null
+}
+
+"""Added in 26.3.0. Specifies ordering for query preset category results."""
+input CategoryOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: CategoryOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering query preset category results.
+"""
+enum CategoryOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 24.12.0"""
 type CheckAndTransitStatus
   @join__type(graph: GRAPHENE)
@@ -2866,6 +2895,27 @@ type CreateAutoScalingRulePayload
   rule: AutoScalingRule!
 }
 
+"""Added in 26.3.0. Input for creating a new query preset category."""
+input CreateCategoryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Human-readable category name (must be unique)."""
+  name: String!
+
+  """Optional category description."""
+  description: String = null
+}
+
+"""
+Added in 26.3.0. Payload returned after creating a query preset category.
+"""
+type CreateCategoryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Created category."""
+  category: QueryPresetCategory!
+}
+
 """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
 type CreateContainerRegistry
   @join__type(graph: GRAPHENE)
@@ -3483,7 +3533,7 @@ input CreateQueryDefinitionInput
   rank: Int! = 0
 
   """Category UUID."""
-  categoryId: String = null
+  categoryId: UUID = null
 
   """Prometheus metric name."""
   metricName: String!
@@ -4100,6 +4150,16 @@ type DeleteAutoScalingRulePayload
 {
   """ID of the deleted auto-scaling rule"""
   id: ID!
+}
+
+"""
+Added in 26.3.0. Payload returned after deleting a query preset category.
+"""
+type DeleteCategoryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Deleted category ID"""
+  id: UUID!
 }
 
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
@@ -9510,7 +9570,7 @@ input ModifyQueryDefinitionInput
   rank: Int
 
   """New category UUID."""
-  categoryId: String
+  categoryId: UUID
 
   """New metric name."""
   metricName: String
@@ -10532,6 +10592,12 @@ type Mutation
 
   """Added in 26.3.0. Delete a query definition (admin only)"""
   adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Create a new query preset category (admin only)."""
+  adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Delete a query preset category (admin only)."""
+  adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role! @join__field(graph: STRAWBERRY)
@@ -13033,6 +13099,16 @@ type Query
   """
   prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.4.2. Get a single query preset category by ID. Available to any authenticated user.
+  """
+  prometheusQueryPresetCategory(id: ID!): QueryPresetCategory @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.4.2. List query preset categories with filtering and pagination. Available to any authenticated user.
+  """
+  prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!]! @join__field(graph: STRAWBERRY)
+
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role @join__field(graph: STRAWBERRY)
 
@@ -13436,7 +13512,7 @@ type QueryDefinition implements Node
   rank: Int!
 
   """Category UUID."""
-  categoryId: String
+  categoryId: UUID
 
   """Prometheus metric name."""
   metricName: String!
@@ -13455,6 +13531,9 @@ type QueryDefinition implements Node
 
   """Last update timestamp."""
   updatedAt: DateTime!
+
+  """Added in UNRELEASED. Resolved category entity."""
+  category: QueryPresetCategory
 }
 
 """Added in 26.3.0. Paginated connection for query definition records."""
@@ -13568,6 +13647,26 @@ enum QueryDefinitionOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.3.0. Prometheus query preset category."""
+type QueryPresetCategory
+  @join__type(graph: STRAWBERRY)
+{
+  """Category ID"""
+  id: UUID!
+
+  """Human-readable category name"""
+  name: String!
+
+  """Optional category description"""
+  description: String
+
+  """Creation timestamp"""
+  createdAt: DateTime!
+
+  """Last update timestamp"""
+  updatedAt: DateTime!
 }
 
 """Added in 26.3.0. Time range for Prometheus query."""

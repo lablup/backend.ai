@@ -1508,6 +1508,29 @@ type CancelImportArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 26.3.0. Filter input for querying query preset categories."""
+input CategoryFilter {
+  """Filter by name."""
+  name: StringFilter = null
+}
+
+"""Added in 26.3.0. Specifies ordering for query preset category results."""
+input CategoryOrderBy {
+  """The field to order by."""
+  field: CategoryOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering query preset category results.
+"""
+enum CategoryOrderField {
+  NAME
+  CREATED_AT
+}
+
 """Added in 26.4.2. Payload containing preset availability check results."""
 type CheckPresetAvailabilityPayloadV2 {
   """Resource presets with availability status."""
@@ -1770,6 +1793,23 @@ input CreateAutoScalingRuleInput {
 type CreateAutoScalingRulePayload {
   """Created auto-scaling rule"""
   rule: AutoScalingRule!
+}
+
+"""Added in 26.3.0. Input for creating a new query preset category."""
+input CreateCategoryInput {
+  """Human-readable category name (must be unique)."""
+  name: String!
+
+  """Optional category description."""
+  description: String = null
+}
+
+"""
+Added in 26.3.0. Payload returned after creating a query preset category.
+"""
+type CreateCategoryPayload {
+  """Created category."""
+  category: QueryPresetCategory!
 }
 
 """Added in 26.4.2. Input for creating a container registry."""
@@ -2130,7 +2170,7 @@ input CreateQueryDefinitionInput {
   rank: Int! = 0
 
   """Category UUID."""
-  categoryId: String = null
+  categoryId: UUID = null
 
   """Prometheus metric name."""
   metricName: String!
@@ -2575,6 +2615,14 @@ input DeleteAutoScalingRuleInput {
 type DeleteAutoScalingRulePayload {
   """ID of the deleted auto-scaling rule"""
   id: ID!
+}
+
+"""
+Added in 26.3.0. Payload returned after deleting a query preset category.
+"""
+type DeleteCategoryPayload {
+  """Deleted category ID"""
+  id: UUID!
 }
 
 """Added in 26.4.2. Payload for container registry deletion."""
@@ -5992,7 +6040,7 @@ input ModifyQueryDefinitionInput {
   rank: Int
 
   """New category UUID."""
-  categoryId: String
+  categoryId: UUID
 
   """New metric name."""
   metricName: String
@@ -6536,6 +6584,12 @@ type Mutation {
 
   """Added in 26.3.0. Delete a query definition (admin only)"""
   adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload!
+
+  """Added in 26.3.0. Create a new query preset category (admin only)."""
+  adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload!
+
+  """Added in 26.3.0. Delete a query preset category (admin only)."""
+  adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload!
 
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role!
@@ -8252,6 +8306,16 @@ type Query {
   """
   prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
 
+  """
+  Added in 26.4.2. Get a single query preset category by ID. Available to any authenticated user.
+  """
+  prometheusQueryPresetCategory(id: ID!): QueryPresetCategory
+
+  """
+  Added in 26.4.2. List query preset categories with filtering and pagination. Available to any authenticated user.
+  """
+  prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!]!
+
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role
 
@@ -8652,7 +8716,7 @@ type QueryDefinition implements Node {
   rank: Int!
 
   """Category UUID."""
-  categoryId: String
+  categoryId: UUID
 
   """Prometheus metric name."""
   metricName: String!
@@ -8671,6 +8735,9 @@ type QueryDefinition implements Node {
 
   """Last update timestamp."""
   updatedAt: DateTime!
+
+  """Added in UNRELEASED. Resolved category entity."""
+  category: QueryPresetCategory
 }
 
 """Added in 26.3.0. Paginated connection for query definition records."""
@@ -8764,6 +8831,24 @@ enum QueryDefinitionOrderField {
   CREATED_AT
   UPDATED_AT
   NAME
+}
+
+"""Added in 26.3.0. Prometheus query preset category."""
+type QueryPresetCategory {
+  """Category ID"""
+  id: UUID!
+
+  """Human-readable category name"""
+  name: String!
+
+  """Optional category description"""
+  description: String
+
+  """Creation timestamp"""
+  createdAt: DateTime!
+
+  """Last update timestamp"""
+  updatedAt: DateTime!
 }
 
 """Added in 26.3.0. Time range for Prometheus query."""
