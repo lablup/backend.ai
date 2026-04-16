@@ -5974,7 +5974,7 @@ input ModelRevisionFilter {
   imageId: UUID = null
 
   """Added in UNRELEASED. Filter by model VFolder ID."""
-  modelId: UUID = null
+  modelVfolderId: UUID = null
 
   """Added in UNRELEASED. Filter by resource group name."""
   resourceGroup: StringFilter = null
@@ -5983,9 +5983,6 @@ input ModelRevisionFilter {
   Added in UNRELEASED. Filter by cluster mode (SINGLE_NODE / MULTI_NODE).
   """
   clusterMode: StringFilter = null
-
-  """Added in UNRELEASED. Filter by runtime variant."""
-  runtimeVariant: StringFilter = null
 
   """Added in UNRELEASED. Filter by revision creation datetime."""
   createdAt: DateTimeFilter = null
