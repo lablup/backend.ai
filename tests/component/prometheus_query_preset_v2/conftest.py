@@ -10,11 +10,18 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import sqlalchemy as sa
 import yarl
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    OperationType,
+    RoleStatus,
+    ScopeType,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.single_entity import (
@@ -32,6 +39,9 @@ from ai.backend.manager.api.rest.v2.prometheus_query_preset.registry import (
     register_v2_prometheus_query_preset_routes,
 )
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -101,10 +111,11 @@ def preset_processors(
     preset_service: PrometheusQueryPresetService,
     rbac_permission_repo: PermissionControllerRepository,
 ) -> PrometheusQueryPresetProcessors:
-    """Real processors with real SingleEntityActionRBACValidator.
+    """Real processors with a real SingleEntityActionRBACValidator.
 
-    RBAC checks use check_permission_with_scope_chain() against the real DB.
-    Without explicit RBAC permission grants, all non-superadmin access is denied.
+    Single-entity RBAC checks use check_permission_with_scope_chain() against
+    the real DB. In this test setup, that means GET access without explicit
+    RBAC permission grants is denied for non-superadmins.
     """
     real_single_entity_validator = SingleEntityActionRBACValidator(rbac_permission_repo)
     return PrometheusQueryPresetProcessors(
@@ -218,24 +229,94 @@ async def preset_factory(
 
 
 @pytest.fixture()
-async def preset_owned_by_admin(
+async def preset_a(
     preset_factory: PresetFactory,
 ) -> PresetFixtureData:
-    """Pre-created preset owned by admin."""
+    """Pre-created preset (no ownership semantics — used across RBAC scenarios)."""
     return await preset_factory()
 
 
 @pytest.fixture()
-async def preset_owned_by_user(
+async def preset_b(
     preset_factory: PresetFactory,
 ) -> PresetFixtureData:
-    """Pre-created preset owned by the regular (non-admin) user."""
+    """Pre-created preset (no ownership semantics — used across RBAC scenarios)."""
     return await preset_factory()
 
 
 @pytest.fixture()
-async def preset_owned_by_other(
+async def preset_c(
     preset_factory: PresetFactory,
 ) -> PresetFixtureData:
-    """Pre-created preset owned by a third party."""
+    """Pre-created preset (no ownership semantics — used across RBAC scenarios)."""
     return await preset_factory()
+
+
+# ---------------------------------------------------------------------------
+# RBAC permission grant fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+async def grant_user_read_on_preset(
+    db_engine: SAEngine,
+    regular_user_fixture: UserFixtureData,
+    preset_a: PresetFixtureData,
+) -> AsyncIterator[None]:
+    """Grant the regular user READ permission on ``preset_a``.
+
+    Creates a role + permission + user_role assignment, then cleans up after
+    the test.
+    """
+    role_id = uuid.uuid4()
+    permission_id = uuid.uuid4()
+    user_role_id = uuid.uuid4()
+
+    role_table = RoleRow.__table__
+    perm_table = PermissionRow.__table__
+    user_role_table = UserRoleRow.__table__
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            role_table.insert().values(
+                id=role_id,
+                name=f"test-read-preset-{secrets.token_hex(4)}",
+                status=RoleStatus.ACTIVE,
+            )
+        )
+        await conn.execute(
+            perm_table.insert().values(
+                id=permission_id,
+                role_id=role_id,
+                scope_type=ScopeType.PROMETHEUS_QUERY_PRESET,
+                scope_id=str(preset_a.id),
+                entity_type=EntityType.PROMETHEUS_QUERY_PRESET,
+                operation=OperationType.READ,
+            )
+        )
+        await conn.execute(
+            user_role_table.insert().values(
+                id=user_role_id,
+                user_id=regular_user_fixture.user_uuid,
+                role_id=role_id,
+            )
+        )
+
+    yield
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            user_role_table.delete().where(
+                sa.column("id") == user_role_id,
+            )
+        )
+        await conn.execute(
+            perm_table.delete().where(
+                sa.column("id") == permission_id,
+            )
+        )
+        await conn.execute(
+            role_table.delete().where(
+                sa.column("id") == role_id,
+            )
+        )

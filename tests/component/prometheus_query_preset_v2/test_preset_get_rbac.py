@@ -2,7 +2,8 @@
 
 Tests that the v2 GET /prometheus-query-presets/{id} endpoint enforces RBAC:
 - Regular users WITHOUT permission are denied (403)
-- Superadmin bypasses RBAC and can access any preset (own, others', third-party)
+- Regular users WITH explicit READ permission can access (200)
+- Superadmin bypasses RBAC and can access any preset (200)
 - Superadmin querying nonexistent preset gets 404 (RBAC bypassed, service returns not found)
 """
 
@@ -28,52 +29,44 @@ class TestPresetGetV2RBAC:
     regular users without explicit permission grants are denied.
     """
 
-    async def test_regular_user_querying_preset_gets_403(
+    async def test_regular_user_without_permission_gets_403(
         self,
         user_v2_registry: V2ClientRegistry,
-        preset_owned_by_admin: PresetFixtureData,
+        preset_a: PresetFixtureData,
     ) -> None:
         """Regular user without RBAC permission cannot GET a preset."""
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.prometheus_query_preset.get(
-                preset_owned_by_admin.id,
+                preset_a.id,
             )
 
-    async def test_superadmin_can_get_own_preset(
+    async def test_regular_user_with_read_permission_gets_200(
         self,
-        admin_v2_registry: V2ClientRegistry,
-        preset_owned_by_admin: PresetFixtureData,
+        user_v2_registry: V2ClientRegistry,
+        preset_a: PresetFixtureData,
+        grant_user_read_on_preset: None,
     ) -> None:
-        """Superadmin can GET their own preset."""
-        result = await admin_v2_registry.prometheus_query_preset.get(
-            preset_owned_by_admin.id,
+        """Regular user with explicit READ RBAC permission can GET a preset."""
+        result = await user_v2_registry.prometheus_query_preset.get(
+            preset_a.id,
         )
         assert result.item is not None
-        assert result.item.id == preset_owned_by_admin.id
+        assert result.item.id == preset_a.id
 
-    async def test_superadmin_can_get_regular_users_preset(
+    async def test_superadmin_can_get_any_preset(
         self,
         admin_v2_registry: V2ClientRegistry,
-        preset_owned_by_user: PresetFixtureData,
+        preset_a: PresetFixtureData,
+        preset_b: PresetFixtureData,
+        preset_c: PresetFixtureData,
     ) -> None:
-        """Superadmin bypasses RBAC and can GET regular user's preset."""
-        result = await admin_v2_registry.prometheus_query_preset.get(
-            preset_owned_by_user.id,
-        )
-        assert result.item is not None
-        assert result.item.id == preset_owned_by_user.id
-
-    async def test_superadmin_can_get_other_users_preset(
-        self,
-        admin_v2_registry: V2ClientRegistry,
-        preset_owned_by_other: PresetFixtureData,
-    ) -> None:
-        """Superadmin bypasses RBAC and can GET third-party's preset."""
-        result = await admin_v2_registry.prometheus_query_preset.get(
-            preset_owned_by_other.id,
-        )
-        assert result.item is not None
-        assert result.item.id == preset_owned_by_other.id
+        """Superadmin bypasses RBAC and can GET any preset."""
+        for preset in (preset_a, preset_b, preset_c):
+            result = await admin_v2_registry.prometheus_query_preset.get(
+                preset.id,
+            )
+            assert result.item is not None
+            assert result.item.id == preset.id
 
     async def test_superadmin_querying_nonexistent_preset_gets_404(
         self,
