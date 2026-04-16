@@ -1563,7 +1563,13 @@ class DeploymentAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.project_id is not None:
-            conditions.append(DeploymentConditions.by_project_id(f.project_id))
+            uuid_condition = self.convert_uuid_filter(
+                f.project_id,
+                equals_factory=DeploymentConditions.by_project_filter_equals,
+                in_factory=DeploymentConditions.by_project_filter_in,
+            )
+            if uuid_condition is not None:
+                conditions.append(uuid_condition)
         if f.resource_group is not None:
             condition = self.convert_string_filter(
                 f.resource_group,
@@ -1576,7 +1582,13 @@ class DeploymentAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.created_user_id is not None:
-            conditions.append(DeploymentConditions.by_created_user_id(f.created_user_id))
+            uuid_condition = self.convert_uuid_filter(
+                f.created_user_id,
+                equals_factory=DeploymentConditions.by_created_user_filter_equals,
+                in_factory=DeploymentConditions.by_created_user_filter_in,
+            )
+            if uuid_condition is not None:
+                conditions.append(uuid_condition)
         if f.created_at is not None:
             dt_condition = f.created_at.build_query_condition(
                 before_factory=DeploymentConditions.by_created_at_before,

@@ -9,7 +9,11 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
@@ -98,6 +102,42 @@ class DeploymentConditions:
     def by_created_user_id(user_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.created_user == user_id
+
+        return inner
+
+    @staticmethod
+    def by_project_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return EndpointRow.project != spec.value
+            return EndpointRow.project == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_project_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return EndpointRow.project.notin_(spec.values)
+            return EndpointRow.project.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_created_user_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return EndpointRow.created_user != spec.value
+            return EndpointRow.created_user == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_created_user_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return EndpointRow.created_user.notin_(spec.values)
+            return EndpointRow.created_user.in_(spec.values)
 
         return inner
 

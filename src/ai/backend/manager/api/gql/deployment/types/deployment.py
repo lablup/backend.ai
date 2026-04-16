@@ -90,6 +90,7 @@ from ai.backend.manager.api.gql.base import (
     NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
+    UUIDFilter,
     encode_cursor,
     to_global_id,
 )
@@ -555,7 +556,7 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by domain name."),
         default=None,
     )
-    project_id: UUID | None = gql_added_field(
+    project_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by project ID."),
         default=None,
     )
@@ -565,7 +566,7 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         ),
         default=None,
     )
-    created_user_id: UUID | None = gql_added_field(
+    created_user_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Filter by the user who created the deployment.",

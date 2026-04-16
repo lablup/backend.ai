@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.query import (
     IntFilter,
     NullableDateTimeFilter,
     StringFilter,
+    UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -518,11 +519,11 @@ class DeploymentFilter(BaseRequestModel):
     tags: StringFilter | None = Field(default=None, description="Tags filter")
     endpoint_url: StringFilter | None = Field(default=None, description="Endpoint URL filter")
     domain_name: StringFilter | None = Field(default=None, description="Domain name filter")
-    project_id: UUID | None = Field(default=None, description="Filter by project ID")
+    project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     resource_group: StringFilter | None = Field(
         default=None, description="Resource group name filter"
     )
-    created_user_id: UUID | None = Field(
+    created_user_id: UUIDFilter | None = Field(
         default=None, description="Filter by the user who created the deployment"
     )
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
