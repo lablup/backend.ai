@@ -12369,10 +12369,6 @@ input UserFairShareUserNestedFilter {
   isActive: Boolean = null
 }
 
-extend type UserNode @key(fields: "id") {
-  id: ID! @external
-}
-
 """
 Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
 """
@@ -13177,7 +13173,7 @@ input WebhookSpecInput {
 
 scalar _Any
 
-union _Entity = ComputeSessionNode | DomainNode | DomainV2 | GroupNode | ImageNode | ProjectV2 | ScalingGroupNode | UserNode | UserV2 | VirtualFolderNode
+union _Entity = ComputeSessionNode | DomainNode | DomainV2 | GroupNode | ImageNode | ProjectV2 | ScalingGroupNode | UserV2 | VirtualFolderNode
 
 type _Service {
   sdl: String!
