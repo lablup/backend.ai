@@ -9135,10 +9135,10 @@ input ModelRevisionFilter
   deploymentId: ID = null
 
   """Added in UNRELEASED. Filter by container image ID."""
-  imageId: UUID = null
+  imageId: UUIDFilter = null
 
   """Added in UNRELEASED. Filter by model VFolder ID."""
-  modelVfolderId: UUID = null
+  modelVfolderId: UUIDFilter = null
 
   """Added in UNRELEASED. Filter by resource group name."""
   resourceGroup: StringFilter = null
