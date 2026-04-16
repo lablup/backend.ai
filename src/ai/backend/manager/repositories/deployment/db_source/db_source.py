@@ -1,6 +1,7 @@
 """Database source implementation for deployment repository."""
 
 import dataclasses
+import logging
 import uuid
 from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
@@ -31,6 +32,7 @@ from ai.backend.common.types import (
     KernelId,
     SessionId,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
@@ -172,6 +174,9 @@ class EndpointWithRoutesRawData:
 
     endpoint_row: EndpointRow
     route_rows: list[RoutingRow]
+
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class DeploymentDBSource:
@@ -2559,6 +2564,73 @@ class DeploymentDBSource:
             if row is None:
                 return None, False
             return cast(uuid.UUID | None, row[0]), True
+
+    async def prune_old_revisions(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_history_limit: int,
+    ) -> int:
+        """Delete old revisions exceeding the history limit.
+
+        Preserves:
+        - The revision referenced by ``current_revision``
+        - The revision referenced by ``deploying_revision``
+
+        Revisions are ordered by revision_number descending; the newest
+        ``revision_history_limit`` revisions are kept (plus the two
+        protected revisions above).
+
+        Returns the number of deleted revisions.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            # Fetch protected revision IDs
+            endpoint_query = sa.select(
+                EndpointRow.current_revision,
+                EndpointRow.deploying_revision,
+            ).where(EndpointRow.id == endpoint_id)
+            ep_result = await db_sess.execute(endpoint_query)
+            ep_row = ep_result.one_or_none()
+            if ep_row is None:
+                return 0
+
+            protected_ids: set[uuid.UUID] = set()
+            if ep_row[0] is not None:
+                protected_ids.add(ep_row[0])
+            if ep_row[1] is not None:
+                protected_ids.add(ep_row[1])
+
+            # Find revisions to keep (newest N by revision_number)
+            keep_query = (
+                sa.select(DeploymentRevisionRow.id)
+                .where(DeploymentRevisionRow.endpoint == endpoint_id)
+                .order_by(DeploymentRevisionRow.revision_number.desc())
+                .limit(revision_history_limit)
+            )
+            keep_result = await db_sess.execute(keep_query)
+            keep_ids = {row[0] for row in keep_result.all()}
+
+            # Union: keep the newest N + the protected revisions
+            keep_ids |= protected_ids
+
+            # Delete everything else
+            delete_query = (
+                sa.delete(DeploymentRevisionRow)
+                .where(
+                    DeploymentRevisionRow.endpoint == endpoint_id,
+                    DeploymentRevisionRow.id.notin_(keep_ids),
+                )
+                .returning(DeploymentRevisionRow.id)
+            )
+            delete_result = await db_sess.execute(delete_query)
+            deleted_count = len(delete_result.all())
+            if deleted_count > 0:
+                log.info(
+                    "Pruned {} old revisions for deployment {} (limit={})",
+                    deleted_count,
+                    endpoint_id,
+                    revision_history_limit,
+                )
+            return deleted_count
 
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)

@@ -44,7 +44,6 @@ from ai.backend.manager.data.vfolder.types import VFolderLocation, VFolderOwners
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -58,7 +57,6 @@ from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
@@ -756,16 +754,17 @@ class ModelServingRepository:
             return await ImageRow.resolve(session, identifiers)
 
     @model_serving_repository_resilience.apply()
-    async def modify_endpoint(
+    async def modify_endpoint_fields(
         self,
         action: ModifyEndpointAction,
         agent_registry: AgentRegistry,
         legacy_etcd_config_loader: LegacyEtcdLoader,
-        storage_manager: StorageSessionManager,
     ) -> MutationResult:
-        """
-        Modify an endpoint with all validations and checks.
-        This method handles all database operations for endpoint modification.
+        """Apply endpoint-level changes only (name, resource_group, replicas, open_to_public).
+
+        Revision-level changes (resource_slots, image, environ, etc.) are handled
+        separately by the caller via DeploymentController.add_revision() +
+        activate_revision().
         """
 
         async def _do_mutate() -> MutationResult:
@@ -825,107 +824,6 @@ class ModelServingRepository:
                     endpoint_row.domain,
                     endpoint_row.project,
                 )
-
-                # If revision-level fields changed, create a new revision
-                if spec.has_revision_changes():
-                    current_rev = endpoint_row._find_current_revision()
-                    if current_rev is None:
-                        raise InvalidAPIParameters("Endpoint has no current revision")
-
-                    # Re-read model definition from vfolder to pick up file changes
-                    refreshed_model_definition = await self._fetch_model_definition_from_vfolder(
-                        db_session,
-                        storage_manager,
-                        current_rev.model,
-                        spec.model_definition_path.optional_value()
-                        or current_rev.model_definition_path,
-                    )
-
-                    # Resolve image if changed
-                    image_id = current_rev.image
-                    image_ref = spec.image.optional_value()
-                    if image_ref is not None:
-                        image_name = image_ref.name
-                        arch = image_ref.architecture.value()
-                        resolved_image = await ImageRow.resolve(
-                            db_session,
-                            [ImageIdentifier(image_name, arch), ImageAlias(image_name)],
-                        )
-                        image_id = resolved_image.id
-
-                    # Merge resource_slots: spec overrides current revision
-                    merged_slots: ResourceSlot = (
-                        spec.resource_slots.optional_value()
-                        or ResourceSlot({
-                            r.slot_name: r.quantity for r in current_rev.resource_slot_rows
-                        })
-                    )
-
-                    # Merge revision fields: current revision as base, spec overrides
-                    new_revision = DeploymentRevisionRow(
-                        endpoint=endpoint_row.id,
-                        revision_number=0,  # placeholder, will be set atomically below
-                        image=image_id,
-                        model=current_rev.model,
-                        model_mount_destination=current_rev.model_mount_destination,
-                        model_definition_path=(
-                            spec.model_definition_path.optional_value()
-                            if spec.model_definition_path.optional_value() is not None
-                            else current_rev.model_definition_path
-                        ),
-                        model_definition=refreshed_model_definition or current_rev.model_definition,
-                        resource_group=endpoint_row.resource_group,
-                        resource_opts=(
-                            spec.resource_opts.optional_value()
-                            if spec.resource_opts.optional_value() is not None
-                            else current_rev.resource_opts
-                        ),
-                        cluster_mode=(
-                            spec.cluster_mode.value().value
-                            if spec.cluster_mode.optional_value() is not None
-                            else current_rev.cluster_mode
-                        ),
-                        cluster_size=(
-                            spec.cluster_size.optional_value() or current_rev.cluster_size
-                        ),
-                        startup_command=current_rev.startup_command,
-                        bootstrap_script=current_rev.bootstrap_script,
-                        environ=(
-                            spec.environ.optional_value()
-                            if spec.environ.optional_value() is not None
-                            else current_rev.environ
-                        ),
-                        callback_url=current_rev.callback_url,
-                        runtime_variant=(
-                            spec.runtime_variant.optional_value() or current_rev.runtime_variant
-                        ),
-                        extra_mounts=list(current_rev.extra_mounts),
-                    )
-
-                    # Atomically assign next revision number
-                    max_query = sa.select(sa.func.max(DeploymentRevisionRow.revision_number)).where(
-                        DeploymentRevisionRow.endpoint == endpoint_row.id
-                    )
-                    result = await db_session.execute(max_query)
-                    latest = result.scalar()
-                    new_revision.revision_number = (latest or 0) + 1
-
-                    db_session.add(new_revision)
-                    await db_session.flush()
-
-                    # Write normalized resource slot rows
-                    for slot_name, quantity in merged_slots.items():
-                        db_session.add(
-                            DeploymentRevisionResourceSlotRow(
-                                revision_id=new_revision.id,
-                                slot_name=str(slot_name),
-                                quantity=quantity,
-                            )
-                        )
-                    await db_session.flush()
-
-                    # Activate: set as current revision
-                    endpoint_row.current_revision = new_revision.id
 
                 await db_session.commit()
 

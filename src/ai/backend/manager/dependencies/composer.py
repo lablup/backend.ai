@@ -241,6 +241,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 network_plugin_ctx=plugins.network_plugin_ctx,
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,
+                deployment_revision_preset_repository=domain.repositories.deployment_revision_preset.repository,
             ),
         )
 
@@ -308,6 +309,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 hook_plugin_ctx=plugins.hook_plugin_ctx,
                 deployment_controller=agents.deployment_controller,
                 revision_generator_registry=agents.revision_generator_registry,
+                model_definition_generator_registry=agents.model_definition_generator_registry,
                 agent_cache=components.agent_cache,
                 notification_center=domain.notification_center,
                 appproxy_client_pool=agents.appproxy_client_pool,

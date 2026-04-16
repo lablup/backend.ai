@@ -1317,6 +1317,21 @@ class DeploymentRepository:
         """
         return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 
+    @deployment_repository_resilience.apply()
+    async def prune_old_revisions(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_history_limit: int,
+    ) -> int:
+        """Delete old revisions that exceed the history limit.
+
+        Preserves current_revision and deploying_revision.
+
+        Returns:
+            Number of revisions deleted.
+        """
+        return await self._db_source.prune_old_revisions(endpoint_id, revision_history_limit)
+
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
     @deployment_repository_resilience.apply()
