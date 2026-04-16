@@ -108,6 +108,7 @@ from ai.backend.manager.api.gql.base import (
     IntFilter,
     OrderDirection,
     StringFilter,
+    UUIDFilter,
     to_global_id,
 )
 from ai.backend.manager.api.gql.common.types import (
@@ -559,13 +560,13 @@ class ModelRevisionOrderFieldGQL(StrEnum):
 class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
     revision_number: IntFilter | None = None
     deployment_id: ID | None = None
-    image_id: UUID | None = gql_added_field(
+    image_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION, description="Filter by container image ID."
         ),
         default=None,
     )
-    model_vfolder_id: UUID | None = gql_added_field(
+    model_vfolder_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION, description="Filter by model VFolder ID."
         ),

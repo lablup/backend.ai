@@ -543,8 +543,10 @@ class RevisionFilter(BaseRequestModel):
 
     revision_number: IntFilter | None = Field(default=None, description="Filter by revision number")
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
-    image_id: UUID | None = Field(default=None, description="Filter by container image ID")
-    model_vfolder_id: UUID | None = Field(default=None, description="Filter by model VFolder ID")
+    image_id: UUIDFilter | None = Field(default=None, description="Filter by container image ID")
+    model_vfolder_id: UUIDFilter | None = Field(
+        default=None, description="Filter by model VFolder ID"
+    )
     resource_group: StringFilter | None = Field(
         default=None, description="Resource group name filter"
     )

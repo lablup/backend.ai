@@ -8,7 +8,11 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.manager.models.condition_utils import (
     make_int_conditions,
     make_string_in_factory,
@@ -37,16 +41,38 @@ class RevisionConditions:
     by_revision_number = make_int_conditions(DeploymentRevisionRow.revision_number)
 
     @staticmethod
-    def by_image_id(image_id: uuid.UUID) -> QueryCondition:
+    def by_image_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DeploymentRevisionRow.image == image_id
+            if spec.negated:
+                return DeploymentRevisionRow.image != spec.value
+            return DeploymentRevisionRow.image == spec.value
 
         return inner
 
     @staticmethod
-    def by_model_vfolder_id(model_vfolder_id: uuid.UUID) -> QueryCondition:
+    def by_image_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DeploymentRevisionRow.model == model_vfolder_id
+            if spec.negated:
+                return DeploymentRevisionRow.image.notin_(spec.values)
+            return DeploymentRevisionRow.image.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_model_vfolder_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return DeploymentRevisionRow.model != spec.value
+            return DeploymentRevisionRow.model == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_model_vfolder_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return DeploymentRevisionRow.model.notin_(spec.values)
+            return DeploymentRevisionRow.model.in_(spec.values)
 
         return inner
 

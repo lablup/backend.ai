@@ -1653,9 +1653,21 @@ class DeploymentAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.image_id is not None:
-            conditions.append(RevisionConditions.by_image_id(f.image_id))
+            uuid_condition = self.convert_uuid_filter(
+                f.image_id,
+                equals_factory=RevisionConditions.by_image_filter_equals,
+                in_factory=RevisionConditions.by_image_filter_in,
+            )
+            if uuid_condition is not None:
+                conditions.append(uuid_condition)
         if f.model_vfolder_id is not None:
-            conditions.append(RevisionConditions.by_model_vfolder_id(f.model_vfolder_id))
+            uuid_condition = self.convert_uuid_filter(
+                f.model_vfolder_id,
+                equals_factory=RevisionConditions.by_model_vfolder_filter_equals,
+                in_factory=RevisionConditions.by_model_vfolder_filter_in,
+            )
+            if uuid_condition is not None:
+                conditions.append(uuid_condition)
         if f.resource_group is not None:
             condition = self.convert_string_filter(
                 f.resource_group,
