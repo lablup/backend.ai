@@ -21,7 +21,9 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
+    ModelRevisionCreator,
     NewDeploymentCreator,
+    VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
@@ -34,11 +36,13 @@ from ai.backend.manager.data.deployment.types import (
     ModelMountConfigData,
     ModelReplicaData,
     ModelRevisionData,
+    ModelRevisionSpec,
     ModelRuntimeConfigData,
     MountMetadata,
     ReplicaSpec,
     ReplicaStateData,
     ResourceConfigData,
+    RevisionRefreshResult,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
@@ -46,6 +50,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
+    PresetValueData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
@@ -163,6 +168,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
     SearchRevisionsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
+    RefreshDeploymentRevisionsAction,
+    RefreshDeploymentRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
@@ -347,6 +356,33 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
         activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),
         detail=route.error_data,
         created_at=route.created_at,
+    )
+
+
+def _build_creator_from_revision_spec(spec: ModelRevisionSpec) -> ModelRevisionCreator:
+    """Rebuild a ``ModelRevisionCreator`` from an existing revision's spec.
+
+    ``model_definition`` is reset to ``None`` so ``DeploymentController.add_revision``
+    re-resolves it from the vfolder. ``revision_preset_id`` is left ``None`` since
+    it is not persisted on the revision row; the materialized ``preset_values``
+    carry forward the preset effect without requiring re-application.
+    ``extra_mounts`` is left empty because ``add_revision`` does not propagate
+    this field to the new revision spec (see ``DeploymentController.add_revision``).
+    """
+    return ModelRevisionCreator(
+        image_id=spec.image_id,
+        resource_spec=spec.resource_spec,
+        mounts=VFolderMountsCreator(
+            model_vfolder_id=spec.mounts.model_vfolder_id,
+            model_definition_path=spec.mounts.model_definition_path,
+            model_mount_destination=spec.mounts.model_mount_destination,
+        ),
+        execution=spec.execution,
+        model_definition=None,
+        revision_preset_id=None,
+        preset_values=[
+            PresetValueData(preset_id=pv.preset_id, value=pv.value) for pv in spec.preset_values
+        ],
     )
 
 
@@ -816,6 +852,63 @@ class DeploymentService:
             activated_revision_id=result.activated_revision_id,
             deployment_policy=result.deployment_policy,
         )
+
+    async def admin_refresh_deployment_revisions(
+        self, action: RefreshDeploymentRevisionsAction
+    ) -> RefreshDeploymentRevisionsActionResult:
+        """Refresh revisions for all active deployments.
+
+        For each active deployment, rebuilds a ``ModelRevisionCreator`` from the
+        current revision and delegates to ``DeploymentController.add_revision``
+        (which re-resolves preset / deployment-config / model_definition) and
+        ``activate_revision``. Each deployment is processed independently so a
+        single failure does not abort the rest (partial success by design).
+        """
+        # Bulk scan + independent per-deployment orchestration: multiple repo
+        # and controller calls are required by design to preserve partial
+        # success semantics. Each inner call owns its own transaction boundary.
+        endpoint_ids = await self._deployment_repository.list_active_endpoint_ids()
+        results: list[RevisionRefreshResult] = []
+        succeeded = 0
+        failed = 0
+        for endpoint_id in endpoint_ids:
+            try:
+                spec = await self._deployment_repository.get_current_revision_spec(endpoint_id)
+                creator = _build_creator_from_revision_spec(spec)
+                new_revision = await self._deployment_controller.add_revision(endpoint_id, creator)
+                await self._deployment_controller.activate_revision(endpoint_id, new_revision.id)
+                results.append(
+                    RevisionRefreshResult(
+                        deployment_id=endpoint_id,
+                        new_revision_id=new_revision.id,
+                        success=True,
+                        failure_reason=None,
+                    )
+                )
+                succeeded += 1
+            except Exception as exc:
+                log.warning(
+                    "admin_refresh_deployment_revisions failed for deployment {}: {}: {}",
+                    endpoint_id,
+                    type(exc).__name__,
+                    exc,
+                )
+                results.append(
+                    RevisionRefreshResult(
+                        deployment_id=endpoint_id,
+                        new_revision_id=None,
+                        success=False,
+                        failure_reason=f"{type(exc).__name__}: {exc}",
+                    )
+                )
+                failed += 1
+        log.info(
+            "admin_refresh_deployment_revisions summary: total={} succeeded={} failed={}",
+            len(endpoint_ids),
+            succeeded,
+            failed,
+        )
+        return RefreshDeploymentRevisionsActionResult(results=results)
 
     # ========== Route Operations ==========
 

@@ -121,6 +121,26 @@ def revision() -> None:
     """Admin deployment revision commands."""
 
 
+@revision.command(name="refresh")
+def revision_refresh() -> None:
+    """Rebuild and activate a fresh revision for every active deployment.
+
+    Useful to repair deployments whose current revision has stale or missing
+    model_definition after backing store migrations. Each deployment is
+    processed independently; partial success is reported per deployment.
+    """
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.deployment.admin_refresh_deployment_revisions()
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @revision.command(name="search")
 @click.option(
     "--deployment-id",

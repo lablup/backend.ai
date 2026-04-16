@@ -58,6 +58,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ModelRevisionSpec,
     RevisionSearchResult,
     RouteHealthStatus,
     RouteInfo,
@@ -1268,6 +1269,18 @@ class DeploymentRepository:
             DeploymentRevisionNotFound: If the endpoint has no current revision.
         """
         return await self._db_source.get_current_revision(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_current_revision_spec(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Get the current revision as a ModelRevisionSpec for revision refresh.
+
+        Raises:
+            DeploymentRevisionNotFound: If the endpoint has no current revision.
+        """
+        return await self._db_source.get_current_revision_spec(endpoint_id)
 
     @deployment_repository_resilience.apply()
     async def search_revisions(

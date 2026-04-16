@@ -10,6 +10,7 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -18,6 +19,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_subscription,
 )
 from ai.backend.manager.api.gql.deployment.types.deployment import (
+    AdminRefreshDeploymentRevisionsPayload,
     CreateDeploymentInput,
     CreateDeploymentPayload,
     DeleteDeploymentInput,
@@ -29,6 +31,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     ModelDeploymentConnection,
     ModelDeploymentEdge,
     ProjectDeploymentScopeGQL,
+    RevisionRefreshResult,
     SyncReplicaInput,
     SyncReplicaPayload,
     UpdateDeploymentInput,
@@ -236,6 +239,34 @@ async def sync_replicas(
 ) -> SyncReplicaPayload:
     payload = await info.context.adapters.deployment.sync_replicas(input.to_pydantic())
     return SyncReplicaPayload(success=payload.success)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Rebuild and activate a fresh revision for every active deployment (superadmin). "
+            "Used to repair deployments whose current revision has stale or missing "
+            "model_definition after backing store migrations."
+        ),
+    )
+)  # type: ignore[misc]
+async def admin_refresh_deployment_revisions(
+    info: Info[StrawberryGQLContext],
+) -> AdminRefreshDeploymentRevisionsPayload:
+    check_admin_only()
+    payload = await info.context.adapters.deployment.admin_refresh_deployment_revisions()
+    return AdminRefreshDeploymentRevisionsPayload(
+        results=[
+            RevisionRefreshResult(
+                deployment_id=r.deployment_id,
+                new_revision_id=r.new_revision_id,
+                success=r.success,
+                failure_reason=r.failure_reason,
+            )
+            for r in payload.results
+        ]
+    )
 
 
 # Subscription resolvers

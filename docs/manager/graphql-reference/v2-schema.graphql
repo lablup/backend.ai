@@ -204,6 +204,14 @@ type AdminGetSSHKeypairPayload {
 }
 
 """
+Added in UNRELEASED. Payload for admin bulk revision refresh mutation result.
+"""
+type AdminRefreshDeploymentRevisionsPayload {
+  """Per-deployment refresh outcomes (partial success by design)"""
+  results: [RevisionRefreshResult!]!
+}
+
+"""
 Added in 26.4.2. Admin input for registering (overwriting) a user's SSH keypair.
 """
 input AdminRegisterSSHKeypairInput {
@@ -6178,6 +6186,11 @@ type Mutation {
   addModelRevision(input: AddRevisionInput!, options: AddRevisionOptions = null): AddRevisionPayload!
 
   """
+  Added in UNRELEASED. Rebuild and activate a fresh revision for every active deployment (superadmin). Used to repair deployments whose current revision has stale or missing model_definition after backing store migrations.
+  """
+  adminRefreshDeploymentRevisions: AdminRefreshDeploymentRevisionsPayload!
+
+  """
   Added in 26.4.2. Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration
   """
   updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload!
@@ -9631,6 +9644,25 @@ Added in 25.15.0. Response payload for artifact restoration operations. Contains
 type RestoreArtifactsPayload {
   """List of restored artifacts."""
   artifacts: [Artifact!]!
+}
+
+"""
+Added in UNRELEASED. Per-deployment result of an admin bulk revision refresh.
+"""
+type RevisionRefreshResult {
+  """Deployment ID"""
+  deploymentId: UUID!
+
+  """
+  Newly created revision ID; null when the refresh failed for this deployment
+  """
+  newRevisionId: UUID
+
+  """Whether the refresh succeeded for this deployment"""
+  success: Boolean!
+
+  """Error class and message when the refresh failed; null on success"""
+  failureReason: String
 }
 
 """Added in 26.4.2. Payload returned after revoking a login session."""

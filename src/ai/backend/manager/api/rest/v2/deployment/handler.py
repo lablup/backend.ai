@@ -247,6 +247,11 @@ class V2DeploymentHandler:
         result = await self._adapter.sync_replicas(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def admin_refresh_deployment_revisions(self) -> APIResponse:
+        """Rebuild and activate a fresh revision for every active deployment."""
+        result = await self._adapter.admin_refresh_deployment_revisions()
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     # ------------------------------------------------------------------
     # Route operations
     # ------------------------------------------------------------------

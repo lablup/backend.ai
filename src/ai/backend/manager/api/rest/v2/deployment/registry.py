@@ -111,6 +111,12 @@ def register_v2_deployment_routes(
         handler.search_revision_resource_slots,
         middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/admin/refresh-revisions",
+        handler.admin_refresh_deployment_revisions,
+        middlewares=[superadmin_required],
+    )
 
     # ------------------------------------------------------------------
     # Replica operations

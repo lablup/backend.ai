@@ -41,6 +41,7 @@ __all__ = (
     "ActivateDeploymentPayload",
     "ActivateRevisionPayload",
     "AddRevisionPayload",
+    "AdminRefreshDeploymentRevisionsPayload",
     "AdminSearchDeploymentsPayload",
     "AdminSearchRevisionsPayload",
     "AutoScalingRuleNode",
@@ -65,6 +66,7 @@ __all__ = (
     "SearchDeploymentPoliciesPayload",
     "SearchReplicasPayload",
     "SearchRoutesPayload",
+    "RevisionRefreshResultInfo",
     "SyncReplicaPayload",
     "UpdateAutoScalingRulePayload",
     "UpdateDeploymentPayload",
@@ -178,6 +180,29 @@ class AddRevisionPayload(BaseResponseModel):
     """Payload for add revision mutation result."""
 
     revision: RevisionNode = Field(description="Added revision")
+
+
+class RevisionRefreshResultInfo(BaseResponseModel):
+    """Per-deployment result of an admin bulk revision refresh."""
+
+    deployment_id: UUID = Field(description="Deployment ID")
+    new_revision_id: UUID | None = Field(
+        default=None,
+        description="Newly created revision ID; null when the refresh failed for this deployment",
+    )
+    success: bool = Field(description="Whether the refresh succeeded for this deployment")
+    failure_reason: str | None = Field(
+        default=None,
+        description="Error class and message when the refresh failed; null on success",
+    )
+
+
+class AdminRefreshDeploymentRevisionsPayload(BaseResponseModel):
+    """Payload for admin bulk revision refresh mutation result."""
+
+    results: list[RevisionRefreshResultInfo] = Field(
+        description="Per-deployment refresh outcomes (partial success by design)"
+    )
 
 
 # ---------------------------------------------------------------------------
