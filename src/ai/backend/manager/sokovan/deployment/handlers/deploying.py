@@ -309,7 +309,10 @@ class DeployingAwaitingPromotionHandler(DeploymentHandler):
                 continue
 
             if spec.promote_delay_seconds > 0 and deployment.phase_started_at is not None:
-                elapsed = (datetime.now(UTC) - deployment.phase_started_at).total_seconds()
+                phase_started_at = deployment.phase_started_at
+                if phase_started_at.tzinfo is None:
+                    phase_started_at = phase_started_at.replace(tzinfo=UTC)
+                elapsed = (datetime.now(UTC) - phase_started_at).total_seconds()
                 if elapsed < spec.promote_delay_seconds:
                     skipped.append(deployment)
                     continue

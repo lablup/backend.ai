@@ -757,6 +757,12 @@ class DeploymentService:
                 if route.status.is_active():
                     drain_route_ids.append(route.route_id)
 
+        if not promote_route_ids:
+            raise InvalidEndpointState(
+                f"Deployment {action.deployment_id} has no healthy green routes to promote. "
+                "Wait for new-revision routes to become HEALTHY before promoting."
+            )
+
         await self._deployment_repository.promote_deployment(
             deployment_id=action.deployment_id,
             promote_route_ids=promote_route_ids,
