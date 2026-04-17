@@ -40,7 +40,7 @@ from ai.backend.manager.repositories.permission_controller.role_manager import (
 )
 
 from . import __version__
-from .config import OIDCPluginConfig
+from .config import OIDCWebAppConfig
 from .valkey_client import ValkeyOpenIDClient
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -245,11 +245,11 @@ async def update_jwks(app: web.Application, _interval: float) -> None:
 class OIDCWebAppPlugin(WebappPlugin):
     require_explicit_allow = True
 
-    _config: OIDCPluginConfig
+    _config: OIDCWebAppConfig
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
-        self._config = OIDCPluginConfig(**plugin_config)
+        self._config = OIDCWebAppConfig(**plugin_config)
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -259,7 +259,7 @@ class OIDCWebAppPlugin(WebappPlugin):
 
     async def update_plugin_config(self, new_etcd_config: Mapping[str, Any]) -> None:
         self.plugin_config = new_etcd_config
-        self._config = OIDCPluginConfig(**new_etcd_config)
+        self._config = OIDCWebAppConfig(**new_etcd_config)
 
     async def _webapp_init(self, app: web.Application) -> None:
         openid_config = self._config.openid

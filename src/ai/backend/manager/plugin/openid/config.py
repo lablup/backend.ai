@@ -41,7 +41,15 @@ class OpenIDProviderConfig(BaseModel):
     )
 
 
-class OIDCPluginConfig(BaseModel):
+class OIDCHookConfig(BaseModel):
+    secret: str = Field(
+        description="Secret key used for signing and verifying JWT tokens.",
+    )
+
+    model_config = {"extra": "ignore"}
+
+
+class OIDCWebAppConfig(BaseModel):
     openid: OpenIDProviderConfig = Field(
         description="OpenID Connect provider configuration.",
     )
@@ -51,3 +59,5 @@ class OIDCPluginConfig(BaseModel):
     login_uri: str = Field(
         description="The login page URI to redirect users to.",
     )
+
+    model_config = {"extra": "ignore"}

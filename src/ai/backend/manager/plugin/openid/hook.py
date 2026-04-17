@@ -17,7 +17,7 @@ from ai.backend.manager.models.login_session.enums import LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginSessionRow
 from ai.backend.manager.models.user import UserStatus, users
 
-from .config import OIDCPluginConfig
+from .config import OIDCHookConfig
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -28,15 +28,15 @@ class OIDCHookPlugin(HookPlugin):
     # Pre-defined attributes from the base class:
     #   - local_config is populated from the manager TOML.
     #   - plugin_config is populated from the "/config/plugins/hook/openid/" etcd key
-    _config: OIDCPluginConfig
+    _config: OIDCHookConfig
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
-        self._config = OIDCPluginConfig(**plugin_config)
+        self._config = OIDCHookConfig(**plugin_config)
 
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         self.plugin_config = plugin_config
-        self._config = OIDCPluginConfig(**plugin_config)
+        self._config = OIDCHookConfig(**plugin_config)
 
     async def init(self, context: Any = None) -> None:
         pass

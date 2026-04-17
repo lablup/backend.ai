@@ -207,13 +207,6 @@ class TestOIDCHookLifecycle:
         await hook_plugin.cleanup()
 
     async def test_update_plugin_config(self, hook_plugin: OIDCHookPlugin) -> None:
-        new_config: dict[str, Any] = {
-            "secret": "new-secret",
-            "login_uri": "https://app.example.com/login",
-            "openid": {
-                "client_id": "new-client-id",
-                "client_secret": "new-client-secret",
-            },
-        }
+        new_config: dict[str, Any] = {"secret": "new-secret"}
         await hook_plugin.update_plugin_config(new_config)
         assert hook_plugin.plugin_config is new_config
