@@ -25,7 +25,7 @@ class PrometheusConfig(BaseModel):
     kernel_metrics_host: str = Field(
         default="",
         description=(
-            "Host-accessible address for kernel metrics scraping. "
+            "Host-only address (no port) for kernel metrics scraping. "
             "When set, model-service targets returned by HTTP SD will have their "
             "Docker-internal IPs rewritten to this address via relabel_configs. "
             "Leave empty to disable rewriting (use when kernel IPs are already routable)."

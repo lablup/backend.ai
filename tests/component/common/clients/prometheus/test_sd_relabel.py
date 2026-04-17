@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 import textwrap
 import time
@@ -192,7 +193,7 @@ def up_model_service_preset() -> MetricPreset:
     )
 
 
-class TestKernelMetricsScrapeWithRelabel:
+class TestModelServiceMetricsScrapeWithRelabel:
     """Verify Prometheus scrapes model-service targets after relabel rewrite."""
 
     async def test_prometheus_scrapes_model_service_after_relabel(
@@ -206,15 +207,14 @@ class TestKernelMetricsScrapeWithRelabel:
         result: PrometheusResponse | None = None
 
         for _ in range(max_attempts):
-            time.sleep(2)
+            await asyncio.sleep(2)
             result = await prometheus_client_with_relabel.query_instant(up_model_service_preset)
-            if result.data.result and len(result.data.result) > 0:
+            if result.data.result and result.data.result[0].values[-1][1] == "1":
                 break
 
         assert result is not None
         assert len(result.data.result) > 0, (
             "Prometheus failed to scrape model-service target after relabel rewrite"
         )
-        # up == 1 means scrape succeeded
         metric = result.data.result[0]
         assert metric.values[-1][1] == "1"
