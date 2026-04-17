@@ -28,6 +28,15 @@ scrape_configs:
     http_sd_configs:
       - url: 'http://{{ http_sd_host }}:{{ http_sd_port }}/metrics/service_discovery'
         refresh_interval: "60s"
+{%- if kernel_metrics_host %}
+    relabel_configs:
+      # Rewrite model-service targets from Docker-internal IPs to host-accessible address
+      - source_labels: [service_group, __address__]
+        separator: ;
+        regex: model-services;[^:]+:(.+)
+        target_label: __address__
+        replacement: {{ kernel_metrics_host }}:${1}
+{%- endif %}
 
   # ETCD Cluster
   - job_name: 'etcd'

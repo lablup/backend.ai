@@ -18,6 +18,13 @@ scrape_configs:
     http_sd_configs:
       - url: 'http://host.docker.internal:18080/metrics/service_discovery'
         refresh_interval: "60s"
+    relabel_configs:
+      # Rewrite model-service targets from Docker-internal IPs to host-accessible address
+      - source_labels: [service_group, __address__]
+        separator: ;
+        regex: model-services;[^:]+:(.+)
+        target_label: __address__
+        replacement: host.docker.internal:${1}
   - job_name: 'etcd'
     scrape_interval: 10s
     metrics_path: /metrics

@@ -22,6 +22,15 @@ class PrometheusConfig(BaseModel):
     http_sd_port: int = Field(
         default=18080, description="HTTP service discovery port for dynamic target discovery"
     )
+    kernel_metrics_host: str = Field(
+        default="",
+        description=(
+            "Host-accessible address for kernel metrics scraping. "
+            "When set, model-service targets returned by HTTP SD will have their "
+            "Docker-internal IPs rewritten to this address via relabel_configs. "
+            "Leave empty to disable rewriting (use when kernel IPs are already routable)."
+        ),
+    )
     etcd_host: str = Field(
         default="host.docker.internal", description="ETCD host address for service discovery"
     )
