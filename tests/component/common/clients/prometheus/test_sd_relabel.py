@@ -197,7 +197,7 @@ class TestKernelMetricsScrapeWithRelabel:
         prometheus_client_with_relabel: PrometheusClient,
         up_model_service_preset: MetricPreset,
     ) -> None:
-        """relabel로 rewrite된 주소를 통해 model-service 지표가 수집된다."""
+        """Model-service metrics are scraped via the relabel-rewritten address."""
         # Prometheus needs time to discover targets and scrape
         max_attempts = 15
         result: PrometheusResponse | None = None
