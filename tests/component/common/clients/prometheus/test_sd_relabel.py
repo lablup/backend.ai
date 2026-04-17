@@ -143,7 +143,10 @@ def prometheus_with_relabel(
             "/etc/prometheus/prometheus.yml",
             mode="ro",
         )
-        .with_kwargs(tmpfs={"/prometheus": "rw,uid=65534,gid=65534"})
+        .with_kwargs(
+            tmpfs={"/prometheus": "rw,uid=65534,gid=65534"},
+            extra_hosts={"host.docker.internal": "host-gateway"},
+        )
         .with_command(
             "--config.file=/etc/prometheus/prometheus.yml "
             "--storage.tsdb.path=/prometheus "
