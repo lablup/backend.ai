@@ -15,6 +15,18 @@ from ai.backend.common.exception import (
 )
 
 
+class UnsupportedOperation(BackendAIError):
+    error_type = "https://api.backend.ai/probs/unsupported-operation"
+    error_title = "This operation is not supported."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
 class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/not-implemented"
     error_title = "This API is not implemented."

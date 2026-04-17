@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.exception import RuntimeVariantNotSupportedError
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.logging import BraceStyleAdapter
@@ -71,7 +71,9 @@ class ModelDefinitionGeneratorRegistry:
             raise RuntimeVariantNotSupportedError(runtime_variant)
         return generator
 
-    async def generate_model_definition(self, context: ModelDefinitionContext) -> ModelDefinition:
+    async def generate_model_definition(
+        self, context: ModelDefinitionContext
+    ) -> ModelDefinitionDraft:
         """
         Generate the final model definition for a revision.
 
@@ -94,8 +96,8 @@ class ModelDefinitionGeneratorRegistry:
         self,
         context: ModelDefinitionContext,
         runtime_variant: RuntimeVariant,
-        base_definition: ModelDefinition,
-    ) -> ModelDefinition:
+        base_definition: ModelDefinitionDraft,
+    ) -> ModelDefinitionDraft:
         """For non-CUSTOM variants, optionally merge the vfolder file on top of
         the generator-produced definition. CUSTOM variants already read from
         vfolder in the generator, so this step is skipped to avoid redundancy."""
@@ -112,8 +114,8 @@ class ModelDefinitionGeneratorRegistry:
     def _apply_user_override(
         self,
         context: ModelDefinitionContext,
-        base_definition: ModelDefinition,
-    ) -> ModelDefinition:
+        base_definition: ModelDefinitionDraft,
+    ) -> ModelDefinitionDraft:
         """Merge user-provided model_definition override if present."""
         if not context.model_definition:
             return base_definition
@@ -129,8 +131,8 @@ class ModelDefinitionGeneratorRegistry:
     async def _try_merge_vfolder_definition(
         self,
         context: ModelDefinitionContext,
-        base_definition: ModelDefinition,
-    ) -> ModelDefinition:
+        base_definition: ModelDefinitionDraft,
+    ) -> ModelDefinitionDraft:
         """
         Try to fetch model definition from vfolder storage and deep merge with base definition.
         Falls back to base definition on failure.
@@ -140,7 +142,9 @@ class ModelDefinitionGeneratorRegistry:
                 vfolder_id=context.mounts.model_vfolder_id,
                 model_definition_path=context.mounts.model_definition_path,
             )
-            merged_definition = base_definition.merge(ModelDefinition.model_validate(vfolder_dict))
+            merged_definition = base_definition.merge(
+                ModelDefinitionDraft.model_validate(vfolder_dict)
+            )
             log.debug(
                 "Vfolder model definition merged successfully for vfolder {}",
                 context.mounts.model_vfolder_id,

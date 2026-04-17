@@ -103,8 +103,11 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    IntFilter,
     OrderDirection,
     StringFilter,
+    UUIDFilter,
     to_global_id,
 )
 from ai.backend.manager.api.gql.common.types import (
@@ -142,6 +145,8 @@ from .resource_slot import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.image.types import ImageV2GQL
+
     from .deployment import ModelDeployment
     from .policy import DeploymentPolicyGQL
 
@@ -439,12 +444,34 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     )
     created_at: datetime = gql_field(description="Timestamp when the revision was created.")
 
-    @gql_field(description="The image of this entity.")  # type: ignore[misc]
+    @gql_field(
+        description="The image of this entity.",
+        deprecation_reason="Use image_v2 instead.",
+    )  # type: ignore[misc]
     async def image(self, info: Info[StrawberryGQLContext]) -> Image:
         image_global_id = to_global_id(
             ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
         )
         return Image(id=ID(image_global_id))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The container image used by this revision, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def image_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ImageV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.image.types"),
+        ]
+        | None
+    ):
+        from ai.backend.common.types import ImageID
+
+        return await info.context.data_loaders.image_loader.load(ImageID(UUID(str(self.image_id))))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -517,8 +544,11 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     name="ModelRevisionOrderField",
 )
 class ModelRevisionOrderFieldGQL(StrEnum):
-    NAME = "name"
+    REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
+    RESOURCE_GROUP = "resource_group"
+    CLUSTER_MODE = "cluster_mode"
+    RUNTIME_VARIANT = "runtime_variant"
 
 
 # Filter and Order Types
@@ -527,8 +557,33 @@ class ModelRevisionOrderFieldGQL(StrEnum):
     name="ModelRevisionFilter",
 )
 class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
-    name: StringFilter | None = None
+    revision_number: IntFilter | None = None
     deployment_id: ID | None = None
+    image_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by container image ID."),
+        default=None,
+    )
+    model_vfolder_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by model VFolder ID."),
+        default=None,
+    )
+    resource_group: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by resource group name."),
+        default=None,
+    )
+    cluster_mode: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="Filter by cluster mode (SINGLE_NODE / MULTI_NODE).",
+        ),
+        default=None,
+    )
+    created_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3", description="Filter by revision creation datetime."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

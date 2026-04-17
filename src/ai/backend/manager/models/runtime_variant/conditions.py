@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Collection
+
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -68,6 +71,13 @@ class RuntimeVariantConditions:
         return inner
 
     by_name_in = staticmethod(make_string_in_factory(RuntimeVariantRow.name))
+
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            return RuntimeVariantRow.id.in_(ids)
+
+        return inner
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:

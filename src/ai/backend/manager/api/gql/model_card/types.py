@@ -73,6 +73,7 @@ from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -91,6 +92,9 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
     from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
 
 
@@ -226,6 +230,60 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         | None
     ):
         return await info.context.data_loaders.vfolder_loader.load(self.vfolder_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The domain this model card belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def domain(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The project this model card belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def project(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ProjectV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.project_loader.load(self.project_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The user who created this model card.",
+        )
+    )  # type: ignore[misc]
+    async def creator(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.user_loader.load(self.creator_id)
 
     @gql_field(  # type: ignore[misc]
         description="Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card."

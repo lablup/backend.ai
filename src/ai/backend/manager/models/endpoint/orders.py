@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-import sqlalchemy as sa
-
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -30,12 +26,34 @@ class DeploymentOrders:
         return EndpointRow.created_at.desc()
 
     @staticmethod
-    def updated_at(ascending: bool = True) -> QueryOrder:
+    def destroyed_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return cast(
-                sa.UnaryExpression[Any] | sa.ColumnElement[Any], EndpointRow.updated_at.asc()
-            )
-        return cast(sa.UnaryExpression[Any] | sa.ColumnElement[Any], EndpointRow.updated_at.desc())
+            return EndpointRow.destroyed_at.asc()
+        return EndpointRow.destroyed_at.desc()
+
+    @staticmethod
+    def domain(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.domain.asc()
+        return EndpointRow.domain.desc()
+
+    @staticmethod
+    def project(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.project.asc()
+        return EndpointRow.project.desc()
+
+    @staticmethod
+    def resource_group(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.resource_group.asc()
+        return EndpointRow.resource_group.desc()
+
+    @staticmethod
+    def tag(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.tag.asc()
+        return EndpointRow.tag.desc()
 
 
 class AccessTokenOrders:

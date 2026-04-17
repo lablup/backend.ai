@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     TerminateSessionsInProjectInput,
 )
+from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -30,6 +31,20 @@ from ai.backend.manager.api.gql.session.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.user import UserNotFound
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.4.3",
+        description="Query a single session by ID. Returns an error if not found.",
+    )
+)  # type: ignore[misc]
+async def session_v2(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> SessionV2GQL | None:
+    payload = await info.context.adapters.session.get(SessionId(id))
+    return SessionV2GQL.from_pydantic(payload)
 
 
 @gql_root_field(

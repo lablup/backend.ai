@@ -467,6 +467,185 @@ class ModelDefinition(BaseConfigModel):
         return None
 
 
+# ============================================================================
+# ModelDefinition draft types — partial-input variants used by source layers
+# (preset storage, vfolder yaml, request DTO). Every field defaults to
+# ``None`` so any subset can flow through ``merge`` without strict
+# validation. ``to_resolved`` converts the draft back to the strict
+# :class:`ModelDefinition` at the persistence boundary; required-field
+# validation is delegated to Pydantic via the strict type's constructor.
+# ============================================================================
+
+
+class ModelHealthCheckDraft(BaseConfigModel):
+    interval: float | None = None
+    path: str | None = None
+    max_retries: int | None = None
+    max_wait_time: float | None = None
+    expected_status_code: int | None = None
+    initial_delay: float | None = None
+
+    def to_resolved(self) -> ModelHealthCheck:
+        if self.path is None:
+            raise ValueError("ModelHealthCheck.path is required")
+        return ModelHealthCheck(
+            interval=self.interval if self.interval is not None else 10.0,
+            path=self.path,
+            max_retries=self.max_retries if self.max_retries is not None else 10,
+            max_wait_time=self.max_wait_time if self.max_wait_time is not None else 15.0,
+            expected_status_code=(
+                self.expected_status_code if self.expected_status_code is not None else 200
+            ),
+            initial_delay=self.initial_delay if self.initial_delay is not None else 60.0,
+        )
+
+
+class ModelServiceConfigDraft(BaseConfigModel):
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: str | list[str] | None = None
+    shell: str | None = None
+    port: int | None = None
+    health_check: ModelHealthCheckDraft | None = None
+
+    def to_resolved(self) -> ModelServiceConfig:
+        if self.start_command is None:
+            raise ValueError("ModelServiceConfig.start_command is required")
+        if self.port is None:
+            raise ValueError("ModelServiceConfig.port is required")
+        return ModelServiceConfig(
+            pre_start_actions=self.pre_start_actions or [],
+            start_command=self.start_command,
+            shell=self.shell if self.shell is not None else "/bin/bash",
+            port=self.port,
+            health_check=(self.health_check.to_resolved() if self.health_check else None),
+        )
+
+
+class ModelConfigDraft(BaseConfigModel):
+    name: str | None = None
+    model_path: str | None = None
+    service: ModelServiceConfigDraft | None = None
+    metadata: ModelMetadata | None = None  # ModelMetadata is already all-Optional.
+
+    def to_resolved(self) -> ModelConfig:
+        if self.name is None:
+            raise ValueError("ModelConfig.name is required")
+        if self.model_path is None:
+            raise ValueError("ModelConfig.model_path is required")
+        return ModelConfig(
+            name=self.name,
+            model_path=self.model_path,
+            service=self.service.to_resolved() if self.service else None,
+            metadata=self.metadata,
+        )
+
+
+def _merge_health_check_draft(
+    base: ModelHealthCheckDraft,
+    override: ModelHealthCheckDraft,
+) -> ModelHealthCheckDraft:
+    s = override.model_fields_set
+    return ModelHealthCheckDraft.model_construct(
+        interval=_pick(base.interval, override.interval, "interval" in s),
+        path=_pick(base.path, override.path, "path" in s),
+        max_retries=_pick(base.max_retries, override.max_retries, "max_retries" in s),
+        max_wait_time=_pick(base.max_wait_time, override.max_wait_time, "max_wait_time" in s),
+        expected_status_code=_pick(
+            base.expected_status_code, override.expected_status_code, "expected_status_code" in s
+        ),
+        initial_delay=_pick(base.initial_delay, override.initial_delay, "initial_delay" in s),
+    )
+
+
+def _merge_service_config_draft(
+    base: ModelServiceConfigDraft,
+    override: ModelServiceConfigDraft,
+) -> ModelServiceConfigDraft:
+    s = override.model_fields_set
+    health_check: ModelHealthCheckDraft | None
+    if "health_check" in s and base.health_check is not None and override.health_check is not None:
+        health_check = _merge_health_check_draft(base.health_check, override.health_check)
+    else:
+        health_check = _pick(base.health_check, override.health_check, "health_check" in s)
+    return ModelServiceConfigDraft.model_construct(
+        pre_start_actions=_pick(
+            base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
+        ),
+        start_command=_pick(base.start_command, override.start_command, "start_command" in s),
+        shell=_pick(base.shell, override.shell, "shell" in s),
+        port=_pick(base.port, override.port, "port" in s),
+        health_check=health_check,
+    )
+
+
+def _merge_config_draft(
+    base: ModelConfigDraft,
+    override: ModelConfigDraft,
+) -> ModelConfigDraft:
+    s = override.model_fields_set
+    service: ModelServiceConfigDraft | None
+    if "service" in s and base.service is not None and override.service is not None:
+        service = _merge_service_config_draft(base.service, override.service)
+    else:
+        service = _pick(base.service, override.service, "service" in s)
+    metadata: ModelMetadata | None
+    if "metadata" in s and base.metadata is not None and override.metadata is not None:
+        metadata = _merge_metadata(base.metadata, override.metadata)
+    else:
+        metadata = _pick(base.metadata, override.metadata, "metadata" in s)
+    return ModelConfigDraft.model_construct(
+        name=_pick(base.name, override.name, "name" in s),
+        model_path=_pick(base.model_path, override.model_path, "model_path" in s),
+        service=service,
+        metadata=metadata,
+    )
+
+
+class ModelDefinitionDraft(BaseConfigModel):
+    """Partial ModelDefinition; every field is optional.
+
+    Drafts are produced by source layers (preset storage, vfolder yaml,
+    request DTO) and merged together. Convert to a strict
+    :class:`ModelDefinition` via :meth:`to_resolved` at the persistence
+    boundary; required-field validation is delegated to Pydantic via the
+    strict type's constructor.
+    """
+
+    models: list[ModelConfigDraft] | None = None
+
+    def merge(self, override: ModelDefinitionDraft) -> ModelDefinitionDraft:
+        """Merge ``override`` over ``self`` and return a new draft.
+
+        ``models`` is merged element-wise by index. Within each element,
+        nested sub-models are merged recursively when both sides provide
+        them; otherwise the override's value (when explicitly set) wins.
+        """
+        if "models" not in override.model_fields_set or override.models is None:
+            return ModelDefinitionDraft.model_construct(models=self.models)
+        if self.models is None or not self.models:
+            return ModelDefinitionDraft.model_construct(models=override.models)
+        if not override.models:
+            return ModelDefinitionDraft.model_construct(models=self.models)
+        merged: list[ModelConfigDraft] = []
+        for i in range(max(len(self.models), len(override.models))):
+            if i >= len(self.models):
+                merged.append(override.models[i])
+            elif i >= len(override.models):
+                merged.append(self.models[i])
+            else:
+                merged.append(_merge_config_draft(self.models[i], override.models[i]))
+        return ModelDefinitionDraft.model_construct(models=merged)
+
+    def to_resolved(self) -> ModelDefinition:
+        """Build the strict ``ModelDefinition`` from this draft.
+
+        Each child draft is converted via its own ``to_resolved`` and the
+        strict type's constructor performs Pydantic validation; missing
+        required fields propagate as ``pydantic.ValidationError``.
+        """
+        return ModelDefinition(models=[m.to_resolved() for m in (self.models or [])])
+
+
 def find_config_file(daemon_name: str) -> Path:
     toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)
     if not toml_path_from_env:

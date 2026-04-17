@@ -12,14 +12,14 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import IntFilter, StringFilter
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 from .types import DeploymentOrder, RevisionOrder, RouteOrder
@@ -76,7 +76,7 @@ class DeploymentFilter(BaseRequestModel):
 class RevisionFilter(BaseRequestModel):
     """Filter for revisions."""
 
-    name: StringFilter | None = Field(default=None, description="Filter by name")
+    revision_number: IntFilter | None = Field(default=None, description="Filter by revision number")
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
 
 
@@ -269,7 +269,7 @@ class RevisionInput(BaseRequestModel):
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Model runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    model_definition: ModelDefinition | None = Field(
+    model_definition: ModelDefinitionDraft | None = Field(
         default=None,
         description="Model definition to override the generated definition",
     )

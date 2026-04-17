@@ -224,7 +224,8 @@ class KernelEnqueueData:
     group_id: UUID
     user_uuid: UUID
     access_key: AccessKey
-    image: str  # Canonical image name
+    image: str  # Canonical image name (historical audit)
+    image_id: UUID | None  # Active reference to ImageRow
     architecture: str
     registry: str
     tag: str | None
@@ -289,6 +290,7 @@ class SessionEnqueueData:
     batch_timeout: int | None  # seconds
     callback_url: yarl.URL | None
     images: list[str]
+    image_ids: list[UUID]
     designated_agent_list: list[str] | None
     network_type: NetworkType | None = None
     network_id: str | None = None
@@ -318,6 +320,7 @@ class ScalingGroupNetworkInfo:
 class ImageInfo:
     """Resolved image information."""
 
+    id: UUID
     canonical: str
     architecture: str
     registry: str

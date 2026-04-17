@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import AsyncGenerator
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -22,7 +23,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.group.types import GroupData, ProjectMemberRoleSpec, ProjectType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
@@ -406,8 +407,13 @@ class TestGroupRepository:
         test_domain: str,
         default_project_resource_policy: str,
     ) -> uuid.UUID:
-        """Create test group"""
+        """Create test group together with both an admin role and a member
+        role bound at the project scope, matching the runtime state produced
+        by GroupDBSource.create() after BA-5746.
+        """
         group_id = uuid.uuid4()
+        admin_role_id = uuid.uuid4()
+        member_role_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as session:
             group = GroupRow(
@@ -423,6 +429,32 @@ class TestGroupRepository:
                 type=ProjectType.GENERAL,
             )
             session.add(group)
+            admin_role = RoleRow(
+                id=admin_role_id,
+                name=f"project-{str(group_id)[:8]}-admin",
+            )
+            session.add(admin_role)
+            member_role = RoleRow(
+                id=member_role_id,
+                name=f"project-{str(group_id)[:8]}-member",
+            )
+            session.add(member_role)
+            session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.ROLE,
+                    entity_id=str(admin_role_id),
+                )
+            )
+            session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.ROLE,
+                    entity_id=str(member_role_id),
+                )
+            )
             await session.commit()
 
         return group_id
@@ -854,6 +886,42 @@ class TestGroupRepository:
             assert scope_assoc.scope_id == test_domain
             assert scope_assoc.entity_id == str(result.id)
 
+    async def test_create_creates_admin_and_member_system_roles(
+        self,
+        group_repository_with_mock_role_manager: GroupRepository,
+        group_db_source_with_mock_role_manager: GroupDBSource,
+        test_domain: str,
+        default_project_resource_policy: str,
+    ) -> None:
+        """Project creation must request both an admin role (via GroupData) and a
+        member role (via ProjectMemberRoleSpec) from the RoleManager."""
+        creator_spec = GroupCreatorSpec(
+            name="test-roles-group",
+            domain_name=test_domain,
+            description="Test group for role creation",
+            resource_policy=default_project_resource_policy,
+        )
+        creator = Creator(spec=creator_spec)
+
+        result = await group_repository_with_mock_role_manager.create(creator)
+
+        mock_create = cast(
+            AsyncMock, group_db_source_with_mock_role_manager._role_manager.create_system_role
+        )
+        assert mock_create.call_count == 2
+
+        passed_specs = [call.args[1] for call in mock_create.call_args_list]
+        assert any(isinstance(spec, GroupData) and spec.id == result.id for spec in passed_specs)
+        assert any(
+            isinstance(spec, ProjectMemberRoleSpec) and spec.project_id == result.id
+            for spec in passed_specs
+        )
+
+        member_spec = next(spec for spec in passed_specs if isinstance(spec, ProjectMemberRoleSpec))
+        assert member_spec.role_name() == f"project-{str(result.id)[:8]}-member"
+        assert member_spec.scope_id().scope_type == ScopeType.PROJECT
+        assert member_spec.scope_id().scope_id == str(result.id)
+
     # ===========================================
     # Tests for modify_validated method
     # ===========================================
@@ -902,7 +970,12 @@ class TestGroupRepository:
         test_group: uuid.UUID,
         test_users_for_group: list[uuid.UUID],
     ) -> None:
-        """Test adding users to group with user_update_mode='add'"""
+        """Test adding users to group with user_update_mode='add'.
+
+        Verifies that modifyGroup add produces the business association, the
+        RBAC scope binding, and a user-role mapping to the project's member
+        role only (not to an admin role).
+        """
         updater_spec = GroupUpdaterSpec()
         updater = Updater(spec=updater_spec, pk_value=test_group)
 
@@ -912,7 +985,6 @@ class TestGroupRepository:
             user_uuids=test_users_for_group[:2],
         )
 
-        # Verify users were added
         async with db_with_cleanup.begin_session() as session:
             assoc_result = await session.execute(
                 sa.select(association_groups_users).where(
@@ -924,6 +996,51 @@ class TestGroupRepository:
             added_user_ids = {a.user_id for a in associations}
             assert test_users_for_group[0] in added_user_ids
             assert test_users_for_group[1] in added_user_ids
+
+            member_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(test_group)[:8]}-member")
+            )
+            assert member_role_id is not None
+
+            user_role_rows = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id.in_(test_users_for_group[:2]),
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(user_role_rows) == 2
+
+            # Over-grant guard: added users must NOT be mapped to the admin role.
+            admin_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(test_group)[:8]}-admin")
+            )
+            assert admin_role_id is not None
+            admin_role_mappings = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id.in_(test_users_for_group[:2]),
+                        UserRoleRow.role_id == admin_role_id,
+                    )
+                )
+            ).all()
+            assert len(admin_role_mappings) == 0
+
+            # RBAC scope binding: (PROJECT, user) rows must exist for each added user.
+            scope_binding_rows = (
+                await session.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(test_group),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id.in_([
+                            str(uid) for uid in test_users_for_group[:2]
+                        ]),
+                    )
+                )
+            ).all()
+            assert len(scope_binding_rows) == 2
 
     async def test_modify_validated_remove_users(
         self,
@@ -950,7 +1067,6 @@ class TestGroupRepository:
             user_uuids=test_users_for_group[:1],
         )
 
-        # Verify user was removed
         async with db_with_cleanup.begin_session() as session:
             assoc_result = await session.execute(
                 sa.select(association_groups_users).where(
@@ -963,6 +1079,59 @@ class TestGroupRepository:
             assert test_users_for_group[0] not in remaining_user_ids
             assert test_users_for_group[1] in remaining_user_ids
             assert test_users_for_group[2] in remaining_user_ids
+
+            member_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(test_group)[:8]}-member")
+            )
+            assert member_role_id is not None
+
+            removed_user_role_rows = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == test_users_for_group[0],
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(removed_user_role_rows) == 0
+
+            remaining_user_role_rows = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id.in_(test_users_for_group[1:3]),
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(remaining_user_role_rows) == 2
+
+            # RBAC scope binding: the removed user's (PROJECT, user) row must
+            # be gone, while the remaining users' rows must still exist.
+            removed_scope_bindings = (
+                await session.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(test_group),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(test_users_for_group[0]),
+                    )
+                )
+            ).all()
+            assert len(removed_scope_bindings) == 0
+
+            remaining_scope_bindings = (
+                await session.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(test_group),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id.in_([
+                            str(uid) for uid in test_users_for_group[1:3]
+                        ]),
+                    )
+                )
+            ).all()
+            assert len(remaining_scope_bindings) == 2
 
     # ===========================================
     # Tests for mark_inactive method

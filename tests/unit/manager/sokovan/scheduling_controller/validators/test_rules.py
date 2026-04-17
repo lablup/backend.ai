@@ -53,6 +53,7 @@ def basic_context() -> SessionCreationContext:
         ],
         image_infos={
             "test-image": ImageInfo(
+                id=uuid.uuid4(),
                 canonical="test-image",
                 architecture="x86_64",
                 registry="localhost",

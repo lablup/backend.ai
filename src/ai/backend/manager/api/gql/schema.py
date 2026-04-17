@@ -64,6 +64,7 @@ from .deployment import (
     admin_create_deployment_revision_preset,
     admin_delete_deployment_revision_preset,
     admin_deployments,
+    admin_refresh_deployment_revisions,
     admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
@@ -245,9 +246,13 @@ from .project_v2 import (
 )
 from .prometheus_query_preset import (
     admin_create_prometheus_query_preset,
+    admin_create_prometheus_query_preset_category,
     admin_delete_prometheus_query_preset,
+    admin_delete_prometheus_query_preset_category,
     admin_modify_prometheus_query_preset,
     prometheus_query_preset,
+    prometheus_query_preset_categories,
+    prometheus_query_preset_category,
     prometheus_query_preset_result,
     prometheus_query_presets,
 )
@@ -341,9 +346,6 @@ from .resource_usage import (
     admin_user_usage_buckets,
     domain_usage_buckets,
     project_usage_buckets,
-    rg_domain_usage_buckets,
-    rg_project_usage_buckets,
-    rg_user_usage_buckets,
     user_usage_buckets,
 )
 from .runtime_variant import (
@@ -380,6 +382,7 @@ from .session.resolver import (
     admin_sessions_v2,
     enqueue_session,
     project_sessions_v2,
+    session_v2,
     terminate_project_sessions_v2,
 )
 from .storage_host import my_storage_host_permissions
@@ -497,6 +500,7 @@ class Query:
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
+    session_v2 = session_v2
     project_deployments = project_deployments
     my_deployments = my_deployments
     resource_slot_type = resource_slot_type
@@ -506,6 +510,9 @@ class Query:
     prometheus_query_preset = prometheus_query_preset
     prometheus_query_presets = prometheus_query_presets
     prometheus_query_preset_result = prometheus_query_preset_result
+    # Prometheus Query Preset Category APIs (read available to any authenticated user)
+    prometheus_query_preset_category = prometheus_query_preset_category
+    prometheus_query_preset_categories = prometheus_query_preset_categories
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
@@ -537,9 +544,6 @@ class Query:
     rg_project_fair_shares = rg_project_fair_shares
     rg_user_fair_share = rg_user_fair_share
     rg_user_fair_shares = rg_user_fair_shares
-    rg_domain_usage_buckets = rg_domain_usage_buckets
-    rg_project_usage_buckets = rg_project_usage_buckets
-    rg_user_usage_buckets = rg_user_usage_buckets
     # Container Registry Scoped APIs
     container_registry_images_v2 = container_registry_images_v2
     # Image Scoped APIs
@@ -656,6 +660,7 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
+    admin_refresh_deployment_revisions = admin_refresh_deployment_revisions
     update_deployment_policy = update_deployment_policy
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
@@ -780,6 +785,9 @@ class Mutation:
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
     admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
+    # Prometheus Query Preset Category - Admin APIs
+    admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
+    admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role

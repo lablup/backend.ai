@@ -70,6 +70,8 @@ class OperationType(enum.StrEnum):
 
 
 class EntityType(enum.StrEnum):
+    """Deprecated for RBAC: use ``RBACElementType`` instead."""
+
     # === RBAC scope/resource types (original 12) ===
     USER = "user"
     PROJECT = "project"
@@ -314,11 +316,13 @@ class FieldType(enum.StrEnum):
 
 
 class ScopeType(enum.StrEnum):
+    """Deprecated for RBAC: use ``RBACElementType`` instead."""
+
     # === Organization/permission scopes (original) ===
     DOMAIN = "domain"
     PROJECT = "project"
     USER = "user"
-    GLOBAL = "global"
+    GLOBAL = "global"  # Deprecated: no longer used in RBAC scope hierarchy
 
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"
@@ -347,7 +351,7 @@ class ScopeType(enum.StrEnum):
             raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
 
 
-GLOBAL_SCOPE_ID = "global"
+GLOBAL_SCOPE_ID = "global"  # Deprecated: no longer used in RBAC scope hierarchy
 
 
 class RBACElementType(enum.StrEnum):

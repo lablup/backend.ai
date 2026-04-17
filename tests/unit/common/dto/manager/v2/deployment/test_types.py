@@ -75,12 +75,24 @@ class TestDeploymentOrderField:
     def test_created_at_value(self) -> None:
         assert DeploymentOrderField.CREATED_AT.value == "created_at"
 
-    def test_updated_at_value(self) -> None:
-        assert DeploymentOrderField.UPDATED_AT.value == "updated_at"
+    def test_destroyed_at_value(self) -> None:
+        assert DeploymentOrderField.DESTROYED_AT.value == "destroyed_at"
+
+    def test_domain_value(self) -> None:
+        assert DeploymentOrderField.DOMAIN.value == "domain"
+
+    def test_project_value(self) -> None:
+        assert DeploymentOrderField.PROJECT.value == "project"
+
+    def test_resource_group_value(self) -> None:
+        assert DeploymentOrderField.RESOURCE_GROUP.value == "resource_group"
+
+    def test_tag_value(self) -> None:
+        assert DeploymentOrderField.TAG.value == "tag"
 
     def test_enum_members_count(self) -> None:
         members = list(DeploymentOrderField)
-        assert len(members) == 3
+        assert len(members) == 7
 
     def test_all_values_are_strings(self) -> None:
         for member in DeploymentOrderField:
@@ -92,22 +104,31 @@ class TestDeploymentOrderField:
     def test_from_string_created_at(self) -> None:
         assert DeploymentOrderField("created_at") is DeploymentOrderField.CREATED_AT
 
-    def test_from_string_updated_at(self) -> None:
-        assert DeploymentOrderField("updated_at") is DeploymentOrderField.UPDATED_AT
+    def test_from_string_destroyed_at(self) -> None:
+        assert DeploymentOrderField("destroyed_at") is DeploymentOrderField.DESTROYED_AT
 
 
 class TestRevisionOrderField:
     """Tests for RevisionOrderField enum."""
 
-    def test_name_value(self) -> None:
-        assert RevisionOrderField.NAME.value == "name"
+    def test_revision_number_value(self) -> None:
+        assert RevisionOrderField.REVISION_NUMBER.value == "revision_number"
 
     def test_created_at_value(self) -> None:
         assert RevisionOrderField.CREATED_AT.value == "created_at"
 
+    def test_resource_group_value(self) -> None:
+        assert RevisionOrderField.RESOURCE_GROUP.value == "resource_group"
+
+    def test_cluster_mode_value(self) -> None:
+        assert RevisionOrderField.CLUSTER_MODE.value == "cluster_mode"
+
+    def test_runtime_variant_value(self) -> None:
+        assert RevisionOrderField.RUNTIME_VARIANT.value == "runtime_variant"
+
     def test_enum_members_count(self) -> None:
         members = list(RevisionOrderField)
-        assert len(members) == 2
+        assert len(members) == 5
 
     def test_all_values_are_strings(self) -> None:
         for member in RevisionOrderField:

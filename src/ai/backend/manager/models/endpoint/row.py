@@ -631,6 +631,24 @@ class EndpointRow(Base):  # type: ignore[misc]
                 return rev
         return None
 
+    def _find_active_revision(self) -> DeploymentRevisionRow | None:
+        """Return the revision representing the deployment's active spec.
+
+        Falls back to ``deploying_revision`` when ``current_revision`` is
+        unset (e.g. during the initial DEPLOYING phase before strategy
+        completion). Used by display/serialization paths that should reflect
+        the spec being deployed rather than rendering empty fields.
+        """
+        current = self._find_current_revision()
+        if current is not None:
+            return current
+        if not self.deploying_revision:
+            return None
+        for rev in self.revisions:
+            if rev.id == self.deploying_revision:
+                return rev
+        return None
+
     def to_summary_data(self) -> DeploymentSummaryData:
         return DeploymentSummaryData(
             id=self.id,
@@ -657,9 +675,12 @@ class EndpointRow(Base):  # type: ignore[misc]
         """Convert to EndpointData.
 
         Requires revisions and revisions.image_row to be eagerly loaded
-        via selectinload for revision field population.
+        via selectinload for revision field population. During the initial
+        DEPLOYING phase ``current_revision`` is unset, so the fields fall
+        back to ``deploying_revision`` so callers see the spec being
+        deployed instead of empty values.
         """
-        current_rev = self._find_current_revision()
+        current_rev = self._find_active_revision()
         return EndpointData(
             id=self.id,
             name=self.name,
@@ -1112,30 +1133,14 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     ) -> None:
         """Apply ModelDeploymentAutoScalingRuleModifier to update fields.
 
-        Uses OptionalState pattern where optional_value() returns the value to update
-        or None if no update should be performed.
+        Uses fields_to_update() which honours both OptionalState (NOP/UPDATE)
+        and TriState (NOP/UPDATE/NULLIFY). Dict keys match DB column names so
+        each entry can be applied directly via setattr, preserving NULLIFY
+        semantics for nullable columns (min/max_threshold, min/max_replicas,
+        prometheus_query_preset_id).
         """
-        if (metric_source := modifier.metric_source.optional_value()) is not None:
-            self.metric_source = metric_source
-        if (metric_name := modifier.metric_name.optional_value()) is not None:
-            self.metric_name = metric_name
-        if (step_size := modifier.step_size.optional_value()) is not None:
-            self.step_size = step_size
-        if (time_window := modifier.time_window.optional_value()) is not None:
-            self.cooldown_seconds = time_window
-        if (min_replicas := modifier.min_replicas.optional_value()) is not None:
-            self.min_replicas = min_replicas
-        if (max_replicas := modifier.max_replicas.optional_value()) is not None:
-            self.max_replicas = max_replicas
-
-        if (max_threshold := modifier.max_threshold.optional_value()) is not None:
-            self.max_threshold = max_threshold
-        if (min_threshold := modifier.min_threshold.optional_value()) is not None:
-            self.min_threshold = min_threshold
-        if (
-            prometheus_query_preset_id := modifier.prometheus_query_preset_id.optional_value()
-        ) is not None:
-            self.prometheus_query_preset_id = prometheus_query_preset_id
+        for column_name, value in modifier.fields_to_update().items():
+            setattr(self, column_name, value)
 
 
 class ModelServiceHelper:

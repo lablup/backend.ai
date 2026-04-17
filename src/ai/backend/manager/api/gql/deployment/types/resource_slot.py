@@ -31,6 +31,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import UnsupportedOperation
 
 
 @gql_node_type(
@@ -55,8 +56,9 @@ class AllocatedResourceSlotNodeGQL(PydanticNodeMixin[AllocatedResourceSlotNodeDT
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        raise NotImplementedError(
-            "AllocatedResourceSlotNodeGQL is not a root-level entity and does not support resolve_nodes."
+        raise UnsupportedOperation(
+            "AllocatedResourceSlotNodeGQL does not support root-level node resolution. "
+            "Access resource slots through the parent revision or preset."
         )
 
 

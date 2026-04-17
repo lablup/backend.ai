@@ -97,11 +97,12 @@ from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentAutoScalingPolicyCreatorSpec,
+    DeploymentCreatorSpec,
+    DeploymentMetadataFields,
+    DeploymentNetworkFields,
+    DeploymentReplicaFields,
     DeploymentRevisionCreatorSpec,
     RouteCreatorSpec,
-)
-from ai.backend.manager.repositories.deployment.creators.endpoint import (
-    LegacyEndpointCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentAutoScalingPolicyUpdaterSpec,
@@ -3639,34 +3640,20 @@ class TestDeploymentRepositoryDuplicateName:
     ) -> RBACEntityCreator[EndpointRow]:
         """Helper to create RBACEntityCreator for endpoint creation."""
         user_id = uuid.uuid4()
-        spec = LegacyEndpointCreatorSpec(
-            name=name,
-            domain=domain.name,
-            project=group.id,
-            resource_group=scaling_group.name,
-            created_user=user_id,
-            session_owner=user_id,
-            revision_history_limit=10,
-            tag=None,
-            replicas=1,
-            desired_replicas=1,
-            open_to_public=False,
-            url=None,
-            image_id=image_id,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=1,
-            resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal(str(1024**3))}),
-            resource_opts=None,
-            model=None,
-            model_mount_destination="/models",
-            model_definition_path=None,
-            extra_mounts=[],
-            runtime_variant=RuntimeVariant("custom"),
-            startup_command=None,
-            bootstrap_script=None,
-            environ=None,
-            callback_url=None,
-            policy=None,
+        spec = DeploymentCreatorSpec(
+            metadata=DeploymentMetadataFields(
+                name=name,
+                domain=domain.name,
+                project_id=group.id,
+                resource_group=scaling_group.name,
+                created_user_id=user_id,
+                session_owner_id=user_id,
+                revision_history_limit=10,
+                tag=None,
+            ),
+            replica=DeploymentReplicaFields(replica_count=1, desired_replica_count=1),
+            network=DeploymentNetworkFields(open_to_public=False, url=None),
+            revision=None,
         )
         return RBACEntityCreator(
             spec=spec,
@@ -3684,7 +3671,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_image_id: uuid.UUID,
     ) -> None:
-        """Test that create_endpoint_legacy raises DeploymentNameAlreadyExists for duplicate name."""
+        """Test that create_endpoint raises DeploymentNameAlreadyExists for duplicate name."""
         # Create first endpoint with specific name
         first_creator = self._create_endpoint_creator(
             name="duplicate-test-endpoint",
@@ -3693,7 +3680,7 @@ class TestDeploymentRepositoryDuplicateName:
             scaling_group=test_scaling_group,
             image_id=test_image_id,
         )
-        await deployment_repository.create_endpoint_legacy(first_creator)
+        await deployment_repository.create_endpoint(first_creator)
 
         # Attempt to create second endpoint with same name should fail
         second_creator = self._create_endpoint_creator(
@@ -3705,7 +3692,7 @@ class TestDeploymentRepositoryDuplicateName:
         )
 
         with pytest.raises(DeploymentNameAlreadyExists):
-            await deployment_repository.create_endpoint_legacy(second_creator)
+            await deployment_repository.create_endpoint(second_creator)
 
     async def test_create_endpoint_succeeds_with_different_name(
         self,
@@ -3715,7 +3702,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_image_id: uuid.UUID,
     ) -> None:
-        """Test that create_endpoint_legacy succeeds with a different name."""
+        """Test that create_endpoint succeeds with a different name."""
         # Create first endpoint
         first_creator = self._create_endpoint_creator(
             name="existing-endpoint",
@@ -3724,7 +3711,7 @@ class TestDeploymentRepositoryDuplicateName:
             scaling_group=test_scaling_group,
             image_id=test_image_id,
         )
-        await deployment_repository.create_endpoint_legacy(first_creator)
+        await deployment_repository.create_endpoint(first_creator)
 
         # Create second endpoint with different name should succeed
         second_creator = self._create_endpoint_creator(
@@ -3735,7 +3722,7 @@ class TestDeploymentRepositoryDuplicateName:
             image_id=test_image_id,
         )
 
-        result = await deployment_repository.create_endpoint_legacy(second_creator)
+        result = await deployment_repository.create_endpoint(second_creator)
 
         assert result.metadata.name == "different-endpoint-name"
         assert result.metadata.project == test_group.id
@@ -3749,7 +3736,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_image_id: uuid.UUID,
     ) -> None:
-        """Test that create_endpoint_legacy allows same name in different project."""
+        """Test that create_endpoint allows same name in different project."""
         # Create endpoint in first project
         first_creator = self._create_endpoint_creator(
             name="same-name-endpoint",
@@ -3758,7 +3745,7 @@ class TestDeploymentRepositoryDuplicateName:
             scaling_group=test_scaling_group,
             image_id=test_image_id,
         )
-        await deployment_repository.create_endpoint_legacy(first_creator)
+        await deployment_repository.create_endpoint(first_creator)
 
         # Create endpoint with same name in different project should succeed
         second_creator = self._create_endpoint_creator(
@@ -3769,7 +3756,7 @@ class TestDeploymentRepositoryDuplicateName:
             image_id=test_image_id,
         )
 
-        result = await deployment_repository.create_endpoint_legacy(second_creator)
+        result = await deployment_repository.create_endpoint(second_creator)
 
         assert result.metadata.name == "same-name-endpoint"
         assert result.metadata.project == different_group.id
@@ -3783,7 +3770,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_image_id: uuid.UUID,
     ) -> None:
-        """Test that create_endpoint_legacy allows same name when existing endpoint is destroyed."""
+        """Test that create_endpoint allows same name when existing endpoint is destroyed."""
         # Create first endpoint
         first_creator = self._create_endpoint_creator(
             name="reusable-endpoint",
@@ -3792,7 +3779,7 @@ class TestDeploymentRepositoryDuplicateName:
             scaling_group=test_scaling_group,
             image_id=test_image_id,
         )
-        first_result = await deployment_repository.create_endpoint_legacy(first_creator)
+        first_result = await deployment_repository.create_endpoint(first_creator)
 
         # Mark the first endpoint as destroyed
         async with db_with_cleanup.begin_session() as db_sess:
@@ -3811,7 +3798,7 @@ class TestDeploymentRepositoryDuplicateName:
             image_id=test_image_id,
         )
 
-        result = await deployment_repository.create_endpoint_legacy(second_creator)
+        result = await deployment_repository.create_endpoint(second_creator)
 
         assert result.metadata.name == "reusable-endpoint"
         assert result.metadata.project == test_group.id

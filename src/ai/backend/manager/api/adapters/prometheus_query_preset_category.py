@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
@@ -36,6 +37,7 @@ from ai.backend.manager.models.prometheus_query_preset_category.orders import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
+    OffsetPagination,
     QueryCondition,
     QueryOrder,
 )
@@ -55,6 +57,19 @@ from .pagination import PaginationSpec
 
 class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
     """Adapter for prometheus query preset category domain operations."""
+
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[CategoryNode | None]:
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[PrometheusQueryPresetCategoryConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.prometheus_query_preset_category.search_categories.wait_for_complete(
+            SearchCategoriesAction(querier=querier)
+        )
+        category_map = {item.id: self._data_to_dto(item) for item in action_result.items}
+        return [category_map.get(category_id) for category_id in ids]
 
     async def create(self, input: CreateCategoryInput) -> CreateCategoryPayload:
         """Create a new prometheus query preset category."""

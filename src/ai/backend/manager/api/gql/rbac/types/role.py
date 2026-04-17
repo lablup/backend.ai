@@ -428,6 +428,26 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         # DataLoader already returns UserV2GQL | None via from_pydantic conversion
         return await info.context.data_loaders.user_loader.load(self.user_id)
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The user who granted this role assignment.",
+        )
+    )  # type: ignore[misc]
+    async def granted_by_user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.granted_by is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(self.granted_by)
+
 
 # ==================== Filter Types ====================
 

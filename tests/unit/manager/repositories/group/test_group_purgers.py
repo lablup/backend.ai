@@ -18,11 +18,12 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 
 # Import Row classes to ensure SQLAlchemy mapper initialization
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow  # noqa: F401
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
@@ -70,6 +71,8 @@ class TestGroupPurgersIntegration:
                 GroupRow,
                 SessionRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 KernelRow,
                 VFolderRow,
                 EndpointRow,

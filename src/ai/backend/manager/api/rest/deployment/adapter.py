@@ -203,6 +203,16 @@ class DeploymentAdapter(BaseFilterAdapter):
             return DeploymentOrders.name(ascending=ascending)
         if order.field == DeploymentOrderField.CREATED_AT:
             return DeploymentOrders.created_at(ascending=ascending)
+        if order.field == DeploymentOrderField.DESTROYED_AT:
+            return DeploymentOrders.destroyed_at(ascending=ascending)
+        if order.field == DeploymentOrderField.DOMAIN:
+            return DeploymentOrders.domain(ascending=ascending)
+        if order.field == DeploymentOrderField.PROJECT:
+            return DeploymentOrders.project(ascending=ascending)
+        if order.field == DeploymentOrderField.RESOURCE_GROUP:
+            return DeploymentOrders.resource_group(ascending=ascending)
+        if order.field == DeploymentOrderField.TAG:
+            return DeploymentOrders.tag(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
@@ -261,15 +271,11 @@ class RevisionAdapter(BaseFilterAdapter):
         """Convert revision filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        # Name filter
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=RevisionConditions.by_name_contains,
-                equals_factory=RevisionConditions.by_name_equals,
-                starts_with_factory=RevisionConditions.by_name_starts_with,
-                ends_with_factory=RevisionConditions.by_name_ends_with,
-                in_factory=RevisionConditions.by_name_in,
+        # Revision number filter
+        if filter.revision_number is not None:
+            condition = self.convert_int_filter(
+                filter.revision_number,
+                RevisionConditions.by_revision_number,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -284,10 +290,16 @@ class RevisionAdapter(BaseFilterAdapter):
         """Convert revision order specification to query order."""
         ascending = order.direction == OrderDirection.ASC
 
-        if order.field == RevisionOrderField.NAME:
-            return RevisionOrders.name(ascending=ascending)
+        if order.field == RevisionOrderField.REVISION_NUMBER:
+            return RevisionOrders.revision_number(ascending=ascending)
         if order.field == RevisionOrderField.CREATED_AT:
             return RevisionOrders.created_at(ascending=ascending)
+        if order.field == RevisionOrderField.RESOURCE_GROUP:
+            return RevisionOrders.resource_group(ascending=ascending)
+        if order.field == RevisionOrderField.CLUSTER_MODE:
+            return RevisionOrders.cluster_mode(ascending=ascending)
+        if order.field == RevisionOrderField.RUNTIME_VARIANT:
+            return RevisionOrders.runtime_variant(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

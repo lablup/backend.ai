@@ -4,20 +4,27 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
 @gql_enum(
@@ -50,6 +57,24 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
     invalidated_at: datetime | None = gql_field(
         description="Timestamp when the session was invalidated."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The user who owns this login session.",
+        )
+    )  # type: ignore[misc]
+    async def user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.user_loader.load(self.user_id)
 
 
 LoginSessionV2EdgeGQL = Edge[LoginSessionV2GQL]

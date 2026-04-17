@@ -26,6 +26,7 @@ from .auto_scaling import (
     UpdateAutoScalingRulePayload,
 )
 from .deployment import (
+    AdminRefreshDeploymentRevisionsPayload,
     CreateDeploymentInput,
     CreateDeploymentPayload,
     DeleteDeploymentInput,
@@ -46,6 +47,7 @@ from .deployment import (
     ModelDeploymentNetworkAccessInput,
     ProjectDeploymentScopeGQL,
     ReplicaState,
+    RevisionRefreshResult,
     SyncReplicaInput,
     SyncReplicaPayload,
     UpdateDeploymentInput,
@@ -163,6 +165,7 @@ __all__ = [
     "UpdateAutoScalingRuleInput",
     "UpdateAutoScalingRulePayload",
     # Deployment
+    "AdminRefreshDeploymentRevisionsPayload",
     "CreateDeploymentInput",
     "CreateDeploymentPayload",
     "DeleteDeploymentInput",
@@ -183,6 +186,7 @@ __all__ = [
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
     "ReplicaState",
+    "RevisionRefreshResult",
     "SyncReplicaInput",
     "SyncReplicaPayload",
     "UpdateDeploymentInput",

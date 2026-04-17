@@ -46,6 +46,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpecDraft,
     MountMetadata,
     ResourceSpecDraft,
+    RevisionDraft,
     RouteHealthStatus,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -143,6 +144,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_draft import revision_draft_from_current
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -216,16 +218,15 @@ class ModelServingService:
         vfolder_id: uuid.UUID,
         scaling_group: str,
     ) -> ModelRevisionSpec:
-        """Generate model revision using RevisionGenerator."""
+        """Resolve a final ModelRevisionSpec via DeploymentController's unified merge pipeline."""
+        del vfolder_id  # the vfolder id already lives on draft.mounts
         default_architecture = (
             await self._deployment_repository.get_default_architecture_from_scaling_group(
                 scaling_group
             )
         )
-        generator = self._revision_generator_registry.get(draft.execution.runtime_variant)
-        return await generator.generate_revision(
+        return await self._deployment_controller.resolve_legacy_revision_spec(
             draft_revision=draft,
-            vfolder_id=vfolder_id,
             default_architecture=default_architecture,
         )
 
@@ -889,22 +890,100 @@ class ModelServingService:
         return ForceSyncActionResult(success=True)
 
     async def modify_endpoint(self, action: ModifyEndpointAction) -> ModifyEndpointActionResult:
-        result = await self._repository.modify_endpoint(
+        spec = cast(EndpointUpdaterSpec, action.updater.spec)
+
+        # 1. Apply endpoint-level changes (name, resource_group, replicas)
+        #    via the existing repository method (which only writes endpoint columns).
+        result = await self._repository.modify_endpoint_fields(
             action,
             self._agent_registry,
             self._config_provider.legacy_etcd_config_loader,
-            self._storage_manager,
         )
-        spec = cast(EndpointUpdaterSpec, action.updater.spec)
-        if spec.replica_count_modified() or spec.has_revision_changes():
-            # Trigger CHECK_REPLICA for both cases:
-            # - replica count change: reconcile running session count
-            # - revision change: rotate sessions to use the newly activated revision
+
+        # 2. If revision-level fields changed, create + activate a new revision.
+        #    Revisions are immutable, so every mutation goes through the same
+        #    ``add_revision`` entry point as fresh creation — this legacy path
+        #    merely supplies the current revision as the caller-provided base
+        #    so that untouched fields survive while yaml stays authoritative.
+        if spec.has_revision_changes():
+            current_rev = await self._deployment_repository.get_current_revision(action.endpoint_id)
+            current_draft = revision_draft_from_current(current_rev)
+            overrides = await self._build_revision_overrides_from_spec(spec)
+
+            vfolder_id = current_rev.model_mount_config.vfolder_id
+            if vfolder_id is None:
+                raise InvalidAPIParameters("model vfolder id is missing on the current revision")
+            definition_path_override = spec.model_definition_path.optional_value()
+            mounts = MountMetadata(
+                model_vfolder_id=vfolder_id,
+                model_definition_path=(
+                    definition_path_override
+                    if definition_path_override is not None
+                    else current_rev.model_mount_config.definition_path
+                ),
+                model_mount_destination=current_rev.model_mount_config.mount_destination
+                or "/models",
+            )
+            revision = await self._deployment_controller.add_revision(
+                endpoint_id=action.endpoint_id,
+                overrides=overrides,
+                mounts=mounts,
+                base=current_draft,
+            )
+            await self._deployment_controller.activate_revision(action.endpoint_id, revision.id)
+        elif spec.replica_count_modified():
+            # Replica-only change: trigger CHECK_REPLICA to reconcile
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.CHECK_REPLICA,
             )
+
         return ModifyEndpointActionResult(
             endpoint_id=action.endpoint_id, success=result.success, data=result.data
+        )
+
+    async def _build_revision_overrides_from_spec(
+        self,
+        spec: EndpointUpdaterSpec,
+    ) -> RevisionDraft:
+        """Convert ``EndpointUpdaterSpec`` overrides into a ``RevisionDraft``.
+
+        Only fields the user explicitly modified are populated. Fields left
+        untouched stay ``None`` so that the controller's merge pipeline can
+        fall through to (in priority order) the current revision base,
+        deployment-config.yaml, preset, and model-definition.yaml.
+        Image ref → image_id resolution happens here because legacy specs
+        carry an ``ImageRef`` rather than a pre-resolved id.
+        """
+        image_id: uuid.UUID | None = None
+        image_ref = spec.image.optional_value()
+        if image_ref is not None:
+            arch = (
+                image_ref.architecture.value()
+                if image_ref.architecture.optional_value()
+                else "x86_64"
+            )
+            image_id = await self._deployment_repository.get_image_id(
+                ImageIdentifier(image_ref.name, arch)
+            )
+
+        resource_slots_override = spec.resource_slots.optional_value()
+        resource_slots_mapping: dict[str, str] | None
+        if resource_slots_override is not None:
+            resource_slots_mapping = {k: str(v) for k, v in resource_slots_override.items()}
+        else:
+            resource_slots_mapping = None
+
+        resource_opts_override = spec.resource_opts.optional_value()
+        environ_override = spec.environ.optional_value()
+
+        return RevisionDraft(
+            image_id=image_id,
+            resource_slots=resource_slots_mapping,
+            resource_opts=dict(resource_opts_override) if resource_opts_override else None,
+            cluster_mode=spec.cluster_mode.optional_value(),
+            cluster_size=spec.cluster_size.optional_value(),
+            environ=dict(environ_override) if environ_override else None,
+            runtime_variant=spec.runtime_variant.optional_value(),
         )
 
     async def validate_model_service(

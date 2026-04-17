@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -46,6 +47,7 @@ from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQ
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
+    OffsetPagination,
     QueryCondition,
     QueryOrder,
     Updater,
@@ -72,6 +74,21 @@ from .pagination import PaginationSpec
 
 class PrometheusQueryPresetAdapter(BaseAdapter):
     """Adapter for prometheus query preset domain operations."""
+
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[QueryDefinitionNode | None]:
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[PrometheusQueryPresetConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.prometheus_query_preset.search_presets.wait_for_complete(
+                SearchPresetsAction(querier=querier)
+            )
+        )
+        preset_map = {item.id: self._data_to_dto(item) for item in action_result.items}
+        return [preset_map.get(preset_id) for preset_id in ids]
 
     async def create(self, input: CreateQueryDefinitionInput) -> CreateQueryDefinitionPayload:
         """Create a new prometheus query definition."""

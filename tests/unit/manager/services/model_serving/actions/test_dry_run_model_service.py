@@ -113,9 +113,35 @@ class TestDryRunModelService:
         return mock
 
     @pytest.fixture
-    def mock_deployment_controller(self) -> MagicMock:
+    def _stub_model_revision_spec(self) -> ModelRevisionSpec:
+        return ModelRevisionSpec(
+            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            image_identifier=ImageIdentifier(
+                canonical="ai.backend/python:3.9",
+                architecture="x86_64",
+            ),
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                model_definition_path=None,
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant("custom"),
+                startup_command=None,
+                environ={},
+            ),
+        )
+
+    @pytest.fixture
+    def mock_deployment_controller(self, _stub_model_revision_spec: ModelRevisionSpec) -> MagicMock:
         mock = MagicMock(spec=DeploymentController)
         mock.mark_lifecycle_needed = AsyncMock()
+        mock.resolve_legacy_revision_spec = AsyncMock(return_value=_stub_model_revision_spec)
         return mock
 
     @pytest.fixture
@@ -140,34 +166,7 @@ class TestDryRunModelService:
 
     @pytest.fixture
     def mock_revision_generator_registry(self) -> MagicMock:
-        mock = MagicMock(spec=RevisionGeneratorRegistry)
-        mock_generator = MagicMock()
-        mock_generator.generate_revision = AsyncMock(
-            return_value=ModelRevisionSpec(
-                image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
-                image_identifier=ImageIdentifier(
-                    canonical="ai.backend/python:3.9",
-                    architecture="x86_64",
-                ),
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
-                    resource_opts=None,
-                ),
-                mounts=MountMetadata(
-                    model_vfolder_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
-                    model_definition_path=None,
-                ),
-                execution=ExecutionSpec(
-                    runtime_variant=RuntimeVariant("custom"),
-                    startup_command=None,
-                    environ={},
-                ),
-            )
-        )
-        mock.get.return_value = mock_generator
-        return mock
+        return MagicMock(spec=RevisionGeneratorRegistry)
 
     @pytest.fixture
     def model_serving_service(
@@ -602,34 +601,8 @@ class TestDryRunWithDeploymentConfigOverrides:
         return mock
 
     @pytest.fixture
-    def mock_deployment_controller(self) -> MagicMock:
-        mock = MagicMock(spec=DeploymentController)
-        mock.mark_lifecycle_needed = AsyncMock()
-        return mock
-
-    @pytest.fixture
-    def mock_deployment_repository(self) -> MagicMock:
-        mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
-        return mock
-
-    @pytest.fixture
-    def mock_event_hub(self) -> MagicMock:
-        mock = MagicMock(spec=EventHub)
-        mock.register_event_propagator = MagicMock()
-        mock.unregister_event_propagator = MagicMock()
-        return mock
-
-    @pytest.fixture
-    def mock_scheduling_controller(self) -> MagicMock:
-        mock = MagicMock(spec=SchedulingController)
-        mock.enqueue_session = AsyncMock()
-        mock.mark_sessions_for_termination = AsyncMock()
-        return mock
-
-    @pytest.fixture
     def revision_from_deployment_config(self) -> ModelRevisionSpec:
-        """Revision spec that would come from deployment config via RevisionGenerator."""
+        """Revision spec that would come from deployment config via the pipeline."""
         return ModelRevisionSpec(
             image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
             image_identifier=ImageIdentifier(
@@ -654,14 +627,37 @@ class TestDryRunWithDeploymentConfigOverrides:
         )
 
     @pytest.fixture
-    def mock_revision_generator_registry(
+    def mock_deployment_controller(
         self, revision_from_deployment_config: ModelRevisionSpec
     ) -> MagicMock:
-        mock = MagicMock(spec=RevisionGeneratorRegistry)
-        mock_generator = MagicMock()
-        mock_generator.generate_revision = AsyncMock(return_value=revision_from_deployment_config)
-        mock.get.return_value = mock_generator
+        mock = MagicMock(spec=DeploymentController)
+        mock.mark_lifecycle_needed = AsyncMock()
+        mock.resolve_legacy_revision_spec = AsyncMock(return_value=revision_from_deployment_config)
         return mock
+
+    @pytest.fixture
+    def mock_deployment_repository(self) -> MagicMock:
+        mock = MagicMock()
+        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        return mock
+
+    @pytest.fixture
+    def mock_event_hub(self) -> MagicMock:
+        mock = MagicMock(spec=EventHub)
+        mock.register_event_propagator = MagicMock()
+        mock.unregister_event_propagator = MagicMock()
+        return mock
+
+    @pytest.fixture
+    def mock_scheduling_controller(self) -> MagicMock:
+        mock = MagicMock(spec=SchedulingController)
+        mock.enqueue_session = AsyncMock()
+        mock.mark_sessions_for_termination = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_revision_generator_registry(self) -> MagicMock:
+        return MagicMock(spec=RevisionGeneratorRegistry)
 
     @pytest.fixture
     def model_serving_service(
@@ -913,9 +909,35 @@ class TestDryRunExtraMountsHandling:
         return mock
 
     @pytest.fixture
-    def mock_deployment_controller(self) -> MagicMock:
+    def _stub_model_revision_spec(self) -> ModelRevisionSpec:
+        return ModelRevisionSpec(
+            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            image_identifier=ImageIdentifier(
+                canonical="ai.backend/python:3.9",
+                architecture="x86_64",
+            ),
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                model_definition_path=None,
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant("custom"),
+                startup_command=None,
+                environ={},
+            ),
+        )
+
+    @pytest.fixture
+    def mock_deployment_controller(self, _stub_model_revision_spec: ModelRevisionSpec) -> MagicMock:
         mock = MagicMock(spec=DeploymentController)
         mock.mark_lifecycle_needed = AsyncMock()
+        mock.resolve_legacy_revision_spec = AsyncMock(return_value=_stub_model_revision_spec)
         return mock
 
     @pytest.fixture
@@ -940,34 +962,7 @@ class TestDryRunExtraMountsHandling:
 
     @pytest.fixture
     def mock_revision_generator_registry(self) -> MagicMock:
-        mock = MagicMock(spec=RevisionGeneratorRegistry)
-        mock_generator = MagicMock()
-        mock_generator.generate_revision = AsyncMock(
-            return_value=ModelRevisionSpec(
-                image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
-                image_identifier=ImageIdentifier(
-                    canonical="ai.backend/python:3.9",
-                    architecture="x86_64",
-                ),
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
-                    resource_opts=None,
-                ),
-                mounts=MountMetadata(
-                    model_vfolder_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
-                    model_definition_path=None,
-                ),
-                execution=ExecutionSpec(
-                    runtime_variant=RuntimeVariant("custom"),
-                    startup_command=None,
-                    environ={},
-                ),
-            )
-        )
-        mock.get.return_value = mock_generator
-        return mock
+        return MagicMock(spec=RevisionGeneratorRegistry)
 
     @pytest.fixture
     def model_serving_service(

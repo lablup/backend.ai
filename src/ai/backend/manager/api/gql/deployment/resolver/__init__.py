@@ -15,6 +15,7 @@ from .auto_scaling import (
 )
 from .deployment import (
     admin_deployments,
+    admin_refresh_deployment_revisions,
     create_model_deployment,
     delete_model_deployment,
     deployment,
@@ -63,6 +64,7 @@ __all__ = [
     "delete_auto_scaling_rule",
     # Deployment
     "admin_deployments",
+    "admin_refresh_deployment_revisions",
     "my_deployments",
     "project_deployments",
     "deployment",

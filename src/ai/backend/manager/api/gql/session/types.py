@@ -51,7 +51,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
@@ -306,6 +306,14 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     id: NodeID[str]
 
+    # Image IDs for this session (used by images resolver)
+    image_ids: list[strawberry.ID] | None = gql_field(
+        description=(
+            "UUIDs of the images used by this session. "
+            "Multiple images are possible in multi-kernel (cluster) sessions."
+        ),
+    )
+
     # Fields used as keys for dynamic resolvers
     domain_name: str
     user_id: ID
@@ -364,12 +372,39 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.3.0",
+            added_version="26.4.3",
             description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
         )
     )  # type: ignore[misc]
-    async def images(self) -> ImageV2ConnectionGQL:
-        raise NotImplementedError
+    async def images(self, info: Info[StrawberryGQLContext]) -> ImageV2ConnectionGQL:
+        from ai.backend.manager.api.gql.image.types import ImageV2EdgeGQL
+
+        if not self.image_ids:
+            return ImageV2ConnectionGQL(
+                edges=[],
+                page_info=strawberry.relay.PageInfo(
+                    has_next_page=False,
+                    has_previous_page=False,
+                    start_cursor=None,
+                    end_cursor=None,
+                ),
+                count=0,
+            )
+
+        unique_ids = list(dict.fromkeys(ImageID(UUID(str(iid))) for iid in self.image_ids))
+        results = await info.context.data_loaders.image_loader.load_many(unique_ids)
+        nodes = [img for img in results if img is not None]
+        edges = [ImageV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return ImageV2ConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=len(nodes),
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(

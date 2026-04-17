@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
@@ -42,6 +44,7 @@ from ai.backend.manager.api.gql.common_types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -50,6 +53,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 
 __all__ = (
     "CreateResourcePresetInputGQL",
@@ -99,6 +106,26 @@ class ResourcePresetGQL(PydanticNodeMixin[ResourcePresetNode]):
     resource_group_name: str | None = gql_field(
         description="Resource group name. Null means global preset."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The resource group this preset belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def resource_group(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        if self.resource_group_name is None:
+            return None
+        return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
 
 # Filter and OrderBy types

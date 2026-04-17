@@ -58,6 +58,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ModelRevisionSpec,
     RevisionSearchResult,
     RouteHealthStatus,
     RouteInfo,
@@ -173,24 +174,6 @@ class DeploymentRepository:
             DeploymentInfo for the created endpoint
         """
         return await self._db_source.create_endpoint(creator, policy_config)
-
-    @deployment_repository_resilience.apply()
-    async def create_endpoint_legacy(
-        self,
-        creator: RBACEntityCreator[EndpointRow],
-    ) -> DeploymentInfo:
-        """Create a new endpoint using legacy DeploymentCreator.
-
-        This is for backward compatibility with legacy deployment creation flow.
-
-        Args:
-            creator: RBACEntityCreator with LegacyEndpointCreatorSpec.
-                The spec MUST be an instance of LegacyEndpointCreatorSpec.
-
-        Returns:
-            DeploymentInfo for the created endpoint
-        """
-        return await self._db_source.create_endpoint_legacy(creator)
 
     @deployment_repository_resilience.apply()
     async def get_image_id(self, image: ImageIdentifier) -> uuid.UUID:
@@ -1270,6 +1253,18 @@ class DeploymentRepository:
         return await self._db_source.get_current_revision(endpoint_id)
 
     @deployment_repository_resilience.apply()
+    async def get_current_revision_spec(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Get the current revision as a ModelRevisionSpec for revision refresh.
+
+        Raises:
+            DeploymentRevisionNotFound: If the endpoint has no current revision.
+        """
+        return await self._db_source.get_current_revision_spec(endpoint_id)
+
+    @deployment_repository_resilience.apply()
     async def search_revisions(
         self,
         querier: BatchQuerier,
@@ -1316,6 +1311,21 @@ class DeploymentRepository:
             ``updated=False`` means a concurrent activation guard fired.
         """
         return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
+
+    @deployment_repository_resilience.apply()
+    async def prune_old_revisions(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_history_limit: int,
+    ) -> int:
+        """Delete old revisions that exceed the history limit.
+
+        Preserves current_revision and deploying_revision.
+
+        Returns:
+            Number of revisions deleted.
+        """
+        return await self._db_source.prune_old_revisions(endpoint_id, revision_history_limit)
 
     # ========== Deployment Auto-Scaling Policy Operations ==========
 

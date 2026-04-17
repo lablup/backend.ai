@@ -54,6 +54,7 @@ def _make_processing_input() -> ProcessingInput:
         hook_plugin_ctx=MagicMock(),
         deployment_controller=MagicMock(),
         revision_generator_registry=MagicMock(),
+        model_definition_generator_registry=MagicMock(),
         agent_cache=MagicMock(),
         notification_center=MagicMock(),
         appproxy_client_pool=MagicMock(),

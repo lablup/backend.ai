@@ -166,7 +166,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         resource_opts = self._convert_resource_opts_input(input.resource_opts)
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
-        model_def = ModelDefinition(**input.model_definition) if input.model_definition else None
+        model_def = (
+            ModelDefinition.model_validate(input.model_definition)
+            if input.model_definition
+            else None
+        )
         strategy, strategy_spec = self._convert_strategy_input(input.deployment_strategy)
 
         creator = Creator(
@@ -454,7 +458,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             return TriState.nop()
         if value is None:
             return TriState.nullify()
-        return TriState.update(ModelDefinition(**value))
+        return TriState.update(ModelDefinition.model_validate(value))
 
     @staticmethod
     def _convert_tri_state(value: Any) -> TriState[Any]:

@@ -34,6 +34,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateRevisionPayload,
     AddRevisionPayload,
+    AdminRefreshDeploymentRevisionsPayload,
     AdminSearchDeploymentsPayload,
     AdminSearchRevisionsPayload,
     BulkDeleteAccessTokensPayload,
@@ -283,6 +284,16 @@ class V2DeploymentClient(BaseDomainClient):
             _PATH + f"/{body.model_deployment_id}/replicas/sync",
             request=body,
             response_model=SyncReplicaPayload,
+        )
+
+    async def admin_refresh_deployment_revisions(
+        self,
+    ) -> AdminRefreshDeploymentRevisionsPayload:
+        """Rebuild and activate a fresh revision for every active deployment (superadmin)."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/admin/refresh-revisions",
+            response_model=AdminRefreshDeploymentRevisionsPayload,
         )
 
     # ------------------------------------------------------------------

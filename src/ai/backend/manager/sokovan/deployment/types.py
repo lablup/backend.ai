@@ -14,11 +14,14 @@ from ai.backend.manager.data.deployment.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.types import DeploymentInfoWithRoutes, RouteInfo
+    from ai.backend.manager.data.deployment.types import (
+        DeploymentInfoWithRoutes,
+        DeploymentPolicyData,
+        RouteInfo,
+    )
 
 
 class DeploymentLifecycleType(StrEnum):
-    CHECK_PENDING = "check_pending"
     CHECK_REPLICA = "check_replica"
     SCALING = "scaling"
     RECONCILE = "reconcile"
@@ -46,6 +49,19 @@ class DeploymentExecutionResult:
     successes: list[DeploymentWithHistory] = field(default_factory=list)
     failures: list[DeploymentExecutionError] = field(default_factory=list)
     skipped: list[DeploymentWithHistory] = field(default_factory=list)
+
+
+@dataclass
+class ActivateRevisionResult:
+    """Result of activating a deployment revision.
+
+    Returned by DeploymentController.activate_revision().
+    """
+
+    deployment_info: DeploymentInfo
+    previous_revision_id: UUID | None
+    activated_revision_id: UUID
+    deployment_policy: DeploymentPolicyData
 
 
 @dataclass

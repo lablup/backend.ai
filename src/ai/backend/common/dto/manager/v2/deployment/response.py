@@ -41,6 +41,7 @@ __all__ = (
     "ActivateDeploymentPayload",
     "ActivateRevisionPayload",
     "AddRevisionPayload",
+    "AdminRefreshDeploymentRevisionsPayload",
     "AdminSearchDeploymentsPayload",
     "AdminSearchRevisionsPayload",
     "AutoScalingRuleNode",
@@ -65,6 +66,7 @@ __all__ = (
     "SearchDeploymentPoliciesPayload",
     "SearchReplicasPayload",
     "SearchRoutesPayload",
+    "RevisionRefreshResultInfo",
     "SyncReplicaPayload",
     "UpdateAutoScalingRulePayload",
     "UpdateDeploymentPayload",
@@ -117,6 +119,10 @@ class DeploymentNode(BaseResponseModel):
     created_user_id: UUID = Field(description="ID of the user who created this deployment")
     current_revision_id: UUID | None = Field(
         default=None, description="ID of the currently active revision"
+    )
+    deploying_revision_id: UUID | None = Field(
+        default=None,
+        description="ID of the revision currently being deployed (in progress, not yet active)",
     )
     policy: DeploymentPolicyInfo | None = Field(
         default=None, description="Deployment update policy"
@@ -178,6 +184,29 @@ class AddRevisionPayload(BaseResponseModel):
     """Payload for add revision mutation result."""
 
     revision: RevisionNode = Field(description="Added revision")
+
+
+class RevisionRefreshResultInfo(BaseResponseModel):
+    """Per-deployment result of an admin bulk revision refresh."""
+
+    deployment_id: UUID = Field(description="Deployment ID")
+    new_revision_id: UUID | None = Field(
+        default=None,
+        description="Newly created revision ID; null when the refresh failed for this deployment",
+    )
+    success: bool = Field(description="Whether the refresh succeeded for this deployment")
+    failure_reason: str | None = Field(
+        default=None,
+        description="Error class and message when the refresh failed; null on success",
+    )
+
+
+class AdminRefreshDeploymentRevisionsPayload(BaseResponseModel):
+    """Payload for admin bulk revision refresh mutation result."""
+
+    results: list[RevisionRefreshResultInfo] = Field(
+        description="Per-deployment refresh outcomes (partial success by design)"
+    )
 
 
 # ---------------------------------------------------------------------------

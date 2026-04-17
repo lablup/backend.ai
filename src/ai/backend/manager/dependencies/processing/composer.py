@@ -60,6 +60,9 @@ from ai.backend.manager.service.container_registry.harbor import (
 from ai.backend.manager.services.processors import Processors, ServiceArgs
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -120,6 +123,7 @@ class ProcessingInput:
     hook_plugin_ctx: HookPluginContext
     deployment_controller: DeploymentController
     revision_generator_registry: RevisionGeneratorRegistry
+    model_definition_generator_registry: ModelDefinitionGeneratorRegistry
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
@@ -245,6 +249,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
             revision_generator_registry=setup_input.revision_generator_registry,
+            model_definition_generator_registry=setup_input.model_definition_generator_registry,
             event_producer=setup_input.event_producer,
             agent_cache=setup_input.agent_cache,
             notification_center=setup_input.notification_center,

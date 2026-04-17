@@ -260,6 +260,16 @@ type AdminGetSSHKeypairPayload
 }
 
 """
+Added in 26.4.3. Payload for admin bulk revision refresh mutation result.
+"""
+type AdminRefreshDeploymentRevisionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Per-deployment refresh outcomes (partial success by design)"""
+  results: [RevisionRefreshResult!]!
+}
+
+"""
 Added in 26.4.2. Admin input for registering (overwriting) a user's SSH keypair.
 """
 input AdminRegisterSSHKeypairInput
@@ -591,15 +601,6 @@ type AgentStats
   totalResource: AgentResource!
 }
 
-enum AgentStatus
-  @join__type(graph: STRAWBERRY)
-{
-  ALIVE @join__enumValue(graph: STRAWBERRY)
-  LOST @join__enumValue(graph: STRAWBERRY)
-  RESTARTING @join__enumValue(graph: STRAWBERRY)
-  TERMINATED @join__enumValue(graph: STRAWBERRY)
-}
-
 enum AgentStatusEnum
   @join__type(graph: STRAWBERRY)
 {
@@ -628,7 +629,7 @@ type AgentStatusInfo
   """
   Current operational status of the agent. One of: ALIVE, LOST, TERMINATED, RESTARTING.
   """
-  status: AgentStatus!
+  status: AgentStatusEnum!
 
   """Timestamp when the agent last changed its status."""
   statusChanged: DateTime
@@ -1679,6 +1680,11 @@ type AutoScalingRule implements Node
   prometheusQueryPresetId: ID
   createdAt: DateTime!
   lastTriggeredAt: DateTime
+
+  """
+  Added in 26.4.3. The Prometheus query preset used for metric-based auto-scaling.
+  """
+  queryPreset: QueryDefinition
 }
 
 """Added in 25.19.0. Connection for auto-scaling rules."""
@@ -2163,6 +2169,35 @@ type CancelImportArtifactPayload
 {
   """Artifact revision with cancelled import."""
   artifactRevision: ArtifactRevision!
+}
+
+"""Added in 26.3.0. Filter input for querying query preset categories."""
+input CategoryFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by name."""
+  name: StringFilter = null
+}
+
+"""Added in 26.3.0. Specifies ordering for query preset category results."""
+input CategoryOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: CategoryOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering query preset category results.
+"""
+enum CategoryOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0"""
@@ -2870,6 +2905,27 @@ type CreateAutoScalingRulePayload
   rule: AutoScalingRule!
 }
 
+"""Added in 26.3.0. Input for creating a new query preset category."""
+input CreateCategoryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Human-readable category name (must be unique)."""
+  name: String!
+
+  """Optional category description."""
+  description: String = null
+}
+
+"""
+Added in 26.3.0. Payload returned after creating a query preset category.
+"""
+type CreateCategoryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Created category."""
+  category: QueryPresetCategory!
+}
+
 """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
 type CreateContainerRegistry
   @join__type(graph: GRAPHENE)
@@ -3487,7 +3543,7 @@ input CreateQueryDefinitionInput
   rank: Int! = 0
 
   """Category UUID."""
-  categoryId: String = null
+  categoryId: UUID = null
 
   """Prometheus metric name."""
   metricName: String!
@@ -4106,6 +4162,16 @@ type DeleteAutoScalingRulePayload
   id: ID!
 }
 
+"""
+Added in 26.3.0. Payload returned after deleting a query preset category.
+"""
+type DeleteCategoryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Deleted category ID"""
+  id: UUID!
+}
+
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
 type DeleteContainerRegistry
   @join__type(graph: GRAPHENE)
@@ -4603,6 +4669,26 @@ input DeploymentFilter
   openToPublic: Boolean = null
   tags: StringFilter = null
   endpointUrl: StringFilter = null
+
+  """Added in 26.4.3. Filter by domain name."""
+  domainName: StringFilter = null
+
+  """Added in 26.4.3. Filter by project ID."""
+  projectId: UUIDFilter = null
+
+  """Added in 26.4.3. Filter by resource group name."""
+  resourceGroup: StringFilter = null
+
+  """Added in 26.4.3. Filter by the user who created the deployment."""
+  createdUserId: UUIDFilter = null
+
+  """Added in 26.4.3. Filter by deployment creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """
+  Added in 26.4.3. Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.
+  """
+  destroyedAt: NullableDateTimeFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -4626,6 +4712,9 @@ type DeploymentHistory implements Node
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
+
+  """Added in 26.4.3. The deployment this history record belongs to."""
+  deployment: ModelDeployment
 }
 
 """Added in 26.3.0. Deployment history connection."""
@@ -4699,7 +4788,11 @@ enum DeploymentOrderField
 {
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  DESTROYED_AT @join__enumValue(graph: STRAWBERRY)
+  DOMAIN @join__enumValue(graph: STRAWBERRY)
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+  RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
+  TAG @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.19.0. Deployment policy configuration."""
@@ -4774,6 +4867,9 @@ type DeploymentRevisionPreset implements Node
 
   """Timestamp of the last modification to this deployment preset."""
   updatedAt: DateTime
+
+  """Added in 26.4.3. The runtime variant this preset is designed for."""
+  runtimeVariant: RuntimeVariant
 
   """Added in 26.4.2. Resource slot allocations for this preset."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
@@ -6070,6 +6166,11 @@ type EntityRef implements Node
 
   """The resolved entity object."""
   entity: EntityNode
+
+  """
+  Added in 26.4.3. The resolved scope object in which the entity is registered.
+  """
+  scope: EntityNode
 }
 
 """An edge in a connection."""
@@ -7240,6 +7341,11 @@ type KernelV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """
+  The UUID of the image used by this kernel. Null if the image has been purged.
+  """
+  imageId: ID
+
   """Startup command executed when the kernel starts."""
   startupCommand: String
 
@@ -7263,6 +7369,9 @@ type KernelV2 implements Node
 
   """Added in 26.2.0. The agent running this kernel."""
   agent: AgentV2
+
+  """Added in 26.4.3. The image used by this kernel."""
+  image: ImageV2
 
   """Added in 26.2.0. The user who owns this kernel."""
   user: UserV2
@@ -7588,6 +7697,9 @@ type KeyPairGQL implements Node
 
   """UUID of the user who owns this keypair."""
   userId: UUID!
+
+  """Added in 26.4.3. The user who owns this keypair."""
+  user: UserV2
 }
 
 """An edge in a connection."""
@@ -8079,6 +8191,12 @@ type LoginHistoryV2 implements Node
 
   """Timestamp when the login attempt occurred."""
   createdAt: DateTime!
+
+  """Added in 26.4.3. The user who attempted to log in."""
+  user: UserV2
+
+  """Added in 26.4.3. The domain at the time of the login attempt."""
+  domain: DomainV2
 }
 
 """Added in 26.4.2. Connection type for paginated login history results."""
@@ -8187,6 +8305,9 @@ type LoginSessionV2 implements Node
 
   """Timestamp when the session was invalidated."""
   invalidatedAt: DateTime
+
+  """Added in 26.4.3. The user who owns this login session."""
+  user: UserV2
 }
 
 """Added in 26.4.2. Connection type for paginated login session results."""
@@ -8409,6 +8530,15 @@ type ModelCardV2 implements Node
   """
   vfolder: VFolder
 
+  """Added in 26.4.3. The domain this model card belongs to."""
+  domain: DomainV2
+
+  """Added in 26.4.3. The project this model card belongs to."""
+  project: ProjectV2
+
+  """Added in 26.4.3. The user who created this model card."""
+  creator: UserV2
+
   """
   Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card.
   """
@@ -8594,12 +8724,25 @@ type ModelDeployment implements Node
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   currentRevisionId: ID
+  deployingRevisionId: ID
   defaultDeploymentStrategy: DeploymentStrategyGQL!
   replicaState: ReplicaState!
   createdUserId: ID!
 
-  """The created user of this entity."""
-  createdUser: UserNode!
+  """
+  Added in 26.4.3. The current active revision of this deployment, resolved via DataLoader.
+  """
+  currentRevision: ModelRevision
+
+  """
+  Added in 26.4.3. The revision currently being deployed (in progress, not yet active), resolved via DataLoader.
+  """
+  deployingRevision: ModelRevision
+
+  """
+  Added in 26.4.3. The user who created this deployment, resolved via DataLoader.
+  """
+  creator: UserV2
 
   """Added in 25.19.0. Deployment policy configuration."""
   deploymentPolicy: DeploymentPolicy
@@ -8647,10 +8790,20 @@ type ModelDeploymentMetadata
   @join__type(graph: STRAWBERRY)
 {
   """The project of this entity."""
-  project: GroupNode!
+  project: GroupNode! @deprecated(reason: "Use project_v2 instead.")
+
+  """
+  Added in 26.4.3. The project this deployment belongs to, resolved via DataLoader.
+  """
+  projectV2: ProjectV2
 
   """The domain of this entity."""
-  domain: DomainNode!
+  domain: DomainNode! @deprecated(reason: "Use domain_v2 instead.")
+
+  """
+  Added in 26.4.3. The domain this deployment belongs to, resolved via DataLoader.
+  """
+  domainV2: DomainV2
   projectId: ID!
   domainName: String!
   name: String!
@@ -8874,7 +9027,12 @@ type ModelReplica implements Node
   """
   The session ID associated with the replica. This can be null right after replica creation.
   """
-  session: ComputeSessionNode!
+  session: ComputeSessionNode! @deprecated(reason: "Use session_v2 instead.")
+
+  """
+  Added in 26.4.3. The compute session running this replica, resolved via DataLoader.
+  """
+  sessionV2: SessionV2
 
   """The revision of this entity."""
   revision: ModelRevision!
@@ -8941,7 +9099,12 @@ type ModelRevision implements Node
   createdAt: DateTime!
 
   """The image of this entity."""
-  image: ImageNode!
+  image: ImageNode! @deprecated(reason: "Use image_v2 instead.")
+
+  """
+  Added in 26.4.3. The container image used by this revision, resolved via DataLoader.
+  """
+  imageV2: ImageV2
 
   """Added in 26.4.2. Resource slot allocations for this revision."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
@@ -8974,8 +9137,23 @@ type ModelRevisionEdge
 input ModelRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
-  name: StringFilter = null
+  revisionNumber: IntFilter = null
   deploymentId: ID = null
+
+  """Added in 26.4.3. Filter by container image ID."""
+  imageId: UUIDFilter = null
+
+  """Added in 26.4.3. Filter by model VFolder ID."""
+  modelVfolderId: UUIDFilter = null
+
+  """Added in 26.4.3. Filter by resource group name."""
+  resourceGroup: StringFilter = null
+
+  """Added in 26.4.3. Filter by cluster mode (SINGLE_NODE / MULTI_NODE)."""
+  clusterMode: StringFilter = null
+
+  """Added in 26.4.3. Filter by revision creation datetime."""
+  createdAt: DateTimeFilter = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
   NOT: [ModelRevisionFilter!] = null
@@ -8993,8 +9171,11 @@ input ModelRevisionOrderBy
 enum ModelRevisionOrderField
   @join__type(graph: STRAWBERRY)
 {
-  NAME @join__enumValue(graph: STRAWBERRY)
+  REVISION_NUMBER @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_MODE @join__enumValue(graph: STRAWBERRY)
+  RUNTIME_VARIANT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -9444,7 +9625,7 @@ input ModifyQueryDefinitionInput
   rank: Int
 
   """New category UUID."""
-  categoryId: String
+  categoryId: UUID
 
   """New metric name."""
   metricName: String
@@ -10060,6 +10241,11 @@ type Mutation
   addModelRevision(input: AddRevisionInput!, options: AddRevisionOptions = null): AddRevisionPayload! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.4.3. Rebuild and activate a fresh revision for every active deployment (superadmin). Used to repair deployments whose current revision has stale or missing model_definition after backing store migrations.
+  """
+  adminRefreshDeploymentRevisions: AdminRefreshDeploymentRevisionsPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.2. Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration
   """
   updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
@@ -10466,6 +10652,12 @@ type Mutation
 
   """Added in 26.3.0. Delete a query definition (admin only)"""
   adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Create a new query preset category (admin only)."""
+  adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Delete a query preset category (admin only)."""
+  adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role! @join__field(graph: STRAWBERRY)
@@ -10934,7 +11126,7 @@ input NotificationRuleTypeFilter
 }
 
 """
-Added in UNRELEASED. Filter for nullable datetime fields with IS NULL / IS NOT NULL support.
+Added in 26.4.3. Filter for nullable datetime fields with IS NULL / IS NOT NULL support.
 """
 input NullableDateTimeFilter
   @join__type(graph: STRAWBERRY)
@@ -12931,6 +13123,11 @@ type Query
   """
   projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.4.3. Query a single session by ID. Returns an error if not found.
+  """
+  sessionV2(id: UUID!): SessionV2 @join__field(graph: STRAWBERRY)
+
   """Added in 25.19.0. List deployments within a specific project."""
   projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
 
@@ -12966,6 +13163,16 @@ type Query
   Added in 26.4.2. Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.
   """
   prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.4.2. Get a single query preset category by ID. Available to any authenticated user.
+  """
+  prometheusQueryPresetCategory(id: ID!): QueryPresetCategory @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.4.2. List query preset categories with filtering and pagination. Available to any authenticated user.
+  """
+  prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!]! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role @join__field(graph: STRAWBERRY)
@@ -13063,21 +13270,6 @@ type Query
 
   """Added in 26.2.0. List user fair shares within resource group scope."""
   rgUserFairShares(scope: ResourceGroupUserScope!, filter: RGUserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0. List domain usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgDomainUsageBuckets(scope: ResourceGroupDomainScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0. List project usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgProjectUsageBuckets(scope: ResourceGroupProjectScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0. List user usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Query images within a specific container registry with optional filtering, ordering, and pagination. Returns container images that belong to the specified registry. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.
@@ -13385,7 +13577,7 @@ type QueryDefinition implements Node
   rank: Int!
 
   """Category UUID."""
-  categoryId: String
+  categoryId: UUID
 
   """Prometheus metric name."""
   metricName: String!
@@ -13404,6 +13596,9 @@ type QueryDefinition implements Node
 
   """Last update timestamp."""
   updatedAt: DateTime!
+
+  """Added in 26.4.3. Resolved category entity."""
+  category: QueryPresetCategory
 }
 
 """Added in 26.3.0. Paginated connection for query definition records."""
@@ -13517,6 +13712,26 @@ enum QueryDefinitionOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.3.0. Prometheus query preset category."""
+type QueryPresetCategory
+  @join__type(graph: STRAWBERRY)
+{
+  """Category ID"""
+  id: UUID!
+
+  """Human-readable category name"""
+  name: String!
+
+  """Optional category description"""
+  description: String
+
+  """Creation timestamp"""
+  createdAt: DateTime!
+
+  """Last update timestamp"""
+  updatedAt: DateTime!
 }
 
 """Added in 26.3.0. Time range for Prometheus query."""
@@ -14213,6 +14428,9 @@ type ResourcePresetV2 implements Node
 
   """Resource group name. Null means global preset."""
   resourceGroupName: String
+
+  """Added in 26.4.3. The resource group this preset belongs to."""
+  resourceGroup: ResourceGroup
 }
 
 """An edge in a connection."""
@@ -14420,6 +14638,27 @@ type RestoreArtifactsPayload
   artifacts: [Artifact!]!
 }
 
+"""
+Added in 26.4.3. Per-deployment result of an admin bulk revision refresh.
+"""
+type RevisionRefreshResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Deployment ID"""
+  deploymentId: UUID!
+
+  """
+  Newly created revision ID; null when the refresh failed for this deployment
+  """
+  newRevisionId: UUID
+
+  """Whether the refresh succeeded for this deployment"""
+  success: Boolean!
+
+  """Error class and message when the refresh failed; null on success"""
+  failureReason: String
+}
+
 """Added in 26.4.2. Payload returned after revoking a login session."""
 type RevokeLoginSessionPayload
   @join__type(graph: STRAWBERRY)
@@ -14586,6 +14825,9 @@ type RoleAssignment implements Node
 
   """The assigned user."""
   user: UserV2
+
+  """Added in 26.4.3. The user who granted this role assignment."""
+  grantedByUser: UserV2
 }
 
 """Added in 26.3.0. Role assignment connection."""
@@ -14810,7 +15052,12 @@ type Route implements Node
   """
   The session associated with the route. Can be null if the route is still provisioning.
   """
-  session: ID
+  session: ID @deprecated(reason: "Use session_v2 instead.")
+
+  """
+  Added in 26.4.3. The compute session associated with this route, resolved via DataLoader.
+  """
+  sessionV2: SessionV2
 
   """The revision associated with the route."""
   revision: ModelRevision
@@ -14883,6 +15130,12 @@ type RouteHistory implements Node
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
+
+  """Added in 26.4.3. The route this history record belongs to."""
+  route: Route
+
+  """Added in 26.4.3. The deployment this history record belongs to."""
+  deployment: ModelDeployment
 }
 
 """Added in 26.3.0. Route history connection."""
@@ -15824,6 +16077,9 @@ type SessionSchedulingHistory implements Node
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
+
+  """Added in 26.4.3. The session this history record belongs to."""
+  session: SessionV2
 }
 
 """Added in 26.3.0. Session scheduling history connection."""
@@ -15912,6 +16168,11 @@ type SessionV2 implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """
+  UUIDs of the images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  """
+  imageIds: [ID!]
   domainName: String!
   userId: ID!
   projectId: ID!
@@ -15944,7 +16205,7 @@ type SessionV2 implements Node
   resourceGroup: ResourceGroup
 
   """
-  Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  Added in 26.4.3. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
   """
   images: ImageV2Connection!
 
@@ -18030,57 +18291,56 @@ type UserList implements PaginatedList
 type UserNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
-  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
 
   """Unique username of the user."""
-  username: String @join__field(graph: GRAPHENE)
+  username: String
 
   """Unique email of the user."""
-  email: String @join__field(graph: GRAPHENE)
-  need_password_change: Boolean @join__field(graph: GRAPHENE)
-  full_name: String @join__field(graph: GRAPHENE)
-  description: String @join__field(graph: GRAPHENE)
-  is_active: Boolean @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 24.03.0. Recommend to use `status` field.")
+  email: String
+  need_password_change: Boolean
+  full_name: String
+  description: String
+  is_active: Boolean @deprecated(reason: "Deprecated since 24.03.0. Recommend to use `status` field.")
 
   """
   The status is one of `active`, `inactive`, `deleted` or `before-verification`.
   """
-  status: String @join__field(graph: GRAPHENE)
+  status: String
 
   """Additional information of user status."""
-  status_info: String @join__field(graph: GRAPHENE)
-  created_at: DateTime @join__field(graph: GRAPHENE)
-  modified_at: DateTime @join__field(graph: GRAPHENE)
-  domain_name: String @join__field(graph: GRAPHENE)
+  status_info: String
+  created_at: DateTime
+  modified_at: DateTime
+  domain_name: String
 
   """The role is one of `user`, `admin`, `superadmin` or `monitor`."""
-  role: String @join__field(graph: GRAPHENE)
-  resource_policy: String @join__field(graph: GRAPHENE)
-  allowed_client_ip: [String] @join__field(graph: GRAPHENE)
-  totp_activated: Boolean @join__field(graph: GRAPHENE)
-  totp_activated_at: DateTime @join__field(graph: GRAPHENE)
-  sudo_session_enabled: Boolean @join__field(graph: GRAPHENE)
+  role: String
+  resource_policy: String
+  allowed_client_ip: [String]
+  totp_activated: Boolean
+  totp_activated_at: DateTime
+  sudo_session_enabled: Boolean
 
   """
   Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
   """
-  container_uid: Int @join__field(graph: GRAPHENE)
+  container_uid: Int
 
   """
   Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
   """
-  container_main_gid: Int @join__field(graph: GRAPHENE)
+  container_main_gid: Int
 
   """
   Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
   """
-  container_gids: [Int] @join__field(graph: GRAPHENE)
+  container_gids: [Int]
 
   """Added in 25.5.0."""
-  project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection @join__field(graph: GRAPHENE)
+  project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
 """

@@ -78,7 +78,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
-from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.orders import (
     DEFAULT_BACKWARD_ORDER as KERNEL_DEFAULT_BACKWARD_ORDER,
@@ -128,6 +127,7 @@ from ai.backend.manager.services.session.actions.enqueue_session import (
 from ai.backend.manager.services.session.actions.get_container_logs import (
     GetContainerLogsAction,
 )
+from ai.backend.manager.services.session.actions.get_session import GetSessionAction
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_in_project import (
@@ -315,19 +315,12 @@ class SessionAdapter(BaseAdapter):
     # Get single session
     # -------------------------------------------------------------------------
 
-    async def get(self, session_id: UUID) -> SessionNode:
-        """Get a single session by ID."""
-        conditions = [SessionConditions.by_ids([SessionId(session_id)])]
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=conditions,
+    async def get(self, session_id: SessionId) -> SessionNode:
+        """Get a single session by ID with RBAC validation."""
+        action_result = await self._processors.session.get_session.wait_for_complete(
+            GetSessionAction(session_id=session_id)
         )
-        action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
-        )
-        if not action_result.data:
-            raise SessionNotFound(f"Session not found: {session_id}")
-        return self._session_data_to_node(action_result.data[0])
+        return self._session_data_to_node(action_result.session_data)
 
     # -------------------------------------------------------------------------
     # Batch load (DataLoader)
@@ -919,7 +912,7 @@ class SessionAdapter(BaseAdapter):
             result = await self._processors.session.rename_session.wait_for_complete(action)
             return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
         # If no fields to update, just return the current session
-        session_node = await self.get(session_id)
+        session_node = await self.get(SessionId(session_id))
         return UpdateSessionPayload(session=session_node)
 
     # -------------------------------------------------------------------------
@@ -952,6 +945,7 @@ class SessionAdapter(BaseAdapter):
         )
         return SessionNode(
             id=data.id,
+            image_ids=data.image_ids,
             domain_name=data.domain_name,
             user_id=data.user_uuid,
             project_id=data.group_id,
@@ -1023,6 +1017,7 @@ class SessionAdapter(BaseAdapter):
         )
         return KernelNode(
             id=info.id,
+            image_id=info.image.image_id,
             startup_command=info.runtime.startup_command,
             session_info=KernelSessionInfoGQLDTO(
                 session_id=UUID(info.session.session_id),

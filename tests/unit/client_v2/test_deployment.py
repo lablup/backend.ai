@@ -11,7 +11,7 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.deployment import DeploymentClient
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteTrafficStatus,
@@ -180,7 +180,7 @@ class TestDeploymentCRUD:
                     vfolder_id=_SAMPLE_VFOLDER_ID,
                     definition_path="model.py",
                 ),
-                model_definition=ModelDefinition(),
+                model_definition=ModelDefinitionDraft(),
             ),
         )
 

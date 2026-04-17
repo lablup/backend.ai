@@ -74,6 +74,10 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
     GetDirectAccessInfoActionResult,
 )
+from ai.backend.manager.services.session.actions.get_session import (
+    GetSessionAction,
+    GetSessionActionResult,
+)
 from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
@@ -187,6 +191,7 @@ class SessionProcessors(AbstractProcessorPackage):
         TerminateSessionsInProjectAction, TerminateSessionsInProjectActionResult
     ]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
+    get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     modify_session: SingleEntityActionProcessor[ModifySessionAction, ModifySessionActionResult]
     check_and_transit_status: ActionProcessor[
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
@@ -281,6 +286,11 @@ class SessionProcessors(AbstractProcessorPackage):
 
         # Single entity actions with RBAC validation
         rbac_single_entity_validators = [single_entity_validator]
+        self.get_session = SingleEntityActionProcessor(
+            service.get_session,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
         self.modify_session = SingleEntityActionProcessor(
             service.modify_session,
             action_monitors,
@@ -321,6 +331,7 @@ class SessionProcessors(AbstractProcessorPackage):
             TerminateSessionsAction.spec(),
             TerminateSessionsInProjectAction.spec(),
             UploadFilesAction.spec(),
+            GetSessionAction.spec(),
             ModifySessionAction.spec(),
             CheckAndTransitStatusAction.spec(),
         ]

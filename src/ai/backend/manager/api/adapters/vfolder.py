@@ -53,7 +53,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import BinarySize, ClusterMode, RuntimeVariant, VFolderUsageMode
+from ai.backend.common.types import BinarySize, VFolderUsageMode
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
@@ -64,9 +64,7 @@ from ai.backend.manager.data.deployment.creator import (
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
-    ExecutionSpec,
     ReplicaSpec,
-    ResourceSpec,
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -115,6 +113,7 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
     MkdirV2Action,
     MoveFileV2Action,
 )
+from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
 )
@@ -377,20 +376,11 @@ class VFolderAdapter(BaseAdapter):
         return CreateUploadSessionPayload(token=result.token, url=result.url)
 
     async def get(self, vfolder_id: UUID) -> VFolderNode:
-        """Get a single vfolder by ID."""
-        conditions: list[QueryCondition] = [VFolderConditions.by_id(vfolder_id)]
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_VFOLDER_PAGINATION_SPEC,
-            limit=1,
+        """Get a single vfolder by ID with RBAC validation."""
+        result = await self._processors.vfolder.get_v2.wait_for_complete(
+            GetVFolderV2Action(vfolder_uuid=vfolder_id)
         )
-        result = await self._processors.vfolder_admin.admin_search_vfolders.wait_for_complete(
-            AdminSearchVFoldersAction(querier=querier)
-        )
-        if not result.data:
-            raise VFolderNotFound()
-        return self._vfolder_data_to_node(result.data[0])
+        return self._vfolder_data_to_node(result.vfolder)
 
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash)."""
@@ -464,25 +454,22 @@ class VFolderAdapter(BaseAdapter):
             ),
             replica_spec=replica_spec,
             network=network_spec,
+            # ``resource_spec`` and ``execution`` are intentionally omitted so
+            # the revision preset drives image / resource_slots / cluster /
+            # runtime_variant. Hard-coding values here would silently override
+            # the preset.
             model_revision=ModelRevisionCreator(
                 image_id=None,
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots={},
-                ),
                 mounts=VFolderMountsCreator(
                     model_vfolder_id=vfolder.id,
                 ),
-                execution=ExecutionSpec(runtime_variant=RuntimeVariant("custom")),
-                model_definition=None,
                 revision_preset_id=input.revision_preset_id,
             ),
             policy=policy,
         )
 
         result = await self._processors.deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator)
+            CreateDeploymentAction(creator=creator, auto_activate=True)
         )
         return DeployVFolderPayload(
             deployment_id=result.data.id,

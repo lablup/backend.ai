@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -10,6 +11,9 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -20,6 +24,11 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.deployment_revision_preset.repository import (
+        DeploymentRevisionPresetRepository,
+    )
 
 
 @dataclass
@@ -33,6 +42,8 @@ class DeploymentControllerInput:
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     revision_generator_registry: RevisionGeneratorRegistry
+    model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
 
 
 class DeploymentControllerDependency(
@@ -65,6 +76,8 @@ class DeploymentControllerDependency(
                 event_producer=setup_input.event_producer,
                 valkey_schedule=setup_input.valkey_schedule,
                 revision_generator_registry=setup_input.revision_generator_registry,
+                model_definition_generator_registry=setup_input.model_definition_generator_registry,
+                deployment_revision_preset_repository=setup_input.deployment_revision_preset_repository,
             )
         )
         yield controller

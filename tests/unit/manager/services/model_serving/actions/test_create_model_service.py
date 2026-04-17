@@ -113,9 +113,35 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_deployment_controller(self) -> MagicMock:
+    def _stub_model_revision_spec(self) -> ModelRevisionSpec:
+        return ModelRevisionSpec(
+            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            image_identifier=ImageIdentifier(
+                canonical="ai.backend/python:3.9",
+                architecture="x86_64",
+            ),
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                model_definition_path=None,
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant("custom"),
+                startup_command=None,
+                environ={},
+            ),
+        )
+
+    @pytest.fixture
+    def mock_deployment_controller(self, _stub_model_revision_spec: ModelRevisionSpec) -> MagicMock:
         mock = MagicMock(spec=DeploymentController)
         mock.mark_lifecycle_needed = AsyncMock()
+        mock.resolve_legacy_revision_spec = AsyncMock(return_value=_stub_model_revision_spec)
         return mock
 
     @pytest.fixture
@@ -140,65 +166,9 @@ class TestCreateModelService:
 
     @pytest.fixture
     def mock_revision_generator_registry(self) -> MagicMock:
-        mock = MagicMock(spec=RevisionGeneratorRegistry)
-        mock_generator = MagicMock()
-        mock_generator.generate_revision = AsyncMock(
-            return_value=ModelRevisionSpec(
-                image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
-                image_identifier=ImageIdentifier(
-                    canonical="ai.backend/python:3.9",
-                    architecture="x86_64",
-                ),
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
-                    resource_opts=None,
-                ),
-                mounts=MountMetadata(
-                    model_vfolder_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-                    model_definition_path=None,
-                ),
-                execution=ExecutionSpec(
-                    runtime_variant=RuntimeVariant("custom"),
-                    startup_command=None,
-                    environ={},
-                ),
-            )
-        )
-        mock.get.return_value = mock_generator
-        return mock
-
-    @pytest.fixture
-    def mock_revision_generator(self, mock_revision_generator_registry: MagicMock) -> MagicMock:
-        """Mock RevisionGenerator.generate_revision for create tests."""
-        mock_generator = MagicMock()
-        mock_generator.generate_revision = AsyncMock(
-            return_value=ModelRevisionSpec(
-                image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
-                image_identifier=ImageIdentifier(
-                    canonical="ai.backend/python:3.9",
-                    architecture="x86_64",
-                ),
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
-                    resource_opts=None,
-                ),
-                mounts=MountMetadata(
-                    model_vfolder_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-                    model_definition_path=None,
-                ),
-                execution=ExecutionSpec(
-                    runtime_variant=RuntimeVariant("custom"),
-                    startup_command=None,
-                    environ={},
-                ),
-            )
-        )
-        mock_revision_generator_registry.get.return_value = mock_generator
-        return mock_generator
+        # RevisionGenerator is now a variant validator — creation tests do not
+        # exercise it, but the service constructor still requires a registry.
+        return MagicMock(spec=RevisionGeneratorRegistry)
 
     @pytest.fixture
     def model_serving_service(
@@ -555,7 +525,6 @@ class TestCreateModelService:
         scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_get_vfolder_ownership_type: AsyncMock,
-        mock_revision_generator: MagicMock,
         mock_resolve_image_for_endpoint_creation: MagicMock,
         mock_resolve_group_id: MagicMock,
         mock_create_session: AsyncMock,
@@ -648,9 +617,12 @@ class TestCreateWithDeploymentConfigOverrides:
         return mock
 
     @pytest.fixture
-    def mock_deployment_controller(self) -> MagicMock:
+    def mock_deployment_controller(
+        self, revision_from_deployment_config: ModelRevisionSpec
+    ) -> MagicMock:
         mock = MagicMock(spec=DeploymentController)
         mock.mark_lifecycle_needed = AsyncMock()
+        mock.resolve_legacy_revision_spec = AsyncMock(return_value=revision_from_deployment_config)
         return mock
 
     @pytest.fixture
@@ -700,14 +672,11 @@ class TestCreateWithDeploymentConfigOverrides:
         )
 
     @pytest.fixture
-    def mock_revision_generator_registry(
-        self, revision_from_deployment_config: ModelRevisionSpec
-    ) -> MagicMock:
-        mock = MagicMock(spec=RevisionGeneratorRegistry)
-        mock_generator = MagicMock()
-        mock_generator.generate_revision = AsyncMock(return_value=revision_from_deployment_config)
-        mock.get.return_value = mock_generator
-        return mock
+    def mock_revision_generator_registry(self) -> MagicMock:
+        # RevisionGenerator is now a variant validator only; the merge result
+        # is produced by DeploymentController.resolve_legacy_revision_spec,
+        # which is mocked on mock_deployment_controller above.
+        return MagicMock(spec=RevisionGeneratorRegistry)
 
     @pytest.fixture
     def model_serving_service(

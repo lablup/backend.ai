@@ -10,7 +10,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -117,6 +117,10 @@ def deployment_processors(
     revision_generator_registry = RevisionGeneratorRegistry(
         RevisionGeneratorRegistryArgs(deployment_repository=repo)
     )
+    model_definition_generator_registry = AsyncMock()
+    model_definition_generator_registry.generate_model_definition.return_value = (
+        ModelDefinitionDraft()
+    )
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(
             scheduling_controller=scheduling_controller,
@@ -126,10 +130,10 @@ def deployment_processors(
             event_producer=event_producer,
             valkey_schedule=valkey_clients.schedule,
             revision_generator_registry=revision_generator_registry,
+            model_definition_generator_registry=model_definition_generator_registry,
+            deployment_revision_preset_repository=None,
         )
     )
-    model_definition_generator_registry = AsyncMock()
-    model_definition_generator_registry.generate_model_definition.return_value = ModelDefinition()
     service = DeploymentService(
         deployment_controller,
         repo,

@@ -20,7 +20,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
@@ -81,14 +81,21 @@ class DeploymentOrderField(StrEnum):
 
     NAME = "name"
     CREATED_AT = "created_at"
-    UPDATED_AT = "updated_at"
+    DESTROYED_AT = "destroyed_at"
+    DOMAIN = "domain"
+    PROJECT = "project"
+    RESOURCE_GROUP = "resource_group"
+    TAG = "tag"
 
 
 class RevisionOrderField(StrEnum):
     """Fields available for ordering deployment revisions."""
 
-    NAME = "name"
+    REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
+    RESOURCE_GROUP = "resource_group"
+    CLUSTER_MODE = "cluster_mode"
+    RUNTIME_VARIANT = "runtime_variant"
 
 
 class RouteOrderField(StrEnum):
@@ -340,6 +347,7 @@ class ResourceConfigInfoDTO(BaseResponseModel):
     """Resource configuration backing DTO for ResourceConfig GQL type."""
 
     resource_group_name: str
+    resource_slots: ResourceSlotInfo
     resource_opts: ResourceOptsInfoDTO | None = None
 
 
