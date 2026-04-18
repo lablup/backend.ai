@@ -323,7 +323,7 @@ Backend.AI supports plugin-based extensibility via Python package entrypoints:
 - [IPU](src/ai/backend/accelerator/ipu) - Graphcore IPU support
 - [Rebellions](src/ai/backend/accelerator/rebellions) - Rebellions NPU (ATOM, ATOM+, ATOM Max) support
 - [Tenstorrent](src/ai/backend/accelerator/tenstorrent) - Tenstorrent NPU (Wormhole, Blackhole) support
-- [TPU](src/ai/backend/accelerator/tpu) - Google TPU (v2 ~ Ironwood) support
+- [TPU](src/ai/backend/accelerator/tpu) - Google TPU (v2 and newer generations) support
 
 **Monitoring Plugins**
 - [`backendai_monitor_stats_v10`](https://github.com/lablup/backend.ai-monitor-datadog) - Datadog statistics collector
