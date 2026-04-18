@@ -97,7 +97,7 @@ Start each component in separate terminals:
 
 **Account Manager** (Terminal 5, optional for SSO and unified user profile):
 ```bash
-./backend.ai am start-server
+./backend.ai am start-server --debug
 ```
 
 **App Proxy** (Terminal 6-7, optional for in-container service access):
