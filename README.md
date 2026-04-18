@@ -9,7 +9,8 @@ Backend.AI
 Backend.AI is a streamlined, container-based computing cluster platform
 that hosts popular computing/ML frameworks and diverse programming languages,
 with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU,
-Rebellions, FuriosaAI, HyperAccel, Google TPU, Graphcore IPU and other NPUs.
+Rebellions, FuriosaAI, HyperAccel, Intel Gaudi, Tenstorrent, Google TPU,
+Graphcore IPU and other NPUs.
 
 It allocates and isolates the underlying computing resources for multi-tenant
 computation sessions on-demand or in batches with customizable job schedulers with its own orchestrator named "Sokovan".
@@ -86,15 +87,20 @@ Start each component in separate terminals:
 
 **Storage Proxy** (Terminal 3):
 ```bash
-./py -m ai.backend.storage.server
+./backend.ai storage start-server --debug
 ```
 
 **Web Server** (Terminal 4):
 ```bash
-./py -m ai.backend.web.server
+./backend.ai web start-server --debug
 ```
 
-**App Proxy** (Terminal 5-6, optional for in-container service access):
+**Account Manager** (Terminal 5, optional for SSO and unified user profile):
+```bash
+./backend.ai am start-server
+```
+
+**App Proxy** (Terminal 6-7, optional for in-container service access):
 ```bash
 ./backend.ai app-proxy-coordinator start-server --debug
 ./backend.ai app-proxy-worker start-server --debug
@@ -174,7 +180,7 @@ as a reference implementation of API clients.
   - `account_manager/`: Unified user profile and SSO management
   - `agent/`: Agent as per-node controller
   - `agent/docker/`: Agent's Docker backend
-  - `agent/k8s/`: Agent's Kubernetes backend
+  - `agent/kubernetes/`: Agent's Kubernetes backend
   - `agent/dummy/`: Agent's dummy backend
   - `kernel/`: Agent's kernel runner counterpart
   - `runner/`: Agent's in-kernel prebuilt binaries
@@ -249,6 +255,10 @@ Backend.AI consists of the following core components:
 - Plugin interfaces: `backendai_scheduler_v10`, `backendai_agentselector_v10`, `backendai_hook_v20`, `backendai_webapp_v20`, `backendai_monitor_stats_v10`, `backendai_monitor_error_v10`
 - Legacy repo: https://github.com/lablup/backend.ai-manager
 
+**[Account Manager](src/ai/backend/account_manager/README.md)** - Unified user profile and SSO daemon
+- Manages user accounts including Backend.AI's first-party service
+- Single sign-on across Backend.AI components
+
 **[Agent](src/ai/backend/agent/README.md)** - Kernel lifecycle management on compute nodes
 - Manages Docker containers (kernels) on individual nodes
 - Self-registers to cluster via heartbeats
@@ -305,14 +315,15 @@ Backend.AI supports plugin-based extensibility via Python package entrypoints:
 
 **Accelerator Plugins** (`backendai_accelerator_v21`)
 - [CUDA](src/ai/backend/accelerator/cuda_open) - NVIDIA GPU support
-- [CUDA Mock](src/ai/backend/accelerator/cuda_mock) - Development without actual GPUs
+- [Mock](src/ai/backend/accelerator/mock) - Development without actual GPUs
 - [ROCm](src/ai/backend/accelerator/rocm) - AMD GPU support
 - [Furiosa](src/ai/backend/accelerator/furiosa) - Furiosa NPU (Warboy / RNGD) support
+- [Habana](src/ai/backend/accelerator/habana) - Intel Gaudi HPU (Gaudi 2, Gaudi 3) support
 - [Hyperaccel](src/ai/backend/accelerator/hyperaccel) - Hyperaccel LPU support
 - [IPU](src/ai/backend/accelerator/ipu) - Graphcore IPU support
 - [Rebellions](src/ai/backend/accelerator/rebellions) - Rebellions NPU (ATOM, ATOM+, ATOM Max) support
 - [Tenstorrent](src/ai/backend/accelerator/tenstorrent) - Tenstorrent NPU (Wormhole, Blackhole) support
-- [TPU](src/ai/backend/accelerator/tpu) - Google TPU (v2, v3) support
+- [TPU](src/ai/backend/accelerator/tpu) - Google TPU (v2 and newer generations) support
 
 **Monitoring Plugins**
 - [`backendai_monitor_stats_v10`](https://github.com/lablup/backend.ai-monitor-datadog) - Datadog statistics collector
