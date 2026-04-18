@@ -84,8 +84,24 @@
               "label": "AWQ"
             },
             {
+              "value": "awq_marlin",
+              "label": "AWQ Marlin"
+            },
+            {
+              "value": "gptq",
+              "label": "GPTQ"
+            },
+            {
+              "value": "gptq_marlin",
+              "label": "GPTQ Marlin"
+            },
+            {
               "value": "fp8",
               "label": "FP8"
+            },
+            {
+              "value": "gguf",
+              "label": "GGUF"
             },
             {
               "value": "bitsandbytes",
@@ -94,6 +110,10 @@
             {
               "value": "modelopt",
               "label": "NVIDIA Model Optimizer"
+            },
+            {
+              "value": "compressed-tensors",
+              "label": "Compressed Tensors"
             }
           ]
         }
@@ -110,7 +130,7 @@
       "key": "--max-model-len",
       "category": "model_loading",
       "ui_type": "number_input",
-      "display_name": "Max Model Length",
+      "display_name": "Max Context Length",
       "ui_option": {
         "ui_type": "number_input",
         "number": {
@@ -271,6 +291,14 @@
             {
               "value": "fp8",
               "label": "FP8"
+            },
+            {
+              "value": "fp8_e4m3",
+              "label": "FP8 E4M3"
+            },
+            {
+              "value": "fp8_e5m2",
+              "label": "FP8 E5M2"
             },
             {
               "value": "bfloat16",
@@ -472,20 +500,36 @@
               "label": "Hermes"
             },
             {
-              "value": "llama3_json",
-              "label": "Llama 3 JSON"
+              "value": "mistral",
+              "label": "Mistral"
             },
             {
-              "value": "llama4_pythonic",
-              "label": "Llama 4 Pythonic"
+              "value": "openai",
+              "label": "OpenAI"
+            },
+            {
+              "value": "pythonic",
+              "label": "Pythonic"
+            },
+            {
+              "value": "llama3_json",
+              "label": "Llama 3 JSON"
             },
             {
               "value": "llama4_json",
               "label": "Llama 4 JSON"
             },
             {
-              "value": "mistral",
-              "label": "Mistral"
+              "value": "llama4_pythonic",
+              "label": "Llama 4 Pythonic"
+            },
+            {
+              "value": "qwen3_coder",
+              "label": "Qwen3 Coder"
+            },
+            {
+              "value": "qwen3_xml",
+              "label": "Qwen3 XML"
             },
             {
               "value": "deepseek_v3",
@@ -496,16 +540,40 @@
               "label": "DeepSeek V3.1"
             },
             {
-              "value": "qwen3_coder",
-              "label": "Qwen3 Coder"
+              "value": "deepseek_v32",
+              "label": "DeepSeek V3.2"
             },
             {
-              "value": "openai",
-              "label": "OpenAI"
+              "value": "glm45",
+              "label": "GLM 4.5"
+            },
+            {
+              "value": "glm47",
+              "label": "GLM 4.7"
             },
             {
               "value": "kimi_k2",
               "label": "Kimi K2"
+            },
+            {
+              "value": "granite",
+              "label": "IBM Granite"
+            },
+            {
+              "value": "granite4",
+              "label": "IBM Granite 4"
+            },
+            {
+              "value": "phi4_mini_json",
+              "label": "Phi 4 Mini JSON"
+            },
+            {
+              "value": "jamba",
+              "label": "Jamba"
+            },
+            {
+              "value": "hunyuan_a13b",
+              "label": "Hunyuan A13B"
             }
           ]
         }
@@ -544,8 +612,56 @@
               "label": "Mistral"
             },
             {
-              "value": "glm4_moe",
-              "label": "GLM 4 MoE"
+              "value": "glm45",
+              "label": "GLM 4.5"
+            },
+            {
+              "value": "kimi_k2",
+              "label": "Kimi K2"
+            },
+            {
+              "value": "openai_gptoss",
+              "label": "OpenAI GPT-OSS"
+            },
+            {
+              "value": "granite",
+              "label": "IBM Granite"
+            },
+            {
+              "value": "gemma4",
+              "label": "Gemma 4"
+            },
+            {
+              "value": "ernie45",
+              "label": "ERNIE 4.5"
+            },
+            {
+              "value": "hunyuan_a13b",
+              "label": "Hunyuan A13B"
+            },
+            {
+              "value": "nemotron_v3",
+              "label": "Nemotron V3"
+            },
+            {
+              "value": "olmo3",
+              "label": "OLMo 3"
+            },
+            {
+              "value": "seed_oss",
+              "label": "Seed OSS"
+            },
+            {
+              "value": "holo2",
+              "label": "Holo 2"
+            },
+            {
+              "value": "step3",
+              "label": "Step3"
+            },
+            {
+              "value": "step3p5",
+              "label": "Step3.5"
             }
           ]
         }
