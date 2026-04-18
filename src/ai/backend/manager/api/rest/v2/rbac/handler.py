@@ -11,7 +11,6 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsInput,
     AssignRoleInput,
     BulkAssignRoleInput,
     BulkRevokeRoleInput,
@@ -21,6 +20,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     DeleteRoleInput,
     PurgeRoleInput,
     RevokeRoleInput,
+    SearchRoleAssignmentsInput,
     SearchRolesInput,
     UpdatePermissionInput,
     UpdateRoleInput,
@@ -28,9 +28,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AdminSearchAssociationsPayload,
     AdminSearchPermissionsPayload,
-    AdminSearchRoleAssignmentsPayload,
     AdminSearchRolesPayload,
     ScopeEntityOperationCombinationInfo,
+    SearchRoleAssignmentsPayload,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
@@ -191,11 +191,11 @@ class V2RBACHandler:
 
     async def search_assignments(
         self,
-        body: BodyParam[AdminSearchRoleAssignmentsInput],
+        body: BodyParam[SearchRoleAssignmentsInput],
     ) -> APIResponse:
         """Search role assignments with filters, orders, and pagination."""
         result = await self._adapter.admin_search_role_assignments(body.parsed)
-        payload = AdminSearchRoleAssignmentsPayload(
+        payload = SearchRoleAssignmentsPayload(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -205,11 +205,11 @@ class V2RBACHandler:
 
     async def my_search_assignments(
         self,
-        body: BodyParam[AdminSearchRoleAssignmentsInput],
+        body: BodyParam[SearchRoleAssignmentsInput],
     ) -> APIResponse:
         """Search role assignments for the current authenticated user."""
         result = await self._adapter.my_search_role_assignments(body.parsed)
-        payload = AdminSearchRoleAssignmentsPayload(
+        payload = SearchRoleAssignmentsPayload(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

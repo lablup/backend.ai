@@ -5,7 +5,6 @@ RBAC DTOs v2 for Manager API.
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsInput,
     AssignRoleInput,
     BulkAssignRoleInput,
     BulkRevokeRoleInput,
@@ -24,6 +23,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleFilter,
     RoleNestedFilter,
     RoleOrderBy,
+    SearchRoleAssignmentsInput,
     SearchRolesInput,
     UpdatePermissionInput,
     UpdateRoleInput,
@@ -93,7 +93,7 @@ __all__ = (
     # Input models (request)
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
-    "AdminSearchRoleAssignmentsInput",
+    "SearchRoleAssignmentsInput",
     "SearchRolesInput",
     "AssignRoleInput",
     "BulkAssignRoleInput",

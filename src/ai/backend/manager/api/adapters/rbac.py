@@ -52,7 +52,7 @@ from ai.backend.common.dto.manager.v2.rbac import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsInput,
+    SearchRoleAssignmentsInput,
     SearchRolesInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -684,7 +684,7 @@ class RBACAdapter(BaseAdapter):
 
     async def my_search_role_assignments(
         self,
-        input: AdminSearchRoleAssignmentsInput,
+        input: SearchRoleAssignmentsInput,
     ) -> SearchResult[RoleAssignmentNode]:
         """Search role assignments for the current authenticated user."""
         me = current_user()
@@ -697,7 +697,7 @@ class RBACAdapter(BaseAdapter):
 
     async def admin_search_role_assignments(
         self,
-        input: AdminSearchRoleAssignmentsInput,
+        input: SearchRoleAssignmentsInput,
         base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[RoleAssignmentNode]:
         """Search role assignments with cursor/offset pagination."""

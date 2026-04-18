@@ -14,13 +14,13 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    AdminSearchRoleAssignmentsInput,
     AssignRoleInput,
     RevokeRoleInput,
+    SearchRoleAssignmentsInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    AdminSearchRoleAssignmentsPayload,
     RoleAssignmentNode,
+    SearchRoleAssignmentsPayload,
 )
 from ai.backend.manager.api.adapters.rbac import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
@@ -234,10 +234,8 @@ class TestMySearchAssignmentsV2:
         )
         try:
             # Regular user searches their own assignments
-            result = await user_v2_registry.rbac.my_search_assignments(
-                AdminSearchRoleAssignmentsInput()
-            )
-            assert isinstance(result, AdminSearchRoleAssignmentsPayload)
+            result = await user_v2_registry.rbac.my_search_assignments(SearchRoleAssignmentsInput())
+            assert isinstance(result, SearchRoleAssignmentsPayload)
             assert result.total_count >= 1
             assert any(a.role_id == target_role.role.id for a in result.items)
             # All results should belong to the current user
@@ -269,9 +267,7 @@ class TestMySearchAssignmentsV2:
         )
         try:
             # Regular user searches — should NOT see admin's assignment
-            result = await user_v2_registry.rbac.my_search_assignments(
-                AdminSearchRoleAssignmentsInput()
-            )
+            result = await user_v2_registry.rbac.my_search_assignments(SearchRoleAssignmentsInput())
             assert all(a.user_id != admin_user_fixture.user_uuid for a in result.items)
         finally:
             # Clean up
@@ -287,9 +283,7 @@ class TestMySearchAssignmentsV2:
         user_v2_registry: V2ClientRegistry,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        result = await user_v2_registry.rbac.my_search_assignments(
-            AdminSearchRoleAssignmentsInput()
-        )
-        assert isinstance(result, AdminSearchRoleAssignmentsPayload)
+        result = await user_v2_registry.rbac.my_search_assignments(SearchRoleAssignmentsInput())
+        assert isinstance(result, SearchRoleAssignmentsPayload)
         assert result.total_count == 0
         assert result.items == []

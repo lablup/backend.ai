@@ -46,9 +46,9 @@ def search(
     from uuid import UUID
 
     from ai.backend.common.dto.manager.v2.rbac.request import (
-        AdminSearchRoleAssignmentsInput,
         RoleAssignmentFilter,
         RoleAssignmentOrderBy,
+        SearchRoleAssignmentsInput,
     )
     from ai.backend.common.dto.manager.v2.rbac.types import RoleAssignmentOrderField
 
@@ -67,7 +67,7 @@ def search(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = AdminSearchRoleAssignmentsInput(
+            request = SearchRoleAssignmentsInput(
                 filter=filter_dto,
                 order=orders,
                 first=first,
