@@ -9,7 +9,8 @@ Backend.AI
 Backend.AI is a streamlined, container-based computing cluster platform
 that hosts popular computing/ML frameworks and diverse programming languages,
 with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU,
-Rebellions, FuriosaAI, HyperAccel, Google TPU, Graphcore IPU and other NPUs.
+Rebellions, FuriosaAI, HyperAccel, Intel Gaudi, Tenstorrent, Google TPU,
+Graphcore IPU and other NPUs.
 
 It allocates and isolates the underlying computing resources for multi-tenant
 computation sessions on-demand or in batches with customizable job schedulers with its own orchestrator named "Sokovan".
@@ -308,11 +309,12 @@ Backend.AI supports plugin-based extensibility via Python package entrypoints:
 - [CUDA Mock](src/ai/backend/accelerator/cuda_mock) - Development without actual GPUs
 - [ROCm](src/ai/backend/accelerator/rocm) - AMD GPU support
 - [Furiosa](src/ai/backend/accelerator/furiosa) - Furiosa NPU (Warboy / RNGD) support
+- [Habana](src/ai/backend/accelerator/habana) - Intel Gaudi HPU (Gaudi 2, Gaudi 3) support
 - [Hyperaccel](src/ai/backend/accelerator/hyperaccel) - Hyperaccel LPU support
 - [IPU](src/ai/backend/accelerator/ipu) - Graphcore IPU support
 - [Rebellions](src/ai/backend/accelerator/rebellions) - Rebellions NPU (ATOM, ATOM+, ATOM Max) support
 - [Tenstorrent](src/ai/backend/accelerator/tenstorrent) - Tenstorrent NPU (Wormhole, Blackhole) support
-- [TPU](src/ai/backend/accelerator/tpu) - Google TPU (v2, v3) support
+- [TPU](src/ai/backend/accelerator/tpu) - Google TPU (v2 ~ Ironwood) support
 
 **Monitoring Plugins**
 - [`backendai_monitor_stats_v10`](https://github.com/lablup/backend.ai-monitor-datadog) - Datadog statistics collector
