@@ -16,7 +16,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsGQLInput,
+    AdminSearchRoleAssignmentsInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput as AssignRoleInputDTO,
@@ -281,8 +281,8 @@ class RoleGQL(PydanticNodeMixin[Any]):
         pydantic_filter = combined_filter.to_pydantic() if combined_filter is not None else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
-        result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
-            AdminSearchRoleAssignmentsGQLInput(
+        result = await info.context.adapters.rbac.admin_search_role_assignments(
+            AdminSearchRoleAssignmentsInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
                 first=first,

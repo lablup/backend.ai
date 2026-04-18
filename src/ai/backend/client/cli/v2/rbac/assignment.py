@@ -42,7 +42,7 @@ def search(
     """Search role assignments."""
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.rbac.request import (
-        AdminSearchRoleAssignmentsGQLInput,
+        AdminSearchRoleAssignmentsInput,
         RoleAssignmentFilter,
         RoleAssignmentOrderBy,
     )
@@ -70,7 +70,7 @@ def search(
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.search_assignments(
-                AdminSearchRoleAssignmentsGQLInput(
+                AdminSearchRoleAssignmentsInput(
                     filter=filter_dto,
                     order=orders,
                     limit=limit,

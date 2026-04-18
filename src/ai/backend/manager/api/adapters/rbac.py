@@ -10,6 +10,7 @@ from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import RBACElementType
@@ -51,7 +52,7 @@ from ai.backend.common.dto.manager.v2.rbac import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsGQLInput,
+    AdminSearchRoleAssignmentsInput,
     SearchRolesInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -111,6 +112,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.common.types import SearchResult
@@ -680,9 +682,22 @@ class RBACAdapter(BaseAdapter):
             has_previous_page=raw.has_previous_page,
         )
 
-    async def admin_search_role_assignments_gql(
+    async def my_search_role_assignments(
         self,
-        input: AdminSearchRoleAssignmentsGQLInput,
+        input: AdminSearchRoleAssignmentsInput,
+    ) -> SearchResult[RoleAssignmentNode]:
+        """Search role assignments for the current authenticated user."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        return await self.admin_search_role_assignments(
+            input,
+            base_conditions=[AssignedUserConditions.by_user_id(me.user_id)],
+        )
+
+    async def admin_search_role_assignments(
+        self,
+        input: AdminSearchRoleAssignmentsInput,
         base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[RoleAssignmentNode]:
         """Search role assignments with cursor/offset pagination."""

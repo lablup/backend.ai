@@ -23,7 +23,7 @@ from .types import (
 __all__ = (
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
-    "AdminSearchRoleAssignmentsGQLInput",
+    "AdminSearchRoleAssignmentsInput",
     "SearchRolesInput",
     "AssignRoleInput",
     "BulkAssignRoleInput",
@@ -303,7 +303,7 @@ class SearchRolesInput(BaseRequestModel):
     offset: int | None = None
 
 
-class AdminSearchRoleAssignmentsGQLInput(BaseRequestModel):
+class AdminSearchRoleAssignmentsInput(BaseRequestModel):
     """GQL pagination search input for role assignments."""
 
     filter: RoleAssignmentFilter | None = None

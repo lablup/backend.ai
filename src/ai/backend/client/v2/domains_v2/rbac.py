@@ -8,7 +8,7 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsGQLInput,
+    AdminSearchRoleAssignmentsInput,
     AssignRoleInput,
     BulkAssignRoleInput,
     BulkRevokeRoleInput,
@@ -172,12 +172,23 @@ class V2RBACClient(BaseDomainClient):
         )
 
     async def search_assignments(
-        self, request: AdminSearchRoleAssignmentsGQLInput
+        self, request: AdminSearchRoleAssignmentsInput
     ) -> AdminSearchRoleAssignmentsPayload:
         """Search role assignments with filters, orders, and pagination."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/assignments/search",
+            request=request,
+            response_model=AdminSearchRoleAssignmentsPayload,
+        )
+
+    async def my_search_assignments(
+        self, request: AdminSearchRoleAssignmentsInput
+    ) -> AdminSearchRoleAssignmentsPayload:
+        """Search role assignments for the current authenticated user."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/assignments/my/search",
             request=request,
             response_model=AdminSearchRoleAssignmentsPayload,
         )

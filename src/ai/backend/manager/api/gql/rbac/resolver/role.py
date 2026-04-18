@@ -10,7 +10,7 @@ from strawberry import Info
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    AdminSearchRoleAssignmentsGQLInput,
+    AdminSearchRoleAssignmentsInput,
     SearchRolesInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -125,8 +125,8 @@ async def admin_role_assignments(
     offset: int | None = None,
 ) -> RoleAssignmentConnection:
     check_admin_only()
-    result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
-        AdminSearchRoleAssignmentsGQLInput(
+    result = await info.context.adapters.rbac.admin_search_role_assignments(
+        AdminSearchRoleAssignmentsInput(
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
@@ -178,8 +178,8 @@ async def my_roles(
 
         raise InsufficientPrivilege("Authentication required")
 
-    result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
-        AdminSearchRoleAssignmentsGQLInput(
+    result = await info.context.adapters.rbac.admin_search_role_assignments(
+        AdminSearchRoleAssignmentsInput(
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,

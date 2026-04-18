@@ -11,7 +11,7 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsGQLInput,
+    AdminSearchRoleAssignmentsInput,
     AssignRoleInput,
     BulkAssignRoleInput,
     BulkRevokeRoleInput,
@@ -191,10 +191,24 @@ class V2RBACHandler:
 
     async def search_assignments(
         self,
-        body: BodyParam[AdminSearchRoleAssignmentsGQLInput],
+        body: BodyParam[AdminSearchRoleAssignmentsInput],
     ) -> APIResponse:
         """Search role assignments with filters, orders, and pagination."""
-        result = await self._adapter.admin_search_role_assignments_gql(body.parsed)
+        result = await self._adapter.admin_search_role_assignments(body.parsed)
+        payload = AdminSearchRoleAssignmentsPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def my_search_assignments(
+        self,
+        body: BodyParam[AdminSearchRoleAssignmentsInput],
+    ) -> APIResponse:
+        """Search role assignments for the current authenticated user."""
+        result = await self._adapter.my_search_role_assignments(body.parsed)
         payload = AdminSearchRoleAssignmentsPayload(
             items=result.items,
             total_count=result.total_count,
