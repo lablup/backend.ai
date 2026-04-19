@@ -20,7 +20,6 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
-    RBACElementRef,
     ScopeType,
 )
 from ai.backend.manager.data.user.types import UserStatus
@@ -414,24 +413,16 @@ class TestCheckBatchPermissionWithScopeChain:
 
     # ── Helpers ──
 
-    def _make_refs(self, fixture: BatchFixture) -> list[RBACElementRef]:
-        return [
-            RBACElementRef(element_type=RBACElementType.VFOLDER, element_id=vid)
-            for vid in fixture.vfolder_ids
-        ]
-
     def _make_input(
         self,
         fixture: BatchFixture,
         operation: OperationType,
-        *,
-        permission_entity_type: EntityType | None = None,
     ) -> BatchPermissionCheckInput:
         return BatchPermissionCheckInput(
             user_id=fixture.user_id,
-            target_element_refs=self._make_refs(fixture),
+            target_element_type=RBACElementType.VFOLDER,
+            target_entity_ids=fixture.vfolder_ids,
             operation=operation,
-            permission_entity_type=permission_entity_type,
         )
 
     # ── Tests ──
@@ -441,14 +432,14 @@ class TestCheckBatchPermissionWithScopeChain:
         db_source: PermissionDBSource,
         user_with_active_role: BatchFixture,
     ) -> None:
-        """Empty target_element_refs returns empty dict."""
+        """Empty target_entity_ids returns empty dict."""
         fixture = user_with_active_role
         result = await db_source.check_batch_permission_with_scope_chain(
             BatchPermissionCheckInput(
                 user_id=fixture.user_id,
-                target_element_refs=[],
+                target_element_type=RBACElementType.VFOLDER,
+                target_entity_ids=[],
                 operation=OperationType.READ,
-                permission_entity_type=None,
             )
         )
         assert result == {}
@@ -522,10 +513,9 @@ class TestCheckBatchPermissionWithScopeChain:
         result = await db_source.check_batch_permission_with_scope_chain(
             self._make_input(fixture, OperationType.READ),
         )
-        refs = self._make_refs(fixture)
-        assert result[refs[0]]  # AUTO
-        assert not result[refs[1]]  # REF
-        assert not result[refs[2]]  # no association
+        assert result[fixture.vfolder_ids[0]]  # AUTO
+        assert not result[fixture.vfolder_ids[1]]  # REF
+        assert not result[fixture.vfolder_ids[2]]  # no association
 
     @pytest.mark.parametrize(
         "permission_setup",
@@ -543,10 +533,9 @@ class TestCheckBatchPermissionWithScopeChain:
         result = await db_source.check_batch_permission_with_scope_chain(
             self._make_input(fixture, OperationType.READ),
         )
-        refs = self._make_refs(fixture)
-        assert result[refs[0]]
-        assert not result[refs[1]]
-        assert not result[refs[2]]
+        assert result[fixture.vfolder_ids[0]]
+        assert not result[fixture.vfolder_ids[1]]
+        assert not result[fixture.vfolder_ids[2]]
 
     @pytest.mark.parametrize(
         "permission_setup",
@@ -588,34 +577,6 @@ class TestCheckBatchPermissionWithScopeChain:
         "permission_setup",
         [
             pytest.param(
-                [PermissionEntry("project", OperationType.READ, EntityType.MODEL_DEPLOYMENT)],
-                id="model-deployment-read",
-            )
-        ],
-        indirect=["permission_setup"],
-    )
-    async def test_cross_scope_entity_type(
-        self,
-        db_source: PermissionDBSource,
-        user_with_active_role: BatchFixture,
-        all_vfolders_in_project_auto: None,
-        permission_setup: None,
-    ) -> None:
-        """permission_entity_type override applies to all entities in batch."""
-        result = await db_source.check_batch_permission_with_scope_chain(
-            self._make_input(
-                user_with_active_role,
-                OperationType.READ,
-                permission_entity_type=EntityType.MODEL_DEPLOYMENT,
-            ),
-        )
-        assert all(result.values())
-        assert len(result) == 3
-
-    @pytest.mark.parametrize(
-        "permission_setup",
-        [
-            pytest.param(
                 [
                     PermissionEntry("project", OperationType.READ),
                     PermissionEntry("vfolder_1", OperationType.READ),
@@ -637,10 +598,9 @@ class TestCheckBatchPermissionWithScopeChain:
         result = await db_source.check_batch_permission_with_scope_chain(
             self._make_input(fixture, OperationType.READ),
         )
-        refs = self._make_refs(fixture)
-        assert result[refs[0]]  # via chain
-        assert result[refs[1]]  # via self-scope
-        assert not result[refs[2]]  # no path
+        assert result[fixture.vfolder_ids[0]]  # via chain
+        assert result[fixture.vfolder_ids[1]]  # via self-scope
+        assert not result[fixture.vfolder_ids[2]]  # no path
 
     @pytest.mark.parametrize(
         "permission_setup",
@@ -659,10 +619,9 @@ class TestCheckBatchPermissionWithScopeChain:
         result = await db_source.check_batch_permission_with_scope_chain(
             self._make_input(fixture, OperationType.READ),
         )
-        refs = self._make_refs(fixture)
-        assert result[refs[0]]  # domain_a -> project_a -> vfolder[0]
-        assert result[refs[1]]  # domain_a -> project_b -> vfolder[1]
-        assert not result[refs[2]]  # domain_b -> project_c -> vfolder[2]
+        assert result[fixture.vfolder_ids[0]]  # domain_a -> project_a -> vfolder[0]
+        assert result[fixture.vfolder_ids[1]]  # domain_a -> project_b -> vfolder[1]
+        assert not result[fixture.vfolder_ids[2]]  # domain_b -> project_c -> vfolder[2]
 
     async def test_other_user_not_affected(
         self,

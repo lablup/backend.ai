@@ -37,7 +37,6 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    RBACElementRef,
     ScopeListResult,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -343,7 +342,7 @@ class PermissionControllerRepository:
     async def check_batch_permission_with_scope_chain(
         self,
         data: BatchPermissionCheckInput,
-    ) -> dict[RBACElementRef, bool]:
+    ) -> dict[str, bool]:
         """Batch permission check that traverses the scope chain via AUTO edges.
 
         Same semantics as check_permission_with_scope_chain but for multiple

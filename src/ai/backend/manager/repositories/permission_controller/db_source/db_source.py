@@ -1090,28 +1090,27 @@ class PermissionDBSource:
     async def check_batch_permission_with_scope_chain(
         self,
         data: BatchPermissionCheckInput,
-    ) -> dict[RBACElementRef, bool]:
+    ) -> dict[str, bool]:
         """Batch CTE-based permission check that traverses the scope chain.
 
         Same two-layer semantics as check_permission_with_scope_chain but for
         multiple entities of the same RBACElementType in a single query.
-        Returns a mapping from each input RBACElementRef to its permission result.
+        Returns a mapping from each entity ID to its permission result.
         """
-        if not data.target_element_refs:
+        if not data.target_entity_ids:
             return {}
 
-        first_ref = data.target_element_refs[0]
-        association_entity_type = first_ref.element_type.to_entity_type()
-        target_entity_type = data.permission_entity_type or association_entity_type
-        target_scope_type = first_ref.element_type.to_scope_type()
-        entity_ids = [ref.element_id for ref in data.target_element_refs]
+        target_entity_type = data.target_element_type.to_entity_type()
+        target_scope_type = data.target_element_type.to_scope_type()
 
         permissions = PermissionRow.__table__
         user_roles = UserRoleRow.__table__
         roles = RoleRow.__table__
 
         # Layer 1: scope chain traversal — find entity_ids with permission via ancestors.
-        scope_chain_cte = self._build_batch_scope_chain_cte(association_entity_type, entity_ids)
+        scope_chain_cte = self._build_batch_scope_chain_cte(
+            target_entity_type, data.target_entity_ids
+        )
         scope_chain_query = (
             sa.select(scope_chain_cte.c.entity_id)
             .select_from(
@@ -1158,7 +1157,7 @@ class PermissionDBSource:
                     user_roles.c.user_id == data.user_id,
                     roles.c.status == RoleStatus.ACTIVE,
                     permissions.c.scope_type == target_scope_type,
-                    permissions.c.scope_id.in_(entity_ids),
+                    permissions.c.scope_id.in_(data.target_entity_ids),
                     permissions.c.entity_type == target_entity_type,
                     permissions.c.operation == data.operation,
                 )
@@ -1167,15 +1166,13 @@ class PermissionDBSource:
 
         combined_query = sa.union(scope_chain_query, self_scope_query)
 
-        result: dict[RBACElementRef, bool] = dict.fromkeys(data.target_element_refs, False)
-        ref_by_id = {ref.element_id: ref for ref in data.target_element_refs}
+        result: dict[str, bool] = dict.fromkeys(data.target_entity_ids, False)
 
         async with self._db.begin_readonly_session_read_committed() as db_session:
             rows = await db_session.execute(combined_query)
             for row in rows:
-                ref = ref_by_id.get(row.entity_id)
-                if ref is not None:
-                    result[ref] = True
+                if row.entity_id in result:
+                    result[row.entity_id] = True
 
         return result
 
