@@ -13,7 +13,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     AcceptRoleInvitationAction,
     CancelRoleInvitationAction,
-    CreateRoleInvitationByEmailAction,
+    CreateRoleInvitationByUsernameAction,
     CreateRoleInvitationResult,
     RejectRoleInvitationAction,
 )
@@ -365,11 +365,11 @@ class PermissionControllerRepository:
     # -- role invitation --
 
     @permission_controller_repository_resilience.apply()
-    async def create_invitation_by_email(
+    async def create_invitation_by_username(
         self,
-        action: CreateRoleInvitationByEmailAction,
+        action: CreateRoleInvitationByUsernameAction,
     ) -> CreateRoleInvitationResult:
-        return await self._db_source.create_invitation_by_email(action)
+        return await self._db_source.create_invitation_by_username(action)
 
     @permission_controller_repository_resilience.apply()
     async def search_invitations(

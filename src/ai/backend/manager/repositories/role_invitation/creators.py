@@ -18,7 +18,7 @@ from ai.backend.manager.repositories.base import CreatorSpec, IntegrityErrorChec
 class RoleInvitationCreatorSpec(CreatorSpec[RoleInvitationRow]):
     """CreatorSpec for role invitation creation."""
 
-    inviter_user_id: UUID | None
+    inviter_user_id: UUID
     invitee_user_id: UUID
     role_id: UUID
 
