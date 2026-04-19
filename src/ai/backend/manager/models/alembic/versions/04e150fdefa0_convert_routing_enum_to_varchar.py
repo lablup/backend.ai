@@ -42,11 +42,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Recreate native ENUM types
+    # Recreate native ENUM types — include 'healthy', 'unhealthy', 'degraded'
+    # which were converted to 'running' + health_status by e3111d960208 but
+    # must exist in the enum for that migration's downgrade to cast back.
     op.execute(
         sa.text(
             "CREATE TYPE routestatus AS ENUM "
-            "('provisioning', 'running', 'terminating', 'terminated', 'failed_to_start')"
+            "('provisioning', 'running', 'healthy', 'unhealthy', 'degraded',"
+            " 'terminating', 'terminated', 'failed_to_start')"
         )
     )
     op.execute(sa.text("CREATE TYPE routetrafficstatus AS ENUM ('active', 'inactive')"))
@@ -58,6 +61,9 @@ def downgrade() -> None:
         type_=sa.Enum(
             "provisioning",
             "running",
+            "healthy",
+            "unhealthy",
+            "degraded",
             "terminating",
             "terminated",
             "failed_to_start",
