@@ -28,19 +28,19 @@ def assignment() -> None:
     multiple=True,
     help="Order by field:direction (e.g., username:asc, granted_at:desc).",
 )
-@click.option("--role-id", type=str, default=None, help="Filter by role UUID.")
+@click.option("--role-id", type=click.UUID, default=None, help="Filter by role UUID.")
 @click.option("--username-contains", type=str, default=None, help="Filter by username (contains).")
 @click.option("--email-contains", type=str, default=None, help="Filter by email (contains).")
 def search(
     limit: int | None,
     offset: int | None,
     order_by: tuple[str, ...],
-    role_id: str | None,
+    role_id: UUID | None,
     username_contains: str | None,
     email_contains: str | None,
 ) -> None:
     """Search role assignments."""
-    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
     from ai.backend.common.dto.manager.v2.rbac.request import (
         RoleAssignmentFilter,
         RoleAssignmentOrderBy,
@@ -52,7 +52,7 @@ def search(
     filter_dto: RoleAssignmentFilter | None = None
     if any([role_id is not None, username_contains is not None, email_contains is not None]):
         filter_dto = RoleAssignmentFilter(
-            role_id=UUID(role_id) if role_id is not None else None,
+            role_id=UUIDFilter(equals=role_id) if role_id is not None else None,
             username=(
                 StringFilter(contains=username_contains) if username_contains is not None else None
             ),

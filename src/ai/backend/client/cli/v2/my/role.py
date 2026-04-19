@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import UUID
 
 import click
 
@@ -26,7 +27,7 @@ def role() -> None:
 @click.option("--after", default=None, type=str, help="Cursor-based: return items after cursor.")
 @click.option("--last", default=None, type=int, help="Cursor-based: return last N items.")
 @click.option("--before", default=None, type=str, help="Cursor-based: return items before cursor.")
-@click.option("--role-id", type=str, default=None, help="Filter by role UUID.")
+@click.option("--role-id", type=click.UUID, default=None, help="Filter by role UUID.")
 @click.option(
     "--order-by",
     multiple=True,
@@ -39,12 +40,11 @@ def search(
     after: str | None,
     last: int | None,
     before: str | None,
-    role_id: str | None,
+    role_id: UUID | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search my role assignments."""
-    from uuid import UUID
-
+    from ai.backend.common.dto.manager.query import UUIDFilter
     from ai.backend.common.dto.manager.v2.rbac.request import (
         RoleAssignmentFilter,
         RoleAssignmentOrderBy,
@@ -55,7 +55,7 @@ def search(
     filter_dto: RoleAssignmentFilter | None = None
     if role_id is not None:
         filter_dto = RoleAssignmentFilter(
-            role_id=UUID(role_id),
+            role_id=UUIDFilter(equals=role_id),
         )
 
     orders = (

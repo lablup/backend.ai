@@ -690,7 +690,7 @@ class RBACAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        return await self.admin_search_role_assignments(
+        return await self._search_role_assignments(
             input,
             base_conditions=[AssignedUserConditions.by_user_id(me.user_id)],
         )
@@ -700,7 +700,15 @@ class RBACAdapter(BaseAdapter):
         input: SearchRoleAssignmentsInput,
         base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[RoleAssignmentNode]:
-        """Search role assignments with cursor/offset pagination."""
+        """Search role assignments with cursor/offset pagination (admin)."""
+        return await self._search_role_assignments(input, base_conditions=base_conditions)
+
+    async def _search_role_assignments(
+        self,
+        input: SearchRoleAssignmentsInput,
+        base_conditions: Sequence[QueryCondition] | None = None,
+    ) -> SearchResult[RoleAssignmentNode]:
+        """Internal implementation for searching role assignments."""
         conditions = self._convert_assignment_filter(input.filter) if input.filter else []
         orders = self._convert_assignment_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -1257,7 +1265,13 @@ class RBACAdapter(BaseAdapter):
     def _convert_assignment_filter(self, f: RoleAssignmentFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.role_id is not None:
-            conditions.append(AssignedUserConditions.by_role_id(f.role_id))
+            condition = self.convert_uuid_filter(
+                f.role_id,
+                equals_factory=AssignedUserConditions.by_role_id_equals,
+                in_factory=AssignedUserConditions.by_role_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.role is not None:
             conditions.extend(self._convert_role_nested_filter(f.role))
         if f.permission is not None:
