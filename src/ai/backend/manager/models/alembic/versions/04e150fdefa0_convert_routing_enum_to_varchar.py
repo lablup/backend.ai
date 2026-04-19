@@ -8,6 +8,7 @@ Create Date: 2026-04-05
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "04e150fdefa0"
@@ -42,26 +43,34 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Recreate native ENUM types
+    # Recreate native ENUM types — include 'healthy', 'unhealthy', 'degraded'
+    # which were converted to 'running' + health_status by e3111d960208 but
+    # must exist in the enum for that migration's downgrade to cast back.
     op.execute(
         sa.text(
             "CREATE TYPE routestatus AS ENUM "
-            "('provisioning', 'running', 'terminating', 'terminated', 'failed_to_start')"
+            "('provisioning', 'running', 'healthy', 'unhealthy', 'degraded',"
+            " 'terminating', 'terminated', 'failed_to_start')"
         )
     )
     op.execute(sa.text("CREATE TYPE routetrafficstatus AS ENUM ('active', 'inactive')"))
 
-    # Convert back: VARCHAR → native ENUM
+    # Convert back: VARCHAR → native ENUM (create_type=False since types are
+    # already created above via raw SQL)
     op.alter_column(
         "routings",
         "status",
-        type_=sa.Enum(
+        type_=postgresql.ENUM(
             "provisioning",
             "running",
+            "healthy",
+            "unhealthy",
+            "degraded",
             "terminating",
             "terminated",
             "failed_to_start",
             name="routestatus",
+            create_type=False,
         ),
         existing_nullable=False,
         postgresql_using="status::routestatus",
@@ -73,7 +82,7 @@ def downgrade() -> None:
     op.alter_column(
         "routings",
         "traffic_status",
-        type_=sa.Enum("active", "inactive", name="routetrafficstatus"),
+        type_=postgresql.ENUM("active", "inactive", name="routetrafficstatus", create_type=False),
         existing_nullable=False,
         postgresql_using="traffic_status::routetrafficstatus",
     )
