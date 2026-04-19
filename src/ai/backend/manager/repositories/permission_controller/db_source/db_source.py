@@ -146,7 +146,18 @@ class PermissionDBSource:
             uuid.UUID(sid): [] for sid in str_ids
         }
         for row in rows:
-            result[uuid.UUID(row.entity_id)].append(row)
+            try:
+                key = uuid.UUID(row.entity_id)
+            except ValueError:
+                log.warning(
+                    "Skipping scope entry with non-UUID entity_id: {}"
+                    " (entity_type: {}, expected: {})",
+                    row.entity_id,
+                    row.entity_type,
+                    EntityType.ROLE,
+                )
+                continue
+            result[key].append(row)
         return result
 
     @staticmethod
