@@ -858,6 +858,9 @@ class GroupDBSource:
         """Add a user to a project (business association + RBAC scope binding).
 
         Skips if the user is already a member of the project.
+
+        TODO: Remove once association_groups_users is fully migrated to
+        association_scopes_entities.
         """
         async with self._db.begin_session() as session:
             already_bound = await session.scalar(
@@ -878,7 +881,11 @@ class GroupDBSource:
             await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=[pair]))
 
     async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
-        """Remove a user from a project (business association + RBAC scope binding)."""
+        """Remove a user from a project (business association + RBAC scope binding).
+
+        TODO: Remove once association_groups_users is fully migrated to
+        association_scopes_entities.
+        """
         async with self._db.begin_session() as session:
             await session.execute(
                 sa.delete(AssocGroupUserRow).where(

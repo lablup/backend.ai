@@ -1,6 +1,6 @@
 import logging
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -92,19 +92,6 @@ from ai.backend.manager.repositories.permission_controller.types import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass(frozen=True)
-class UserScopeBinding:
-    """A (user, scope) pair describing which scope a user should be synced to.
-
-    Built from a role's bound scopes during role assign/revoke to drive
-    user-scope membership entries in ``association_scopes_entities``.
-    """
-
-    user_id: uuid.UUID
-    scope_type: ScopeType
-    scope_id: str
-
-
 @dataclass
 class CreateRoleInput:
     """Input for creating a role with object permissions."""
@@ -120,129 +107,82 @@ class PermissionDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def _get_role_bound_scopes(
-        self,
-        db_session: SASession,
-        role_ids: Iterable[uuid.UUID],
-    ) -> dict[uuid.UUID, list[AssociationScopesEntitiesRow]]:
-        """Fetch scope entries bound to one or more roles, grouped by role ID."""
-        str_ids = [str(rid) for rid in role_ids]
-        if not str_ids:
-            return {}
-        ase = AssociationScopesEntitiesRow
-        rows = (
-            (
-                await db_session.execute(
-                    sa.select(ase).where(
-                        ase.entity_type == EntityType.ROLE,
-                        ase.entity_id.in_(str_ids),
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        result: dict[uuid.UUID, list[AssociationScopesEntitiesRow]] = {
-            uuid.UUID(sid): [] for sid in str_ids
-        }
-        for row in rows:
-            try:
-                key = uuid.UUID(row.entity_id)
-            except (ValueError, TypeError):
-                log.warning(
-                    "Skipping scope entry with non-UUID entity_id: {!r}"
-                    " (type: {}, entity_type: {}, expected: {})",
-                    row.entity_id,
-                    type(row.entity_id).__name__,
-                    row.entity_type,
-                    EntityType.ROLE,
-                )
-                continue
-            result[key].append(row)
-        return result
-
-    @staticmethod
-    def _build_bindings(
-        user_ids: Iterable[uuid.UUID],
-        role_scopes: Sequence[AssociationScopesEntitiesRow],
-    ) -> list[UserScopeBinding]:
-        """Expand role-bound scopes x users into individual binding entries."""
-        uid_list = list(user_ids)
-        return [
-            UserScopeBinding(
-                user_id=uid,
-                scope_type=entry.scope_type,
-                scope_id=entry.scope_id,
-            )
-            for entry in role_scopes
-            for uid in uid_list
-        ]
-
     @staticmethod
     async def _sync_user_scopes_on_assign(
         db_session: SASession,
-        bindings: Sequence[UserScopeBinding],
+        user_ids: Collection[uuid.UUID],
     ) -> None:
-        """Insert user-scope membership entries (idempotent).
+        """Ensure user-scope membership entries exist for all assigned roles.
 
-        For each binding, creates an ``association_scopes_entities`` row
-        mapping the user to the scope.  Existing entries are silently skipped.
+        For each user, finds every scope bound to any of their assigned roles
+        and inserts the corresponding user-scope entries.  Executed as a single
+        ``INSERT … SELECT`` so the role lookup and insert share the same snapshot.
         """
-        if not bindings:
+        if not user_ids:
             return
-        values = [
-            {
-                "scope_type": b.scope_type,
-                "scope_id": b.scope_id,
-                "entity_type": EntityType.USER,
-                "entity_id": str(b.user_id),
-                "relation_type": RelationType.AUTO,
-            }
-            for b in bindings
-        ]
+        ase = AssociationScopesEntitiesRow
+        str_user_ids = [str(uid) for uid in user_ids]
+        uid_subq = sa.select(
+            sa.func.unnest(sa.cast(sa.literal(str_user_ids), sa.ARRAY(sa.String))).label("uid")
+        ).subquery("u")
+        source = (
+            sa.select(
+                ase.scope_type,
+                ase.scope_id,
+                sa.literal(EntityType.USER.value).label("entity_type"),
+                uid_subq.c.uid.label("entity_id"),
+                sa.literal(RelationType.AUTO.value).label("relation_type"),
+            )
+            .join(
+                UserRoleRow,
+                sa.cast(UserRoleRow.role_id, sa.String) == ase.entity_id,
+            )
+            .where(
+                ase.entity_type == EntityType.ROLE,
+                sa.cast(UserRoleRow.user_id, sa.String) == uid_subq.c.uid,
+            )
+        )
         await db_session.execute(
-            pg_insert(AssociationScopesEntitiesRow).values(values).on_conflict_do_nothing()
+            pg_insert(ase)
+            .from_select(
+                ["scope_type", "scope_id", "entity_type", "entity_id", "relation_type"],
+                source,
+            )
+            .on_conflict_do_nothing()
         )
 
     @staticmethod
     async def _sync_user_scopes_on_revoke(
         db_session: SASession,
-        bindings: Sequence[UserScopeBinding],
+        user_ids: Collection[uuid.UUID],
     ) -> None:
-        """Remove user-scope entries no longer covered by any remaining role.
+        """Remove user-scope entries no longer covered by any assigned role.
 
-        For each binding, deletes the user-scope row only when no other role
-        still binds the same user to the same scope.
+        Deletes user-scope rows for *user_ids* when no assigned role binds
+        the user to that scope.  Executed as a single ``DELETE`` statement
+        so the coverage check and deletion share the same snapshot.
         """
-        if not bindings:
+        if not user_ids:
             return
-        str_user_ids = list({str(b.user_id) for b in bindings})
-        scope_filter = sa.or_(*[
-            sa.and_(
-                AssociationScopesEntitiesRow.scope_type == b.scope_type,
-                AssociationScopesEntitiesRow.scope_id == b.scope_id,
-            )
-            for b in bindings
-        ])
-        ase_role = sa.orm.aliased(AssociationScopesEntitiesRow, flat=True)
+        ase = AssociationScopesEntitiesRow
+        str_user_ids = [str(uid) for uid in user_ids]
+        ase_remaining = sa.orm.aliased(ase, flat=True)
         await db_session.execute(
-            sa.delete(AssociationScopesEntitiesRow).where(
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.entity_id.in_(str_user_ids),
-                scope_filter,
+            sa.delete(ase).where(
+                ase.entity_type == EntityType.USER,
+                ase.entity_id.in_(str_user_ids),
                 ~sa.exists(
                     sa.select(sa.literal(1))
-                    .select_from(ase_role)
+                    .select_from(ase_remaining)
                     .join(
                         UserRoleRow,
-                        sa.cast(UserRoleRow.role_id, sa.String) == ase_role.entity_id,
+                        sa.cast(UserRoleRow.role_id, sa.String) == ase_remaining.entity_id,
                     )
                     .where(
-                        ase_role.entity_type == EntityType.ROLE,
-                        ase_role.scope_type == AssociationScopesEntitiesRow.scope_type,
-                        ase_role.scope_id == AssociationScopesEntitiesRow.scope_id,
-                        sa.cast(UserRoleRow.user_id, sa.String)
-                        == AssociationScopesEntitiesRow.entity_id,
+                        ase_remaining.entity_type == EntityType.ROLE,
+                        ase_remaining.scope_type == ase.scope_type,
+                        ase_remaining.scope_id == ase.scope_id,
+                        sa.cast(UserRoleRow.user_id, sa.String) == ase.entity_id,
                     )
                 ),
             )
@@ -410,7 +350,6 @@ class PermissionDBSource:
 
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:
-            scopes_map = await self._get_role_bound_scopes(db_session, [data.role_id])
             creator = Creator(
                 spec=UserRoleCreatorSpec(
                     user_id=data.user_id,
@@ -419,8 +358,7 @@ class PermissionDBSource:
                 )
             )
             result = await execute_creator(db_session, creator)
-            bindings = self._build_bindings([data.user_id], scopes_map.get(data.role_id, []))
-            await self._sync_user_scopes_on_assign(db_session, bindings)
+            await self._sync_user_scopes_on_assign(db_session, [data.user_id])
             return result.row
 
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -431,7 +369,6 @@ class PermissionDBSource:
         holds in each project that this role belongs to.
         """
         async with self._db.begin_session() as db_session:
-            scopes_map = await self._get_role_bound_scopes(db_session, [data.role_id])
             user_role_row = await db_session.scalar(
                 sa.select(UserRoleRow)
                 .where(UserRoleRow.user_id == data.user_id)
@@ -445,11 +382,13 @@ class PermissionDBSource:
             await db_session.delete(user_role_row)
             await db_session.flush()
 
-            bindings = self._build_bindings([data.user_id], scopes_map.get(data.role_id, []))
-            await self._sync_user_scopes_on_revoke(db_session, bindings)
+            await self._sync_user_scopes_on_revoke(db_session, [data.user_id])
 
-            # Single query: find projects this role belongs to and count
-            # remaining user-role mappings per project
+            # Used by PermissionControllerService.revoke_role() to decide whether
+            # to call GroupDBSource.unbind_user_from_project().
+            # TODO: remove this query when unbind_user_from_project() is retired
+            # (i.e. association_groups_users is fully migrated to
+            # association_scopes_entities).
             ase = AssociationScopesEntitiesRow
             project_subq = (
                 sa.select(ase.scope_id).where(
@@ -1191,13 +1130,8 @@ class PermissionDBSource:
     ) -> BulkCreatorResultWithFailures[UserRoleRow]:
         async with self._db.begin_session() as db_session:
             result = await execute_bulk_creator_partial(db_session, bulk_creator)
-            users_by_role: dict[uuid.UUID, list[uuid.UUID]] = {}
-            for row in result.successes:
-                users_by_role.setdefault(row.role_id, []).append(row.user_id)
-            scopes_map = await self._get_role_bound_scopes(db_session, users_by_role.keys())
-            for role_id, user_ids in users_by_role.items():
-                bindings = self._build_bindings(user_ids, scopes_map.get(role_id, []))
-                await self._sync_user_scopes_on_assign(db_session, bindings)
+            all_user_ids = [row.user_id for row in result.successes]
+            await self._sync_user_scopes_on_assign(db_session, all_user_ids)
             return result
 
     async def bulk_revoke_role(
@@ -1207,8 +1141,6 @@ class PermissionDBSource:
         failures: list[BulkRoleRevocationFailure] = []
 
         async with self._db.begin_session() as db_session:
-            scopes_map = await self._get_role_bound_scopes(db_session, [data.role_id])
-            role_scopes = scopes_map.get(data.role_id, [])
             for user_id in data.user_ids:
                 try:
                     async with db_session.begin_nested():
@@ -1225,8 +1157,6 @@ class PermissionDBSource:
                         user_role_id = user_role_row.id
                         await db_session.delete(user_role_row)
                         await db_session.flush()
-                        revoke_bindings = self._build_bindings([user_id], role_scopes)
-                        await self._sync_user_scopes_on_revoke(db_session, revoke_bindings)
                         successes.append(
                             UserRoleRevocationData(
                                 user_role_id=user_role_id,
@@ -1242,5 +1172,7 @@ class PermissionDBSource:
                         str(e),
                     )
                     failures.append(BulkRoleRevocationFailure(user_id=user_id, message=str(e)))
+            revoked_user_ids = [s.user_id for s in successes]
+            await self._sync_user_scopes_on_revoke(db_session, revoked_user_ids)
 
         return BulkRoleRevocationResultData(successes=successes, failures=failures)
