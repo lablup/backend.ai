@@ -284,7 +284,7 @@ class PurgeVFolderPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
         description="Payload returned after restoring a virtual folder from trash.",
     ),
     model=RestorePayloadDTO,
-    name="RestoreVFolderV2Payload",
+    name="RestoreVFolderPayload",
 )
 class RestoreVFolderPayloadGQL(PydanticOutputMixin[RestorePayloadDTO]):
     id: UUID = gql_field(description="ID of the restored virtual folder.")

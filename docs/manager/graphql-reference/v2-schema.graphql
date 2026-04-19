@@ -6797,7 +6797,7 @@ type Mutation {
   """
   Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
   """
-  restoreVFolder(vfolderId: UUID!): RestoreVFolderV2Payload!
+  restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload!
 
   """Added in 26.4.2. Deploy a deployment directly from a model VFolder."""
   deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload!
@@ -9704,7 +9704,7 @@ type RestoreArtifactsPayload {
 """
 Added in UNRELEASED. Payload returned after restoring a virtual folder from trash.
 """
-type RestoreVFolderV2Payload {
+type RestoreVFolderPayload {
   """ID of the restored virtual folder"""
   id: UUID!
 }
