@@ -23,8 +23,7 @@ class CreateRoleInvitationByEmailAction(BaseRBACAction):
     """Project admin creates role invitations by invitee emails."""
 
     invitee_emails: list[str]
-    domain_name: str
-    inviter_user_id: UUID | None
+    inviter_user_id: UUID
     role_id: UUID
 
     @classmethod

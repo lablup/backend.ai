@@ -1145,14 +1145,12 @@ class PermissionDBSource:
     ) -> CreateRoleInvitationResult:
         """Resolve emails and create invitations in a single transaction.
 
-        Emails that don't resolve to an ACTIVE user in the same domain are
-        silently skipped. Duplicate active invitations (caught by the partial
-        unique index) are also silently skipped.
+        Emails that don't resolve to an ACTIVE user are silently skipped.
+        Duplicate active invitations (caught by the partial unique index)
+        are also silently skipped.
         """
         async with self._db.begin_session_read_committed() as session:
-            email_to_user_id = await self._resolve_invitation_emails(
-                session, action.invitee_emails, action.domain_name
-            )
+            email_to_user_id = await self._resolve_invitation_emails(session, action.invitee_emails)
             specs = [
                 RoleInvitationCreatorSpec(
                     inviter_user_id=action.inviter_user_id,
@@ -1293,11 +1291,9 @@ class PermissionDBSource:
     async def _resolve_invitation_emails(
         session: SASession,
         emails: list[str],
-        domain_name: str,
     ) -> dict[str, uuid.UUID]:
-        """Resolve emails to user UUIDs (ACTIVE, same domain)."""
+        """Resolve emails to user UUIDs (ACTIVE users only)."""
         stmt = sa.select(UserRow.email, UserRow.uuid).where(
-            UserRow.domain_name == domain_name,
             UserRow.status == UserStatus.ACTIVE,
             UserRow.email.in_(emails),
         )

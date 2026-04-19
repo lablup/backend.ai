@@ -21,4 +21,4 @@ class RoleInvitationData:
     role_id: uuid.UUID
     state: RoleInvitationState
     created_at: datetime
-    modified_at: datetime | None
+    updated_at: datetime | None

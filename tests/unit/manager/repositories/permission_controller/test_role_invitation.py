@@ -230,13 +230,11 @@ class TestCreateRoleInvitation:
     def create_action(
         self,
         invitee_email: str,
-        domain_name: str,
         inviter: uuid.UUID,
         role_id: uuid.UUID,
     ) -> CreateRoleInvitationByEmailAction:
         return CreateRoleInvitationByEmailAction(
             invitee_emails=[invitee_email],
-            domain_name=domain_name,
             inviter_user_id=inviter,
             role_id=role_id,
         )
@@ -258,11 +256,9 @@ class TestCreateRoleInvitation:
         perm_db: PermissionDBSource,
         inviter: uuid.UUID,
         role_id: uuid.UUID,
-        domain_name: str,
     ) -> None:
         action = CreateRoleInvitationByEmailAction(
             invitee_emails=["nobody@test.io"],
-            domain_name=domain_name,
             inviter_user_id=inviter,
             role_id=role_id,
         )
