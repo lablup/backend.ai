@@ -795,8 +795,8 @@ async def get_allowed_vfolder_hosts_by_group(
             result_hosts = allowed_hosts | values
             allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    final_result: VFolderHostPermissionMap = (
-        allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy.get(
+        "allowed_vfolder_hosts", VFolderHostPermissionMap()
     )
     return final_result
 
@@ -854,8 +854,8 @@ async def get_allowed_vfolder_hosts_by_user(
             result_hosts = allowed_hosts | row.allowed_vfolder_hosts
             allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    final_result: VFolderHostPermissionMap = (
-        allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy.get(
+        "allowed_vfolder_hosts", VFolderHostPermissionMap()
     )
     return final_result
 
