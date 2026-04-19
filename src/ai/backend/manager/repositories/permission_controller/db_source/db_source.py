@@ -121,16 +121,12 @@ class PermissionDBSource:
         if not user_ids:
             return
         ase = AssociationScopesEntitiesRow
-        str_user_ids = [str(uid) for uid in user_ids]
-        uid_subq = sa.select(
-            sa.func.unnest(sa.cast(sa.literal(str_user_ids), sa.ARRAY(sa.String))).label("uid")
-        ).subquery("u")
         source = (
             sa.select(
                 ase.scope_type,
                 ase.scope_id,
                 sa.literal(EntityType.USER.value).label("entity_type"),
-                uid_subq.c.uid.label("entity_id"),
+                sa.cast(UserRoleRow.user_id, sa.String).label("entity_id"),
                 sa.literal(RelationType.AUTO.value).label("relation_type"),
             )
             .join(
@@ -139,7 +135,7 @@ class PermissionDBSource:
             )
             .where(
                 ase.entity_type == EntityType.ROLE,
-                sa.cast(UserRoleRow.user_id, sa.String) == uid_subq.c.uid,
+                UserRoleRow.user_id.in_(user_ids),
             )
         )
         await db_session.execute(
