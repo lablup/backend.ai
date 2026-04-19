@@ -116,6 +116,7 @@ class RBACElementTypeDTO(StrEnum):
     DEPLOYMENT_POLICY = "deployment:policy"
     DEPLOYMENT_REVISION = "deployment:revision"
     IMAGE_ALIAS = "image:alias"
+    ROLE_ASSIGNMENT = "role:assignment"
 
     # Entity-level scopes
     ARTIFACT_REVISION = "artifact_revision"

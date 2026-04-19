@@ -9,7 +9,17 @@ from ai.backend.manager.actions.action.rbac import (
     RBACActionName,
     RBACRequiredPermission,
 )
-from ai.backend.manager.data.permission.role import UserRoleRevocationData
+from ai.backend.manager.actions.action.rbac_role_invitation import (
+    AcceptRoleInvitationAction,
+    CancelRoleInvitationAction,
+    CreateRoleInvitationByEmailAction,
+    CreateRoleInvitationResult,
+    RejectRoleInvitationAction,
+)
+from ai.backend.manager.data.permission.role import (
+    UserRoleRevocationData,
+)
+from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
@@ -349,3 +359,31 @@ class PermissionControllerService:
             actions = entity_map.setdefault(perm.element_type, {})
             actions[action_cls.action_name()] = perm
         return GetPermissionMatrixActionResult(matrix=result)
+
+    async def create_role_invitation_by_email(
+        self, action: CreateRoleInvitationByEmailAction
+    ) -> CreateRoleInvitationResult:
+        """Create role invitations by resolving invitee emails."""
+        return await self._repository.create_invitation_by_email(action)
+
+    async def accept_role_invitation(
+        self, action: AcceptRoleInvitationAction
+    ) -> RoleInvitationData:
+        """Accept a PENDING invitation and assign the role.
+
+        State transition and role assignment happen atomically
+        in a single DB session within the repository.
+        """
+        return await self._repository.accept_invitation(action)
+
+    async def reject_role_invitation(
+        self, action: RejectRoleInvitationAction
+    ) -> RoleInvitationData:
+        """Reject a PENDING invitation."""
+        return await self._repository.reject_invitation(action)
+
+    async def cancel_role_invitation(
+        self, action: CancelRoleInvitationAction
+    ) -> RoleInvitationData:
+        """Cancel a PENDING invitation."""
+        return await self._repository.cancel_invitation(action)
