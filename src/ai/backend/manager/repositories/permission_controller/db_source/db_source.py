@@ -148,11 +148,12 @@ class PermissionDBSource:
         for row in rows:
             try:
                 key = uuid.UUID(row.entity_id)
-            except ValueError:
+            except (ValueError, TypeError):
                 log.warning(
-                    "Skipping scope entry with non-UUID entity_id: {}"
-                    " (entity_type: {}, expected: {})",
+                    "Skipping scope entry with non-UUID entity_id: {!r}"
+                    " (type: {}, entity_type: {}, expected: {})",
                     row.entity_id,
+                    type(row.entity_id).__name__,
                     row.entity_type,
                     EntityType.ROLE,
                 )
