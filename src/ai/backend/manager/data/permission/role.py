@@ -95,6 +95,14 @@ class ScopeChainPermissionCheckInput:
 
 
 @dataclass(frozen=True)
+class BatchPermissionCheckInput:
+    user_id: uuid.UUID
+    target_element_refs: list[RBACElementRef]
+    operation: OperationType
+    permission_entity_type: EntityType | None
+
+
+@dataclass(frozen=True)
 class UserRoleAssignmentInput:
     """
     Input to create a new user-role association.

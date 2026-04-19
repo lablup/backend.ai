@@ -28,6 +28,7 @@ from ai.backend.manager.data.permission.permission import (
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     AssignedUserListResult,
+    BatchPermissionCheckInput,
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
@@ -1036,6 +1037,147 @@ class PermissionDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalar(combined_query)
             return result or False
+
+    @staticmethod
+    def _build_batch_scope_chain_cte(
+        target_entity_type: EntityType,
+        entity_ids: list[str],
+    ) -> sa.CTE:
+        """Build a recursive CTE that walks the scope chain upward for multiple entities.
+
+        Like _build_scope_chain_cte but carries entity_id through the recursion
+        so each result row can be traced back to its originating entity.
+        """
+        ase = AssociationScopesEntitiesRow.__table__
+
+        # Base case: direct AUTO scope entries for all target entities.
+        scope_chain_base = sa.select(
+            ase.c.entity_id,
+            ase.c.scope_type,
+            ase.c.scope_id,
+        ).where(
+            sa.and_(
+                ase.c.entity_type == target_entity_type,
+                ase.c.entity_id.in_(entity_ids),
+                ase.c.relation_type == RelationType.AUTO,
+            )
+        )
+        scope_chain_cte = scope_chain_base.cte("batch_scope_chain", recursive=True)
+
+        # Recursive case: walk parent scopes upward, carrying entity_id.
+        parent = ase.alias("parent")
+        scope_chain_recursive = (
+            sa.select(
+                scope_chain_cte.c.entity_id,
+                parent.c.scope_type,
+                parent.c.scope_id,
+            )
+            .select_from(
+                parent.join(
+                    scope_chain_cte,
+                    sa.and_(
+                        parent.c.entity_type == scope_chain_cte.c.scope_type,
+                        parent.c.entity_id == scope_chain_cte.c.scope_id,
+                    ),
+                )
+            )
+            .where(
+                parent.c.relation_type == RelationType.AUTO,
+            )
+        )
+        return scope_chain_cte.union(scope_chain_recursive)
+
+    async def check_batch_permission_with_scope_chain(
+        self,
+        data: BatchPermissionCheckInput,
+    ) -> dict[RBACElementRef, bool]:
+        """Batch CTE-based permission check that traverses the scope chain.
+
+        Same two-layer semantics as check_permission_with_scope_chain but for
+        multiple entities of the same RBACElementType in a single query.
+        Returns a mapping from each input RBACElementRef to its permission result.
+        """
+        if not data.target_element_refs:
+            return {}
+
+        first_ref = data.target_element_refs[0]
+        association_entity_type = first_ref.element_type.to_entity_type()
+        target_entity_type = data.permission_entity_type or association_entity_type
+        target_scope_type = first_ref.element_type.to_scope_type()
+        entity_ids = [ref.element_id for ref in data.target_element_refs]
+
+        permissions = PermissionRow.__table__
+        user_roles = UserRoleRow.__table__
+        roles = RoleRow.__table__
+
+        # Layer 1: scope chain traversal — find entity_ids with permission via ancestors.
+        scope_chain_cte = self._build_batch_scope_chain_cte(association_entity_type, entity_ids)
+        scope_chain_query = (
+            sa.select(scope_chain_cte.c.entity_id)
+            .select_from(
+                scope_chain_cte.join(
+                    permissions,
+                    sa.and_(
+                        permissions.c.scope_type == scope_chain_cte.c.scope_type,
+                        permissions.c.scope_id == scope_chain_cte.c.scope_id,
+                    ),
+                )
+                .join(
+                    roles,
+                    roles.c.id == permissions.c.role_id,
+                )
+                .join(
+                    user_roles,
+                    user_roles.c.role_id == roles.c.id,
+                )
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == data.user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    permissions.c.entity_type == target_entity_type,
+                    permissions.c.operation == data.operation,
+                )
+            )
+        )
+
+        # Layer 2: self-scope direct match — permission scoped to the entity itself.
+        self_scope_query = (
+            sa.select(permissions.c.scope_id.label("entity_id"))
+            .select_from(
+                permissions.join(
+                    roles,
+                    roles.c.id == permissions.c.role_id,
+                ).join(
+                    user_roles,
+                    user_roles.c.role_id == roles.c.id,
+                )
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == data.user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    permissions.c.scope_type == target_scope_type,
+                    permissions.c.scope_id.in_(entity_ids),
+                    permissions.c.entity_type == target_entity_type,
+                    permissions.c.operation == data.operation,
+                )
+            )
+        )
+
+        combined_query = sa.union(scope_chain_query, self_scope_query)
+
+        result: dict[RBACElementRef, bool] = dict.fromkeys(data.target_element_refs, False)
+        ref_by_id = {ref.element_id: ref for ref in data.target_element_refs}
+
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            rows = await db_session.execute(combined_query)
+            for row in rows:
+                ref = ref_by_id.get(row.entity_id)
+                if ref is not None:
+                    result[ref] = True
+
+        return result
 
     async def bulk_assign_role(
         self, bulk_creator: BulkCreator[UserRoleRow]
