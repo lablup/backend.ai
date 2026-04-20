@@ -1330,3 +1330,87 @@ class TestCheckPermissionWithScopeChain:
             )
         )
         assert result is expected
+
+    # ── Cycle detection ──
+
+    @pytest.fixture
+    async def scope_chain_with_cycle(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: ScopeChainFixture,
+    ) -> None:
+        """Create a cycle: vfolder -> project -> domain -> project (back-edge)."""
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            # vfolder -> project (AUTO)
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=fixture_ids.project_id,
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=fixture_ids.vfolder_id,
+                    relation_type=RelationType.AUTO,
+                )
+            )
+            # project -> domain (AUTO)
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.DOMAIN,
+                    scope_id=fixture_ids.domain_id,
+                    entity_type=EntityType.PROJECT,
+                    entity_id=fixture_ids.project_id,
+                    relation_type=RelationType.AUTO,
+                )
+            )
+            # domain -> project (AUTO, creates cycle)
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=fixture_ids.project_id,
+                    entity_type=EntityType.DOMAIN,
+                    entity_id=fixture_ids.domain_id,
+                    relation_type=RelationType.AUTO,
+                )
+            )
+            await db_sess.flush()
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [PermissionEntry("domain", OperationType.READ)],
+                OperationType.READ,
+                True,
+                id="cycle-with-permission",
+            ),
+            pytest.param(
+                [],
+                OperationType.READ,
+                False,
+                id="cycle-without-permission",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_scope_chain_cycle_terminates(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        scope_chain_with_cycle: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """Cyclic scope chain terminates without infinite recursion (UNION deduplicates)."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
+        )
+        assert result is expected

@@ -635,3 +635,76 @@ class TestCheckBatchPermissionWithScopeChain:
             self._make_input(user_with_active_role, OperationType.READ),
         )
         assert not any(result.values())
+
+    # ── Cycle detection ──
+
+    @pytest.fixture
+    async def scope_chain_with_cycle(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: BatchFixture,
+    ) -> None:
+        """Create a cycle: vfolders -> project -> domain -> project (back-edge)."""
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            # vfolders -> project (AUTO)
+            for vfolder_id in fixture_ids.vfolder_ids:
+                db_sess.add(
+                    AssociationScopesEntitiesRow(
+                        scope_type=ScopeType.PROJECT,
+                        scope_id=fixture_ids.project_id,
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=vfolder_id,
+                        relation_type=RelationType.AUTO,
+                    )
+                )
+            # project -> domain (AUTO)
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.DOMAIN,
+                    scope_id=fixture_ids.domain_id,
+                    entity_type=EntityType.PROJECT,
+                    entity_id=fixture_ids.project_id,
+                    relation_type=RelationType.AUTO,
+                )
+            )
+            # domain -> project (AUTO, creates cycle)
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=fixture_ids.project_id,
+                    entity_type=EntityType.DOMAIN,
+                    entity_id=fixture_ids.domain_id,
+                    relation_type=RelationType.AUTO,
+                )
+            )
+            await db_sess.flush()
+
+    @pytest.mark.parametrize(
+        "permission_setup",
+        [pytest.param([PermissionEntry("domain", OperationType.READ)], id="domain-read")],
+        indirect=["permission_setup"],
+    )
+    async def test_scope_chain_cycle_terminates_with_permission(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: BatchFixture,
+        scope_chain_with_cycle: None,
+        permission_setup: None,
+    ) -> None:
+        """Cyclic scope chain terminates without infinite recursion; permission is found."""
+        result = await db_source.check_batch_permission_with_scope_chain(
+            self._make_input(user_with_active_role, OperationType.READ),
+        )
+        assert all(result.values())
+
+    async def test_scope_chain_cycle_terminates_without_permission(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: BatchFixture,
+        scope_chain_with_cycle: None,
+    ) -> None:
+        """Cyclic scope chain terminates without infinite recursion; no permission granted."""
+        result = await db_source.check_batch_permission_with_scope_chain(
+            self._make_input(user_with_active_role, OperationType.READ),
+        )
+        assert not any(result.values())
