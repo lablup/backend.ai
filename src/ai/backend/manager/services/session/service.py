@@ -80,8 +80,6 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
-    CheckAndTransitStatusBatchAction,
-    CheckAndTransitStatusBatchActionResult,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -1530,45 +1528,6 @@ class SessionService:
         return CheckAndTransitStatusActionResult(
             result=result, session_data=session_row.to_dataclass(owner=session_owner_data)
         )
-
-    async def check_and_transit_status_multi(
-        self, action: CheckAndTransitStatusBatchAction
-    ) -> CheckAndTransitStatusBatchActionResult:
-        user_id = action.user_id
-        user_role = action.user_role
-        session_ids = action.session_ids
-        accessible_session_ids: list[SessionId] = []
-
-        for sid in session_ids:
-            if user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
-                accessible_session_ids.append(sid)
-            else:
-                try:
-                    session_row = await self._session_repository.get_session_to_determine_status(
-                        sid
-                    )
-                    if session_row.user_uuid == user_id:
-                        accessible_session_ids.append(sid)
-                    else:
-                        log.warning(
-                            f"You are not allowed to transit others's sessions status, skip (s:{sid})"
-                        )
-                except Exception:
-                    log.warning(f"Session not found or access denied, skip (s:{sid})")
-
-        now = datetime.now(tzutc())
-        if accessible_session_ids:
-            session_rows = await self._agent_registry.session_lifecycle_mgr.transit_session_status(
-                accessible_session_ids, now
-            )
-            await self._agent_registry.session_lifecycle_mgr.deregister_status_updatable_session([
-                row.id for row, is_transited in session_rows if is_transited
-            ])
-            result = {row.id: row.status.name for row, _ in session_rows}
-        else:
-            result = {}
-
-        return CheckAndTransitStatusBatchActionResult(session_status_map=result)
 
     async def search(self, action: SearchSessionsAction) -> SearchSessionsActionResult:
         """Search sessions with querier pattern."""

@@ -1,0 +1,244 @@
+"""Tests for ``BatchActionProcessor`` filtering infrastructure (BA-5777).
+
+Verifies that the processor narrows ``entity_ids`` exactly to what each
+validator allowed — no more, no less — and that later validators only
+see IDs that survived earlier ones.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from typing import Any, override
+
+import pytest
+
+from ai.backend.common.data.permission.types import EntityType
+from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.manager.actions.action.batch import BaseBatchAction, BaseBatchActionResult
+from ai.backend.manager.actions.processor.batch import (
+    BatchActionProcessor,
+)
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.validator.batch import (
+    BatchActionValidator,
+    BatchValidationResult,
+    DeniedEntity,
+)
+
+
+@dataclass
+class _MockBatchAction(BaseBatchAction[str]):
+    @override
+    def typed_entity_ids(self) -> list[str]:
+        return list(self.entity_ids)
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.SESSION
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+@dataclass
+class _MockBatchActionResult(BaseBatchActionResult):
+    processed_ids: list[str] = field(default_factory=list)
+
+    @override
+    def entity_ids(self) -> list[str]:
+        return list(self.processed_ids)
+
+
+class _AllowSetValidator(BatchActionValidator):
+    """Approves any ID in ``allowed``; anything else visible is denied."""
+
+    _ALLOW_ALL_REASON = ""
+
+    def __init__(self, allowed: set[str], name: str = "allow-set") -> None:
+        self._allowed = set(allowed)
+        self._name = name
+
+    @classmethod
+    @override
+    def name(cls) -> str:
+        return "allow-set"
+
+    @override
+    async def validate(
+        self, action: BaseBatchAction[Any], meta: BaseActionTriggerMeta
+    ) -> BatchValidationResult:
+        current = list(action.entity_ids)
+        allowed = [eid for eid in current if eid in self._allowed]
+        denied = [
+            DeniedEntity(entity_id=eid, deny_reason="not in allow-set")
+            for eid in current
+            if eid not in self._allowed
+        ]
+        return BatchValidationResult(allowed_entity_ids=allowed, denied_entities=denied)
+
+
+class _RecordingValidator(BatchActionValidator):
+    """Captures the entity IDs each ``validate()`` call received."""
+
+    def __init__(self, allowed: set[str]) -> None:
+        self._allowed = set(allowed)
+        self.observed_batches: list[list[str]] = []
+
+    @classmethod
+    @override
+    def name(cls) -> str:
+        return "recording"
+
+    @override
+    async def validate(
+        self, action: BaseBatchAction[Any], meta: BaseActionTriggerMeta
+    ) -> BatchValidationResult:
+        current = list(action.entity_ids)
+        self.observed_batches.append(current)
+        allowed = [eid for eid in current if eid in self._allowed]
+        denied = [
+            DeniedEntity(entity_id=eid, deny_reason="blocked")
+            for eid in current
+            if eid not in self._allowed
+        ]
+        return BatchValidationResult(allowed_entity_ids=allowed, denied_entities=denied)
+
+
+def _echo_func() -> Callable[[_MockBatchAction], Awaitable[_MockBatchActionResult]]:
+    async def _run(action: _MockBatchAction) -> _MockBatchActionResult:
+        return _MockBatchActionResult(processed_ids=list(action.entity_ids))
+
+    return _run
+
+
+class TestBatchActionProcessorFiltering:
+    async def test_no_validators_passes_all_ids_through(self) -> None:
+        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+            func=_echo_func(),
+        )
+        action = _MockBatchAction(entity_ids=["a", "b", "c"])
+
+        outcome = await processor.wait_for_complete(action)
+
+        assert outcome.result.processed_ids == ["a", "b", "c"]
+        assert outcome.validator_decisions == []
+
+    async def test_validator_denies_subset_reports_denied_ids(self) -> None:
+        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+            func=_echo_func(),
+            validators=[_AllowSetValidator(allowed={"a", "c"})],
+        )
+        action = _MockBatchAction(entity_ids=["a", "b", "c"])
+
+        outcome = await processor.wait_for_complete(action)
+
+        assert outcome.result.processed_ids == ["a", "c"]
+        assert len(outcome.validator_decisions) == 1
+        decision = outcome.validator_decisions[0]
+        assert decision.validator_name == "allow-set"
+        assert decision.results.allowed_entity_ids == ["a", "c"]
+        assert decision.results.denied_entities == [
+            DeniedEntity(entity_id="b", deny_reason="not in allow-set"),
+        ]
+
+    async def test_validator_denies_all_still_runs_service_with_empty_batch(self) -> None:
+        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+            func=_echo_func(),
+            validators=[_AllowSetValidator(allowed=set())],
+        )
+        action = _MockBatchAction(entity_ids=["a", "b"])
+
+        outcome = await processor.wait_for_complete(action)
+
+        assert outcome.result.processed_ids == []
+        decision = outcome.validator_decisions[0]
+        assert decision.results.allowed_entity_ids == []
+        assert [d.entity_id for d in decision.results.denied_entities] == ["a", "b"]
+
+    async def test_later_validator_only_sees_surviving_ids(self) -> None:
+        first = _RecordingValidator(allowed={"a", "b"})
+        second = _RecordingValidator(allowed={"a"})
+        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+            func=_echo_func(),
+            validators=[first, second],
+        )
+        action = _MockBatchAction(entity_ids=["a", "b", "c"])
+
+        outcome = await processor.wait_for_complete(action)
+
+        # First validator sees the full batch; second only sees IDs that
+        # survived the first.
+        assert first.observed_batches == [["a", "b", "c"]]
+        assert second.observed_batches == [["a", "b"]]
+
+        assert outcome.result.processed_ids == ["a"]
+        assert [
+            (
+                d.validator_name,
+                d.results.allowed_entity_ids,
+                [de.entity_id for de in d.results.denied_entities],
+            )
+            for d in outcome.validator_decisions
+        ] == [
+            ("recording", ["a", "b"], ["c"]),
+            ("recording", ["a"], ["b"]),
+        ]
+
+    async def test_original_action_is_not_mutated(self) -> None:
+        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+            func=_echo_func(),
+            validators=[_AllowSetValidator(allowed={"a"})],
+        )
+        original = _MockBatchAction(entity_ids=["a", "b"])
+
+        outcome = await processor.wait_for_complete(original)
+
+        assert outcome.result.processed_ids == ["a"]
+        # `_process_action` uses from_filtered; it must not mutate the caller's action.
+        assert original.entity_ids == ["a", "b"]
+
+    async def test_pass_through_reuses_same_action_instance(self) -> None:
+        seen: list[_MockBatchAction] = []
+
+        async def _capture(action: _MockBatchAction) -> _MockBatchActionResult:
+            seen.append(action)
+            return _MockBatchActionResult(processed_ids=list(action.entity_ids))
+
+        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+            func=_capture,
+            validators=[_AllowSetValidator(allowed={"a", "b"})],
+        )
+        original = _MockBatchAction(entity_ids=["a", "b"])
+
+        await processor.wait_for_complete(original)
+
+        # No denials → no filtering copy was created.
+        assert seen[0] is original
+
+
+@pytest.mark.parametrize(
+    ("allowed", "batch", "expected_processed"),
+    [
+        ({"a", "b"}, ["a", "b"], ["a", "b"]),
+        ({"a"}, ["a", "b"], ["a"]),
+        (set(), ["a", "b"], []),
+    ],
+)
+async def test_single_validator_scenarios(
+    allowed: set[str],
+    batch: list[str],
+    expected_processed: list[str],
+) -> None:
+    processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+        func=_echo_func(),
+        validators=[_AllowSetValidator(allowed=allowed)],
+    )
+    action = _MockBatchAction(entity_ids=batch)
+
+    outcome = await processor.wait_for_complete(action)
+
+    assert outcome.result.processed_ids == expected_processed
