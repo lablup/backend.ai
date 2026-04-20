@@ -2,7 +2,7 @@ import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -441,17 +441,6 @@ class PermissionDBSource:
             result = await db_session.scalars(stmt)
             return list(result.all())
 
-    async def get_entity_mapped_scopes(
-        self, target_object_id: ObjectId
-    ) -> list[AssociationScopesEntitiesRow]:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            stmt = sa.select(AssociationScopesEntitiesRow).where(
-                AssociationScopesEntitiesRow.entity_id == target_object_id.entity_id,
-                AssociationScopesEntitiesRow.entity_type == target_object_id.entity_type.value,
-            )
-            result = await db_session.scalars(stmt)
-            return list(result.all())
-
     async def check_scope_permission_exist(
         self,
         user_id: uuid.UUID,
@@ -481,42 +470,6 @@ class PermissionDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalar(role_query)
             return result or False
-
-    def _make_query_statement_for_object_permission(
-        self,
-        user_id: uuid.UUID,
-        object_ids: Iterable[ObjectId],
-    ) -> sa.sql.Select[Any]:
-        object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
-        return (
-            sa.select(RoleRow)
-            .select_from(
-                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-                .join(PermissionRow, RoleRow.id == PermissionRow.role_id)
-                .join(
-                    AssociationScopesEntitiesRow,
-                    sa.and_(
-                        PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
-                        PermissionRow.scope_type == AssociationScopesEntitiesRow.scope_type,
-                    ),
-                )
-                .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
-            )
-            .where(
-                sa.and_(
-                    RoleRow.status == RoleStatus.ACTIVE,
-                    UserRoleRow.user_id == user_id,
-                    sa.or_(
-                        PermissionRow.scope_type == ScopeType.GLOBAL,
-                        AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
-                        ObjectPermissionRow.entity_id.in_(object_id_for_cond),
-                    ),
-                )
-            )
-            .options(
-                contains_eager(RoleRow.object_permission_rows),
-            )
-        )
 
     def _make_query_statement_for_object_permissions(
         self,
@@ -564,20 +517,6 @@ class PermissionDBSource:
                 contains_eager(RoleRow.object_permission_rows),
             )
         )
-
-    async def check_object_permission_exist(
-        self,
-        user_id: uuid.UUID,
-        object_id: ObjectId,
-        operation: OperationType,
-    ) -> bool:
-        role_query = self._make_query_statement_for_object_permissions(
-            user_id, [object_id], operation
-        )
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            result = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], result.unique().all())
-            return len(role_rows) > 0
 
     async def check_batch_object_permission_exist(
         self,
