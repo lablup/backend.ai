@@ -173,19 +173,35 @@ in one place.
 
 ```python
 class AppConfigDBSource:
+    _db: ExtendedAsyncSAEngine
+
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._db = db
+
     async def get(
-        self, sess: SASession, scope_type: AppConfigScopeType, scope_id: str
-    ) -> AppConfigRow | None: ...
+        self, scope_type: AppConfigScopeType, scope_id: str
+    ) -> AppConfigRow | None:
+        async with self._db.begin_readonly_session() as db_sess:
+            ...
 
     async def upsert(
         self,
-        sess: SASession,
         scope_type: AppConfigScopeType,
         scope_id: str,
         extra_config: Mapping[str, Any],
         user_app_config_defaults: Mapping[str, Any] | None = None,  # DOMAIN only
-    ) -> AppConfigRow: ...
+    ) -> AppConfigRow:
+        async with self._db.begin_session() as db_sess:
+            ...
 ```
+
+- `_db` is kept as a field on `AppConfigDBSource`.
+- Each public method opens its own transaction boundary via
+  `async with self._db.begin_readonly_session()` /
+  `begin_session()`.
+- Callers (repository / service) never pass a session in —
+  matches `repositories/CLAUDE.md`'s
+  "NEVER accept a DB session from the caller" rule.
 
 Permission checks and scope validation are performed in the service
 layer.
