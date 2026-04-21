@@ -9,12 +9,6 @@ Implemented-Version:
 
 # BEP-1052: Scoped App Config Redesign
 
-## Related Issues
-
-- JIRA: BA-5782
-
-# Domain Configuration API — GraphQL/REST Schema Proposal (v2)
-
 ## Overview
 
 A GraphQL / REST API schema proposal for the per-domain settings, global
