@@ -166,7 +166,7 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 
 1. ~~**I-18** Bitnami → OSS~~ **완료** (§5.1, 단 HA 버전은 Plan 2+)
 2. ~~**I-26** cuda_open slot name 오타~~ **완료** (§5.6.3, 커널에 GPU device attach 정상화)
-3. **I-28** Agent pod 재시작 후 첫 GPU 세션 hang — 9회 재현 테스트로 100% 일관된 실패 확인 (§5.6.5). 재시도로 우회 가능하나 근본 수정은 kernel runner REPL 초기화 재검토 필요
+3. ~~**I-28** Agent pod 재시작 후 첫 GPU 세션 hang~~ **완료** (§5.6.5, `containerPortRange`를 NodePort 범위 밖 [40000, 45000]로 이동)
 4. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그
 5. **I-22** keypair + container-registry fixture를 차트 hook으로 편입
 6. **I-25** Multi-node 세션 스케줄러 분산 확인 (sokovan `cluster_mode` 처리)
@@ -311,7 +311,7 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 |---|---|---|---|
 | I-5 | Fractional GPU / CUDA hook | 부분 | CUDA device 감지 + 커널 attach + 컨테이너 내부 `nvidia-smi`/`libcuda`/`cudaMalloc` end-to-end 검증(§5.6). fractional(cuda.shares) + CUDA hook 주입은 별도 |
 | I-9 | Accelerator plugin (CUDA/ROCm/TPU) 동작 확인 | 부분 | CUDA(cuda_open): end-to-end 검증(§5.6). ROCm/TPU는 하드웨어 부재 |
-| I-28 | Agent pod 재시작 후 첫 GPU 세션 hang | 재현 100%, 우회 가능 | §5.6.5 — 9회 retry 테스트로 확정. bai-krunner가 ep_poll에서 REPL 메시지를 읽지 않음. Timeout 상향으로도 해결 안 됨 |
+| I-28 | ~~Agent pod 재시작 후 첫 GPU 세션 hang~~ | **해결** | §5.6.5 — `containerPortRange`가 K8s NodePort와 충돌. [40000,45000]로 이동으로 fix |
 | I-6 확장 | GPU 포함 multi-node 세션 | 미검증 | CPU-only multi-node는 §5.3에서 완전 검증. GPU 분산 별도 |
 | I-8 | vfolder / storage-proxy 마운트 | 미구현 | Agent 차트에 vfolder hostPath 옵션 없음. `simple_plan.md §4.5` 호스트 pre-mount 방식 반영 필요 |
 | I-7 | AppProxy Coordinator / Worker chart | 부재 | Web UI 접근 및 service-port proxy 경로 미구성 |
@@ -345,7 +345,7 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 | I-16 노드 prerequisite 런북 | 미작성 (§5.4는 초안) |
 | I-17 업그레이드 / 롤백 가이드 | 미작성 |
 
-**즉시 다음에 손대기 좋은 3개**: **I-24-FIX** (krunner 빈 볼륨 sentinel — I-28 cold-start도 간접 완화), **I-22** (chart hook 편입으로 설치 자동화 완성), **I-7 또는 I-8** (AppProxy 또는 vfolder — 사용자 관점 기능 확장).
+**즉시 다음에 손대기 좋은 3개**: **I-22** (chart hook 편입으로 설치 자동화 완성), **I-24-FIX** (krunner 빈 볼륨 sentinel — 드물지만 반복 가능한 버그), **I-7 또는 I-8** (AppProxy 또는 vfolder — 사용자 관점 기능 확장).
 
 ---
 
@@ -439,46 +439,39 @@ GPU 노드에는 `kubectl label node <name> accelerator=gpu` 선행.
   ```
 - **commit 027d9e8d7** (`feat(BA-4944): per-container CUDA metric collection #9787`)에서 유입된 것으로 보임.
 
-#### 5.6.5 I-28 — Agent pod 재시작 후 첫 GPU 세션 reliable hang (미해결)
+#### 5.6.5 I-28 (FIXED) — `containerPortRange`가 K8s NodePort 범위와 충돌
 
-**재현성 100% 확정** (2026-04-21 15:40 ~ 15:53, 9회 시도):
+**증상**: Agent pod 재시작 후 *첫* GPU 세션은 항상 실패(세션이 `CREATING`→`TERMINATED`), 같은 agent 위 두 번째 세션부터 성공. 9회 재현 테스트 100% 일관.
 
-| Round | 상태 | 시간 | 결과 |
-|---|---|---|---|
-| R1 | Cold (pod 재시작 직후 첫 GPU 세션) | 89s | ❌ TERMINATED |
-| R2 | Warm (R1 실패 직후 재시도) | 15s | ✅ RUNNING |
-| R3 | Warm | 15s | ✅ RUNNING |
-| R4 | Cold (또 다른 pod 재시작 직후) | 90s | ❌ TERMINATED |
-| R5 | Warm | 16s | ✅ RUNNING |
-| R8 | Cold (`init-polling-timeout-sec=180`으로 상향 후) | 281s | ❌ TERMINATED |
-| R9 | Cold (진단용) | 진행 중 (process tree 확보) | ❌ TERMINATED |
+**범인**: Backend.AI agent 기본 `container.port-range = [30000, 32000]`이 Kubernetes **NodePort 기본 범위 (30000-32767)** 와 완전히 겹침.
 
-- **규칙**: Agent pod 재시작 후 *첫* GPU 세션은 항상 실패, 이후 동일 스펙 세션은 모두 성공.
-- **타임아웃 상향은 해결책이 아님**: R8에서 `init-polling-timeout-sec`을 60→180초로 늘려도 여전히 실패(281s 후 TERMINATED). 커널 runner가 시간이 지나도 ready 상태에 도달하지 못함.
+호스트 `charsyam-nvidia`에는 `kube-system/gpu-agent` NodePort 서비스가 `:30000`에 노출돼 있어서 kube-proxy가 iptables DNAT rule을 설치해둔 상태:
 
-**프로세스/네트워크 진단** (실패한 cold 세션 컨테이너 c8ee... 내부):
-- `bai-krunner` (pid 7): `S (sleeping)` on `ep_poll` — 이벤트 루프 waiting 중
-- 이미 기동된 child: `ipykernel_launcher` (pid 36), `dropbearmulti (sshd)` (pid 57), `ttyd` (pid 59) — 모두 정상
-- 컨테이너 내부 `/proc/net/tcp` LISTEN: `0.0.0.0:2000` (REPL in), `0.0.0.0:2001` (REPL out), `0.0.0.0:2200` (sshd), `0.0.0.0:7681` (ttyd) — 전부 바인딩됨
-- Docker port publish: `127.0.0.1:30000 → 2000`, `127.0.0.1:30001 → 2001`, `0.0.0.0:30002-30014 → service ports` — publish 정상
-- Agent pod(hostNetwork)에서 TCP connect: `127.0.0.1:30000`/`30001` 둘 다 OK
-- 그러나 Agent pod에서 REPL로 ZMQ `b"status"` 메시지를 직접 보내도 **10초 내 응답 없음** — kernel runner가 PULL socket에서 메시지를 읽지 않거나 PUSH socket으로 응답하지 않음
+```
+KUBE-EXT-FKJSPAFAUGLF36EM  /* kube-system/gpu-agent */  tcp dpt:30000
+```
 
-**정황상 결론**: TCP 경로는 이상 없음. `bai-krunner` 프로세스가 ep_poll에 갇혀 REPL 메시지를 processing 하지 못하는 상태. Warm 상태(이전 실패 세션이 한 번 있은 뒤)에서는 같은 코드가 정상 작동하므로, agent pod이 처음 container를 만들 때만 발생하는 초기화 race로 추정.
+Agent pod이 hostNetwork=true로 동작하고 port pool이 30000부터 시작하므로 첫 kernel container가 REPL(2000) → host 30000 매핑을 받음. Docker는 `docker-proxy`를 127.0.0.1:30000에 띄우지만, iptables DNAT rule이 먼저 match해서 loopback으로 들어오는 TCP를 gpu-agent service endpoint로 라우팅. 결과:
 
-**의심 후보**:
-1. ZMQ inproc/TCP 핸드셰이크가 nvidia-container-runtime 첫 OCI hook 실행과 경쟁 (hook이 libnvidia-cuda 로드하면서 일시적으로 프로세스를 blocking)
-2. `bai-krunner`가 REPL loop 진입 전 `asyncio.sleep(0)` 후 `main_loop`/`run_tasks` 생성(`src/ai/backend/kernel/base.py:269-280`)하는데, first-container에서 GPU 관련 import가 이 경로에서 추가 지연을 유발해 REPL polling이 시작되지 않음
-3. Docker userland-proxy의 첫 TCP forwarding setup이 agent에서 먼저 온 SYN을 소실
+- Agent의 ZMQ PUSH가 `tcp://127.0.0.1:30000`에 connect → 실제로는 gpu-agent FastAPI (`server: uvicorn`, paths `/gpus`, `/cdi/rebuild`, `/create_pod`)에 도달
+- TCP handshake는 성공하지만 ZMQ greeting frame이 HTTP 서버에 의해 거부됨 → `EVENT_HANDSHAKE_FAILED_NO_DETAIL` (errno 32, EPIPE)
+- ZMQ는 1초 간격으로 무한 재시도 → 메시지 영원히 전달되지 않음
+- Kernel runner(`bai-krunner`)는 정상이지만 `insock.recv_multipart()`에서 데이터를 받지 못해 agent가 타임아웃으로 포기
 
-**차트에 추가된 설정** (이번에 노출):
-- `agent.kernelLifecycles.initPollingAttempt` (기본 20)
-- `agent.kernelLifecycles.initPollingTimeoutSec` (기본 180)
-- `agent.kernelLifecycles.initTimeoutSec` (기본 120)
+두 번째 세션부터 성공하는 이유: 첫 실패 세션이 port 30000-30014를 여전히 점유한 상태에서 agent가 30015+ 를 배정 → NodePort 서비스와 안 겹침 → ZMQ handshake 정상.
 
-이 설정들은 일반 cold-start 지연에는 도움이 되지만 I-28 본건(`bai-krunner` 영구 hang)에는 효과 없음. 실용적 workaround는 "첫 세션 실패 시 재시도" 또는 agent pod 기동 직후 dummy warmup 세션 자동 생성.
+**증거** (warm `127.0.0.1:30015` vs cold `127.0.0.1:30000`에 ZMQ PUSH monitor 붙여 비교):
 
-**status**: 재현 가능, 영향 제한적(사용자는 재시도로 우회 가능), 근본 수정은 kernel runner의 REPL 초기화 경로 재검토 필요. 별도 이슈로 추후 추적.
+```
+cold (port 30000):  EVENT_CONNECTED → EVENT_HANDSHAKE_FAILED_NO_DETAIL → EVENT_DISCONNECTED → retry (infinite)
+warm (port 30015):  EVENT_CONNECTED → EVENT_HANDSHAKE_SUCCEEDED
+```
+
+**Fix**: `deploy/helm/backend-ai-agent/values.yaml`에서 기본값을 `containerPortRange: [40000, 45000]`으로 변경. NodePort 범위(30000-32767) 밖으로 이동.
+
+**검증**: 40000 범위 적용 후 agent pod 재시작 직후 첫 GPU 세션이 **12초 내 RUNNING 진입**, 첫 container의 REPL port가 40000. `nvidia-smi -L` 컨테이너 내부에서 정상 동작.
+
+**Docs를 위한 일반화**: Backend.AI agent를 K8s hostNetwork 모드로 배포할 때 `container.port-range`는 반드시 클러스터의 NodePort range(`kube-apiserver --service-node-port-range`)와 겹치지 않아야 함. 특히 호스트 자체가 K8s 노드라 kube-proxy가 iptables rule을 관리하면 loopback 바인딩도 가로채짐 — K8s에서는 `hostNetwork` Pod이 host netns의 iptables 체인을 모두 통과함.
 
 #### 5.6.6 검증된 end-to-end 단계
 

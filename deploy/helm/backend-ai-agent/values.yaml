@@ -22,7 +22,17 @@ agent:
   # RPC / agent-sock ports the DaemonSet opens on the host (hostNetwork=true).
   rpcPort: 6001
   agentSockPort: 6007
-  containerPortRange: [30000, 32000]
+  # Kernel container published-port pool. MUST NOT overlap with the
+  # cluster's NodePort range (kube-apiserver `--service-node-port-range`,
+  # default 30000-32767): any host port allocated inside that window may
+  # collide with a kube-proxy iptables DNAT rule for an existing NodePort
+  # Service, which silently reroutes the kernel's REPL TCP traffic to the
+  # Service endpoint instead of the intended docker-proxy. ZMQ then fails
+  # the greeting (EPIPE/HANDSHAKE_FAILED_NO_DETAIL) and the agent gives up
+  # after `kernel-lifecycles.init-polling-timeout-sec`. 40000-45000 is
+  # comfortably above the default NodePort window while leaving headroom
+  # for concurrent kernels.
+  containerPortRange: [40000, 45000]
 
   # Host-side directories the agent expects to read/write. All are mounted via
   # hostPath with DirectoryOrCreate where appropriate.
@@ -74,15 +84,13 @@ agent:
     disk: 8G
 
   # Kernel lifecycle polling timeouts (see `ai.backend.agent.config.unified
-  # .KernelLifecyclesConfig`). Defaults match the upstream 60s which is too
-  # tight for GPU kernels on the FIRST session after an agent pod restart:
-  # nvidia-container-runtime setup + first CUDA context init pushes
-  # `check_status` past the default window. Raising the window lets the
-  # retry loop absorb that one-shot cost.
+  # .KernelLifecyclesConfig`). Upstream defaults are 10 attempts / 60 s window.
+  # Exposed here so operators can tune for images with slow boot paths
+  # (large CUDA runtimes, heavy bootstrap scripts, etc.).
   kernelLifecycles:
-    initPollingAttempt: 20
-    initPollingTimeoutSec: 180.0
-    initTimeoutSec: 120.0
+    initPollingAttempt: 10
+    initPollingTimeoutSec: 60.0
+    initTimeoutSec: 60.0
 
   # Extra tolerations/nodeSelector/affinity to limit where the agent runs.
   nodeSelector: {}
