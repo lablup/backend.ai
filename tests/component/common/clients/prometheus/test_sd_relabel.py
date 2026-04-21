@@ -98,7 +98,7 @@ async def mock_sd_server(mock_metrics_server: int) -> AsyncIterator[int]:
 
 @pytest.fixture
 def prometheus_config_yaml(mock_sd_server: int) -> str:
-    """Prometheus config YAML with relabel_configs for model-service targets."""
+    """Prometheus config YAML with relabel_configs for loopback address rewrite."""
     return textwrap.dedent(f"""\
         global:
           scrape_interval: 2s
@@ -110,11 +110,10 @@ def prometheus_config_yaml(mock_sd_server: int) -> str:
               - url: 'http://host.docker.internal:{mock_sd_server}/metrics/service_discovery'
                 refresh_interval: '2s'
             relabel_configs:
-              - source_labels: [service_group, __address__]
-                separator: ;
-                regex: model-services;[^:]+:(.+)
+              - source_labels: [__address__]
+                regex: '127\\.0\\.0\\.1(.*)'
                 target_label: __address__
-                replacement: host.docker.internal:${{1}}
+                replacement: 'host.docker.internal${{1}}'
     """)
 
 

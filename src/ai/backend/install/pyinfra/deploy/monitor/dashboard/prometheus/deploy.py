@@ -383,7 +383,6 @@ class PrometheusDeploy(BaseDockerComposeDeploy):
             # Jinja2 context (resolve host.docker.internal to actual host IP)
             http_sd_host=self.resolve_host(self.config.http_sd_host),
             http_sd_port=self.config.http_sd_port,
-            kernel_metrics_host=self.resolve_host(self.config.kernel_metrics_host),
             etcd_host=self.resolve_host(self.config.etcd_host),
             etcd_port=self.config.etcd_port,
             redis_exporter_host=self.resolve_host(self.config.redis_exporter_host),
