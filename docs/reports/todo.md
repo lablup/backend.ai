@@ -166,8 +166,8 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 
 1. ~~**I-18** Bitnami → OSS~~ **완료** (§5.1, 단 HA 버전은 Plan 2+)
 2. ~~**I-26** cuda_open slot name 오타~~ **완료** (§5.6.3, 커널에 GPU device attach 정상화)
-3. ~~**I-28** CUDA 이미지 커널 runner init 타임아웃~~ **재분류: cold-start 타이밍 이슈로 확인** (§5.6.5). GPU 세션 end-to-end 검증됨 (§5.6.6)
-4. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그. I-28 완화 효과 기대
+3. **I-28** Agent pod 재시작 후 첫 GPU 세션 hang — 9회 재현 테스트로 100% 일관된 실패 확인 (§5.6.5). 재시도로 우회 가능하나 근본 수정은 kernel runner REPL 초기화 재검토 필요
+4. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그
 5. **I-22** keypair + container-registry fixture를 차트 hook으로 편입
 6. **I-25** Multi-node 세션 스케줄러 분산 확인 (sokovan `cluster_mode` 처리)
 7. **I-1** Manager 노드 pinning + Swarm manager 사전 조인 절차 문서화
@@ -311,7 +311,7 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 |---|---|---|---|
 | I-5 | Fractional GPU / CUDA hook | 부분 | CUDA device 감지 + 커널 attach + 컨테이너 내부 `nvidia-smi`/`libcuda`/`cudaMalloc` end-to-end 검증(§5.6). fractional(cuda.shares) + CUDA hook 주입은 별도 |
 | I-9 | Accelerator plugin (CUDA/ROCm/TPU) 동작 확인 | 부분 | CUDA(cuda_open): end-to-end 검증(§5.6). ROCm/TPU는 하드웨어 부재 |
-| I-28 | 초기 cold-start runner init 타임아웃 | 완화 필요 | §5.6.5 — 타이밍 이슈. I-24-FIX 수정 + timeout 설정 노출로 해결 기대 |
+| I-28 | Agent pod 재시작 후 첫 GPU 세션 hang | 재현 100%, 우회 가능 | §5.6.5 — 9회 retry 테스트로 확정. bai-krunner가 ep_poll에서 REPL 메시지를 읽지 않음. Timeout 상향으로도 해결 안 됨 |
 | I-6 확장 | GPU 포함 multi-node 세션 | 미검증 | CPU-only multi-node는 §5.3에서 완전 검증. GPU 분산 별도 |
 | I-8 | vfolder / storage-proxy 마운트 | 미구현 | Agent 차트에 vfolder hostPath 옵션 없음. `simple_plan.md §4.5` 호스트 pre-mount 방식 반영 필요 |
 | I-7 | AppProxy Coordinator / Worker chart | 부재 | Web UI 접근 및 service-port proxy 경로 미구성 |
@@ -439,22 +439,46 @@ GPU 노드에는 `kubectl label node <name> accelerator=gpu` 선행.
   ```
 - **commit 027d9e8d7** (`feat(BA-4944): per-container CUDA metric collection #9787`)에서 유입된 것으로 보임.
 
-#### 5.6.5 I-28 (RECLASSIFIED) — 초기 cold-start 구간의 runner init 타임아웃
+#### 5.6.5 I-28 — Agent pod 재시작 후 첫 GPU 세션 reliable hang (미해결)
 
-- 최초 2회 시도(05:53 / 06:05)에서 세션이 `waiting for kernel service initialization` → 70초 타임아웃 → `ContainerStartupFailedError` → `TERMINATED`로 빠짐. 초기엔 CUDA 이미지 특정 버그로 의심했으나, 이후 판별 실험에서 CUDA image × GPU 조합만의 결정적 버그는 아닌 것으로 확인.
-- **판별 실험** (2026-04-21 15:26~15:30):
-  | 실험 | 결과 |
-  |---|---|
-  | 비-CUDA 이미지 (`python:3.13-ubuntu24.04-amd64`) + GPU 없음 | ✅ RUNNING |
-  | CUDA 이미지 + GPU 없음 (`cuda.device=0`) | ✅ RUNNING |
-  | CUDA 이미지 + GPU (`cuda.device=1`) — 3번째 시도 | ✅ RUNNING (2초 내 서비스 전부 ready) |
-- **재현 조건**: 재현되는 경우는 "agent pod이 막 재시작된 직후, 해당 distro의 krunner 볼륨 첫 추출 중"으로 보임. 따뜻해진 상태에서는 같은 세션 스펙이 2초 내 완료.
-- **영향**: 세션 생성이 체감 2회 정도 retry를 요구하는 상황. 차단 문제는 아님.
-- **개선안 (차후)**:
-  - `[agent.agent.waiting_kernel_service_timeout]` 설정 노출 (현재 하드코딩 70s) + 기본값 상향
-  - 또는 agent 기동 시 주요 distro의 krunner 볼륨을 pre-warm
-  - I-24-FIX (빈 볼륨 sentinel 체크)가 간접적으로 이 구간을 안정화할 가능성 있음
-- **status**: 차단 요소 아님. I-24-FIX 구현 후 재검증.
+**재현성 100% 확정** (2026-04-21 15:40 ~ 15:53, 9회 시도):
+
+| Round | 상태 | 시간 | 결과 |
+|---|---|---|---|
+| R1 | Cold (pod 재시작 직후 첫 GPU 세션) | 89s | ❌ TERMINATED |
+| R2 | Warm (R1 실패 직후 재시도) | 15s | ✅ RUNNING |
+| R3 | Warm | 15s | ✅ RUNNING |
+| R4 | Cold (또 다른 pod 재시작 직후) | 90s | ❌ TERMINATED |
+| R5 | Warm | 16s | ✅ RUNNING |
+| R8 | Cold (`init-polling-timeout-sec=180`으로 상향 후) | 281s | ❌ TERMINATED |
+| R9 | Cold (진단용) | 진행 중 (process tree 확보) | ❌ TERMINATED |
+
+- **규칙**: Agent pod 재시작 후 *첫* GPU 세션은 항상 실패, 이후 동일 스펙 세션은 모두 성공.
+- **타임아웃 상향은 해결책이 아님**: R8에서 `init-polling-timeout-sec`을 60→180초로 늘려도 여전히 실패(281s 후 TERMINATED). 커널 runner가 시간이 지나도 ready 상태에 도달하지 못함.
+
+**프로세스/네트워크 진단** (실패한 cold 세션 컨테이너 c8ee... 내부):
+- `bai-krunner` (pid 7): `S (sleeping)` on `ep_poll` — 이벤트 루프 waiting 중
+- 이미 기동된 child: `ipykernel_launcher` (pid 36), `dropbearmulti (sshd)` (pid 57), `ttyd` (pid 59) — 모두 정상
+- 컨테이너 내부 `/proc/net/tcp` LISTEN: `0.0.0.0:2000` (REPL in), `0.0.0.0:2001` (REPL out), `0.0.0.0:2200` (sshd), `0.0.0.0:7681` (ttyd) — 전부 바인딩됨
+- Docker port publish: `127.0.0.1:30000 → 2000`, `127.0.0.1:30001 → 2001`, `0.0.0.0:30002-30014 → service ports` — publish 정상
+- Agent pod(hostNetwork)에서 TCP connect: `127.0.0.1:30000`/`30001` 둘 다 OK
+- 그러나 Agent pod에서 REPL로 ZMQ `b"status"` 메시지를 직접 보내도 **10초 내 응답 없음** — kernel runner가 PULL socket에서 메시지를 읽지 않거나 PUSH socket으로 응답하지 않음
+
+**정황상 결론**: TCP 경로는 이상 없음. `bai-krunner` 프로세스가 ep_poll에 갇혀 REPL 메시지를 processing 하지 못하는 상태. Warm 상태(이전 실패 세션이 한 번 있은 뒤)에서는 같은 코드가 정상 작동하므로, agent pod이 처음 container를 만들 때만 발생하는 초기화 race로 추정.
+
+**의심 후보**:
+1. ZMQ inproc/TCP 핸드셰이크가 nvidia-container-runtime 첫 OCI hook 실행과 경쟁 (hook이 libnvidia-cuda 로드하면서 일시적으로 프로세스를 blocking)
+2. `bai-krunner`가 REPL loop 진입 전 `asyncio.sleep(0)` 후 `main_loop`/`run_tasks` 생성(`src/ai/backend/kernel/base.py:269-280`)하는데, first-container에서 GPU 관련 import가 이 경로에서 추가 지연을 유발해 REPL polling이 시작되지 않음
+3. Docker userland-proxy의 첫 TCP forwarding setup이 agent에서 먼저 온 SYN을 소실
+
+**차트에 추가된 설정** (이번에 노출):
+- `agent.kernelLifecycles.initPollingAttempt` (기본 20)
+- `agent.kernelLifecycles.initPollingTimeoutSec` (기본 180)
+- `agent.kernelLifecycles.initTimeoutSec` (기본 120)
+
+이 설정들은 일반 cold-start 지연에는 도움이 되지만 I-28 본건(`bai-krunner` 영구 hang)에는 효과 없음. 실용적 workaround는 "첫 세션 실패 시 재시도" 또는 agent pod 기동 직후 dummy warmup 세션 자동 생성.
+
+**status**: 재현 가능, 영향 제한적(사용자는 재시도로 우회 가능), 근본 수정은 kernel runner의 REPL 초기화 경로 재검토 필요. 별도 이슈로 추후 추적.
 
 #### 5.6.6 검증된 end-to-end 단계
 

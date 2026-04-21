@@ -37,6 +37,11 @@ data:
     reserved-disk = {{ .Values.agent.reserved.disk | quote }}
     allocation-mode = "auto-split"
 
+    [kernel-lifecycles]
+    init-polling-attempt = {{ .Values.agent.kernelLifecycles.initPollingAttempt }}
+    init-polling-timeout-sec = {{ .Values.agent.kernelLifecycles.initPollingTimeoutSec }}
+    init-timeout-sec = {{ .Values.agent.kernelLifecycles.initTimeoutSec }}
+
     [logging]
     level = "INFO"
     drivers = ["console"]

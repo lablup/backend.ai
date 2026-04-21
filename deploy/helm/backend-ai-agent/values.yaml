@@ -73,6 +73,17 @@ agent:
     memory: 1G
     disk: 8G
 
+  # Kernel lifecycle polling timeouts (see `ai.backend.agent.config.unified
+  # .KernelLifecyclesConfig`). Defaults match the upstream 60s which is too
+  # tight for GPU kernels on the FIRST session after an agent pod restart:
+  # nvidia-container-runtime setup + first CUDA context init pushes
+  # `check_status` past the default window. Raising the window lets the
+  # retry loop absorb that one-shot cost.
+  kernelLifecycles:
+    initPollingAttempt: 20
+    initPollingTimeoutSec: 180.0
+    initTimeoutSec: 120.0
+
   # Extra tolerations/nodeSelector/affinity to limit where the agent runs.
   nodeSelector: {}
   tolerations:
