@@ -1,5 +1,4 @@
 import logging
-from typing import Final
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import MetricPreset
@@ -8,9 +7,15 @@ from ai.backend.common.clients.prometheus.types import ValueType as PrometheusVa
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
+    CONTAINER_UTILIZATION_METRIC_NAME,
     UTILIZATION_METRIC_INTERVAL,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.metric.types import (
+    DIFF_METRICS,
+    RATE_METRICS,
+    UtilizationMetricType,
+)
 
 from .actions.container import (
     ContainerMetricAction,
@@ -19,18 +24,13 @@ from .actions.container import (
     ContainerMetricMetadataActionResult,
 )
 from .types import (
-    DIFF_METRICS,
-    RATE_METRICS,
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
     ContainerMetricResult,
     MetricResultValue,
-    UtilizationMetricType,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-CONTAINER_UTILIZATION_METRIC_NAME: Final[str] = "backendai_container_utilization"
 
 
 class ContainerUtilizationMetricService:

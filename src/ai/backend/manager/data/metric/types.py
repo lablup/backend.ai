@@ -3,28 +3,33 @@ from __future__ import annotations
 import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Self
+from typing import Final, Self
 
+from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
 from ai.backend.common.types import KernelId
 
+__all__ = [
+    "DIFF_METRICS",
+    "KernelLiveStatBatchResult",
+    "KernelLiveStatEntry",
+    "MetricValue",
+    "RATE_METRICS",
+    "UtilizationMetricType",
+    "ValueType",
+]
 
-class ValueType(enum.StrEnum):
-    """
-    Specifies the type of a metric value.
-    """
 
-    CURRENT = "current"
-    CAPACITY = "capacity"
-    PCT = "pct"
+class UtilizationMetricType(enum.StrEnum):
+    """Classification for how to wrap a PromQL query."""
+
+    GAUGE = "gauge"
+    RATE = "rate"
+    DIFF = "diff"
 
 
-@dataclass(frozen=True)
-class KernelMetricValue:
-    """A single value for one metric of one kernel."""
-
-    metric_name: str
-    value_type: ValueType
-    value: str
+# Metric-name -> UtilizationMetricType classification rules.
+DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
+RATE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
 
 
 @dataclass(frozen=True)
@@ -35,7 +40,7 @@ class KernelLiveStatEntry:
     """
 
     kernel_id: KernelId
-    values: list[KernelMetricValue]
+    values: list[MetricValue]
 
 
 @dataclass(frozen=True)
@@ -52,7 +57,7 @@ class KernelLiveStatBatchResult:
     def from_metric_values(
         cls,
         kernel_ids: Sequence[KernelId],
-        values_by_kernel: Mapping[KernelId, Sequence[KernelMetricValue]],
+        values_by_kernel: Mapping[KernelId, Sequence[MetricValue]],
     ) -> Self:
         return cls(
             entries={

@@ -1,6 +1,7 @@
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -299,7 +300,11 @@ def create_services(args: ServiceArgs) -> Services:
         utilization_metric=UtilizationMetricService(
             args.prometheus_client,
             args.config_provider.config.metric.timewindow,
-            repositories.metric.repository,
+            MetricRepository(
+                args.db,
+                prometheus_client=args.prometheus_client,
+                timewindow=args.config_provider.config.metric.timewindow,
+            ),
         ),
         model_serving=ModelServingService(
             agent_registry=args.agent_registry,

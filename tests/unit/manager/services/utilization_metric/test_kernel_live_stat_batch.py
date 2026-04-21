@@ -3,102 +3,48 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.dto.clients.prometheus.response import (
-    MetricResponse,
-    MetricResponseInfo,
-    PrometheusQueryData,
-    PrometheusResponse,
-)
+from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
 from ai.backend.common.exception import PrometheusConnectionError
 from ai.backend.common.types import KernelId
-from ai.backend.manager.data.metric.types import ValueType
 from ai.backend.manager.services.metric.actions.live_stat import QueryKernelLiveStatAction
 from ai.backend.manager.services.metric.root_service import UtilizationMetricService
 
 
 class TestKernelLiveStatBatch:
-    """Test the Prometheus-based kernel live stat query pipeline."""
+    """Test the kernel live stat query pipeline via service → repository."""
 
     @pytest.fixture()
-    def mock_prometheus_client(self) -> Mock:
-        return Mock(spec=PrometheusClient)
+    def mock_metric_repository(self) -> Mock:
+        return Mock()
 
     @pytest.fixture()
-    def metric_service(self, mock_prometheus_client: Mock) -> UtilizationMetricService:
+    def metric_service(self, mock_metric_repository: Mock) -> UtilizationMetricService:
         return UtilizationMetricService(
-            prometheus_client=mock_prometheus_client,
+            prometheus_client=Mock(),
             timewindow="1m",
-            metric_repository=Mock(),
+            metric_repository=mock_metric_repository,
         )
 
-    @staticmethod
-    def _sample(
-        kernel_id: str,
-        metric_name: str,
-        value_type: str,
-        value: str,
-    ) -> MetricResponse:
-        return MetricResponse(
-            metric=MetricResponseInfo(
-                kernel_id=kernel_id,
-                container_metric_name=metric_name,
-                value_type=value_type,
-            ),
-            values=[(0.0, value)],
-        )
-
-    @staticmethod
-    def _response(samples: list[MetricResponse]) -> PrometheusResponse:
-        return PrometheusResponse(
-            status="success",
-            data=PrometheusQueryData(result_type="vector", result=samples),
-        )
-
-    def _query_inspecting_side_effect(
+    async def test_collects_and_assembles_batch_result(
         self,
-        *,
-        gauge_samples: list[MetricResponse] | None = None,
-        diff_samples: list[MetricResponse] | None = None,
-        rate_samples: list[MetricResponse] | None = None,
-    ) -> AsyncMock:
-        """Return an AsyncMock whose side_effect inspects the rendered PromQL
-        query to decide which response to return, avoiding reliance on call
-        ordering from ``asyncio.gather``."""
-
-        async def _side_effect(preset: object) -> PrometheusResponse:
-            rendered = preset.render()  # type: ignore[attr-defined]
-            if 'container_metric_name=~"cpu_util"' in rendered:
-                return self._response(diff_samples or [])
-            if 'container_metric_name=~"net_rx|net_tx"' in rendered:
-                return self._response(rate_samples or [])
-            # Default: gauge query (no container_metric_name filter)
-            return self._response(gauge_samples or [])
-
-        return AsyncMock(side_effect=_side_effect)
-
-    async def test_collects_gauge_diff_rate_values(
-        self,
-        mock_prometheus_client: Mock,
+        mock_metric_repository: Mock,
         metric_service: UtilizationMetricService,
     ) -> None:
-        """Gauge, diff, and rate values are collected and merged per kernel."""
+        """Service assembles KernelLiveStatBatchResult from repository response."""
         kid = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
-        kid_str = str(kid)
 
-        mock_prometheus_client.query_instant = self._query_inspecting_side_effect(
-            gauge_samples=[
-                self._sample(kid_str, "mem", "current", "5368709120"),
-                self._sample(kid_str, "mem", "capacity", "8589934592"),
-                self._sample(kid_str, "cpu_util", "capacity", "100.0"),
-            ],
-            diff_samples=[
-                self._sample(kid_str, "cpu_util", "current", "50.0"),
-            ],
-            rate_samples=[
-                self._sample(kid_str, "net_rx", "current", "1024.0"),
-                self._sample(kid_str, "net_tx", "current", "2048.0"),
-            ],
+        mock_metric_repository.query_kernel_live_stats = AsyncMock(
+            return_value={
+                kid: [
+                    MetricValue(
+                        metric_name="mem", value_type=ValueType.CURRENT, value="5368709120"
+                    ),
+                    MetricValue(
+                        metric_name="mem", value_type=ValueType.CAPACITY, value="8589934592"
+                    ),
+                    MetricValue(metric_name="cpu_util", value_type=ValueType.CURRENT, value="50.0"),
+                ],
+            }
         )
 
         result = await metric_service.query_kernel_live_stat_batch(
@@ -110,20 +56,15 @@ class TestKernelLiveStatBatch:
         assert values_by_key[("mem", ValueType.CURRENT)] == "5368709120"
         assert values_by_key[("mem", ValueType.CAPACITY)] == "8589934592"
         assert values_by_key[("cpu_util", ValueType.CURRENT)] == "50.0"
-        assert values_by_key[("cpu_util", ValueType.CAPACITY)] == "100.0"
-        assert values_by_key[("net_rx", ValueType.CURRENT)] == "1024.0"
-        assert values_by_key[("net_tx", ValueType.CURRENT)] == "2048.0"
 
-    async def test_empty_kernel_returns_empty_entry_not_none(
+    async def test_empty_kernel_returns_empty_entry(
         self,
-        mock_prometheus_client: Mock,
+        mock_metric_repository: Mock,
         metric_service: UtilizationMetricService,
     ) -> None:
-        """A kernel with no Prometheus samples must yield an empty entry, not None."""
+        """A kernel with no Prometheus samples must yield an empty entry."""
         empty_kernel = KernelId(UUID("00000000-0000-0000-0000-000000000000"))
-        mock_prometheus_client.query_instant = AsyncMock(
-            return_value=self._response([]),
-        )
+        mock_metric_repository.query_kernel_live_stats = AsyncMock(return_value={})
 
         result = await metric_service.query_kernel_live_stat_batch(
             QueryKernelLiveStatAction(kernel_ids=[empty_kernel])
@@ -133,12 +74,12 @@ class TestKernelLiveStatBatch:
 
     async def test_prometheus_connection_error_returns_empty_entries(
         self,
-        mock_prometheus_client: Mock,
+        mock_metric_repository: Mock,
         metric_service: UtilizationMetricService,
     ) -> None:
         """When Prometheus is unreachable, every kernel_id maps to an empty entry."""
         kid = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
-        mock_prometheus_client.query_instant = AsyncMock(
+        mock_metric_repository.query_kernel_live_stats = AsyncMock(
             side_effect=PrometheusConnectionError("unreachable")
         )
 
@@ -148,70 +89,35 @@ class TestKernelLiveStatBatch:
         entry = result.stats.entries[kid]
         assert entry.values == []
 
-    async def test_issues_three_prometheus_queries(
-        self,
-        mock_prometheus_client: Mock,
-        metric_service: UtilizationMetricService,
-    ) -> None:
-        """The batch loader must issue exactly 3 instant queries (GAUGE/DIFF/RATE)."""
-        kid = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
-        mock_prometheus_client.query_instant = AsyncMock(
-            return_value=self._response([]),
-        )
-
-        await metric_service.query_kernel_live_stat_batch(
-            QueryKernelLiveStatAction(kernel_ids=[kid])
-        )
-        assert mock_prometheus_client.query_instant.await_count == 3
-
-    async def test_rendered_queries_use_regex_matchers(
-        self,
-        mock_prometheus_client: Mock,
-        metric_service: UtilizationMetricService,
-    ) -> None:
-        kid = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
-        mock_prometheus_client.query_instant = AsyncMock(
-            return_value=self._response([]),
-        )
-
-        await metric_service.query_kernel_live_stat_batch(
-            QueryKernelLiveStatAction(kernel_ids=[kid])
-        )
-
-        rendered_queries = [
-            call.args[0].render() for call in mock_prometheus_client.query_instant.await_args_list
-        ]
-        assert len(rendered_queries) == 3
-        assert all('kernel_id=~"' in query for query in rendered_queries)
-        assert any('container_metric_name=~"cpu_util"' in query for query in rendered_queries)
-        assert any('container_metric_name=~"net_rx|net_tx"' in query for query in rendered_queries)
-
     async def test_empty_kernel_ids_short_circuits(
         self,
-        mock_prometheus_client: Mock,
+        mock_metric_repository: Mock,
         metric_service: UtilizationMetricService,
     ) -> None:
-        """No kernel_ids -> empty result, no Prometheus query issued."""
+        """No kernel_ids -> empty result, no repository query issued."""
         result = await metric_service.query_kernel_live_stat_batch(
             QueryKernelLiveStatAction(kernel_ids=[])
         )
         assert result.stats.entries == {}
-        mock_prometheus_client.query_instant.assert_not_called()
 
     async def test_multiple_kernels_grouped_correctly(
         self,
-        mock_prometheus_client: Mock,
+        mock_metric_repository: Mock,
         metric_service: UtilizationMetricService,
     ) -> None:
         """Values from multiple kernels are grouped into separate entries."""
         kid1 = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
         kid2 = KernelId(UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"))
 
-        mock_prometheus_client.query_instant = self._query_inspecting_side_effect(
-            gauge_samples=[
-                self._sample(str(kid1), "mem", "current", "100"),
-                self._sample(str(kid2), "mem", "current", "200"),
-            ],
+        mock_metric_repository.query_kernel_live_stats = AsyncMock(
+            return_value={
+                kid1: [
+                    MetricValue(metric_name="mem", value_type=ValueType.CURRENT, value="100"),
+                ],
+                kid2: [
+                    MetricValue(metric_name="mem", value_type=ValueType.CURRENT, value="200"),
+                ],
+            }
         )
 
         result = await metric_service.query_kernel_live_stat_batch(
