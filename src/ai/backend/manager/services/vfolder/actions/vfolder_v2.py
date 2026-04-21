@@ -4,13 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    RBACElementType,
-    ScopeType,
-)
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.action.scope import BaseScopeAction
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.vfolder.actions.base import (

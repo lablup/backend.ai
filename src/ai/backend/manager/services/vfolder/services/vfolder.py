@@ -1647,15 +1647,16 @@ class VFolderService:
     async def purge_v2(self, action: PurgeVFolderV2Action) -> PurgeVFolderV2ActionResult:
         """Permanently purge a vfolder by ID. RBAC enforced at processor level."""
         me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
 
         # Host permission check — resolved from current user context
-        if me is not None:
-            await self._vfolder_repository.ensure_host_permission_allowed_by_user(
-                vfolder_data.host,
-                permission=VFolderHostPermission.DELETE,
-                user_uuid=me.user_id,
-            )
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            vfolder_data.host,
+            permission=VFolderHostPermission.DELETE,
+            user_uuid=me.user_id,
+        )
 
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_id])
         await self._remove_vfolder_from_storage(vfolder_data)
