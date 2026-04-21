@@ -94,12 +94,10 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.types import (
     ProjectVFolderSearchScope,
     UserVFolderSearchScope,
 )
-from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
@@ -132,9 +130,6 @@ from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     PurgeVFolderV2Action,
-)
-from ai.backend.manager.services.vfolder.actions.vfolder_v2_rbac import (
-    DeleteVFolderV2RBACAction,
 )
 
 from .base import BaseAdapter
@@ -393,9 +388,8 @@ class VFolderAdapter(BaseAdapter):
 
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash). RBAC enforced."""
-        updater = Updater(spec=VFolderTrashUpdaterSpec(), pk_value=vfolder_id)
-        action = DeleteVFolderV2RBACAction(vfolder_id=vfolder_id, updater=updater)
-        await self._processors.vfolder.delete_v2_rbac.wait_for_complete(action)
+        action = DeleteVFolderV2Action(vfolder_id=vfolder_id)
+        await self._processors.vfolder.delete_v2.wait_for_complete(action)
         return DeleteVFolderPayload(id=vfolder_id)
 
     async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
@@ -497,11 +491,8 @@ class VFolderAdapter(BaseAdapter):
 
     async def bulk_delete(self, input: BulkDeleteVFoldersInput) -> BulkDeleteVFoldersPayload:
         """Soft-delete multiple vfolders."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
         for vfolder_id in input.ids:
-            action = DeleteVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
+            action = DeleteVFolderV2Action(vfolder_id=vfolder_id)
             await self._processors.vfolder.delete_v2.wait_for_complete(action)
         return BulkDeleteVFoldersPayload(deleted_count=len(input.ids))
 

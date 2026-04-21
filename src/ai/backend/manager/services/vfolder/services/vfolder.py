@@ -16,8 +16,10 @@ from sqlalchemy import exc as sa_exc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -161,10 +163,6 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2ActionResult,
     PurgeVFolderV2Action,
     PurgeVFolderV2ActionResult,
-)
-from ai.backend.manager.services.vfolder.actions.vfolder_v2_rbac import (
-    DeleteVFolderV2RBACAction,
-    DeleteVFolderV2RBACActionResult,
 )
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
@@ -1630,19 +1628,17 @@ class VFolderService:
         return GetVFolderV2ActionResult(vfolder=vfolder_data)
 
     async def delete_v2(self, action: DeleteVFolderV2Action) -> DeleteVFolderV2ActionResult:
-        """Delete (trash) a vfolder (v2). Resolves policy internally from user_id."""
-        user = await self._user_repository.get_user_by_uuid(action.user_id)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_id, user.id, user.domain_name
-        )
+        """Soft-delete a vfolder by ID. RBAC enforced at processor level."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
 
-        # Host permission check — resolved from user_id
+        # Host permission check — resolved from current user context
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(
             vfolder_data.host,
             permission=VFolderHostPermission.DELETE,
-            user_uuid=action.user_id,
+            user_uuid=me.user_id,
         )
 
         await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
@@ -1667,13 +1663,6 @@ class VFolderService:
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_id])
         await self._remove_vfolder_from_storage(vfolder_data)
         return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
-
-    async def delete_v2_rbac(
-        self, action: DeleteVFolderV2RBACAction
-    ) -> DeleteVFolderV2RBACActionResult:
-        """Soft-delete a vfolder by ID. RBAC enforced at processor level."""
-        await self._vfolder_repository.trash_vfolder(action.updater)
-        return DeleteVFolderV2RBACActionResult(vfolder_id=action.vfolder_id)
 
     async def clone_v2(self, action: CloneVFolderV2Action) -> CloneVFolderV2ActionResult:
         """Clone a vfolder (v2). Resolves policy internally from user_id."""

@@ -98,10 +98,6 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     PurgeVFolderV2Action,
     PurgeVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.vfolder_v2_rbac import (
-    DeleteVFolderV2RBACAction,
-    DeleteVFolderV2RBACActionResult,
-)
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 
@@ -164,12 +160,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     create_upload_session_v2: ActionProcessor[
         CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
     ]
-    delete_v2: ActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
+    delete_v2: SingleEntityActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
     purge_v2: ActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
     clone_v2: ActionProcessor[CloneVFolderV2Action, CloneVFolderV2ActionResult]
-    delete_v2_rbac: SingleEntityActionProcessor[
-        DeleteVFolderV2RBACAction, DeleteVFolderV2RBACActionResult
-    ]
 
     def __init__(
         self,
@@ -261,12 +254,11 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.create_upload_session_v2 = ActionProcessor(
             service.create_upload_session_v2, action_monitors
         )
-        self.delete_v2 = ActionProcessor(service.delete_v2, action_monitors)
+        self.delete_v2 = SingleEntityActionProcessor(
+            service.delete_v2, action_monitors, validators=single_entity_rbac_validators
+        )
         self.purge_v2 = ActionProcessor(service.purge_v2, action_monitors)
         self.clone_v2 = ActionProcessor(service.clone_v2, action_monitors)
-        self.delete_v2_rbac = SingleEntityActionProcessor(
-            service.delete_v2_rbac, action_monitors, validators=single_entity_rbac_validators
-        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -306,5 +298,4 @@ class VFolderProcessors(AbstractProcessorPackage):
             DeleteVFolderV2Action.spec(),
             PurgeVFolderV2Action.spec(),
             CloneVFolderV2Action.spec(),
-            DeleteVFolderV2RBACAction.spec(),
         ]
