@@ -70,6 +70,12 @@ def register_v2_vfolder_routes(
     )
     registry.add(
         "POST",
+        "/{vfolder_id}/restore",
+        handler.restore,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/{vfolder_id}/deploy",
         handler.deploy,
         middlewares=[auth_required],

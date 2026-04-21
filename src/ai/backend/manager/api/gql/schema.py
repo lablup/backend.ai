@@ -421,6 +421,7 @@ from .vfolder_v2 import (
     my_vfolders,
     project_vfolders,
     purge_vfolder_v2,
+    restore_vfolder_v2,
     vfolder_create_download_session_v2,
     vfolder_create_upload_session_v2,
     vfolder_delete_files_v2,
@@ -842,6 +843,7 @@ class Mutation:
     create_vfolder_v2 = create_vfolder_v2
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
+    restore_vfolder_v2 = restore_vfolder_v2
     deploy_vfolder_v2 = deploy_vfolder_v2
     bulk_delete_vfolders_v2 = bulk_delete_vfolders_v2
     bulk_purge_vfolders_v2 = bulk_purge_vfolders_v2

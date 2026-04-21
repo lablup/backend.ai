@@ -162,6 +162,10 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     PurgeVFolderV2Action,
     PurgeVFolderV2ActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.vfolder_v2_rbac import (
+    DeleteVFolderV2RBACAction,
+    DeleteVFolderV2RBACActionResult,
+)
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
     VFolderOwnershipInfo,
@@ -1663,6 +1667,13 @@ class VFolderService:
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_id])
         await self._remove_vfolder_from_storage(vfolder_data)
         return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
+
+    async def delete_v2_rbac(
+        self, action: DeleteVFolderV2RBACAction
+    ) -> DeleteVFolderV2RBACActionResult:
+        """Soft-delete a vfolder by ID. RBAC enforced at processor level."""
+        await self._vfolder_repository.trash_vfolder(action.updater)
+        return DeleteVFolderV2RBACActionResult(vfolder_id=action.vfolder_id)
 
     async def clone_v2(self, action: CloneVFolderV2Action) -> CloneVFolderV2ActionResult:
         """Clone a vfolder (v2). Resolves policy internally from user_id."""

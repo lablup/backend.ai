@@ -98,6 +98,14 @@ class V2VFolderHandler:
         result = await self._adapter.purge(path.parsed.vfolder_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def restore(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """Restore a trashed vfolder."""
+        result = await self._adapter.restore(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def deploy(
         self,
         path: PathParam[VFolderIdPathParam],

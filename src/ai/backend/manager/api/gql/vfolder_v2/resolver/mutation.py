@@ -6,6 +6,7 @@ from uuid import UUID
 
 from strawberry import Info
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
@@ -31,6 +32,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
     MoveFileInputGQL,
     MoveFilePayloadGQL,
     PurgeVFolderPayloadGQL,
+    RestoreVFolderPayloadGQL,
     UploadSessionInputGQL,
     UploadSessionPayloadGQL,
 )
@@ -76,6 +78,22 @@ async def purge_vfolder_v2(
 ) -> PurgeVFolderPayloadGQL:
     payload = await info.context.adapters.vfolder.purge(vfolder_id)
     return PurgeVFolderPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore a trashed virtual folder. RBAC enforced via scope chain.",
+    ),
+    name="restoreVFolder",
+)  # type: ignore[misc]
+async def restore_vfolder_v2(
+    info: Info[StrawberryGQLContext],
+    vfolder_id: UUID,
+) -> RestoreVFolderPayloadGQL:
+    """Restore a virtual folder from trash."""
+    payload = await info.context.adapters.vfolder.restore(vfolder_id)
+    return RestoreVFolderPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(

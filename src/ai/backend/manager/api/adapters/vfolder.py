@@ -40,6 +40,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     MkdirPayload,
     MoveFilePayload,
     PurgeVFolderPayload,
+    RestoreVFolderPayload,
     SearchVFoldersPayload,
     VFolderNode,
 )
@@ -93,13 +94,18 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.types import (
     ProjectVFolderSearchScope,
     UserVFolderSearchScope,
 )
+from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.base import (
+    RestoreVFolderFromTrashAction,
 )
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     BatchLoadVFoldersByIdsAction,
@@ -126,6 +132,9 @@ from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     PurgeVFolderV2Action,
+)
+from ai.backend.manager.services.vfolder.actions.vfolder_v2_rbac import (
+    DeleteVFolderV2RBACAction,
 )
 
 from .base import BaseAdapter
@@ -383,13 +392,23 @@ class VFolderAdapter(BaseAdapter):
         return self._vfolder_data_to_node(result.vfolder)
 
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
-        """Soft-delete a vfolder (move to trash)."""
+        """Soft-delete a vfolder (move to trash). RBAC enforced."""
+        updater = Updater(spec=VFolderTrashUpdaterSpec(), pk_value=vfolder_id)
+        action = DeleteVFolderV2RBACAction(vfolder_id=vfolder_id, updater=updater)
+        await self._processors.vfolder.delete_v2_rbac.wait_for_complete(action)
+        return DeleteVFolderPayload(id=vfolder_id)
+
+    async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
+        """Restore a trashed vfolder. RBAC enforced."""
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        action = DeleteVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
-        await self._processors.vfolder.delete_v2.wait_for_complete(action)
-        return DeleteVFolderPayload(id=vfolder_id)
+        action = RestoreVFolderFromTrashAction(
+            user_uuid=me.user_id,
+            vfolder_uuid=vfolder_id,
+        )
+        await self._processors.vfolder.restore_vfolder_from_trash.wait_for_complete(action)
+        return RestoreVFolderPayload(id=vfolder_id)
 
     async def purge(self, vfolder_id: UUID) -> PurgeVFolderPayload:
         """Permanently delete a vfolder."""

@@ -63,8 +63,10 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.testutils.db import with_tables
 
 
@@ -753,3 +755,167 @@ class TestVfolderRepositoryPurge:
 
         # Verify vfolder still exists in DB (not deleted)
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
+
+
+class TestVFolderRepositoryTrashAndRestore:
+    """Tests for trash_vfolder() and restore_vfolders_from_trash()."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                ImageRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def vfolder_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> VfolderRepository:
+        return VfolderRepository(db=db_with_cleanup)
+
+    @pytest.fixture
+    async def ready_vfolder(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> uuid.UUID:
+        """Create a READY vfolder in DB and return its ID."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        user_uuid = uuid.uuid4()
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+        vfolder_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="test",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            password_info = PasswordInfo(
+                password="dummy",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=600_000,
+                salt_size=32,
+            )
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"u-{user_uuid.hex[:8]}",
+                    email=f"u-{user_uuid.hex[:8]}@test.local",
+                    password=password_info,
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name=domain_name,
+                    role=UserRole.USER,
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    name=f"test-vf-{vfolder_id.hex[:8]}",
+                    host="local:volume1",
+                    domain_name=domain_name,
+                    quota_scope_id=f"user:{user_uuid}",
+                    usage_mode=VFolderUsageMode.GENERAL,
+                    permission=VFolderMountPermission.READ_WRITE,
+                    max_files=0,
+                    max_size=None,
+                    num_files=0,
+                    cur_size=0,
+                    creator=f"u-{user_uuid.hex[:8]}@test.local",
+                    unmanaged_path=None,
+                    ownership_type=VFolderOwnershipType.USER,
+                    user=user_uuid,
+                    group=None,
+                    cloneable=False,
+                    status=VFolderOperationStatus.READY,
+                )
+            )
+            await db_sess.flush()
+
+        return vfolder_id
+
+    # -- trash_vfolder --
+
+    async def test_trash_vfolder_sets_delete_pending(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        ready_vfolder: uuid.UUID,
+    ) -> None:
+        updater = Updater(spec=VFolderTrashUpdaterSpec(), pk_value=ready_vfolder)
+        result = await vfolder_repository.trash_vfolder(updater)
+
+        assert result.id == ready_vfolder
+        assert result.status == VFolderOperationStatus.DELETE_PENDING
+
+    async def test_trash_vfolder_not_found(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        updater = Updater(spec=VFolderTrashUpdaterSpec(), pk_value=uuid.uuid4())
+        with pytest.raises(VFolderNotFound):
+            await vfolder_repository.trash_vfolder(updater)
+
+    # -- restore_vfolders_from_trash --
+
+    async def test_restore_sets_ready(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        ready_vfolder: uuid.UUID,
+    ) -> None:
+        """Trash then restore -> status back to READY."""
+        # First trash it
+        updater = Updater(spec=VFolderTrashUpdaterSpec(), pk_value=ready_vfolder)
+        trashed = await vfolder_repository.trash_vfolder(updater)
+        assert trashed.status == VFolderOperationStatus.DELETE_PENDING
+
+        # Now restore
+        restored = await vfolder_repository.restore_vfolders_from_trash([ready_vfolder])
+        assert len(restored) == 1
+        assert restored[0].id == ready_vfolder
+        assert restored[0].status == VFolderOperationStatus.READY
+
+    async def test_restore_nonexistent_returns_empty(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        result = await vfolder_repository.restore_vfolders_from_trash([uuid.uuid4()])
+        assert result == []

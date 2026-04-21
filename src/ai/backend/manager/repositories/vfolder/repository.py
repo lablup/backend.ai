@@ -402,6 +402,37 @@ class VfolderRepository:
             return created_row.to_data()
 
     @vfolder_repository_resilience.apply()
+    async def trash_vfolder(self, updater: Updater[VFolderRow]) -> VFolderData:
+        """Soft-delete a single vfolder by setting its status to DELETE_PENDING.
+
+        Checks that no active sessions are mounting the vfolder before
+        proceeding. Uses ``execute_updater`` with PK-based WHERE; returns the
+        updated row or raises ``VFolderNotFound`` if no matching row exists.
+        """
+        async with self._db.begin_session() as session:
+            # Pre-check: reject if any session is currently mounting this vfolder
+            vfolder_row = await self._get_vfolder_by_id(session, uuid.UUID(str(updater.pk_value)))
+            if vfolder_row is None:
+                raise VFolderNotFound()
+            mount_sessions = await get_sessions_by_mounted_folder(
+                session, VFolderID.from_row(vfolder_row)
+            )
+            if mount_sessions:
+                session_ids = [str(sid) for sid in mount_sessions]
+                raise VFolderDeletionNotAllowed(
+                    "Cannot delete the vfolder. "
+                    f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
+                )
+            # Expire the pre-loaded ORM identity so execute_updater's
+            # RETURNING clause produces a fresh row with updated status.
+            await session.refresh(vfolder_row)
+            session.expunge(vfolder_row)
+            result = await execute_updater(session, updater)
+            if result is None:
+                raise VFolderNotFound()
+            return self._vfolder_row_to_data(result.row)
+
+    @vfolder_repository_resilience.apply()
     async def update_vfolder_attribute(self, updater: Updater[VFolderRow]) -> VFolderData:
         """
         Update VFolder attributes.

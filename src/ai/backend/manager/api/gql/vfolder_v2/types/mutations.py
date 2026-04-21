@@ -79,6 +79,10 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     PurgeVFolderPayload as PurgePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    RestoreVFolderPayload as RestorePayloadDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -272,6 +276,18 @@ class DeleteVFolderPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
 )
 class PurgeVFolderPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
     id: UUID = gql_field(description="ID of the purged virtual folder.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after restoring a virtual folder from trash.",
+    ),
+    model=RestorePayloadDTO,
+    name="RestoreVFolderPayload",
+)
+class RestoreVFolderPayloadGQL(PydanticOutputMixin[RestorePayloadDTO]):
+    id: UUID = gql_field(description="ID of the restored virtual folder.")
 
 
 @gql_pydantic_type(
