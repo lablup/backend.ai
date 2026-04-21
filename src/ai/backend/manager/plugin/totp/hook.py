@@ -77,7 +77,7 @@ class TOTPHook(HookPlugin):
         if not user.totp_key:
             raise Reject("User activated TOTP but TOTP key does not exist")
 
-        otp = params.get("stoken") or params.get("sToken") or params.get("otp")
+        otp = params.get("otp")
         if not otp:
             auth_response = RequireTwoFactorAuthResponse(
                 response_type=AuthResponseType.REQUIRE_TWO_FACTOR_AUTH,
