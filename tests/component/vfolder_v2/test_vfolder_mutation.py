@@ -20,6 +20,8 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.field import VFolderPermissionField
+from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInProjectInput
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
@@ -237,3 +239,24 @@ class TestPurgeVFolderRBAC:
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.vfolder.purge(project_vfolder.id)
+
+
+class TestCreateVFolderInProjectRBAC:
+    """POST /v2/vfolders/projects/{project_id} -- ScopeActionProcessor RBAC."""
+
+    async def test_regular_user_denied(
+        self,
+        user_v2_registry: V2ClientRegistry,
+        group_fixture: uuid.UUID,
+        vfolder_host_permission_fixture: None,
+    ) -> None:
+        """Regular user without project CREATE permission is denied before service runs."""
+        request = CreateVFolderInProjectInput(
+            name=f"rbac-denied-{secrets.token_hex(4)}",
+            host="local",
+            usage_mode=VFolderUsageMode.GENERAL,
+            permission=VFolderPermissionField.READ_WRITE,
+            cloneable=False,
+        )
+        with pytest.raises(PermissionDeniedError):
+            await user_v2_registry.vfolder.create_in_project(group_fixture, request)
