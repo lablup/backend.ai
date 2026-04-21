@@ -374,6 +374,9 @@ input AppConfigFilterGQL {
   """Exact match on `scope_id` (e.g. a specific domain_name or user_id)."""
   scopeId: StringFilter
 
+  """`created_at` range filter."""
+  createdAt: DateTimeFilter
+
   """`modified_at` range filter."""
   modifiedAt: DateTimeFilter
 }
