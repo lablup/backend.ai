@@ -2469,7 +2469,9 @@ type CreateVFSStoragePayload {
   vfsStorage: VFSStorage!
 }
 
-"""Added in 26.4.2. Input for creating a new virtual folder."""
+"""
+Added in UNRELEASED. Input for creating a virtual folder within a project.
+"""
 input CreateVFolderInProjectInput {
   """VFolder name."""
   name: String!
@@ -2487,6 +2489,7 @@ input CreateVFolderInProjectInput {
   cloneable: Boolean! = false
 }
 
+"""Added in 26.4.2. Input for creating a new virtual folder."""
 input CreateVFolderV2Input {
   """VFolder name."""
   name: String!

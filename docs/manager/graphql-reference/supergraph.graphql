@@ -3948,7 +3948,9 @@ type CreateUserV2Payload
   user: UserV2!
 }
 
-"""Added in 26.4.2. Input for creating a new virtual folder."""
+"""
+Added in UNRELEASED. Input for creating a virtual folder within a project.
+"""
 input CreateVFolderInProjectInput
   @join__type(graph: STRAWBERRY)
 {
@@ -3968,6 +3970,7 @@ input CreateVFolderInProjectInput
   cloneable: Boolean! = false
 }
 
+"""Added in 26.4.2. Input for creating a new virtual folder."""
 input CreateVFolderV2Input
   @join__type(graph: STRAWBERRY)
 {
