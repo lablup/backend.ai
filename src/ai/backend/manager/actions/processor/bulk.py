@@ -1,7 +1,6 @@
 import logging
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -26,7 +25,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
-class BulkValidatorDecision:
+class ValidatorDecision:
     """One validator's per-entity verdict observed during bulk processing.
 
     Mirrors the ``SubStepResult`` pattern used by the scheduler history so
@@ -49,7 +48,7 @@ class BulkProcessResult[TBulkActionResult: BaseBulkActionResult]:
     """
 
     result: TBulkActionResult
-    validator_decisions: list[BulkValidatorDecision]
+    validator_decisions: list[ValidatorDecision]
 
 
 class BulkActionProcessor[
@@ -70,32 +69,28 @@ class BulkActionProcessor[
 
         self._validators = validators or []
 
-    @asynccontextmanager
-    async def _validator_scope(
+    async def _run_validator(
         self,
         validator: BulkActionValidator,
         action: TBulkAction,
         meta: BaseActionTriggerMeta,
-    ) -> AsyncIterator[BulkValidationResult]:
-        """Run one validator inside a bookend scope.
+    ) -> BulkValidationResult:
+        """Invoke one validator and emit its timing/trace log.
 
-        Yields the validator's ``BulkValidationResult`` so the caller can
-        record the decision inside the block. Timing and per-validator
-        logging live here rather than inside each validator implementation.
+        Timing and per-validator logging live here rather than inside each
+        validator implementation so the cross-cutting concern has one home.
         """
         started_at = datetime.now(UTC)
         validation = await validator.validate(action, meta)
-        try:
-            yield validation
-        finally:
-            duration = (datetime.now(UTC) - started_at).total_seconds()
-            log.debug(
-                "bulk validator {} saw {} ids, denied {} in {:.3f}s",
-                validator.name(),
-                len(validation.allowed_entity_ids) + len(validation.denied_entities),
-                len(validation.denied_entities),
-                duration,
-            )
+        duration = (datetime.now(UTC) - started_at).total_seconds()
+        log.debug(
+            "bulk validator {} saw {} ids, denied {} in {:.3f}s",
+            validator.name(),
+            len(action.entity_ids),
+            len(validation.denied_entities),
+            duration,
+        )
+        return validation
 
     def _process_action(
         self,
@@ -120,20 +115,21 @@ class BulkActionProcessor[
         action_id = uuid.uuid4()
         action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
 
+        # Run every validator over the surviving ID set, then invoke the
+        # service function once on the final narrowed action — the service
+        # must only see IDs that passed every validator.
         current_action: TBulkAction = action
-        decisions: list[BulkValidatorDecision] = []
+        decisions: list[ValidatorDecision] = []
 
         for validator in self._validators:
-            async with self._validator_scope(
-                validator, current_action, action_trigger_meta
-            ) as validation:
-                decisions.append(
-                    BulkValidatorDecision(
-                        validator_name=validator.name(),
-                        results=validation,
-                    )
+            validation = await self._run_validator(validator, current_action, action_trigger_meta)
+            decisions.append(
+                ValidatorDecision(
+                    validator_name=validator.name(),
+                    results=validation,
                 )
-                current_action = self._process_action(current_action, validation)
+            )
+            current_action = self._process_action(current_action, validation)
 
         action_result = await self._runner.run(current_action, action_trigger_meta)
         return BulkProcessResult(result=action_result, validator_decisions=decisions)

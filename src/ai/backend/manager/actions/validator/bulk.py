@@ -20,7 +20,7 @@ class BulkValidationResult:
 
     ``BulkActionProcessor`` intersects ``allowed_entity_ids`` across
     validators and records each ``DeniedEntity`` — with its reason — on the
-    corresponding ``BulkValidatorDecision`` so the final response can
+    corresponding ``ValidatorDecision`` so the final response can
     surface *why* each ID was filtered out.
     """
 
@@ -32,7 +32,7 @@ class BulkActionValidator(ABC):
     @classmethod
     @abstractmethod
     def name(cls) -> str:
-        """Stable identifier used in ``BulkValidatorDecision.validator_name``.
+        """Stable identifier used in ``ValidatorDecision.validator_name``.
 
         Chosen by the implementation so logs and partial-success responses can
         attribute denials to a specific validator independently of the Python

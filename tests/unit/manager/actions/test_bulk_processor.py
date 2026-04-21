@@ -56,9 +56,8 @@ class _MockBulkActionResult(BaseBulkActionResult):
 class _AllowSetValidator(BulkActionValidator):
     """Approves any ID in ``allowed``; anything else visible is denied."""
 
-    def __init__(self, allowed: set[str], name: str = "allow-set") -> None:
+    def __init__(self, allowed: set[str]) -> None:
         self._allowed = set(allowed)
-        self._name = name
 
     @classmethod
     @override
