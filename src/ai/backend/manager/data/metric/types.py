@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Final, Self
 
 from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
@@ -19,22 +19,22 @@ __all__ = [
 ]
 
 
-class UtilizationMetricType(enum.Enum):
+class UtilizationMetricType(StrEnum):
     """
     Specifies the type of a metric value.
     """
 
-    GAUGE = enum.auto()
+    GAUGE = "gauge"
     """
     Represents an instantly measured occupancy value.
     (e.g., used space as bytes, occupied amount as the number of items or a bandwidth)
     """
-    RATE = enum.auto()
+    RATE = "rate"
     """
     Represents a rate of changes calculated from underlying gauge/accumulation values
     (e.g., I/O bps calculated from RX/TX accum.bytes)
     """
-    DIFF = enum.auto()
+    DIFF = "diff"
     """
     Represents a difference of changes calculated from underlying gauge/accumulation values
     (e.g., Utilization msec from CPU usage)
