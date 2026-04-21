@@ -7,6 +7,7 @@ import pytest
 from ai.backend.agent.stage.kernel_lifecycle.docker.mount.krunner import (
     KernelRunnerMountProvisioner,
 )
+from ai.backend.common.types import MountPermission
 
 
 class TestKernelRunnerMountProvisionerDefaultMounts:
@@ -35,3 +36,11 @@ class TestKernelRunnerMountProvisionerDefaultMounts:
         assert "/opt/kernel/fantompass.py" in mount_targets
         assert "/opt/kernel/hash_phrase.py" in mount_targets
         assert "/opt/kernel/words.json" in mount_targets
+
+    def test_default_mounts_are_read_only(
+        self,
+        provisioner: KernelRunnerMountProvisioner,
+    ) -> None:
+        mounts = provisioner._prepare_default_mounts()
+        for mount in mounts:
+            assert mount.permission == MountPermission.READ_ONLY
