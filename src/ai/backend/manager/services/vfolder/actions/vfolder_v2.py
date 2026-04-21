@@ -60,14 +60,14 @@ class DeleteVFolderV2ActionResult(VFolderSingleEntityActionResult):
 
 
 @dataclass
-class PurgeVFolderV2Action(BaseScopeAction):
-    user_id: uuid.UUID
+class PurgeVFolderV2Action(VFolderSingleEntityAction):
+    """Permanently purge a vfolder by ID with RBAC enforcement."""
+
     vfolder_id: uuid.UUID
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.VFOLDER
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_id)
 
     @override
     @classmethod
@@ -75,16 +75,8 @@ class PurgeVFolderV2Action(BaseScopeAction):
         return ActionOperationType.PURGE
 
     @override
-    def entity_id(self) -> str | None:
+    def target_entity_id(self) -> str:
         return str(self.vfolder_id)
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.user_id)
 
     @override
     def target_element(self) -> RBACElementRef:
@@ -95,9 +87,13 @@ class PurgeVFolderV2Action(BaseScopeAction):
 
 
 @dataclass
-class PurgeVFolderV2ActionResult(BaseActionResult):
+class PurgeVFolderV2ActionResult(VFolderSingleEntityActionResult):
     vfolder_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:
+        return str(self.vfolder_id)
+
+    @override
+    def target_entity_id(self) -> str:
         return str(self.vfolder_id)
