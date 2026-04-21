@@ -20,7 +20,7 @@ class ValueType(enum.StrEnum):
 
 @dataclass(frozen=True)
 class KernelMetricValue:
-    """A single (current|capacity) value for one metric of one kernel."""
+    """A single value for one metric of one kernel."""
 
     metric_name: str
     value_type: ValueType
@@ -31,8 +31,7 @@ class KernelMetricValue:
 class KernelLiveStatEntry:
     """All live_stat samples belonging to a single kernel.
 
-    An empty ``values`` list represents "no Prometheus samples yet" --- callers
-    do not need to handle ``None``; the entry is always present.
+    An empty `values` list represents "no Prometheus samples yet"
     """
 
     kernel_id: KernelId
@@ -41,11 +40,7 @@ class KernelLiveStatEntry:
 
 @dataclass(frozen=True)
 class KernelLiveStatBatchResult:
-    """Per-kernel batch result for ``query_kernel_live_stat_batch``.
-
-    Always contains one entry per requested ``kernel_id``. Missing data is
-    represented as an empty ``KernelLiveStatEntry.values`` list, never ``None``.
-    """
+    # Per-kernel batch result for `query_kernel_live_stat_batch`
 
     entries: dict[KernelId, KernelLiveStatEntry]
 
