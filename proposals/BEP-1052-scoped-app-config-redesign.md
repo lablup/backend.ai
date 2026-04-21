@@ -191,14 +191,6 @@ class AppConfigDBSource:
             ...
 ```
 
-- `_db` is kept as a field on `AppConfigDBSource`.
-- Each public method opens its own transaction boundary via
-  `async with self._db.begin_readonly_session()` /
-  `begin_session()`.
-- Callers (repository / service) never pass a session in —
-  matches `repositories/CLAUDE.md`'s
-  "NEVER accept a DB session from the caller" rule.
-
 Permission checks and scope validation are performed in the service
 layer.
 
@@ -670,8 +662,6 @@ in a single transaction:
    result is exposed as `UserAppConfig.config`.
 
 ```python
-# db_source owns session and queries. Repository only delegates.
-
 class AppConfigDBSource:
     _db: ExtendedAsyncSAEngine
 
@@ -722,17 +712,8 @@ class UserAppConfigRepository:
         self._db_source = db_source
 
     async def get_merged(self, user_id: str) -> MergedAppConfig:
-        # Repository only delegates — session and query logic live in db_source.
         return await self._db_source.get_merged(user_id)
 ```
-
-This follows the rules in `manager/repositories/CLAUDE.md`:
-- `_db` is a field on `AppConfigDBSource`. Every public db_source method
-  opens its own transaction boundary
-  (`async with self._db.begin_readonly_session()`).
-- All SQLAlchemy query code lives in `db_source/db_source.py`.
-  `repository.py` only delegates.
-- The caller (service layer) never passes a session in.
 
 ### Exposure
 
