@@ -63,8 +63,7 @@ Summary matrix:
   never deleted — only key-level removals.
 - **Single source-of-truth table**: a single `app_configs` table holds
   every scope; only the exposure layer is split.
-- **Relay style**: Input/Payload conventions, the Node interface, and
-  `clientMutationId`.
+- **Relay style**: Input/Payload conventions and the Node interface.
 
 ---
 
@@ -478,8 +477,6 @@ enum AppConfigScopeGQL {
 # ── Admin input ───────────────────────────────────────────────
 
 input AdminUpdateAppConfigInput {
-  clientMutationId: String
-
   """ID of the app_config row to update (Relay global ID)."""
   id: ID!
 
@@ -505,8 +502,6 @@ input AdminUpdateAppConfigInput {
 }
 
 input AdminDeleteAppConfigKeysInput {
-  clientMutationId: String
-
   """ID of the app_config row to delete from (Relay global ID)."""
   id: ID!
 
@@ -538,8 +533,6 @@ input AdminDeleteAppConfigKeysInput {
 # ── My (self) input ──────────────────────────────────────────
 
 input UpdateMyAppConfigInput {
-  clientMutationId: String
-
   """
   Partial update of UserAppConfig.userCustomizedConfig. Deep-merged
   into the caller's existing value; keys absent from the input are
@@ -550,8 +543,6 @@ input UpdateMyAppConfigInput {
 }
 
 input DeleteMyAppConfigKeysInput {
-  clientMutationId: String
-
   """
   JSON key paths to remove from the caller's `userCustomizedConfig`
   (dot-notation). Missing paths are silently ignored.
@@ -562,12 +553,10 @@ input DeleteMyAppConfigKeysInput {
 # ── Payload ──────────────────────────────────────────────────
 
 type UpdateAppConfigPayload {
-  clientMutationId: String
   appConfig: AppConfig!
 }
 
 type UpdateMyAppConfigPayload {
-  clientMutationId: String
   """The updated self config (includes the merged `config`)."""
   appConfig: UserAppConfig!
 }
