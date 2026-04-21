@@ -48,6 +48,19 @@ _LIVE_STAT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "value_type",
 })
 
+_GAUGE_TEMPLATE: Final[str] = (
+    f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
+)
+_RATE_TEMPLATE: Final[str] = (
+    "sum by ({group_by})(rate("
+    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
+    f" / {UTILIZATION_METRIC_INTERVAL}"
+)
+_DIFF_TEMPLATE: Final[str] = (
+    "sum by ({group_by})(rate("
+    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
+)
+
 
 def _regex_union(values: Sequence[str]) -> str:
     return "|".join(re.escape(value) for value in values)
@@ -135,20 +148,11 @@ class MetricRepository:
 
         match metric_type:
             case UtilizationMetricType.GAUGE:
-                template = (
-                    f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
-                )
+                template = _GAUGE_TEMPLATE
             case UtilizationMetricType.RATE:
-                template = (
-                    "sum by ({group_by})(rate("
-                    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
-                    f" / {UTILIZATION_METRIC_INTERVAL}"
-                )
+                template = _RATE_TEMPLATE
             case UtilizationMetricType.DIFF:
-                template = (
-                    "sum by ({group_by})(rate("
-                    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
-                )
+                template = _DIFF_TEMPLATE
             case _:
                 raise UnreachableError(f"Unsupported metric type: {metric_type}")
         return MetricPreset(
