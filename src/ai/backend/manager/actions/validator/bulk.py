@@ -3,24 +3,24 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.action.batch import BaseBatchAction
+from ai.backend.manager.actions.action.bulk import BaseBulkAction
 
 
 @dataclass(frozen=True)
 class DeniedEntity:
-    """A batch entity that a validator rejected, paired with its reason."""
+    """A bulk entity that a validator rejected, paired with its reason."""
 
     entity_id: str
     deny_reason: str
 
 
 @dataclass(frozen=True)
-class BatchValidationResult:
-    """Per-entity validation outcome for a batch action.
+class BulkValidationResult:
+    """Per-entity validation outcome for a bulk action.
 
-    ``BatchActionProcessor`` intersects ``allowed_entity_ids`` across
+    ``BulkActionProcessor`` intersects ``allowed_entity_ids`` across
     validators and records each ``DeniedEntity`` — with its reason — on the
-    corresponding ``BatchValidatorDecision`` so the final response can
+    corresponding ``BulkValidatorDecision`` so the final response can
     surface *why* each ID was filtered out.
     """
 
@@ -28,11 +28,11 @@ class BatchValidationResult:
     denied_entities: list[DeniedEntity]
 
 
-class BatchActionValidator(ABC):
+class BulkActionValidator(ABC):
     @classmethod
     @abstractmethod
     def name(cls) -> str:
-        """Stable identifier used in ``BatchValidatorDecision.validator_name``.
+        """Stable identifier used in ``BulkValidatorDecision.validator_name``.
 
         Chosen by the implementation so logs and partial-success responses can
         attribute denials to a specific validator independently of the Python
@@ -42,9 +42,9 @@ class BatchActionValidator(ABC):
 
     @abstractmethod
     async def validate(
-        self, action: BaseBatchAction[Any], meta: BaseActionTriggerMeta
-    ) -> BatchValidationResult:
-        """Validate the batch action and return per-entity permission results.
+        self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
+    ) -> BulkValidationResult:
+        """Validate the bulk action and return per-entity permission results.
 
         Implementations must classify every ID in ``action.entity_ids`` as
         either allowed or denied. Validators that cannot make a decision for

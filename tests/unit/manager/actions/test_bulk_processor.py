@@ -1,4 +1,4 @@
-"""Tests for ``BatchActionProcessor`` filtering infrastructure (BA-5777).
+"""Tests for ``BulkActionProcessor`` filtering infrastructure (BA-5777).
 
 Verifies that the processor narrows ``entity_ids`` exactly to what each
 validator allowed — no more, no less — and that later validators only
@@ -15,20 +15,20 @@ import pytest
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.action.batch import BaseBatchAction, BaseBatchActionResult
-from ai.backend.manager.actions.processor.batch import (
-    BatchActionProcessor,
+from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
+from ai.backend.manager.actions.processor.bulk import (
+    BulkActionProcessor,
 )
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.validator.batch import (
-    BatchActionValidator,
-    BatchValidationResult,
+from ai.backend.manager.actions.validator.bulk import (
+    BulkActionValidator,
+    BulkValidationResult,
     DeniedEntity,
 )
 
 
 @dataclass
-class _MockBatchAction(BaseBatchAction[str]):
+class _MockBulkAction(BaseBulkAction[str]):
     @override
     def typed_entity_ids(self) -> list[str]:
         return list(self.entity_ids)
@@ -45,7 +45,7 @@ class _MockBatchAction(BaseBatchAction[str]):
 
 
 @dataclass
-class _MockBatchActionResult(BaseBatchActionResult):
+class _MockBulkActionResult(BaseBulkActionResult):
     processed_ids: list[str] = field(default_factory=list)
 
     @override
@@ -53,10 +53,8 @@ class _MockBatchActionResult(BaseBatchActionResult):
         return list(self.processed_ids)
 
 
-class _AllowSetValidator(BatchActionValidator):
+class _AllowSetValidator(BulkActionValidator):
     """Approves any ID in ``allowed``; anything else visible is denied."""
-
-    _ALLOW_ALL_REASON = ""
 
     def __init__(self, allowed: set[str], name: str = "allow-set") -> None:
         self._allowed = set(allowed)
@@ -69,8 +67,8 @@ class _AllowSetValidator(BatchActionValidator):
 
     @override
     async def validate(
-        self, action: BaseBatchAction[Any], meta: BaseActionTriggerMeta
-    ) -> BatchValidationResult:
+        self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
+    ) -> BulkValidationResult:
         current = list(action.entity_ids)
         allowed = [eid for eid in current if eid in self._allowed]
         denied = [
@@ -78,10 +76,10 @@ class _AllowSetValidator(BatchActionValidator):
             for eid in current
             if eid not in self._allowed
         ]
-        return BatchValidationResult(allowed_entity_ids=allowed, denied_entities=denied)
+        return BulkValidationResult(allowed_entity_ids=allowed, denied_entities=denied)
 
 
-class _RecordingValidator(BatchActionValidator):
+class _RecordingValidator(BulkActionValidator):
     """Captures the entity IDs each ``validate()`` call received."""
 
     def __init__(self, allowed: set[str]) -> None:
@@ -95,8 +93,8 @@ class _RecordingValidator(BatchActionValidator):
 
     @override
     async def validate(
-        self, action: BaseBatchAction[Any], meta: BaseActionTriggerMeta
-    ) -> BatchValidationResult:
+        self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
+    ) -> BulkValidationResult:
         current = list(action.entity_ids)
         self.observed_batches.append(current)
         allowed = [eid for eid in current if eid in self._allowed]
@@ -105,22 +103,22 @@ class _RecordingValidator(BatchActionValidator):
             for eid in current
             if eid not in self._allowed
         ]
-        return BatchValidationResult(allowed_entity_ids=allowed, denied_entities=denied)
+        return BulkValidationResult(allowed_entity_ids=allowed, denied_entities=denied)
 
 
-def _echo_func() -> Callable[[_MockBatchAction], Awaitable[_MockBatchActionResult]]:
-    async def _run(action: _MockBatchAction) -> _MockBatchActionResult:
-        return _MockBatchActionResult(processed_ids=list(action.entity_ids))
+def _echo_func() -> Callable[[_MockBulkAction], Awaitable[_MockBulkActionResult]]:
+    async def _run(action: _MockBulkAction) -> _MockBulkActionResult:
+        return _MockBulkActionResult(processed_ids=list(action.entity_ids))
 
     return _run
 
 
-class TestBatchActionProcessorFiltering:
+class TestBulkActionProcessorFiltering:
     async def test_no_validators_passes_all_ids_through(self) -> None:
-        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+        processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
         )
-        action = _MockBatchAction(entity_ids=["a", "b", "c"])
+        action = _MockBulkAction(entity_ids=["a", "b", "c"])
 
         outcome = await processor.wait_for_complete(action)
 
@@ -128,11 +126,11 @@ class TestBatchActionProcessorFiltering:
         assert outcome.validator_decisions == []
 
     async def test_validator_denies_subset_reports_denied_ids(self) -> None:
-        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+        processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
             validators=[_AllowSetValidator(allowed={"a", "c"})],
         )
-        action = _MockBatchAction(entity_ids=["a", "b", "c"])
+        action = _MockBulkAction(entity_ids=["a", "b", "c"])
 
         outcome = await processor.wait_for_complete(action)
 
@@ -146,11 +144,11 @@ class TestBatchActionProcessorFiltering:
         ]
 
     async def test_validator_denies_all_still_runs_service_with_empty_batch(self) -> None:
-        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+        processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
             validators=[_AllowSetValidator(allowed=set())],
         )
-        action = _MockBatchAction(entity_ids=["a", "b"])
+        action = _MockBulkAction(entity_ids=["a", "b"])
 
         outcome = await processor.wait_for_complete(action)
 
@@ -162,11 +160,11 @@ class TestBatchActionProcessorFiltering:
     async def test_later_validator_only_sees_surviving_ids(self) -> None:
         first = _RecordingValidator(allowed={"a", "b"})
         second = _RecordingValidator(allowed={"a"})
-        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+        processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
             validators=[first, second],
         )
-        action = _MockBatchAction(entity_ids=["a", "b", "c"])
+        action = _MockBulkAction(entity_ids=["a", "b", "c"])
 
         outcome = await processor.wait_for_complete(action)
 
@@ -189,30 +187,30 @@ class TestBatchActionProcessorFiltering:
         ]
 
     async def test_original_action_is_not_mutated(self) -> None:
-        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+        processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
             validators=[_AllowSetValidator(allowed={"a"})],
         )
-        original = _MockBatchAction(entity_ids=["a", "b"])
+        original = _MockBulkAction(entity_ids=["a", "b"])
 
         outcome = await processor.wait_for_complete(original)
 
         assert outcome.result.processed_ids == ["a"]
-        # `_process_action` uses from_filtered; it must not mutate the caller's action.
+        # The processor constructs a fresh action; it must not mutate the caller's.
         assert original.entity_ids == ["a", "b"]
 
     async def test_pass_through_reuses_same_action_instance(self) -> None:
-        seen: list[_MockBatchAction] = []
+        seen: list[_MockBulkAction] = []
 
-        async def _capture(action: _MockBatchAction) -> _MockBatchActionResult:
+        async def _capture(action: _MockBulkAction) -> _MockBulkActionResult:
             seen.append(action)
-            return _MockBatchActionResult(processed_ids=list(action.entity_ids))
+            return _MockBulkActionResult(processed_ids=list(action.entity_ids))
 
-        processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+        processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_capture,
             validators=[_AllowSetValidator(allowed={"a", "b"})],
         )
-        original = _MockBatchAction(entity_ids=["a", "b"])
+        original = _MockBulkAction(entity_ids=["a", "b"])
 
         await processor.wait_for_complete(original)
 
@@ -233,11 +231,11 @@ async def test_single_validator_scenarios(
     batch: list[str],
     expected_processed: list[str],
 ) -> None:
-    processor = BatchActionProcessor[_MockBatchAction, _MockBatchActionResult](
+    processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
         func=_echo_func(),
         validators=[_AllowSetValidator(allowed=allowed)],
     )
-    action = _MockBatchAction(entity_ids=batch)
+    action = _MockBulkAction(entity_ids=batch)
 
     outcome = await processor.wait_for_complete(action)
 

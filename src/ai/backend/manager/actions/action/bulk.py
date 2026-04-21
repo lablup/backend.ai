@@ -6,16 +6,16 @@ from .base import BaseAction, BaseActionResult
 
 
 @dataclass
-class BaseBatchAction[T](BaseAction):
-    """Base class for actions operating on a batch of entities.
+class BaseBulkAction[T](BaseAction):
+    """Base class for actions operating on a bulk of entities.
 
-    ``entity_ids`` is stored as ``list[str]`` so ``BatchActionValidator``
+    ``entity_ids`` is stored as ``list[str]`` so ``BulkActionValidator``
     implementations can match against validator verdicts directly. The
     original ``T``-typed view is exposed via ``typed_entity_ids()``.
 
-    Batch actions intentionally carry **only** ``entity_ids``. User context
+    Bulk actions intentionally carry **only** ``entity_ids``. User context
     (user id, role) flows through ``current_user()``, not the action, so
-    ``BatchActionProcessor`` can reconstruct a filtered action by calling
+    ``BulkActionProcessor`` can reconstruct a filtered action by calling
     ``type(action)(entity_ids=...)`` directly — no ``__init__`` override or
     factory hook is required. Subclasses that try to add required fields
     break that constructor call and will fail fast at runtime, which is
@@ -30,7 +30,7 @@ class BaseBatchAction[T](BaseAction):
         raise NotImplementedError
 
 
-class BaseBatchActionResult(BaseActionResult):
+class BaseBulkActionResult(BaseActionResult):
     @override
     def entity_id(self) -> str | None:
         return None
@@ -40,5 +40,5 @@ class BaseBatchActionResult(BaseActionResult):
         raise NotImplementedError
 
 
-TBatchAction = TypeVar("TBatchAction", bound=BaseBatchAction[Any])
-TBatchActionResult = TypeVar("TBatchActionResult", bound=BaseBatchActionResult)
+TBulkAction = TypeVar("TBulkAction", bound=BaseBulkAction[Any])
+TBulkActionResult = TypeVar("TBulkActionResult", bound=BaseBulkActionResult)
