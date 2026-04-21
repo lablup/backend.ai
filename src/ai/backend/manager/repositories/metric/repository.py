@@ -7,7 +7,7 @@ from typing import Final
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_NAME,
@@ -102,7 +102,7 @@ class MetricRepository:
         self,
         kernel_ids: Sequence[KernelId],
         *,
-        metric_type: str,
+        metric_type: UtilizationMetricType,
         metric_name_filter: frozenset[str] | None = None,
         value_type_filter: ValueType | None = None,
     ) -> KernelMetricValuesByKernel:
@@ -119,7 +119,7 @@ class MetricRepository:
         self,
         kernel_ids: Sequence[KernelId],
         *,
-        metric_type: str,
+        metric_type: UtilizationMetricType,
         metric_name_filter: frozenset[str] | None = None,
         value_type_filter: ValueType | None = None,
     ) -> MetricPreset:
@@ -150,9 +150,7 @@ class MetricRepository:
                     f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
                 )
             case _:
-                template = (
-                    f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
-                )
+                raise UnreachableError(f"Unsupported metric type: {metric_type}")
         return MetricPreset(
             template=template,
             labels=labels,

@@ -19,15 +19,31 @@ __all__ = [
 ]
 
 
-class UtilizationMetricType(enum.StrEnum):
-    """Classification for how to wrap a PromQL query."""
+class UtilizationMetricType(enum.Enum):
+    """
+    Specifies the type of a metric value.
+    """
 
-    GAUGE = "gauge"
-    RATE = "rate"
-    DIFF = "diff"
+    GAUGE = enum.auto()
+    """
+    Represents an instantly measured occupancy value.
+    (e.g., used space as bytes, occupied amount as the number of items or a bandwidth)
+    """
+    RATE = enum.auto()
+    """
+    Represents a rate of changes calculated from underlying gauge/accumulation values
+    (e.g., I/O bps calculated from RX/TX accum.bytes)
+    """
+    DIFF = enum.auto()
+    """
+    Represents a difference of changes calculated from underlying gauge/accumulation values
+    (e.g., Utilization msec from CPU usage)
+    """
 
 
 # Metric-name -> UtilizationMetricType classification rules.
+# TODO: Refactor to query metric metadata from the repository layer once
+#       the metadata persistence is available.
 DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
 RATE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
 
