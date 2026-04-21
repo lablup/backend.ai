@@ -42,7 +42,7 @@ class TestMyRoles:
             )
         )
         info = MagicMock()
-        info.context.adapters.rbac.admin_search_role_assignments_gql = mock_search
+        info.context.adapters.rbac.admin_search_role_assignments = mock_search
 
         with patch(
             "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
@@ -105,7 +105,7 @@ class TestMyRoles:
             )
         )
         info = MagicMock()
-        info.context.adapters.rbac.admin_search_role_assignments_gql = mock_search
+        info.context.adapters.rbac.admin_search_role_assignments = mock_search
 
         with patch(
             "ai.backend.manager.api.gql.rbac.resolver.role.current_user",

@@ -10,6 +10,7 @@ from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import RBACElementType
@@ -51,7 +52,7 @@ from ai.backend.common.dto.manager.v2.rbac import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsGQLInput,
+    SearchRoleAssignmentsInput,
     SearchRolesInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -111,6 +112,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.common.types import SearchResult
@@ -680,12 +682,33 @@ class RBACAdapter(BaseAdapter):
             has_previous_page=raw.has_previous_page,
         )
 
-    async def admin_search_role_assignments_gql(
+    async def my_search_role_assignments(
         self,
-        input: AdminSearchRoleAssignmentsGQLInput,
+        input: SearchRoleAssignmentsInput,
+    ) -> SearchResult[RoleAssignmentNode]:
+        """Search role assignments for the current authenticated user."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        return await self._search_role_assignments(
+            input,
+            base_conditions=[AssignedUserConditions.by_user_id(me.user_id)],
+        )
+
+    async def admin_search_role_assignments(
+        self,
+        input: SearchRoleAssignmentsInput,
         base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[RoleAssignmentNode]:
-        """Search role assignments with cursor/offset pagination."""
+        """Search role assignments with cursor/offset pagination (admin)."""
+        return await self._search_role_assignments(input, base_conditions=base_conditions)
+
+    async def _search_role_assignments(
+        self,
+        input: SearchRoleAssignmentsInput,
+        base_conditions: Sequence[QueryCondition] | None = None,
+    ) -> SearchResult[RoleAssignmentNode]:
+        """Internal implementation for searching role assignments."""
         conditions = self._convert_assignment_filter(input.filter) if input.filter else []
         orders = self._convert_assignment_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -1242,7 +1265,13 @@ class RBACAdapter(BaseAdapter):
     def _convert_assignment_filter(self, f: RoleAssignmentFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.role_id is not None:
-            conditions.append(AssignedUserConditions.by_role_id(f.role_id))
+            condition = self.convert_uuid_filter(
+                f.role_id,
+                equals_factory=AssignedUserConditions.by_role_id_equals,
+                in_factory=AssignedUserConditions.by_role_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.role is not None:
             conditions.extend(self._convert_role_nested_filter(f.role))
         if f.permission is not None:

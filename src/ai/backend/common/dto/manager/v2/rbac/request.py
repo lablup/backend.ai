@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import (
     OrderDirection,
@@ -23,7 +23,7 @@ from .types import (
 __all__ = (
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
-    "AdminSearchRoleAssignmentsGQLInput",
+    "SearchRoleAssignmentsInput",
     "SearchRolesInput",
     "AssignRoleInput",
     "BulkAssignRoleInput",
@@ -208,7 +208,7 @@ PermissionNestedFilter.model_rebuild()
 class RoleAssignmentFilter(BaseRequestModel):
     """Filter for role assignments."""
 
-    role_id: UUID | None = None
+    role_id: UUIDFilter | None = None
     role: RoleNestedFilter | None = None
     permission: PermissionNestedFilter | None = None
     username: StringFilter | None = None
@@ -303,8 +303,8 @@ class SearchRolesInput(BaseRequestModel):
     offset: int | None = None
 
 
-class AdminSearchRoleAssignmentsGQLInput(BaseRequestModel):
-    """GQL pagination search input for role assignments."""
+class SearchRoleAssignmentsInput(BaseRequestModel):
+    """Pagination search input for role assignments."""
 
     filter: RoleAssignmentFilter | None = None
     order: list[RoleAssignmentOrderBy] | None = None

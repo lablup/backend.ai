@@ -9809,7 +9809,7 @@ type RoleAssignmentEdge {
 
 """Added in 26.3.0. Filter for role assignments"""
 input RoleAssignmentFilter {
-  roleId: UUID = null
+  roleId: UUIDFilter = null
   role: RoleAssignmentRoleNestedFilter = null
   permission: PermissionNestedFilter = null
   username: StringFilter = null

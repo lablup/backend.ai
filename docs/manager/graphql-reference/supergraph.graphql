@@ -14857,7 +14857,7 @@ type RoleAssignmentEdge
 input RoleAssignmentFilter
   @join__type(graph: STRAWBERRY)
 {
-  roleId: UUID = null
+  roleId: UUIDFilter = null
   role: RoleAssignmentRoleNestedFilter = null
   permission: PermissionNestedFilter = null
   username: StringFilter = null

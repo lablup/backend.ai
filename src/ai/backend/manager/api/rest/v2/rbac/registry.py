@@ -111,6 +111,12 @@ def register_v2_rbac_routes(
     )
     registry.add(
         "POST",
+        "/assignments/my/search",
+        handler.my_search_assignments,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/assignments/bulk-assign",
         handler.bulk_assign_role,
         middlewares=[superadmin_required],

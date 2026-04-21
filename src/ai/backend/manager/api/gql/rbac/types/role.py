@@ -16,7 +16,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsGQLInput,
+    SearchRoleAssignmentsInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput as AssignRoleInputDTO,
@@ -88,7 +88,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -266,7 +266,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         offset: int | None = None,
     ) -> RoleAssignmentConnection:
         # Add role_id filter to scope assignments to this role
-        role_filter = RoleAssignmentFilter(role_id=UUID(self.id))
+        role_filter = RoleAssignmentFilter(role_id=UUIDFilter(equals=UUID(self.id)))
         if filter is not None:
             # Merge with user-provided filter
             combined_filter = RoleAssignmentFilter(
@@ -281,8 +281,8 @@ class RoleGQL(PydanticNodeMixin[Any]):
         pydantic_filter = combined_filter.to_pydantic() if combined_filter is not None else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
-        result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
-            AdminSearchRoleAssignmentsGQLInput(
+        result = await info.context.adapters.rbac.admin_search_role_assignments(
+            SearchRoleAssignmentsInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
                 first=first,
@@ -532,7 +532,7 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
     name="RoleAssignmentFilter",
 )
 class RoleAssignmentFilter(PydanticInputMixin[RoleAssignmentFilterDTO], GQLFilter):
-    role_id: UUID | None = None
+    role_id: UUIDFilter | None = None
     role: RoleAssignmentRoleNestedFilterGQL | None = None
     permission: (
         Annotated[

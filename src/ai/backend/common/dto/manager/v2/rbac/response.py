@@ -21,7 +21,7 @@ from .types import (
 __all__ = (
     "AdminSearchAssociationsPayload",
     "AdminSearchPermissionsPayload",
-    "AdminSearchRoleAssignmentsPayload",
+    "SearchRoleAssignmentsPayload",
     "AdminSearchRolesPayload",
     "AssociationScopesEntitiesNode",
     "BulkAssignRoleFailureInfo",
@@ -183,7 +183,7 @@ class AdminSearchPermissionsPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
-class AdminSearchRoleAssignmentsPayload(BaseResponseModel):
+class SearchRoleAssignmentsPayload(BaseResponseModel):
     """Paginated result for role assignment search."""
 
     items: list[RoleAssignmentNode] = Field(description="List of role assignment nodes.")
