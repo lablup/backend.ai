@@ -28,6 +28,12 @@ scrape_configs:
     http_sd_configs:
       - url: 'http://{{ http_sd_host }}:{{ http_sd_port }}/metrics/service_discovery'
         refresh_interval: "60s"
+    relabel_configs:
+      # Rewrite loopback targets to host-accessible address for Docker-based Prometheus
+      - source_labels: [__address__]
+        regex: '127\.0\.0\.1(.*)'
+        target_label: __address__
+        replacement: '{{ http_sd_host }}${1}'
 
   # ETCD Cluster
   - job_name: 'etcd'
