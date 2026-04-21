@@ -583,27 +583,69 @@ in a single transaction:
    result is exposed as `UserAppConfig.config`.
 
 ```python
-class UserAppConfigRepository:
+# db_source owns session and queries. Repository only delegates.
+
+class AppConfigDBSource:
+    _db: ExtendedAsyncSAEngine
+
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._db = db
+
     async def get_merged(self, user_id: str) -> MergedAppConfig:
-        async with self._db.begin_readonly_session() as sess:
-            domain_name = await self._users.get_domain(sess, user_id)
-            domain_row = await self._db_source.get_by_scope(
-                sess, AppConfigScopeType.DOMAIN, domain_name
-            )
-            user_row = await self._db_source.get_by_scope(
-                sess, AppConfigScopeType.USER, user_id
-            )
+        async with self._db.begin_readonly_session() as db_sess:
+            user_row = (await db_sess.execute(
+                sa.select(UserRow.domain_name).where(UserRow.uuid == user_id)
+            )).one_or_none()
+            if not user_row:
+                raise UserNotFound(f"User {user_id} not found")
+            domain_name = user_row.domain_name
+
+            rows = (await db_sess.execute(
+                sa.select(AppConfigRow).where(
+                    sa.or_(
+                        sa.and_(
+                            AppConfigRow.scope_type == AppConfigScopeType.DOMAIN,
+                            AppConfigRow.scope_id == domain_name,
+                        ),
+                        sa.and_(
+                            AppConfigRow.scope_type == AppConfigScopeType.USER,
+                            AppConfigRow.scope_id == user_id,
+                        ),
+                    )
+                )
+            )).scalars().all()
+
+        domain_row = next((r for r in rows if r.scope_type == AppConfigScopeType.DOMAIN), None)
+        user_row = next((r for r in rows if r.scope_type == AppConfigScopeType.USER), None)
 
         domain_defaults = domain_row.user_app_config_defaults if domain_row else {}
         user_customized = user_row.extra_config if user_row else {}
-        merged = deep_merge(domain_defaults, user_customized)
         return MergedAppConfig(
             domain_name=domain_name,
             user_id=user_id,
             user_customized_config=user_customized,
-            config=merged,  # GQL: UserAppConfig.config
+            config=deep_merge(domain_defaults, user_customized),  # GQL: UserAppConfig.config
         )
+
+
+class UserAppConfigRepository:
+    _db_source: AppConfigDBSource
+
+    def __init__(self, db_source: AppConfigDBSource) -> None:
+        self._db_source = db_source
+
+    async def get_merged(self, user_id: str) -> MergedAppConfig:
+        # Repository only delegates — session and query logic live in db_source.
+        return await self._db_source.get_merged(user_id)
 ```
+
+This follows the rules in `manager/repositories/CLAUDE.md`:
+- `_db` is a field on `AppConfigDBSource`. Every public db_source method
+  opens its own transaction boundary
+  (`async with self._db.begin_readonly_session()`).
+- All SQLAlchemy query code lives in `db_source/db_source.py`.
+  `repository.py` only delegates.
+- The caller (service layer) never passes a session in.
 
 ### Exposure
 
