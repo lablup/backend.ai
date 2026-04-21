@@ -428,17 +428,28 @@ input AdminUpdateAppConfigInput {
   id: ID!
 
   """
-  New stored value. Replaces the existing value entirely.
+  New stored value. If provided, replaces the existing value entirely.
+  **Omit (or pass null) to leave `config` unchanged** — useful when
+  only `userAppConfigDefaults` needs to be modified on a DOMAIN row.
   - GLOBAL/DOMAIN scope: the scope's `config` field.
   - USER scope: that user's `userCustomizedConfig`
     (the merged `config` is read-only computed and cannot be written
     directly).
   """
-  config: JSON!
+  config: JSON
 
-  """DOMAIN scope rows only — per-user preference defaults (merge base)."""
+  """
+  DOMAIN scope rows only — per-user preference defaults (merge base).
+  Omit (or pass null) to leave `userAppConfigDefaults` unchanged.
+  """
   userAppConfigDefaults: JSON
 }
+
+# Field-level partial update: both `config` and `userAppConfigDefaults`
+# are optional — only the fields present in the input are replaced.
+# Key-level merge within the JSON value is NOT supported (whichever
+# field you provide gets wholesale-replaced). Omitting both fields is
+# a no-op that only bumps `modifiedAt`.
 
 # ↑ Identification is by row id, so the row must exist. Creating new
 # scope rows (a new global / new domain / new user row) belongs to a
