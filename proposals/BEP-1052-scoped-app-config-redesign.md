@@ -53,11 +53,14 @@ Summary matrix:
   `global_app_config` (Public read / Admin write), `domain_app_config`
   (Admin read & write), `user_app_config` (Owner/Admin read / Owner-self
   + Admin write).
-- **Two write mutations split admin/user**: `admin_update_app_config`
-  (Admin-only) can modify any scope, while `update_my_app_config`
-  (User-only) can modify the caller's own `user_app_config` only.
-  `delete` is not supported — rows always exist; an empty config is
-  represented as `extra_config = {}`.
+- **Write mutations split admin/user, update and delete as separate
+  operations.** `admin_update_app_config` / `update_my_app_config`
+  apply a **deep-merge partial update** (JSON Merge Patch with `null`
+  interpreted as a plain JSON value, *not* as a deletion sentinel). To
+  remove keys explicitly, callers use the dedicated
+  `admin_delete_app_config_keys` / `delete_my_app_config_keys`
+  mutations that take a list of JSON key paths. Rows themselves are
+  never deleted — only key-level removals.
 - **Single source-of-truth table**: a single `app_configs` table holds
   every scope; only the exposure layer is split.
 - **Relay style**: Input/Payload conventions, the Node interface, and
@@ -220,7 +223,11 @@ Two exposure strategies depending on the scope:
 """Global config. Readable without authentication."""
 type GlobalAppConfig implements Node {
   id: ID!
-  extraConfig: JSON!
+
+  """Stored config value (global-scope)."""
+  config: JSON!
+
+  createdAt: DateTime!
   modifiedAt: DateTime!
 }
 
@@ -237,6 +244,7 @@ type DomainAppConfig implements Node {
   """Per-user preference defaults — merge base for users in the domain."""
   userAppConfigDefaults: JSON!
 
+  createdAt: DateTime!
   modifiedAt: DateTime!
 }
 
@@ -256,6 +264,7 @@ type UserAppConfig implements Node {
   """
   config: JSON!
 
+  createdAt: DateTime!
   modifiedAt: DateTime!
 }
 ```
@@ -318,7 +327,7 @@ can pull their own `UserAppConfig` directly without going through
 
 ```graphql
 type Query {
-  """Global config (no auth). Used for pre-login theme/branding."""
+  """Global config (no auth). Readable before login."""
   globalAppConfig: GlobalAppConfig
 
   """
@@ -402,25 +411,62 @@ enum AppConfigOrderField {
 
 ### Mutations
 
-Write mutations are split into two flavors that match the access
-model. **No delete mutation** — rows always exist; "clearing" is
-expressed as `extra_config = {}` via update.
+Write mutations come in two flavors that match the access model, and
+each flavor has separate **update** and **delete** operations:
 
-- `admin_update_app_config`: admin only; identifies the target row by
-  id; can modify any scope.
-- `update_my_app_config`: any authenticated user; the server fixes the
-  target to the caller (`scope_id = current_user.user_id`).
+- Admin:
+  - `admin_update_app_config` — partial update of any scope (by row id).
+  - `admin_delete_app_config_keys` — remove specified keys from any
+    scope (by row id).
+- Self:
+  - `update_my_app_config` — partial update of the caller's
+    `user_app_config`. The server fixes the target to
+    `scope_id = current_user.user_id`.
+  - `delete_my_app_config_keys` — remove specified keys from the
+    caller's `user_app_config`.
+
+Rows themselves are never deleted; only key-level removals are
+supported.
+
+**Update mutations** apply a **deep-merge partial update** onto the
+existing stored JSON:
+
+- Keys present in the input are merged into the existing value at the
+  same path. Nested objects merge recursively.
+- Keys absent from the input are left unchanged.
+- A `null` leaf value is written **as a JSON null** — it does *not*
+  delete the key. Use the delete mutation when you want to remove
+  keys explicitly.
+- Arrays are treated as leaves — replaced wholesale, not
+  element-merged (same rule used by the user/domain read-merge in §5).
+- Supplying `{}` is a no-op.
+
+**Delete mutations** take a list of **JSON key paths** (dot-notation,
+e.g. `"sectionA.optionX"`). Each path is removed from the target
+JSON. Non-existent paths are silently ignored (idempotent). Removing
+a non-leaf path removes the entire subtree.
 
 ```graphql
 type Mutation {
   """
   App config update (Admin only). Identifies an existing row of any
-  scope (global/domain/user) by id and modifies it.
+  scope (global/domain/user) by id and deep-merges the provided
+  JSON into it.
   """
   adminUpdateAppConfig(input: AdminUpdateAppConfigInput!): UpdateAppConfigPayload!
 
-  """Self user_app_config update (authenticated user). Target is the caller."""
+  """
+  Remove specified keys from an app config row (Admin only).
+  Identified by row id. Takes a list of JSON key paths
+  (dot-notation).
+  """
+  adminDeleteAppConfigKeys(input: AdminDeleteAppConfigKeysInput!): UpdateAppConfigPayload!
+
+  """Self user_app_config partial update. Target is the caller."""
   updateMyAppConfig(input: UpdateMyAppConfigInput!): UpdateMyAppConfigPayload!
+
+  """Remove specified keys from the caller's user_app_config."""
+  deleteMyAppConfigKeys(input: DeleteMyAppConfigKeysInput!): UpdateMyAppConfigPayload!
 }
 
 enum AppConfigScopeGQL {
@@ -438,28 +484,50 @@ input AdminUpdateAppConfigInput {
   id: ID!
 
   """
-  New stored value. If provided, replaces the existing value entirely.
-  **Omit (or pass null) to leave `config` unchanged** — useful when
-  only `userAppConfigDefaults` needs to be modified on a DOMAIN row.
-  - GLOBAL/DOMAIN scope: the scope's `config` field.
-  - USER scope: that user's `userCustomizedConfig`
+  Partial update. The provided JSON is deep-merged into the existing
+  stored value — keys present in the input are merged in, keys absent
+  are left unchanged, and leaf `null` values are written as JSON null
+  (not deletions). Use `adminDeleteAppConfigKeys` to remove keys.
+  Omit the field entirely to leave `config` untouched.
+  - GLOBAL/DOMAIN scope: patches the scope's `config` field.
+  - USER scope: patches that user's `userCustomizedConfig`
     (the merged `config` is read-only computed and cannot be written
     directly).
   """
   config: JSON
 
   """
-  DOMAIN scope rows only — per-user preference defaults (merge base).
-  Omit (or pass null) to leave `userAppConfigDefaults` unchanged.
+  DOMAIN scope rows only — partial update of `userAppConfigDefaults`
+  via the same deep-merge semantics as `config`. Omit to leave
+  `userAppConfigDefaults` untouched.
   """
   userAppConfigDefaults: JSON
 }
 
-# Field-level partial update: both `config` and `userAppConfigDefaults`
-# are optional — only the fields present in the input are replaced.
-# Key-level merge within the JSON value is NOT supported (whichever
-# field you provide gets wholesale-replaced). Omitting both fields is
-# a no-op that only bumps `modifiedAt`.
+input AdminDeleteAppConfigKeysInput {
+  clientMutationId: String
+
+  """ID of the app_config row to delete from (Relay global ID)."""
+  id: ID!
+
+  """
+  JSON key paths to remove from `config` (dot-notation, e.g.
+  `"sectionA.optionX"`). Missing paths are silently ignored.
+  Removing a non-leaf path removes the entire subtree.
+  """
+  configKeys: [String!]
+
+  """
+  DOMAIN scope rows only — key paths to remove from
+  `userAppConfigDefaults`.
+  """
+  userAppConfigDefaultsKeys: [String!]
+}
+
+# Both `config` and `userAppConfigDefaults` are optional on
+# AdminUpdateAppConfigInput; whatever is provided is patched into the
+# existing value. Omitting both is a no-op. Same optionality applies
+# to the two key lists on AdminDeleteAppConfigKeysInput.
 
 # ↑ Identification is by row id, so the row must exist. Creating new
 # scope rows (a new global / new domain / new user row) belongs to a
@@ -472,8 +540,23 @@ input AdminUpdateAppConfigInput {
 input UpdateMyAppConfigInput {
   clientMutationId: String
 
-  """The caller's customized value. Replaces UserAppConfig.userCustomizedConfig in full."""
+  """
+  Partial update of UserAppConfig.userCustomizedConfig. Deep-merged
+  into the caller's existing value; keys absent from the input are
+  preserved; leaf `null` values are written as JSON null (not
+  deletions). Use `deleteMyAppConfigKeys` to remove keys.
+  """
   userCustomizedConfig: JSON!
+}
+
+input DeleteMyAppConfigKeysInput {
+  clientMutationId: String
+
+  """
+  JSON key paths to remove from the caller's `userCustomizedConfig`
+  (dot-notation). Missing paths are silently ignored.
+  """
+  keys: [String!]!
 }
 
 # ── Payload ──────────────────────────────────────────────────
@@ -501,6 +584,7 @@ type AppConfig implements Node {
   """Populated only on DOMAIN scope rows."""
   userAppConfigDefaults: JSON
 
+  createdAt: DateTime!
   modifiedAt: DateTime!
 }
 ```
@@ -515,7 +599,9 @@ type AppConfig implements Node {
 | `UserNode.appConfig`                 | ❌        | ✅ (self)  | ✅    |
 | `adminAppConfigs`                    | ❌        | ❌         | ✅    |
 | `adminUpdateAppConfig`               | ❌        | ❌         | ✅    |
+| `adminDeleteAppConfigKeys`           | ❌        | ❌         | ✅    |
 | `updateMyAppConfig`                  | ❌        | ✅ (self)  | ✅    |
+| `deleteMyAppConfigKeys`              | ❌        | ✅ (self)  | ✅    |
 
 Where the checks live:
 - `admin*` mutation resolver: `check_admin_only()` at entry.
@@ -545,13 +631,15 @@ DELETE is not provided. To clear, PUT with `extra_config = {}`.
 
 | Method | Path                                      | Access     | Description                                     |
 |--------|-------------------------------------------|------------|-------------------------------------------------|
-| GET    | `/v2/app_config/global`                   | Anonymous  | Read global config                              |
-| GET    | `/v2/app_config/domain/{domain_name}`     | Admin      | Read domain config                              |
-| GET    | `/v2/app_config/user/{user_id}`           | Admin      | Read any user's config                          |
-| POST   | `/v2/app_config/admin/search`             | Admin      | Cross-scope search (filter / order / paginate)  |
-| PUT    | `/v2/app_config/{scope_type}/{scope_id}`  | Admin      | Update any scope                                |
-| GET    | `/v2/app_config/user/me`                  | User       | Read own config (includes merged result)        |
-| PUT    | `/v2/app_config/user/me`                  | User       | Update own config                               |
+| GET    | `/v2/app_config/global`                         | Anonymous  | Read global config                              |
+| GET    | `/v2/app_config/domain/{domain_name}`           | Admin      | Read domain config                              |
+| GET    | `/v2/app_config/user/{user_id}`                 | Admin      | Read any user's config                          |
+| POST   | `/v2/app_config/admin/search`                   | Admin      | Cross-scope search (filter / order / paginate)  |
+| PATCH  | `/v2/app_config/{scope_type}/{scope_id}`        | Admin      | Partial update (deep merge) of any scope        |
+| POST   | `/v2/app_config/{scope_type}/{scope_id}/delete` | Admin      | Remove specified key paths from any scope       |
+| GET    | `/v2/app_config/user/me`                        | User       | Read own config (includes merged result)        |
+| PATCH  | `/v2/app_config/user/me`                        | User       | Partial update of own config                    |
+| POST   | `/v2/app_config/user/me/delete`                 | User       | Remove specified key paths from own config      |
 
 `POST /v2/app_config/admin/search` accepts the same input schema as
 the GQL `adminAppConfigs` field (`filter` / `orderBy` / pagination
@@ -673,23 +761,25 @@ Each scenario describes *who* calls *when* and *what they want to
 achieve*, paired with the actual call spec. Intended as a reference
 for client-side implementation.
 
-### S1. Pre-login theme / branding loading (anonymous)
+### S1. Pre-login global config loading (anonymous)
 
-The WebUI fetches the theme and branding before rendering the login
-screen so they can be applied up front.
+The WebUI fetches the global config before rendering the login
+screen. (The JSON shape inside `config` is owned by the frontend;
+backend stores it opaquely.)
 
 ```graphql
-query BootstrapPublicTheme {
+query LoadGlobalAppConfig {
   globalAppConfig {
-    extraConfig
+    config
+    modifiedAt
   }
 }
 ```
 
 - No auth token.
-- Response: `{ globalAppConfig: { extraConfig: { theme: {...}, branding: {...} } } }`
-- On failure (row missing, network error) the WebUI falls back to the
-  built-in default theme.
+- Response: `{ globalAppConfig: { config: { ... opaque JSON ... }, modifiedAt: "..." } }`
+- On failure (row missing, network error) the WebUI falls back to its
+  built-in defaults.
 
 ### S2. Bootstrapping right after login
 
@@ -703,7 +793,7 @@ query BootstrapMe {
     config
     modifiedAt
   }
-  globalAppConfig { extraConfig }
+  globalAppConfig { config }
 }
 ```
 
@@ -715,9 +805,9 @@ query BootstrapMe {
   `userCustomizedConfig` around separately so the Settings page can
   show only "what the user explicitly changed" in the edit form.
 
-### S3. The user updates their own preferences (language / visible columns)
+### S3. The user patches part of their own config
 
-The user saves "language: ko, sessions table columns: [name, status]".
+The user updates a subset of keys in their `userCustomizedConfig`.
 
 ```graphql
 mutation SaveMyConfig($input: UpdateMyAppConfigInput!) {
@@ -735,8 +825,8 @@ mutation SaveMyConfig($input: UpdateMyAppConfigInput!) {
 {
   "input": {
     "userCustomizedConfig": {
-      "language": "ko",
-      "tables": { "sessions": { "columns": ["name", "status"] } }
+      "sectionA": { "optionX": "value-1" },
+      "sectionB": "value-2"
     }
   }
 }
@@ -744,15 +834,18 @@ mutation SaveMyConfig($input: UpdateMyAppConfigInput!) {
 
 - `scope_id` is absent from the input — the server fixes it to
   `current_user.user_id`.
+- **Partial update** semantics: other keys the user previously saved
+  (e.g. `sectionC.*`) are preserved. Key removal uses
+  `deleteMyAppConfigKeys` separately.
 - `appConfig.config` in the response already reflects the re-computed
-  deep merge of the new `userCustomizedConfig` with the domain
-  defaults, so the WebUI can update the UI immediately without a
-  follow-up fetch.
+  read-merge of the patched `userCustomizedConfig` with the domain
+  defaults. (The JSON shape itself is not defined by this BEP — it is
+  owned by the frontend.)
 
-### S4. Admin updates the domain's default theme + sets per-user defaults
+### S4. Admin patches part of a domain's config and user defaults
 
-An admin wants to change the domain's `primaryColor` and seed every
-user in the domain with `language = ko`.
+An admin patches a specific subtree of the domain `config` and a
+specific key of `userAppConfigDefaults`.
 
 Step 1 — look up the target row id:
 
@@ -764,7 +857,7 @@ query GetDomainAppConfigId($name: String!) {
 }
 ```
 
-Step 2 — update:
+Step 2 — update (deep-merge partial update):
 
 ```graphql
 mutation UpdateDomainConfig($input: AdminUpdateAppConfigInput!) {
@@ -778,22 +871,25 @@ mutation UpdateDomainConfig($input: AdminUpdateAppConfigInput!) {
 {
   "input": {
     "id": "QXBwQ29uZmlnOmRvbWFpbi1kZWZhdWx0",
-    "config": { "theme": { "primaryColor": "#ff5722" } },
-    "userAppConfigDefaults": { "language": "ko", "darkMode": false }
+    "config": { "sectionA": { "optionX": "new-value" } },
+    "userAppConfigDefaults": { "sectionB": "default-value" }
   }
 }
 ```
 
 - Server: `check_admin_only()` → locates the DOMAIN row by id →
-  replaces `config` and `userAppConfigDefaults` wholesale.
+  deep-merges the input into the existing `config` and
+  `userAppConfigDefaults` independently.
+- **Partial**: unrelated keys (`sectionA.optionY`, `sectionC.*`, …)
+  are left untouched.
 - Effect: on the next `myAppConfig` call, every user in that domain
-  receives the new defaults merged with their own
+  receives the updated defaults merged with their own
   `userCustomizedConfig`.
 
-### S5. Admin edits a specific user's config on their behalf
+### S5. Admin patches a specific user's config on their behalf
 
-For a support request, an admin needs to modify user A's settings
-directly.
+For a support request, an admin patches a subset of keys in user A's
+`userCustomizedConfig`.
 
 ```graphql
 query GetUserAppConfigId($userId: String!) {
@@ -815,16 +911,16 @@ mutation OverrideUserConfig($input: AdminUpdateAppConfigInput!) {
 {
   "input": {
     "id": "QXBwQ29uZmlnOnVzZXItMDAwMTIz",
-    "config": { "language": "ko", "experimental": { "vfolderV2": true } }
+    "config": { "sectionA": { "flag": true } }
   }
 }
 ```
 
-- For the USER scope, the `config` input value is stored into that
+- For the USER scope, the `config` input is deep-merged into that
   user's `userCustomizedConfig` (the merged `config` is a read-only
   computed field and cannot be written directly).
 - The next time that user calls `myAppConfig`, the updated
-  `userCustomizedConfig` gets merged with the domain defaults in the
+  `userCustomizedConfig` is merged with the domain defaults in the
   response.
 
 ### S6. Admin audits all AppConfigs (search / filter / pagination)
@@ -866,21 +962,36 @@ query AuditUserConfigs(
 - Useful when auditing "what settings users are actively overriding
   after a global/domain default change".
 
-### S7. Operator resets a scope to empty
+### S7. Operator clears specific keys (or subtrees)
 
-Something like "reset this domain's settings entirely". Since there
-is no DELETE, the caller issues an update with `config = {}`.
+Key removal is explicit via the dedicated delete mutation — update
+never deletes. An admin removing a subtree and a specific leaf from
+a domain's `config`:
+
+```graphql
+mutation ClearDomainKeys($input: AdminDeleteAppConfigKeysInput!) {
+  adminDeleteAppConfigKeys(input: $input) {
+    appConfig { id scope scopeId config modifiedAt }
+  }
+}
+```
 
 ```json
 {
   "input": {
     "id": "QXBwQ29uZmlnOmRvbWFpbi1kZWZhdWx0",
-    "config": {},
-    "userAppConfigDefaults": {}
+    "configKeys": ["sectionA", "sectionB.optionX"]
   }
 }
 ```
 
-- The row itself remains. On the next bootstrap, users will see no
-  domain contribution and only their own `userCustomizedConfig` (plus
-  global).
+- `sectionA` — full subtree removed from the domain's `config`.
+- `sectionB.optionX` — only that leaf removed; sibling keys under
+  `sectionB` are preserved.
+- Missing paths are silently ignored (idempotent).
+- The row itself is never deleted — it always exists for the lifetime
+  of the parent entity.
+
+The self-service equivalent for a user is `deleteMyAppConfigKeys`,
+which takes a flat `keys: [String!]!` array targeting their own
+`userCustomizedConfig`.
