@@ -413,8 +413,8 @@ class CUDAPlugin(AbstractComputePlugin):
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
         device_ids: list[DeviceId] = []
-        if SlotName("cuda.devices") in device_alloc:
-            device_ids.extend(device_alloc[SlotName("cuda.devices")].keys())
+        if SlotName("cuda.device") in device_alloc:
+            device_ids.extend(device_alloc[SlotName("cuda.device")].keys())
         available_devices = await self.list_devices()
         attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:

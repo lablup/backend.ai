@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Document ID** | TR-2026-004-TODO |
-| **Last Updated** | 2026-04-15 |
+| **Last Updated** | 2026-04-21 |
 | **Branch** | `docs/dood` |
 | **Related** | `simple_plan.md`, `k8s-control-plane-dood-agent-architecture.md` |
 
@@ -33,6 +33,7 @@
 - [x] hostPath 마운트: `/var/lib/backend.ai`, scratch, ipc, krunner stage
 - [x] `agent.toml` ConfigMap (etcd 좌표, RPC/agent-sock 포트, reserved 리소스)
 - [x] krunner 페이로드 공유 (agent Pod과 호스트 dockerd가 동일 경로로 bind-mount 소스를 보도록 구성)
+- [x] GPU 지원 (v0.2.0부터) — `agent.gpu.enabled`일 때 `runtimeClassName: nvidia` + NVIDIA envs + `/usr/local/cuda` hostPath. CPU/GPU 두 release 분리 (`values-agent-cpu.yaml` / `values-agent-gpu.yaml`). 상세: §5.6
 
 ---
 
@@ -164,17 +165,21 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 ## 3. 다음 스프린트 우선순위
 
 1. ~~**I-18** Bitnami → OSS~~ **완료** (§5.1, 단 HA 버전은 Plan 2+)
-2. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그
-3. **I-22** keypair + container-registry fixture를 차트 hook으로 편입
-4. **I-25** Multi-node 세션 스케줄러 분산 확인 (sokovan `cluster_mode` 처리)
-5. **I-1** Manager 노드 pinning + Swarm manager 사전 조인 절차 문서화
-6. **I-2** `dockerGid` 자동 감지
-7. **I-6** Multi-node 세션 smoke test — CNI(Cilium) × Swarm 공존은 **검증됨** (§5.3). GPU/vfolder 포함 확장 테스트
-8. **I-7** AppProxy Coordinator/Worker 차트 작성
-9. **I-8** vfolder NFS 마운트 옵션 Agent 차트에 추가
-10. **I-10** 레지스트리 크리덴셜 sync Job
-11. **I-3, I-4** 프로덕션 시크릿/인증 강화
-12. (I-6 확장 통과 이후) **I-5, I-9** GPU / accelerator 검증
+2. ~~**I-26** cuda_open slot name 오타~~ **완료** (§5.6.3, 커널에 GPU device attach 정상화)
+3. **I-28** CUDA 이미지 커널 runner init 타임아웃 — GPU 세션 end-to-end 차단 (§5.6.5)
+4. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그
+5. **I-22** keypair + container-registry fixture를 차트 hook으로 편입
+6. **I-25** Multi-node 세션 스케줄러 분산 확인 (sokovan `cluster_mode` 처리)
+7. **I-1** Manager 노드 pinning + Swarm manager 사전 조인 절차 문서화
+8. **I-2** `dockerGid` 자동 감지
+9. **I-6** Multi-node 세션 smoke test — CNI(Cilium) × Swarm 공존은 **검증됨** (§5.3). GPU/vfolder 포함 확장 테스트
+10. **I-7** AppProxy Coordinator/Worker 차트 작성
+11. **I-8** vfolder NFS 마운트 옵션 Agent 차트에 추가
+12. **I-10** 레지스트리 크리덴셜 sync Job
+13. **I-27** `gather_container_measures` DockerContainer API 오사용 (§5.6.4) — stats만 영향
+14. **I-3, I-4** 프로덕션 시크릿/인증 강화
+15. **I-5 후속** Fractional GPU / CUDA hook end-to-end (I-28 해결 후)
+16. **I-9** 추가 accelerator (ROCm/TPU) 검증
 
 ---
 
@@ -304,8 +309,9 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 #### 기능 미검증
 | # | 항목 | 상태 | 비고 |
 |---|---|---|---|
-| I-5 | Fractional GPU / CUDA hook | 미검증 | GPU agent 노드에서 smoke test 필요 |
-| I-9 | Accelerator plugin (CUDA/ROCm/TPU) 동작 확인 | 미검증 | `docker/agent/Dockerfile`의 `cuda_open`, `mock` wheel 포함은 됐으나 kernel 세션에서 device allocation 미검증 |
+| I-5 | Fractional GPU / CUDA hook | 부분 | cuda_open의 device 감지 + 커널 device attach는 §5.6에서 검증. fractional(쪼개기) + CUDA hook 주입은 별도 |
+| I-9 | Accelerator plugin (CUDA/ROCm/TPU) 동작 확인 | 부분 | CUDA(cuda_open): agent 감지 + manager 스케줄 + 커널 attach 검증 (§5.6). ROCm/TPU는 하드웨어 부재 |
+| I-28 | CUDA 이미지 커널 runner init 타임아웃 | 미해결 | GPU 할당은 정상이나 세션이 `CREATING`→`TERMINATED`. 별도 디버깅 필요 (§5.6.5) |
 | I-6 확장 | GPU 포함 multi-node 세션 | 미검증 | CPU-only multi-node는 §5.3에서 완전 검증. GPU 분산 별도 |
 | I-8 | vfolder / storage-proxy 마운트 | 미구현 | Agent 차트에 vfolder hostPath 옵션 없음. `simple_plan.md §4.5` 호스트 pre-mount 방식 반영 필요 |
 | I-7 | AppProxy Coordinator / Worker chart | 부재 | Web UI 접근 및 service-port proxy 경로 미구성 |
@@ -322,6 +328,7 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 | I-14 | 커널 컨테이너 로그/메트릭 수집 (Prometheus/Loki 통합) | 미설계 |
 | I-15 | DB 마이그레이션 실패 시 rollback 시나리오 검증 | 미검증 |
 | I-24-FIX | krunner 빈-볼륨 sentinel 체크 (`agent/docker/kernel.py:524`) | 코드 수정 미반영 (제안만) |
+| I-27 | `gather_container_measures` DockerContainer API 오사용 (`cuda_open/plugin.py:285-288`) | 미수정, stats만 영향 |
 | I-22 | keypair / container-registry fixture 차트 hook 편입 | 수동 실행 단계 유지 |
 | I-3, I-4 | 프로덕션 시크릿 / etcd RBAC | 미강화 |
 
@@ -338,4 +345,144 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 | I-16 노드 prerequisite 런북 | 미작성 (§5.4는 초안) |
 | I-17 업그레이드 / 롤백 가이드 | 미작성 |
 
-**즉시 다음에 손대기 좋은 3개**: **I-24-FIX** (반복 재현 버그 근본 수정), **I-22** (chart hook 편입으로 설치 자동화 완성), **I-5/I-9** (GPU 노드 smoke test).
+**즉시 다음에 손대기 좋은 3개**: **I-28** (CUDA 이미지 커널 runner 기동 실패 원인 분석 — GPU 세션 end-to-end 차단), **I-24-FIX** (반복 재현 버그 근본 수정), **I-22** (chart hook 편입으로 설치 자동화 완성).
+
+---
+
+### 5.6 GPU 노드 검증 (2026-04-21, charsyam-nvidia, RTX 4070 Laptop)
+
+범위: agent가 GPU를 감지하고 Manager → Scheduler → Agent → 커널 컨테이너까지 device가 attach되는 경로. 커널 내부에서 CUDA 애플리케이션이 실제 실행되는 것은 §5.6.5 I-28 때문에 미검증이지만, **같은 이미지 + 동일 runtime으로 수동 `docker run`** 시 `nvidia-smi`와 `libcuda` 로드가 정상임을 확인하여 GPU/runtime 경로 자체는 검증됨.
+
+#### 5.6.1 접근: nvidia runtime 기반 (hostPath 라이브러리 주입 X)
+
+agent pod 자체를 **`runtimeClassName: nvidia`로 실행**. hostPath로 NVIDIA `.so`를 주입하는 변형을 시도하지 않음. 이유:
+
+- 호스트에 NVIDIA driver + nvidia-container-toolkit + `nvidia-container-runtime` 바이너리가 이미 설치돼 있음
+- containerd에 `nvidia` runtime plugin이 구성돼 있음 (`/etc/containerd/config.toml` 하위에 `plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options.BinaryName = "/usr/bin/nvidia-container-runtime"`)
+- 클러스터에 `RuntimeClass/nvidia` (handler=nvidia) 기존 등록됨 (160일 전)
+
+이 조합이면 agent pod에 device + libnvidia-ml.so + libcuda.so 등이 자동 주입됨. pod env로 `NVIDIA_VISIBLE_DEVICES=all` + `NVIDIA_DRIVER_CAPABILITIES=compute,utility` 설정.
+
+**단, libcudart는 자동 주입되지 않음.** nvidia-container-toolkit은 "compute" capability가 있어도 CUDA base 이미지가 아닌 컨테이너에는 CUDA runtime을 주입하지 않는다 (이미지가 `ENV CUDA_VERSION=...` 또는 `LABEL com.nvidia.cuda`를 가진 경우에만 주입). 우리 agent 이미지는 `python:3.13.7-slim` 기반이므로 제외됨.
+
+cuda_open 플러그인은 `_load_library("libcudart.so.{major}")`로 CUDA runtime을 로드하므로 (cuda_open/nvidia.py:591) libcudart가 없으면 `could not load the CUDA runtime library` 경고와 함께 `CUDA acceleration is disabled` 로 빠짐.
+
+**해결**: 호스트의 `/usr/local/cuda`를 hostPath로 read-only 마운트하고 `LD_LIBRARY_PATH`에 `/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib` 추가. 그러면 `libcudart.so.13`을 로드할 수 있음.
+
+커널 컨테이너 (DooD)의 경우는 cuda_open 플러그인이 docker 생성 옵션에 `HostConfig.Runtime=nvidia`를 넣음 (`plugin.py:400-401`). 호스트 dockerd가 nvidia runtime으로 커널 컨테이너를 기동 → 커널 내부에는 full CUDA(libcudart 포함)가 자동 주입됨.
+
+#### 5.6.2 차트 변경 (backend-ai-agent v0.1.0 → v0.2.0)
+
+`deploy/helm/backend-ai-agent/values.yaml`:
+- `agent.gpu` 블록 추가: `enabled` (기본 false), `runtimeClassName` (기본 `nvidia`), `visibleDevices` (기본 `all`), `driverCapabilities` (기본 `compute,utility`), `hostCudaPath` (기본 `/usr/local/cuda`)
+- `agent.affinity: {}` 필드 추가 (CPU/GPU 노드 분리용 nodeAffinity 지원)
+
+`deploy/helm/backend-ai-agent/templates/daemonset.yaml`:
+- `.Values.agent.gpu.enabled`로 다음을 조건부 렌더링:
+  - podSpec `runtimeClassName`
+  - 컨테이너 env: `NVIDIA_VISIBLE_DEVICES`, `NVIDIA_DRIVER_CAPABILITIES`, `LD_LIBRARY_PATH`
+  - `host-cuda` hostPath volume + `/usr/local/cuda` read-only mount
+- `.Values.agent.affinity`를 `with` 블록으로 추가
+
+신규 파일:
+- `deploy/helm/values-agent-cpu.yaml`: 기본 agent release 오버라이드. `affinity: nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution`로 `accelerator NotIn [gpu]` 제한.
+- `deploy/helm/values-agent-gpu.yaml`: GPU 전용 release. `nodeSelector: accelerator=gpu` + `agent.gpu.enabled: true`.
+
+**두 개의 helm release로 분리하는 이유**: `runtimeClassName: nvidia`는 cluster 차원 리소스지만 각 노드 containerd에 실제 `nvidia` runtime이 등록돼 있어야 pod 기동이 됨. non-GPU 노드(ser8)에 등록돼 있지 않을 가능성이 크므로 하나의 DaemonSet에 `runtimeClassName`을 붙이면 non-GPU 노드에서 pod가 깨짐. 두 release로 mutually exclusive하게 배포:
+
+```bash
+helm upgrade --install bai-agent deploy/helm/backend-ai-agent \
+  -n backend-ai -f deploy/helm/values-agent-cpu.yaml
+
+helm install bai-agent-gpu deploy/helm/backend-ai-agent \
+  -n backend-ai -f deploy/helm/values-agent-gpu.yaml
+```
+
+GPU 노드에는 `kubectl label node <name> accelerator=gpu` 선행.
+
+#### 5.6.3 I-26 (FIXED) — cuda_open `get_attached_devices` slot name 오타
+
+- **증상**: agent가 GPU 감지(`detected devices: [CUDADevice(model_name: RTX 4070 Laptop GPU, ...)]`) + `CUDA acceleration is enabled.` + Manager DB에 `cuda.device: "1"` 기록까지 모두 정상. 세션 `cpu=2, mem=4g, cuda.device=1`로 enqueue → `i-charsyam-nvidia`에 할당 → `resource allocations done` 까지 진행. 그러나 커널 부착 단계에서 `attached devices: {'cuda': [], ...}` (빈 배열). 커널 컨테이너에 GPU가 전혀 주입되지 않음.
+- **원인**: `src/ai/backend/accelerator/cuda_open/plugin.py:416-417`이 `SlotName("cuda.devices")` (복수형)로 조회:
+  ```python
+  device_ids: list[DeviceId] = []
+  if SlotName("cuda.devices") in device_alloc:
+      device_ids.extend(device_alloc[SlotName("cuda.devices")].keys())
+  ```
+  실제 등록된 slot은 `cuda.device` (단수, `plugin.py:92`):
+  ```python
+  slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
+      (SlotName("cuda.device"), SlotTypes("count")),
+  )
+  ```
+  나머지 plugin 내부 참조(line 188, 349, 446, 450, 455, 460)는 모두 단수 `cuda.device`. 416-417만 복수형 — 2022-07-22 (commit 685c50b017) 이후 줄곧 dead code. device_ids가 항상 비어 `attached_devices`가 빈 배열 반환 → 커널에 GPU device attach 누락.
+- **수정**: `cuda.devices` → `cuda.device`.
+- **후속 검증**: 재배포 후 `attached devices: {'cuda': [{'device_id': '0', 'model_name': 'NVIDIA GeForce RTX 4070 Laptop GPU', 'data': {'smp': 36, 'mem': 8184725504}}], ...}` 로 정상 부착 확인.
+
+#### 5.6.4 I-27 (FOUND, 미수정) — `gather_container_measures` DockerContainer API 오사용
+
+- `src/ai/backend/accelerator/cuda_open/plugin.py:285-288`이 `container_info = await docker.containers.get(cid)` 반환값을 dict로 간주:
+  ```python
+  container_info = await docker.containers.get(cid)
+  nvidia_device_reqs = [
+      x
+      for x in container_info.get("HostConfig", {}).get("DeviceRequests", [])
+      ...
+  ]
+  ```
+- aiodocker의 `docker.containers.get(cid)`는 `DockerContainer` 래퍼 객체를 반환. `.get()`은 해당 객체에 없어 `AttributeError: 'DockerContainer' object has no attribute 'get'`.
+- **영향**: GPU 컨테이너의 `gather_container_measures`가 매 5초 예외로 실패 (stats 수집만 중단). 커널 생성/실행/GPU allocation에는 영향 없음. 로그가 시끄러워짐.
+- **수정 방안**: inspect JSON을 명시 호출.
+  ```python
+  container = await docker.containers.get(cid)
+  container_info = await container.show()
+  ```
+- **commit 027d9e8d7** (`feat(BA-4944): per-container CUDA metric collection #9787`)에서 유입된 것으로 보임.
+
+#### 5.6.5 I-28 (미해결) — CUDA 이미지 커널 runner init 타임아웃
+
+- `cr.backend.ai/stable/python:3.12-ubuntu24.04-amd64-cuda12.6.1` 이미지로 GPU 세션 생성 시 커널 컨테이너는 정상 기동되지만 `waiting for kernel service initialization` 상태에서 **약 70초 타임아웃** → `ContainerStartupFailedError: Container startup failed. (container might be missing or failed to initialize)` → 세션이 `CREATING` → `TERMINATED`.
+- agent 로그:
+  ```
+  create_kernel(...) attached devices: {'cuda': [{'device_id': '0', 'model_name': 'NVIDIA GeForce RTX 4070 Laptop GPU', ...}], ...}
+  create_kernel(...) container started
+  create_kernel(...) waiting for kernel service initialization
+  (70s later)
+  ERROR Container startup failed, the container might be missing or failed to initialize
+  ```
+- **수동 sanity test**: 동일 이미지 + 동일 nvidia runtime + 동일 env로 `docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=0 -e NVIDIA_DRIVER_CAPABILITIES=all <image> bash -c "nvidia-smi -L; python3 -c 'import ctypes; ctypes.CDLL(\"libcuda.so.1\")'"` 실행하면 정상 동작 (`GPU 0: NVIDIA GeForce RTX 4070 Laptop GPU`, `libcuda loaded`). UUID도 agent가 감지한 `7a825f44-...`와 일치. **GPU/runtime 경로 자체는 문제 없음.**
+- **따라서 원인은 Backend.AI 커널 runner (컨테이너 안의 `backend.ai` entrypoint) 측**. 의심 후보:
+  1. I-24 krunner 빈-볼륨 이슈의 재발 — 이 이미지의 distro 키(`ubuntu24.04` 또는 이미지 맞춤 distro)로 만들어진 krunner 볼륨이 비정상 상태일 가능성
+  2. krunner가 bind-mount하는 `ai.backend.kernel` / `ai.backend.helpers` 경로와 CUDA 이미지의 기존 `PYTHONPATH`가 충돌
+  3. service ports (sshd/ttyd/jupyter/jupyterlab/vscode/tensorboard) 중 하나의 초기화 지연
+- **다음 단계 제안**:
+  - 문제 세션 실패 직후 `docker logs <container_id>` 확인 (agent가 destroy하기 전에 잡아야 함)
+  - 또는 agent 코드의 `waiting for kernel service initialization` timeout을 임시로 늘려 초기화가 궁극적으로 성공하는지 확인
+  - CUDA 없는 `python:3.13-ubuntu24.04-amd64` 이미지로 동일 세션 생성해 I-28이 CUDA 특정인지 일반인지 구분
+
+#### 5.6.6 검증된 end-to-end 단계
+
+| 단계 | 결과 |
+|---|---|
+| `nvidia` RuntimeClass + containerd nvidia runtime + host toolkit 상태 점검 | ✅ |
+| agent pod에 `runtimeClassName: nvidia` + NVIDIA envs + hostPath `/usr/local/cuda` 적용 | ✅ |
+| cuda_open GPU 감지 (NVML + libcudart) | ✅ `CUDADevice(..., model_name: NVIDIA GeForce RTX 4070 Laptop GPU, ...)` |
+| agent self-register → etcd `/sorna/local/nodes/agents/i-charsyam-nvidia: running` | ✅ |
+| Manager DB `agents.available_slots."cuda.device" = "1"` + `schedulable: True` | ✅ |
+| 세션 enqueue `{cpu:2, mem:4g, cuda.device:1}` → scheduler가 `i-charsyam-nvidia`에 할당 | ✅ `used.cuda.device: 1.000000` |
+| agent `DiscretePropertyAllocMap.allocate()` 성공 | ✅ `resource allocations done` |
+| **(I-26 수정 후)** `get_attached_devices()`가 GPU를 반환하고 커널 컨테이너 docker config에 device inject | ✅ attached `device_id: '0'` |
+| 커널 컨테이너 생성 (`HostConfig.Runtime=nvidia` + `NVIDIA_VISIBLE_DEVICES=0`) | ✅ 컨테이너 시작됨 |
+| 동일 이미지 + 동일 runtime 수동 실행 → `nvidia-smi -L` + `libcuda.so.1` 로드 | ✅ UUID 일치 |
+| Backend.AI 커널 service ready (sshd/jupyter 기동) | ❌ I-28 |
+
+#### 5.6.7 추가 runbook 항목 (§5.4 보강 권장)
+
+GPU 노드를 추가할 때:
+1. 노드에 NVIDIA driver + nvidia-container-toolkit 설치
+2. containerd `config.toml`에 `nvidia` runtime 등록 (`nvidia-ctk runtime configure --runtime=containerd --set-as-default=false`)
+3. 클러스터에 `RuntimeClass/nvidia` 존재 확인 (handler=nvidia)
+4. 호스트에 `/usr/local/cuda` (CUDA toolkit) 설치 — libcudart 제공용
+5. 노드 label: `kubectl label node <name> accelerator=gpu`
+6. `helm upgrade --install bai-agent-gpu deploy/helm/backend-ai-agent -n backend-ai -f deploy/helm/values-agent-gpu.yaml`
+7. 로그 확인: `kubectl logs ... -c agent | grep "detected devices"` — CUDADevice 배열이 비어있지 않아야 함

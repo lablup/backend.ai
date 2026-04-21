@@ -18,6 +18,9 @@ spec:
       hostNetwork: {{ .Values.agent.hostNetwork }}
       hostPID: {{ .Values.agent.hostPID }}
       dnsPolicy: {{ if .Values.agent.hostNetwork }}ClusterFirstWithHostNet{{ else }}ClusterFirst{{ end }}
+      {{- if .Values.agent.gpu.enabled }}
+      runtimeClassName: {{ .Values.agent.gpu.runtimeClassName }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets: {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -26,6 +29,9 @@ spec:
       {{- end }}
       {{- with .Values.agent.tolerations }}
       tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
         - name: render-config
@@ -93,6 +99,14 @@ spec:
             # host kernel can actually open.
             - name: PYTHONPATH
               value: "{{ .Values.agent.hostPaths.krunner }}"
+            {{- if .Values.agent.gpu.enabled }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "{{ .Values.agent.gpu.visibleDevices }}"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "{{ .Values.agent.gpu.driverCapabilities }}"
+            - name: LD_LIBRARY_PATH
+              value: "{{ .Values.agent.gpu.hostCudaPath }}/lib64:{{ .Values.agent.gpu.hostCudaPath }}/targets/x86_64-linux/lib"
+            {{- end }}
           volumeMounts:
             - name: config-rendered
               mountPath: /etc/backend.ai
@@ -113,6 +127,11 @@ spec:
               readOnly: true
             - name: krunner
               mountPath: {{ .Values.agent.hostPaths.krunner }}
+            {{- if .Values.agent.gpu.enabled }}
+            - name: host-cuda
+              mountPath: {{ .Values.agent.gpu.hostCudaPath }}
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml .Values.agent.resources | nindent 12 }}
       volumes:
@@ -135,3 +154,7 @@ spec:
           hostPath: { path: /sys }
         - name: krunner
           hostPath: { path: {{ .Values.agent.hostPaths.krunner }}, type: DirectoryOrCreate }
+        {{- if .Values.agent.gpu.enabled }}
+        - name: host-cuda
+          hostPath: { path: {{ .Values.agent.gpu.hostCudaPath }}, type: Directory }
+        {{- end }}

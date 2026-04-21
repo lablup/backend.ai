@@ -918,6 +918,8 @@ spec:
 
 **Alternative: NVIDIA CUDA base image for Agent**. Build the Agent image from `nvidia/cuda:12.x-base` and use NVIDIA Container Runtime. When the Agent Pod is created, the NVIDIA runtime automatically mounts driver libraries and devices into the container. This simplifies the Pod spec but requires the Agent image to match the host driver version at the CUDA level.
 
+> **Tested variant (2026-04-21, see `todo.md` §5.6)**: The first real deployment used `runtimeClassName: nvidia` (K8s RuntimeClass → containerd nvidia runtime → `/usr/bin/nvidia-container-runtime`) on the Agent DaemonSet Pod — **without** switching the Agent base image to `nvidia/cuda`. The nvidia-container-runtime injects `/dev/nvidia*` and `libnvidia-ml.so.*` automatically, but does **not** inject `libcudart.so` into non-CUDA base images (the injection is gated on `ENV CUDA_VERSION` / `LABEL com.nvidia.cuda`). Because the `cuda_open` accelerator plugin needs `libcudart.so` for device discovery, the Tested variant additionally bind-mounts the host's `/usr/local/cuda` read-only and prepends it to `LD_LIBRARY_PATH`. Kernel containers (spawned via DooD) are unaffected — the plugin sets `HostConfig.Runtime=nvidia` on each `docker create` call, so the host's dockerd injects the full CUDA stack into the kernel container.
+
 #### 4.7.4 Kernel Container GPU Allocation
 
 Once the Agent is running with GPU access, kernel container GPU allocation works identically to the current bare-metal model. The Agent uses the Docker/containerd API directly to attach GPU devices, libraries, and environment variables to each kernel container.

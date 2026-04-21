@@ -50,15 +50,33 @@ agent:
   hostPID: true
   privileged: true
 
+  # GPU (NVIDIA) support. When enabled, the agent pod is scheduled with
+  # runtimeClassName=nvidia so nvidia-container-runtime injects the driver
+  # libraries and /dev/nvidia* devices. Requires the node to have the
+  # NVIDIA driver + nvidia-container-toolkit installed and a `nvidia`
+  # RuntimeClass registered in the cluster.
+  gpu:
+    enabled: false
+    runtimeClassName: nvidia
+    visibleDevices: all
+    driverCapabilities: compute,utility
+    # Host CUDA toolkit path. nvidia-container-runtime injects the driver
+    # libraries (libnvidia-ml) but NOT the CUDA runtime (libcudart). The
+    # Backend.AI CUDA plugin needs libcudart to discover devices, so we
+    # bind-mount the host's CUDA install read-only and prepend it to the
+    # loader path.
+    hostCudaPath: /usr/local/cuda
+
   # Reserved capacity taken away from the node's reported resources.
   reserved:
     cpu: 1
     memory: 1G
     disk: 8G
 
-  # Extra tolerations/nodeSelector to limit where the agent runs.
+  # Extra tolerations/nodeSelector/affinity to limit where the agent runs.
   nodeSelector: {}
   tolerations:
     # Tolerate common agent-node taints; adjust in production.
     - operator: Exists
       effect: NoSchedule
+  affinity: {}
