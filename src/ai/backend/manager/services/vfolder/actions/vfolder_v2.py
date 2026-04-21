@@ -1,4 +1,4 @@
-"""V2 vfolder actions — RBAC-enforced via SingleEntityActionProcessor."""
+"""V2 vfolder action definitions."""
 
 import uuid
 from dataclasses import dataclass
