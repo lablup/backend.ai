@@ -58,7 +58,7 @@ class ContainerUtilizationMetricService:
     ) -> UtilizationMetricType:
         # TODO: Refactor to query metric metadata from the repository layer
         #       once the metadata persistence is available.
-        if metric_name in DIFF_METRICS and label.value_type == "current":
+        if metric_name in DIFF_METRICS and label.value_type == PrometheusValueType.CURRENT:
             return UtilizationMetricType.DIFF
         if metric_name in RATE_METRICS:
             return UtilizationMetricType.RATE
