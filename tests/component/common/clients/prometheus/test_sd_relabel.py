@@ -192,7 +192,7 @@ def up_model_service_preset() -> MetricPreset:
     )
 
 
-class TestModelServiceMetricsScrapeWithRelabel:
+class TestLoopbackRelabelScrape:
     """Verify Prometheus scrapes model-service targets after relabel rewrite."""
 
     async def test_prometheus_scrapes_model_service_after_relabel(
