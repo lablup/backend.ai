@@ -140,21 +140,16 @@ class UtilizationMetricService:
         match metric_type:
             case UtilizationMetricType.GAUGE:
                 template = (
-                    "sum by ({group_by})(" + CONTAINER_UTILIZATION_METRIC_NAME + "{{{labels}}})"
+                    f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
                 )
             case UtilizationMetricType.RATE:
                 template = (
                     "sum by ({group_by})(rate("
-                    + CONTAINER_UTILIZATION_METRIC_NAME
-                    + "{{{labels}}}[{window}]))"
-                    " / " + str(UTILIZATION_METRIC_INTERVAL)
+                    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
+                    f" / {UTILIZATION_METRIC_INTERVAL}"
                 )
             case UtilizationMetricType.DIFF:
-                template = (
-                    "sum by ({group_by})(rate("
-                    + CONTAINER_UTILIZATION_METRIC_NAME
-                    + "{{{labels}}}[{window}]))"
-                )
+                template = f"sum by ({{group_by}})(rate({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
             case _:
                 raise UnreachableError(f"Unsupported metric type: {metric_type}")
         return MetricPreset(

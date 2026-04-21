@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Final, Self
+from typing import Final, Self, cast
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -98,16 +98,16 @@ class KernelMetricValuesByKernel:
         grouped: dict[KernelId, list[KernelMetricValue]] = {}
         for metric in response.data.result:
             info = metric.metric
-            if (
-                info.kernel_id is None
-                or info.container_metric_name is None
-                or info.value_type is None
-                or not metric.values
-            ):
+            if not info.has_container_metric_labels or not metric.values:
                 continue
+            # Non-None guaranteed by has_container_metric_labels above;
+            # cast needed because property checks don't narrow types.
+            kernel_id_str = cast(str, info.kernel_id)
+            container_metric_name = cast(str, info.container_metric_name)
+            value_type_str = cast(str, info.value_type)
             try:
-                value_type = ValueType(info.value_type)
-                kernel_id = KernelId(UUID(info.kernel_id))
+                value_type = ValueType(value_type_str)
+                kernel_id = KernelId(UUID(kernel_id_str))
             except ValueError:
                 continue
             # Instant queries are normalized into a one-element list, and range
@@ -115,7 +115,7 @@ class KernelMetricValuesByKernel:
             _, raw_value = metric.values[-1]
             grouped.setdefault(kernel_id, []).append(
                 KernelMetricValue(
-                    metric_name=info.container_metric_name,
+                    metric_name=container_metric_name,
                     value_type=value_type,
                     value=raw_value,
                 )
