@@ -3960,11 +3960,11 @@ input CreateVFolderInProjectInput
   """Storage host for the vfolder."""
   host: String = null
 
-  """Usage mode of the vfolder (general, model, data)."""
-  usageMode: String! = "general"
+  """Usage mode of the vfolder."""
+  usageMode: VFolderUsageMode! = GENERAL
 
-  """Default permission of the vfolder (ro, rw, wd)."""
-  permission: String! = "rw"
+  """Default mount permission of the vfolder."""
+  permission: VFolderMountPermission! = READ_WRITE
 
   """Whether the vfolder is cloneable."""
   cloneable: Boolean! = false
