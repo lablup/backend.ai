@@ -65,8 +65,12 @@ from ai.backend.manager.data.role_invitation.types import (
     RoleInvitationState,
 )
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.errors.common import GenericBadRequest, ObjectNotFound
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleNotAssigned, RoleNotFound
+from ai.backend.manager.errors.role_invitation import (
+    RoleInvitationInvalidState,
+    RoleInvitationNotFound,
+)
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -93,7 +97,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.base.types import SearchScope
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
@@ -108,7 +111,9 @@ from ai.backend.manager.repositories.role_invitation.creators import (
     RoleInvitationCreatorSpec,
 )
 from ai.backend.manager.repositories.role_invitation.types import (
+    InviteeSearchScope,
     RoleInvitationSearchResult,
+    RoleInvitationSearchScope,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1169,10 +1174,26 @@ class PermissionDBSource:
                 created=[row.to_data() for row in result.successes],
             )
 
-    async def search_invitations(
+    async def search_invitations_by_invitee(
         self,
         querier: BatchQuerier,
-        scope: SearchScope | None = None,
+        scope: InviteeSearchScope,
+    ) -> RoleInvitationSearchResult:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(RoleInvitationRow)
+            result = await execute_batch_querier(session, query, querier, scope=scope)
+            items = [row.RoleInvitationRow.to_data() for row in result.rows]
+            return RoleInvitationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_invitations_by_role(
+        self,
+        querier: BatchQuerier,
+        scope: RoleInvitationSearchScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
@@ -1229,16 +1250,16 @@ class PermissionDBSource:
     ) -> RoleInvitationRow:
         """Fetch a PENDING invitation for acceptance.
 
-        Raises ObjectNotFound if not found.
-        Raises GenericBadRequest if already accepted, rejected, or canceled.
+        Raises RoleInvitationNotFound if not found.
+        Raises RoleInvitationInvalidState if already accepted, rejected, or canceled.
         """
         cond_id = RoleInvitationConditions.by_id(invitation_id)
         stmt = sa.select(RoleInvitationRow).where(cond_id())
         row = await session.scalar(stmt)
         if row is None:
-            raise ObjectNotFound(object_name="RoleInvitation")
+            raise RoleInvitationNotFound()
         if row.state != RoleInvitationState.PENDING:
-            raise GenericBadRequest(
+            raise RoleInvitationInvalidState(
                 f"Cannot accept: invitation is {row.state.value}, expected pending"
             )
         return row
@@ -1250,18 +1271,18 @@ class PermissionDBSource:
         """Fetch a PENDING invitation for rejection.
 
         Already rejected invitations are silently returned (idempotent).
-        Raises ObjectNotFound if not found.
-        Raises GenericBadRequest if accepted or canceled.
+        Raises RoleInvitationNotFound if not found.
+        Raises RoleInvitationInvalidState if accepted or canceled.
         """
         cond_id = RoleInvitationConditions.by_id(invitation_id)
         stmt = sa.select(RoleInvitationRow).where(cond_id())
         row = await session.scalar(stmt)
         if row is None:
-            raise ObjectNotFound(object_name="RoleInvitation")
+            raise RoleInvitationNotFound()
         if row.state == RoleInvitationState.REJECTED:
             return row
         if row.state != RoleInvitationState.PENDING:
-            raise GenericBadRequest(
+            raise RoleInvitationInvalidState(
                 f"Cannot reject: invitation is {row.state.value}, expected pending"
             )
         return row
@@ -1273,18 +1294,18 @@ class PermissionDBSource:
         """Fetch a PENDING invitation for cancellation.
 
         Already canceled invitations are silently returned (idempotent).
-        Raises ObjectNotFound if not found.
-        Raises GenericBadRequest if accepted or rejected.
+        Raises RoleInvitationNotFound if not found.
+        Raises RoleInvitationInvalidState if accepted or rejected.
         """
         cond_id = RoleInvitationConditions.by_id(invitation_id)
         stmt = sa.select(RoleInvitationRow).where(cond_id())
         row = await session.scalar(stmt)
         if row is None:
-            raise ObjectNotFound(object_name="RoleInvitation")
+            raise RoleInvitationNotFound()
         if row.state == RoleInvitationState.CANCELED:
             return row
         if row.state != RoleInvitationState.PENDING:
-            raise GenericBadRequest(
+            raise RoleInvitationInvalidState(
                 f"Cannot cancel: invitation is {row.state.value}, expected pending"
             )
         return row

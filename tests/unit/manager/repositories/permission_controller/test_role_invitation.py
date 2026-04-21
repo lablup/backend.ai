@@ -16,7 +16,10 @@ from ai.backend.manager.actions.action.rbac_role_invitation import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.role_invitation.types import RoleInvitationState
-from ai.backend.manager.errors.common import GenericBadRequest, ObjectNotFound
+from ai.backend.manager.errors.role_invitation import (
+    RoleInvitationInvalidState,
+    RoleInvitationNotFound,
+)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -356,7 +359,7 @@ class TestAcceptRoleInvitation:
 
     async def test_not_found(self, perm_db: PermissionDBSource) -> None:
         action = AcceptRoleInvitationAction(invitation_id=uuid.uuid4())
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(RoleInvitationNotFound):
             await perm_db.accept_invitation(action)
 
     async def test_already_rejected_fails(
@@ -365,7 +368,7 @@ class TestAcceptRoleInvitation:
         rejected_id: uuid.UUID,
     ) -> None:
         action = AcceptRoleInvitationAction(invitation_id=rejected_id)
-        with pytest.raises(GenericBadRequest):
+        with pytest.raises(RoleInvitationInvalidState):
             await perm_db.accept_invitation(action)
 
     async def test_already_canceled_fails(
@@ -374,7 +377,7 @@ class TestAcceptRoleInvitation:
         canceled_id: uuid.UUID,
     ) -> None:
         action = AcceptRoleInvitationAction(invitation_id=canceled_id)
-        with pytest.raises(GenericBadRequest):
+        with pytest.raises(RoleInvitationInvalidState):
             await perm_db.accept_invitation(action)
 
 
@@ -428,7 +431,7 @@ class TestRejectRoleInvitation:
 
     async def test_not_found(self, perm_db: PermissionDBSource) -> None:
         action = RejectRoleInvitationAction(invitation_id=uuid.uuid4())
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(RoleInvitationNotFound):
             await perm_db.reject_invitation(action)
 
     async def test_already_rejected_is_idempotent(
@@ -447,7 +450,7 @@ class TestRejectRoleInvitation:
         accepted_id: uuid.UUID,
     ) -> None:
         action = RejectRoleInvitationAction(invitation_id=accepted_id)
-        with pytest.raises(GenericBadRequest):
+        with pytest.raises(RoleInvitationInvalidState):
             await perm_db.reject_invitation(action)
 
 
@@ -501,7 +504,7 @@ class TestCancelRoleInvitation:
 
     async def test_not_found(self, perm_db: PermissionDBSource) -> None:
         action = CancelRoleInvitationAction(invitation_id=uuid.uuid4())
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(RoleInvitationNotFound):
             await perm_db.cancel_invitation(action)
 
     async def test_already_canceled_is_idempotent(
@@ -520,5 +523,5 @@ class TestCancelRoleInvitation:
         accepted_id: uuid.UUID,
     ) -> None:
         action = CancelRoleInvitationAction(invitation_id=accepted_id)
-        with pytest.raises(GenericBadRequest):
+        with pytest.raises(RoleInvitationInvalidState):
             await perm_db.cancel_invitation(action)

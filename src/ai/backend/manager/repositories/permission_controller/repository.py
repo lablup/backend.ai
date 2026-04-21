@@ -51,7 +51,6 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import SearchScope
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -62,7 +61,9 @@ from ai.backend.manager.repositories.permission_controller.types import (
     ScopedRoleSearchScope,
 )
 from ai.backend.manager.repositories.role_invitation.types import (
+    InviteeSearchScope,
     RoleInvitationSearchResult,
+    RoleInvitationSearchScope,
 )
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
@@ -372,12 +373,20 @@ class PermissionControllerRepository:
         return await self._db_source.create_invitation_by_username(action)
 
     @permission_controller_repository_resilience.apply()
-    async def search_invitations(
+    async def search_invitations_by_invitee(
         self,
         querier: BatchQuerier,
-        scope: SearchScope | None = None,
+        scope: InviteeSearchScope,
     ) -> RoleInvitationSearchResult:
-        return await self._db_source.search_invitations(querier, scope)
+        return await self._db_source.search_invitations_by_invitee(querier, scope)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_invitations_by_role(
+        self,
+        querier: BatchQuerier,
+        scope: RoleInvitationSearchScope,
+    ) -> RoleInvitationSearchResult:
+        return await self._db_source.search_invitations_by_role(querier, scope)
 
     @permission_controller_repository_resilience.apply()
     async def accept_invitation(

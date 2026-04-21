@@ -31,6 +31,7 @@ class RoleInvitationRow(Base):  # type: ignore[misc]
     inviter_user_id: Mapped[uuid.UUID | None] = mapped_column(
         "inviter_user_id",
         GUID,
+        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="SET NULL"),
         nullable=True,
     )
     invitee_user_id: Mapped[uuid.UUID] = mapped_column(

@@ -188,6 +188,7 @@ def upgrade() -> None:
         sa.Column(
             "inviter_user_id",
             GUID,
+            sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="SET NULL"),
             nullable=True,
         ),
         sa.Column(

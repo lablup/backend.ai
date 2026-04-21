@@ -39,6 +39,7 @@ class InviteeSearchScope(SearchScope):
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        # Invitee existence is guaranteed by RBAC authentication before reaching here.
         return []
 
 
@@ -58,4 +59,5 @@ class RoleInvitationSearchScope(SearchScope):
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        # Role existence is validated by the RBAC permission check before reaching here.
         return []
