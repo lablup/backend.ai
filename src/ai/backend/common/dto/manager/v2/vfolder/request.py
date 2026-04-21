@@ -30,6 +30,7 @@ __all__ = (
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
+    "CreateVFolderInProjectInput",
     "CreateVFolderInput",
     "DeleteFilesInput",
     "DeleteInvitationInput",
@@ -72,6 +73,35 @@ class CreateVFolderInput(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
     unmanaged_path: str | None = Field(default=None, description="Path for unmanaged vfolders")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_and_validate_name(cls, v: object) -> object:
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("name must not be blank or whitespace-only")
+            return stripped
+        return v
+
+
+class CreateVFolderInProjectInput(BaseRequestModel):
+    """Input for creating a virtual folder within a project.
+
+    Unlike ``CreateVFolderInput``, ``project_id`` is supplied as a separate
+    mutation/path argument so this model contains only the payload fields.
+    """
+
+    name: VFolderName = Field(description="VFolder name")
+    host: str | None = Field(default=None, description="Storage host for the vfolder")
+    usage_mode: VFolderUsageMode = Field(
+        default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
+    )
+    permission: VFolderPermissionField = Field(
+        default=VFolderPermissionField.READ_WRITE,
+        description="Default permission of the vfolder",
+    )
+    cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
 
     @field_validator("name", mode="before")
     @classmethod

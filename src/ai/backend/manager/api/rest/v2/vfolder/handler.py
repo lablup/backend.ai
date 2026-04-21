@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CloneVFolderInput,
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
+    CreateVFolderInProjectInput,
     CreateVFolderInput,
     DeleteFilesInput,
     DeployVFolderInput,
@@ -109,7 +110,7 @@ class V2VFolderHandler:
     async def project_create(
         self,
         path: PathParam[ProjectIdPathParam],
-        body: BodyParam[CreateVFolderInput],
+        body: BodyParam[CreateVFolderInProjectInput],
     ) -> APIResponse:
         """Create a vfolder owned by a project."""
         result = await self._adapter.create_in_project(path.parsed.project_id, body.parsed)

@@ -183,10 +183,10 @@ def project_create(
 ) -> None:
     """Create a vfolder owned by a project."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInProjectInput
     from ai.backend.common.dto.manager.v2.vfolder.types import VFolderUsageMode
 
-    input_dto = CreateVFolderInput(
+    input_dto = CreateVFolderInProjectInput(
         name=name,
         usage_mode=VFolderUsageMode(usage_mode),
         host=host,

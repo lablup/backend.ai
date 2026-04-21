@@ -20,6 +20,9 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateUploadSessionInput as UploadInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    CreateVFolderInProjectInput as CreateInProjectInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -113,6 +116,25 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     project_id: UUID | None = gql_field(
         default=None, description="Project ID for project-owned vfolder."
     )
+    host: str | None = gql_field(default=None, description="Storage host for the vfolder.")
+    usage_mode: str = gql_field(
+        default="general", description="Usage mode of the vfolder (general, model, data)."
+    )
+    permission: str = gql_field(
+        default="rw", description="Default permission of the vfolder (ro, rw, wd)."
+    )
+    cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for creating a virtual folder within a project.",
+    ),
+    name="CreateVFolderInProjectInput",
+)
+class CreateVFolderInProjectInputGQL(PydanticInputMixin[CreateInProjectInputDTO]):
+    name: str = gql_field(description="VFolder name.")
     host: str | None = gql_field(default=None, description="Storage host for the vfolder.")
     usage_mode: str = gql_field(
         default="general", description="Usage mode of the vfolder (general, model, data)."
