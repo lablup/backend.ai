@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Document ID** | TR-2026-004-TODO |
-| **Last Updated** | 2026-04-21 |
+| **Last Updated** | 2026-04-21 (2차 — vfolder/storage-proxy 계획 §6 추가) |
 | **Branch** | `docs/dood` |
 | **Related** | `simple_plan.md`, `k8s-control-plane-dood-agent-architecture.md` |
 
@@ -167,14 +167,14 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 1. ~~**I-18** Bitnami → OSS~~ **완료** (§5.1, 단 HA 버전은 Plan 2+)
 2. ~~**I-26** cuda_open slot name 오타~~ **완료** (§5.6.3, 커널에 GPU device attach 정상화)
 3. ~~**I-28** Agent pod 재시작 후 첫 GPU 세션 hang~~ **완료** (§5.6.5, `containerPortRange`를 NodePort 범위 밖 [40000, 45000]로 이동)
-4. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그
-5. **I-22** keypair + container-registry fixture를 차트 hook으로 편입
-6. **I-25** Multi-node 세션 스케줄러 분산 확인 (sokovan `cluster_mode` 처리)
-7. **I-1** Manager 노드 pinning + Swarm manager 사전 조인 절차 문서화
-8. **I-2** `dockerGid` 자동 감지
-9. **I-6** Multi-node 세션 smoke test — CNI(Cilium) × Swarm 공존은 **검증됨** (§5.3). GPU/vfolder 포함 확장 테스트
-10. **I-7** AppProxy Coordinator/Worker 차트 작성
-11. **I-8** vfolder NFS 마운트 옵션 Agent 차트에 추가
+4. **I-8 vfolder 스택** — §6 세부 계획. L1(NFS Docker + agent hostPath) → L2(storage-proxy 차트 신규) → L3(multi-node)
+5. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그
+6. **I-22** keypair + container-registry fixture를 차트 hook으로 편입
+7. **I-25** Multi-node 세션 스케줄러 분산 확인 (sokovan `cluster_mode` 처리)
+8. **I-1** Manager 노드 pinning + Swarm manager 사전 조인 절차 문서화
+9. **I-2** `dockerGid` 자동 감지
+10. **I-6** Multi-node 세션 smoke test — CNI(Cilium) × Swarm 공존은 **검증됨** (§5.3). GPU/vfolder 포함 확장 테스트
+11. **I-7** AppProxy Coordinator/Worker 차트 작성 (vfolder 다음 축)
 12. **I-10** 레지스트리 크리덴셜 sync Job
 13. **I-27** `gather_container_measures` DockerContainer API 오사용 (§5.6.4) — stats만 영향
 14. **I-3, I-4** 프로덕션 시크릿/인증 강화
@@ -345,7 +345,7 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 | I-16 노드 prerequisite 런북 | 미작성 (§5.4는 초안) |
 | I-17 업그레이드 / 롤백 가이드 | 미작성 |
 
-**즉시 다음에 손대기 좋은 3개**: **I-22** (chart hook 편입으로 설치 자동화 완성), **I-24-FIX** (krunner 빈 볼륨 sentinel — 드물지만 반복 가능한 버그), **I-7 또는 I-8** (AppProxy 또는 vfolder — 사용자 관점 기능 확장).
+**즉시 다음에 손대기 좋은 3개**: **I-8 vfolder 스택** (§6 계획 참조 — L1 NFS pre-mount → L2 storage-proxy 차트), **I-22** (chart hook 편입으로 설치 자동화 완성), **I-24-FIX** (krunner 빈 볼륨 sentinel — 드물지만 반복 가능한 버그).
 
 ---
 
@@ -505,3 +505,146 @@ GPU 노드를 추가할 때:
 5. 노드 label: `kubectl label node <name> accelerator=gpu`
 6. `helm upgrade --install bai-agent-gpu deploy/helm/backend-ai-agent -n backend-ai -f deploy/helm/values-agent-gpu.yaml`
 7. 로그 확인: `kubectl logs ... -c agent | grep "detected devices"` — CUDADevice 배열이 비어있지 않아야 함
+
+---
+
+## 6. 다음 단계 — vfolder / storage-proxy 도입 (2026-04-21 기준 계획)
+
+현재 데모 가능한 최소 기능은 완료 (control plane + agent 등록 + 단일/멀티노드 CPU 세션 + 단일노드 GPU 세션 end-to-end). 사용자 관점으로 제품화하려면 3가지 축이 남음: **vfolder / storage-proxy**, **AppProxy**, **Web Server**. 이 중 가장 손대기 쉬운 vfolder 축부터 진행.
+
+### 6.1 배경 — 이 클러스터에 NFS 인프라가 없음
+
+실 운영 환경은 전용 NFS 서버가 있지만 현재 3노드 lab 클러스터에는 공유 스토리지가 없음. 개발/검증 용도로 **NFS 서버를 Docker 컨테이너로 띄워서** 사용 — 실제 운영에서는 외부 NFS(또는 CephFS/S3)로 교체 가능한 구조로 만듦.
+
+### 6.2 테스트 수준 L1 → L2 → L3 단계별 계획
+
+| 수준 | 목표 | 작업 | 검증 기준 |
+|---|---|---|---|
+| **L1. 공유 scratch (vfolder API 없음)** | 모든 노드에서 보이는 공유 디렉터리가 커널 컨테이너에 마운트됨 | (1) NFS 서버 Docker 컨테이너 ser8에 배포<br>(2) 각 agent 노드에 `/vfroot` NFS mount (systemd-mount)<br>(3) agent 차트에 optional `hostPath: /vfroot` → 커널 mount 옵션 추가 | 세션 두 개(같은 노드/다른 노드)에서 같은 파일을 읽고 쓸 수 있음 |
+| **L2. vfolder API (단일노드)** | `./bai vfolder create/upload/download/mount` end-to-end | (4) `deploy/helm/backend-ai-storage-proxy/` 신규 차트 작성<br>(5) storage-proxy Deployment (1 replica, ser8 pin, hostPath `/vfroot`)<br>(6) Service 2포트: `6021` (manager API), `6022` (client API)<br>(7) manager etcd-seed Job에 volume proxy 등록 추가<br>(8) storage backend (`vfs` driver) 정의 | 세션 create 시 `--mount myfolder:/work` 적용, 업로드한 파일이 컨테이너 내부에서 보임 |
+| **L3. vfolder multi-node** | 다른 노드에서도 같은 vfolder 접근 | L2 + 모든 agent 노드가 같은 `/vfroot` NFS pre-mount 이미 완료(L1에서 구현됨) | 다른 노드에 스케줄된 세션에서 동일 vfolder 파일 접근 |
+
+### 6.3 L1 세부 작업
+
+**NFS 서버 컨테이너 (ser8)**
+```bash
+mkdir -p /srv/bai-shared/vfroot
+# Ubuntu 24.04은 nfsd 모듈 기본 제공
+docker run -d --name bai-nfs --privileged --restart unless-stopped \
+  -v /srv/bai-shared:/srv/bai-shared \
+  -e SHARED_DIRECTORY=/srv/bai-shared \
+  -p 2049:2049 \
+  itsthenetwork/nfs-server-alpine:latest
+```
+
+**각 agent 노드에 NFS 마운트**
+```bash
+# charsyam-nvidia에서
+apt-get install -y nfs-common
+mkdir -p /vfroot
+echo "ser8:/srv/bai-shared/vfroot  /vfroot  nfs4  rw,hard,timeo=600,retrans=2  0 0" >> /etc/fstab
+mount /vfroot
+# ser8도 동일 (서버와 같은 노드지만 mount 경로는 /vfroot로 통일)
+```
+
+**agent 차트 변경** (`deploy/helm/backend-ai-agent/values.yaml` + `templates/daemonset.yaml`)
+- `agent.vfolderHostPath` 필드 추가 (기본 disabled, `"/vfroot"` 등)
+- 활성화 시 DaemonSet에 `hostPath: /vfroot` volume + container mount 추가
+- 세션 create 시 `mounts` 필드에 vfolder spec 전달되면 agent가 자동 bind (기존 `mount_vfolders` 경로 — 하지만 vfolder 메타데이터 없으면 호출 안 됨)
+
+**L1 한계**: Backend.AI의 `mount_vfolders`는 Manager가 kernel_config에 vfolder 목록을 주입해야 작동. Manager는 DB의 vfolder 레코드를 보고 주입. vfolder 레코드를 만들려면 storage-proxy 등록이 필요. 즉 L1만으로는 "세션에 공유 경로가 자동으로 붙는다"가 구현 안 됨.
+
+**L1의 실제 검증**: agent 차트의 hostPath 옵션이 정상 적용되는지, NFS mount가 각 노드에서 유지되는지, 수동으로 `docker run -v /vfroot:/work ...` 해봤을 때 양 노드에서 같은 파일이 보이는지까지. vfolder API를 안 쓰므로 세션 생성 시 mount 적용은 불가능 — L2에서 해결.
+
+### 6.4 L2 세부 작업 — storage-proxy 차트 신규
+
+**차트 구조** (`deploy/helm/backend-ai-storage-proxy/`)
+- `Chart.yaml` — appVersion 26.4.0
+- `values.yaml` — replica=1, nodeSelector(ser8), hostPath vfroot, etcd 좌표, secret
+- `templates/deployment.yaml` — storage-proxy pod
+- `templates/service.yaml` — manager API (6021), client API (6022)
+- `templates/configmap-storage-proxy-toml.yaml` — `storage-proxy.toml` 렌더링
+
+**storage-proxy.toml 핵심 필드**
+```toml
+[storage-proxy]
+ipc-base-path = "/tmp/backend.ai/ipc"
+event-loop = "uvloop"
+node-id = "storage-proxy-1"
+
+[api.manager]
+service-addr = { host = "0.0.0.0", port = 6021 }
+secret = "..."  # manager와 공유
+
+[api.client]
+service-addr = { host = "0.0.0.0", port = 6022 }
+
+[[volume]]
+name = "default"
+backend = "vfs"
+path = "/vfroot"
+
+[etcd]
+namespace = "local"
+addr = { host = "bai-etcd.backend-ai.svc.cluster.local", port = 2379 }
+```
+
+**Manager 쪽 etcd 등록** (`backend-ai-manager` 차트의 `etcdSeed` Job 확장)
+```
+/sorna/local/volumes/_types                        → ["proxy1"]
+/sorna/local/volumes/proxies/proxy1/client_api     → http://storage-proxy.ingress/client-api
+/sorna/local/volumes/proxies/proxy1/manager_api    → http://bai-storage-proxy:6021
+/sorna/local/volumes/proxies/proxy1/secret         → (manager secret)
+/sorna/local/volumes/proxies/proxy1/default_host   → proxy1:default
+```
+
+**관리자 CLI로 storage host 등록**
+```
+./bai admin vfs-storage create --name default --proxy proxy1 ...
+```
+
+**검증 시나리오**
+1. `./bai vfolder create test-folder` → DB + filesystem에 디렉터리 생성
+2. `./bai vfolder upload test-folder <file>` → storage-proxy client API로 업로드, `/vfroot/test-folder`에 파일 존재
+3. 세션 생성 시 `--mounts test-folder` → 컨테이너 내부 `/home/work/test-folder`에서 파일 보임
+4. 세션 종료 후 vfolder 내용 유지
+5. `./bai vfolder download test-folder <file>` → storage-proxy client API로 다운로드
+
+### 6.5 L3 세부 작업 — multi-node 확장
+
+L2에서 `/vfroot`를 모든 agent 노드에 pre-mount하는 것만 보장하면 multi-node는 자동 동작. 확인 사항:
+
+- GPU 노드와 CPU 노드 둘 다 `/vfroot` mount 살아있는지
+- `./bai session enqueue ... --agent-list i-charsyam-nvidia` / `--agent-list i-ser8` 로 강제 배치 후 같은 vfolder 접근 가능 여부
+- 멀티노드 클러스터(`cluster-size=2`)에서 main1 / sub1 모두 vfolder 접근
+
+### 6.6 작업 순서 & 예상 소요
+
+| 순서 | 작업 | 예상 |
+|---|---|---|
+| 1 | L1.1 NFS Docker 컨테이너 기동, 3노드 중 2개 (ser8 + charsyam-nvidia)에 `/vfroot` mount | 30분 |
+| 2 | L1.2 agent 차트에 optional `vfolderHostPath` 추가, 수동 `docker run -v` 검증 | 1시간 |
+| 3 | L2.1 storage-proxy 차트 작성 (Deployment / Service / ConfigMap) | 반나절 |
+| 4 | L2.2 storage-proxy 이미지 빌드 (`docker/backend.ai-storage-proxy.dockerfile` 재사용) | 1시간 |
+| 5 | L2.3 manager etcd-seed Job에 volume proxy 등록 추가 | 1시간 |
+| 6 | L2.4 storage host DB 레코드 (fixture or CLI) | 1시간 |
+| 7 | L2.5 `./bai vfolder create/upload/download/mount` end-to-end 테스트 | 반나절 (디버깅 포함) |
+| 8 | L3 multi-node smoke (existing cluster-size=2 CPU 세션 + vfolder) | 1시간 |
+
+총합 약 **2일** (실제 디버깅 고려하면 3일 여유).
+
+### 6.7 L1 시작 전 체크리스트
+
+- [ ] ser8에 docker 여유 공간 (`df -h /var/lib/docker`) 10GB+ 확인
+- [ ] charsyam-nvidia에 `nfs-common` 패키지 설치 가능 확인
+- [ ] ser8 방화벽에서 :2049 오픈 (기존 6001/6007 외에)
+- [ ] ser8의 nfsd kernel module 로드 가능 (`modprobe nfsd`)
+- [ ] agent 차트의 nodeSelector/affinity와 NFS mount가 호환되는지 (현재 CPU release는 NotIn gpu, GPU release는 accelerator=gpu — 둘 다 ser8 + nvidia에서 동작, NFS는 양쪽에 필요)
+
+### 6.8 범위 외 (이번 작업에 포함 안 함)
+
+- **AppProxy 차트** (I-7): 별도 다음 사이클
+- **Web Server 차트**: 별도
+- **S3 / CephFS 백엔드**: Plan 2+
+- **NFS HA** (keepalived, DRBD 등): 운영 배포 시
+- **PersistentVolume CSI 통합** (`csi-driver-nfs`): K8s-native 선호 시 대안
