@@ -95,7 +95,7 @@ class ScopeChainPermissionCheckInput:
 
 
 @dataclass(frozen=True)
-class BatchPermissionCheckInput:
+class BulkPermissionCheckInput:
     user_id: uuid.UUID
     target_element_type: RBACElementType
     target_entity_ids: list[str]

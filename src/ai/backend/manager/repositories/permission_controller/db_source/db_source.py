@@ -28,7 +28,7 @@ from ai.backend.manager.data.permission.permission import (
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     AssignedUserListResult,
-    BatchPermissionCheckInput,
+    BulkPermissionCheckInput,
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
@@ -956,9 +956,9 @@ class PermissionDBSource:
         )
         return data.target_element_ref.element_id in granted
 
-    async def check_batch_permission_with_scope_chain(
+    async def check_bulk_permission_with_scope_chain(
         self,
-        data: BatchPermissionCheckInput,
+        data: BulkPermissionCheckInput,
     ) -> dict[str, bool]:
         """Batch CTE-based permission check for multiple entities."""
         if not data.target_entity_ids:

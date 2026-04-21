@@ -1,6 +1,6 @@
 """
-Tests for PermissionDBSource.check_batch_permission_with_scope_chain().
-Covers batched CTE-based scope chain traversal with per-entity results.
+Tests for PermissionDBSource.check_bulk_permission_with_scope_chain().
+Covers bulk CTE-based scope chain traversal with per-entity results.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.manager.data.permission.role import BatchPermissionCheckInput
+from ai.backend.manager.data.permission.role import BulkPermissionCheckInput
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -72,7 +72,7 @@ class BatchFixture:
             self.vfolder_ids = [str(uuid.uuid4()) for _ in range(3)]
 
 
-class TestCheckBatchPermissionWithScopeChain:
+class TestCheckBulkPermissionWithScopeChain:
     """Tests for batched CTE-based scope chain permission traversal."""
 
     @pytest.fixture
@@ -417,8 +417,8 @@ class TestCheckBatchPermissionWithScopeChain:
         self,
         fixture: BatchFixture,
         operation: OperationType,
-    ) -> BatchPermissionCheckInput:
-        return BatchPermissionCheckInput(
+    ) -> BulkPermissionCheckInput:
+        return BulkPermissionCheckInput(
             user_id=fixture.user_id,
             target_element_type=RBACElementType.VFOLDER,
             target_entity_ids=fixture.vfolder_ids,
@@ -434,8 +434,8 @@ class TestCheckBatchPermissionWithScopeChain:
     ) -> None:
         """Empty target_entity_ids returns empty dict."""
         fixture = user_with_active_role
-        result = await db_source.check_batch_permission_with_scope_chain(
-            BatchPermissionCheckInput(
+        result = await db_source.check_bulk_permission_with_scope_chain(
+            BulkPermissionCheckInput(
                 user_id=fixture.user_id,
                 target_element_type=RBACElementType.VFOLDER,
                 target_entity_ids=[],
@@ -457,7 +457,7 @@ class TestCheckBatchPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """All vfolders in same project with READ permission -> all True."""
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(user_with_active_role, OperationType.READ),
         )
         assert all(result.values())
@@ -477,7 +477,7 @@ class TestCheckBatchPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """Permission at DOMAIN scope propagates through chain to all vfolders."""
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(user_with_active_role, OperationType.UPDATE),
         )
         assert all(result.values())
@@ -490,7 +490,7 @@ class TestCheckBatchPermissionWithScopeChain:
         all_vfolders_in_project_auto: None,
     ) -> None:
         """No permissions -> all False."""
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(user_with_active_role, OperationType.READ),
         )
         assert not any(result.values())
@@ -510,7 +510,7 @@ class TestCheckBatchPermissionWithScopeChain:
     ) -> None:
         """AUTO edge -> granted, REF edge -> denied, no edge -> denied."""
         fixture = user_with_active_role
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(fixture, OperationType.READ),
         )
         assert result[fixture.vfolder_ids[0]]  # AUTO
@@ -530,7 +530,7 @@ class TestCheckBatchPermissionWithScopeChain:
     ) -> None:
         """Self-scope permission on vfolder[0] only; others denied."""
         fixture = user_with_active_role
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(fixture, OperationType.READ),
         )
         assert result[fixture.vfolder_ids[0]]
@@ -550,7 +550,7 @@ class TestCheckBatchPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """READ permission does not satisfy UPDATE check."""
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(user_with_active_role, OperationType.UPDATE),
         )
         assert not any(result.values())
@@ -568,7 +568,7 @@ class TestCheckBatchPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """Inactive role does not grant any permission in batch."""
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(user_with_inactive_role, OperationType.READ),
         )
         assert not any(result.values())
@@ -595,7 +595,7 @@ class TestCheckBatchPermissionWithScopeChain:
     ) -> None:
         """vfolder[0] via chain (AUTO), vfolder[1] via self-scope, vfolder[2] denied."""
         fixture = user_with_active_role
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(fixture, OperationType.READ),
         )
         assert result[fixture.vfolder_ids[0]]  # via chain
@@ -616,7 +616,7 @@ class TestCheckBatchPermissionWithScopeChain:
     ) -> None:
         """Domain permission grants vfolders in child projects but not in another domain."""
         fixture = user_with_active_role
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(fixture, OperationType.READ),
         )
         assert result[fixture.vfolder_ids[0]]  # domain_a -> project_a -> vfolder[0]
@@ -631,7 +631,7 @@ class TestCheckBatchPermissionWithScopeChain:
         other_user_with_project_permission: None,
     ) -> None:
         """Permission for another user does not leak into batch results."""
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(user_with_active_role, OperationType.READ),
         )
         assert not any(result.values())
@@ -692,7 +692,7 @@ class TestCheckBatchPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """Cyclic scope chain terminates without infinite recursion; permission is found."""
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(user_with_active_role, OperationType.READ),
         )
         assert all(result.values())
@@ -704,7 +704,7 @@ class TestCheckBatchPermissionWithScopeChain:
         scope_chain_with_cycle: None,
     ) -> None:
         """Cyclic scope chain terminates without infinite recursion; no permission granted."""
-        result = await db_source.check_batch_permission_with_scope_chain(
+        result = await db_source.check_bulk_permission_with_scope_chain(
             self._make_input(user_with_active_role, OperationType.READ),
         )
         assert not any(result.values())

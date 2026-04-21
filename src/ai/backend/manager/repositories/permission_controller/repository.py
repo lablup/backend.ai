@@ -19,7 +19,7 @@ from ai.backend.manager.data.permission.permission import (
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
     BatchEntityPermissionCheckInput,
-    BatchPermissionCheckInput,
+    BulkPermissionCheckInput,
     BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
     BulkRoleRevocationResultData,
@@ -339,13 +339,13 @@ class PermissionControllerRepository:
         return await self._db_source.check_permission_with_scope_chain(data)
 
     @permission_controller_repository_resilience.apply()
-    async def check_batch_permission_with_scope_chain(
+    async def check_bulk_permission_with_scope_chain(
         self,
-        data: BatchPermissionCheckInput,
+        data: BulkPermissionCheckInput,
     ) -> dict[str, bool]:
         """Batch permission check that traverses the scope chain via AUTO edges.
 
         Same semantics as check_permission_with_scope_chain but for multiple
         entities of the same RBACElementType in a single query.
         """
-        return await self._db_source.check_batch_permission_with_scope_chain(data)
+        return await self._db_source.check_bulk_permission_with_scope_chain(data)
