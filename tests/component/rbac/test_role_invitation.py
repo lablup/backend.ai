@@ -61,6 +61,7 @@ def permission_controller_processors(
     )
     validators = MagicMock()
     validators.rbac.scope.validate = AsyncMock()
+    validators.rbac.single_entity.validate = AsyncMock()
     return PermissionControllerProcessors(
         service=service, action_monitors=[], validators=validators
     )

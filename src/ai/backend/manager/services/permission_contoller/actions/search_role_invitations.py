@@ -217,11 +217,7 @@ class SearchMyRoleInvitationsActionResult(_InvitationScopeActionResult):
 
 @dataclass
 class SearchRoleInvitationsByRoleAction(_RoleScopedInvitationAction):
-    """Search invitations by role (admin/project-admin view).
-
-    Uses plain ActionProcessor without RBAC validator — RBAC enforcement
-    for this operation is deferred to a future iteration.
-    """
+    """Search invitations by role (admin/project-admin view)."""
 
     querier: BatchQuerier
     scope: RoleInvitationSearchScope
