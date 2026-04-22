@@ -11,7 +11,15 @@ import shutil
 import signal
 import struct
 import sys
-from collections.abc import AsyncGenerator, Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
@@ -194,7 +202,11 @@ deeplearning_sample_volume = VolumeInfo(
 
 
 async def get_extra_volumes(docker: Docker, lang: str) -> list[VolumeInfo]:
-    avail_volumes = (await docker.volumes.list())["Volumes"]  # type: ignore[no-untyped-call]
+    volumes_result = await _retry_on_stale_connection(
+        lambda: docker.volumes.list(),  # type: ignore[no-untyped-call]
+        operation="list_volumes",
+    )
+    avail_volumes = volumes_result["Volumes"]
     if not avail_volumes:
         return []
     avail_volume_names = {v["Name"] for v in avail_volumes}
@@ -278,6 +290,40 @@ def _DockerContainerError_reduce(self: DockerContainerError) -> tuple[type, tupl
         type(self),
         (self.status, {"message": self.message}, self.container_id, *self.args),
     )
+
+
+_STALE_CONNECTION_ERRORS: Final[tuple[type[BaseException], ...]] = (
+    aiohttp.ClientConnectionError,
+    aiohttp.ServerDisconnectedError,
+)
+
+
+async def _retry_on_stale_connection[T](
+    coro_factory: Callable[[], Awaitable[T]],
+    *,
+    operation: str,
+) -> T:
+    """Run ``coro_factory()``; on stale-connection errors, retry exactly once.
+
+    The shared aiodocker client pools keepalive sockets inside its
+    ``aiohttp.ClientSession``. After ``systemctl restart docker``, the first
+    post-restart call can pick a stale socket and fail with
+    ``aiohttp.ClientConnectionError`` or ``aiohttp.ServerDisconnectedError``;
+    aiohttp reconnects transparently on the next attempt, so a single retry
+    is sufficient to absorb the one-shot failure.
+
+    For persistent connection failures (e.g., dockerd actually down), the
+    second attempt fails and the exception propagates normally.
+    """
+    try:
+        return await coro_factory()
+    except _STALE_CONNECTION_ERRORS as e:
+        log.warning(
+            "stale aiodocker connection on {}; retrying once: {!r}",
+            operation,
+            e,
+        )
+        return await coro_factory()
 
 
 @dataclass
@@ -1251,7 +1297,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         docker = self.docker
         container: DockerContainer | None = None
         try:
-            container = await docker.containers.create(config=container_config, name=kernel_name)
+            container = await _retry_on_stale_connection(
+                lambda: docker.containers.create(config=container_config, name=kernel_name),
+                operation="create_kernel_container",
+            )
             if container is None:
                 raise ContainerCreationError(
                     container_id="",
@@ -1282,7 +1331,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             raise
 
         try:
-            await container.start()
+            await _retry_on_stale_connection(
+                lambda: container.start(),
+                operation="start_kernel_container",
+            )
         except asyncio.CancelledError as e:
             await _rollback_container_creation()
             raise ContainerCreationError(
@@ -1320,8 +1372,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             additional_network_names |= set(n)
 
         for name in additional_network_names:
-            network = await docker.networks.get(name)
-            await network.connect({"Container": container._id})
+            network = await _retry_on_stale_connection(
+                lambda: docker.networks.get(name),
+                operation="get_network",
+            )
+            await _retry_on_stale_connection(
+                lambda: network.connect({"Container": container._id}),
+                operation="connect_network",
+            )
 
         kernel_obj.set_container_id(ContainerId(cid))
         container_network_info: ContainerNetworkInfo | None = None
@@ -1623,7 +1681,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @override
     async def extract_image_command(self, image: str) -> str | None:
-        result = await self.docker.images.get(image)
+        result = await _retry_on_stale_connection(
+            lambda: self.docker.images.get(image),
+            operation="get_image",
+        )
         return cast(str | None, result["Config"].get("Cmd"))
 
     @override
@@ -1633,7 +1694,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     ) -> Sequence[tuple[KernelId, Container]]:
         result = []
         fetch_tasks = []
-        for container in await self.docker.containers.list():
+        containers = await _retry_on_stale_connection(
+            lambda: self.docker.containers.list(),
+            operation="list_containers",
+        )
+        for container in containers:
 
             async def _fetch_container_info(container: DockerContainer) -> None:
                 kernel_id_str: str = "(unknown)"
@@ -1647,7 +1712,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
                         )
                         if self.id == owner_id:
-                            await container.show()
+                            await _retry_on_stale_connection(
+                                lambda: container.show(),
+                                operation="show_container",
+                            )
                             result.append(
                                 (
                                     kernel_id,
@@ -1701,12 +1769,31 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             "Cmd": ["ldd", "--version"],
         }
 
-        container = await docker.containers.create(container_config)
-        await container.start()
-        await container.wait()  # wait until container finishes to prevent race condition
-        container_log = await container.log(stdout=True, stderr=True, follow=False)
-        await container.stop()
-        await container.delete()
+        container = await _retry_on_stale_connection(
+            lambda: docker.containers.create(container_config),
+            operation="create_distro_probe_container",
+        )
+        await _retry_on_stale_connection(
+            lambda: container.start(),
+            operation="start_distro_probe_container",
+        )
+        # wait until container finishes to prevent race condition
+        await _retry_on_stale_connection(
+            lambda: container.wait(),
+            operation="wait_distro_probe_container",
+        )
+        container_log = await _retry_on_stale_connection(
+            lambda: container.log(stdout=True, stderr=True, follow=False),
+            operation="log_distro_probe_container",
+        )
+        await _retry_on_stale_connection(
+            lambda: container.stop(),
+            operation="stop_distro_probe_container",
+        )
+        await _retry_on_stale_connection(
+            lambda: container.delete(),
+            operation="delete_distro_probe_container",
+        )
         log.debug("response: {}", container_log)
         version_lines = container_log[0].splitlines()
         if m := LDD_GLIBC_REGEX.search(version_lines[0]):
@@ -1730,7 +1817,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     @override
     async def scan_images(self) -> ScanImagesResult:
         docker = self.docker
-        all_images = await docker.images.list()
+        all_images = await _retry_on_stale_connection(
+            lambda: docker.images.list(),
+            operation="list_images",
+        )
         scanned_images: dict[ImageCanonical, InstalledImageInfo] = {}
         removed_images: dict[ImageCanonical, InstalledImageInfo] = {}
         for image in all_images:
@@ -1751,7 +1841,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         self.checked_invalid_images.add(repo_tag)
                     continue
 
-                img_detail = await docker.images.inspect(repo_tag)
+                img_detail = await _retry_on_stale_connection(
+                    lambda: docker.images.inspect(repo_tag),
+                    operation="inspect_image",
+                )
                 labels = (img_detail.get("Config") or {}).get("Labels")
                 if labels is None:
                     continue
@@ -1891,7 +1984,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         kwargs: dict[str, Any] = {"auth": auth_config}
         if timeout_seconds != Sentinel.TOKEN:
             kwargs["timeout"] = timeout_seconds
-        result = await self.docker.images.push(image_ref.canonical, **kwargs)
+        result = await _retry_on_stale_connection(
+            lambda: self.docker.images.push(image_ref.canonical, **kwargs),
+            operation="push_image",
+        )
 
         if not result:
             raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
@@ -1915,8 +2011,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 "auth": encoded_creds,
             }
         log.info("pulling image {} from registry", image_ref.canonical)
-        result = await self.docker.images.pull(
-            image_ref.canonical, auth=auth_config, timeout=timeout_seconds
+        result = await _retry_on_stale_connection(
+            lambda: self.docker.images.pull(
+                image_ref.canonical, auth=auth_config, timeout=timeout_seconds
+            ),
+            operation="pull_image",
         )
 
         if not result:
@@ -1926,8 +2025,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def _purge_image(self, request: DockerPurgeImageReq) -> PurgeImageResp:
         try:
-            await self.docker.images.delete(
-                request.image, force=request.force, noprune=request.noprune
+            await _retry_on_stale_connection(
+                lambda: self.docker.images.delete(
+                    request.image, force=request.force, noprune=request.noprune
+                ),
+                operation="delete_image",
             )
             return PurgeImageResp.success(image=request.image)
         except Exception as e:
@@ -1960,7 +2062,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
         try:
-            image_info = await self.docker.images.inspect(image_ref.canonical)
+            image_info = await _retry_on_stale_connection(
+                lambda: self.docker.images.inspect(image_ref.canonical),
+                operation="inspect_image",
+            )
             if auto_pull == AutoPullBehavior.DIGEST:
                 if image_info["Id"] != image_id:
                     return True
@@ -2050,7 +2155,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             container = self.docker.containers.container(container_id)
             # The default timeout of the docker stop API is 10 seconds
             # to kill if container does not self-terminate.
-            await container.stop()
+            await _retry_on_stale_connection(
+                lambda: container.stop(),
+                operation="stop_container",
+            )
         except DockerError as e:
             if e.status == HTTPStatus.CONFLICT and "is not running" in e.message:
                 # already dead
@@ -2129,7 +2237,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             container = docker.containers.container(container_id)
             try:
                 with timeout(90):
-                    await container.delete(force=True, v=True)
+                    await _retry_on_stale_connection(
+                        lambda: container.delete(force=True, v=True),
+                        operation="delete_container",
+                    )
             except DockerError as e:
                 if (
                     e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
@@ -2165,24 +2276,36 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def create_local_network(self, network_name: str) -> None:
         docker = self.docker
         try:
-            await docker.networks.get(network_name)
+            await _retry_on_stale_connection(
+                lambda: docker.networks.get(network_name),
+                operation="get_network",
+            )
         except DockerError as e:
             if e.status == HTTPStatus.NOT_FOUND:
-                await docker.networks.create({
-                    "Name": network_name,
-                    "Driver": "bridge",
-                    "Labels": {
-                        "ai.backend.cluster-network": "1",
-                    },
-                })
+                await _retry_on_stale_connection(
+                    lambda: docker.networks.create({
+                        "Name": network_name,
+                        "Driver": "bridge",
+                        "Labels": {
+                            "ai.backend.cluster-network": "1",
+                        },
+                    }),
+                    operation="create_network",
+                )
             else:
                 raise
 
     @override
     async def destroy_local_network(self, network_name: str) -> None:
         try:
-            network = await self.docker.networks.get(network_name)
-            await network.delete()
+            network = await _retry_on_stale_connection(
+                lambda: self.docker.networks.get(network_name),
+                operation="get_network",
+            )
+            await _retry_on_stale_connection(
+                lambda: network.delete(),
+                operation="delete_network",
+            )
         except DockerError as e:
             if e.status == HTTPStatus.NOT_FOUND:
                 # skip silently if already removed/missing

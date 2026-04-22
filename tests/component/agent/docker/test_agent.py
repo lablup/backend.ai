@@ -8,11 +8,12 @@ from pickle import PickleError
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import pytest
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.agent import AgentClass
-from ai.backend.agent.docker.agent import DockerAgent
+from ai.backend.agent.docker.agent import DockerAgent, _retry_on_stale_connection
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.docker import ImageRef
@@ -248,3 +249,82 @@ async def test_shared_docker_client_closed_when_super_shutdown_raises(
     with pytest.raises(_SimulatedShutdownError):
         await unmanaged_agent.shutdown(signal.SIGTERM)
     assert unmanaged_agent.docker.session.closed is True
+
+
+class TestRetryOnStaleConnection:
+    """Unit tests for the stale-connection retry helper."""
+
+    async def test_retry_on_stale_connection_retries_once_then_succeeds(self) -> None:
+        calls = 0
+        sentinel = object()
+
+        async def factory() -> Any:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise aiohttp.ClientConnectionError("stale socket")
+            return sentinel
+
+        result = await _retry_on_stale_connection(factory, operation="test_op")
+        assert result is sentinel
+        assert calls == 2
+
+    async def test_retry_on_stale_connection_retries_once_on_server_disconnected(self) -> None:
+        calls = 0
+        sentinel = object()
+
+        async def factory() -> Any:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise aiohttp.ServerDisconnectedError()
+            return sentinel
+
+        result = await _retry_on_stale_connection(factory, operation="test_op")
+        assert result is sentinel
+        assert calls == 2
+
+    async def test_retry_on_stale_connection_does_not_retry_other_errors(self) -> None:
+        calls = 0
+        docker_error = DockerError(
+            status=HTTPStatus.CONFLICT,
+            data={"message": "simulated conflict"},
+        )
+
+        async def factory() -> Any:
+            nonlocal calls
+            calls += 1
+            raise docker_error
+
+        with pytest.raises(DockerError) as exc_info:
+            await _retry_on_stale_connection(factory, operation="test_op")
+        assert exc_info.value is docker_error
+        assert calls == 1
+
+    async def test_retry_on_stale_connection_propagates_persistent_failure(self) -> None:
+        calls = 0
+
+        async def factory() -> Any:
+            nonlocal calls
+            calls += 1
+            raise aiohttp.ClientConnectionError(f"persistent failure {calls}")
+
+        with pytest.raises(aiohttp.ClientConnectionError):
+            await _retry_on_stale_connection(factory, operation="test_op")
+        # First attempt + one retry = 2 invocations total.
+        assert calls == 2
+
+
+async def test_check_image_retries_on_stale_connection(agent: DockerAgent, mocker: Any) -> None:
+    """``check_image`` should absorb a one-shot stale-socket error."""
+    behavior = AutoPullBehavior.DIGEST
+    inspect_mock = AsyncMock(
+        side_effect=[
+            aiohttp.ClientConnectionError("stale socket"),
+            digest_matching_image_info,
+        ],
+    )
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
+    pull = await agent.check_image(imgref, query_digest, behavior)
+    assert not pull
+    assert inspect_mock.await_count == 2
