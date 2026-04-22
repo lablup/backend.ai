@@ -433,12 +433,25 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Mapping[str, Any]:
         cores = [*map(int, device_alloc[SlotName("cpu")].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
+        host_config: dict[str, Any] = {
+            "Cpus": len(cores),
+            "CpusetCpus": ",".join(sorted_core_ids),
+        }
+        devices = await self.list_devices()
+        core_to_node = {int(dev.device_id): dev.numa_node for dev in devices}
+        allocated_nodes: set[int] = set()
+        for core in cores:
+            node = core_to_node.get(core)
+            if node is None or node < 0:
+                allocated_nodes.clear()
+                break
+            allocated_nodes.add(node)
+        # Pin memory to the NUMA node only when the allocation is fully node-local;
+        # Docker does not expose a multi-node cpuset.mems equivalent via HostConfig.
+        if len(allocated_nodes) == 1:
+            host_config["CpusetMems"] = str(next(iter(allocated_nodes)))
         return {
-            "HostConfig": {
-                "Cpus": len(cores),
-                "CpusetCpus": ",".join(sorted_core_ids),
-                # 'CpusetMems': f'{resource_spec.numa_node}',
-            },
+            "HostConfig": host_config,
         }
 
     async def restore_from_container(
