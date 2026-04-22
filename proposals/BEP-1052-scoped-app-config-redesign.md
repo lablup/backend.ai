@@ -949,6 +949,12 @@ arguments) in the request body and returns the same result.
 
 ## 5. `user_app_config` semantics — Merge policy
 
+> The merge semantics described here apply **only to the `USER`
+> scope**. `PUBLIC`, `DOMAIN`, and `DOMAIN_USER_DEFAULTS` rows are
+> read as-is — no cross-scope merge, no `mergedConfig` /
+> `domainConfig` / `domainDefaultConfig` companion views, just the
+> raw stored `extra_config`.
+
 ### Storage
 
 - `user_app_config.extra_config` (the DB column, exposed as
