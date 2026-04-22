@@ -138,6 +138,7 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     name="CreateVFolderInProjectInput",
 )
 class CreateVFolderInProjectInputGQL(PydanticInputMixin[CreateInProjectInputDTO]):
+    project_id: UUID = gql_field(description="Project UUID that owns the vfolder.")
     name: str = gql_field(description="VFolder name.")
     host: str | None = gql_field(default=None, description="Storage host for the vfolder.")
     usage_mode: VFolderUsageModeGQL = gql_field(

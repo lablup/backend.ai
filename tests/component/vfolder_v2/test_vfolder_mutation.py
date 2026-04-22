@@ -252,6 +252,7 @@ class TestCreateVFolderInProjectRBAC:
     ) -> None:
         """Regular user without project CREATE permission is denied before service runs."""
         request = CreateVFolderInProjectInput(
+            project_id=group_fixture,
             name=f"rbac-denied-{secrets.token_hex(4)}",
             host="local",
             usage_mode=VFolderUsageMode.GENERAL,
@@ -259,4 +260,4 @@ class TestCreateVFolderInProjectRBAC:
             cloneable=False,
         )
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.create_in_project(group_fixture, request)
+            await user_v2_registry.vfolder.create_in_project(request)

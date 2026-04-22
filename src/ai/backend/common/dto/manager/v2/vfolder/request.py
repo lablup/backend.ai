@@ -88,10 +88,13 @@ class CreateVFolderInput(BaseRequestModel):
 class CreateVFolderInProjectInput(BaseRequestModel):
     """Input for creating a virtual folder within a project.
 
-    Unlike ``CreateVFolderInput``, ``project_id`` is supplied as a separate
-    mutation/path argument so this model contains only the payload fields.
+    The project the vfolder belongs to is identified by ``project_id``. In
+    transport layers where the scope is expressed separately (REST path
+    segment, GraphQL scope argument), that value is injected into this
+    field before the DTO reaches the adapter.
     """
 
+    project_id: UUID = Field(description="Project UUID that owns the vfolder")
     name: VFolderName = Field(description="VFolder name")
     host: str | None = Field(default=None, description="Storage host for the vfolder")
     usage_mode: VFolderUsageMode = Field(

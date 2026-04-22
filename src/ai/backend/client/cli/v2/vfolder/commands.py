@@ -187,6 +187,7 @@ def project_create(
     from ai.backend.common.dto.manager.v2.vfolder.types import VFolderUsageMode
 
     input_dto = CreateVFolderInProjectInput(
+        project_id=project_id,
         name=name,
         usage_mode=VFolderUsageMode(usage_mode),
         host=host,
@@ -196,7 +197,7 @@ def project_create(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.vfolder.create_in_project(project_id, input_dto)
+            result = await registry.vfolder.create_in_project(input_dto)
             print_result(result)
         finally:
             await registry.close()

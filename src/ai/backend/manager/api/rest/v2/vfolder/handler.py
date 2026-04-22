@@ -112,8 +112,13 @@ class V2VFolderHandler:
         path: PathParam[ProjectIdPathParam],
         body: BodyParam[CreateVFolderInProjectInput],
     ) -> APIResponse:
-        """Create a vfolder owned by a project."""
-        result = await self._adapter.create_in_project(path.parsed.project_id, body.parsed)
+        """Create a vfolder owned by a project.
+
+        The path segment ``{project_id}`` is authoritative; any ``project_id``
+        value in the body is overridden to match the URL.
+        """
+        dto = body.parsed.model_copy(update={"project_id": path.parsed.project_id})
+        result = await self._adapter.create_in_project(dto)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def deploy(

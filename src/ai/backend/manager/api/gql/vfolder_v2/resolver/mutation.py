@@ -258,11 +258,10 @@ async def bulk_delete_vfolders_v2(
 )  # type: ignore[misc]
 async def create_vfolder_in_project(
     info: Info[StrawberryGQLContext],
-    project_id: UUID,
     input: CreateVFolderInProjectInputGQL,
 ) -> CreateVFolderPayloadGQL:
     """Create a new virtual folder scoped to a project."""
-    payload = await info.context.adapters.vfolder.create_in_project(project_id, input.to_pydantic())
+    payload = await info.context.adapters.vfolder.create_in_project(input.to_pydantic())
     return CreateVFolderPayloadGQL.from_pydantic(payload)
 
 

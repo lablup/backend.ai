@@ -369,10 +369,9 @@ class VFolderAdapter(BaseAdapter):
 
     async def create_in_project(
         self,
-        project_id: UUID,
         input: CreateVFolderInProjectInput,
     ) -> CreateVFolderPayload:
-        """Create a vfolder owned by ``project_id``.
+        """Create a vfolder owned by ``input.project_id``.
 
         Uses ``CreateVFolderInProjectAction`` which is PROJECT-scoped so the
         caller must hold CREATE permission on the project.
@@ -381,7 +380,7 @@ class VFolderAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         action = CreateVFolderInProjectAction(
-            project_id=project_id,
+            project_id=input.project_id,
             user_id=me.user_id,
             domain_name=me.domain_name,
             name=input.name,

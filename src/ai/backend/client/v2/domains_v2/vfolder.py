@@ -81,13 +81,15 @@ class V2VFolderClient(BaseDomainClient):
 
     async def create_in_project(
         self,
-        project_id: UUID,
         request: CreateVFolderInProjectInput,
     ) -> CreateVFolderPayload:
-        """Create a vfolder owned by a project."""
+        """Create a vfolder owned by a project.
+
+        The target project is read from ``request.project_id``.
+        """
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/projects/{project_id}",
+            f"{_PATH}/projects/{request.project_id}",
             request=request,
             response_model=CreateVFolderPayload,
         )
