@@ -356,6 +356,7 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
+        # TODO(#11232): Consolidate per-plugin streamer into a single shared instance owned by the agent.
         self._stats_streamer = DockerStatsStreamer(self._docker)
 
     async def cleanup(self) -> None:
@@ -466,6 +467,7 @@ class CPUPlugin(AbstractComputePlugin):
                 return None
             return cpu_used
 
+        # TODO(#11223): After sysfs-first lands, CPU is sourced from sysfs and this stream becomes redundant here; migrate to a network/IO consumer.
         async def api_impl(container_id: str) -> float | None:
             ret = self._stats_streamer.get_latest(container_id)
             if ret is None:
@@ -687,6 +689,7 @@ class MemoryPlugin(AbstractComputePlugin):
 
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
+        # TODO(#11232): Consolidate per-plugin streamer into a single shared instance owned by the agent.
         self._stats_streamer = DockerStatsStreamer(self._docker)
 
     async def cleanup(self) -> None:
@@ -958,6 +961,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz,
             )
 
+        # TODO(#11223): After sysfs-first lands, memory is sourced from sysfs and this stream becomes redundant here; migrate to a network/IO consumer.
         async def api_impl(
             container_id: str,
         ) -> tuple[int, int, int, int, int, int, int] | None:

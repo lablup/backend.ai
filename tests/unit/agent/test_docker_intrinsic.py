@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
+from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.docker.intrinsic import (
@@ -819,6 +821,61 @@ class TestDockerStatsStreamerReconnect:
             await streamer.close()
             assert task.done()
             assert task.cancelled() or task.exception() is None
+
+    async def test_reader_exits_cleanly_on_container_gone_404(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """DockerError 404 from the stats stream means the container is gone:
+        the reader must exit cleanly (no retry spin, no warning-level log)."""
+
+        call_count = 0
+
+        async def frames(_cid: str) -> Any:
+            nonlocal call_count
+            call_count += 1
+            # Raise on the very first iteration to simulate an already-gone
+            # container. A no-op ``yield`` in an unreachable branch keeps this
+            # function an async generator without tripping ``unreachable`` mypy.
+            if call_count < 0:
+                yield {}
+            raise DockerError(404, {"message": "No such container"})
+
+        def fake_container_cls(docker: Any, id: str) -> _FakeDockerContainer:
+            return _FakeDockerContainer(frames, id)
+
+        with (
+            patch(
+                "ai.backend.agent.docker.intrinsic.DockerContainer",
+                side_effect=fake_container_cls,
+            ),
+            caplog.at_level(logging.DEBUG, logger="ai.backend.agent.docker.intrinsic"),
+        ):
+            streamer = DockerStatsStreamer(AsyncMock())
+            streamer.start("cid_gone")
+            task = streamer._tasks["cid_gone"]
+            # The reader must exit on its own; 404 must NOT spin in the retry loop.
+            await asyncio.wait_for(task, timeout=2.0)
+            assert task.done()
+            assert not task.cancelled()
+            assert task.exception() is None
+            # Only one stream-open attempt; no reconnect/retry on 404.
+            assert call_count == 1
+            # ``get_latest`` may re-spawn a reader as a safety net, but the
+            # cached sample was dropped in the reader's finally block and the
+            # respawned reader will hit the same 404 path, so the return value
+            # is still ``None``.
+            assert streamer._latest.get("cid_gone") is None
+            await streamer.close()
+            # 404 is a debug-level path; container-gone is not an error.
+            intrinsic_records = [
+                r for r in caplog.records if r.name == "ai.backend.agent.docker.intrinsic"
+            ]
+            for record in intrinsic_records:
+                assert record.levelno < logging.WARNING, (
+                    f"unexpected warning-or-above log: {record.levelname} {record.getMessage()}"
+                )
+            assert streamer.get_latest("cid_gone") is None
 
 
 class _AgentStub:
