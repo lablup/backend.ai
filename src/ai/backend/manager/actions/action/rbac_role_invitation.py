@@ -19,10 +19,10 @@ from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 
 
 @dataclass
-class CreateRoleInvitationByUsernameAction(BaseRBACAction):
-    """Project admin creates role invitations by invitee usernames or emails."""
+class CreateRoleInvitationByEmailAction(BaseRBACAction):
+    """Project admin creates role invitations by invitee emails."""
 
-    invitee_username_or_emails: list[str]
+    invitee_emails: list[str]
     inviter_user_id: UUID
     role_id: UUID
 

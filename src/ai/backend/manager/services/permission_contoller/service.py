@@ -12,7 +12,7 @@ from ai.backend.manager.actions.action.rbac import (
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     AcceptRoleInvitationAction,
     CancelRoleInvitationAction,
-    CreateRoleInvitationByUsernameAction,
+    CreateRoleInvitationByEmailAction,
     CreateRoleInvitationResult,
     RejectRoleInvitationAction,
 )
@@ -360,11 +360,11 @@ class PermissionControllerService:
             actions[action_cls.action_name()] = perm
         return GetPermissionMatrixActionResult(matrix=result)
 
-    async def create_role_invitation_by_username(
-        self, action: CreateRoleInvitationByUsernameAction
+    async def create_role_invitation_by_email(
+        self, action: CreateRoleInvitationByEmailAction
     ) -> CreateRoleInvitationResult:
-        """Create role invitations by resolving invitee usernames or emails."""
-        return await self._repository.create_invitation_by_username(action)
+        """Create role invitations by resolving invitee emails."""
+        return await self._repository.create_invitation_by_email(action)
 
     async def accept_role_invitation(
         self, action: AcceptRoleInvitationAction

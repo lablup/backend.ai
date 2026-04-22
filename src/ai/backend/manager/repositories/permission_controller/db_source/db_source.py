@@ -17,7 +17,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     AcceptRoleInvitationAction,
     CancelRoleInvitationAction,
-    CreateRoleInvitationByUsernameAction,
+    CreateRoleInvitationByEmailAction,
     CreateRoleInvitationResult,
     RejectRoleInvitationAction,
 )
@@ -1144,28 +1144,26 @@ class PermissionDBSource:
 
     # -- role invitation --
 
-    async def create_invitation_by_username(
+    async def create_invitation_by_email(
         self,
-        action: CreateRoleInvitationByUsernameAction,
+        action: CreateRoleInvitationByEmailAction,
     ) -> CreateRoleInvitationResult:
-        """Resolve usernames/emails and create invitations in a single transaction.
+        """Resolve emails and create invitations in a single transaction.
 
-        Identifiers that don't resolve to exactly one ACTIVE user are silently skipped.
+        Emails that don't resolve to exactly one ACTIVE user are silently skipped.
         Duplicate active invitations (caught by the partial unique index)
         are also silently skipped.
         """
         async with self._db.begin_session_read_committed() as session:
-            identifier_to_user_id = await self._resolve_invitation_identifiers(
-                session, action.invitee_username_or_emails
-            )
+            email_to_user_id = await self._resolve_invitation_emails(session, action.invitee_emails)
             specs = [
                 RoleInvitationCreatorSpec(
                     inviter_user_id=action.inviter_user_id,
                     invitee_user_id=user_id,
                     role_id=action.role_id,
                 )
-                for identifier in action.invitee_username_or_emails
-                if (user_id := identifier_to_user_id.get(identifier)) is not None
+                for email in action.invitee_emails
+                if (user_id := email_to_user_id.get(email)) is not None
             ]
             if not specs:
                 return CreateRoleInvitationResult()
@@ -1311,29 +1309,24 @@ class PermissionDBSource:
         return row
 
     @staticmethod
-    async def _resolve_invitation_identifiers(
+    async def _resolve_invitation_emails(
         session: SASession,
-        identifiers: list[str],
+        emails: Collection[str],
     ) -> dict[str, uuid.UUID]:
-        """Resolve usernames or emails to user UUIDs (ACTIVE users only).
+        """Resolve emails to user UUIDs (ACTIVE users only).
 
-        Each identifier is matched against both ``username`` and ``email``.
-        If more than one ACTIVE user matches a given identifier the entry is
-        silently skipped (ambiguous).
+        Emails that don't match exactly one ACTIVE user are silently skipped.
         """
-        stmt = sa.select(UserRow.username, UserRow.email, UserRow.uuid).where(
+        if not emails:
+            return {}
+        stmt = sa.select(UserRow.email, UserRow.uuid).where(
             UserRow.status == UserStatus.ACTIVE,
-            sa.or_(
-                UserRow.username.in_(identifiers),
-                UserRow.email.in_(identifiers),
-            ),
+            UserRow.email.in_(emails),
         )
         result = await session.execute(stmt)
         rows = result.all()
 
         resolved: dict[str, uuid.UUID] = {}
-        for identifier in identifiers:
-            matches = [r.uuid for r in rows if r.username == identifier or r.email == identifier]
-            if len(matches) == 1:
-                resolved[identifier] = matches[0]
+        for row in rows:
+            resolved[row.email] = row.uuid
         return resolved

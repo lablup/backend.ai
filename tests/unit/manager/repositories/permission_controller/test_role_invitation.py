@@ -11,7 +11,7 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     AcceptRoleInvitationAction,
     CancelRoleInvitationAction,
-    CreateRoleInvitationByUsernameAction,
+    CreateRoleInvitationByEmailAction,
     RejectRoleInvitationAction,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -235,9 +235,9 @@ class TestCreateRoleInvitation:
         invitee_email: str,
         inviter: uuid.UUID,
         role_id: uuid.UUID,
-    ) -> CreateRoleInvitationByUsernameAction:
-        return CreateRoleInvitationByUsernameAction(
-            invitee_username_or_emails=[invitee_email],
+    ) -> CreateRoleInvitationByEmailAction:
+        return CreateRoleInvitationByEmailAction(
+            invitee_emails=[invitee_email],
             inviter_user_id=inviter,
             role_id=role_id,
         )
@@ -246,50 +246,26 @@ class TestCreateRoleInvitation:
         self,
         perm_db: PermissionDBSource,
         invitee: uuid.UUID,
-        create_action: CreateRoleInvitationByUsernameAction,
+        create_action: CreateRoleInvitationByEmailAction,
     ) -> None:
-        result = await perm_db.create_invitation_by_username(create_action)
+        result = await perm_db.create_invitation_by_email(create_action)
 
         assert len(result.created) == 1
         assert result.created[0].invitee_user_id == invitee
         assert result.created[0].state == RoleInvitationState.PENDING
 
-    async def test_success_by_username(
-        self,
-        perm_db: PermissionDBSource,
-        db: ExtendedAsyncSAEngine,
-        invitee: uuid.UUID,
-        inviter: uuid.UUID,
-        role_id: uuid.UUID,
-    ) -> None:
-        async with db.begin_readonly_session() as s:
-            row = await s.get(UserRow, invitee)
-            assert row is not None
-            username = row.username
-        assert username is not None
-
-        action = CreateRoleInvitationByUsernameAction(
-            invitee_username_or_emails=[username],
-            inviter_user_id=inviter,
-            role_id=role_id,
-        )
-        result = await perm_db.create_invitation_by_username(action)
-
-        assert len(result.created) == 1
-        assert result.created[0].invitee_user_id == invitee
-
-    async def test_unknown_identifier_skipped(
+    async def test_unknown_email_skipped(
         self,
         perm_db: PermissionDBSource,
         inviter: uuid.UUID,
         role_id: uuid.UUID,
     ) -> None:
-        action = CreateRoleInvitationByUsernameAction(
-            invitee_username_or_emails=["nobody@test.io"],
+        action = CreateRoleInvitationByEmailAction(
+            invitee_emails=["nobody@test.io"],
             inviter_user_id=inviter,
             role_id=role_id,
         )
-        result = await perm_db.create_invitation_by_username(action)
+        result = await perm_db.create_invitation_by_email(action)
 
         assert len(result.created) == 0
 
@@ -300,11 +276,11 @@ class TestCreateRoleInvitation:
         inviter: uuid.UUID,
         invitee: uuid.UUID,
         role_id: uuid.UUID,
-        create_action: CreateRoleInvitationByUsernameAction,
+        create_action: CreateRoleInvitationByEmailAction,
     ) -> None:
         await _insert_invitation(db, inviter, invitee, role_id)
 
-        result = await perm_db.create_invitation_by_username(create_action)
+        result = await perm_db.create_invitation_by_email(create_action)
 
         assert len(result.created) == 0
 
