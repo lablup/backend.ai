@@ -33,6 +33,13 @@ from .rbac_project import (
     ProjectSoftDeleteRBACAction,
     ProjectUpdateRBACAction,
 )
+from .rbac_role_invitation import (
+    AcceptRoleInvitationAction,
+    CancelRoleInvitationAction,
+    CreateRoleInvitationByEmailAction,
+    RejectRoleInvitationAction,
+    RoleInvitationReadRBACAction,
+)
 from .rbac_session import (
     SessionCreateRBACAction,
     SessionGetRBACAction,
@@ -104,6 +111,11 @@ RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     VFolderGrantUpdateRBACAction,
     VFolderGrantSoftDeleteRBACAction,
     VFolderGrantHardDeleteRBACAction,
+    CreateRoleInvitationByEmailAction,
+    RoleInvitationReadRBACAction,
+    AcceptRoleInvitationAction,
+    RejectRoleInvitationAction,
+    CancelRoleInvitationAction,
 )
 
 __all__ = (

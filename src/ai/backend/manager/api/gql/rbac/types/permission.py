@@ -188,6 +188,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.MODEL_CARD
                 | RBACElementType.PROJECT_ADMIN_PAGE
                 | RBACElementType.DOMAIN_ADMIN_PAGE
+                | RBACElementType.ROLE_ASSIGNMENT
             ):
                 return None
 
