@@ -1015,7 +1015,7 @@ class AppConfigDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get_merged(
+    async def get_user_merged_config(
         self, user_id: str, domain_name: str, name: str
     ) -> MergedAppConfig:
         # Caller (repository / service) resolves the user's domain_name
@@ -1083,7 +1083,7 @@ class UserAppConfigRepository:
 
     async def get_merged(self, user_id: str, name: str) -> MergedAppConfig:
         domain_name = await self._user_db_source.get_domain_name(user_id)
-        return await self._db_source.get_merged(user_id, domain_name, name)
+        return await self._db_source.get_user_merged_config(user_id, domain_name, name)
 ```
 
 ### Exposure
