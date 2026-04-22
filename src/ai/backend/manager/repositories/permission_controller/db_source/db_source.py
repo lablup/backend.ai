@@ -2,7 +2,7 @@ import logging
 import uuid
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -80,7 +80,6 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.role_invitation.conditions import RoleInvitationConditions
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -384,9 +383,8 @@ class PermissionDBSource:
         async with self._db.begin_session() as db_session:
             return await self._assign_role_in_session(db_session, data)
 
-    @staticmethod
     async def _assign_role_in_session(
-        db_session: SASession, data: UserRoleAssignmentInput
+        self, db_session: SASession, data: UserRoleAssignmentInput
     ) -> UserRoleRow:
         creator = Creator(
             spec=UserRoleCreatorSpec(
@@ -396,7 +394,7 @@ class PermissionDBSource:
             )
         )
         result = await execute_creator(db_session, creator)
-        await PermissionDBSource._sync_user_scopes_on_assign(db_session, [data.user_id])
+        await self._sync_user_scopes_on_assign(db_session, [data.user_id])
         return result.row
 
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -1210,14 +1208,18 @@ class PermissionDBSource:
     ) -> RoleInvitationData:
         """Transition PENDING→ACCEPTED and assign the role in one session."""
         async with self._db.begin_session_read_committed() as session:
-            row = await self._get_invitation_to_accept(session, action.invitation_id)
-            row.state = RoleInvitationState.ACCEPTED
+            row = await self._update_invitation_state(
+                session, action.invitation_id, RoleInvitationState.ACCEPTED
+            )
+            if row is None:
+                existing = await self._get_failed_invitation(session, action.invitation_id)
+                raise RoleInvitationInvalidState(
+                    f"Cannot accept: invitation is {existing.state.value}, expected pending"
+                )
             await self._assign_role_in_session(
                 session,
                 UserRoleAssignmentInput(user_id=row.invitee_user_id, role_id=row.role_id),
             )
-            await session.flush()
-            await session.refresh(row)
             return row.to_data()
 
     async def reject_invitation(
@@ -1225,88 +1227,70 @@ class PermissionDBSource:
         action: RejectRoleInvitationAction,
     ) -> RoleInvitationData:
         async with self._db.begin_session_read_committed() as session:
-            row = await self._get_invitation_to_reject(session, action.invitation_id)
-            row.state = RoleInvitationState.REJECTED
-            await session.flush()
-            await session.refresh(row)
-            return row.to_data()
+            row = await self._update_invitation_state(
+                session, action.invitation_id, RoleInvitationState.REJECTED
+            )
+            if row is not None:
+                return row.to_data()
+            existing = await self._get_failed_invitation(session, action.invitation_id)
+            if existing.state == RoleInvitationState.REJECTED:
+                return existing.to_data()
+            raise RoleInvitationInvalidState(
+                f"Cannot reject: invitation is {existing.state.value}, expected pending"
+            )
 
     async def cancel_invitation(
         self,
         action: CancelRoleInvitationAction,
     ) -> RoleInvitationData:
         async with self._db.begin_session_read_committed() as session:
-            row = await self._get_invitation_to_cancel(session, action.invitation_id)
-            row.state = RoleInvitationState.CANCELED
-            await session.flush()
-            await session.refresh(row)
-            return row.to_data()
+            row = await self._update_invitation_state(
+                session, action.invitation_id, RoleInvitationState.CANCELED
+            )
+            if row is not None:
+                return row.to_data()
+            existing = await self._get_failed_invitation(session, action.invitation_id)
+            if existing.state == RoleInvitationState.CANCELED:
+                return existing.to_data()
+            raise RoleInvitationInvalidState(
+                f"Cannot cancel: invitation is {existing.state.value}, expected pending"
+            )
 
     @staticmethod
-    async def _get_invitation_to_accept(
-        session: SASession, invitation_id: uuid.UUID
-    ) -> RoleInvitationRow:
-        """Fetch a PENDING invitation for acceptance.
-
-        Raises RoleInvitationNotFound if not found.
-        Raises RoleInvitationInvalidState if already accepted, rejected, or canceled.
-        """
-        cond_id = RoleInvitationConditions.by_id(invitation_id)
-        stmt = sa.select(RoleInvitationRow).where(cond_id())
-        row = await session.scalar(stmt)
-        if row is None:
-            raise RoleInvitationNotFound()
-        if row.state != RoleInvitationState.PENDING:
-            raise RoleInvitationInvalidState(
-                f"Cannot accept: invitation is {row.state.value}, expected pending"
+    async def _update_invitation_state(
+        session: SASession,
+        invitation_id: uuid.UUID,
+        target_state: RoleInvitationState,
+    ) -> RoleInvitationRow | None:
+        """UPDATE PENDING→*target_state* with RETURNING; None if no row matched."""
+        update_stmt = (
+            sa.update(RoleInvitationRow)
+            .where(
+                RoleInvitationRow.id == invitation_id,
+                RoleInvitationRow.state == RoleInvitationState.PENDING,
             )
-        return row
+            .values(state=target_state)
+            .returning(*RoleInvitationRow.__table__.columns)
+        )
+        result = await session.execute(sa.select(RoleInvitationRow).from_statement(update_stmt))
+        return cast(RoleInvitationRow | None, result.scalar_one_or_none())
 
     @staticmethod
-    async def _get_invitation_to_reject(
-        session: SASession, invitation_id: uuid.UUID
+    async def _get_failed_invitation(
+        session: SASession,
+        invitation_id: uuid.UUID,
     ) -> RoleInvitationRow:
-        """Fetch a PENDING invitation for rejection.
+        """Fetch the row that caused an update to match no row.
 
-        Already rejected invitations are silently returned (idempotent).
-        Raises RoleInvitationNotFound if not found.
-        Raises RoleInvitationInvalidState if accepted or canceled.
+        Raises RoleInvitationNotFound if the row does not exist. The caller
+        inspects the returned row's state to decide idempotent vs. invalid.
         """
-        cond_id = RoleInvitationConditions.by_id(invitation_id)
-        stmt = sa.select(RoleInvitationRow).where(cond_id())
-        row = await session.scalar(stmt)
-        if row is None:
+        existing = await session.scalar(
+            sa.select(RoleInvitationRow).where(RoleInvitationRow.id == invitation_id)
+        )
+        if existing is None:
             raise RoleInvitationNotFound()
-        if row.state == RoleInvitationState.REJECTED:
-            return row
-        if row.state != RoleInvitationState.PENDING:
-            raise RoleInvitationInvalidState(
-                f"Cannot reject: invitation is {row.state.value}, expected pending"
-            )
-        return row
-
-    @staticmethod
-    async def _get_invitation_to_cancel(
-        session: SASession, invitation_id: uuid.UUID
-    ) -> RoleInvitationRow:
-        """Fetch a PENDING invitation for cancellation.
-
-        Already canceled invitations are silently returned (idempotent).
-        Raises RoleInvitationNotFound if not found.
-        Raises RoleInvitationInvalidState if accepted or rejected.
-        """
-        cond_id = RoleInvitationConditions.by_id(invitation_id)
-        stmt = sa.select(RoleInvitationRow).where(cond_id())
-        row = await session.scalar(stmt)
-        if row is None:
-            raise RoleInvitationNotFound()
-        if row.state == RoleInvitationState.CANCELED:
-            return row
-        if row.state != RoleInvitationState.PENDING:
-            raise RoleInvitationInvalidState(
-                f"Cannot cancel: invitation is {row.state.value}, expected pending"
-            )
-        return row
+        return existing
 
     @staticmethod
     async def _resolve_invitation_emails(
