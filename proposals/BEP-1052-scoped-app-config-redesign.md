@@ -884,49 +884,49 @@ never need to know row IDs.
 
 Mounted under the existing `app-configs` prefix
 (`RouteRegistry.create("app-configs", ...)` in
-`api/rest/v2/app_config/registry.py`). Scope is expressed as **named
-sub-resources** (`domains/`, `users/`, `public`, `my`) and documents
-are addressed by their `name` segment, matching the project-wide v2
+`api/rest/v2/app_config/registry.py`), matching the project-wide v2
 conventions in `api/rest/v2/CLAUDE.md`.
 
 ### Endpoints
 
-Write endpoints map 1:1 onto the GQL mutations: `POST` = create
-(strict insert; errors `409` if any row exists), `PUT` = update
-(errors `404` if no `ALIVE` row), `DELETE` = soft-delete, and a
-dedicated `POST {path}:restore` action reverses the soft-delete
-(`DELETED → ALIVE`, value unchanged; errors `404` / `409` if
-missing / already `ALIVE`).
+All scope-parameterized endpoints follow a single URL shape:
+`/v2/app-configs/{scope_type}/{scope_id}[/{name}]`, where
 
-| Method | Path                                                                  | Access     | Description                                          |
-|--------|-----------------------------------------------------------------------|------------|------------------------------------------------------|
-| GET    | `/v2/app-configs/public`                                              | Anonymous  | List all public documents                            |
-| GET    | `/v2/app-configs/public/{name}`                                       | Anonymous  | Read one public document                             |
-| GET    | `/v2/app-configs/domains/{domain_name}`                               | Admin      | List a domain's own documents                        |
-| GET    | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Read one of a domain's own documents                 |
-| POST   | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Create one of a domain's own documents               |
-| PUT    | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Replace one of a domain's own documents              |
-| DELETE | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Soft-delete one of a domain's own documents          |
-| POST   | `/v2/app-configs/domains/{domain_name}/{name}:restore`                | Admin      | Restore a soft-deleted domain document               |
-| GET    | `/v2/app-configs/domains/{domain_name}/user-defaults`                 | Admin      | List a domain's user-defaults documents              |
-| GET    | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Read one user-defaults document                      |
-| POST   | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Create one user-defaults document                    |
-| PUT    | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Replace one user-defaults document                   |
-| DELETE | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Soft-delete one user-defaults document               |
-| POST   | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}:restore`  | Admin      | Restore a soft-deleted user-defaults document        |
-| GET    | `/v2/app-configs/users/{user_id}`                                     | Admin      | List a user's documents                              |
-| GET    | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Read one of a user's documents (raw)                 |
-| POST   | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Create one of a user's documents                     |
-| PUT    | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Replace one of a user's documents                    |
-| DELETE | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Soft-delete one of a user's documents                |
-| POST   | `/v2/app-configs/users/{user_id}/{name}:restore`                      | Admin      | Restore a soft-deleted user document                 |
-| POST   | `/v2/app-configs/search`                                              | Admin      | Cross-scope search (filter / order / paginate)       |
-| GET    | `/v2/app-configs/my`                                                  | User       | List own documents (each with merged result)         |
-| GET    | `/v2/app-configs/my/{name}`                                           | User       | Read own document (with merged result)               |
-| POST   | `/v2/app-configs/my/{name}`                                           | User       | Create own document                                  |
-| PUT    | `/v2/app-configs/my/{name}`                                           | User       | Replace own document                                 |
-| DELETE | `/v2/app-configs/my/{name}`                                           | User       | Soft-delete own document                             |
-| POST   | `/v2/app-configs/my/{name}:restore`                                   | User       | Restore own soft-deleted document                    |
+- `{scope_type}` ∈ `public | domain | domain_user_defaults | user`
+  (matches `AppConfigScopeType` in §1).
+- `{scope_id}` follows the §1 Scope ID convention — the literal
+  `"public"` for `public`, `domain_name` for `domain` /
+  `domain_user_defaults`, `user_id` (UUID) for `user`.
+- `{name}` is the document name.
+
+Verbs map 1:1 onto the GQL mutations:
+
+| Method | Path                                                     | Description                                             |
+|--------|----------------------------------------------------------|---------------------------------------------------------|
+| GET    | `/v2/app-configs/{scope_type}/{scope_id}`                | List documents in a scope (`status=ALIVE` default)      |
+| GET    | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Read one document                                       |
+| POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Create (strict insert; `409` if any row exists)         |
+| PUT    | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Replace (`404` if no `ALIVE` row)                       |
+| DELETE | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Soft-delete                                             |
+| POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}:restore` | Restore (`DELETED → ALIVE`, value unchanged)            |
+
+Authorization follows the §3 permission matrix and the
+`input.key.scope` table — anonymous read is allowed only on
+`scope_type=public` reads; writes to non-`user` scopes require
+admin; for `scope_type=user`, admin or the owner
+(`{scope_id} == current_user.user_id`).
+
+Two shortcut endpoint families sit outside the scope-parameterized
+shape:
+
+| Method | Path                                | Access | Description                                            |
+|--------|-------------------------------------|--------|--------------------------------------------------------|
+| GET    | `/v2/app-configs/my[/{name}]`       | User   | List / read own documents (with merged result)         |
+| POST   | `/v2/app-configs/my/{name}`         | User   | Create own document                                    |
+| PUT    | `/v2/app-configs/my/{name}`         | User   | Replace own document                                   |
+| DELETE | `/v2/app-configs/my/{name}`         | User   | Soft-delete own document                               |
+| POST   | `/v2/app-configs/my/{name}:restore` | User   | Restore own soft-deleted document                      |
+| POST   | `/v2/app-configs/search`            | Admin  | Cross-scope search — same body schema as `adminAppConfigs` |
 
 `POST /v2/app-configs/search` accepts the same input schema as the
 GQL `adminAppConfigs` field (`filter` / `orderBy` / pagination
