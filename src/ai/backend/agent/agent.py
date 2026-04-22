@@ -2746,6 +2746,12 @@ class AbstractAgent[
                     vfolder_mounts = [
                         VFolderMount.from_json(item) for item in kernel_config["mounts"]
                     ]
+                    # NOTE: Inline injection until EnvironProvisioner is wired
+                    #  into the kernel creation pipeline. See also:
+                    #  agent/stage/kernel_lifecycle/docker/environ.py
+                    if vfolder_mounts:
+                        persistent_paths = ":".join(str(m.kernel_path) for m in vfolder_mounts)
+                        environ["BACKENDAI_PERSISTENT_PATHS"] = persistent_paths
                     if not restarting:
                         await ctx.mount_vfolders(vfolder_mounts, resource_spec)
                         await ctx.mount_krunner(resource_spec, environ)
