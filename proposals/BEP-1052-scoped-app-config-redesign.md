@@ -60,13 +60,14 @@ Summary matrix:
   structure and meaning of the configuration are owned by the frontend.
 - **Scope = Entity**: access control is expressed at the scope (entity)
   level, not the field level.
-  `global_app_config` (Public read / Admin write), `domain_app_config`
-  (Admin read & write), `user_app_config` (Owner/Admin read / Owner-self
-  + Admin write).
+  `public_app_config` (Anonymous read / Admin write), `domain_app_config`
+  (Admin read & write), `domain_user_defaults_app_config` (Admin write,
+  reaches users via merge), `user_app_config` (Owner/Admin read /
+  Owner-self + Admin write).
 - **Named documents within a scope**: each row is identified by the
   natural composite key `(scope_type, scope_id, name)`. A scope can hold
-  any number of named documents; clients address them explicitly by name
-  (no hierarchical fall-through lookup — see §6).
+  any number of named documents; clients address them explicitly by
+  name (no hierarchical fall-through lookup).
 - **Writes split into create / update / delete / restore.**
   `createAppConfig` strictly inserts a new row (errors if any row
   already exists for the key, even a soft-deleted one);
@@ -211,7 +212,8 @@ on `(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name)` rows.
 Splitting it from `DomainAppConfigRepository` keeps each repository
 mapped to exactly one scope, matching the rest of the layout.
 
-All getters/listers filter `status = ALIVE`.
+All read methods default to filtering `status = ALIVE` unless the
+caller opts in via `filter.status` on `search(...)`.
 
 ### `db_source` is a single module
 
@@ -306,7 +308,7 @@ type DomainAppConfig implements Node {
   id: ID!
 
   """Owning domain (back-reference). Lookup only."""
-  domain: Domain!
+  domain: DomainV2!
 
   """Document name (unique within this domain)."""
   name: String!
@@ -327,14 +329,14 @@ own Node type — their values enter this graph through
 unified `createAppConfig` / `updateAppConfig` / `deleteAppConfig`
 mutations with the appropriate `key.scope`; read-side access is via
 `adminAppConfigs` or `node(id)` returning the generic `AppConfig`.
-`Domain.appConfigs` is not exposed to non-admins — domain values
+`DomainV2.appConfigs` is not exposed to non-admins — domain values
 reach the user only via this merge.
 """
 type UserAppConfig implements Node {
   id: ID!
 
   """Owning user (back-reference)."""
-  user: User!
+  user: UserV2!
 
   """Document name (unique within this user)."""
   name: String!
@@ -374,19 +376,20 @@ type UserAppConfig implements Node {
 
 ### Added/extended fields (Relationship)
 
-| Location   | Field                                                                                  |
-|------------|----------------------------------------------------------------------------------------|
-| `Domain`   | `appConfigs(filter, orderBy, ...pagination): DomainAppConfigConnection!`               |
-| `UserNode` | `appConfigs(filter, orderBy, ...pagination): UserAppConfigConnection!`                 |
+| Location      | Field                                                                                  |
+|---------------|----------------------------------------------------------------------------------------|
+| `DomainV2` | `appConfigs(filter, orderBy, ...pagination): DomainAppConfigConnection!`               |
+| `UserV2`   | `appConfigs(filter, orderBy, ...pagination): UserAppConfigConnection!`                 |
 
 ### Permissions
 
-Each `appConfigs` child field inherits the parent resolver's
-permission policy — see the permission matrix below for the resulting
-access rules.
+Each `appConfigs` child field enforces its own access rule (not
+simply inherited from the parent node) — see the permission matrix
+below. In short: `DomainV2.appConfigs` is admin-only;
+`UserV2.appConfigs` is owner-or-admin.
 
 ```graphql
-extend type Domain {
+extend type DomainV2 {
   """
   App config documents owned by this domain (DOMAIN scope rows).
   Admin only. Filter by `name` (or any combination) to retrieve a
@@ -405,7 +408,7 @@ extend type Domain {
   ): DomainAppConfigConnection!
 }
 
-extend type UserNode {
+extend type UserV2 {
   """
   App config documents owned by this user. Owner or admin only.
   Filter by `name` to retrieve a single document. `filter.scope` /
@@ -426,7 +429,7 @@ extend type UserNode {
 
 A self-fetch shortcut root field `myAppConfigs` (Connection) is
 provided so callers can pull their own documents directly without
-going through `user_node(id)`.
+going through `admin_user_v2(user_id:)`.
 
 ### Queries
 
@@ -479,9 +482,10 @@ type Query {
 
   # ─ The following are not new additions; existing root fields are reused ─
   #
-  # user_node(id: String!): UserNode
-  #                                — admin → user_node(id: ...) { appConfigs { ... } }
-  # domain(name: String!): Domain  — admin → domain(name: ...) { appConfigs { ... } }
+  # admin_user_v2(user_id: UUID!): UserV2
+  #                                — admin → admin_user_v2(user_id: ...) { appConfigs { ... } }
+  # domain_v2(name: String!): DomainV2
+  #                                — admin → domain_v2(name: ...) { appConfigs { ... } }
   # node(id: ID!): Node            — Relay standard, direct access by global ID
 }
 ```
@@ -547,8 +551,8 @@ AND-combined. For arbitrary boolean shapes, nest predicates under
 input AppConfigFilterGQL {
   """
   Filter by scope type. Meaningful only on `adminAppConfigs`; on
-  per-scope Connections (`publicAppConfigs`, `Domain.appConfigs`,
-  `UserNode.appConfigs`, `myAppConfigs`) the scope
+  per-scope Connections (`publicAppConfigs`, `DomainV2.appConfigs`,
+  `UserV2.appConfigs`, `myAppConfigs`) the scope
   is already pinned by the field, so this filter is ignored.
   """
   scope: AppConfigScopeEnumFilter = null
@@ -634,8 +638,8 @@ Writes are expressed as four separate mutations — **create**,
 and covers every scope (admin writes in any scope, as well as users
 writing their own USER rows).
 Per-scope branching lives in the **internal layer** only: queries
-are split for typing ergonomics (`Domain.appConfigs`,
-`UserNode.appConfigs`, `myAppConfigs`, `publicAppConfigs`,
+are split for typing ergonomics (`DomainV2.appConfigs`,
+`UserV2.appConfigs`, `myAppConfigs`, `publicAppConfigs`,
 `adminAppConfigs`), and the repository / service split in §2 routes
 the write to the right backend. Scope-dependent authorization is
 enforced in the **service layer** (see permission rules below).
@@ -768,7 +772,7 @@ input RestoreAppConfigInput {
 Result of `createAppConfig`. Exposes the newly created row via the
 generic `AppConfig`. For `USER`-scope writes, clients that need the
 recomputed merged view should re-query `myAppConfigs` or
-`UserNode.appConfigs`.
+`UserV2.appConfigs`.
 """
 type CreateAppConfigPayload {
   appConfig: AppConfig!
@@ -778,7 +782,7 @@ type CreateAppConfigPayload {
 Result of `updateAppConfig`. Exposes the affected row via the
 generic `AppConfig` regardless of which scope the mutation
 targeted. For `USER`-scope writes, clients that need the recomputed
-merged view should re-query `myAppConfigs` or `UserNode.appConfigs`
+merged view should re-query `myAppConfigs` or `UserV2.appConfigs`
 (they expose `mergedConfig` / `domainDefaultConfig` /
 `domainConfig`), since `AppConfig.config` is the raw stored value
 only.
@@ -830,8 +834,8 @@ Queries:
 |--------------------------|-----------|------------|-------|
 | `publicAppConfigs`       | ✅        | ✅         | ✅    |
 | `myAppConfigs`           | ❌        | ✅ (self)  | ✅    |
-| `Domain.appConfigs`      | ❌        | ❌         | ✅    |
-| `UserNode.appConfigs`    | ❌        | ✅ (self)  | ✅    |
+| `DomainV2.appConfigs`      | ❌        | ❌         | ✅    |
+| `UserV2.appConfigs`    | ❌        | ✅ (self)  | ✅    |
 | `adminAppConfigs`        | ❌        | ❌         | ✅    |
 
 Write mutations (`createAppConfig`, `updateAppConfig`,
@@ -854,9 +858,9 @@ Where the checks live:
   `scopeId == current_user.user_id`. Any other caller combination
   returns a permission error; there is no silent reinterpretation of
   `scopeId`.
-- `Domain.appConfigs` field resolver: `check_admin_only()`; returns
+- `DomainV2.appConfigs` field resolver: `check_admin_only()`; returns
   an empty Connection for non-admin callers.
-- `UserNode.appConfigs` field resolver: returns an empty Connection
+- `UserV2.appConfigs` field resolver: returns an empty Connection
   when the parent node's `user_id` differs from `current_user` and the
   caller is not an admin.
 
@@ -900,7 +904,10 @@ All scope-parameterized endpoints follow a single URL shape:
   `domain_user_defaults`, `user_id` (UUID) for `user`.
 - `{name}` is the document name.
 
-Verbs map 1:1 onto the GQL mutations:
+Verbs map 1:1 onto the GQL mutations. `POST` / `PUT` accept a
+`{ "config": ... }` JSON body (same shape as
+`CreateAppConfigInput.config` / `UpdateAppConfigInput.config` in
+§3); `GET` / `DELETE` / `POST .../restore` take no body.
 
 | Method | Path                                                     | Description                                             |
 |--------|----------------------------------------------------------|---------------------------------------------------------|
@@ -936,9 +943,9 @@ arguments) in the request body and returns the same result.
 > `/v2/app-configs/my/...` follows the `my_` self-service convention
 > (`api/rest/v2/CLAUDE.md`) — the adapter resolves `current_user()`
 > internally and fixes `scope_id` to the caller's `user_id`. The
-> body for PUT accepts only `userCustomizedConfig` (snake-case
-> `user_customized_config` in REST); there is no input field that
-> can target another user.
+> body shape is the same `{ "config": ... }` as above (maps to
+> the user row's `user_customized_config` internally); there is no
+> input field that can target another user.
 
 > Read endpoints filter to `status = ALIVE` by default. Revival
 > goes through the dedicated `POST {path}/restore` action;
@@ -1002,12 +1009,14 @@ single transaction:
 
 > Reading the DOMAIN row for merge is done by the service with the
 > caller's own `domain_name` — it does *not* go through
-> `Domain.appConfigs` (admin-only) and is not an authorization hole:
+> `DomainV2.appConfigs` (admin-only) and is not an authorization hole:
 > users can only read their own domain's value, and only via merge.
 
-A list variant returns one merged result per `name` for which at
-least one of the three rows (DOMAIN, DOMAIN_USER_DEFAULTS, USER)
-exists.
+A list variant (exposed as
+`UserAppConfigRepository.list_merged(user_id)`, backing the
+`myAppConfigs` resolver) returns one merged result per `name` for
+which at least one of the three rows (DOMAIN, DOMAIN_USER_DEFAULTS,
+USER) exists.
 
 ```python
 class AppConfigDBSource:
@@ -1203,7 +1212,7 @@ unified `updateAppConfig` with `key.scope = USER` and `key.scopeId
 = current_user.user_id`; the service layer authorizes the write by
 matching `scopeId` against the caller. To see the recomputed merge
 the client re-queries `myAppConfigs` (or reads the row through
-`UserNode.appConfigs` / `node(id)`), since the mutation payload
+`UserV2.appConfigs` / `node(id)`), since the mutation payload
 returns the raw `AppConfig` only.
 
 ```graphql
@@ -1370,9 +1379,10 @@ query AuditConfigs(
 }
 ```
 
-- Server: `check_admin_only()` → Connection search. In cursor mode
-  the sort order is pinned to the cursor key. By default returns
-  `ALIVE` rows only.
+- Server: service-layer admin check → Connection search. In cursor
+  mode the sort order is pinned to the cursor key. By default
+  returns `ALIVE` rows only — pass `filter.status` to include
+  `DELETED` rows.
 
 ### S7. Operator removes an entire document (soft-delete)
 
@@ -1399,7 +1409,7 @@ mutation RemoveDomainLegacyMenu($input: DeleteAppConfigInput!) {
   call `deleteAppConfig` only when `key.scope = USER` and
   `key.scopeId == current_user.user_id`.
 - Service flips `status = DELETED` on the matching row. Subsequent
-  reads (`Domain.appConfigs`, `UserNode.appConfigs`,
+  reads (`DomainV2.appConfigs`, `UserV2.appConfigs`,
   `adminAppConfigs`, etc.) hide the document.
 - **Idempotent**: no-op when the row is absent or already `DELETED`.
 - **Recoverable**: `restoreAppConfig` on the same `key` flips the
