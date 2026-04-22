@@ -13,13 +13,12 @@ import pytest
 
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
-    CPUDevice,
     CPUPlugin,
     MemoryPlugin,
     read_proc_net_dev,
 )
 from ai.backend.agent.stats import StatModes
-from ai.backend.common.types import DeviceId, DeviceName, SlotName
+from ai.backend.common.types import DeviceId, SlotName
 
 
 class BaseDockerIntrinsicTest:
@@ -626,21 +625,22 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
         return plugin
 
     @staticmethod
-    def _make_device(core_id: int, numa_node: int | None) -> CPUDevice:
-        return CPUDevice(
-            device_id=DeviceId(str(core_id)),
-            hw_location="root",
-            memory_size=0,
-            processing_units=1,
-            numa_node=numa_node,
-            device_name=DeviceName("cpu"),
-        )
-
-    @staticmethod
     def _device_alloc(core_ids: list[int]) -> dict[SlotName, dict[DeviceId, Decimal]]:
         return {
             SlotName("cpu"): {DeviceId(str(cid)): Decimal("1") for cid in core_ids},
         }
+
+    @staticmethod
+    @contextmanager
+    def _patch_node_of_cpu(core_to_node: dict[int, int]) -> Generator[None, None, None]:
+        """Patch libnuma.node_of_cpu; return -1 for any core missing from the map
+        (matches real libnuma's behavior for unknown cores when NUMA info is
+        unavailable)."""
+        with patch(
+            "ai.backend.agent.docker.intrinsic.libnuma.node_of_cpu",
+            side_effect=lambda core: core_to_node.get(core, -1),
+        ):
+            yield
 
     async def test_single_node_allocation_sets_cpuset_mems(
         self,
@@ -648,13 +648,7 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
     ) -> None:
         """When all allocated cores are on the same NUMA node, CpusetMems is pinned
         to that node as a string."""
-        devices = [
-            self._make_device(0, 0),
-            self._make_device(1, 0),
-            self._make_device(2, 1),
-            self._make_device(3, 1),
-        ]
-        with patch.object(CPUPlugin, "list_devices", AsyncMock(return_value=devices)):
+        with self._patch_node_of_cpu({0: 0, 1: 0, 2: 1, 3: 1}):
             result = await cpu_plugin.generate_docker_args(
                 AsyncMock(),
                 self._device_alloc([0, 1]),
@@ -670,15 +664,9 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
         self,
         cpu_plugin: CPUPlugin,
     ) -> None:
-        """When cores span multiple NUMA nodes, CpusetMems must be omitted
-        because Docker's HostConfig cannot express a multi-node cpuset.mems."""
-        devices = [
-            self._make_device(0, 0),
-            self._make_device(1, 0),
-            self._make_device(2, 1),
-            self._make_device(3, 1),
-        ]
-        with patch.object(CPUPlugin, "list_devices", AsyncMock(return_value=devices)):
+        """When cores span multiple NUMA nodes, CpusetMems must be omitted so that
+        the Docker/kernel default NUMA memory placement policy can apply."""
+        with self._patch_node_of_cpu({0: 0, 1: 0, 2: 1, 3: 1}):
             result = await cpu_plugin.generate_docker_args(
                 AsyncMock(),
                 self._device_alloc([0, 2]),
@@ -691,49 +679,34 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
         assert host_config["CpusetCpus"] == "0,2"
 
     @pytest.mark.parametrize(
-        ("missing_core_numa", "case_id"),
+        ("core_to_node", "case_id"),
         [
-            (None, "unknown_node"),
-            (-1, "negative_node"),
+            ({0: 0}, "unknown_node"),
+            ({0: 0, 1: -1}, "negative_node"),
         ],
     )
     async def test_unknown_or_negative_node_omits_cpuset_mems(
         self,
         cpu_plugin: CPUPlugin,
-        missing_core_numa: int | None,
+        core_to_node: dict[int, int],
         case_id: str,
     ) -> None:
-        """When any allocated core maps to an unknown (None) or negative NUMA node,
-        CpusetMems must be omitted.
+        """When any allocated core maps to an unknown (libnuma returns -1) or
+        explicitly negative NUMA node, CpusetMems must be omitted.
 
-        For the `unknown_node` case, we simulate a core missing from the device list
-        (so `core_to_node.get(core)` returns None). For the `negative_node` case, we
-        include a device with numa_node = -1.
+        `unknown_node` covers the case where libnuma cannot resolve a core (the
+        patched side_effect returns -1 for unmapped cores). `negative_node` covers
+        the case where libnuma reports -1 for a known core (NUMA info unavailable).
+        Both collapse to the same `node < 0` branch in the SUT.
         """
-        if missing_core_numa is None:
-            # Core 5 is allocated but not present in the device list.
-            devices = [
-                self._make_device(0, 0),
-                self._make_device(1, 0),
-            ]
-            allocated_cores = [0, 5]
-            expected_cpuset_cpus = "0,5"
-        else:
-            devices = [
-                self._make_device(0, 0),
-                self._make_device(1, missing_core_numa),
-            ]
-            allocated_cores = [0, 1]
-            expected_cpuset_cpus = "0,1"
-
-        with patch.object(CPUPlugin, "list_devices", AsyncMock(return_value=devices)):
+        with self._patch_node_of_cpu(core_to_node):
             result = await cpu_plugin.generate_docker_args(
                 AsyncMock(),
-                self._device_alloc(allocated_cores),
+                self._device_alloc([0, 1]),
             )
 
         host_config = result["HostConfig"]
         assert "CpusetMems" not in host_config, f"case={case_id}"
         # Sanity: core-list plumbing still works.
-        assert host_config["Cpus"] == len(allocated_cores)
-        assert host_config["CpusetCpus"] == expected_cpuset_cpus
+        assert host_config["Cpus"] == 2
+        assert host_config["CpusetCpus"] == "0,1"

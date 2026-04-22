@@ -437,17 +437,16 @@ class CPUPlugin(AbstractComputePlugin):
             "Cpus": len(cores),
             "CpusetCpus": ",".join(sorted_core_ids),
         }
-        devices = await self.list_devices()
-        core_to_node = {int(dev.device_id): dev.numa_node for dev in devices}
         allocated_nodes: set[int] = set()
         for core in cores:
-            node = core_to_node.get(core)
-            if node is None or node < 0:
+            node = libnuma.node_of_cpu(core)
+            if node < 0:
                 allocated_nodes.clear()
                 break
             allocated_nodes.add(node)
-        # Pin memory to the NUMA node only when the allocation is fully node-local;
-        # Docker does not expose a multi-node cpuset.mems equivalent via HostConfig.
+        # Pin memory only when the CPU allocation is fully node-local.
+        # For multi-node CPU allocations, intentionally leave CpusetMems unset
+        # so Docker/kernel default NUMA memory placement policy can apply.
         if len(allocated_nodes) == 1:
             host_config["CpusetMems"] = str(next(iter(allocated_nodes)))
         return {
