@@ -10,13 +10,23 @@ from ai.backend.manager.data.metric.types import KernelLiveStatBatchResult
 
 
 @dataclass(frozen=True)
-class QueryKernelLiveStatAction(BaseAction):
-    kernel_ids: Sequence[KernelId]
-
+class KernelLiveStatAction(BaseAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.CONTAINER_LIVE_STAT
+
+
+@dataclass(frozen=True)
+class KernelLiveStatActionResult(BaseActionResult):
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass(frozen=True)
+class QueryKernelLiveStatAction(KernelLiveStatAction):
+    kernel_ids: Sequence[KernelId]
 
     @override
     @classmethod
@@ -25,9 +35,5 @@ class QueryKernelLiveStatAction(BaseAction):
 
 
 @dataclass(frozen=True)
-class QueryKernelLiveStatActionResult(BaseActionResult):
+class QueryKernelLiveStatActionResult(KernelLiveStatActionResult):
     stats: KernelLiveStatBatchResult
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
