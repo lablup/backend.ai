@@ -31,6 +31,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
@@ -274,7 +275,10 @@ class VFolderService:
                 )
                 if not group_info:
                     raise ProjectNotFound(f"Project with {group_id_or_name} not found.")
-                group_uuid, max_vfolder_count, max_quota_scope_size, group_type = group_info
+                group_uuid = group_info.group_uuid
+                max_vfolder_count = group_info.max_vfolder_count
+                max_quota_scope_size = group_info.max_quota_scope_size
+                group_type = group_info.group_type
                 container_uid = None
             case None:
                 user_info = await self._vfolder_repository.get_user_resource_info(user_uuid)
@@ -1498,8 +1502,8 @@ class VFolderService:
 
     async def _resolve_project_info(
         self, project_id: uuid.UUID, domain_name: str
-    ) -> tuple[uuid.UUID, int, int, ProjectType]:
-        """Fetch ``(group_uuid, max_vfolder_count, max_quota_scope_size, group_type)``."""
+    ) -> ProjectResourceInfo:
+        """Fetch project resource info for vfolder creation."""
         group_info = await self._vfolder_repository.get_group_resource_info(project_id, domain_name)
         if not group_info:
             raise ProjectNotFound(f"Project with {project_id} not found.")
@@ -1564,12 +1568,11 @@ class VFolderService:
         container_uid: int | None = None
 
         if project_id is not None:
-            (
-                group_uuid,
-                max_vfolder_count,
-                max_quota_scope_size,
-                group_type,
-            ) = await self._resolve_project_info(project_id, domain_name)
+            project_info = await self._resolve_project_info(project_id, domain_name)
+            group_uuid = project_info.group_uuid
+            max_vfolder_count = project_info.max_vfolder_count
+            max_quota_scope_size = project_info.max_quota_scope_size
+            group_type = project_info.group_type
             container_uid = None
         else:
             user_info = await self._vfolder_repository.get_user_resource_info(user_uuid)
@@ -1699,12 +1702,11 @@ class VFolderService:
         folder_host = await self._resolve_host(action.host)
         self._check_name_parameter(action.name, is_group=True)
 
-        (
-            group_uuid,
-            max_vfolder_count,
-            max_quota_scope_size,
-            group_type,
-        ) = await self._resolve_project_info(project_id, domain_name)
+        project_info = await self._resolve_project_info(project_id, domain_name)
+        group_uuid = project_info.group_uuid
+        max_vfolder_count = project_info.max_vfolder_count
+        max_quota_scope_size = project_info.max_quota_scope_size
+        group_type = project_info.group_type
         quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, group_uuid)
 
         allowed_types = await self._check_ownership_allowed("group")
