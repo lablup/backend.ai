@@ -13,6 +13,8 @@ import aiohttp
 import pytest
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
@@ -905,6 +907,149 @@ class TestSharedStatsStreamerWiring:
 
         assert streamer._tasks == {}
         assert streamer._latest == {}
+
+    async def test_stats_streamer_available_before_scan_running_kernels(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ordering invariant: ``DockerAgent.__ainit__`` must install the shared
+        :class:`DockerStatsStreamer` on ``self`` and attach it to the intrinsic
+        plugins BEFORE ``super().__ainit__()`` runs.
+
+        ``AbstractAgent.__ainit__`` calls :meth:`scan_running_kernels` and
+        starts the container lifecycle handler; on warm restart either of
+        those can fire ``_on_container_started`` -> ``self._stats_streamer``
+        before any code placed AFTER ``super().__ainit__()`` gets to execute.
+        If the streamer is not set by then, ``_on_container_started`` raises
+        ``AttributeError`` on a bare class annotation.
+
+        This test monkeypatches :meth:`AbstractAgent.scan_running_kernels`
+        (the exact point where the blocker bites) and asserts the streamer
+        is already set when it runs. It also confirms the intrinsic plugins
+        (discovered via ``hasattr(..., "attach_stats_streamer")``) received
+        the same streamer instance before the super init is reached.
+        """
+        observed_streamer: list[DockerStatsStreamer | None] = []
+        observed_cpu_streamer: list[DockerStatsStreamer | None] = []
+        observed_mem_streamer: list[DockerStatsStreamer | None] = []
+
+        class _StopAfterOrderingAssertion(BaseException):
+            """Sentinel used to short-circuit ``__ainit__`` once the ordering
+            invariant has been verified. A ``BaseException`` subclass ensures
+            it propagates past any ``except Exception:`` guards in the init
+            flow below the stubbed ``super().__ainit__()`` call."""
+
+        cpu_plugin = CPUPlugin.__new__(CPUPlugin)
+        mem_plugin = MemoryPlugin.__new__(MemoryPlugin)
+        # A non-intrinsic plugin with no attach_stats_streamer attribute
+        # must be skipped silently by the hasattr-based attach loop.
+        unrelated_plugin = object()
+
+        computer_ctx_cpu = MagicMock()
+        computer_ctx_cpu.instance = cpu_plugin
+        computer_ctx_mem = MagicMock()
+        computer_ctx_mem.instance = mem_plugin
+        computer_ctx_other = MagicMock()
+        computer_ctx_other.instance = unrelated_plugin
+
+        async def fake_scan_running_kernels(self: Any) -> None:
+            # Record the streamer state at the exact moment the race would
+            # bite on warm restart.
+            observed_streamer.append(getattr(self, "_stats_streamer", None))
+            observed_cpu_streamer.append(getattr(cpu_plugin, "_stats_streamer", None))
+            observed_mem_streamer.append(getattr(mem_plugin, "_stats_streamer", None))
+
+        async def fake_super_ainit(self: Any) -> None:
+            # Emulate the part of AbstractAgent.__ainit__ that matters for
+            # this ordering test: call scan_running_kernels, which is where
+            # the blocker actually fires on warm restart. Then bail out
+            # so the post-super section (which depends on ``self.id``,
+            # Redis, networks, etc.) is not exercised.
+            await self.scan_running_kernels()
+            raise _StopAfterOrderingAssertion()
+
+        # Patch the exact targets of the race.
+        monkeypatch.setattr(
+            AbstractAgent,
+            "scan_running_kernels",
+            fake_scan_running_kernels,
+            raising=True,
+        )
+        monkeypatch.setattr(
+            AbstractAgent,
+            "__ainit__",
+            fake_super_ainit,
+            raising=True,
+        )
+
+        # Stub the pre-super Docker interactions so __ainit__ does not
+        # require a live Docker daemon. Only the ordering is under test.
+        mock_docker_client = AsyncMock()
+        mock_docker_client.version = AsyncMock(
+            return_value={"Version": "0", "ApiVersion": "0", "KernelVersion": "test"},
+        )
+        mock_docker_client.system = MagicMock()
+        mock_docker_client.system.info = AsyncMock(return_value={"CgroupDriver": "cgroupfs"})
+        mock_docker_client.connector = aiohttp.UnixConnector(path="/var/run/docker.sock")
+
+        def docker_factory(*args: Any, **kwargs: Any) -> AsyncMock:
+            return mock_docker_client
+
+        monkeypatch.setattr(
+            "ai.backend.agent.docker.agent.Docker",
+            docker_factory,
+        )
+
+        # ``async with closing_async(Docker()) as docker`` is used in the
+        # pre-super section; wrap the mock in an async context manager.
+        class _AsyncCMWrapper:
+            def __init__(self, obj: Any) -> None:
+                self._obj = obj
+
+            async def __aenter__(self) -> Any:
+                return self._obj
+
+            async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+                return None
+
+        monkeypatch.setattr(
+            "ai.backend.agent.docker.agent.closing_async",
+            lambda obj: _AsyncCMWrapper(obj),
+        )
+
+        # Construct a minimally-initialised DockerAgent without running
+        # the heavy synchronous __init__ (which needs real etcd, registries,
+        # etc.). Only the attributes touched before super().__ainit__() need
+        # to be populated.
+        agent = DockerAgent.__new__(DockerAgent)
+        agent.local_config = MagicMock()
+        agent.local_config.agent.docker_mode = "native"
+        agent._kernel_recovery_adapter = MagicMock()
+        agent._kernel_recovery_adapter.adapt_recovery_data = AsyncMock(return_value=None)
+        # Typed as ``Mapping[DeviceName, ComputerContext]`` in AbstractAgent;
+        # the test uses ``MagicMock`` stand-ins so the attach loop can iterate.
+        fake_computers: Any = {
+            "cpu": computer_ctx_cpu,
+            "mem": computer_ctx_mem,
+            "other": computer_ctx_other,
+        }
+        agent.computers = fake_computers
+
+        with pytest.raises(_StopAfterOrderingAssertion):
+            await agent.__ainit__()
+
+        # The patched scan_running_kernels ran exactly once (via the stub
+        # super) and at that moment the streamer must already be set.
+        assert len(observed_streamer) == 1
+        assert observed_streamer[0] is not None
+        assert isinstance(observed_streamer[0], DockerStatsStreamer)
+        # Both intrinsic plugins must already hold the same streamer instance.
+        assert observed_cpu_streamer[0] is observed_streamer[0]
+        assert observed_mem_streamer[0] is observed_streamer[0]
+        # Non-intrinsic plugins are silently skipped by the hasattr loop.
+        assert not hasattr(unrelated_plugin, "_stats_streamer")
+
+        await agent._stats_streamer.close()
 
 
 def aiohttp_client_connection_error(msg: str) -> Exception:
