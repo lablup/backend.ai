@@ -139,6 +139,40 @@ class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             await cpu_plugin.gather_container_measures(cpu_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
 
+    async def test_cgroup_mode_falls_back_to_api_on_sysfs_failure(
+        self,
+        cpu_plugin: CPUPlugin,
+        container_ids: list[str],
+        cgroup_stat_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        """When sysfs read fails in CGROUP mode, the Docker API is used
+        as a per-read fallback instead of silently returning zero."""
+        # Arrange: cgroup version that triggers "return None" in sysfs_impl.
+        cgroup_stat_context.agent.docker_info = {"CgroupVersion": "invalid"}
+        cgroup_stat_context.agent.get_cgroup_path = MagicMock(return_value=MagicMock())
+
+        results = await cpu_plugin.gather_container_measures(cgroup_stat_context, container_ids)
+
+        assert mock_fetch_api_stats.call_count == len(container_ids)
+        # api_impl returns cpu_usage = 1_000_000_000 ns / 1e6 = 1000 msec
+        for cid in container_ids:
+            assert results[0].per_container[cid].value == 1000
+
+    async def test_linuxkit_forces_api_even_in_cgroup_mode(
+        self,
+        container_ids: list[str],
+        cpu_cgroup_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        """On linuxkit hosts the API path is used even when mode is CGROUP."""
+        plugin = CPUPlugin.__new__(CPUPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "linuxkit"}}
+        plugin._docker = AsyncMock()
+
+        await plugin.gather_container_measures(cpu_cgroup_context, container_ids)
+        assert mock_fetch_api_stats.call_count == len(container_ids)
+
 
 class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
     """Tests for MemoryPlugin Docker client lifecycle management."""
