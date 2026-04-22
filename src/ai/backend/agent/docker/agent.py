@@ -1325,9 +1325,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             # serve both single-node and multi-node without duplicate-attach 403s.
             if additional_network_names:
                 container_info = await container.show()
-                already_attached_networks = set(
-                    container_info.get("NetworkSettings", {}).get("Networks", {}).keys()
-                )
+                networks = container_info.get("NetworkSettings", {}).get("Networks", {}) or {}
+                # `get_docker_networks()` may return either network names or IDs
+                # (see `Resources.get_docker_networks` contract), so collect both
+                # the dict keys (names) and `NetworkID` values to filter against.
+                already_attached_networks = set(networks.keys()) | {
+                    n["NetworkID"] for n in networks.values() if n.get("NetworkID")
+                }
             else:
                 already_attached_networks = set()
 
