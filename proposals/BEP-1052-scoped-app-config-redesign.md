@@ -77,14 +77,15 @@ Summary matrix:
 Add a `user_app_config_defaults` column to `app_configs` that is
 meaningful only on the domain scope.
 
-`scope_type` is **stored as a plain `String` at the DB column level**
-and converted to the `AppConfigScopeType` enum only when materializing
-the row at the data layer. We deliberately avoid the Postgres ENUM
-type because adding/removing enum members would otherwise require an
-alembic migration every time, and `scope_type` values for this table
-are only ever set by server code (no direct external input). New
-scopes (e.g. `project`, future `team`, etc.) become usable with a
-code-only change.
+`scope_type` uses the project's standard `StrEnumType` TypeDecorator
+(`src/ai/backend/manager/models/base.py`), which stores the column as
+`VARCHAR(length)` while transparently coercing values to/from a
+Python `enum.StrEnum` at the ORM boundary. We deliberately avoid the
+Postgres native ENUM type (the deprecated `EnumType`) because
+adding/removing enum members would otherwise require an alembic
+migration every time, and `scope_type` values for this table are only
+ever set by server code (no direct external input). New scopes (e.g.
+`project`, future `team`, etc.) become usable with a code-only change.
 
 ```python
 class AppConfigScopeType(enum.StrEnum):
@@ -99,9 +100,11 @@ class AppConfigRow(Base):
 
     id: Mapped[uuid.UUID]
 
-    # Stored as plain str — no migration needed when the enum changes.
-    # Cast to AppConfigScopeType at the data-layer conversion boundary.
-    scope_type: Mapped[str] = mapped_column(sa.String(length=32), nullable=False, index=True)
+    # VARCHAR(32) under the hood — no migration when the enum changes —
+    # but typed as AppConfigScopeType at the ORM layer via StrEnumType.
+    scope_type: Mapped[AppConfigScopeType] = mapped_column(
+        StrEnumType(AppConfigScopeType, length=32), nullable=False, index=True
+    )
 
     scope_id: Mapped[str]                     # global: literal "global"; otherwise domain_name / user_id
     extra_config: Mapped[dict[str, Any]]      # shared across all scopes
@@ -115,14 +118,6 @@ class AppConfigRow(Base):
     )
 
     __table_args__ = (sa.UniqueConstraint("scope_type", "scope_id", name="uq_app_configs_scope"),)
-
-    def to_data(self) -> AppConfigData:
-        return AppConfigData(
-            id=self.id,
-            scope_type=AppConfigScopeType(self.scope_type),  # str → enum
-            scope_id=self.scope_id,
-            ...
-        )
 ```
 
 ### Scope ID convention
