@@ -287,17 +287,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _sentinel = Sentinel.TOKEN
 
-ACTIVE_STATUS_SET = frozenset([
-    ContainerStatus.RUNNING,
-    ContainerStatus.RESTARTING,
-    ContainerStatus.PAUSED,
-])
-
-DEAD_STATUS_SET = frozenset([
-    ContainerStatus.EXITED,
-    ContainerStatus.DEAD,
-    ContainerStatus.REMOVING,
-])
+ACTIVE_STATUS_SET = ContainerStatus.active_set()
+DEAD_STATUS_SET = ContainerStatus.dead_set()
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"

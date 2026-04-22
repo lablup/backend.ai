@@ -27,7 +27,6 @@ from typing import (
     NewType,
     NotRequired,
     Self,
-    TypeAlias,
     TypedDict,
     TypeVar,
     cast,
@@ -386,6 +385,7 @@ ImageCanonical = NewType("ImageCanonical", str)
 
 
 class ContainerStatus(enum.StrEnum):
+    CREATED = "created"
     RUNNING = "running"
     RESTARTING = "restarting"
     PAUSED = "paused"
@@ -1209,7 +1209,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-VolumeID: TypeAlias = uuid.UUID
+type VolumeID = uuid.UUID
 
 
 @attrs.define(slots=True, frozen=True)
