@@ -8,7 +8,6 @@ import itertools
 import math
 import numbers
 import textwrap
-import uuid
 from abc import ABC, ABCMeta, abstractmethod
 from collections import UserDict, UserString, defaultdict, namedtuple
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
@@ -633,7 +632,7 @@ class VFolderMountOptions:
 class VFolderMountRequest:
     """A single vfolder mount request combining reference, destination path, and options."""
 
-    ref: str | uuid.UUID  # vfolder name (with optional /subpath) or UUID
+    ref: str | UUID  # vfolder name (with optional /subpath) or UUID
     dst_path: str | None = None  # custom mount destination path
     options: VFolderMountOptions = attrs.Factory(VFolderMountOptions)
 
@@ -1209,7 +1208,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-VolumeID = NewType("VolumeID", uuid.UUID)
+VolumeID = NewType("VolumeID", UUID)
 
 
 @attrs.define(slots=True, frozen=True)
