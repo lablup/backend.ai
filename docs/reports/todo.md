@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Document ID** | TR-2026-004-TODO |
-| **Last Updated** | 2026-04-22 (3차 — §6.9 storage-proxy Pod 배포 결과, I-29~I-31 추가) |
+| **Last Updated** | 2026-04-22 (4차 — §6.9에 L3 multi-node 세션 mount 검증 추가, I-8 완료 전환) |
 | **Branch** | `docs/dood` |
 | **Related** | `simple_plan.md`, `k8s-control-plane-dood-agent-architecture.md` |
 
@@ -56,7 +56,7 @@
 | I-5 | **Fractional GPU / CUDA hook** DooD 경로에서 end-to-end 검증 안 됨 | 커널 컨테이너가 호스트 dockerd로 생성되므로 동작할 것으로 예상되나 실제 smoke test 필요 |
 | I-6 | **Multi-node 세션 (Swarm overlay × K8s CNI 공존) 미검증** — 최우선 기능 검증 대상 | 아래 §2.5 참조 |
 | I-7 | **AppProxy / Web Server 차트 부재** | 현재 Manager + Agent만 차트화. AppProxy Coordinator/Worker, Web Server 차트 추가 필요 |
-| I-8 | **Storage Proxy / vfolder NFS 마운트** (부분 완료) | §6.9: storage-proxy Pod 차트 + L1 NFS + vfolder CRUD/ls/mkdir 왕복까지 검증. **남은 작업**: agent 차트 `/vfroot` hostPath + kernel_config 주입, 실제 TUS 업로드, 세션 mount L2/L3 |
+| I-8 | **Storage Proxy / vfolder NFS 마운트** ✅ **완료** | §6.9: storage-proxy Pod 차트 + L1 NFS + vfolder CRUD + L2/L3 세션 mount까지 end-to-end 검증 (GPU kernel on nvidia 노드 → NFS → ser8 왕복). 계획과 달리 agent 차트 변경은 불필요했음 — DooD에서 bind mount는 호스트 dockerd가 처리하고, 호스트에 NFS가 fstab으로 마운트되어 있으면 agent Pod가 `/vfroot`를 몰라도 동작. 잔여: 실제 TUS 업로드 smoke (선택) |
 | I-9 | **Accelerator 플러그인 (CUDA / ROCm / TPU)** 이미지 포함 여부 미검증 | `docker/agent/Dockerfile`에 plugin wheel 설치 경로 점검 |
 
 ### 2.3 Operational — 운영/관측
@@ -177,7 +177,7 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 1. ~~**I-18** Bitnami → OSS~~ **완료** (§5.1, 단 HA 버전은 Plan 2+)
 2. ~~**I-26** cuda_open slot name 오타~~ **완료** (§5.6.3, 커널에 GPU device attach 정상화)
 3. ~~**I-28** Agent pod 재시작 후 첫 GPU 세션 hang~~ **완료** (§5.6.5, `containerPortRange`를 NodePort 범위 밖 [40000, 45000]로 이동)
-4. **I-8 vfolder 스택** — storage-proxy Pod + vfolder CRUD 왕복 **완료** (§6.9). 남은 것: agent 차트 `/vfroot` hostPath 연결, 세션 mount L2/L3 검증
+4. ~~**I-8 vfolder 스택**~~ ✅ **완료** (§6.9 업데이트 참조 — L2/L3 포함 전 체인 검증, agent 차트 변경 불필요 확인)
 5. **I-29** bootstrap fixture 수정 (vfolder 허용 프리셋) — 차트 재설치 시 수동 `./bai` 복구 단계 불필요하게 만들기
 6. **I-30** containerd `k8s.io` namespace 이미지 전달 자동화 — 빌드 스크립트 또는 nerdctl 전환
 7. **I-31** storage-proxy prometheus multiproc 경로 상류 수정 (차트 workaround는 있음)
@@ -697,9 +697,15 @@ L2에서 `/vfroot`를 모든 agent 노드에 pre-mount하는 것만 보장하면
 - `./bai vfolder create` → manager → storage-proxy manager API (6022) → `mkdir /vfroot/volume1/<user>/<uuid>/<...>/` → NFS 서버 `/srv/bai-shared/vfroot/volume1/...` 에 실체 생성 ✅
 - `./bai vfolder mkdir <id> subdir` → 동일 경로로 전파 ✅
 - `kubectl exec storage-proxy-pod -- sh -c 'echo X > /vfroot/.../direct.txt'` → `./bai vfolder ls <id>` 로 조회 ✅ (반대 방향 왕복)
+- **L2/L3 세션 mount**: `./bai session enqueue ... mounts=[{vfolder_id}]` → nvidia 노드 GPU kernel → `/home/work/test-folder` 에 vfolder bind mount ✅
+  - kernel 내부에서 `cat /home/work/test-folder/direct.txt` → storage-proxy Pod가 ser8 NFS에 쓴 내용이 nvidia 노드에서 그대로 보임
+  - kernel 내부에서 `echo X > /home/work/test-folder/from-kernel.txt` → 즉시 ser8 NFS 서버에 반영 (NFS sync 모드)
+  - `docker inspect` 로 확인한 mount 라인: `/vfroot/volume1/<quota_scope>/<hash>/<uuid> → /home/work/test-folder (bind)`
 
-**아직 검증 안 된 것**
+**계획과 달랐던 부분 (agent 차트 변경 불필요)**
 
-- **TUS 업로드 실체 전송**: `./bai vfolder upload` 가 토큰/URL만 발급하고 종료. 실제 바이트 전송은 TUS 클라이언트 필요 — 별도 smoke 필요. mkdir 왕복이 증명되었으니 동일 경로로 동작할 것으로 기대.
-- **세션 mount (L2/L3)**: agent 차트에 `/vfroot` hostPath 가 아직 없음. kernel_config 에 mounts 주입되어도 agent 노드에 경로가 없어 bind 실패. **I-8 남은 작업** 으로 유지.
-- **multi-node vfolder** (L3): L2 위에 agent 차트 수정만 들어가면 자동. GPU 세션 노드에서 같은 vfolder 파일 접근 확인 필요.
+§6.3 L1 계획에 "agent 차트에 `vfolderHostPath` 옵션 추가, hostPath `/vfroot` volume + container mount 추가" 라고 적었지만 **실측 결과 필요 없음**. 이유: DooD 구조에서 kernel 컨테이너는 **호스트 dockerd** 가 기동하고, bind mount source 경로는 호스트 mount namespace 에서 해석됨. Agent Pod는 manager로부터 받은 경로 문자열(`/vfroot/volume1/...`)을 그대로 dockerd API에 전달할 뿐, 자체적으로 그 경로에 접근하지 않음. 호스트 fstab 에 NFS mount 만 살아있으면 agent Pod는 `/vfroot` 의 존재조차 몰라도 됨. 이것이 DooD의 장점 중 하나이고, §6.3에서 과대 설계했던 부분.
+
+**아직 검증 안 된 것 (선택 사항)**
+
+- **TUS 업로드 실체 전송**: `./bai vfolder upload` 가 토큰/URL만 발급하고 종료. 실제 바이트 전송은 TUS 클라이언트 필요. mkdir/세션 write 왕복이 증명되었으니 동일 경로 — smoke test는 선택.
