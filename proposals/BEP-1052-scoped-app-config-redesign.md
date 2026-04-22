@@ -1086,14 +1086,14 @@ mutation SaveMyTheme($input: UpdateAppConfigInput!) {
 - **Upsert**: if the user has never written `theme` before, the row
   is created with this value (and `status = ALIVE`).
 
-### S4. Admin writes a domain's document and the user-defaults document
+### S4. Admin writes the per-user defaults for a domain
 
-The domain's own value and the per-user defaults live in two
-different scopes — but both go through the **same** mutation
-`updateAppConfig`, distinguished by `key.scope`. Two calls are
-needed because they address two separate rows.
-
-Step A — replace the domain's own `theme`:
+The domain admin publishes a `preferences` document that every user
+in the domain inherits as the merge base — e.g. the default visible
+columns and column order for the main tables. The write targets the
+`DOMAIN_USER_DEFAULTS` scope; DOMAIN-scope writes (the domain's own
+public value, e.g. a `menu` document) use the exact same mutation
+with `key.scope = DOMAIN`.
 
 ```graphql
 mutation ReplaceAppConfig($input: UpdateAppConfigInput!) {
@@ -1106,35 +1106,29 @@ mutation ReplaceAppConfig($input: UpdateAppConfigInput!) {
 ```json
 {
   "input": {
-    "key": { "scope": "DOMAIN", "scopeId": "default", "name": "theme" },
-    "config": { "sectionA": { "optionX": "new-value" } }
+    "key": {
+      "scope": "DOMAIN_USER_DEFAULTS",
+      "scopeId": "default",
+      "name": "preferences"
+    },
+    "config": { "tableColumns": { "sessions": ["name", "status", "createdAt"] } }
   }
 }
 ```
 
-Step B — replace the user-defaults `theme` for the same domain:
-
-```json
-{
-  "input": {
-    "key": { "scope": "DOMAIN_USER_DEFAULTS", "scopeId": "default", "name": "theme" },
-    "config": { "sectionB": "default-value" }
-  }
-}
-```
-
-- Authorization: both calls require admin — the service rejects
-  non-admin writes to `DOMAIN` and `DOMAIN_USER_DEFAULTS`.
-- Internally, the service routes each call to the matching
-  repository (§2) and replaces `extra_config` wholesale.
+- Authorization: admin required — the service rejects non-admin
+  writes to `DOMAIN_USER_DEFAULTS` (and to `DOMAIN` / `GLOBAL`).
+- Internally, the service routes to the matching repository (§2) and
+  replaces `extra_config` wholesale.
 - **Upsert**: if the document doesn't exist yet, the row is created
   with this value.
 - **Revive**: if the row was previously soft-deleted, `status` flips
   back to `ALIVE`.
-- Effect of Step B: on the next `myAppConfigs` call, every user in
-  that domain receives the updated `theme` defaults merged with their
-  own `theme` `userCustomizedConfig`. Step A only affects readers of
-  `Domain.appConfigs` (the admin view of the domain's own value).
+- Effect: on the next `myAppConfigs` call, every user in that domain
+  receives the updated `preferences` defaults deep-merged with their
+  own `preferences` `userCustomizedConfig` (per §5). Users who have
+  never customized `preferences` still see the new defaults via the
+  "defaults-only" row-listing rule fixed in S2.
 
 ### S5. Admin writes a specific user's document on their behalf
 
