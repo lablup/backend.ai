@@ -908,7 +908,7 @@ Verbs map 1:1 onto the GQL mutations:
 | POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Create (strict insert; `409` if any row exists)         |
 | PUT    | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Replace (`404` if no `ALIVE` row)                       |
 | DELETE | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Soft-delete                                             |
-| POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}:restore` | Restore (`DELETED → ALIVE`, value unchanged)            |
+| POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}/restore` | Restore (`DELETED → ALIVE`, value unchanged)            |
 
 Authorization follows the §3 permission matrix and the
 `input.key.scope` table — anonymous read is allowed only on
@@ -925,7 +925,7 @@ shape:
 | POST   | `/v2/app-configs/my/{name}`         | User   | Create own document                                    |
 | PUT    | `/v2/app-configs/my/{name}`         | User   | Replace own document                                   |
 | DELETE | `/v2/app-configs/my/{name}`         | User   | Soft-delete own document                               |
-| POST   | `/v2/app-configs/my/{name}:restore` | User   | Restore own soft-deleted document                      |
+| POST   | `/v2/app-configs/my/{name}/restore` | User   | Restore own soft-deleted document                      |
 | POST   | `/v2/app-configs/search`            | Admin  | Cross-scope search — same body schema as `adminAppConfigs` |
 
 `POST /v2/app-configs/search` accepts the same input schema as the
@@ -940,7 +940,7 @@ arguments) in the request body and returns the same result.
 > can target another user.
 
 > Read endpoints filter to `status = ALIVE` by default. Revival
-> goes through the dedicated `POST {path}:restore` action;
+> goes through the dedicated `POST {path}/restore` action;
 > `PUT`/`POST` on a soft-deleted natural key does *not* revive and
 > instead errors (`404` for PUT since no ALIVE row, `409` for POST
 > since a row already exists).
@@ -1110,10 +1110,6 @@ bundle) — the server does not publish a bootstrap list.
 
 ### Bootstrap flow
 
-All of the use cases below use the GraphQL endpoint. The REST
-schema (§4) is an equivalent surface for non-GraphQL clients, but
-the WebUI bootstrap is specified in GQL.
-
 1. **Pre-login (anonymous)** — for each document the WebUI wants
    before login, it issues a `publicAppConfigs` query with a `name`
    filter (no auth). The `theme` / `branding` shapes are pulled via
@@ -1122,11 +1118,10 @@ the WebUI bootstrap is specified in GQL.
    that document.
 
 2. **Post-login** — the WebUI issues a single `myAppConfigs` query
-   (optionally combined with `publicAppConfigs` in the same GQL
-   document) to fetch *all* of the caller's user documents in one
-   round trip. Each entry carries `userCustomizedConfig`,
-   `domainDefaultConfig`, `domainConfig`, and the three-way merged
-   `mergedConfig` (§5). See S2 in §7.
+   to fetch *all* of the caller's user documents in one round trip.
+   Each entry carries `userCustomizedConfig`, `domainDefaultConfig`,
+   `domainConfig`, and the three-way merged `mergedConfig` (§5).
+   See S2 in §7.
 
 3. **Domain-scoped reads** (admin UI) — the WebUI traverses
    `domain(name: "...") { appConfigs { ... } }` (or a single
