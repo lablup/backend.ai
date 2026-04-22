@@ -632,13 +632,28 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
 
     @staticmethod
     @contextmanager
-    def _patch_node_of_cpu(core_to_node: dict[int, int]) -> Generator[None, None, None]:
+    def _patch_node_of_cpu(
+        core_to_node: dict[int, int],
+        *,
+        num_nodes: int = 2,
+    ) -> Generator[None, None, None]:
         """Patch libnuma.node_of_cpu; return -1 for any core missing from the map
         (matches real libnuma's behavior for unknown cores when NUMA info is
-        unavailable)."""
-        with patch(
-            "ai.backend.agent.docker.intrinsic.libnuma.node_of_cpu",
-            side_effect=lambda core: core_to_node.get(core, -1),
+        unavailable).
+
+        Also patches libnuma.num_nodes to report a multi-node host by default
+        so the NUMA-aware branch is exercised. Tests covering the non-NUMA
+        short-circuit can pass ``num_nodes=1``.
+        """
+        with (
+            patch(
+                "ai.backend.agent.docker.intrinsic.libnuma.num_nodes",
+                return_value=num_nodes,
+            ),
+            patch(
+                "ai.backend.agent.docker.intrinsic.libnuma.node_of_cpu",
+                side_effect=lambda core: core_to_node.get(core, -1),
+            ),
         ):
             yield
 
@@ -707,6 +722,30 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
 
         host_config = result["HostConfig"]
         assert "CpusetMems" not in host_config, f"case={case_id}"
+        # Sanity: core-list plumbing still works.
+        assert host_config["Cpus"] == 2
+        assert host_config["CpusetCpus"] == "0,1"
+
+    async def test_non_numa_host_omits_cpuset_mems(
+        self,
+        cpu_plugin: CPUPlugin,
+    ) -> None:
+        """On non-NUMA / non-Linux hosts (macOS, Docker Desktop, WSL, Linux
+        without libnuma.so) libnuma.num_nodes() reports 1 and node_of_cpu()
+        hardcodes 0. The plugin must short-circuit before inspecting per-core
+        nodes so containers are not unconditionally pinned to CpusetMems="0".
+        """
+        # node_of_cpu would return 0 for every core on a non-NUMA host; assert
+        # we never reach that branch by mapping cores to a bogus node that
+        # would otherwise produce a stale CpusetMems assignment.
+        with self._patch_node_of_cpu({0: 0, 1: 0}, num_nodes=1):
+            result = await cpu_plugin.generate_docker_args(
+                AsyncMock(),
+                self._device_alloc([0, 1]),
+            )
+
+        host_config = result["HostConfig"]
+        assert "CpusetMems" not in host_config
         # Sanity: core-list plumbing still works.
         assert host_config["Cpus"] == 2
         assert host_config["CpusetCpus"] == "0,1"

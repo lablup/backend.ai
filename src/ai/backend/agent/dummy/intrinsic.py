@@ -145,7 +145,6 @@ class CPUPlugin(AbstractComputePlugin):
                 "CpuQuota": int(100_000 * len(cores)),
                 "Cpus": ",".join(sorted_core_ids),
                 "CpusetCpus": ",".join(sorted_core_ids),
-                # 'CpusetMems': f'{resource_spec.numa_node}',
             },
         }
 
