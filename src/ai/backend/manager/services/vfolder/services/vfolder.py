@@ -1480,64 +1480,6 @@ class VFolderService:
         if name_exists:
             raise VFolderAlreadyExists(f"VFolder with the given name already exists. ({name})")
 
-    async def _do_create_vfolder(
-        self,
-        *,
-        folder_id: uuid.UUID,
-        name: str,
-        domain_name: str,
-        quota_scope_id: QuotaScopeID,
-        usage_mode: VFolderUsageMode,
-        permission: VFolderPermission,
-        host: str,
-        creator: str,
-        creator_id: uuid.UUID,
-        ownership_type: VFolderOwnershipType,
-        user: uuid.UUID | None,
-        group: uuid.UUID | None,
-        cloneable: bool,
-        max_quota_scope_size: int,
-        vfolder_permission_mode: int | None,
-        create_owner_permission: bool,
-    ) -> VFolderData:
-        """Call storage-proxy, insert the row, and fetch back the created VFolderData."""
-        try:
-            vfid = VFolderID(quota_scope_id, folder_id)
-            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(host, False)
-            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-            await manager_client.create_folder(
-                volume_name, str(vfid), max_quota_scope_size, vfolder_permission_mode
-            )
-        except aiohttp.ClientResponseError as e:
-            raise VFolderCreationFailure from e
-
-        params = VFolderCreateParams(
-            id=folder_id,
-            name=name,
-            domain_name=domain_name,
-            quota_scope_id=str(quota_scope_id),
-            usage_mode=usage_mode,
-            permission=permission,
-            host=host,
-            creator=creator,
-            creator_id=creator_id,
-            ownership_type=ownership_type,
-            user=user,
-            group=group,
-            unmanaged_path=None,
-            cloneable=cloneable,
-            status=VFolderOperationStatus.READY,
-        )
-
-        try:
-            await self._vfolder_repository.create_vfolder_with_permission(
-                params, create_owner_permission=create_owner_permission
-            )
-        except sa_exc.DataError as e:
-            raise VFolderInvalidParameter from e
-
-        return await self._vfolder_repository.get_by_id(folder_id)
-
     async def _resolve_host(self, requested_host: str | None) -> str:
         """Return the target storage host, falling back to the configured default."""
         host = requested_host
@@ -1668,11 +1610,19 @@ class VFolderService:
         if group_type == ProjectType.MODEL_STORE:
             mount_permission = VFolderPermission.READ_ONLY
 
-        vfolder_data = await self._do_create_vfolder(
-            folder_id=uuid.uuid4(),
+        folder_id = uuid.uuid4()
+        vfid = VFolderID(quota_scope_id, folder_id)
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host, False)
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.create_folder(
+            volume_name, str(vfid), max_quota_scope_size, vfolder_permission_mode
+        )
+
+        params = VFolderCreateParams(
+            id=folder_id,
             name=action.name,
             domain_name=domain_name,
-            quota_scope_id=quota_scope_id,
+            quota_scope_id=str(quota_scope_id),
             usage_mode=action.usage_mode,
             permission=mount_permission,
             host=folder_host,
@@ -1681,10 +1631,12 @@ class VFolderService:
             ownership_type=VFolderOwnershipType(ownership_type),
             user=user_uuid if ownership_type == "user" else None,
             group=group_uuid if ownership_type == "group" else None,
+            unmanaged_path=None,
             cloneable=action.cloneable,
-            max_quota_scope_size=max_quota_scope_size,
-            vfolder_permission_mode=vfolder_permission_mode,
-            create_owner_permission=(group_type == ProjectType.MODEL_STORE),
+            status=VFolderOperationStatus.READY,
+        )
+        vfolder_data = await self._vfolder_repository.create_vfolder_with_permission(
+            params, create_owner_permission=(group_type == ProjectType.MODEL_STORE)
         )
         return CreateVFolderV2ActionResult(vfolder=vfolder_data)
 
@@ -1776,11 +1728,17 @@ class VFolderService:
         if group_type == ProjectType.MODEL_STORE:
             mount_permission = VFolderPermission.READ_ONLY
 
-        vfolder_data = await self._do_create_vfolder(
-            folder_id=uuid.uuid4(),
+        folder_id = uuid.uuid4()
+        vfid = VFolderID(quota_scope_id, folder_id)
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host, False)
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.create_folder(volume_name, str(vfid), max_quota_scope_size, None)
+
+        params = VFolderCreateParams(
+            id=folder_id,
             name=action.name,
             domain_name=domain_name,
-            quota_scope_id=quota_scope_id,
+            quota_scope_id=str(quota_scope_id),
             usage_mode=action.usage_mode,
             permission=mount_permission,
             host=folder_host,
@@ -1789,10 +1747,12 @@ class VFolderService:
             ownership_type=VFolderOwnershipType.GROUP,
             user=None,
             group=group_uuid,
+            unmanaged_path=None,
             cloneable=action.cloneable,
-            max_quota_scope_size=max_quota_scope_size,
-            vfolder_permission_mode=None,
-            create_owner_permission=(group_type == ProjectType.MODEL_STORE),
+            status=VFolderOperationStatus.READY,
+        )
+        vfolder_data = await self._vfolder_repository.create_vfolder_with_permission(
+            params, create_owner_permission=(group_type == ProjectType.MODEL_STORE)
         )
         return CreateVFolderInProjectActionResult(
             project_id=action.project_id,
