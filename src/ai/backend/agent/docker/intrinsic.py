@@ -131,6 +131,12 @@ def read_netns_net_dev(ns_path: Path) -> ContainerNetStat:
     return _parse_proc_net_dev(content)
 
 
+def _validate_stats_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
+    if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
+        return None
+    return entry
+
+
 async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
     short_cid = container.id[:7]
     try:
@@ -149,7 +155,7 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
         )
         return None
     else:
-        entry = {"read": "0001-01-01"}
+        entry: dict[str, Any] = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
         match ret:
             case list() if ret:
@@ -164,9 +170,102 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
                     ret,
                 )
                 return None
-        if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
+        return _validate_stats_entry(entry)
+
+
+class DockerStatsStreamer:
+    """
+    Maintains one long-lived `container.stats(stream=True)` reader per container and
+    exposes the most recent decoded sample from an in-memory cache.
+
+    Callers read the cached sample via :meth:`get_latest` instead of issuing a new
+    HTTP round-trip every collection cycle. The first call for a previously-unseen
+    container lazily spawns the reader; no sample is returned until dockerd has
+    emitted at least one frame.
+
+    Readers self-terminate when the upstream iterator ends (container removed) or
+    raises a connection error. A subsequent :meth:`get_latest` call starts a fresh
+    reader if the container reappears.
+
+    TODO(#11219): Wire start/stop into the agent's container-lifecycle hooks
+    (_handle_start_event / _handle_clean_event) to avoid relying on lazy startup.
+    """
+
+    _docker: Docker
+    _latest: dict[str, dict[str, Any]]
+    _tasks: dict[str, asyncio.Task[None]]
+    _closed: bool
+
+    def __init__(self, docker: Docker) -> None:
+        self._docker = docker
+        self._latest = {}
+        self._tasks = {}
+        self._closed = False
+
+    def get_latest(self, container_id: str) -> dict[str, Any] | None:
+        """Return the most recent cached sample for `container_id`, starting a
+        reader if none is running. Returns None until the first frame arrives."""
+        if self._closed:
             return None
-        return entry
+        task = self._tasks.get(container_id)
+        if task is None or task.done():
+            self._tasks[container_id] = asyncio.create_task(
+                self._read_stream(container_id),
+                name=f"docker-stats-stream:{container_id[:7]}",
+            )
+        return self._latest.get(container_id)
+
+    async def stop(self, container_id: str) -> None:
+        task = self._tasks.pop(container_id, None)
+        self._latest.pop(container_id, None)
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+    async def close(self) -> None:
+        self._closed = True
+        tasks = list(self._tasks.values())
+        self._tasks.clear()
+        self._latest.clear()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        for task in tasks:
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+    async def _read_stream(self, container_id: str) -> None:
+        short_cid = container_id[:7]
+        container = DockerContainer(self._docker, id=container_id)
+        try:
+            async for frame in container.stats(stream=True):
+                validated = _validate_stats_entry(frame)
+                if validated is not None:
+                    self._latest[container_id] = validated
+        except asyncio.CancelledError:
+            raise
+        except RuntimeError as e:
+            msg = str(e.args[0]).lower() if e.args else ""
+            if "event loop is closed" in msg or "session is closed" in msg:
+                return
+            log.warning(
+                "stats stream stopped unexpectedly (cid:{}): {!r}",
+                short_cid,
+                e,
+            )
+        except (DockerError, aiohttp.ClientError) as e:
+            log.debug(
+                "stats stream ended (cid:{}): {!r}",
+                short_cid,
+                e,
+            )
+        finally:
+            self._latest.pop(container_id, None)
 
 
 # Pseudo-plugins for intrinsic devices (CPU and the main memory)
@@ -189,11 +288,14 @@ class CPUPlugin(AbstractComputePlugin):
     ]
 
     _docker: Docker
+    _stats_streamer: DockerStatsStreamer
 
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
+        self._stats_streamer = DockerStatsStreamer(self._docker)
 
     async def cleanup(self) -> None:
+        await self._stats_streamer.close()
         await self._docker.close()
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
@@ -295,12 +397,7 @@ class CPUPlugin(AbstractComputePlugin):
             return cpu_used
 
         async def api_impl(container_id: str) -> float | None:
-            container = DockerContainer(self._docker, id=container_id)
-            try:
-                async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
-                    ret = await fetch_api_stats(container)
-            except TimeoutError:
-                return None
+            ret = self._stats_streamer.get_latest(container_id)
             if ret is None:
                 return None
             cpu_usage = cast(float, nmget(ret, "cpu_stats.cpu_usage.total_usage", 0))
@@ -516,11 +613,14 @@ class MemoryPlugin(AbstractComputePlugin):
     ]
 
     _docker: Docker
+    _stats_streamer: DockerStatsStreamer
 
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
+        self._stats_streamer = DockerStatsStreamer(self._docker)
 
     async def cleanup(self) -> None:
+        await self._stats_streamer.close()
         await self._docker.close()
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
@@ -785,12 +885,7 @@ class MemoryPlugin(AbstractComputePlugin):
         async def api_impl(
             container_id: str,
         ) -> tuple[int, int, int, int, int, int, int] | None:
-            container = DockerContainer(self._docker, id=container_id)
-            try:
-                async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
-                    ret = await fetch_api_stats(container)
-            except TimeoutError:
-                return None
+            ret = self._stats_streamer.get_latest(container_id)
             if ret is None:
                 return None
             mem_cur_bytes = nmget(ret, "memory_stats.usage", 0)

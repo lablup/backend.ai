@@ -13,6 +13,7 @@ import pytest
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
+    DockerStatsStreamer,
     MemoryPlugin,
     read_proc_net_dev,
 )
@@ -76,15 +77,24 @@ class BaseDockerIntrinsicTest:
         ) as mock:
             yield mock
 
+    def _make_prewarmed_streamer(
+        self,
+        sample: dict[str, Any] | None,
+    ) -> MagicMock:
+        streamer = MagicMock(spec=DockerStatsStreamer)
+        streamer.get_latest = MagicMock(return_value=sample)
+        return streamer
+
 
 class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
     """Tests for CPUPlugin Docker client lifecycle management."""
 
     @pytest.fixture
-    def cpu_plugin(self) -> CPUPlugin:
+    def cpu_plugin(self, docker_stats_response: dict[str, Any]) -> CPUPlugin:
         plugin = CPUPlugin.__new__(CPUPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
         plugin._docker = AsyncMock()
+        plugin._stats_streamer = self._make_prewarmed_streamer(docker_stats_response)
         return plugin
 
     @pytest.fixture
@@ -144,10 +154,11 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
     """Tests for MemoryPlugin Docker client lifecycle management."""
 
     @pytest.fixture
-    def memory_plugin(self) -> MemoryPlugin:
+    def memory_plugin(self, docker_stats_response: dict[str, Any]) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
         plugin._docker = AsyncMock()
+        plugin._stats_streamer = self._make_prewarmed_streamer(docker_stats_response)
         return plugin
 
     @pytest.fixture
@@ -248,10 +259,11 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
     """Tests for container PID validation before reading /proc/[pid]/net/dev."""
 
     @pytest.fixture
-    def memory_plugin(self) -> MemoryPlugin:
+    def memory_plugin(self, docker_stats_response: dict[str, Any]) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
         plugin._docker = AsyncMock()
+        plugin._stats_streamer = self._make_prewarmed_streamer(docker_stats_response)
         return plugin
 
     @contextmanager
@@ -387,10 +399,11 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
     """Tests for timeout protection and error isolation in MemoryPlugin sysfs_impl."""
 
     @pytest.fixture
-    def memory_plugin(self) -> MemoryPlugin:
+    def memory_plugin(self, docker_stats_response: dict[str, Any]) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
         plugin._docker = AsyncMock()
+        plugin._stats_streamer = self._make_prewarmed_streamer(docker_stats_response)
         return plugin
 
     @pytest.fixture
