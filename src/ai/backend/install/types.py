@@ -21,11 +21,6 @@ class InstallModes(enum.StrEnum):
     CONFIGURE = "CONFIGURE"
 
 
-class PackageDeploymentType(enum.StrEnum):
-    RELEASE = "release"  # Install using prebuilt release packages
-    PRODUCTION = "production"  # Deploy to production servers via PyInfra
-
-
 class PackageSource(enum.StrEnum):
     GITHUB_RELEASE = "github-release"
     LOCAL_DIR = "local-dir"
