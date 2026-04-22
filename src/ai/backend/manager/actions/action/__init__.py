@@ -8,9 +8,9 @@ from .base import (
     TAction,
     TActionResult,
 )
-from .batch import (
-    BaseBatchAction,
-    BaseBatchActionResult,
+from .bulk import (
+    BaseBulkAction,
+    BaseBulkActionResult,
 )
 from .rbac import (
     BaseRBACAction,
@@ -123,8 +123,8 @@ __all__ = (
     "BaseActionResult",
     "BaseActionResultMeta",
     "BaseActionTriggerMeta",
-    "BaseBatchAction",
-    "BaseBatchActionResult",
+    "BaseBulkAction",
+    "BaseBulkActionResult",
     "BaseRBACAction",
     "RBACActionName",
     "RBACRequiredPermission",
