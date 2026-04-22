@@ -18,7 +18,7 @@ from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import ImageNotAvailable
-from ai.backend.common.types import AutoPullBehavior
+from ai.backend.common.types import AutoPullBehavior, ImageConfig
 
 
 class DummyEtcd:
@@ -262,7 +262,9 @@ class TestRetryOnStaleConnection:
             nonlocal calls
             calls += 1
             if calls == 1:
-                raise aiohttp.ClientConnectionError("stale socket")
+                # ServerDisconnectedError is the canonical stale-pool signal
+                # and is a concrete subclass of ClientConnectionError.
+                raise aiohttp.ServerDisconnectedError()
             return sentinel
 
         result = await _retry_on_stale_connection(factory, operation="test_op")
@@ -278,6 +280,23 @@ class TestRetryOnStaleConnection:
             calls += 1
             if calls == 1:
                 raise aiohttp.ServerDisconnectedError()
+            return sentinel
+
+        result = await _retry_on_stale_connection(factory, operation="test_op")
+        assert result is sentinel
+        assert calls == 2
+
+    async def test_retry_on_stale_connection_retries_once_on_client_os_error(self) -> None:
+        calls = 0
+        sentinel = object()
+
+        async def factory() -> Any:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                # Kernel-level reset (ECONNRESET) that can appear before
+                # aiohttp's own server-side detection kicks in.
+                raise aiohttp.ClientOSError("connection reset by peer")
             return sentinel
 
         result = await _retry_on_stale_connection(factory, operation="test_op")
@@ -307,12 +326,32 @@ class TestRetryOnStaleConnection:
         async def factory() -> Any:
             nonlocal calls
             calls += 1
-            raise aiohttp.ClientConnectionError(f"persistent failure {calls}")
+            raise aiohttp.ServerDisconnectedError()
 
-        with pytest.raises(aiohttp.ClientConnectionError):
+        with pytest.raises(aiohttp.ServerDisconnectedError):
             await _retry_on_stale_connection(factory, operation="test_op")
         # First attempt + one retry = 2 invocations total.
         assert calls == 2
+
+    async def test_server_timeout_is_not_retried(self) -> None:
+        """``ServerTimeoutError`` must propagate on the first attempt.
+
+        Regression guard for the narrowed catch tuple: a long-running
+        ``images.push`` / ``images.pull`` that blows its ``timeout=`` is a
+        response-too-slow signal, not a stale-pool symptom. It must NOT be
+        silently retried (which would emit a misleading "stale aiodocker
+        connection" warning and mask real slowness).
+        """
+        calls = 0
+
+        async def factory() -> Any:
+            nonlocal calls
+            calls += 1
+            raise aiohttp.ServerTimeoutError("simulated response timeout")
+
+        with pytest.raises(aiohttp.ServerTimeoutError):
+            await _retry_on_stale_connection(factory, operation="test_op")
+        assert calls == 1
 
 
 async def test_check_image_retries_on_stale_connection(agent: DockerAgent, mocker: Any) -> None:
@@ -320,7 +359,7 @@ async def test_check_image_retries_on_stale_connection(agent: DockerAgent, mocke
     behavior = AutoPullBehavior.DIGEST
     inspect_mock = AsyncMock(
         side_effect=[
-            aiohttp.ClientConnectionError("stale socket"),
+            aiohttp.ServerDisconnectedError(),
             digest_matching_image_info,
         ],
     )
@@ -328,3 +367,70 @@ async def test_check_image_retries_on_stale_connection(agent: DockerAgent, mocke
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert not pull
     assert inspect_mock.await_count == 2
+
+
+async def test_container_create_retries_on_stale_connection(
+    agent: DockerAgent, mocker: Any
+) -> None:
+    """``resolve_image_distro`` (a wrapped ``containers.create`` call-site) must
+    absorb a one-shot stale-socket error on the create call.
+
+    This exercises a real wrapped method — not the helper in isolation — so the
+    narrowed retry tuple is validated end-to-end on the ``containers.create``
+    path (the smallest wrapped call-site of ``create`` on ``DockerAgent``).
+    """
+    # Mock valkey_stat_client so the cache miss path is taken and the distro
+    # write at the end is a no-op. ``close`` is also awaitable so shutdown can
+    # run cleanly in the ``agent`` fixture teardown.
+    valkey_client = MagicMock()
+    valkey_client.get_image_distro = AsyncMock(return_value=None)
+    valkey_client.set_image_distro = AsyncMock(return_value=None)
+    valkey_client.close = AsyncMock(return_value=None)
+    valkey_client.set_agent_container_count = AsyncMock(return_value=None)
+    mocker.patch.object(agent, "valkey_stat_client", new=valkey_client)
+
+    # The probe container mock: start/wait/stop/delete are no-ops, log returns
+    # a musl-identifying line so resolve_image_distro short-circuits on alpine.
+    probe_container = MagicMock()
+    probe_container.start = AsyncMock(return_value=None)
+    probe_container.wait = AsyncMock(return_value=None)
+    probe_container.log = AsyncMock(return_value=["musl libc (x86_64)"])
+    probe_container.stop = AsyncMock(return_value=None)
+    probe_container.delete = AsyncMock(return_value=None)
+
+    # First create attempt hits a stale pooled socket; second attempt succeeds.
+    create_mock = AsyncMock(
+        side_effect=[
+            aiohttp.ServerDisconnectedError(),
+            probe_container,
+        ],
+    )
+    mocker.patch.object(agent.docker.containers, "create", new=create_mock)
+
+    image_config: ImageConfig = {
+        "canonical": "lablup/lua:5.3-alpine3.8",
+        "project": "lablup",
+        "architecture": DEFAULT_IMAGE_ARCH,
+        "digest": "sha256:b000000000000000000000000000000000000000000000000000000000000001",
+        "repo_digest": None,
+        "registry": {
+            "name": "index.docker.io",
+            "url": "https://index.docker.io",
+            "username": None,
+            "password": None,
+        },
+        "labels": {},
+        "is_local": False,
+        "auto_pull": AutoPullBehavior.DIGEST,
+    }
+    distro = await agent.resolve_image_distro(image_config)
+
+    assert distro == "alpine3.8"
+    assert create_mock.await_count == 2
+    # Downstream container lifecycle methods must have been invoked exactly
+    # once against the (successfully created) probe container.
+    probe_container.start.assert_awaited_once()
+    probe_container.wait.assert_awaited_once()
+    probe_container.log.assert_awaited_once()
+    probe_container.stop.assert_awaited_once()
+    probe_container.delete.assert_awaited_once()

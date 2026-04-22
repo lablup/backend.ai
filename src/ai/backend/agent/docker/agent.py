@@ -292,9 +292,24 @@ def _DockerContainerError_reduce(self: DockerContainerError) -> tuple[type, tupl
     )
 
 
+# Aim: catch "the pooled socket was reset by dockerd restart / keepalive timeout".
+# - ``ServerDisconnectedError`` is the canonical case (dockerd closed our pooled
+#   keepalive socket; aiohttp surfaces it on the next request over that socket).
+# - ``ClientOSError`` covers the kernel-level path (EPIPE / ECONNRESET) that can
+#   appear before aiohttp's own server-side detection kicks in.
+# Explicitly NOT caught (by design — they fall through):
+# - ``ServerTimeoutError`` (subclass of ``ServerConnectionError``): a legitimate
+#   long-running ``images.pull`` / ``images.push`` blowing its ``timeout=`` is a
+#   response-too-slow signal, not a stale-pool symptom. Retrying silently would
+#   mask real slowness and emit a misleading "stale aiodocker connection" log.
+# - ``ClientSSLError`` (TLS / certificate issues): a retry will not help.
+# Note: ``ClientConnectorError`` (fresh connection refused — dockerd is actually
+# down) inherits from ``ClientOSError`` in aiohttp, so it IS technically caught
+# by the tuple below. The one-shot retry is cheap and, if dockerd is truly down,
+# the second attempt still fails and the error propagates with its original type.
 _STALE_CONNECTION_ERRORS: Final[tuple[type[BaseException], ...]] = (
-    aiohttp.ClientConnectionError,
     aiohttp.ServerDisconnectedError,
+    aiohttp.ClientOSError,
 )
 
 
@@ -308,12 +323,15 @@ async def _retry_on_stale_connection[T](
     The shared aiodocker client pools keepalive sockets inside its
     ``aiohttp.ClientSession``. After ``systemctl restart docker``, the first
     post-restart call can pick a stale socket and fail with
-    ``aiohttp.ClientConnectionError`` or ``aiohttp.ServerDisconnectedError``;
-    aiohttp reconnects transparently on the next attempt, so a single retry
-    is sufficient to absorb the one-shot failure.
+    ``aiohttp.ServerDisconnectedError`` or an OS-level socket error
+    (``aiohttp.ClientOSError``, e.g. EPIPE / ECONNRESET); aiohttp reconnects
+    transparently on the next attempt, so a single retry is sufficient to
+    absorb the one-shot failure.
 
     For persistent connection failures (e.g., dockerd actually down), the
-    second attempt fails and the exception propagates normally.
+    second attempt fails and the exception propagates normally. Response-
+    too-slow timeouts (``ServerTimeoutError``) are intentionally NOT retried
+    here — see the comment above ``_STALE_CONNECTION_ERRORS``.
     """
     try:
         return await coro_factory()
