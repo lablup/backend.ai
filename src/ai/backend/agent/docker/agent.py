@@ -1481,106 +1481,115 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def __ainit__(self) -> None:
         self.docker = Docker()
-        docker = self.docker
-        docker_host = ""
-        match docker.connector:
-            case aiohttp.TCPConnector():
-                if docker.docker_host is None:
-                    raise InvalidArgumentError("docker_host is not set for TCP connector")
-                docker_host = docker.docker_host
-            case aiohttp.NamedPipeConnector() | aiohttp.UnixConnector() as connector:
-                docker_host = connector.path
-            case _:
-                docker_host = "(unknown)"
-        log.info("accessing the local Docker daemon via {}", docker_host)
-        docker_version = await docker.version()
-        log.info(
-            "running with Docker {0} with API {1}",
-            docker_version["Version"],
-            docker_version["ApiVersion"],
-        )
-        kernel_version = docker_version["KernelVersion"]
-        if "linuxkit" in kernel_version:
-            self.local_config.agent.docker_mode = "linuxkit"
-        else:
-            self.local_config.agent.docker_mode = "native"
-        docker_info = await docker.system.info()
-        docker_info = dict(docker_info)
-        # Assume cgroup v1 if CgroupVersion key is absent
-        if "CgroupVersion" not in docker_info:
-            docker_info["CgroupVersion"] = "1"
-        log.info(
-            "Cgroup Driver: {0}, Cgroup Version: {1}",
-            docker_info["CgroupDriver"],
-            docker_info["CgroupVersion"],
-        )
-        self.docker_info = docker_info
-        await self._kernel_recovery_adapter.adapt_recovery_data()
-        await super().__ainit__()
         try:
-            gwbridge = await docker.networks.get("docker_gwbridge")
-            gwbridge_info = await gwbridge.show()
-            self.gwbridge_subnet = gwbridge_info["IPAM"]["Config"][0]["Subnet"]
-        except (DockerError, KeyError, IndexError):
-            self.gwbridge_subnet = None
-        ipc_base_path = self.local_config.agent.ipc_base_path
-        (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
-        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
-        # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
-        if sys.platform != "darwin":
-            socket_relay_name = f"backendai-socket-relay.{self.id}"
-            socket_relay_container = PersistentServiceContainer(
-                "backendai-socket-relay:latest",
-                {
-                    "Cmd": [
-                        f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                        f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
-                    ],
-                    "HostConfig": {
-                        "Mounts": [
-                            {
-                                "Type": "bind",
-                                "Source": str(ipc_base_path / "container"),
-                                "Target": "/ipc",
-                            },
-                        ],
-                        "NetworkMode": "host",
-                    },
-                },
-                name=socket_relay_name,
+            docker = self.docker
+            docker_host = ""
+            match docker.connector:
+                case aiohttp.TCPConnector():
+                    if docker.docker_host is None:
+                        raise InvalidArgumentError("docker_host is not set for TCP connector")
+                    docker_host = docker.docker_host
+                case aiohttp.NamedPipeConnector() | aiohttp.UnixConnector() as connector:
+                    docker_host = connector.path
+                case _:
+                    docker_host = "(unknown)"
+            log.info("accessing the local Docker daemon via {}", docker_host)
+            docker_version = await docker.version()
+            log.info(
+                "running with Docker {0} with API {1}",
+                docker_version["Version"],
+                docker_version["ApiVersion"],
             )
-            await socket_relay_container.ensure_running_latest()
-        self.agent_sock_task = asyncio.create_task(self.handle_agent_socket())
-        self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
-        self.docker_ptask_group = aiotools.PersistentTaskGroup()
+            kernel_version = docker_version["KernelVersion"]
+            if "linuxkit" in kernel_version:
+                self.local_config.agent.docker_mode = "linuxkit"
+            else:
+                self.local_config.agent.docker_mode = "native"
+            docker_info = await docker.system.info()
+            docker_info = dict(docker_info)
+            # Assume cgroup v1 if CgroupVersion key is absent
+            if "CgroupVersion" not in docker_info:
+                docker_info["CgroupVersion"] = "1"
+            log.info(
+                "Cgroup Driver: {0}, Cgroup Version: {1}",
+                docker_info["CgroupDriver"],
+                docker_info["CgroupVersion"],
+            )
+            self.docker_info = docker_info
+            await self._kernel_recovery_adapter.adapt_recovery_data()
+            await super().__ainit__()
+            try:
+                gwbridge = await docker.networks.get("docker_gwbridge")
+                gwbridge_info = await gwbridge.show()
+                self.gwbridge_subnet = gwbridge_info["IPAM"]["Config"][0]["Subnet"]
+            except (DockerError, KeyError, IndexError):
+                self.gwbridge_subnet = None
+            ipc_base_path = self.local_config.agent.ipc_base_path
+            (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
+            self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
+            # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
+            if sys.platform != "darwin":
+                socket_relay_name = f"backendai-socket-relay.{self.id}"
+                socket_relay_container = PersistentServiceContainer(
+                    "backendai-socket-relay:latest",
+                    {
+                        "Cmd": [
+                            f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
+                            f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
+                        ],
+                        "HostConfig": {
+                            "Mounts": [
+                                {
+                                    "Type": "bind",
+                                    "Source": str(ipc_base_path / "container"),
+                                    "Target": "/ipc",
+                                },
+                            ],
+                            "NetworkMode": "host",
+                        },
+                    },
+                    name=socket_relay_name,
+                )
+                await socket_relay_container.ensure_running_latest()
+            self.agent_sock_task = asyncio.create_task(self.handle_agent_socket())
+            self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
+            self.docker_ptask_group = aiotools.PersistentTaskGroup()
 
-        self.network_plugin_ctx = NetworkPluginContext(
-            self.etcd, self.local_config.model_dump(by_alias=True)
-        )
-        await self.network_plugin_ctx.init(
-            context=self,
-            allowlist=self.local_config.agent.allow_network_plugins,
-            blocklist=self.local_config.agent.block_network_plugins,
-        )
+            self.network_plugin_ctx = NetworkPluginContext(
+                self.etcd, self.local_config.model_dump(by_alias=True)
+            )
+            await self.network_plugin_ctx.init(
+                context=self,
+                allowlist=self.local_config.agent.allow_network_plugins,
+                blocklist=self.local_config.agent.block_network_plugins,
+            )
+        except BaseException:
+            # Release the shared aiodocker client if boot fails after its construction
+            # so the underlying aiohttp.ClientSession does not leak.
+            await self.docker.close()
+            raise
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
-        # Stop handling agent sock.
-        if self.agent_sock_task is not None:
-            self.agent_sock_task.cancel()
-            await self.agent_sock_task
-        if self.docker_ptask_group is not None:
-            await self.docker_ptask_group.shutdown()
-
         try:
-            await super().shutdown(stop_signal)
-        finally:
-            # Stop docker event monitoring.
-            if self.monitor_docker_task is not None:
-                self.monitor_docker_task.cancel()
-                await self.monitor_docker_task
+            # Stop handling agent sock.
+            if self.agent_sock_task is not None:
+                self.agent_sock_task.cancel()
+                await self.agent_sock_task
+            if self.docker_ptask_group is not None:
+                await self.docker_ptask_group.shutdown()
 
-        if self.docker:
-            await self.docker.close()
+            try:
+                await super().shutdown(stop_signal)
+            finally:
+                # Stop docker event monitoring.
+                if self.monitor_docker_task is not None:
+                    self.monitor_docker_task.cancel()
+                    await self.monitor_docker_task
+        finally:
+            # Always release the shared aiodocker client so its aiohttp.ClientSession
+            # does not leak even when inner shutdown steps raise.
+            if self.docker is not None:
+                await self.docker.close()
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
