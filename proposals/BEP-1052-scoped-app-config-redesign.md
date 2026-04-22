@@ -758,43 +758,49 @@ Where the checks live:
 
 ---
 
-## 4. REST Schema — `/app_config/{scope_type}/{scope_id}/{name}`
+## 4. REST Schema — `/v2/app-configs/...`
 
-Scope and document name are expressed as URL path segments, consistent
-with the v2 routing convention.
+Mounted under the existing `app-configs` prefix
+(`RouteRegistry.create("app-configs", ...)` in
+`api/rest/v2/app_config/registry.py`). Scope is expressed as **named
+sub-resources** (`domains/`, `users/`, `global`, `my`) and documents
+are addressed by their `name` segment, matching the project-wide v2
+conventions in `api/rest/v2/CLAUDE.md`.
 
 ### Endpoints
 
-REST splits along the same Admin/User axis as GraphQL. Admin handles
-arbitrary scopes via `/v2/app_config/{scope_type}/{scope_id}/{name}`;
-users have a self-service path `/v2/app_config/user/me/{name}`.
+| Method | Path                                                                  | Access     | Description                                          |
+|--------|-----------------------------------------------------------------------|------------|------------------------------------------------------|
+| GET    | `/v2/app-configs/global`                                              | Anonymous  | List all global documents                            |
+| GET    | `/v2/app-configs/global/{name}`                                       | Anonymous  | Read one global document                             |
+| GET    | `/v2/app-configs/domains/{domain_name}`                               | Admin      | List a domain's own documents                        |
+| GET    | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Read one of a domain's own documents                 |
+| PUT    | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Replace one of a domain's own documents (upsert)     |
+| DELETE | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Soft-delete one of a domain's own documents          |
+| GET    | `/v2/app-configs/domains/{domain_name}/user-defaults`                 | Admin      | List a domain's user-defaults documents              |
+| GET    | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Read one user-defaults document                      |
+| PUT    | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Replace one user-defaults document (upsert)          |
+| DELETE | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Soft-delete one user-defaults document               |
+| GET    | `/v2/app-configs/users/{user_id}`                                     | Admin      | List a user's documents                              |
+| GET    | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Read one of a user's documents (raw)                 |
+| PUT    | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Replace one of a user's documents                    |
+| DELETE | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Soft-delete one of a user's documents                |
+| POST   | `/v2/app-configs/search`                                              | Admin      | Cross-scope search (filter / order / paginate)       |
+| GET    | `/v2/app-configs/my`                                                  | User       | List own documents (each with merged result)         |
+| GET    | `/v2/app-configs/my/{name}`                                           | User       | Read own document (with merged result)               |
+| PUT    | `/v2/app-configs/my/{name}`                                           | User       | Replace own document                                 |
+| DELETE | `/v2/app-configs/my/{name}`                                           | User       | Soft-delete own document                             |
 
-| Method | Path                                                       | Access     | Description                                          |
-|--------|------------------------------------------------------------|------------|------------------------------------------------------|
-| GET    | `/v2/app_config/global`                                    | Anonymous  | List all global documents                            |
-| GET    | `/v2/app_config/global/{name}`                             | Anonymous  | Read a single global document                        |
-| GET    | `/v2/app_config/domain/{domain_name}`                      | Admin      | List all documents of a domain                       |
-| GET    | `/v2/app_config/domain/{domain_name}/{name}`               | Admin      | Read one domain document                             |
-| GET    | `/v2/app_config/user/{user_id}`                            | Admin      | List all documents of a user                         |
-| GET    | `/v2/app_config/user/{user_id}/{name}`                     | Admin      | Read one user document                               |
-| POST   | `/v2/app_config/admin/search`                              | Admin      | Cross-scope search (filter / order / paginate)       |
-| PUT    | `/v2/app_config/{scope_type}/{scope_id}/{name}`            | Admin      | Replace one document (upsert)                        |
-| DELETE | `/v2/app_config/{scope_type}/{scope_id}/{name}`            | Admin      | Soft-delete one document                             |
-| GET    | `/v2/app_config/user/me`                                   | User       | List all own documents (each with merged result)     |
-| GET    | `/v2/app_config/user/me/{name}`                            | User       | Read one own document (with merged result)           |
-| PUT    | `/v2/app_config/user/me/{name}`                            | User       | Replace one own document                             |
-| DELETE | `/v2/app_config/user/me/{name}`                            | User       | Soft-delete one own document                         |
-
-`POST /v2/app_config/admin/search` accepts the same input schema as
-the GQL `adminAppConfigs` field (`filter` / `orderBy` / pagination
+`POST /v2/app-configs/search` accepts the same input schema as the
+GQL `adminAppConfigs` field (`filter` / `orderBy` / pagination
 arguments) in the request body and returns the same result.
 
-> `/v2/app_config/user/me/...` follows the `my_` self-service
-> convention — the adapter resolves `current_user()` internally and
-> fixes `scope_id` to the caller's `user_id`. The body for PUT
-> accepts only `userCustomizedConfig` (snake-case
-> `user_customized_config` in REST); there is no input field that can
-> target another user.
+> `/v2/app-configs/my/...` follows the `my_` self-service convention
+> (`api/rest/v2/CLAUDE.md`) — the adapter resolves `current_user()`
+> internally and fixes `scope_id` to the caller's `user_id`. The
+> body for PUT accepts only `userCustomizedConfig` (snake-case
+> `user_customized_config` in REST); there is no input field that
+> can target another user.
 
 > Read endpoints filter to `status = ALIVE` by default. PUT on a
 > soft-deleted document revives it (`status = ALIVE`) and overwrites
@@ -917,7 +923,7 @@ the WebUI can render and edit cleanly:
 - `mergedConfig` — `domainDefaultConfig` ⊕ `userCustomizedConfig`,
   what the UI actually applies
 
-The REST `GET /v2/app_config/user/me/{name}` response carries the
+The REST `GET /v2/app-configs/my/{name}` response carries the
 same three views (snake_case in REST: `user_customized_config`,
 `domain_default_config`, `merged_config`).
 
@@ -939,7 +945,7 @@ is known.
 ```toml
 [app_config]
 # Global documents fetched anonymously before login.
-# Each entry is a name fetched from /v2/app_config/global/{name}.
+# Each entry is a name fetched from /v2/app-configs/global/{name}.
 bootstrap_global = ["theme", "branding"]
 ```
 
@@ -947,19 +953,19 @@ bootstrap_global = ["theme", "branding"]
 
 1. **Pre-login (anonymous)** — for each `name` in
    `bootstrap_global`, the WebUI calls
-   `GET /v2/app_config/global/{name}` (no auth). On 404 or network
+   `GET /v2/app-configs/global/{name}` (no auth). On 404 or network
    error, the WebUI falls back to its built-in defaults for that
    document.
 
 2. **Post-login** — the WebUI calls
-   `GET /v2/app_config/user/me` to fetch *all* of the caller's user
+   `GET /v2/app-configs/my` to fetch *all* of the caller's user
    documents in one round trip. Each entry includes the merged
    `config` (per-`name` merge with the matching
    `DOMAIN_USER_DEFAULTS` row).
 
 3. **Domain-scoped reads** (admin UI) — the WebUI calls
-   `GET /v2/app_config/domain/{domain_name}` /
-   `GET /v2/app_config/domain/{domain_name}/{name}` directly with
+   `GET /v2/app-configs/domains/{domain_name}` /
+   `GET /v2/app-configs/domains/{domain_name}/{name}` directly with
    admin credentials.
 
 ---
