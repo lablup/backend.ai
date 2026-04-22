@@ -1563,7 +1563,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 allowlist=self.local_config.agent.allow_network_plugins,
                 blocklist=self.local_config.agent.block_network_plugins,
             )
-        except BaseException:
+        except Exception:
             # Release the shared aiodocker client if boot fails after its construction
             # so the underlying aiohttp.ClientSession does not leak.
             await self.docker.close()
@@ -1586,10 +1586,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     self.monitor_docker_task.cancel()
                     await self.monitor_docker_task
         finally:
-            # Always release the shared aiodocker client so its aiohttp.ClientSession
-            # does not leak even when inner shutdown steps raise.
-            if self.docker is not None:
-                await self.docker.close()
+            # Outer finally guarantees the shared aiodocker client is released
+            # even if inner shutdown steps raise.
+            await self.docker.close()
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
@@ -1925,9 +1924,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if error := result[-1].get("error"):
             raise RuntimeError(f"Failed to pull image: {error}")
 
-    async def _purge_image(self, docker: Docker, request: DockerPurgeImageReq) -> PurgeImageResp:
+    async def _purge_image(self, request: DockerPurgeImageReq) -> PurgeImageResp:
         try:
-            await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
+            await self.docker.images.delete(
+                request.image, force=request.force, noprune=request.noprune
+            )
             return PurgeImageResp.success(image=request.image)
         except Exception as e:
             log.error(f'Failed to purge image "{request.image}": {e}')
@@ -1939,7 +1940,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             tasks = [
                 tg.create_task(
                     self._purge_image(
-                        self.docker,
                         DockerPurgeImageReq(
                             image=image, force=request.force, noprune=request.noprune
                         ),
