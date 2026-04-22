@@ -405,11 +405,8 @@ class VFolderAdapter(BaseAdapter):
         return RestoreVFolderPayload(id=vfolder_id)
 
     async def purge(self, vfolder_id: UUID) -> PurgeVFolderPayload:
-        """Permanently delete a vfolder."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        action = PurgeVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
+        """Permanently delete a vfolder. RBAC enforced."""
+        action = PurgeVFolderV2Action(vfolder_id=vfolder_id)
         await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
 
@@ -498,11 +495,8 @@ class VFolderAdapter(BaseAdapter):
 
     async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
         """Permanently purge multiple vfolders."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
         for vfolder_id in input.ids:
-            action = PurgeVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
+            action = PurgeVFolderV2Action(vfolder_id=vfolder_id)
             await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return BulkPurgeVFoldersPayload(purged_count=len(input.ids))
 

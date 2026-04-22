@@ -161,7 +161,7 @@ class VFolderProcessors(AbstractProcessorPackage):
         CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
     ]
     delete_v2: SingleEntityActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
-    purge_v2: ActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
+    purge_v2: SingleEntityActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
     clone_v2: ActionProcessor[CloneVFolderV2Action, CloneVFolderV2ActionResult]
 
     def __init__(
@@ -257,7 +257,9 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.delete_v2 = SingleEntityActionProcessor(
             service.delete_v2, action_monitors, validators=single_entity_rbac_validators
         )
-        self.purge_v2 = ActionProcessor(service.purge_v2, action_monitors)
+        self.purge_v2 = SingleEntityActionProcessor(
+            service.purge_v2, action_monitors, validators=single_entity_rbac_validators
+        )
         self.clone_v2 = ActionProcessor(service.clone_v2, action_monitors)
 
     @override
