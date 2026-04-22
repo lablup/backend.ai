@@ -1,21 +1,16 @@
-import enum
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Self
 from uuid import UUID
 
 from pydantic import BaseModel
 
-from ai.backend.common.dto.clients.prometheus.response import MetricResponseInfo
+from ai.backend.common.clients.prometheus.types import ValueType
+from ai.backend.common.dto.clients.prometheus.response import (
+    MetricResponseInfo,
+)
 from ai.backend.common.exception import InvalidAPIParameters
-
-
-class ValueType(enum.StrEnum):
-    """
-    Specifies the type of a metric value.
-    """
-
-    CURRENT = "current"
-    CAPACITY = "capacity"
 
 
 class MetricQueryParameter(BaseModel):
@@ -78,25 +73,3 @@ class ContainerMetricOptionalLabel:
 class ContainerMetricResult:
     metric: ContainerMetricResponseInfo
     values: list[MetricResultValue]
-
-
-class UtilizationMetricType(enum.Enum):
-    """
-    Specifies the type of a metric value.
-    """
-
-    GAUGE = enum.auto()
-    """
-    Represents an instantly measured occupancy value.
-    (e.g., used space as bytes, occupied amount as the number of items or a bandwidth)
-    """
-    RATE = enum.auto()
-    """
-    Represents a rate of changes calculated from underlying gauge/accumulation values
-    (e.g., I/O bps calculated from RX/TX accum.bytes)
-    """
-    DIFF = enum.auto()
-    """
-    Represents a difference of changes calculated from underlying gauge/accumulation values
-    (e.g., Utilization msec from CPU usage)
-    """

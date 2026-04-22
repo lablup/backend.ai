@@ -19,6 +19,15 @@ class MetricResponseInfo(BaseModel):
 
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
+    @property
+    def has_container_metric_labels(self) -> bool:
+        """Check if all required labels for container metric processing are present."""
+        return (
+            self.kernel_id is not None
+            and self.container_metric_name is not None
+            and self.value_type is not None
+        )
+
 
 type MetricResponseValue = tuple[float, str]  # (timestamp, value)
 
