@@ -1023,22 +1023,13 @@ query BootstrapMe {
 }
 ```
 
-- Server: `myAppConfigs` resolver identifies the caller via
-  `current_user()` and returns one entry per `name` for which **either**
-  a `(scope=USER, scope_id=current_user)` row **or** a same-`name`
-  `(scope=DOMAIN_USER_DEFAULTS, scope_id=current_user.domain_name)`
-  row is `ALIVE`. For each such `name` it deep-merges the defaults
-  row's `extra_config` with the user row's `userCustomizedConfig` and
-  exposes the result as `mergedConfig`; `domainDefaultConfig` carries
-  the defaults row's raw value separately. Names backed only by
-  defaults appear with `userCustomizedConfig = {}` and
-  `mergedConfig == domainDefaultConfig`, so the viewer always sees
-  every document that is effectively applied to them — not just the
-  ones they have personally customized.
-- The WebUI initializes UI state from `mergedConfig` per document, and
-  keeps `userCustomizedConfig` and `domainDefaultConfig` around
-  separately so the Settings page can show "what the user explicitly
-  changed" against "what the domain provides".
+- Server: `myAppConfigs` returns one entry per `name` for which a
+  `USER` row or a same-`name` `DOMAIN_USER_DEFAULTS` row is `ALIVE`
+  (defaults-only entries have `userCustomizedConfig = {}`). Merge
+  per §5.
+- The WebUI initializes UI state from `mergedConfig` per document
+  and keeps `userCustomizedConfig` / `domainDefaultConfig` around so
+  the Settings page can show user-changed vs. domain-provided.
 
 ### S3. The user saves their own document
 
@@ -1124,11 +1115,8 @@ mutation ReplaceAppConfig($input: UpdateAppConfigInput!) {
   with this value.
 - **Revive**: if the row was previously soft-deleted, `status` flips
   back to `ALIVE`.
-- Effect: on the next `myAppConfigs` call, every user in that domain
-  receives the updated `preferences` defaults deep-merged with their
-  own `preferences` `userCustomizedConfig` (per §5). Users who have
-  never customized `preferences` still see the new defaults via the
-  "defaults-only" row-listing rule fixed in S2.
+- Effect: every user in the domain picks up the new defaults on the
+  next `myAppConfigs` read (merged per §5).
 
 ### S5. Admin writes a specific user's document on their behalf
 
