@@ -46,13 +46,13 @@ document is identified by `(scope, scopeId, name)`.
 
 Summary matrix:
 
-| Story                                                | Scope    | Read              | Write       |
-|------------------------------------------------------|----------|-------------------|-------------|
-| Theme, Branding (must work before login)             | `public` | Anyone            | Admin       |
-| UI hide/show, menu config                            | `domain` | Logged-in users   | Admin       |
-| Domain-only internal management settings             | `domain` | Admin             | Admin       |
-| Per-user preference defaults (per-domain)            | `domain` | Logged-in users   | Admin       |
-| Per-user personal settings                           | `user`   | Owner/Admin       | Owner/Admin |
+| Story                                                | Scope                  | Read              | Write       |
+|------------------------------------------------------|------------------------|-------------------|-------------|
+| Theme, Branding (must work before login)             | `public`               | Anyone            | Admin       |
+| UI hide/show, menu config                            | `domain`               | Logged-in users   | Admin       |
+| Domain-only internal management settings             | `domain`               | Admin             | Admin       |
+| Per-user preference defaults (per-domain)            | `domain_user_defaults` | Logged-in users   | Admin       |
+| Per-user personal settings                           | `user`                 | Owner/Admin       | Owner/Admin |
 
 ## Design Principles
 
@@ -591,7 +591,7 @@ input AppConfigFilterGQL {
   NOT: [AppConfigFilterGQL!] = null
 }
 
-"""EnumFilter for AppConfigScopeGQL (equals / in / not_equals / not_in)."""
+"""EnumFilter for AppConfigScopeGQL (equals / in / notEquals / notIn)."""
 input AppConfigScopeEnumFilter {
   equals: AppConfigScopeGQL
   in: [AppConfigScopeGQL!]
@@ -599,7 +599,7 @@ input AppConfigScopeEnumFilter {
   notIn: [AppConfigScopeGQL!]
 }
 
-"""EnumFilter for AppConfigStatusGQL (equals / in / not_equals / not_in)."""
+"""EnumFilter for AppConfigStatusGQL (equals / in / notEquals / notIn)."""
 input AppConfigStatusEnumFilter {
   equals: AppConfigStatusGQL
   in: [AppConfigStatusGQL!]
@@ -858,11 +858,14 @@ Where the checks live:
   `scopeId == current_user.user_id`. Any other caller combination
   returns a permission error; there is no silent reinterpretation of
   `scopeId`.
-- `DomainV2.appConfigs` field resolver: `check_admin_only()`; returns
-  an empty Connection for non-admin callers.
-- `UserV2.appConfigs` field resolver: returns an empty Connection
-  when the parent node's `user_id` differs from `current_user` and the
-  caller is not an admin.
+- `DomainV2.appConfigs` field resolver: `check_admin_only()` at
+  entry — raises a permission error (the helper in
+  `src/ai/backend/manager/api/gql/utils.py` raises
+  `web.HTTPForbidden`) for non-admin callers; does not silently
+  return an empty Connection.
+- `UserV2.appConfigs` field resolver: raises a permission error
+  when the parent node's `user_id` differs from `current_user` and
+  the caller is not an admin.
 
 #### Name → ID resolution and ID-based Actions
 
