@@ -298,9 +298,10 @@ type DomainAppConfig implements Node {
 
 `DOMAIN_USER_DEFAULTS` rows are not exposed as their own Node type —
 their value enters this graph through `domainDefaultConfig` below
-(plus the merged `mergedConfig`). Admin-side direct manipulation of
-`DOMAIN_USER_DEFAULTS` rows still goes through `adminAppConfigs` /
-`adminUpdateAppConfig` / `node(id)` returning the generic `AppConfig`.
+(plus the merged `mergedConfig`). Admin-side direct manipulation goes
+through the unified `updateAppConfig` / `deleteAppConfig` mutations
+with `key.scope = DOMAIN_USER_DEFAULTS`; read-side access is via
+`adminAppConfigs` or `node(id)` returning the generic `AppConfig`.
 """
 type UserAppConfig implements Node {
   id: ID!
@@ -581,35 +582,46 @@ flavor exposes two operations:
   if soft-deleted).
 - **delete** — soft-delete the entire document (`status = DELETED`).
 
-Admin mutations identify rows by the **`AppConfigKey` input type**
-that bundles `(scope, scopeId, name)`. Self mutations only take
-`name` — the server fixes `scope = USER` and
-`scopeId = current_user.user_id`.
+Write mutations are **unified** across all scopes — a single
+`updateAppConfig` / `deleteAppConfig` pair accepts an
+`AppConfigKey { scope, scopeId, name }` and covers every write path
+(admin writes in any scope, as well as users writing their own USER
+rows). Per-scope branching lives in the **internal layer** only:
+queries are split for typing ergonomics (`Domain.appConfigs`,
+`UserNode.appConfigs`, `myAppConfigs`, `globalAppConfigs`,
+`adminAppConfigs`), and the repository / service split in §2 routes
+the write to the right backend. Scope-dependent authorization is
+enforced in the **service layer** (see permission rules below).
 
 ```graphql
 type Mutation {
   """
-  App config write (Admin only). Identifies a row of any scope by
-  `AppConfigKey { scope, scopeId, name }` and replaces its stored
-  JSON with the input. Creates the row if it does not exist (upsert);
-  revives the row to `status = ALIVE` if it was previously
+  Replace a single app config document. Identifies a row of any
+  scope by `AppConfigKey { scope, scopeId, name }` and replaces its
+  stored JSON with the input wholesale. Upsert: creates the row on
+  first write, revives `status = ALIVE` if it was previously
   soft-deleted.
+
+  Authorization is scope-dependent and enforced in the service
+  layer:
+  - `GLOBAL` / `DOMAIN` / `DOMAIN_USER_DEFAULTS`: admin only.
+  - `USER`: admin, or the owner themselves — `scopeId` must equal
+    the caller's `user_id`.
+
+  For `USER` scope the input `config` replaces that row's
+  `userCustomizedConfig`; the merged view is recomputed on the next
+  read and is never written directly.
   """
-  adminUpdateAppConfig(input: AdminUpdateAppConfigInput!): UpdateAppConfigPayload!
+  updateAppConfig(input: UpdateAppConfigInput!): UpdateAppConfigPayload!
 
   """
-  Soft-delete an entire app config document (Admin only). Sets
-  `status = DELETED`; the row remains for audit. Silent no-op if
-  already deleted or non-existent. Use `adminUpdateAppConfig` to
-  revive.
+  Soft-delete an app config document (`status = DELETED`). Same
+  scope-dependent authorization rules as `updateAppConfig`. The row
+  is preserved for audit; `updateAppConfig` on the same key revives
+  it to `ALIVE`. Idempotent — silent no-op if the row is absent or
+  already `DELETED`.
   """
-  adminDeleteAppConfig(input: AdminDeleteAppConfigInput!): DeleteAppConfigPayload!
-
-  """Self user_app_config write for the named document. Target is the caller."""
-  updateMyAppConfig(input: UpdateMyAppConfigInput!): UpdateMyAppConfigPayload!
-
-  """Soft-delete the caller's named document."""
-  deleteMyAppConfig(input: DeleteMyAppConfigInput!): DeleteMyAppConfigPayload!
+  deleteAppConfig(input: DeleteAppConfigInput!): DeleteAppConfigPayload!
 }
 
 enum AppConfigScopeGQL {
@@ -624,15 +636,16 @@ enum AppConfigStatusGQL {
   DELETED
 }
 
-# ── Composite key shared by admin mutations ──────────────────
+# ── Composite key shared by write mutations ──────────────────
 
 """
 Natural composite key identifying a single app config row.
 Mirrors the Python `AppConfigKey` dataclass used by the repository /
 db_source layer.
-- GLOBAL: `scopeId` must be the literal string `"global"`.
-- DOMAIN: `scopeId` is `domain_name`.
-- USER:   `scopeId` is `user_id` (UUID string).
+- `GLOBAL`:               `scopeId` is the literal string `"global"`.
+- `DOMAIN`:               `scopeId` is `domain_name`.
+- `DOMAIN_USER_DEFAULTS`: `scopeId` is `domain_name`.
+- `USER`:                 `scopeId` is `user_id` (UUID string).
 - `name` is the document name (unique within the scope).
 """
 input AppConfigKey {
@@ -641,74 +654,48 @@ input AppConfigKey {
   name: String!
 }
 
-# ── Admin input ───────────────────────────────────────────────
+# ── Inputs ────────────────────────────────────────────────────
 
-input AdminUpdateAppConfigInput {
+input UpdateAppConfigInput {
   """Target row identifier."""
   key: AppConfigKey!
 
   """
   New stored value — replaces the row's content wholesale. Pass `{}`
   to clear the document while keeping the row.
-  - GLOBAL / DOMAIN / DOMAIN_USER_DEFAULTS scope: replaces the
-    document's `config` field directly.
-  - USER scope: replaces that user's `userCustomizedConfig`
-    (the merged `config` is read-only computed and cannot be written
-    directly).
+  - `GLOBAL` / `DOMAIN` / `DOMAIN_USER_DEFAULTS`: replaces the
+    document's `config` directly.
+  - `USER`: replaces that user's `userCustomizedConfig` (the merged
+    `config` is read-only computed and cannot be written).
   """
   config: JSON!
 }
 
-input AdminDeleteAppConfigInput {
+input DeleteAppConfigInput {
   """Target row identifier."""
   key: AppConfigKey!
 }
 
-# ── My (self) input ──────────────────────────────────────────
-
-input UpdateMyAppConfigInput {
-  """
-  Document name. The server fixes `scope = USER` and
-  `scopeId = current_user.user_id`; there is no input field that can
-  target another user.
-  """
-  name: String!
-
-  """
-  New stored value — replaces the caller's `userCustomizedConfig`
-  for the named document wholesale. Pass `{}` to clear it.
-  """
-  userCustomizedConfig: JSON!
-}
-
-input DeleteMyAppConfigInput {
-  """Document name (server-fixed scope as above). Soft-deletes the document."""
-  name: String!
-}
-
 # ── Payload ──────────────────────────────────────────────────
 
-"""Result of `adminUpdateAppConfig`."""
+"""
+Result of `updateAppConfig`. Exposes the affected row via the
+generic `AppConfig` regardless of which scope the mutation
+targeted. For `USER`-scope writes, clients that need the recomputed
+merged view should re-query `myAppConfigs` or `UserNode.appConfigs`
+(they expose `mergedConfig` / `domainDefaultConfig`), since
+`AppConfig.config` is the raw stored value only.
+"""
 type UpdateAppConfigPayload {
   appConfig: AppConfig!
 }
 
 """
-Result of `adminDeleteAppConfig`. The returned row reflects the post
+Result of `deleteAppConfig`. The returned row reflects the post
 soft-delete state (`status = DELETED`).
 """
 type DeleteAppConfigPayload {
   appConfig: AppConfig!
-}
-
-"""Result of `updateMyAppConfig` (includes `mergedConfig`)."""
-type UpdateMyAppConfigPayload {
-  appConfig: UserAppConfig!
-}
-
-"""Result of `deleteMyAppConfig` (post soft-delete state)."""
-type DeleteMyAppConfigPayload {
-  appConfig: UserAppConfig!
 }
 
 """Generic AppConfig type used in the admin mutation payload — exposes the raw stored value."""
@@ -732,24 +719,34 @@ type AppConfig implements Node {
 
 ### Permission matrix
 
-| Operation                            | Anonymous | User       | Admin |
-|--------------------------------------|-----------|------------|-------|
-| `globalAppConfigs`                   | ✅        | ✅         | ✅    |
-| `myAppConfigs`                       | ❌        | ✅ (self)  | ✅    |
-| `Domain.appConfigs`                  | ❌        | ❌         | ✅    |
-| `UserNode.appConfigs`                | ❌        | ✅ (self)  | ✅    |
-| `adminAppConfigs`                    | ❌        | ❌         | ✅    |
-| `adminUpdateAppConfig`               | ❌        | ❌         | ✅    |
-| `adminDeleteAppConfig`               | ❌        | ❌         | ✅    |
-| `updateMyAppConfig`                  | ❌        | ✅ (self)  | ✅    |
-| `deleteMyAppConfig`                  | ❌        | ✅ (self)  | ✅    |
+Queries:
+
+| Operation                | Anonymous | User       | Admin |
+|--------------------------|-----------|------------|-------|
+| `globalAppConfigs`       | ✅        | ✅         | ✅    |
+| `myAppConfigs`           | ❌        | ✅ (self)  | ✅    |
+| `Domain.appConfigs`      | ❌        | ❌         | ✅    |
+| `UserNode.appConfigs`    | ❌        | ✅ (self)  | ✅    |
+| `adminAppConfigs`        | ❌        | ❌         | ✅    |
+
+Write mutations (`updateAppConfig`, `deleteAppConfig`) share one
+entry point; the rule depends on the input `scope`:
+
+| `input.key.scope`        | Anonymous | User                                             | Admin |
+|--------------------------|-----------|--------------------------------------------------|-------|
+| `GLOBAL`                 | ❌        | ❌                                               | ✅    |
+| `DOMAIN`                 | ❌        | ❌                                               | ✅    |
+| `DOMAIN_USER_DEFAULTS`   | ❌        | ❌                                               | ✅    |
+| `USER`                   | ❌        | ✅ *only if* `input.key.scopeId == current_user.user_id` | ✅    |
 
 Where the checks live:
-- `admin*` mutation resolver: `check_admin_only()` at entry.
-- `*My*` mutation resolver: `current_user()` for auth, then the
-  server hard-fixes `scope = USER` and `scope_id =
-  current_user.user_id` — there is literally no input field that can
-  target another user.
+- `updateAppConfig` / `deleteAppConfig` resolver: thin pass-through
+  to the service layer. The service dispatches on `input.key.scope`,
+  routes to the matching repository (§2), and enforces the
+  scope-dependent rule above — admin-only for non-`USER` scopes;
+  for `USER`, admin *or* `scopeId == current_user.user_id`. Any
+  other caller combination returns a permission error; there is no
+  silent reinterpretation of `scopeId`.
 - `Domain.appConfigs` field resolver: `check_admin_only()`; returns
   an empty Connection for non-admin callers.
 - `UserNode.appConfigs` field resolver: returns an empty Connection
@@ -1027,12 +1024,17 @@ query BootstrapMe {
 ```
 
 - Server: `myAppConfigs` resolver identifies the caller via
-  `current_user()`, lists all `(scope=USER, scope_id=current_user)`
-  rows that are `ALIVE`, and for each row deep-merges the same-`name`
-  `DOMAIN_USER_DEFAULTS` row's `extra_config` into
-  `userCustomizedConfig`, exposing the result as `mergedConfig`.
-  `domainDefaultConfig` exposes that defaults row's raw value
-  separately.
+  `current_user()` and returns one entry per `name` for which **either**
+  a `(scope=USER, scope_id=current_user)` row **or** a same-`name`
+  `(scope=DOMAIN_USER_DEFAULTS, scope_id=current_user.domain_name)`
+  row is `ALIVE`. For each such `name` it deep-merges the defaults
+  row's `extra_config` with the user row's `userCustomizedConfig` and
+  exposes the result as `mergedConfig`; `domainDefaultConfig` carries
+  the defaults row's raw value separately. Names backed only by
+  defaults appear with `userCustomizedConfig = {}` and
+  `mergedConfig == domainDefaultConfig`, so the viewer always sees
+  every document that is effectively applied to them — not just the
+  ones they have personally customized.
 - The WebUI initializes UI state from `mergedConfig` per document, and
   keeps `userCustomizedConfig` and `domainDefaultConfig` around
   separately so the Settings page can show "what the user explicitly
@@ -1040,18 +1042,18 @@ query BootstrapMe {
 
 ### S3. The user saves their own document
 
-The user replaces their `theme` document.
+The user replaces their `theme` document. They call the unified
+`updateAppConfig` with `key.scope = USER` and `key.scopeId =
+current_user.user_id`; the service layer authorizes the write by
+matching `scopeId` against the caller. To see the recomputed merge
+the client re-queries `myAppConfigs` (or reads the row through
+`UserNode.appConfigs` / `node(id)`), since the mutation payload
+returns the raw `AppConfig` only.
 
 ```graphql
-mutation SaveMyTheme($input: UpdateMyAppConfigInput!) {
-  updateMyAppConfig(input: $input) {
-    appConfig {
-      name
-      userCustomizedConfig
-      domainDefaultConfig
-      mergedConfig
-      modifiedAt
-    }
+mutation SaveMyTheme($input: UpdateAppConfigInput!) {
+  updateAppConfig(input: $input) {
+    appConfig { id scope scopeId name config modifiedAt }
   }
 }
 ```
@@ -1059,8 +1061,12 @@ mutation SaveMyTheme($input: UpdateMyAppConfigInput!) {
 ```json
 {
   "input": {
-    "name": "theme",
-    "userCustomizedConfig": {
+    "key": {
+      "scope": "USER",
+      "scopeId": "00000000-0000-0000-0000-000000000123",
+      "name": "theme"
+    },
+    "config": {
       "sectionA": { "optionX": "value-1" },
       "sectionB": "value-2"
     }
@@ -1068,33 +1074,34 @@ mutation SaveMyTheme($input: UpdateMyAppConfigInput!) {
 }
 ```
 
-- Server fixes `scope = USER`, `scope_id = current_user.user_id`.
-  Only `name` is taken from the input.
-- **Replace** semantics: the document's `userCustomizedConfig` is set
-  to the input as-is. Anything the caller wants to keep must be sent
-  in the same payload — there is no partial-merge or per-key patch.
+- Authorization: `scope=USER` → service allows admin *or* caller
+  whose `user_id == key.scopeId`. Any other `scope` submitted by a
+  non-admin is rejected here.
+- For `USER` scope, the input `config` replaces the row's
+  `userCustomizedConfig` wholesale. The merged view is recomputed on
+  the next read.
+- **Replace** semantics: anything the caller wants to keep must be
+  sent in the same payload — there is no partial-merge or per-key
+  patch.
 - **Upsert**: if the user has never written `theme` before, the row
   is created with this value (and `status = ALIVE`).
-- `appConfig.mergedConfig` in the response already reflects the
-  re-computed read-merge of the new `userCustomizedConfig` with the
-  same-`name` `DOMAIN_USER_DEFAULTS` row.
 
 ### S4. Admin writes a domain's document and the user-defaults document
 
-The domain's own value and the per-user defaults are two separate
-rows in two scopes — written via two `adminUpdateAppConfig` calls
-(or one batched mutation client-side). Single-step per row,
-identified by `AppConfigKey`:
+The domain's own value and the per-user defaults live in two
+different scopes — but both go through the **same** mutation
+`updateAppConfig`, distinguished by `key.scope`. Two calls are
+needed because they address two separate rows.
+
+Step A — replace the domain's own `theme`:
 
 ```graphql
-mutation UpdateDomainTheme($input: AdminUpdateAppConfigInput!) {
-  adminUpdateAppConfig(input: $input) {
+mutation ReplaceAppConfig($input: UpdateAppConfigInput!) {
+  updateAppConfig(input: $input) {
     appConfig { id scope scopeId name status config modifiedAt }
   }
 }
 ```
-
-Step A — replace the domain's own `theme`:
 
 ```json
 {
@@ -1116,8 +1123,10 @@ Step B — replace the user-defaults `theme` for the same domain:
 }
 ```
 
-- Server: `check_admin_only()` → locates each row by its full key →
-  replaces that row's `extra_config` with the input wholesale.
+- Authorization: both calls require admin — the service rejects
+  non-admin writes to `DOMAIN` and `DOMAIN_USER_DEFAULTS`.
+- Internally, the service routes each call to the matching
+  repository (§2) and replaces `extra_config` wholesale.
 - **Upsert**: if the document doesn't exist yet, the row is created
   with this value.
 - **Revive**: if the row was previously soft-deleted, `status` flips
@@ -1130,12 +1139,16 @@ Step B — replace the user-defaults `theme` for the same domain:
 ### S5. Admin writes a specific user's document on their behalf
 
 For a support request, an admin overwrites user A's `preferences`
-`userCustomizedConfig`:
+`userCustomizedConfig` — same `updateAppConfig`, now with
+`key.scope = USER` and `key.scopeId = user A's user_id`. The
+service's USER-scope rule allows this call because the caller is an
+admin (owner-only would require matching `scopeId`). The merged
+`config` is always read-only and never written directly.
 
 ```graphql
-mutation OverrideUserPrefs($input: AdminUpdateAppConfigInput!) {
-  adminUpdateAppConfig(input: $input) {
-    appConfig { id scope scopeId name config modifiedAt }
+mutation ReplaceAppConfig($input: UpdateAppConfigInput!) {
+  updateAppConfig(input: $input) {
+    appConfig { id scope scopeId name status config modifiedAt }
   }
 }
 ```
@@ -1153,9 +1166,8 @@ mutation OverrideUserPrefs($input: AdminUpdateAppConfigInput!) {
 }
 ```
 
-- For the USER scope, the `config` input replaces that user's
-  `userCustomizedConfig` for the `preferences` document wholesale
-  (the merged `config` is read-only computed).
+- For `USER` scope the `config` input replaces that user's
+  `userCustomizedConfig` wholesale.
 - **Upsert**: creates the row if user A has never saved `preferences`
   before.
 - The next time that user calls `myAppConfigs`, the new
@@ -1207,8 +1219,8 @@ Removing a stale or deprecated document — e.g. retiring an old
 `legacy_menu` document for a domain:
 
 ```graphql
-mutation RemoveDomainLegacyMenu($input: AdminDeleteAppConfigInput!) {
-  adminDeleteAppConfig(input: $input) {
+mutation RemoveDomainLegacyMenu($input: DeleteAppConfigInput!) {
+  deleteAppConfig(input: $input) {
     appConfig { id scope scopeId name status modifiedAt }
   }
 }
@@ -1222,12 +1234,18 @@ mutation RemoveDomainLegacyMenu($input: AdminDeleteAppConfigInput!) {
 }
 ```
 
-- Server: `check_admin_only()` → flips `status = DELETED` on the
-  matching row. Subsequent reads (`Domain.appConfigs`,
-  `UserNode.appConfigs`, `adminAppConfigs`, etc.) hide the document.
+- Authorization: admin required for non-`USER` scopes; a user can
+  call `deleteAppConfig` only when `key.scope = USER` and
+  `key.scopeId == current_user.user_id`.
+- Service flips `status = DELETED` on the matching row. Subsequent
+  reads (`Domain.appConfigs`, `UserNode.appConfigs`,
+  `adminAppConfigs`, etc.) hide the document.
 - **Idempotent**: no-op when the row is absent or already `DELETED`.
-- **Recoverable**: `adminUpdateAppConfig` on the same key revives the
-  row to `ALIVE`, overwriting the stored value with the provided JSON.
+- **Recoverable**: `updateAppConfig` on the same `key` revives the
+  row to `ALIVE`, overwriting the stored value with the provided
+  JSON.
 
-The self-service equivalent is `deleteMyAppConfig`, which only takes
-a `name` and soft-deletes that document of the caller.
+A user removing their own document uses the same `deleteAppConfig`
+mutation with `key.scope = USER` and `key.scopeId =
+current_user.user_id` — the service's USER-scope rule authorizes
+the call.
