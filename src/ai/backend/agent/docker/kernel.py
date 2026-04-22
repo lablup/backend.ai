@@ -221,8 +221,7 @@ class DockerKernel(AbstractKernel):
         try:
             async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
                 log.info("Container (k: {}) is being committed", kernel_id)
-                docker = Docker()
-                try:
+                async with closing_async(Docker()) as docker:
                     # There is a known issue at certain versions of Docker Engine
                     # which prevents container from being committed when request config body is empty
                     # https://github.com/moby/moby/issues/45543
@@ -289,8 +288,6 @@ class DockerKernel(AbstractKernel):
                                         await write_task
                         finally:
                             await docker.images.delete(image_id)
-                finally:
-                    await docker.close()
         except TimeoutError:
             log.warning("Session is already being committed.")
 
