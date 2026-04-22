@@ -95,6 +95,28 @@ class ScopeChainPermissionCheckInput:
 
 
 @dataclass(frozen=True)
+class EffectivePermissionsInput:
+    """Input for resolving effective permissions per entity for a given user.
+
+    Given a user, an element type, and a list of entity IDs, returns the
+    set of permitted operations per entity by traversing the scope chain
+    and evaluating all role/permission assignments.
+    """
+
+    user_id: uuid.UUID
+    target_element_type: RBACElementType
+    target_entity_ids: list[str]
+    permission_entity_type: EntityType | None = None
+
+
+@dataclass(frozen=True)
+class EffectivePermissionsResult:
+    """Mapping from entity ID to the set of operations the user is authorized to perform."""
+
+    permissions: dict[str, set[OperationType]]
+
+
+@dataclass(frozen=True)
 class BulkPermissionCheckInput:
     user_id: uuid.UUID
     target_element_type: RBACElementType

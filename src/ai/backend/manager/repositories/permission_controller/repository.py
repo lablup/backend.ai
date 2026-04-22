@@ -31,6 +31,8 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleAssignmentResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
+    EffectivePermissionsInput,
+    EffectivePermissionsResult,
     RoleData,
     RoleDetailData,
     RoleListResult,
@@ -362,6 +364,18 @@ class PermissionControllerRepository:
         entities of the same RBACElementType in a single query.
         """
         return await self._db_source.check_bulk_permission_with_scope_chain(data)
+
+    @permission_controller_repository_resilience.apply()
+    async def resolve_effective_permissions(
+        self,
+        data: EffectivePermissionsInput,
+    ) -> EffectivePermissionsResult:
+        """Resolve the set of permitted operations per entity for a given user.
+
+        For each target entity, traverses the scope chain (AUTO edges) and
+        self-scope permissions to collect all operations the user can perform.
+        """
+        return await self._db_source.resolve_effective_permissions(data)
 
     # -- role invitation --
 
