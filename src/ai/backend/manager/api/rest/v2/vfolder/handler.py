@@ -12,8 +12,8 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CloneVFolderInput,
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
-    CreateVFolderInProjectInput,
     CreateVFolderInput,
+    CreateVFolderInScopeInput,
     DeleteFilesInput,
     DeployVFolderInput,
     ListFilesInput,
@@ -110,15 +110,10 @@ class V2VFolderHandler:
     async def project_create(
         self,
         path: PathParam[ProjectIdPathParam],
-        body: BodyParam[CreateVFolderInProjectInput],
+        body: BodyParam[CreateVFolderInScopeInput],
     ) -> APIResponse:
-        """Create a vfolder owned by a project.
-
-        The path segment ``{project_id}`` is authoritative; any ``project_id``
-        value in the body is overridden to match the URL.
-        """
-        dto = body.parsed.model_copy(update={"project_id": path.parsed.project_id})
-        result = await self._adapter.create_in_project(dto)
+        """Create a vfolder owned by a project. Scope comes from the URL path."""
+        result = await self._adapter.create_in_project(path.parsed.project_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def deploy(

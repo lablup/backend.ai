@@ -183,11 +183,10 @@ def project_create(
 ) -> None:
     """Create a vfolder owned by a project."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInProjectInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInScopeInput
     from ai.backend.common.dto.manager.v2.vfolder.types import VFolderUsageMode
 
-    input_dto = CreateVFolderInProjectInput(
-        project_id=project_id,
+    input_dto = CreateVFolderInScopeInput(
         name=name,
         usage_mode=VFolderUsageMode(usage_mode),
         host=host,
@@ -197,7 +196,7 @@ def project_create(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.vfolder.create_in_project(input_dto)
+            result = await registry.vfolder.create_in_project(project_id, input_dto)
             print_result(result)
         finally:
             await registry.close()

@@ -30,7 +30,7 @@ __all__ = (
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
-    "CreateVFolderInProjectInput",
+    "CreateVFolderInScopeInput",
     "CreateVFolderInput",
     "DeleteFilesInput",
     "DeleteInvitationInput",
@@ -85,16 +85,16 @@ class CreateVFolderInput(BaseRequestModel):
         return v
 
 
-class CreateVFolderInProjectInput(BaseRequestModel):
-    """Input for creating a virtual folder within a project.
+class CreateVFolderInScopeInput(BaseRequestModel):
+    """Scope-agnostic body for vfolder creation under a specific scope.
 
-    The project the vfolder belongs to is identified by ``project_id``. In
-    transport layers where the scope is expressed separately (REST path
-    segment, GraphQL scope argument), that value is injected into this
-    field before the DTO reaches the adapter.
+    The owning scope (project, user, domain, …) is supplied externally by
+    the transport layer (REST path segment, GraphQL mutation argument)
+    and is NOT part of this body. This keeps the body reusable across
+    scope-specific endpoints without forcing clients to duplicate the
+    scope identifier.
     """
 
-    project_id: UUID = Field(description="Project UUID that owns the vfolder")
     name: VFolderName = Field(description="VFolder name")
     host: str | None = Field(default=None, description="Storage host for the vfolder")
     usage_mode: VFolderUsageMode = Field(

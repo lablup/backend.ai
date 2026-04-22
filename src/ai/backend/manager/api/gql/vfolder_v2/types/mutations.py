@@ -20,10 +20,10 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateUploadSessionInput as UploadInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
-    CreateVFolderInProjectInput as CreateInProjectInputDTO,
+    CreateVFolderInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
-    CreateVFolderInput as CreateInputDTO,
+    CreateVFolderInScopeInput as CreateInScopeInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     DeleteFilesInput as DeleteFilesInputDTO,
@@ -133,12 +133,14 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Input for creating a virtual folder within a project.",
+        description=(
+            "Scope-agnostic body for vfolder creation. The owning scope is "
+            "supplied as a separate mutation argument."
+        ),
     ),
-    name="CreateVFolderInProjectInput",
+    name="CreateVFolderInScopeInput",
 )
-class CreateVFolderInProjectInputGQL(PydanticInputMixin[CreateInProjectInputDTO]):
-    project_id: UUID = gql_field(description="Project UUID that owns the vfolder.")
+class CreateVFolderInScopeInputGQL(PydanticInputMixin[CreateInScopeInputDTO]):
     name: str = gql_field(description="VFolder name.")
     host: str | None = gql_field(default=None, description="Storage host for the vfolder.")
     usage_mode: VFolderUsageModeGQL = gql_field(
