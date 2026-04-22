@@ -1052,6 +1052,37 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 f"seccomp={json.dumps(seccomp_profile)}"
             ]
 
+    async def _attach_additional_networks(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        requested_networks: Iterable[str],
+    ) -> None:
+        """
+        Connect the container to each requested network, skipping any that
+        Docker has already attached (e.g. `bridge` auto-attached when
+        `NetworkMode` is unset). `requested_networks` may contain network
+        names or IDs per the `Resources.get_docker_networks` contract.
+        """
+        requested = set(requested_networks)
+        if not requested:
+            return
+        container_info = await container.show()
+        networks = container_info.get("NetworkSettings", {}).get("Networks", {}) or {}
+        already_attached = set(networks.keys()) | {
+            n["NetworkID"] for n in networks.values() if n.get("NetworkID")
+        }
+        for ref in requested - already_attached:
+            network = await docker.networks.get(ref)
+            try:
+                await network.connect({"Container": container._id})
+            except DockerError as e:
+                # Defense against a race between container.show() and connect()
+                # where Docker may attach the network in between.
+                if e.status == HTTPStatus.FORBIDDEN and "already exists" in str(e.message):
+                    continue
+                raise
+
     @override
     async def start_container(
         self,
@@ -1320,31 +1351,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
                 additional_network_names |= set(n)
 
-            # Skip networks already attached by Docker (e.g. `bridge` auto-attached
-            # when NetworkMode is unset). A single `docker-networks` config can then
-            # serve both single-node and multi-node without duplicate-attach 403s.
-            if additional_network_names:
-                container_info = await container.show()
-                networks = container_info.get("NetworkSettings", {}).get("Networks", {}) or {}
-                # `get_docker_networks()` may return either network names or IDs
-                # (see `Resources.get_docker_networks` contract), so collect both
-                # the dict keys (names) and `NetworkID` values to filter against.
-                already_attached_networks = set(networks.keys()) | {
-                    n["NetworkID"] for n in networks.values() if n.get("NetworkID")
-                }
-            else:
-                already_attached_networks = set()
-
-            for name in additional_network_names - already_attached_networks:
-                network = await docker.networks.get(name)
-                try:
-                    await network.connect({"Container": container._id})
-                except DockerError as e:
-                    # Defense against a race between container.show() and connect()
-                    # where Docker may attach the network in between.
-                    if e.status == HTTPStatus.FORBIDDEN and "already exists" in str(e.message):
-                        continue
-                    raise
+            await self._attach_additional_networks(docker, container, additional_network_names)
 
             kernel_obj.set_container_id(ContainerId(cid))
             container_network_info: ContainerNetworkInfo | None = None
