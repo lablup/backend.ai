@@ -1002,11 +1002,6 @@ A list variant returns one merged result per `name` for which at
 least one of the three rows (DOMAIN, DOMAIN_USER_DEFAULTS, USER)
 exists.
 
-> **Note**: the Python sketch below is illustrative only — it shows
-> the data flow / SQL shape. Method names, signatures, and class
-> placement are *not* part of this BEP's contract and may differ in
-> the actual implementation.
-
 ```python
 class AppConfigDBSource:
     _db: ExtendedAsyncSAEngine
@@ -1019,40 +1014,44 @@ class AppConfigDBSource:
     ) -> MergedAppConfig:
         # Caller (repository / service) resolves the user's domain_name
         # before calling — this db_source touches only app_configs rows.
-        # Three scoped queries on the same readonly session — each
-        # natural key returns at most one row, so no post-query
-        # filtering needed.
+        # A single query pulls all three source rows (DOMAIN +
+        # DOMAIN_USER_DEFAULTS on `domain_name`, USER on `user_id`),
+        # bounded to at most three rows thanks to the natural-key
+        # UniqueConstraint.
         async with self._db.begin_readonly_session() as db_sess:
-            domain_row = (await db_sess.execute(
+            rows = (await db_sess.execute(
                 sa.select(AppConfigRow).where(
                     AppConfigRow.status == AppConfigStatus.ALIVE,
-                    AppConfigRow.scope_type == AppConfigScopeType.DOMAIN,
-                    AppConfigRow.scope_id == domain_name,
                     AppConfigRow.name == name,
+                    sa.or_(
+                        sa.and_(
+                            AppConfigRow.scope_type.in_([
+                                AppConfigScopeType.DOMAIN,
+                                AppConfigScopeType.DOMAIN_USER_DEFAULTS,
+                            ]),
+                            AppConfigRow.scope_id == domain_name,
+                        ),
+                        sa.and_(
+                            AppConfigRow.scope_type == AppConfigScopeType.USER,
+                            AppConfigRow.scope_id == user_id,
+                        ),
+                    ),
                 )
-            )).scalar_one_or_none()
+            )).scalars().all()
 
-            defaults_row = (await db_sess.execute(
-                sa.select(AppConfigRow).where(
-                    AppConfigRow.status == AppConfigStatus.ALIVE,
-                    AppConfigRow.scope_type == AppConfigScopeType.DOMAIN_USER_DEFAULTS,
-                    AppConfigRow.scope_id == domain_name,
-                    AppConfigRow.name == name,
-                )
-            )).scalar_one_or_none()
-
-            user_row = (await db_sess.execute(
-                sa.select(AppConfigRow).where(
-                    AppConfigRow.status == AppConfigStatus.ALIVE,
-                    AppConfigRow.scope_type == AppConfigScopeType.USER,
-                    AppConfigRow.scope_id == user_id,
-                    AppConfigRow.name == name,
-                )
-            )).scalar_one_or_none()
-
-        domain_value = domain_row.extra_config if domain_row else {}
-        domain_defaults = defaults_row.extra_config if defaults_row else {}
-        user_customized = user_row.extra_config if user_row else {}
+        by_scope = {row.scope_type: row for row in rows}
+        domain_value = (
+            by_scope[AppConfigScopeType.DOMAIN].extra_config
+            if AppConfigScopeType.DOMAIN in by_scope else {}
+        )
+        domain_defaults = (
+            by_scope[AppConfigScopeType.DOMAIN_USER_DEFAULTS].extra_config
+            if AppConfigScopeType.DOMAIN_USER_DEFAULTS in by_scope else {}
+        )
+        user_customized = (
+            by_scope[AppConfigScopeType.USER].extra_config
+            if AppConfigScopeType.USER in by_scope else {}
+        )
         return MergedAppConfig(
             domain_name=domain_name,
             user_id=user_id,
