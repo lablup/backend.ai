@@ -644,9 +644,6 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             jail_path = None
 
         dotfile_extractor_path = self.resolve_krunner_filepath("runner/extract_dotfiles.py")
-        persistent_files_warning_doc_path = self.resolve_krunner_filepath(
-            "runner/DO_NOT_STORE_PERSISTENT_FILES_HERE.md"
-        )
         entrypoint_sh_path = self.resolve_krunner_filepath("runner/entrypoint.sh")
 
         fantompass_path = self.resolve_krunner_filepath("runner/fantompass.py")
@@ -664,11 +661,6 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
-        _mount(
-            MountTypes.BIND,
-            persistent_files_warning_doc_path,
-            "/home/work/DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
-        )
 
         _mount(MountTypes.VOLUME, krunner_volume, "/opt/backend.ai")
         pylib_path = f"/opt/backend.ai/lib/python{krunner_pyver}/site-packages/"
@@ -2737,6 +2729,12 @@ class AbstractAgent[
                     vfolder_mounts = [
                         VFolderMount.from_json(item) for item in kernel_config["mounts"]
                     ]
+                    # NOTE: Inline injection until EnvironProvisioner is wired
+                    #  into the kernel creation pipeline. See also:
+                    #  agent/stage/kernel_lifecycle/docker/environ.py
+                    if vfolder_mounts:
+                        persistent_paths = ":".join(str(m.kernel_path) for m in vfolder_mounts)
+                        environ["BACKENDAI_PERSISTENT_PATHS"] = persistent_paths
                     if not restarting:
                         await ctx.mount_vfolders(vfolder_mounts, resource_spec)
                         await ctx.mount_krunner(resource_spec, environ)

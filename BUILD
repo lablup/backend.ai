@@ -23,7 +23,7 @@ python_requirements(
         "pyzmq": ["zmq"],
         "ruamel.yaml": ["ruamel.yaml"],
         "tomli-w": ["tomli_w"],
-        "tt-smi": ["tt_smi", "tt_tools"],
+        "tt-smi": ["tt_smi", "tt_tools", "tt_tools_common"],
         "typing-extensions": ["typing_extensions"],
         "valkey-glide": ["glide"],
         "zipstream-new": ["zipstream"],

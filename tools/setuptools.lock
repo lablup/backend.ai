@@ -9,6 +9,7 @@
 //     "CPython==3.13.7"
 //   ],
 //   "generated_with_requirements": [
+//     "Cython~=3.0",
 //     "setuptools~=80.0.0",
 //     "wheel~=0.46.2"
 //   ],
@@ -36,19 +37,87 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529",
-              "url": "https://files.pythonhosted.org/packages/b7/b9/c538f279a4e237a006a2c98387d081e9eb060d203d8ed34467cc0f0b9b53/packaging-26.0-py3-none-any.whl"
+              "hash": "732fc93bc33ae4b14f6afaca663b916c2fdd5dcbfad7114e17fb2434eeaea45c",
+              "url": "https://files.pythonhosted.org/packages/ff/fa/d3c15189f7c52aaefbaea76fb012119b04b9013f4bf446cb4eb4c26c4e6b/cython-3.2.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4",
-              "url": "https://files.pythonhosted.org/packages/65/ee/299d360cdc32edc7d2cf530f3accf79c4fca01e96ffc950d8a52213bd8e4/packaging-26.0.tar.gz"
+              "hash": "36bf3f5eb56d5281aafabecbaa6ed288bc11db87547bba4e1e52943ae6961ccf",
+              "url": "https://files.pythonhosted.org/packages/0a/8b/fd393f0923c82be4ec0db712fffb2ff0a7a131707b842c99bf24b549274d/cython-3.2.4-cp39-abi3-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "28e8075087a59756f2d059273184b8b639fe0f16cf17470bd91c39921bc154e0",
+              "url": "https://files.pythonhosted.org/packages/18/b5/1cfca43b7d20a0fdb1eac67313d6bb6b18d18897f82dd0f17436bdd2ba7f/cython-3.2.4-cp313-cp313-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "3b6e58f73a69230218d5381817850ce6d0da5bb7e87eb7d528c7027cbba40b06",
+              "url": "https://files.pythonhosted.org/packages/5e/91/4865fbfef1f6bb4f21d79c46104a53d1a3fa4348286237e15eafb26e0828/cython-3.2.4-cp39-abi3-manylinux2014_armv7l.manylinux_2_17_armv7l.manylinux_2_31_armv7l.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "03893c88299a2c868bb741ba6513357acd104e7c42265809fd58dce1456a36fc",
+              "url": "https://files.pythonhosted.org/packages/71/bb/8f28c39c342621047fea349a82fac712a5e2b37546d2f737bbde48d5143d/cython-3.2.4-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "6d5267f22b6451eb1e2e1b88f6f78a2c9c8733a6ddefd4520d3968d26b824581",
+              "url": "https://files.pythonhosted.org/packages/73/48/48530d9b9d64ec11dbe0dd3178a5fe1e0b27977c1054ecffb82be81e9b6a/cython-3.2.4-cp39-abi3-manylinux1_i686.manylinux_2_28_i686.manylinux_2_5_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f81eda419b5ada7b197bbc3c5f4494090e3884521ffd75a3876c93fbf66c9ca8",
+              "url": "https://files.pythonhosted.org/packages/7a/d2/16fa02f129ed2b627e88d9d9ebd5ade3eeb66392ae5ba85b259d2d52b047/cython-3.2.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "31a90b4a2c47bb6d56baeb926948348ec968e932c1ae2c53239164e3e8880ccf",
+              "url": "https://files.pythonhosted.org/packages/86/70/03dc3c962cde9da37a93cca8360e576f904d5f9beecfc9d70b1f820d2e5f/cython-3.2.4-cp39-abi3-musllinux_1_2_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "28b1e363b024c4b8dcf52ff68125e635cb9cb4b0ba997d628f25e32543a71103",
+              "url": "https://files.pythonhosted.org/packages/8d/30/7c24d9292650db4abebce98abc9b49c820d40fa7c87921c0a84c32f4efe7/cython-3.2.4-cp39-abi3-musllinux_1_2_armv7l.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "84226ecd313b233da27dc2eb3601b4f222b8209c3a7216d8733b031da1dc64e6",
+              "url": "https://files.pythonhosted.org/packages/91/85/7574c9cd44b69a27210444b6650f6477f56c75fee1b70d7672d3e4166167/cython-3.2.4.tar.gz"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e65e4773021f8dc8532010b4fbebe782c77f9a0817e93886e518c93bd6a44e9d",
+              "url": "https://files.pythonhosted.org/packages/b1/97/10b50c38313c37b1300325e2e53f48ea9a2c078a85c0c9572057135e31d5/cython-3.2.4-cp39-abi3-musllinux_1_2_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e71efb20048358a6b8ec604a0532961c50c067b5e63e345e2e359fff72feaee8",
+              "url": "https://files.pythonhosted.org/packages/fa/39/60317957dbef179572398253f29d28f75f94ab82d6d39ea3237fb6c89268/cython-3.2.4-cp39-abi3-musllinux_1_2_aarch64.whl"
+            }
+          ],
+          "project_name": "cython",
+          "requires_dists": [],
+          "requires_python": ">=3.8",
+          "version": "3.2.4"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "5d9c0669c6285e491e0ced2eee587eaf67b670d94a19e94e3984a481aba6802f",
+              "url": "https://files.pythonhosted.org/packages/7a/c2/920ef838e2f0028c8262f16101ec09ebd5969864e5a64c4c05fad0617c56/packaging-26.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f042152b681c4bfac5cae2742a55e103d27ab2ec0f3d88037136b6bfe7c9c5de",
+              "url": "https://files.pythonhosted.org/packages/df/de/0d2b39fb4af88a0258f3bac87dfcbb48e73fbdea4a2ed0e2213f9a4c2f9a/packaging-26.1.tar.gz"
             }
           ],
           "project_name": "packaging",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "26.0"
+          "version": "26.1"
         },
         {
           "artifacts": [
@@ -155,6 +224,7 @@
   "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
+    "Cython~=3.0",
     "setuptools~=80.0.0",
     "wheel~=0.46.2"
   ],

@@ -463,6 +463,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 zshrc_path = Path(str(files("ai.backend.runner").joinpath(".zshrc")))
                 vimrc_path = Path(str(files("ai.backend.runner").joinpath(".vimrc")))
                 tmux_conf_path = Path(str(files("ai.backend.runner").joinpath(".tmux.conf")))
+                persistent_files_warning_doc_path = Path(
+                    str(
+                        files("ai.backend.runner").joinpath("DO_NOT_STORE_PERSISTENT_FILES_HERE.md")
+                    )
+                )
                 jupyter_custom_dir = self.work_dir / ".jupyter" / "custom"
                 jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy(jupyter_custom_css_path.resolve(), jupyter_custom_dir / "custom.css")
@@ -474,6 +479,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
+                shutil.copy(
+                    persistent_files_warning_doc_path.resolve(),
+                    self.work_dir / "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
+                )
 
                 def chown_scratch(uid: int | None, gid: int | None) -> None:
                     paths = [
@@ -485,6 +494,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         self.work_dir / ".zshrc",
                         self.work_dir / ".vimrc",
                         self.work_dir / ".tmux.conf",
+                        self.work_dir / "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
                     ]
                     self._chown_paths_if_root(paths, uid, gid)
 
