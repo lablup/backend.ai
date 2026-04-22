@@ -99,7 +99,6 @@ class AppConfigScopeType(enum.StrEnum):
     PUBLIC = "public"
     DOMAIN = "domain"
     DOMAIN_USER_DEFAULTS = "domain_user_defaults"   # per-domain defaults applied to users in that domain
-    PROJECT = "project"
     USER = "user"
 
 
@@ -201,10 +200,10 @@ repositories/app_config/
 
 | Repository                              | Methods                                                                                                              |
 |-----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `PublicAppConfigRepository`             | `get(name)`, `list()`, `create(name, extra_config)`, `update(name, extra_config)`, `soft_delete(name)`, `restore(name)`                                             |
-| `DomainAppConfigRepository`             | `get(domain_name, name)`, `list(domain_name)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)` |
-| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `list(domain_name)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)` |
-| `UserAppConfigRepository`               | `get(user_id, name)`, `list(user_id)`, `create(user_id, name, extra_config)`, `update(user_id, name, extra_config)`, `soft_delete(user_id, name)`, `restore(user_id, name)`, `get_merged(user_id, name)`, `list_merged(user_id)` |
+| `PublicAppConfigRepository`             | `get(name)`, `get_by_id(id)`, `create(name, extra_config)`, `update(name, extra_config)`, `soft_delete(name)`, `restore(name)`, `search(filter)`                                             |
+| `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)`, `search(domain_name, filter)` |
+| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)`, `search(domain_name, filter)` |
+| `UserAppConfigRepository`               | `get(user_id, name)`, `get_by_id(id)`, `create(user_id, name, extra_config)`, `update(user_id, name, extra_config)`, `soft_delete(user_id, name)`, `restore(user_id, name)`, `search(user_id, filter)`, `get_merged(user_id, name)`, `list_merged(user_id)` |
 
 `DomainUserDefaultsAppConfigRepository` mirrors
 `DomainAppConfigRepository` (admin-only, same call shape) but operates
@@ -230,9 +229,9 @@ class AppConfigDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             ...   # filters status = ALIVE
 
-    async def list_in_scope(
-        self, scope_type: AppConfigScopeType, scope_id: str
-    ) -> list[AppConfigRow]:
+    async def get_by_id(self, id: uuid.UUID) -> AppConfigRow | None:
+        # ID-based lookup for Actions that have already resolved the
+        # natural key to a row id (see §3 "Name → ID resolution").
         async with self._db.begin_readonly_session() as db_sess:
             ...   # filters status = ALIVE
 
@@ -270,8 +269,10 @@ class AppConfigDBSource:
             ...
 ```
 
-`list_in_scope` keeps the two-arg form because it intentionally drops
-the `name` part of the key (and therefore is not an `AppConfigKey`).
+Listing operations are not db_source primitives — listing is
+expressed as search (filter + pagination) at the Connection layer,
+which the service implements via a separate search path rather
+than a scoped-list on the db_source.
 
 Permission checks and scope validation are performed in the service
 layer.
