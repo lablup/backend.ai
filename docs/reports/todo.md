@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Document ID** | TR-2026-004-TODO |
-| **Last Updated** | 2026-04-21 (2차 — vfolder/storage-proxy 계획 §6 추가) |
+| **Last Updated** | 2026-04-22 (3차 — §6.9 storage-proxy Pod 배포 결과, I-29~I-31 추가) |
 | **Branch** | `docs/dood` |
 | **Related** | `simple_plan.md`, `k8s-control-plane-dood-agent-architecture.md` |
 
@@ -56,7 +56,7 @@
 | I-5 | **Fractional GPU / CUDA hook** DooD 경로에서 end-to-end 검증 안 됨 | 커널 컨테이너가 호스트 dockerd로 생성되므로 동작할 것으로 예상되나 실제 smoke test 필요 |
 | I-6 | **Multi-node 세션 (Swarm overlay × K8s CNI 공존) 미검증** — 최우선 기능 검증 대상 | 아래 §2.5 참조 |
 | I-7 | **AppProxy / Web Server 차트 부재** | 현재 Manager + Agent만 차트화. AppProxy Coordinator/Worker, Web Server 차트 추가 필요 |
-| I-8 | **Storage Proxy / vfolder NFS 마운트 미구현** | Agent 차트에 vfolder hostPath 마운트 항목 없음. `simple_plan.md §4.5` (호스트 pre-mount) 방식 반영 필요 |
+| I-8 | **Storage Proxy / vfolder NFS 마운트** (부분 완료) | §6.9: storage-proxy Pod 차트 + L1 NFS + vfolder CRUD/ls/mkdir 왕복까지 검증. **남은 작업**: agent 차트 `/vfroot` hostPath + kernel_config 주입, 실제 TUS 업로드, 세션 mount L2/L3 |
 | I-9 | **Accelerator 플러그인 (CUDA / ROCm / TPU)** 이미지 포함 여부 미검증 | `docker/agent/Dockerfile`에 plugin wheel 설치 경로 점검 |
 
 ### 2.3 Operational — 운영/관측
@@ -76,6 +76,16 @@
 |---|---|---|
 | I-16 | 노드 prerequisite 문서 (Docker, NVIDIA driver, NFS, Swarm init/join, taint/label) 부재 | `simple_plan.md §6.1` 기반으로 runbook 작성 |
 | I-17 | 업그레이드/롤백 가이드 부재 | |
+
+### 2.5 Storage-Proxy Pod 배포 중 새로 발견된 이슈 (2026-04-22)
+
+§6.9 참조. 세 건 모두 "storage-proxy Pod가 기동 안 되거나 vfolder CRUD가 거부되는" 현상으로 묶이지만 원인은 서로 독립.
+
+| # | 이슈 | 영향 | 대응 |
+|---|---|---|---|
+| I-29 | **Bootstrap fixture 가 vfolder 기능을 막고 있음** — `max_vfolder_count=0` (user policy), `allowed_vfolder_hosts: []` (keypair policy는 legacy `local:volume1`만), admin user `main_access_key=null`, etcd `volumes/_types/{user,group}` 미시드 | `./bai vfolder create` 가 4단계 거부 (user-owned not allowed → no main_keypair → create-vfolder not allowed) | `deploy/helm/backend-ai-manager/files/bootstrap-fixture.json` 와 etcd-seed ConfigMap 확장: (1) `user_resource_policies[*].max_vfolder_count` 기본값 상향, (2) `keypair_resource_policies[*].allowed_vfolder_hosts`에 `proxy1:volume1` 추가, (3) users[*].main_access_key 필드 세팅, (4) etcd-seed JSON에 `volumes._types.user=""`, `volumes._types.group=""` 키 추가 |
+| I-30 | **Docker 빌드 이미지가 containerd `k8s.io` namespace에 안 보임** | `docker build -t ...:dev` 후 helm install 하면 `ImagePullBackOff` — kubelet은 containerd `k8s.io` ns 조회, docker는 `moby` ns 저장. 과거 manager/agent 이미지도 동일 문제였을 것 | 빌드 script 또는 README에 `docker save | sudo ctr -n k8s.io images import` 스텝 추가. 또는 `nerdctl build` 또는 containerd buildkit 직접 빌드로 전환. **영구 해결**: buildah/kaniko 전환 시 k8s.io ns 직접 저장 가능. 임시로 `Makefile`/`./dev build` 헬퍼 제공 권장 |
+| I-31 | **Prometheus multiprocess dir 기본 경로가 상대 경로** (`./run/prometheus/<component>`) | storage-proxy 멀티워커 구조에서 워커 CWD 가 부모와 달라져 `FileNotFoundError: run/prometheus/storage/gauge_livesum_*.db` 로 크래시 | storage-proxy chart에서 `BACKENDAI_PROMETHEUS_DIR=/tmp/backend.ai/prometheus` 환경변수 세팅 + emptyDir mount로 해결 (chart에 반영됨). **상류 대응 후보**: `ai.backend.common.metrics.multiprocess.setup_prometheus_multiprocess_dir` 기본값을 `/tmp/backend.ai/prometheus/<component>` 같은 절대 경로로 변경 또는 명시적 에러 가이드. 같은 구조인 manager/agent는 CWD 가 `/root` / `/workspace` 으로 고정되어 운좋게 동작 중 |
 
 ---
 
@@ -167,8 +177,11 @@ sudo docker swarm join --token <worker-token> <NODE_A_IP>:2377
 1. ~~**I-18** Bitnami → OSS~~ **완료** (§5.1, 단 HA 버전은 Plan 2+)
 2. ~~**I-26** cuda_open slot name 오타~~ **완료** (§5.6.3, 커널에 GPU device attach 정상화)
 3. ~~**I-28** Agent pod 재시작 후 첫 GPU 세션 hang~~ **완료** (§5.6.5, `containerPortRange`를 NodePort 범위 밖 [40000, 45000]로 이동)
-4. **I-8 vfolder 스택** — §6 세부 계획. L1(NFS Docker + agent hostPath) → L2(storage-proxy 차트 신규) → L3(multi-node)
-5. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그
+4. **I-8 vfolder 스택** — storage-proxy Pod + vfolder CRUD 왕복 **완료** (§6.9). 남은 것: agent 차트 `/vfroot` hostPath 연결, 세션 mount L2/L3 검증
+5. **I-29** bootstrap fixture 수정 (vfolder 허용 프리셋) — 차트 재설치 시 수동 `./bai` 복구 단계 불필요하게 만들기
+6. **I-30** containerd `k8s.io` namespace 이미지 전달 자동화 — 빌드 스크립트 또는 nerdctl 전환
+7. **I-31** storage-proxy prometheus multiproc 경로 상류 수정 (차트 workaround는 있음)
+8. **I-24-FIX** krunner 볼륨 sentinel 체크 추가 (`agent/docker/kernel.py:524`) — 반복 재현 가능 버그
 6. **I-22** keypair + container-registry fixture를 차트 hook으로 편입
 7. **I-25** Multi-node 세션 스케줄러 분산 확인 (sokovan `cluster_mode` 처리)
 8. **I-1** Manager 노드 pinning + Swarm manager 사전 조인 절차 문서화
@@ -648,3 +661,45 @@ L2에서 `/vfroot`를 모든 agent 노드에 pre-mount하는 것만 보장하면
 - **S3 / CephFS 백엔드**: Plan 2+
 - **NFS HA** (keepalived, DRBD 등): 운영 배포 시
 - **PersistentVolume CSI 통합** (`csi-driver-nfs`): K8s-native 선호 시 대안
+
+### 6.9 L1 + L2 실행 결과 (2026-04-22)
+
+§6.3 L1 + §6.4 L2 작업 실제 수행. **storage-proxy Pod 자체는 정상 기동 + vfolder CRUD/ls/mkdir 왕복까지 검증 완료.** 단, 계획에서 명시하지 않았던 bootstrap fixture 공백과 이미지 전달 경로 문제가 수면 위로 올라와 I-29/I-30/I-31로 새로 적재.
+
+**확정된 구조 (계획 대비 차이)**
+
+| 결정 | 계획 §6.4 | 최종 | 이유 |
+|---|---|---|---|
+| 네트워크 노출 | Service (clusterIP) + 2포트 | `hostNetwork: true` + ser8 pin, Service 없음 | client API(6021) 가 사용자 머신 + kernel 컨테이너 양쪽에서 reachable 해야 함. ClusterIP는 kernel(DooD Docker bridge)에서 해석 안 되고, NodePort는 번거로움. hostNetwork + host IP 하나로 통일 |
+| manager API port | 6021 | 6022 | 계획이 API 두 개를 뒤집어 적어두었음 (실제 `src/ai/backend/storage/config` halfstack.toml 기준 client=6021, manager=6022) |
+| etcd 등록 주체 | manager etcdSeed Job | 동일 — 단 seed를 `etcd-seed.json`(config prefix)과 `volumes-seed.json`(volumes prefix) 2개로 분리하고 같은 Job에서 `mgr etcd put-json` 을 두 번 호출 | Backend.AI etcd가 `/sorna/<ns>/{config,volumes,...}/` 로 top-level 네임스페이스를 구분하므로 prefix 하나(`config`)로는 `volumes/`에 못 씀 |
+| 볼륨 경로 | `/vfroot` (root of NFS export) | `/vfroot/volume1/` (서브디렉터리) | 향후 추가 볼륨(volume2, ...) 병치를 위해 per-volume subpath 유지 |
+| Dockerfile | `docker/backend.ai-storage-proxy.dockerfile` (`pip wheel from dist/`) 재사용 | `docker/storage-proxy/Dockerfile` 신규 (Pants 기반, manager/agent 패턴과 동일) | 신규 Dockerfile이 git-lfs pull 과 pants 빌드를 self-contained 로 수행 — `dist/` 사전 빌드 의존 제거 |
+
+**실제 배포 순서 (이후 재현 runbook)**
+
+1. `itsthenetwork/nfs-server-alpine` 컨테이너 ser8에 `docker run`, `/srv/bai-shared/vfroot` export
+2. 3노드(`ser8`, `charsyam-nvidia`, `charsyam-gen1`) `/etc/fstab` 에 `192.168.0.156:/ /vfroot nfs4 rw,hard,timeo=600,retrans=2,_netdev,nofail 0 0` 추가 후 `mount -a`
+3. `docker build -f docker/storage-proxy/Dockerfile -t backend.ai-storage-proxy:dev .`
+4. **`docker save backend.ai-storage-proxy:dev | sudo ctr -n k8s.io images import -`** ← I-30. 이 스텝이 없으면 ImagePullBackOff
+5. `helm install bai-sp deploy/helm/backend-ai-storage-proxy -n backend-ai -f deploy/helm/values-storage-proxy-local.yaml`
+6. `helm upgrade bai deploy/helm/backend-ai-manager -n backend-ai -f deploy/helm/values-local.yaml` — post-upgrade etcd-seed Job 이 `/sorna/local/volumes/proxies/proxy1/*` 키 5개 주입
+7. `kubectl rollout restart deployment bai-backend-ai-manager` — manager 가 부팅 시에만 volume 설정 읽으므로 재기동 필수
+8. **bootstrap 복구 4단계** (I-29 해소 전까지 매번 필요):
+   - `./bai admin resource-policy user update default --max-vfolder-count 100`
+   - `./bai admin resource-policy keypair update default --json '{"allowed_vfolder_hosts":[{"host":"proxy1:volume1","permissions":["create-vfolder","modify-vfolder","delete-vfolder","mount-in-session","upload-file","download-file","invite-others","set-user-specific-permission"]}]}'`
+   - `./bai user update <admin-uuid> '{"main_access_key":"AKIAIOSFODNN7EXAMPLE"}'`
+   - `kubectl exec -n backend-ai bai-etcd-0 -- etcdctl put /sorna/local/volumes/_types/user "" ; ... put /sorna/local/volumes/_types/group ""`
+9. `./bai vfolder create --name test-folder --host proxy1:volume1`
+
+**검증된 경로 (end-to-end)**
+
+- `./bai vfolder create` → manager → storage-proxy manager API (6022) → `mkdir /vfroot/volume1/<user>/<uuid>/<...>/` → NFS 서버 `/srv/bai-shared/vfroot/volume1/...` 에 실체 생성 ✅
+- `./bai vfolder mkdir <id> subdir` → 동일 경로로 전파 ✅
+- `kubectl exec storage-proxy-pod -- sh -c 'echo X > /vfroot/.../direct.txt'` → `./bai vfolder ls <id>` 로 조회 ✅ (반대 방향 왕복)
+
+**아직 검증 안 된 것**
+
+- **TUS 업로드 실체 전송**: `./bai vfolder upload` 가 토큰/URL만 발급하고 종료. 실제 바이트 전송은 TUS 클라이언트 필요 — 별도 smoke 필요. mkdir 왕복이 증명되었으니 동일 경로로 동작할 것으로 기대.
+- **세션 mount (L2/L3)**: agent 차트에 `/vfroot` hostPath 가 아직 없음. kernel_config 에 mounts 주입되어도 agent 노드에 경로가 없어 bind 실패. **I-8 남은 작업** 으로 유지.
+- **multi-node vfolder** (L3): L2 위에 agent 차트 수정만 들어가면 자동. GPU 세션 노드에서 같은 vfolder 파일 접근 확인 필요.

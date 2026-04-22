@@ -56,14 +56,18 @@ spec:
         - name: seed
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Chain both seeds in one Pod so they share the rendered
+          # manager.toml (render-config initContainer writes to an emptyDir
+          # that does not survive across Pods). `set -e` aborts on the first
+          # failure — volumes seed must not mask a failed global config seed.
+          command: ["/bin/sh", "-c"]
           args:
-            - mgr
-            - --config
-            - /etc/backend.ai/manager.toml
-            - etcd
-            - put-json
-            - config
-            - /seed/etcd-seed.json
+            - |
+              set -e
+              backend.ai mgr --config /etc/backend.ai/manager.toml etcd put-json config /seed/etcd-seed.json
+              {{- if .Values.storageProxy.enabled }}
+              backend.ai mgr --config /etc/backend.ai/manager.toml etcd put-json volumes /seed/volumes-seed.json
+              {{- end }}
           volumeMounts:
             - name: config-rendered
               mountPath: /etc/backend.ai

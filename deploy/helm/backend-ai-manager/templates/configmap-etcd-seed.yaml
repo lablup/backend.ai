@@ -18,4 +18,28 @@ data:
     "addr" (printf "%s:6379" (include "bai-manager.redisHost" .))
     "password" .Values.redis.password) }}
     {{- toJson $seed | nindent 4 }}
+{{- if .Values.storageProxy.enabled }}
+{{/*
+  Storage-proxy registration written under the `volumes/` prefix via a second
+  `mgr etcd put-json volumes /seed/volumes-seed.json` invocation in the Job
+  below. Manager reads these at startup (StorageSessionManager) to build its
+  proxy list. Keys under `volumes/proxies/<name>/{client_api, manager_api,
+  secret, ssl_verify}` match the VolumeProxyConfig schema — any deviation
+  causes `StorageProxyNotFound` at folder-op time.
+*/}}
+{{- $firstVolume := index .Values.storageProxy.volumes 0 }}
+{{- $volumesSeed := dict
+    "default_host" (printf "%s:%s" .Values.storageProxy.proxyName $firstVolume.name)
+    "proxies" (dict
+        .Values.storageProxy.proxyName (dict
+            "client_api" (printf "http://%s:%v" .Values.storageProxy.clientApiHost .Values.storageProxy.clientApiPort)
+            "manager_api" (printf "http://%s:%v" .Values.storageProxy.managerApiHost .Values.storageProxy.managerApiPort)
+            "secret" .Values.storageProxy.managerSecret
+            "ssl_verify" (ternary "true" "false" .Values.storageProxy.sslVerify)
+        )
+    )
+}}
+  volumes-seed.json: |-
+    {{- toJson $volumesSeed | nindent 4 }}
+{{- end }}
 {{- end }}
