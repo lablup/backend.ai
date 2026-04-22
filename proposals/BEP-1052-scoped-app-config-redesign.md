@@ -166,12 +166,16 @@ single row per natural key. A scope can hold any number of distinct
 
 ### Status filtering
 
-All read paths filter `status = ALIVE` by default. `DELETED` rows are
-visible only to dedicated admin recovery / audit endpoints (out of
-scope for this BEP). Revival uses the dedicated `restoreAppConfig`
-mutation, which flips `status = DELETED → ALIVE` while preserving
-the stored value; `createAppConfig` errors on any pre-existing row
-(ALIVE or DELETED), and `updateAppConfig` errors on a `DELETED` row.
+All read paths filter `status = ALIVE` by default. Callers can
+opt into seeing `DELETED` rows by passing an explicit status
+filter on Connections that expose one (`AppConfigFilterGQL.status`
+in GraphQL — see §3) or the equivalent REST query parameter — this
+is used for admin recovery / audit flows and for checking whether a
+name is reusable after deletion. Revival uses the dedicated
+`restoreAppConfig` mutation, which flips `status = DELETED → ALIVE`
+while preserving the stored value; `createAppConfig` errors on any
+pre-existing row (ALIVE or DELETED), and `updateAppConfig` errors
+on a `DELETED` row.
 
 ---
 
@@ -563,6 +567,15 @@ input AppConfigFilterGQL {
   """`modified_at` range filter."""
   modifiedAt: DateTimeFilter = null
 
+  """
+  Filter by row `status`. When omitted, Connections only return
+  `ALIVE` rows. Pass `{ equals: DELETED }` (or `{ in: [ALIVE,
+  DELETED] }`) to include soft-deleted rows — used by admin
+  recovery / audit flows and by callers checking whether a name
+  is reusable after deletion.
+  """
+  status: AppConfigStatusEnumFilter = null
+
   """All sub-filters must match (AND combination)."""
   AND: [AppConfigFilterGQL!] = null
 
@@ -579,6 +592,14 @@ input AppConfigScopeEnumFilter {
   in: [AppConfigScopeGQL!]
   notEquals: AppConfigScopeGQL
   notIn: [AppConfigScopeGQL!]
+}
+
+"""EnumFilter for AppConfigStatusGQL (equals / in / not_equals / not_in)."""
+input AppConfigStatusEnumFilter {
+  equals: AppConfigStatusGQL
+  in: [AppConfigStatusGQL!]
+  notEquals: AppConfigStatusGQL
+  notIn: [AppConfigStatusGQL!]
 }
 
 input AppConfigOrderByGQL {
@@ -600,17 +621,17 @@ enum AppConfigOrderField {
 }
 ```
 
-All Connections filter to `status = ALIVE` by default. (A separate
-admin endpoint can expose `DELETED` rows for recovery if needed; out
-of scope for this BEP.)
+All Connections filter to `status = ALIVE` by default. Callers can
+opt into seeing `DELETED` rows (or both) by passing
+`filter.status` on the Connection — admin recovery / audit flows
+read deleted rows this way.
 
 ### Mutations
 
 Writes are expressed as four separate mutations — **create**,
-**update**, **delete**, **restore** — so that each has an
-unambiguous precondition (no upsert magic; revival is explicit).
-Each accepts an `AppConfigKey` and covers every scope (admin writes
-in any scope, as well as users writing their own USER rows).
+**update**, **delete**, **restore**. Each accepts an `AppConfigKey`
+and covers every scope (admin writes in any scope, as well as users
+writing their own USER rows).
 Per-scope branching lives in the **internal layer** only: queries
 are split for typing ergonomics (`Domain.appConfigs`,
 `UserNode.appConfigs`, `myAppConfigs`, `publicAppConfigs`,
