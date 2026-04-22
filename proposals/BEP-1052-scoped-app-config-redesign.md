@@ -56,8 +56,11 @@ Summary matrix:
 - **Write mutations split admin/user, update and delete as separate
   operations.** `admin_update_app_config` / `update_my_app_config`
   apply a **deep-merge partial update** (JSON Merge Patch with `null`
-  interpreted as a plain JSON value, *not* as a deletion sentinel). To
-  remove keys explicitly, callers use the dedicated
+  interpreted as a plain JSON value, *not* as a deletion sentinel),
+  with **upsert semantics** — the target row is created on first write
+  if it does not yet exist. Identification is by the `(scope, scopeId)`
+  natural key, never by Relay `id`, since each scope holds at most one
+  row. To remove keys explicitly, callers use the dedicated
   `admin_delete_app_config_keys` / `delete_my_app_config_keys`
   mutations that take a list of JSON key paths. Rows themselves are
   never deleted — only key-level removals.
@@ -409,18 +412,36 @@ Write mutations come in two flavors that match the access model, and
 each flavor has separate **update** and **delete** operations:
 
 - Admin:
-  - `admin_update_app_config` — partial update of any scope (by row id).
+  - `admin_update_app_config` — partial update of any scope, identified
+    by `(scope, scopeId)`. **Upsert semantics**: if the target row does
+    not yet exist, it is created with the provided JSON as the initial
+    value.
   - `admin_delete_app_config_keys` — remove specified keys from any
-    scope (by row id).
+    scope, identified by `(scope, scopeId)`. Silent no-op if the row
+    does not exist.
 - Self:
   - `update_my_app_config` — partial update of the caller's
     `user_app_config`. The server fixes the target to
-    `scope_id = current_user.user_id`.
+    `scope_id = current_user.user_id`. **Upsert semantics**: creates
+    the user's row on first call.
   - `delete_my_app_config_keys` — remove specified keys from the
     caller's `user_app_config`.
 
 Rows themselves are never deleted; only key-level removals are
 supported.
+
+Mutations identify rows by **`(scope, scopeId)` natural key**, not by
+Relay global `id`. Reasons:
+
+- `(scope_type, scope_id)` already has a `UniqueConstraint`; each scope
+  holds at most one row, so the natural key *is* the identifier and the
+  Relay `id` is just a surrogate for it.
+- The repository layer's `upsert(scope_type, scope_id, ...)` matches
+  this signature 1:1, and upsert semantics fall out naturally — callers
+  do not need to know whether the row exists.
+- Eliminates the "query for `id` → mutation" two-step that an
+  `id`-based input would force on every caller.
+- Reads still go through the Relay `node(id: ID!)` interface as usual.
 
 **Update mutations** apply a **deep-merge partial update** onto the
 existing stored JSON:
@@ -443,16 +464,17 @@ a non-leaf path removes the entire subtree.
 ```graphql
 type Mutation {
   """
-  App config update (Admin only). Identifies an existing row of any
-  scope (global/domain/user) by id and deep-merges the provided
-  JSON into it.
+  App config update (Admin only). Identifies a row of any scope
+  (global/domain/user) by `(scope, scopeId)` and deep-merges the
+  provided JSON into it. Creates the row if it does not exist
+  (upsert).
   """
   adminUpdateAppConfig(input: AdminUpdateAppConfigInput!): UpdateAppConfigPayload!
 
   """
   Remove specified keys from an app config row (Admin only).
-  Identified by row id. Takes a list of JSON key paths
-  (dot-notation).
+  Identified by `(scope, scopeId)`. Takes a list of JSON key paths
+  (dot-notation). Silent no-op if the row does not exist.
   """
   adminDeleteAppConfigKeys(input: AdminDeleteAppConfigKeysInput!): UpdateAppConfigPayload!
 
@@ -472,8 +494,16 @@ enum AppConfigScopeGQL {
 # ── Admin input ───────────────────────────────────────────────
 
 input AdminUpdateAppConfigInput {
-  """ID of the app_config row to update (Relay global ID)."""
-  id: ID!
+  """Target scope (`global` / `domain` / `user`)."""
+  scope: AppConfigScopeGQL!
+
+  """
+  Scope identifier:
+  - GLOBAL: must be the literal string `"global"`.
+  - DOMAIN: `domain_name`.
+  - USER:   `user_id` (UUID string).
+  """
+  scopeId: String!
 
   """
   Partial update. The provided JSON is deep-merged into the existing
@@ -497,8 +527,11 @@ input AdminUpdateAppConfigInput {
 }
 
 input AdminDeleteAppConfigKeysInput {
-  """ID of the app_config row to delete from (Relay global ID)."""
-  id: ID!
+  """Target scope (`global` / `domain` / `user`)."""
+  scope: AppConfigScopeGQL!
+
+  """Scope identifier — same convention as `AdminUpdateAppConfigInput.scopeId`."""
+  scopeId: String!
 
   """
   JSON key paths to remove from `config` (dot-notation, e.g.
@@ -519,11 +552,13 @@ input AdminDeleteAppConfigKeysInput {
 # existing value. Omitting both is a no-op. Same optionality applies
 # to the two key lists on AdminDeleteAppConfigKeysInput.
 
-# ↑ Identification is by row id, so the row must exist. Creating new
-# scope rows (a new global / new domain / new user row) belongs to a
-# separate flow — typically by seeding an empty row when the
-# domain/user is created, or via a future `adminCreateAppConfig`
-# mutation.
+# ↑ Upsert semantics: `adminUpdateAppConfig` creates the
+# `(scope, scopeId)` row on first write if it does not yet exist,
+# using the provided JSON as the initial value. Subsequent writes
+# deep-merge into the stored value as described above.
+# `adminDeleteAppConfigKeys` is a silent no-op when the row does not
+# exist (the desired post-condition — "these keys are absent" —
+# already holds).
 
 # ── My (self) input ──────────────────────────────────────────
 
@@ -818,19 +853,8 @@ mutation SaveMyConfig($input: UpdateMyAppConfigInput!) {
 ### S4. Admin patches part of a domain's config and user defaults
 
 An admin patches a specific subtree of the domain `config` and a
-specific key of `userAppConfigDefaults`.
-
-Step 1 — look up the target row id:
-
-```graphql
-query GetDomainAppConfigId($name: String!) {
-  domain(name: $name) {
-    appConfig { id config userAppConfigDefaults }
-  }
-}
-```
-
-Step 2 — update (deep-merge partial update):
+specific key of `userAppConfigDefaults`. Single-step — identified by
+`(scope, scopeId)`, no preliminary id lookup needed:
 
 ```graphql
 mutation UpdateDomainConfig($input: AdminUpdateAppConfigInput!) {
@@ -843,16 +867,20 @@ mutation UpdateDomainConfig($input: AdminUpdateAppConfigInput!) {
 ```json
 {
   "input": {
-    "id": "QXBwQ29uZmlnOmRvbWFpbi1kZWZhdWx0",
+    "scope": "DOMAIN",
+    "scopeId": "default",
     "config": { "sectionA": { "optionX": "new-value" } },
     "userAppConfigDefaults": { "sectionB": "default-value" }
   }
 }
 ```
 
-- Server: `check_admin_only()` → locates the DOMAIN row by id →
-  deep-merges the input into the existing `config` and
-  `userAppConfigDefaults` independently.
+- Server: `check_admin_only()` → locates the DOMAIN row by
+  `(scope_type=domain, scope_id="default")` → deep-merges the input
+  into the existing `config` and `userAppConfigDefaults`
+  independently.
+- **Upsert**: if the domain has no `app_configs` row yet, one is
+  created with the provided JSON as the initial value.
 - **Partial**: unrelated keys (`sectionA.optionY`, `sectionC.*`, …)
   are left untouched.
 - Effect: on the next `myAppConfig` call, every user in that domain
@@ -862,15 +890,8 @@ mutation UpdateDomainConfig($input: AdminUpdateAppConfigInput!) {
 ### S5. Admin patches a specific user's config on their behalf
 
 For a support request, an admin patches a subset of keys in user A's
-`userCustomizedConfig`.
-
-```graphql
-query GetUserAppConfigId($userId: String!) {
-  user_node(id: $userId) {
-    appConfig { id userCustomizedConfig }
-  }
-}
-```
+`userCustomizedConfig` directly — `(scope=USER, scopeId=user_id)`
+identifies the row and upserts it if necessary:
 
 ```graphql
 mutation OverrideUserConfig($input: AdminUpdateAppConfigInput!) {
@@ -883,7 +904,8 @@ mutation OverrideUserConfig($input: AdminUpdateAppConfigInput!) {
 ```json
 {
   "input": {
-    "id": "QXBwQ29uZmlnOnVzZXItMDAwMTIz",
+    "scope": "USER",
+    "scopeId": "00000000-0000-0000-0000-000000000123",
     "config": { "sectionA": { "flag": true } }
   }
 }
@@ -892,6 +914,8 @@ mutation OverrideUserConfig($input: AdminUpdateAppConfigInput!) {
 - For the USER scope, the `config` input is deep-merged into that
   user's `userCustomizedConfig` (the merged `config` is a read-only
   computed field and cannot be written directly).
+- **Upsert**: if user A has never written their config before, the
+  row is created with this patch as the initial value.
 - The next time that user calls `myAppConfig`, the updated
   `userCustomizedConfig` is merged with the domain defaults in the
   response.
@@ -952,7 +976,8 @@ mutation ClearDomainKeys($input: AdminDeleteAppConfigKeysInput!) {
 ```json
 {
   "input": {
-    "id": "QXBwQ29uZmlnOmRvbWFpbi1kZWZhdWx0",
+    "scope": "DOMAIN",
+    "scopeId": "default",
     "configKeys": ["sectionA", "sectionB.optionX"]
   }
 }
@@ -962,8 +987,8 @@ mutation ClearDomainKeys($input: AdminDeleteAppConfigKeysInput!) {
 - `sectionB.optionX` — only that leaf removed; sibling keys under
   `sectionB` are preserved.
 - Missing paths are silently ignored (idempotent).
-- The row itself is never deleted — it always exists for the lifetime
-  of the parent entity.
+- The row itself is never deleted; if no row exists for the target
+  `(scope, scopeId)` the call is a silent no-op.
 
 The self-service equivalent for a user is `deleteMyAppConfigKeys`,
 which takes a flat `keys: [String!]!` array targeting their own
