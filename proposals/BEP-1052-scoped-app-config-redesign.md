@@ -1027,35 +1027,23 @@ four views (snake_case: `user_customized_config`,
 
 The WebUI requests configs by addressing them explicitly with
 `(scope, scopeId, name)`. There is no server-side hierarchical
-fall-through — clients know which scope they are asking about.
-
-### `webserver.conf` — bootstrap document list
-
-The web server is configured with the list of **public** documents the
-WebUI must load before the login screen renders. Domain / user
-documents are addressed by the WebUI at runtime once the auth context
-is known.
-
-```toml
-[app_config]
-# Public documents fetched anonymously before login.
-# Each entry is a name fetched from /v2/app-configs/public/{name}.
-bootstrap_public = ["theme", "branding"]
-```
+fall-through — clients know which scope they are asking about. The
+list of public documents the WebUI must load before login is owned
+entirely by the frontend (hard-coded or shipped in the WebUI
+bundle) — the server does not publish a bootstrap list.
 
 ### Bootstrap flow
 
-1. **Pre-login (anonymous)** — for each `name` in
-   `bootstrap_public`, the WebUI calls
-   `GET /v2/app-configs/public/{name}` (no auth). On 404 or network
-   error, the WebUI falls back to its built-in defaults for that
-   document.
+1. **Pre-login (anonymous)** — for each document the WebUI wants
+   before login, it calls `GET /v2/app-configs/public/{name}` (no
+   auth). On 404 or network error, the WebUI falls back to its
+   built-in defaults for that document.
 
-2. **Post-login** — the WebUI calls
-   `GET /v2/app-configs/my` to fetch *all* of the caller's user
-   documents in one round trip. Each entry includes the merged
-   `config` (per-`name` merge with the matching
-   `DOMAIN_USER_DEFAULTS` row).
+2. **Post-login** — the WebUI calls `GET /v2/app-configs/my` to
+   fetch *all* of the caller's user documents in one round trip.
+   Each entry includes the merged `config` (per-`name` three-way
+   merge of `DOMAIN`, `DOMAIN_USER_DEFAULTS`, and `USER` rows — see
+   §5).
 
 3. **Domain-scoped reads** (admin UI) — the WebUI calls
    `GET /v2/app-configs/domains/{domain_name}` /
@@ -1088,8 +1076,8 @@ query LoadPublicTheme {
 - Single-document retrieval is just a Connection query with a `name`
   filter — there is no singular root field.
 - On failure (no edge returned, network error) the WebUI falls back
-  to its built-in defaults. The list of bootstrap documents is in
-  `webserver.conf` (§6).
+  to its built-in defaults. The set of pre-login documents is
+  hard-coded in the WebUI (see §6).
 
 ### S2. Bootstrapping right after login
 
