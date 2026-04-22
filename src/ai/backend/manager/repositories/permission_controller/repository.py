@@ -11,11 +11,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.actions.action.rbac_role_invitation import (
-    AcceptRoleInvitationAction,
-    CancelRoleInvitationAction,
-    CreateRoleInvitationByEmailAction,
     CreateRoleInvitationResult,
-    RejectRoleInvitationAction,
 )
 from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId
@@ -382,9 +378,16 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def create_invitation_by_email(
         self,
-        action: CreateRoleInvitationByEmailAction,
+        *,
+        invitee_emails: list[str],
+        inviter_user_id: uuid.UUID,
+        role_id: uuid.UUID,
     ) -> CreateRoleInvitationResult:
-        return await self._db_source.create_invitation_by_email(action)
+        return await self._db_source.create_invitation_by_email(
+            invitee_emails=invitee_emails,
+            inviter_user_id=inviter_user_id,
+            role_id=role_id,
+        )
 
     @permission_controller_repository_resilience.apply()
     async def search_invitations_by_invitee(
@@ -405,20 +408,20 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def accept_invitation(
         self,
-        action: AcceptRoleInvitationAction,
+        invitation_id: uuid.UUID,
     ) -> RoleInvitationData:
-        return await self._db_source.accept_invitation(action)
+        return await self._db_source.accept_invitation(invitation_id)
 
     @permission_controller_repository_resilience.apply()
     async def reject_invitation(
         self,
-        action: RejectRoleInvitationAction,
+        invitation_id: uuid.UUID,
     ) -> RoleInvitationData:
-        return await self._db_source.reject_invitation(action)
+        return await self._db_source.reject_invitation(invitation_id)
 
     @permission_controller_repository_resilience.apply()
     async def cancel_invitation(
         self,
-        action: CancelRoleInvitationAction,
+        invitation_id: uuid.UUID,
     ) -> RoleInvitationData:
-        return await self._db_source.cancel_invitation(action)
+        return await self._db_source.cancel_invitation(invitation_id)

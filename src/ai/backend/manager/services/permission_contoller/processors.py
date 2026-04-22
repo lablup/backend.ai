@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
@@ -63,6 +64,24 @@ from .actions.search_permissions import (
     SearchPermissionsAction,
     SearchPermissionsActionResult,
 )
+from .actions.search_role_invitations import (
+    AcceptRoleInvitationAction as AcceptInvitationAction,
+)
+from .actions.search_role_invitations import (
+    CancelRoleInvitationAction as CancelInvitationAction,
+)
+from .actions.search_role_invitations import (
+    CreateRoleInvitationAction,
+    CreateRoleInvitationActionResult,
+    RoleInvitationActionResult,
+    SearchMyRoleInvitationsAction,
+    SearchMyRoleInvitationsActionResult,
+    SearchRoleInvitationsByRoleAction,
+    SearchRoleInvitationsByRoleActionResult,
+)
+from .actions.search_role_invitations import (
+    RejectRoleInvitationAction as RejectInvitationAction,
+)
 from .actions.search_scopes import (
     SearchScopesAction,
     SearchScopesActionResult,
@@ -109,6 +128,24 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
     update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
     delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
+    create_role_invitation: ScopeActionProcessor[
+        CreateRoleInvitationAction, CreateRoleInvitationActionResult
+    ]
+    accept_role_invitation: SingleEntityActionProcessor[
+        AcceptInvitationAction, RoleInvitationActionResult
+    ]
+    reject_role_invitation: SingleEntityActionProcessor[
+        RejectInvitationAction, RoleInvitationActionResult
+    ]
+    cancel_role_invitation: SingleEntityActionProcessor[
+        CancelInvitationAction, RoleInvitationActionResult
+    ]
+    search_my_role_invitations: ScopeActionProcessor[
+        SearchMyRoleInvitationsAction, SearchMyRoleInvitationsActionResult
+    ]
+    search_role_invitations_by_role: ActionProcessor[
+        SearchRoleInvitationsByRoleAction, SearchRoleInvitationsByRoleActionResult
+    ]
 
     def __init__(
         self,
@@ -148,6 +185,28 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
         self.update_permission = ActionProcessor(service.update_permission, action_monitors)
         self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
+        invitation_scope_validators = [validators.rbac.scope]
+        invitation_entity_validators = [validators.rbac.single_entity]
+        self.create_role_invitation = ScopeActionProcessor(
+            service.create_role_invitation, action_monitors, validators=invitation_scope_validators
+        )
+        self.accept_role_invitation = SingleEntityActionProcessor(
+            service.accept_invitation, action_monitors, validators=invitation_entity_validators
+        )
+        self.reject_role_invitation = SingleEntityActionProcessor(
+            service.reject_invitation, action_monitors, validators=invitation_entity_validators
+        )
+        self.cancel_role_invitation = SingleEntityActionProcessor(
+            service.cancel_invitation, action_monitors, validators=invitation_entity_validators
+        )
+        self.search_my_role_invitations = ScopeActionProcessor(
+            service.search_my_role_invitations,
+            action_monitors,
+            validators=invitation_scope_validators,
+        )
+        self.search_role_invitations_by_role = ActionProcessor(
+            service.search_role_invitations_by_role, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -175,4 +234,10 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             CreatePermissionAction.spec(),
             UpdatePermissionAction.spec(),
             DeletePermissionAction.spec(),
+            CreateRoleInvitationAction.spec(),
+            AcceptInvitationAction.spec(),
+            RejectInvitationAction.spec(),
+            CancelInvitationAction.spec(),
+            SearchMyRoleInvitationsAction.spec(),
+            SearchRoleInvitationsByRoleAction.spec(),
         ]
