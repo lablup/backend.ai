@@ -148,10 +148,10 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.manager_admin.service import (
         ManagerAdminService,  # pants: no-infer-dep
     )
-    from ai.backend.manager.services.metric.processors.utilization_metric import (
+    from ai.backend.manager.services.metric.processors import (
         UtilizationMetricProcessors,  # pants: no-infer-dep
     )
-    from ai.backend.manager.services.metric.root_service import (
+    from ai.backend.manager.services.metric.service import (
         UtilizationMetricService,  # pants: no-infer-dep
     )
     from ai.backend.manager.services.model_card.processors import (

@@ -32,6 +32,7 @@ from ai.backend.manager.repositories.keypair_resource_policy.repositories import
     KeypairResourcePolicyRepositories,
 )
 from ai.backend.manager.repositories.manager_admin.repositories import ManagerAdminRepositories
+from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 from ai.backend.manager.repositories.model_card.repositories import ModelCardRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
@@ -97,6 +98,7 @@ class Repositories:
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
     manager_admin: ManagerAdminRepositories
+    metric: MetricRepositories
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
@@ -146,6 +148,7 @@ class Repositories:
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         manager_admin_repositories = ManagerAdminRepositories.create(args)
+        metric_repositories = MetricRepositories.create(args)
         model_serving_repositories = ModelServingRepositories.create(args)
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
@@ -196,6 +199,7 @@ class Repositories:
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
             manager_admin=manager_admin_repositories,
+            metric=metric_repositories,
             model_serving=model_serving_repositories,
             notification=notification_repositories,
             permission_controller=permission_controller_repositories,

@@ -1,7 +1,6 @@
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -61,10 +60,8 @@ from ai.backend.manager.services.login_client_type.processors import (
 from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
-from ai.backend.manager.services.metric.processors.utilization_metric import (
-    UtilizationMetricProcessors,
-)
-from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.services.metric.processors import UtilizationMetricProcessors
+from ai.backend.manager.services.metric.service import UtilizationMetricService
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
@@ -298,13 +295,7 @@ def create_services(args: ServiceArgs) -> Services:
             appproxy_client_pool=args.appproxy_client_pool,
         ),
         utilization_metric=UtilizationMetricService(
-            args.prometheus_client,
-            args.config_provider.config.metric.timewindow,
-            MetricRepository(
-                args.db,
-                prometheus_client=args.prometheus_client,
-                timewindow=args.config_provider.config.metric.timewindow,
-            ),
+            metric_repository=repositories.metric.repository,
         ),
         model_serving=ModelServingService(
             agent_registry=args.agent_registry,

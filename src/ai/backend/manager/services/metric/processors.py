@@ -11,10 +11,10 @@ from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricMetadataActionResult,
 )
 from ai.backend.manager.services.metric.actions.live_stat import (
-    QueryKernelLiveStatAction,
-    QueryKernelLiveStatActionResult,
+    KernelLiveStatAction,
+    KernelLiveStatActionResult,
 )
-from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.services.metric.service import UtilizationMetricService
 
 
 class UtilizationMetricProcessors(AbstractProcessorPackage):
@@ -22,9 +22,7 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
     query_container_metadata: ActionProcessor[
         ContainerMetricMetadataAction, ContainerMetricMetadataActionResult
     ]
-    query_kernel_live_stat: ActionProcessor[
-        QueryKernelLiveStatAction, QueryKernelLiveStatActionResult
-    ]
+    query_kernel_live_stat: ActionProcessor[KernelLiveStatAction, KernelLiveStatActionResult]
 
     def __init__(
         self,
@@ -32,10 +30,8 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.query_container = ActionProcessor(service.container.query_metric, action_monitors)
-        self.query_container_metadata = ActionProcessor(
-            service.container.query_metadata, action_monitors
-        )
+        self.query_container = ActionProcessor(service.query_metric, action_monitors)
+        self.query_container_metadata = ActionProcessor(service.query_metadata, action_monitors)
         self.query_kernel_live_stat = ActionProcessor(
             service.query_kernel_live_stat_batch, action_monitors
         )
@@ -45,5 +41,5 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
         return [
             ContainerMetricAction.spec(),
             ContainerMetricMetadataAction.spec(),
-            QueryKernelLiveStatAction.spec(),
+            KernelLiveStatAction.spec(),
         ]

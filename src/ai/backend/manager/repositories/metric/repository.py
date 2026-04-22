@@ -6,10 +6,18 @@ from typing import Final
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.common.clients.prometheus.querier import ContainerMetricQuerier
 from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
-from ai.backend.common.exception import BackendAIError, UnreachableError
+from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+from ai.backend.common.exception import (
+    BackendAIError,
+    FailedToGetMetric,
+    PrometheusConnectionError,
+    UnreachableError,
+)
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.metrics.types import (
+    CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     CONTAINER_UTILIZATION_METRIC_NAME,
     UTILIZATION_METRIC_INTERVAL,
 )
@@ -21,10 +29,17 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.metric.types import (
     DIFF_METRICS,
     RATE_METRICS,
+    KernelLiveStatBatchResult,
     UtilizationMetricType,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.metric.types import KernelMetricValuesByKernel
+from ai.backend.manager.services.metric.types import (
+    ContainerMetricOptionalLabel,
+    ContainerMetricResponseInfo,
+    ContainerMetricResult,
+    MetricResultValue,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -81,6 +96,42 @@ class MetricRepository:
         self._prometheus_client = prometheus_client
         self._timewindow = timewindow
 
+    async def query_container_metric_metadata(self) -> list[str]:
+        result = await self._prometheus_client.query_label_values(
+            label_name=CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
+            metric_match=CONTAINER_UTILIZATION_METRIC_NAME,
+        )
+        return result.data
+
+    async def query_container_metric(
+        self,
+        metric_name: str,
+        label: ContainerMetricOptionalLabel,
+        time_range: QueryTimeRange,
+    ) -> list[ContainerMetricResult]:
+        preset = self._build_container_metric_preset(metric_name, label)
+        response = await self._prometheus_client.query_range(preset, time_range)
+        return [
+            ContainerMetricResult(
+                metric=ContainerMetricResponseInfo.from_metric_response_info(m.metric),
+                values=[MetricResultValue(*value) for value in m.values],
+            )
+            for m in response.data.result
+        ]
+
+    async def query_kernel_live_stat_batch(
+        self,
+        kernel_ids: Sequence[KernelId],
+    ) -> KernelLiveStatBatchResult:
+        if not kernel_ids:
+            return KernelLiveStatBatchResult.empty(kernel_ids)
+        try:
+            values_by_kernel = await self.query_kernel_live_stats(kernel_ids)
+        except (PrometheusConnectionError, FailedToGetMetric):
+            log.warning("Failed to query Prometheus for kernel live stats, returning empty results")
+            return KernelLiveStatBatchResult.empty(kernel_ids)
+        return KernelLiveStatBatchResult.from_metric_values(kernel_ids, values_by_kernel)
+
     async def query_kernel_live_stats(
         self,
         kernel_ids: Sequence[KernelId],
@@ -127,6 +178,63 @@ class MetricRepository:
         )
         response = await self._prometheus_client.query_instant(preset)
         return KernelMetricValuesByKernel.from_prometheus_response(response)
+
+    def _get_metric_type(
+        self,
+        metric_name: str,
+        label: ContainerMetricOptionalLabel,
+    ) -> UtilizationMetricType:
+        # TODO: Refactor to query metric metadata from DB Source
+        #       once the metadata persistence is available.
+        if metric_name in DIFF_METRICS and label.value_type == ValueType.CURRENT:
+            return UtilizationMetricType.DIFF
+        if metric_name in RATE_METRICS:
+            return UtilizationMetricType.RATE
+        return UtilizationMetricType.GAUGE
+
+    def _build_container_metric_preset(
+        self,
+        metric_name: str,
+        label: ContainerMetricOptionalLabel,
+    ) -> MetricPreset:
+        metric_type = self._get_metric_type(metric_name, label)
+        querier = ContainerMetricQuerier(
+            metric_name=metric_name,
+            value_type=ValueType(label.value_type.value),
+            kernel_id=label.kernel_id,
+            session_id=label.session_id,
+            agent_id=label.agent_id,
+            user_id=label.user_id,
+            project_id=label.project_id,
+        )
+        match metric_type:
+            # TODO: Define device metadata for each metric
+            # TODO: Refactor metric template retrieval to query metric metadata from DB Source
+            case UtilizationMetricType.GAUGE:
+                template = (
+                    "sum by ({group_by})(" + CONTAINER_UTILIZATION_METRIC_NAME + "{{{labels}}})"
+                )
+            case UtilizationMetricType.RATE:
+                template = (
+                    "sum by ({group_by})(rate("
+                    + CONTAINER_UTILIZATION_METRIC_NAME
+                    + "{{{labels}}}[{window}]))"
+                    " / " + str(UTILIZATION_METRIC_INTERVAL)
+                )
+            case UtilizationMetricType.DIFF:
+                template = (
+                    "sum by ({group_by})(rate("
+                    + CONTAINER_UTILIZATION_METRIC_NAME
+                    + "{{{labels}}}[{window}]))"
+                )
+            case _:
+                raise UnreachableError(f"Unknown metric type: {metric_type}")
+        return MetricPreset(
+            template=template,
+            labels=querier.labels(),
+            group_by=querier.group_by_labels(),
+            window=self._timewindow,
+        )
 
     def _build_live_stat_preset(
         self,

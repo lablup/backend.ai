@@ -4,10 +4,10 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
-from ai.backend.common.exception import PrometheusConnectionError
 from ai.backend.common.types import KernelId
-from ai.backend.manager.services.metric.actions.live_stat import QueryKernelLiveStatAction
-from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.data.metric.types import KernelLiveStatBatchResult
+from ai.backend.manager.services.metric.actions.live_stat import KernelLiveStatAction
+from ai.backend.manager.services.metric.service import UtilizationMetricService
 
 
 class TestKernelLiveStatBatch:
@@ -20,8 +20,6 @@ class TestKernelLiveStatBatch:
     @pytest.fixture()
     def metric_service(self, mock_metric_repository: Mock) -> UtilizationMetricService:
         return UtilizationMetricService(
-            prometheus_client=Mock(),
-            timewindow="1m",
             metric_repository=mock_metric_repository,
         )
 
@@ -33,8 +31,9 @@ class TestKernelLiveStatBatch:
         """Service assembles KernelLiveStatBatchResult from repository response."""
         kid = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
 
-        mock_metric_repository.query_kernel_live_stats = AsyncMock(
-            return_value={
+        batch_result = KernelLiveStatBatchResult.from_metric_values(
+            [kid],
+            {
                 kid: [
                     MetricValue(
                         metric_name="mem", value_type=ValueType.CURRENT, value="5368709120"
@@ -44,11 +43,12 @@ class TestKernelLiveStatBatch:
                     ),
                     MetricValue(metric_name="cpu_util", value_type=ValueType.CURRENT, value="50.0"),
                 ],
-            }
+            },
         )
+        mock_metric_repository.query_kernel_live_stat_batch = AsyncMock(return_value=batch_result)
 
         result = await metric_service.query_kernel_live_stat_batch(
-            QueryKernelLiveStatAction(kernel_ids=[kid])
+            KernelLiveStatAction(kernel_ids=[kid])
         )
         entry = result.stats.entries[kid]
         values_by_key = {(v.metric_name, v.value_type): v.value for v in entry.values}
@@ -64,39 +64,26 @@ class TestKernelLiveStatBatch:
     ) -> None:
         """A kernel with no Prometheus samples must yield an empty entry."""
         empty_kernel = KernelId(UUID("00000000-0000-0000-0000-000000000000"))
-        mock_metric_repository.query_kernel_live_stats = AsyncMock(return_value={})
+        batch_result = KernelLiveStatBatchResult.from_metric_values([empty_kernel], {})
+        mock_metric_repository.query_kernel_live_stat_batch = AsyncMock(return_value=batch_result)
 
         result = await metric_service.query_kernel_live_stat_batch(
-            QueryKernelLiveStatAction(kernel_ids=[empty_kernel])
+            KernelLiveStatAction(kernel_ids=[empty_kernel])
         )
         entry = result.stats.entries[empty_kernel]
         assert entry.values == []
 
-    async def test_prometheus_connection_error_returns_empty_entries(
+    async def test_empty_kernel_ids_returns_empty_result(
         self,
         mock_metric_repository: Mock,
         metric_service: UtilizationMetricService,
     ) -> None:
-        """When Prometheus is unreachable, every kernel_id maps to an empty entry."""
-        kid = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
-        mock_metric_repository.query_kernel_live_stats = AsyncMock(
-            side_effect=PrometheusConnectionError("unreachable")
-        )
+        """No kernel_ids -> empty result from repository."""
+        batch_result = KernelLiveStatBatchResult.empty([])
+        mock_metric_repository.query_kernel_live_stat_batch = AsyncMock(return_value=batch_result)
 
         result = await metric_service.query_kernel_live_stat_batch(
-            QueryKernelLiveStatAction(kernel_ids=[kid])
-        )
-        entry = result.stats.entries[kid]
-        assert entry.values == []
-
-    async def test_empty_kernel_ids_short_circuits(
-        self,
-        mock_metric_repository: Mock,
-        metric_service: UtilizationMetricService,
-    ) -> None:
-        """No kernel_ids -> empty result, no repository query issued."""
-        result = await metric_service.query_kernel_live_stat_batch(
-            QueryKernelLiveStatAction(kernel_ids=[])
+            KernelLiveStatAction(kernel_ids=[])
         )
         assert result.stats.entries == {}
 
@@ -109,19 +96,21 @@ class TestKernelLiveStatBatch:
         kid1 = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
         kid2 = KernelId(UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"))
 
-        mock_metric_repository.query_kernel_live_stats = AsyncMock(
-            return_value={
+        batch_result = KernelLiveStatBatchResult.from_metric_values(
+            [kid1, kid2],
+            {
                 kid1: [
                     MetricValue(metric_name="mem", value_type=ValueType.CURRENT, value="100"),
                 ],
                 kid2: [
                     MetricValue(metric_name="mem", value_type=ValueType.CURRENT, value="200"),
                 ],
-            }
+            },
         )
+        mock_metric_repository.query_kernel_live_stat_batch = AsyncMock(return_value=batch_result)
 
         result = await metric_service.query_kernel_live_stat_batch(
-            QueryKernelLiveStatAction(kernel_ids=[kid1, kid2])
+            KernelLiveStatAction(kernel_ids=[kid1, kid2])
         )
 
         values1 = {
