@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from collections.abc import Awaitable, Mapping
+from collections.abc import Awaitable, Coroutine
 from dataclasses import dataclass
 from itertools import groupby
 from typing import Any
 from uuid import UUID
 
+import aiotools
 import async_timeout
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -137,14 +138,15 @@ class SessionLauncher:
                         image_config = img_cfg.to_image_config(AutoPullBehavior(auto_pull))
                         agent_image_configs[agent_id][canonical] = image_config
 
-        # Trigger image checking and pulling on each agent
-        async def pull_for_agent(
-            agent_id: AgentId, images: dict[str, ImageConfig]
-        ) -> Mapping[str, str]:
+        # Trigger image checking and pulling on each agent. The coroutine
+        # returns the owning agent_id on success so that the outer loop can
+        # log per-agent results and failures at a single call site.
+        async def pull_for_agent(agent_id: AgentId, images: dict[str, ImageConfig]) -> AgentId:
             async with self._agent_client_pool.acquire(agent_id) as client:
-                return await client.check_and_pull(images)
+                await client.check_and_pull(images)
+            return agent_id
 
-        pull_tasks: list[Awaitable[Mapping[str, str]]] = []
+        pull_tasks: list[Coroutine[Any, Any, AgentId]] = []
         for agent_id, agent_images in agent_image_configs.items():
             pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
@@ -157,7 +159,17 @@ class SessionLauncher:
                     "check_and_pull_images",
                     success_detail="Image pull triggered",
                 ):
-                    await asyncio.gather(*pull_tasks, return_exceptions=True)
+                    succeeded: list[AgentId] = []
+                    async for fut in aiotools.as_completed_safe(pull_tasks):
+                        try:
+                            succeeded.append(await fut)
+                        except Exception:
+                            log.exception("Failed to trigger image pull on an agent")
+                    log.debug(
+                        "Image pull triggered on {}/{} agents",
+                        len(succeeded),
+                        len(pull_tasks),
+                    )
 
     async def start_sessions_for_handler(
         self,

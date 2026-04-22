@@ -28,6 +28,7 @@ from typing import (
 if TYPE_CHECKING:
     from janus import _AsyncQueueProxy
 
+import aiotools
 import janus
 import msgpack
 import zmq
@@ -77,17 +78,28 @@ async def pipe_output(
     console_fd = sys.stdout.fileno() if target == "stdout" else sys.stderr.fileno()
     target_bytes = target.encode("ascii")
     loop = current_loop()
+
+    async def _write(sink: str, awaitable: Awaitable[Any]) -> None:
+        try:
+            await awaitable
+        except Exception:
+            log.exception("Failed to write kernel {} to {}", target, sink)
+
     try:
         while True:
             data = await stream.read(4096)
             if not data:
                 break
-            await asyncio.gather(
-                loop.run_in_executor(None, os.write, console_fd, data),
-                loop.run_in_executor(None, os.write, log_fd, data),
-                outsock.send_multipart([target_bytes, data]),
-                return_exceptions=True,
-            )
+            writes = [
+                _write("console", loop.run_in_executor(None, os.write, console_fd, data)),
+                _write("logfile", loop.run_in_executor(None, os.write, log_fd, data)),
+                _write(
+                    "outsock",
+                    cast(Awaitable[Any], outsock.send_multipart([target_bytes, data])),
+                ),
+            ]
+            async for fut in aiotools.as_completed_safe(writes):
+                await fut
     except asyncio.CancelledError:
         pass
     except Exception:
