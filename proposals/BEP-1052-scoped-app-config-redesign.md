@@ -1034,21 +1034,29 @@ bundle) — the server does not publish a bootstrap list.
 
 ### Bootstrap flow
 
+All of the use cases below use the GraphQL endpoint. The REST
+schema (§4) is an equivalent surface for non-GraphQL clients, but
+the WebUI bootstrap is specified in GQL.
+
 1. **Pre-login (anonymous)** — for each document the WebUI wants
-   before login, it calls `GET /v2/app-configs/public/{name}` (no
-   auth). On 404 or network error, the WebUI falls back to its
-   built-in defaults for that document.
+   before login, it issues a `publicAppConfigs` query with a `name`
+   filter (no auth). The `theme` / `branding` shapes are pulled via
+   a single document fetch each — see S1 in §7. On no-edge /
+   network error the WebUI falls back to its built-in defaults for
+   that document.
 
-2. **Post-login** — the WebUI calls `GET /v2/app-configs/my` to
-   fetch *all* of the caller's user documents in one round trip.
-   Each entry includes the merged `config` (per-`name` three-way
-   merge of `DOMAIN`, `DOMAIN_USER_DEFAULTS`, and `USER` rows — see
-   §5).
+2. **Post-login** — the WebUI issues a single `myAppConfigs` query
+   (optionally combined with `publicAppConfigs` in the same GQL
+   document) to fetch *all* of the caller's user documents in one
+   round trip. Each entry carries `userCustomizedConfig`,
+   `domainDefaultConfig`, `domainConfig`, and the three-way merged
+   `mergedConfig` (§5). See S2 in §7.
 
-3. **Domain-scoped reads** (admin UI) — the WebUI calls
-   `GET /v2/app-configs/domains/{domain_name}` /
-   `GET /v2/app-configs/domains/{domain_name}/{name}` directly with
-   admin credentials.
+3. **Domain-scoped reads** (admin UI) — the WebUI traverses
+   `domain(name: "...") { appConfigs { ... } }` (or a single
+   document via `filter: { name: { equals: "..." } }`) with admin
+   credentials. The root `adminAppConfigs` is available for
+   cross-scope admin search — S6 in §7.
 
 ---
 
