@@ -1126,13 +1126,9 @@ publish a bootstrap list.
    to fetch *all* of the caller's user documents in one round trip.
    Each entry carries `userCustomizedConfig`, `domainDefaultConfig`,
    `domainConfig`, and the three-way merged `mergedConfig` (§5).
-   See S2 in §7.
-
-3. **Domain-scoped reads** (admin UI) — the WebUI traverses
-   `domain(name: "...") { appConfigs { ... } }` (or a single
-   document via `filter: { name: { equals: "..." } }`) with admin
-   credentials. The root `adminAppConfigs` is available for
-   cross-scope admin search — S6 in §7.
+   The same query covers admin callers — the merge already folds in
+   the domain-side values the admin UI needs, so there is no
+   separate domain-scope bootstrap step. See S2 in §7.
 
 ---
 
