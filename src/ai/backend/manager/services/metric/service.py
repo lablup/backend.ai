@@ -23,14 +23,14 @@ class UtilizationMetricService:
     ) -> None:
         self._metric_repository = metric_repository
 
-    async def query_metadata(
+    async def query_container_metric_metadata(
         self,
         _action: ContainerMetricMetadataAction,
     ) -> ContainerMetricMetadataActionResult:
         metric_names = await self._metric_repository.query_container_metric_metadata()
         return ContainerMetricMetadataActionResult(metric_names=metric_names)
 
-    async def query_metric(
+    async def query_container_metric(
         self,
         action: ContainerMetricAction,
     ) -> ContainerMetricActionResult:

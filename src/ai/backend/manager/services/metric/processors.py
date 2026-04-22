@@ -30,8 +30,10 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.query_container = ActionProcessor(service.query_metric, action_monitors)
-        self.query_container_metadata = ActionProcessor(service.query_metadata, action_monitors)
+        self.query_container = ActionProcessor(service.query_container_metric, action_monitors)
+        self.query_container_metadata = ActionProcessor(
+            service.query_container_metric_metadata, action_monitors
+        )
         self.query_kernel_live_stat = ActionProcessor(
             service.query_kernel_live_stat_batch, action_monitors
         )
