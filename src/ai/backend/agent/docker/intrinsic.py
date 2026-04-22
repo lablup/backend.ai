@@ -98,7 +98,7 @@ def _warn_cgroup_fallback_once(plugin: str, container_id: str) -> None:
 
 
 def _is_linuxkit(local_config: Mapping[str, Any]) -> bool:
-    return bool(local_config["agent"]["docker-mode"] == "linuxkit")
+    return cast(str, local_config["agent"]["docker-mode"]) == "linuxkit"
 
 
 # The list of pruned fstype when checking the filesystem usage statistics.
