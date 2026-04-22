@@ -18,6 +18,29 @@ def read_news_types() -> set[str]:
     return news_types
 
 
+def get_pr_touched_fragments(base_ref: str, base_path: Path) -> set[str]:
+    """Return fragment filenames added or modified by this PR vs ``origin/<base_ref>``.
+
+    Requires ``origin/<base_ref>`` to have been fetched (e.g., via
+    ``actions/checkout`` with ``fetch-depth: 0``).
+    """
+    result = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--name-only",
+            "--diff-filter=AM",
+            f"origin/{base_ref}...HEAD",
+            "--",
+            str(base_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {Path(line).name for line in result.stdout.splitlines() if line.strip()}
+
+
 def main(pr_number: str) -> None:
     news_types = read_news_types()
     base_path = Path("./changes")
@@ -28,12 +51,27 @@ def main(pr_number: str) -> None:
         r"^\d+\.(?P<type>" + "|".join(map(re.escape, news_types)) + r")(\.)?(md)?$"
     )
 
-    files = [f.name for f in base_path.iterdir() if f.is_file() and f.name not in exempted_files]
+    base_ref = os.getenv("GITHUB_BASE_REF") or ""
+    pr_touched_fragments: set[str] | None = (
+        get_pr_touched_fragments(base_ref, base_path) if base_ref else None
+    )
+
+    all_fragments = [
+        f.name for f in base_path.iterdir() if f.is_file() and f.name not in exempted_files
+    ]
+    if pr_touched_fragments is not None:
+        files = [f for f in all_fragments if f in pr_touched_fragments]
+    else:
+        files = all_fragments
+
     existing_fragments = []
+    mismatched_fragments: list[tuple[str, str]] = []
     for file in files:
-        if rx_numbered_fragment.search(file):
+        if match := rx_numbered_fragment.search(file):
             if file[0 : file.find(".")] == pr_number:
                 existing_fragments.append(file)
+            elif pr_touched_fragments is not None:
+                mismatched_fragments.append((file, match.group("type")))
         elif rx_unnumbered_fragment.search(file) is None:
             print(f"{file} is an invalid news fragment filename.")
             sys.exit(1)
@@ -50,6 +88,17 @@ def main(pr_number: str) -> None:
             renamed_pairs.append(
                 (original_filename, numbered_filename),
             )
+    for original_filename, news_type in mismatched_fragments:
+        numbered_filename = f"{pr_number}.{news_type}.md"
+        file_path = base_path / original_filename
+        file_path.rename(base_path / numbered_filename)
+        print(
+            f"{original_filename} has a PR number mismatch and is renamed to "
+            f"{numbered_filename}"
+        )
+        renamed_pairs.append(
+            (original_filename, numbered_filename),
+        )
 
     if renamed_pairs:
         subprocess.run(
