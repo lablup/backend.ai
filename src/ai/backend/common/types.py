@@ -1209,7 +1209,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-type VolumeID = uuid.UUID
+VolumeID = NewType("VolumeID", uuid.UUID)
 
 
 @attrs.define(slots=True, frozen=True)
