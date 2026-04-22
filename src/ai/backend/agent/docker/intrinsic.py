@@ -19,7 +19,6 @@ from ai.backend.agent import __version__  # pants: no-infer-dep
 from ai.backend.agent.alloc_map import AllocationStrategy
 from ai.backend.agent.docker.kernel import DockerKernel
 from ai.backend.agent.errors import (
-    ContainerStatsStreamError,
     InvalidResourceConfigError,
 )
 from ai.backend.agent.exception import InvalidArgumentError
@@ -81,7 +80,6 @@ _STATS_STREAM_INITIAL_BACKOFF: float = 1.0
 _STATS_STREAM_MAX_BACKOFF: float = 30.0
 _STATS_STREAM_BACKOFF_FACTOR: float = 2.0
 _STATS_STREAM_MAX_RETRIES: int = 8
-_STATS_STREAM_FIRST_SAMPLE_TIMEOUT: float = 0.5
 
 # The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
@@ -147,42 +145,6 @@ def _validate_stats_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
     return entry
 
 
-async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
-    short_cid = container.id[:7]
-    try:
-        # aiodocker may return list[dict] or dict depending on version
-        ret: list[dict[str, Any]] | dict[str, Any] = await container.stats(stream=False)
-    except RuntimeError as e:
-        msg = str(e.args[0]).lower()
-        if "event loop is closed" in msg or "session is closed" in msg:
-            return None
-        raise
-    except (DockerError, aiohttp.ClientError) as e:
-        log.error(
-            "cannot read stats (cid:{}): client error: {!r}.",
-            short_cid,
-            e,
-        )
-        return None
-    else:
-        entry: dict[str, Any] = {"read": "0001-01-01"}
-        # aiodocker 0.16 or later returns a list of dict, even when not streaming.
-        match ret:
-            case list() if ret:
-                entry = ret[0]
-            case dict() if ret:
-                entry = ret
-            case _:
-                # The API may return an empty result upon container termination.
-                log.warning(
-                    "cannot read stats (cid:{}): got an empty result: {}",
-                    short_cid,
-                    ret,
-                )
-                return None
-        return _validate_stats_entry(entry)
-
-
 class DockerStatsStreamer:
     """
     Maintains one long-lived ``container.stats(stream=True)`` reader per container
@@ -199,9 +161,7 @@ class DockerStatsStreamer:
       reader task is cancelled promptly when the container goes away.
 
     :meth:`get_latest` also lazily spawns a reader as a safety net for events
-    that were missed. Callers that want to guarantee a non-``None`` first sample
-    for a newly-started container can ``await`` :meth:`wait_for_first_sample`
-    with a short bounded timeout (typically 200-500 ms).
+    that were missed.
 
     On transient transport failures (``ClientConnectionError`` /
     :class:`asyncio.TimeoutError`) the reader reconnects with bounded exponential
@@ -212,14 +172,12 @@ class DockerStatsStreamer:
     _docker: Docker
     _latest: dict[str, dict[str, Any]]
     _tasks: dict[str, asyncio.Task[None]]
-    _first_sample_events: dict[str, asyncio.Event]
     _closed: bool
 
     def __init__(self, docker: Docker) -> None:
         self._docker = docker
         self._latest = {}
         self._tasks = {}
-        self._first_sample_events = {}
         self._closed = False
 
     def start(self, container_id: str) -> None:
@@ -230,7 +188,6 @@ class DockerStatsStreamer:
         task = self._tasks.get(container_id)
         if task is not None and not task.done():
             return
-        self._first_sample_events.setdefault(container_id, asyncio.Event())
         self._tasks[container_id] = asyncio.create_task(
             self._read_stream(container_id),
             name=f"docker-stats-stream:{container_id[:7]}",
@@ -251,38 +208,12 @@ class DockerStatsStreamer:
             self.start(container_id)
         return self._latest.get(container_id)
 
-    async def wait_for_first_sample(
-        self,
-        container_id: str,
-        wait_timeout: float = _STATS_STREAM_FIRST_SAMPLE_TIMEOUT,
-    ) -> bool:
-        """Wait up to ``wait_timeout`` seconds for the first stats frame of
-        ``container_id`` to arrive. Returns True if a sample arrived in time,
-        False otherwise. Spawns a reader if none is running."""
-        if self._closed:
-            return False
-        self.start(container_id)
-        event = self._first_sample_events.get(container_id)
-        if event is None:
-            return self._latest.get(container_id) is not None
-        if event.is_set():
-            return True
-        try:
-            async with asyncio.timeout(wait_timeout):
-                await event.wait()
-        except TimeoutError:
-            return False
-        return True
-
     async def stop(self, container_id: str) -> None:
         """Cancel and await the reader for ``container_id``, and drop its
         cached sample. Re-raises :class:`asyncio.CancelledError` so the caller's
         cancellation propagates; other exceptions are logged and swallowed."""
         task = self._tasks.pop(container_id, None)
         self._latest.pop(container_id, None)
-        event = self._first_sample_events.pop(container_id, None)
-        if event is not None:
-            event.set()
         if task is None or task.done():
             return
         task.cancel()
@@ -307,9 +238,6 @@ class DockerStatsStreamer:
         tasks = list(self._tasks.values())
         self._tasks.clear()
         self._latest.clear()
-        for event in self._first_sample_events.values():
-            event.set()
-        self._first_sample_events.clear()
         for task in tasks:
             if not task.done():
                 task.cancel()
@@ -348,13 +276,9 @@ class DockerStatsStreamer:
                     return
                 except (aiohttp.ClientConnectionError, TimeoutError) as e:
                     if retries >= _STATS_STREAM_MAX_RETRIES:
-                        err = ContainerStatsStreamError(
-                            f"stats stream exhausted retries for cid:{short_cid}: {e!r}"
-                        )
                         log.error(
-                            "stats stream permanent failure (cid:{}) [{}]: {!r}",
+                            "stats stream exhausted retries for cid:{}: {!r}",
                             short_cid,
-                            err.error_code(),
                             e,
                         )
                         return
@@ -394,10 +318,6 @@ class DockerStatsStreamer:
                 )
         finally:
             self._latest.pop(container_id, None)
-            event = self._first_sample_events.pop(container_id, None)
-            if event is not None:
-                # Unblock any pending waiters; they'll observe no cached sample.
-                event.set()
 
     async def _consume_stream(self, container_id: str) -> bool:
         """Consume one docker stats stream iterator. Returns True if at least
@@ -409,9 +329,6 @@ class DockerStatsStreamer:
             if validated is not None:
                 self._latest[container_id] = validated
                 consumed_any = True
-                event = self._first_sample_events.get(container_id)
-                if event is not None and not event.is_set():
-                    event.set()
         return consumed_any
 
 

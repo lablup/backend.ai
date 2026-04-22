@@ -71,16 +71,6 @@ class BaseDockerIntrinsicTest:
         ctx.mode = StatModes.CGROUP
         return ctx
 
-    @pytest.fixture
-    def mock_fetch_api_stats(
-        self, docker_stats_response: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        with patch(
-            "ai.backend.agent.docker.intrinsic.fetch_api_stats",
-            return_value=docker_stats_response,
-        ) as mock:
-            yield mock
-
     def _make_prewarmed_streamer(
         self,
         sample: dict[str, Any] | None,
@@ -135,7 +125,6 @@ class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         cpu_plugin: CPUPlugin,
         container_ids: list[str],
         docker_stat_context: MagicMock,
-        mock_fetch_api_stats: MagicMock,
     ) -> None:
         """Verify API mode uses the plugin's Docker client, not a new one."""
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
@@ -240,7 +229,6 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         memory_plugin: MemoryPlugin,
         container_ids: list[str],
         docker_stat_context: MagicMock,
-        mock_fetch_api_stats: MagicMock,
     ) -> None:
         """Verify API mode uses the plugin's Docker client, not a new one."""
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
@@ -656,15 +644,29 @@ def sample_stats_frame() -> dict[str, Any]:
     }
 
 
+async def _poll_for_latest(
+    streamer: DockerStatsStreamer,
+    container_id: str,
+    timeout: float = 2.0,
+) -> dict[str, Any] | None:
+    """Poll ``streamer.get_latest`` until it returns a non-None value or timeout."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        sample = streamer.get_latest(container_id)
+        if sample is not None:
+            return sample
+        await asyncio.sleep(0)
+    return streamer.get_latest(container_id)
+
+
 class TestDockerStatsStreamerLifecycle:
     """Tests for eager start/stop lifecycle of :class:`DockerStatsStreamer`."""
 
     async def test_start_spawns_reader_and_first_sample_lands(
         self, sample_stats_frame: dict[str, Any]
     ) -> None:
-        """After start(), a reader task is created; a subsequent
-        wait_for_first_sample() returns True as soon as the first frame
-        lands in the cache."""
+        """After start(), a reader task is created and the first emitted
+        frame lands in the cache."""
         first_emitted = asyncio.Event()
         hold_open = asyncio.Event()
 
@@ -684,9 +686,8 @@ class TestDockerStatsStreamerLifecycle:
             streamer = DockerStatsStreamer(AsyncMock())
             streamer.start("cid_000")
             assert "cid_000" in streamer._tasks
-            got = await streamer.wait_for_first_sample("cid_000", wait_timeout=2.0)
-            assert got is True
-            assert streamer.get_latest("cid_000") == sample_stats_frame
+            sample = await _poll_for_latest(streamer, "cid_000", timeout=2.0)
+            assert sample == sample_stats_frame
             hold_open.set()
             await streamer.close()
 
@@ -709,7 +710,7 @@ class TestDockerStatsStreamerLifecycle:
         ):
             streamer = DockerStatsStreamer(AsyncMock())
             streamer.start("cid_000")
-            await streamer.wait_for_first_sample("cid_000", wait_timeout=2.0)
+            await _poll_for_latest(streamer, "cid_000", timeout=2.0)
             task = streamer._tasks["cid_000"]
             await streamer.stop("cid_000")
             assert "cid_000" not in streamer._tasks
@@ -743,30 +744,6 @@ class TestDockerStatsStreamerLifecycle:
                 assert task.done()
             assert streamer._tasks == {}
             assert streamer._latest == {}
-
-    async def test_first_sample_wait_times_out_when_no_frames(self) -> None:
-        """wait_for_first_sample returns False when no frame arrives within
-        the timeout. The reader keeps running until stop()/close()."""
-        never_yielded = asyncio.Event()
-        sentinel: dict[str, Any] = {}
-
-        async def frames(_cid: str) -> Any:
-            # Park forever without yielding a frame; emit only after the
-            # event is set (never set by this test).
-            await never_yielded.wait()
-            yield sentinel
-
-        def fake_container_cls(docker: Any, id: str) -> _FakeDockerContainer:
-            return _FakeDockerContainer(frames, id)
-
-        with patch(
-            "ai.backend.agent.docker.intrinsic.DockerContainer",
-            side_effect=fake_container_cls,
-        ):
-            streamer = DockerStatsStreamer(AsyncMock())
-            got = await streamer.wait_for_first_sample("cid_000", wait_timeout=0.05)
-            assert got is False
-            await streamer.close()
 
 
 class TestDockerStatsStreamerReconnect:
@@ -805,10 +782,9 @@ class TestDockerStatsStreamerReconnect:
         ):
             streamer = DockerStatsStreamer(AsyncMock())
             streamer.start("cid_000")
-            got = await streamer.wait_for_first_sample("cid_000", wait_timeout=2.0)
-            assert got is True
+            sample = await _poll_for_latest(streamer, "cid_000", timeout=2.0)
+            assert sample == sample_stats_frame
             assert call_count >= 2
-            assert streamer.get_latest("cid_000") == sample_stats_frame
             await streamer.close()
 
     async def test_cancelled_error_reraises_from_reader(self) -> None:
