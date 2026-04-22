@@ -1323,10 +1323,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             # Skip networks already attached by Docker (e.g. `bridge` auto-attached
             # when NetworkMode is unset). A single `docker-networks` config can then
             # serve both single-node and multi-node without duplicate-attach 403s.
-            container_info = await container.show()
-            already_attached_networks = set(
-                container_info.get("NetworkSettings", {}).get("Networks", {}).keys()
-            )
+            if additional_network_names:
+                container_info = await container.show()
+                already_attached_networks = set(
+                    container_info.get("NetworkSettings", {}).get("Networks", {}).keys()
+                )
+            else:
+                already_attached_networks = set()
 
             for name in additional_network_names - already_attached_networks:
                 network = await docker.networks.get(name)
@@ -1335,7 +1338,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 except DockerError as e:
                     # Defense against a race between container.show() and connect()
                     # where Docker may attach the network in between.
-                    if e.status == 403 and "already exists" in str(e.message):
+                    if e.status == HTTPStatus.FORBIDDEN and "already exists" in str(e.message):
                         continue
                     raise
 
