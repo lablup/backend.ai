@@ -619,10 +619,7 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
 
     @pytest.fixture
     def cpu_plugin(self) -> CPUPlugin:
-        plugin = CPUPlugin.__new__(CPUPlugin)
-        plugin.local_config = {"agent": {"docker-mode": "default"}}
-        plugin._docker = AsyncMock()
-        return plugin
+        return CPUPlugin.__new__(CPUPlugin)
 
     @staticmethod
     def _device_alloc(core_ids: list[int]) -> dict[SlotName, dict[DeviceId, Decimal]]:
@@ -694,17 +691,17 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
         assert host_config["CpusetCpus"] == "0,2"
 
     @pytest.mark.parametrize(
-        ("core_to_node", "case_id"),
+        "core_to_node",
         [
-            ({0: 0}, "unknown_node"),
-            ({0: 0, 1: -1}, "negative_node"),
+            {0: 0},
+            {0: 0, 1: -1},
         ],
+        ids=["unknown_node", "negative_node"],
     )
     async def test_unknown_or_negative_node_omits_cpuset_mems(
         self,
         cpu_plugin: CPUPlugin,
         core_to_node: dict[int, int],
-        case_id: str,
     ) -> None:
         """When any allocated core maps to an unknown (libnuma returns -1) or
         explicitly negative NUMA node, CpusetMems must be omitted.
@@ -721,7 +718,7 @@ class TestCPUPluginGenerateDockerArgsNumaLocality:
             )
 
         host_config = result["HostConfig"]
-        assert "CpusetMems" not in host_config, f"case={case_id}"
+        assert "CpusetMems" not in host_config
         # Sanity: core-list plumbing still works.
         assert host_config["Cpus"] == 2
         assert host_config["CpusetCpus"] == "0,1"
