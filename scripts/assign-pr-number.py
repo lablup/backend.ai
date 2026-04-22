@@ -18,8 +18,12 @@ def read_news_types() -> set[str]:
     return news_types
 
 
-def get_pr_touched_fragments(base_ref: str, base_path: Path) -> set[str]:
-    """Return fragment filenames added or modified by this PR vs ``origin/<base_ref>``.
+def get_pr_added_fragments(base_ref: str, base_path: Path) -> set[str]:
+    """Return fragment filenames *newly added* by this PR vs ``origin/<base_ref>``.
+
+    Only ``A``-status entries are returned: a fragment that already existed on
+    the base branch and was merely modified in place (e.g., a typo fix on a
+    historical fragment) must keep its original PR-number prefix.
 
     Requires ``origin/<base_ref>`` to have been fetched (e.g., via
     ``actions/checkout`` with ``fetch-depth: 0``).
@@ -29,7 +33,7 @@ def get_pr_touched_fragments(base_ref: str, base_path: Path) -> set[str]:
             "git",
             "diff",
             "--name-only",
-            "--diff-filter=AM",
+            "--diff-filter=A",
             f"origin/{base_ref}...HEAD",
             "--",
             str(base_path),
@@ -39,6 +43,27 @@ def get_pr_touched_fragments(base_ref: str, base_path: Path) -> set[str]:
         text=True,
     )
     return {Path(line).name for line in result.stdout.splitlines() if line.strip()}
+
+
+def rename_fragment_or_exit(
+    base_path: Path, original_filename: str, numbered_filename: str, log_message: str
+) -> None:
+    """Rename a fragment, but abort if the target already exists.
+
+    ``Path.rename`` silently overwrites the destination on POSIX, so without an
+    explicit guard the destination fragment's contents are lost whenever two
+    fragments of the same news type collide on ``<pr>.<type>.md``.
+    """
+    target_path = base_path / numbered_filename
+    if target_path.exists():
+        print(
+            f"Cannot rename {original_filename} to {numbered_filename}: "
+            f"another fragment already occupies the target filename. "
+            f"Remove or rename one of the conflicting fragments and retry."
+        )
+        sys.exit(1)
+    (base_path / original_filename).rename(target_path)
+    print(log_message)
 
 
 def main(pr_number: str) -> None:
@@ -52,15 +77,15 @@ def main(pr_number: str) -> None:
     )
 
     base_ref = os.getenv("GITHUB_BASE_REF") or ""
-    pr_touched_fragments: set[str] | None = (
-        get_pr_touched_fragments(base_ref, base_path) if base_ref else None
+    pr_added_fragments: set[str] | None = (
+        get_pr_added_fragments(base_ref, base_path) if base_ref else None
     )
 
     all_fragments = [
         f.name for f in base_path.iterdir() if f.is_file() and f.name not in exempted_files
     ]
-    if pr_touched_fragments is not None:
-        files = [f for f in all_fragments if f in pr_touched_fragments]
+    if pr_added_fragments is not None:
+        files = [f for f in all_fragments if f in pr_added_fragments]
     else:
         files = all_fragments
 
@@ -70,7 +95,7 @@ def main(pr_number: str) -> None:
         if match := rx_numbered_fragment.search(file):
             if file[0 : file.find(".")] == pr_number:
                 existing_fragments.append(file)
-            elif pr_touched_fragments is not None:
+            elif pr_added_fragments is not None:
                 mismatched_fragments.append((file, match.group("type")))
         elif rx_unnumbered_fragment.search(file) is None:
             print(f"{file} is an invalid news fragment filename.")
@@ -82,19 +107,23 @@ def main(pr_number: str) -> None:
             original_filename = match.group()
             news_type = match.group("type")
             numbered_filename = f"{pr_number}.{news_type}.md"
-            file_path = base_path / original_filename
-            file_path.rename(base_path / numbered_filename)
-            print(f"{original_filename} is renamed to {pr_number}.{news_type}.md")
+            rename_fragment_or_exit(
+                base_path,
+                original_filename,
+                numbered_filename,
+                f"{original_filename} is renamed to {numbered_filename}",
+            )
             renamed_pairs.append(
                 (original_filename, numbered_filename),
             )
     for original_filename, news_type in mismatched_fragments:
         numbered_filename = f"{pr_number}.{news_type}.md"
-        file_path = base_path / original_filename
-        file_path.rename(base_path / numbered_filename)
-        print(
+        rename_fragment_or_exit(
+            base_path,
+            original_filename,
+            numbered_filename,
             f"{original_filename} has a PR number mismatch and is renamed to "
-            f"{numbered_filename}"
+            f"{numbered_filename}",
         )
         renamed_pairs.append(
             (original_filename, numbered_filename),
