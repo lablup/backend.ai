@@ -153,12 +153,12 @@ class AppConfigRow(Base):
 
 ### Scope ID convention
 
-| `scope_type`            | `scope_id` value          | Row count                   | Meaning of `extra_config`                                    |
-|-------------------------|---------------------------|-----------------------------|--------------------------------------------------------------|
-| `public`                | literal string `"public"` | one per `name`              | public (pre-login) value of the document                      |
-| `domain`                | `domain_name`             | one per `(domain, name)`    | the domain's own value of the document                        |
-| `domain_user_defaults`  | `domain_name`             | one per `(domain, name)`    | merge base for users in that domain (per-document)            |
-| `user`                  | `user_id` (UUID string)   | one per `(user_id, name)`   | user-customized value of the document                         |
+| `scope_type`            | `scope_id` value          | Meaning of `extra_config`                                    |
+|-------------------------|---------------------------|--------------------------------------------------------------|
+| `public`                | literal string `"public"` | public (pre-login) value of the document                      |
+| `domain`                | `domain_name`             | the domain's own value of the document                        |
+| `domain_user_defaults`  | `domain_name`             | merge base for users in that domain (per-document)            |
+| `user`                  | `user_id` (UUID string)   | user-customized value of the document                         |
 
 `UniqueConstraint` on `(scope_type, scope_id, name)` guarantees a
 single row per natural key. A scope can hold any number of distinct
@@ -178,7 +178,7 @@ the stored value; `createAppConfig` errors on any pre-existing row
 ## 2. Repository Layer — split per scope
 
 Keep `models/app_config/row.py`'s `AppConfigRow` as a single class, but
-**split the repository into three classes per scope**. Their access
+**split the repository into four classes per scope**. Their access
 policies and call patterns differ enough that combining them would make
 method signatures unwieldy.
 
@@ -186,9 +186,7 @@ method signatures unwieldy.
 repositories/app_config/
 ├── db_source/
 │   └── db_source.py         # single db_source
-├── cache_source/
-│   └── cache_source.py
-├── global_app_config_repository.py
+├── public_app_config_repository.py
 ├── domain_app_config_repository.py
 ├── domain_user_defaults_app_config_repository.py
 ├── user_app_config_repository.py
@@ -839,6 +837,25 @@ Where the checks live:
 - `UserNode.appConfigs` field resolver: returns an empty Connection
   when the parent node's `user_id` differs from `current_user` and the
   caller is not an admin.
+
+#### Name → ID resolution and ID-based Actions
+
+The actions that implement search / update / mutate all operate on
+the **row ID** internally — never on the raw natural key.
+Resolution is one extra service-layer step before the RBAC check:
+
+1. Resolve `(scope, scopeId, name)` → row `id` via the matching
+   repository. This lookup is **permission-agnostic** — it only
+   needs the natural key and may run for any caller. Returning an
+   `id` for a row the caller cannot access is fine (see next step).
+2. Run the RBAC check against the resolved `id` (using the standard
+   RBAC plumbing that consumes scope + actor context).
+3. Dispatch the ID-based Action (search, update, delete, restore,
+   etc.) to the repository.
+
+This keeps Actions themselves uniform (ID-only) while still
+accepting natural-key identification at the API surface — clients
+never need to know row IDs.
 
 ---
 
