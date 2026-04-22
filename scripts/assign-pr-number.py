@@ -45,27 +45,6 @@ def get_pr_added_fragments(base_ref: str, base_path: Path) -> set[str]:
     return {Path(line).name for line in result.stdout.splitlines() if line.strip()}
 
 
-def rename_fragment_or_exit(
-    base_path: Path, original_filename: str, numbered_filename: str, log_message: str
-) -> None:
-    """Rename a fragment, but abort if the target already exists.
-
-    ``Path.rename`` silently overwrites the destination on POSIX, so without an
-    explicit guard the destination fragment's contents are lost whenever two
-    fragments of the same news type collide on ``<pr>.<type>.md``.
-    """
-    target_path = base_path / numbered_filename
-    if target_path.exists():
-        print(
-            f"Cannot rename {original_filename} to {numbered_filename}: "
-            f"another fragment already occupies the target filename. "
-            f"Remove or rename one of the conflicting fragments and retry."
-        )
-        sys.exit(1)
-    (base_path / original_filename).rename(target_path)
-    print(log_message)
-
-
 def main(pr_number: str) -> None:
     news_types = read_news_types()
     base_path = Path("./changes")
@@ -80,6 +59,11 @@ def main(pr_number: str) -> None:
     pr_added_fragments: set[str] | None = (
         get_pr_added_fragments(base_ref, base_path) if base_ref else None
     )
+    # Backport PRs (targeting release branches) carry fragments already
+    # numbered for the original ``main`` PR; rewriting those prefixes would
+    # erase the link back to the original change in release notes. Restrict
+    # mismatched-prefix rewrites to PRs targeting ``main``.
+    rewrite_mismatched = base_ref == "main"
 
     all_fragments = [
         f.name for f in base_path.iterdir() if f.is_file() and f.name not in exempted_files
@@ -89,45 +73,59 @@ def main(pr_number: str) -> None:
     else:
         files = all_fragments
 
-    existing_fragments = []
+    existing_fragments: list[str] = []
+    unnumbered_fragments: list[tuple[str, str]] = []
     mismatched_fragments: list[tuple[str, str]] = []
     for file in files:
         if match := rx_numbered_fragment.search(file):
             if file[0 : file.find(".")] == pr_number:
                 existing_fragments.append(file)
-            elif pr_added_fragments is not None:
+            elif rewrite_mismatched:
                 mismatched_fragments.append((file, match.group("type")))
-        elif rx_unnumbered_fragment.search(file) is None:
+        elif match := rx_unnumbered_fragment.search(file):
+            unnumbered_fragments.append((file, match.group("type")))
+        else:
             print(f"{file} is an invalid news fragment filename.")
             sys.exit(1)
 
-    renamed_pairs = []
-    for file in files:
-        if match := rx_unnumbered_fragment.search(file):
-            original_filename = match.group()
-            news_type = match.group("type")
-            numbered_filename = f"{pr_number}.{news_type}.md"
-            rename_fragment_or_exit(
-                base_path,
-                original_filename,
-                numbered_filename,
-                f"{original_filename} is renamed to {numbered_filename}",
+    # Plan all renames before touching disk so that collisions — both with
+    # existing files and between two fragments of the same type in one PR —
+    # are detected atomically, not mid-way through a partial rename.
+    planned_renames: list[tuple[str, str, str]] = []
+    for filename, news_type in unnumbered_fragments:
+        target = f"{pr_number}.{news_type}.md"
+        planned_renames.append((filename, target, f"{filename} is renamed to {target}"))
+    for filename, news_type in mismatched_fragments:
+        target = f"{pr_number}.{news_type}.md"
+        planned_renames.append((
+            filename,
+            target,
+            f"{filename} has a PR number mismatch and is renamed to {target}",
+        ))
+
+    seen_targets: set[str] = set()
+    for original, target, _ in planned_renames:
+        if target in seen_targets:
+            print(
+                f"Cannot rename {original} to {target}: another fragment in this PR "
+                f"also targets {target}. Remove or rename one of the conflicting "
+                f"fragments and retry."
             )
-            renamed_pairs.append(
-                (original_filename, numbered_filename),
+            sys.exit(1)
+        if (base_path / target).exists():
+            print(
+                f"Cannot rename {original} to {target}: another fragment already "
+                f"occupies {target}. Remove or rename one of the conflicting "
+                f"fragments and retry."
             )
-    for original_filename, news_type in mismatched_fragments:
-        numbered_filename = f"{pr_number}.{news_type}.md"
-        rename_fragment_or_exit(
-            base_path,
-            original_filename,
-            numbered_filename,
-            f"{original_filename} has a PR number mismatch and is renamed to "
-            f"{numbered_filename}",
-        )
-        renamed_pairs.append(
-            (original_filename, numbered_filename),
-        )
+            sys.exit(1)
+        seen_targets.add(target)
+
+    renamed_pairs: list[tuple[str, str]] = []
+    for original, target, log_message in planned_renames:
+        (base_path / original).rename(base_path / target)
+        print(log_message)
+        renamed_pairs.append((original, target))
 
     if renamed_pairs:
         subprocess.run(
