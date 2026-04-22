@@ -10,10 +10,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.agent.docker import intrinsic
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
     MemoryPlugin,
+    _warn_cgroup_fallback_once,
     read_proc_net_dev,
 )
 from ai.backend.agent.stats import StatModes
@@ -276,6 +278,101 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await memory_plugin.gather_container_measures(memory_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
+
+    async def test_cgroup_mode_falls_back_to_api_on_sysfs_failure(
+        self,
+        memory_plugin: MemoryPlugin,
+        container_ids: list[str],
+        cgroup_stat_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        """When sysfs read fails in CGROUP mode, the Docker API is used
+        as a per-read fallback instead of silently returning zero."""
+        # Arrange: cgroup version that triggers "return None" in sysfs_impl.
+        cgroup_stat_context.agent.get_cgroup_version = MagicMock(return_value="invalid")
+        cgroup_stat_context.agent.get_cgroup_path = MagicMock(return_value=MagicMock())
+
+        results = await memory_plugin.gather_container_measures(cgroup_stat_context, container_ids)
+
+        assert mock_fetch_api_stats.call_count == len(container_ids)
+        # api_impl returns mem_cur = 1024 * 1024 * 100 = 104857600 bytes
+        for cid in container_ids:
+            assert results[0].per_container[cid].value == 1024 * 1024 * 100
+
+    async def test_linuxkit_forces_api_even_in_cgroup_mode(
+        self,
+        container_ids: list[str],
+        cgroup_stat_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        """On linuxkit hosts the API path is used even when mode is CGROUP."""
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "linuxkit"}}
+        plugin._docker = AsyncMock()
+
+        await plugin.gather_container_measures(cgroup_stat_context, container_ids)
+        assert mock_fetch_api_stats.call_count == len(container_ids)
+
+
+class TestWarnCgroupFallbackOnce:
+    """Tests for _warn_cgroup_fallback_once() dedup and bounded-cache semantics."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_warn_cache(self) -> Generator[None, None, None]:
+        """Reset the module-level warn cache between tests to avoid bleed-through."""
+        intrinsic._cgroup_fallback_warned.clear()
+        yield
+        intrinsic._cgroup_fallback_warned.clear()
+
+    def test_deduplicates_per_container(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The helper logs once per (plugin, container_id) and stays silent on
+        subsequent calls for the same container."""
+        with caplog.at_level("WARNING", logger="ai.backend.agent.docker.intrinsic"):
+            _warn_cgroup_fallback_once("CPUPlugin", "container_abc")
+            _warn_cgroup_fallback_once("CPUPlugin", "container_abc")
+            _warn_cgroup_fallback_once("CPUPlugin", "container_abc")
+
+        warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warn_records) == 1
+
+        # A different container should still warn.
+        caplog.clear()
+        with caplog.at_level("WARNING", logger="ai.backend.agent.docker.intrinsic"):
+            _warn_cgroup_fallback_once("CPUPlugin", "container_xyz")
+        warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warn_records) == 1
+
+        # Same container under a different plugin namespace should also warn once.
+        caplog.clear()
+        with caplog.at_level("WARNING", logger="ai.backend.agent.docker.intrinsic"):
+            _warn_cgroup_fallback_once("MemoryPlugin", "container_abc")
+        warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warn_records) == 1
+
+    def test_evicts_beyond_limit(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """When the bounded cache overflows, the oldest entry is evicted and a
+        previously-seen container may warn again."""
+        cap = intrinsic._CGROUP_FALLBACK_WARN_CACHE_SIZE
+        first_cid = "first_container"
+
+        with caplog.at_level("WARNING", logger="ai.backend.agent.docker.intrinsic"):
+            # First warn for `first_cid`.
+            _warn_cgroup_fallback_once("CPUPlugin", first_cid)
+            # Fill the cache with `cap` distinct new entries to evict `first_cid`.
+            for i in range(cap):
+                _warn_cgroup_fallback_once("CPUPlugin", f"filler_{i}")
+            # `first_cid` should have been evicted and now warn again.
+            _warn_cgroup_fallback_once("CPUPlugin", first_cid)
+
+        warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        # 1 (first) + cap (fillers) + 1 (re-warn of first) = cap + 2
+        assert len(warn_records) == cap + 2
 
 
 class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):

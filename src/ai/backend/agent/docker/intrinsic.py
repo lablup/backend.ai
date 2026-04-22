@@ -8,12 +8,13 @@ import platform
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, assert_never, cast
 
 import aiohttp
 import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
+from cachetools import LRUCache
 
 from ai.backend.agent import __version__  # pants: no-infer-dep
 from ai.backend.agent.alloc_map import AllocationStrategy
@@ -75,14 +76,20 @@ _INVALID_PID: int = 0
 
 # Tracks containers for which we have already logged a cgroup->Docker-API
 # fallback warning, to avoid log spam on persistent read failures.
-_cgroup_fallback_warned: set[str] = set()
+# Bounded LRU cache to prevent unbounded growth on hosts with high container churn;
+# oldest entries are evicted on overflow, so a recreated container may re-warn.
+# Shared across CPUPlugin / MemoryPlugin since keys are namespaced via the `plugin:` prefix.
+_CGROUP_FALLBACK_WARN_CACHE_SIZE = 1024
+_cgroup_fallback_warned: LRUCache[str, None] = LRUCache(
+    maxsize=_CGROUP_FALLBACK_WARN_CACHE_SIZE,
+)
 
 
 def _warn_cgroup_fallback_once(plugin: str, container_id: str) -> None:
     key = f"{plugin}:{container_id}"
     if key in _cgroup_fallback_warned:
         return
-    _cgroup_fallback_warned.add(key)
+    _cgroup_fallback_warned[key] = None
     log.warning(
         "{0}: cgroup sysfs read failed for container {1}; falling back to Docker API",
         plugin,
@@ -340,7 +347,7 @@ class CPUPlugin(AbstractComputePlugin):
             case StatModes.CGROUP | StatModes.DOCKER:
                 impl = api_impl
             case _:
-                raise RuntimeError("should not reach here")
+                assert_never(ctx.mode)
 
         tasks = []
         for cid in container_ids:
@@ -863,7 +870,7 @@ class MemoryPlugin(AbstractComputePlugin):
             case StatModes.CGROUP | StatModes.DOCKER:
                 impl = api_impl
             case _:
-                raise RuntimeError("should not reach here")
+                assert_never(ctx.mode)
 
         per_container_mem_used_bytes = {}
         per_container_io_read_bytes = {}
