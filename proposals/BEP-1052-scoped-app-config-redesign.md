@@ -889,8 +889,8 @@ never need to know row IDs.
 
 Mounted under the existing `app-configs` prefix
 (`RouteRegistry.create("app-configs", ...)` in
-`api/rest/v2/app_config/registry.py`), matching the project-wide v2
-conventions in `api/rest/v2/CLAUDE.md`.
+`src/ai/backend/manager/api/rest/v2/app_config/registry.py`), matching the project-wide v2
+conventions in `src/ai/backend/manager/api/rest/v2/CLAUDE.md`.
 
 ### Endpoints
 
@@ -941,7 +941,7 @@ GQL `adminAppConfigs` field (`filter` / `orderBy` / pagination
 arguments) in the request body and returns the same result.
 
 > `/v2/app-configs/my/...` follows the `my_` self-service convention
-> (`api/rest/v2/CLAUDE.md`) — the adapter resolves `current_user()`
+> (`src/ai/backend/manager/api/rest/v2/CLAUDE.md`) — the adapter resolves `current_user()`
 > internally and fixes `scope_id` to the caller's `user_id`. The
 > body shape is the same `{ "config": ... }` as above (maps to
 > the user row's `user_customized_config` internally); there is no
