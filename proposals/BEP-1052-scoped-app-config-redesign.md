@@ -476,13 +476,13 @@ type Mutation {
   Identified by `(scope, scopeId)`. Takes a list of JSON key paths
   (dot-notation). Silent no-op if the row does not exist.
   """
-  adminDeleteAppConfigKeys(input: AdminDeleteAppConfigKeysInput!): UpdateAppConfigPayload!
+  adminDeleteAppConfigKeys(input: AdminDeleteAppConfigKeysInput!): DeleteAppConfigPayload!
 
   """Self user_app_config partial update. Target is the caller."""
   updateMyAppConfig(input: UpdateMyAppConfigInput!): UpdateMyAppConfigPayload!
 
   """Remove specified keys from the caller's user_app_config."""
-  deleteMyAppConfigKeys(input: DeleteMyAppConfigKeysInput!): UpdateMyAppConfigPayload!
+  deleteMyAppConfigKeys(input: DeleteMyAppConfigKeysInput!): DeleteMyAppConfigPayload!
 }
 
 enum AppConfigScopeGQL {
@@ -582,12 +582,23 @@ input DeleteMyAppConfigKeysInput {
 
 # ── Payload ──────────────────────────────────────────────────
 
+"""Result of `adminUpdateAppConfig`."""
 type UpdateAppConfigPayload {
   appConfig: AppConfig!
 }
 
+"""Result of `adminDeleteAppConfigKeys`."""
+type DeleteAppConfigPayload {
+  appConfig: AppConfig!
+}
+
+"""Result of `updateMyAppConfig` (includes the merged `config`)."""
 type UpdateMyAppConfigPayload {
-  """The updated self config (includes the merged `config`)."""
+  appConfig: UserAppConfig!
+}
+
+"""Result of `deleteMyAppConfigKeys` (includes the merged `config`)."""
+type DeleteMyAppConfigPayload {
   appConfig: UserAppConfig!
 }
 
