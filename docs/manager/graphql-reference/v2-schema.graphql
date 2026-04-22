@@ -2473,6 +2473,9 @@ type CreateVFSStoragePayload {
 Added in UNRELEASED. Input for creating a virtual folder within a project.
 """
 input CreateVFolderInProjectInput {
+  """Project UUID that owns the vfolder."""
+  projectId: UUID!
+
   """VFolder name."""
   name: String!
 
@@ -6811,7 +6814,7 @@ type Mutation {
   """
   Added in UNRELEASED. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
   """
-  createVFolderInProject(projectId: UUID!, input: CreateVFolderInProjectInput!): CreateVFolderV2Payload!
+  createVFolderInProject(input: CreateVFolderInProjectInput!): CreateVFolderV2Payload!
 
   """Added in 26.4.2. Soft-delete a virtual folder (move to trash)."""
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!

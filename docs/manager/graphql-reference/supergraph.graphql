@@ -3954,6 +3954,9 @@ Added in UNRELEASED. Input for creating a virtual folder within a project.
 input CreateVFolderInProjectInput
   @join__type(graph: STRAWBERRY)
 {
+  """Project UUID that owns the vfolder."""
+  projectId: UUID!
+
   """VFolder name."""
   name: String!
 
@@ -10823,7 +10826,7 @@ type Mutation
   """
   Added in UNRELEASED. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
   """
-  createVFolderInProject(projectId: UUID!, input: CreateVFolderInProjectInput!): CreateVFolderV2Payload! @join__field(graph: STRAWBERRY)
+  createVFolderInProject(input: CreateVFolderInProjectInput!): CreateVFolderV2Payload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Soft-delete a virtual folder (move to trash)."""
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload! @join__field(graph: STRAWBERRY)
