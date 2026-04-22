@@ -11,9 +11,10 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import sqlalchemy as sa
 import yarl
 
 from ai.backend.client.v2.auth import HMACAuth
@@ -22,7 +23,13 @@ from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInScopeInput
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderUsageMode,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
@@ -34,11 +41,17 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -76,13 +89,27 @@ def vfolder_processors(
     database_engine: ExtendedAsyncSAEngine,
     rbac_permission_repo: PermissionControllerRepository,
 ) -> VFolderProcessors:
-    """Override: real scope + single-entity RBAC validators."""
+    """Override: real scope + single-entity RBAC validators.
+
+    Storage-proxy calls (``get_proxy_and_volume`` / ``create_folder``) and
+    the etcd-backed allowed-vfolder-types lookup are stubbed so that
+    service-layer create paths can complete without external dependencies.
+    """
     vfolder_repository = VfolderRepository(database_engine)
     user_repository = UserRepository(database_engine)
+    config_provider = MagicMock()
+    config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
+        return_value=["user", "group"]
+    )
+    storage_manager = MagicMock()
+    storage_manager.get_proxy_and_volume.return_value = ("local", "local")
+    manager_client = MagicMock()
+    manager_client.create_folder = AsyncMock(return_value=None)
+    storage_manager.get_manager_facing_client.return_value = manager_client
     service = VFolderService(
-        config_provider=MagicMock(),
+        config_provider=config_provider,
         etcd=MagicMock(),
-        storage_manager=MagicMock(),
+        storage_manager=storage_manager,
         background_task_manager=MagicMock(),
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
@@ -149,6 +176,88 @@ async def user_v2_registry(
         yield registry
     finally:
         await registry.close()
+
+
+@pytest.fixture()
+async def project_host_permission_fixture(
+    db_engine: SAEngine,
+    group_fixture: uuid.UUID,
+    vfolder_host_permission_fixture: None,
+) -> AsyncIterator[None]:
+    """Grant all VFolderHostPermission flags on the 'local' host to the test project.
+
+    The base ``vfolder_host_permission_fixture`` covers the domain and keypair
+    resource policy, but group-owned creates read from the project row itself.
+    """
+    all_perms: set[VFolderHostPermission] = set(VFolderHostPermission)
+    host_perms = VFolderHostPermissionMap({"local": all_perms})
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            groups.update()
+            .where(groups.c.id == group_fixture)
+            .values(allowed_vfolder_hosts=host_perms)
+        )
+    yield
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            groups.update()
+            .where(groups.c.id == group_fixture)
+            .values(allowed_vfolder_hosts=VFolderHostPermissionMap())
+        )
+
+
+@pytest.fixture()
+async def regular_user_vfolder_create_permission(
+    db_engine: SAEngine,
+    regular_user_fixture: UserFixtureData,
+    group_fixture: uuid.UUID,
+) -> AsyncIterator[None]:
+    """Grant PROJECT-scoped VFOLDER:CREATE permission to the regular user."""
+    role_id = uuid.uuid4()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(RoleRow.__table__).values(
+                id=role_id,
+                name=f"test-vfolder-creator-{secrets.token_hex(4)}",
+                status=RoleStatus.ACTIVE,
+            )
+        )
+        await conn.execute(
+            sa.insert(UserRoleRow.__table__).values(
+                user_id=regular_user_fixture.user_uuid,
+                role_id=role_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(PermissionRow.__table__).values(
+                role_id=role_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_fixture),
+                entity_type=EntityType.VFOLDER,
+                operation=OperationType.CREATE,
+            )
+        )
+    yield
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(
+            UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+
+
+@pytest.fixture()
+async def created_vfolder_cleanup(
+    db_engine: SAEngine,
+) -> AsyncIterator[list[uuid.UUID]]:
+    """Collect vfolder IDs created during a test and delete them on teardown."""
+    ids: list[uuid.UUID] = []
+    yield ids
+    if ids:
+        async with db_engine.begin() as conn:
+            await conn.execute(vfolders.delete().where(vfolders.c.id.in_(ids)))
 
 
 @pytest.fixture()
@@ -242,7 +351,7 @@ class TestPurgeVFolderRBAC:
 
 
 class TestCreateVFolderInProjectRBAC:
-    """POST /v2/vfolders/projects/{project_id} -- ScopeActionProcessor RBAC."""
+    """POST /v2/vfolders/projects/{project_id}/create -- ScopeActionProcessor RBAC."""
 
     async def test_regular_user_denied(
         self,
@@ -260,3 +369,42 @@ class TestCreateVFolderInProjectRBAC:
         )
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.vfolder.create_in_project(group_fixture, request)
+
+    async def test_superadmin_succeeds(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        group_fixture: uuid.UUID,
+        project_host_permission_fixture: None,
+        created_vfolder_cleanup: list[uuid.UUID],
+    ) -> None:
+        """Superadmin bypasses scope RBAC and can create a project-owned vfolder."""
+        request = CreateVFolderInScopeInput(
+            name=f"rbac-admin-{secrets.token_hex(4)}",
+            host="local",
+            usage_mode=VFolderUsageMode.GENERAL,
+            permission=VFolderPermissionField.READ_WRITE,
+            cloneable=False,
+        )
+        payload = await admin_v2_registry.vfolder.create_in_project(group_fixture, request)
+        created_vfolder_cleanup.append(payload.vfolder.id)
+        assert payload.vfolder.ownership.project_id == group_fixture
+
+    async def test_regular_user_with_permission_succeeds(
+        self,
+        user_v2_registry: V2ClientRegistry,
+        group_fixture: uuid.UUID,
+        project_host_permission_fixture: None,
+        regular_user_vfolder_create_permission: None,
+        created_vfolder_cleanup: list[uuid.UUID],
+    ) -> None:
+        """Regular user granted PROJECT-scoped VFOLDER:CREATE succeeds."""
+        request = CreateVFolderInScopeInput(
+            name=f"rbac-user-{secrets.token_hex(4)}",
+            host="local",
+            usage_mode=VFolderUsageMode.GENERAL,
+            permission=VFolderPermissionField.READ_WRITE,
+            cloneable=False,
+        )
+        payload = await user_v2_registry.vfolder.create_in_project(group_fixture, request)
+        created_vfolder_cleanup.append(payload.vfolder.id)
+        assert payload.vfolder.ownership.project_id == group_fixture
