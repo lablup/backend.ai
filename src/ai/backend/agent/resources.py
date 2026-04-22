@@ -451,25 +451,6 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return {}
 
-    async def notify_container_started(self, container_id: str) -> None:
-        """
-        Lifecycle hook invoked by the agent when a container transitions to RUNNING.
-
-        Subclasses may override this to eagerly spin up per-container resources
-        (e.g. start a long-lived stats stream reader) instead of relying on
-        lazy initialisation from the next stat collection cycle. Default: no-op.
-        """
-        return
-
-    async def notify_container_destroyed(self, container_id: str) -> None:
-        """
-        Lifecycle hook invoked by the agent when a container is being cleaned up.
-
-        Subclasses may override this to release per-container resources
-        (e.g. cancel the long-lived stats stream reader task). Default: no-op.
-        """
-        return
-
     @abstractmethod
     async def restore_from_container(
         self,

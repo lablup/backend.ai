@@ -50,6 +50,11 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
+from ai.backend.agent.docker.intrinsic import (
+    CPUPlugin,
+    DockerStatsStreamer,
+    MemoryPlugin,
+)
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.exception import (
     ContainerCreationError,
@@ -1422,6 +1427,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
+    _stats_streamer: DockerStatsStreamer
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1559,6 +1565,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # For legacy accelerator plugins
         self.docker = Docker()
 
+        # Single DockerStatsStreamer shared across intrinsic compute plugins.
+        # Keeps one long-lived ``container.stats(stream=True)`` reader per
+        # container instead of one per plugin, cutting open connections to
+        # dockerd in half for CPU + Memory plugins.
+        self._stats_streamer = DockerStatsStreamer(self.docker)
+        for computer_ctx in self.computers.values():
+            instance = computer_ctx.instance
+            if isinstance(instance, (CPUPlugin, MemoryPlugin)):
+                instance.attach_stats_streamer(self._stats_streamer)
+
         self.network_plugin_ctx = NetworkPluginContext(
             self.etcd, self.local_config.model_dump(by_alias=True)
         )
@@ -1576,6 +1592,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if self.docker_ptask_group is not None:
             await self.docker_ptask_group.shutdown()
 
+        # Close the shared stats streamer before the underlying Docker client
+        # so in-flight reader tasks can cleanly drain their stream iterators.
+        if self._stats_streamer is not None:
+            await self._stats_streamer.close()
+
         try:
             await super().shutdown(stop_signal)
         finally:
@@ -1586,6 +1607,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         if self.docker:
             await self.docker.close()
+
+    @override
+    async def _on_container_started(self, container_id: ContainerId) -> None:
+        self._stats_streamer.start(str(container_id))
+
+    @override
+    async def _on_container_destroyed(self, container_id: ContainerId) -> None:
+        await self._stats_streamer.stop(str(container_id))
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:

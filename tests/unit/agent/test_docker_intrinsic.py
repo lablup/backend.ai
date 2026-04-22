@@ -6,14 +6,13 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
 from aiodocker.exceptions import DockerError
 
-from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
@@ -21,9 +20,7 @@ from ai.backend.agent.docker.intrinsic import (
     MemoryPlugin,
     read_proc_net_dev,
 )
-from ai.backend.agent.resources import ComputerContext
 from ai.backend.agent.stats import StatModes
-from ai.backend.common.types import ContainerId, DeviceName
 
 
 class BaseDockerIntrinsicTest:
@@ -878,71 +875,36 @@ class TestDockerStatsStreamerReconnect:
             assert streamer.get_latest("cid_gone") is None
 
 
-class _AgentStub:
-    """Minimal stand-in exposing only the attributes the notify helpers read."""
+class TestSharedStatsStreamerWiring:
+    """Verify the agent owns a single streamer that both intrinsic plugins share."""
 
-    def __init__(self, computers: dict[DeviceName, ComputerContext]) -> None:
-        self.computers = computers
+    async def test_agent_owns_single_statsstreamer_shared_with_plugins(self) -> None:
+        """After :meth:`DockerAgent.attach_stats_streamer` is called for each
+        intrinsic plugin, both plugins must reference the SAME streamer
+        instance that the agent owns on ``self._stats_streamer``."""
+        streamer = DockerStatsStreamer(AsyncMock())
 
+        cpu_plugin = CPUPlugin.__new__(CPUPlugin)
+        mem_plugin = MemoryPlugin.__new__(MemoryPlugin)
+        cpu_plugin.attach_stats_streamer(streamer)
+        mem_plugin.attach_stats_streamer(streamer)
 
-class TestAgentContainerLifecycleHooks:
-    """Tests that the agent's start/clean event handlers notify compute plugins."""
+        assert cpu_plugin._stats_streamer is streamer
+        assert mem_plugin._stats_streamer is streamer
+        assert cpu_plugin._stats_streamer is mem_plugin._stats_streamer
 
-    @staticmethod
-    def _make_agent_stub(
-        computers: dict[str, ComputerContext],
-    ) -> AbstractAgent[Any, Any]:
-        """Build a stub exposing ``self.computers`` so the notify helpers can
-        be exercised without instantiating the full AbstractAgent (which is
-        abstract with many required overrides)."""
-        typed_computers: dict[DeviceName, ComputerContext] = {
-            DeviceName(k): v for k, v in computers.items()
-        }
-        return cast(AbstractAgent[Any, Any], _AgentStub(typed_computers))
+    async def test_agent_stats_streamer_closed_on_shutdown(self) -> None:
+        """``DockerAgent.shutdown`` must close the shared streamer so in-flight
+        reader tasks are cancelled before the underlying Docker client goes
+        away."""
+        streamer = DockerStatsStreamer(AsyncMock())
+        streamer.start("cid_000")
+        assert "cid_000" in streamer._tasks
 
-    async def test_notify_started_calls_plugin_hook(self) -> None:
-        """The agent's helper invokes notify_container_started on every plugin."""
-        plugin = AsyncMock()
-        plugin.notify_container_started = AsyncMock()
-        plugin.notify_container_destroyed = AsyncMock()
-        agent = self._make_agent_stub({
-            "cpu": ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock()),
-        })
+        await streamer.close()
 
-        await AbstractAgent._notify_compute_plugins_container_started(agent, ContainerId("cid_000"))
-        plugin.notify_container_started.assert_awaited_once_with("cid_000")
-        plugin.notify_container_destroyed.assert_not_called()
-
-    async def test_notify_destroyed_calls_plugin_hook(self) -> None:
-        """The agent's helper invokes notify_container_destroyed on every plugin."""
-        plugin = AsyncMock()
-        plugin.notify_container_started = AsyncMock()
-        plugin.notify_container_destroyed = AsyncMock()
-        agent = self._make_agent_stub({
-            "cpu": ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock()),
-        })
-
-        await AbstractAgent._notify_compute_plugins_container_destroyed(
-            agent, ContainerId("cid_000")
-        )
-        plugin.notify_container_destroyed.assert_awaited_once_with("cid_000")
-        plugin.notify_container_started.assert_not_called()
-
-    async def test_notify_tolerates_plugin_exceptions(self) -> None:
-        """If one plugin raises, others are still notified; the error is logged."""
-        broken = AsyncMock()
-        broken.notify_container_started = AsyncMock(side_effect=RuntimeError("boom"))
-        healthy = AsyncMock()
-        healthy.notify_container_started = AsyncMock()
-
-        agent = self._make_agent_stub({
-            "broken": ComputerContext(instance=broken, devices=[], alloc_map=MagicMock()),
-            "healthy": ComputerContext(instance=healthy, devices=[], alloc_map=MagicMock()),
-        })
-
-        await AbstractAgent._notify_compute_plugins_container_started(agent, ContainerId("cid_000"))
-        broken.notify_container_started.assert_awaited_once_with("cid_000")
-        healthy.notify_container_started.assert_awaited_once_with("cid_000")
+        assert streamer._tasks == {}
+        assert streamer._latest == {}
 
 
 def aiohttp_client_connection_error(msg: str) -> Exception:

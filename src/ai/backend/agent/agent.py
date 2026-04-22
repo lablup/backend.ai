@@ -1417,41 +1417,25 @@ class AbstractAgent[
                 if ev.container_id is not None:
                     kernel_obj.set_container_id(ev.container_id)
         if ev.container_id is not None:
-            await self._notify_compute_plugins_container_started(ev.container_id)
+            await self._on_container_started(ev.container_id)
         log.info("Kernel {0} started", ev.kernel_id)
 
-    async def _notify_compute_plugins_container_started(self, container_id: ContainerId) -> None:
-        """Notify all compute plugins that ``container_id`` has started.
+    async def _on_container_started(self, container_id: ContainerId) -> None:
+        """Hook for subclasses to react to a container transitioning to RUNNING.
 
-        Plugins may use this to eagerly initialise per-container state
-        (e.g. :class:`DockerStatsStreamer`). Plugin failures are logged but
-        never prevent the container from running.
+        The default implementation is a no-op. Concrete agents (e.g. the Docker
+        agent) override this to start per-container resources such as a
+        long-lived stats stream reader.
         """
-        short_cid = str(container_id)[:13]
-        for device_name, computer_ctx in self.computers.items():
-            try:
-                await computer_ctx.instance.notify_container_started(str(container_id))
-            except Exception as e:
-                log.warning(
-                    "compute plugin {} notify_container_started failed (cid:{}): {!r}",
-                    device_name,
-                    short_cid,
-                    e,
-                )
+        return
 
-    async def _notify_compute_plugins_container_destroyed(self, container_id: ContainerId) -> None:
-        """Notify all compute plugins that ``container_id`` has been cleaned up."""
-        short_cid = str(container_id)[:13]
-        for device_name, computer_ctx in self.computers.items():
-            try:
-                await computer_ctx.instance.notify_container_destroyed(str(container_id))
-            except Exception as e:
-                log.warning(
-                    "compute plugin {} notify_container_destroyed failed (cid:{}): {!r}",
-                    device_name,
-                    short_cid,
-                    e,
-                )
+    async def _on_container_destroyed(self, container_id: ContainerId) -> None:
+        """Hook for subclasses to react to a container being cleaned up.
+
+        The default implementation is a no-op. Concrete agents (e.g. the Docker
+        agent) override this to release per-container resources.
+        """
+        return
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         log.info(
@@ -1537,7 +1521,7 @@ class AbstractAgent[
             await destruction_task
             del destruction_task
         if ev.container_id is not None:
-            await self._notify_compute_plugins_container_destroyed(ev.container_id)
+            await self._on_container_destroyed(ev.container_id)
         await self.stat_ctx.remove_kernel_metric(ev.kernel_id, ev.container_id)
         async with self.registry_lock:
             try:
