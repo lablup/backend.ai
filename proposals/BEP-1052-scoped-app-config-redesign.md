@@ -1146,7 +1146,7 @@ frontend; backend stores it opaquely.)
 
 ```graphql
 query LoadPublicTheme {
-  publicAppConfigs(filter: { name: { equals: "theme" } }, first: 1) {
+  publicAppConfigs(filter: { name: { equals: "theme" } }) {
     edges { node { name config modifiedAt } }
   }
 }
@@ -1195,16 +1195,18 @@ query BootstrapMe {
 
 ### S3. The user saves their own document
 
-The user replaces their `theme` document. They call the unified
-`updateAppConfig` with `key.scope = USER` and `key.scopeId =
-current_user.user_id`; the service layer authorizes the write by
+The user replaces their `preferences` document — e.g. language,
+experimental-feature toggles, visible-column choices per table
+(`theme` is admin-only, so users don't write it). They call the
+unified `updateAppConfig` with `key.scope = USER` and `key.scopeId
+= current_user.user_id`; the service layer authorizes the write by
 matching `scopeId` against the caller. To see the recomputed merge
 the client re-queries `myAppConfigs` (or reads the row through
 `UserNode.appConfigs` / `node(id)`), since the mutation payload
 returns the raw `AppConfig` only.
 
 ```graphql
-mutation SaveMyTheme($input: UpdateAppConfigInput!) {
+mutation SaveMyConfig($input: UpdateAppConfigInput!) {
   updateAppConfig(input: $input) {
     appConfig { id scope scopeId name config modifiedAt }
   }
@@ -1217,11 +1219,11 @@ mutation SaveMyTheme($input: UpdateAppConfigInput!) {
     "key": {
       "scope": "USER",
       "scopeId": "00000000-0000-0000-0000-000000000123",
-      "name": "theme"
+      "name": "preferences"
     },
     "config": {
-      "sectionA": { "optionX": "value-1" },
-      "sectionB": "value-2"
+      "language": "ko",
+      "experimentalFeatures": { "multiNodeScheduler": true }
     }
   }
 }
@@ -1244,16 +1246,17 @@ mutation SaveMyTheme($input: UpdateAppConfigInput!) {
   an entry for that `name` — the list-or-create decision is the
   client's, not the server's.
 
-### S4. Admin publishes the per-user defaults for a domain
+### S4. Admin publishes a per-user default for a domain
 
-The domain admin publishes a new `preferences` document that every
-user in the domain inherits as the merge base — e.g. the default
-visible columns and column order for the main tables. The first
-publish uses `createAppConfig` with `key.scope =
-DOMAIN_USER_DEFAULTS`; later edits on the same document use
-`updateAppConfig` with the identical input shape. DOMAIN-scope
-publishes (the domain's own public value, e.g. a `menu` document)
-go through the same mutations with `key.scope = DOMAIN`.
+The domain admin publishes a new `theme` document that every user
+in the domain inherits as the merge base — `theme` is admin-only
+per the user stories, so this is the only path by which the
+domain's theme reaches users. The first publish uses
+`createAppConfig` with `key.scope = DOMAIN_USER_DEFAULTS`; later
+edits on the same document use `updateAppConfig` with the
+identical input shape. DOMAIN-scope publishes (the domain's own
+public value, e.g. a `menu` document) go through the same
+mutations with `key.scope = DOMAIN`.
 
 ```graphql
 mutation CreateAppConfig($input: CreateAppConfigInput!) {
@@ -1269,9 +1272,12 @@ mutation CreateAppConfig($input: CreateAppConfigInput!) {
     "key": {
       "scope": "DOMAIN_USER_DEFAULTS",
       "scopeId": "default",
-      "name": "preferences"
+      "name": "theme"
     },
-    "config": { "tableColumns": { "sessions": ["name", "status", "createdAt"] } }
+    "config": {
+      "mode": "dark",
+      "accent": "#6f5ae8"
+    }
   }
 }
 ```
@@ -1286,18 +1292,21 @@ mutation CreateAppConfig($input: CreateAppConfigInput!) {
 - Effect: every user in the domain picks up the new defaults on the
   next `myAppConfigs` read (merged per §5).
 
-### S5. Admin writes a specific user's document on their behalf
+### S5. Admin seeds a specific user's document on their behalf
 
-For a support request, an admin overwrites user A's `preferences`
-`userCustomizedConfig` — same `updateAppConfig`, now with
+For a support request, an admin seeds user A's `preferences`
+`userCustomizedConfig` for the first time — `createAppConfig` with
 `key.scope = USER` and `key.scopeId = user A's user_id`. The
-service's USER-scope rule allows this call because the caller is an
-admin (owner-only would require matching `scopeId`). The merged
-`config` is always read-only and never written directly.
+service's USER-scope rule allows the call because the caller is an
+admin (owner-only would require matching `scopeId`); `create`
+errors if user A already has a `preferences` row, in which case
+the admin falls back to `updateAppConfig` with the same input
+shape. The merged `config` is always read-only and never written
+directly.
 
 ```graphql
-mutation ReplaceAppConfig($input: UpdateAppConfigInput!) {
-  updateAppConfig(input: $input) {
+mutation CreateAppConfigForUser($input: CreateAppConfigInput!) {
+  createAppConfig(input: $input) {
     appConfig { id scope scopeId name status config modifiedAt }
   }
 }
@@ -1311,24 +1320,24 @@ mutation ReplaceAppConfig($input: UpdateAppConfigInput!) {
       "scopeId": "00000000-0000-0000-0000-000000000123",
       "name": "preferences"
     },
-    "config": { "sectionA": { "flag": true } }
+    "config": { "experimentalFeatures": { "multiNodeScheduler": true } }
   }
 }
 ```
 
-- For `USER` scope the `config` input replaces that user's
-  `userCustomizedConfig` wholesale.
-- If user A has never saved `preferences` before, the admin uses
-  `createAppConfig` instead (same input shape) — `updateAppConfig`
-  errors on missing rows.
+- For `USER` scope the `config` input is stored as that user's
+  `userCustomizedConfig`.
+- `createAppConfig` does *not* revive a `DELETED` row — that is
+  what `restoreAppConfig` is for; `create` errors on any
+  pre-existing row regardless of status.
 - The next time that user calls `myAppConfigs`, the new
   `preferences` `userCustomizedConfig` is merged with the matching
   domain defaults in the response.
 
 ### S6. Admin audits all AppConfigs (cross-scope search)
 
-Cases such as "list every user document modified in the last week" or
-"every domain that customized the `menu` document":
+Cases such as "list every domain that touched `theme` in the last
+week" or "every domain that customized the `menu` document":
 
 ```graphql
 query AuditConfigs(
@@ -1351,8 +1360,8 @@ query AuditConfigs(
 ```json
 {
   "filter": {
-    "scope": { "equals": "USER" },
-    "name": { "equals": "preferences" },
+    "scope": { "in": ["DOMAIN", "DOMAIN_USER_DEFAULTS"] },
+    "name": { "equals": "theme" },
     "modifiedAt": { "gte": "2026-04-14T00:00:00Z" }
   },
   "orderBy": [{ "field": "MODIFIED_AT", "direction": "DESC" }],
