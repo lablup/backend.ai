@@ -829,7 +829,9 @@ arguments) in the request body and returns the same result.
 The merge — for a given `(user_id, name)` — proceeds as follows in a
 single transaction:
 
-1. Look up the `domain_name` for `user_id` from `users`.
+1. Caller (repository / service) resolves the user's `domain_name`
+   and passes it in. The app-config db_source itself never queries
+   the `users` table.
 2. Read the
    `(scope_type=domain_user_defaults, scope_id=domain_name, name=name)`
    row to get its `extra_config` (the user-defaults).
@@ -858,36 +860,31 @@ class AppConfigDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get_merged(self, user_id: str, name: str) -> MergedAppConfig:
+    async def get_merged(
+        self, user_id: str, domain_name: str, name: str
+    ) -> MergedAppConfig:
+        # Caller (repository / service) resolves the user's domain_name
+        # before calling — this db_source touches only app_configs rows.
+        # Two scoped queries on the same readonly session — each natural
+        # key returns at most one row, so no post-query filtering needed.
         async with self._db.begin_readonly_session() as db_sess:
-            user_row_meta = (await db_sess.execute(
-                sa.select(UserRow.domain_name).where(UserRow.uuid == user_id)
-            )).one_or_none()
-            if not user_row_meta:
-                raise UserNotFound(f"User {user_id} not found")
-            domain_name = user_row_meta.domain_name
-
-            rows = (await db_sess.execute(
+            defaults_row = (await db_sess.execute(
                 sa.select(AppConfigRow).where(
                     AppConfigRow.status == AppConfigStatus.ALIVE,
+                    AppConfigRow.scope_type == AppConfigScopeType.DOMAIN_USER_DEFAULTS,
+                    AppConfigRow.scope_id == domain_name,
                     AppConfigRow.name == name,
-                    sa.or_(
-                        sa.and_(
-                            AppConfigRow.scope_type == AppConfigScopeType.DOMAIN_USER_DEFAULTS,
-                            AppConfigRow.scope_id == domain_name,
-                        ),
-                        sa.and_(
-                            AppConfigRow.scope_type == AppConfigScopeType.USER,
-                            AppConfigRow.scope_id == user_id,
-                        ),
-                    )
                 )
-            )).scalars().all()
+            )).scalar_one_or_none()
 
-        defaults_row = next(
-            (r for r in rows if r.scope_type == AppConfigScopeType.DOMAIN_USER_DEFAULTS), None
-        )
-        user_row = next((r for r in rows if r.scope_type == AppConfigScopeType.USER), None)
+            user_row = (await db_sess.execute(
+                sa.select(AppConfigRow).where(
+                    AppConfigRow.status == AppConfigStatus.ALIVE,
+                    AppConfigRow.scope_type == AppConfigScopeType.USER,
+                    AppConfigRow.scope_id == user_id,
+                    AppConfigRow.name == name,
+                )
+            )).scalar_one_or_none()
 
         domain_defaults = defaults_row.extra_config if defaults_row else {}
         user_customized = user_row.extra_config if user_row else {}
@@ -903,12 +900,19 @@ class AppConfigDBSource:
 
 class UserAppConfigRepository:
     _db_source: AppConfigDBSource
+    _user_db_source: UserDBSource    # supplies the user → domain_name lookup
 
-    def __init__(self, db_source: AppConfigDBSource) -> None:
+    def __init__(
+        self,
+        db_source: AppConfigDBSource,
+        user_db_source: UserDBSource,
+    ) -> None:
         self._db_source = db_source
+        self._user_db_source = user_db_source
 
     async def get_merged(self, user_id: str, name: str) -> MergedAppConfig:
-        return await self._db_source.get_merged(user_id, name)
+        domain_name = await self._user_db_source.get_domain_name(user_id)
+        return await self._db_source.get_merged(user_id, domain_name, name)
 ```
 
 ### Exposure
@@ -1158,35 +1162,7 @@ mutation OverrideUserPrefs($input: AdminUpdateAppConfigInput!) {
   `preferences` `userCustomizedConfig` is merged with the matching
   domain defaults in the response.
 
-### S6. Admin lists every document of a single user
-
-Operational case — "what's stored in user A's app configs?". Use the
-typed parent-node child Connection on `UserNode`:
-
-```graphql
-query ListUserConfigs($userId: String!) {
-  user_node(id: $userId) {
-    appConfigs(first: 50) {
-      edges {
-        cursor
-        node { id name userCustomizedConfig domainDefaultConfig mergedConfig modifiedAt }
-      }
-      pageInfo { hasNextPage endCursor }
-      count
-    }
-  }
-}
-```
-
-- `user_node` resolver enforces "owner or admin". Admin reaches any
-  user, so this works for the operational use case. Each
-  `node.mergedConfig` is the per-`name` merged value;
-  `node.userCustomizedConfig` / `node.domainDefaultConfig` show the
-  raw inputs to the merge.
-- For cross-user audits use `adminAppConfigs(filter: { scope: { equals: USER }, ... })`
-  in S7 instead.
-
-### S7. Admin audits all AppConfigs (cross-scope search)
+### S6. Admin audits all AppConfigs (cross-scope search)
 
 Cases such as "list every user document modified in the last week" or
 "every domain that customized the `menu` document":
@@ -1225,7 +1201,7 @@ query AuditConfigs(
   the sort order is pinned to the cursor key. By default returns
   `ALIVE` rows only.
 
-### S8. Operator removes an entire document (soft-delete)
+### S7. Operator removes an entire document (soft-delete)
 
 Removing a stale or deprecated document — e.g. retiring an old
 `legacy_menu` document for a domain:
