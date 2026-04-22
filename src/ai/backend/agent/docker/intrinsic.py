@@ -18,7 +18,10 @@ from aiodocker.exceptions import DockerError
 from ai.backend.agent import __version__  # pants: no-infer-dep
 from ai.backend.agent.alloc_map import AllocationStrategy
 from ai.backend.agent.docker.kernel import DockerKernel
-from ai.backend.agent.errors import InvalidResourceConfigError
+from ai.backend.agent.errors import (
+    ContainerStatsStreamError,
+    InvalidResourceConfigError,
+)
 from ai.backend.agent.exception import InvalidArgumentError
 from ai.backend.agent.plugin.network import (
     AbstractNetworkAgentPlugin,
@@ -70,8 +73,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # Note that psutil's linux implementation automatically filters out "non-device" filesystems by
 # checking /proc/filesystems so we don't have to put all the details virtual filesystems like
 # "sockfs", "debugfs", etc.
-_CONTAINER_STAT_TIMEOUT: float = 2.0
+_CONTAINER_INSPECT_TIMEOUT: float = 2.0
 _INVALID_PID: int = 0
+
+# Stats stream reconnect parameters
+_STATS_STREAM_INITIAL_BACKOFF: float = 1.0
+_STATS_STREAM_MAX_BACKOFF: float = 30.0
+_STATS_STREAM_BACKOFF_FACTOR: float = 2.0
+_STATS_STREAM_MAX_RETRIES: int = 8
+_STATS_STREAM_FIRST_SAMPLE_TIMEOUT: float = 0.5
 
 # The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
@@ -175,97 +185,234 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
 
 class DockerStatsStreamer:
     """
-    Maintains one long-lived `container.stats(stream=True)` reader per container and
-    exposes the most recent decoded sample from an in-memory cache.
+    Maintains one long-lived ``container.stats(stream=True)`` reader per container
+    and exposes the most recent decoded sample from an in-memory cache.
 
     Callers read the cached sample via :meth:`get_latest` instead of issuing a new
-    HTTP round-trip every collection cycle. The first call for a previously-unseen
-    container lazily spawns the reader; no sample is returned until dockerd has
-    emitted at least one frame.
+    HTTP round-trip every collection cycle.
 
-    Readers self-terminate when the upstream iterator ends (container removed) or
-    raises a connection error. A subsequent :meth:`get_latest` call starts a fresh
-    reader if the container reappears.
+    Reader lifecycle is driven by the agent's container lifecycle hooks:
 
-    TODO(#11219): Wire start/stop into the agent's container-lifecycle hooks
-    (_handle_start_event / _handle_clean_event) to avoid relying on lazy startup.
+    * :meth:`start` is called eagerly from the agent's ``_handle_start_event`` so
+      a reader is spawned as soon as the container transitions to RUNNING.
+    * :meth:`stop` is called from the agent's ``_handle_clean_event`` so the
+      reader task is cancelled promptly when the container goes away.
+
+    :meth:`get_latest` also lazily spawns a reader as a safety net for events
+    that were missed. Callers that want to guarantee a non-``None`` first sample
+    for a newly-started container can ``await`` :meth:`wait_for_first_sample`
+    with a short bounded timeout (typically 200-500 ms).
+
+    On transient transport failures (``ClientConnectionError`` /
+    :class:`asyncio.TimeoutError`) the reader reconnects with bounded exponential
+    backoff. If reconnection budget is exhausted, it logs an error and exits;
+    a subsequent :meth:`get_latest` will start a fresh reader.
     """
 
     _docker: Docker
     _latest: dict[str, dict[str, Any]]
     _tasks: dict[str, asyncio.Task[None]]
+    _first_sample_events: dict[str, asyncio.Event]
     _closed: bool
 
     def __init__(self, docker: Docker) -> None:
         self._docker = docker
         self._latest = {}
         self._tasks = {}
+        self._first_sample_events = {}
         self._closed = False
 
+    def start(self, container_id: str) -> None:
+        """Eagerly start the stream reader for ``container_id`` if not already
+        running. Idempotent; safe to call from container lifecycle hooks."""
+        if self._closed:
+            return
+        task = self._tasks.get(container_id)
+        if task is not None and not task.done():
+            return
+        self._first_sample_events.setdefault(container_id, asyncio.Event())
+        self._tasks[container_id] = asyncio.create_task(
+            self._read_stream(container_id),
+            name=f"docker-stats-stream:{container_id[:7]}",
+        )
+
     def get_latest(self, container_id: str) -> dict[str, Any] | None:
-        """Return the most recent cached sample for `container_id`, starting a
-        reader if none is running. Returns None until the first frame arrives."""
+        """Return the most recent cached sample for ``container_id``.
+
+        Lazily spawns a reader if none is running — intended as a safety net
+        for cases where the container start event was missed. For newly-created
+        containers the primary entry point should be :meth:`start` so the first
+        frame lands in the cache by the time the next collection cycle runs.
+        """
         if self._closed:
             return None
         task = self._tasks.get(container_id)
         if task is None or task.done():
-            self._tasks[container_id] = asyncio.create_task(
-                self._read_stream(container_id),
-                name=f"docker-stats-stream:{container_id[:7]}",
-            )
+            self.start(container_id)
         return self._latest.get(container_id)
 
+    async def wait_for_first_sample(
+        self,
+        container_id: str,
+        wait_timeout: float = _STATS_STREAM_FIRST_SAMPLE_TIMEOUT,
+    ) -> bool:
+        """Wait up to ``wait_timeout`` seconds for the first stats frame of
+        ``container_id`` to arrive. Returns True if a sample arrived in time,
+        False otherwise. Spawns a reader if none is running."""
+        if self._closed:
+            return False
+        self.start(container_id)
+        event = self._first_sample_events.get(container_id)
+        if event is None:
+            return self._latest.get(container_id) is not None
+        if event.is_set():
+            return True
+        try:
+            async with asyncio.timeout(wait_timeout):
+                await event.wait()
+        except TimeoutError:
+            return False
+        return True
+
     async def stop(self, container_id: str) -> None:
+        """Cancel and await the reader for ``container_id``, and drop its
+        cached sample. Re-raises :class:`asyncio.CancelledError` so the caller's
+        cancellation propagates; other exceptions are logged and swallowed."""
         task = self._tasks.pop(container_id, None)
         self._latest.pop(container_id, None)
-        if task is not None and not task.done():
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
+        event = self._first_sample_events.pop(container_id, None)
+        if event is not None:
+            event.set()
+        if task is None or task.done():
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            # Propagate only if the CURRENT task (the caller) is being cancelled;
+            # a CancelledError bubbling out of the awaited task itself is expected.
+            current = asyncio.current_task()
+            if current is not None and current.cancelling() > 0:
+                raise
+        except Exception as e:
+            log.warning(
+                "stats stream stop: reader task for cid:{} raised: {!r}",
+                container_id[:7],
+                e,
+            )
 
     async def close(self) -> None:
+        """Cancel and await every in-flight reader task. Idempotent."""
         self._closed = True
         tasks = list(self._tasks.values())
         self._tasks.clear()
         self._latest.clear()
+        for event in self._first_sample_events.values():
+            event.set()
+        self._first_sample_events.clear()
         for task in tasks:
             if not task.done():
                 task.cancel()
         for task in tasks:
             try:
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
+            except asyncio.CancelledError:
+                current = asyncio.current_task()
+                if current is not None and current.cancelling() > 0:
+                    raise
+            except Exception as e:
+                log.warning("stats stream close: reader task raised: {!r}", e)
 
     async def _read_stream(self, container_id: str) -> None:
+        """Run the long-lived reader for ``container_id`` with bounded
+        exponential-backoff reconnect on transient transport failures."""
         short_cid = container_id[:7]
-        container = DockerContainer(self._docker, id=container_id)
+        backoff = _STATS_STREAM_INITIAL_BACKOFF
+        retries = 0
         try:
-            async for frame in container.stats(stream=True):
-                validated = _validate_stats_entry(frame)
-                if validated is not None:
-                    self._latest[container_id] = validated
-        except asyncio.CancelledError:
-            raise
-        except RuntimeError as e:
-            msg = str(e.args[0]).lower() if e.args else ""
-            if "event loop is closed" in msg or "session is closed" in msg:
-                return
-            log.warning(
-                "stats stream stopped unexpectedly (cid:{}): {!r}",
-                short_cid,
-                e,
-            )
-        except (DockerError, aiohttp.ClientError) as e:
-            log.debug(
-                "stats stream ended (cid:{}): {!r}",
-                short_cid,
-                e,
-            )
+            while True:
+                consumed_any = False
+                try:
+                    consumed_any = await self._consume_stream(container_id)
+                except asyncio.CancelledError:
+                    raise
+                except RuntimeError as e:
+                    msg = str(e.args[0]).lower() if e.args else ""
+                    if "event loop is closed" in msg or "session is closed" in msg:
+                        return
+                    log.warning(
+                        "stats stream stopped unexpectedly (cid:{}): {!r}",
+                        short_cid,
+                        e,
+                    )
+                    return
+                except (aiohttp.ClientConnectionError, TimeoutError) as e:
+                    if retries >= _STATS_STREAM_MAX_RETRIES:
+                        err = ContainerStatsStreamError(
+                            f"stats stream exhausted retries for cid:{short_cid}: {e!r}"
+                        )
+                        log.error(
+                            "stats stream permanent failure (cid:{}) [{}]: {!r}",
+                            short_cid,
+                            err.error_code(),
+                            e,
+                        )
+                        return
+                    retries += 1
+                    wait = min(backoff, _STATS_STREAM_MAX_BACKOFF)
+                    log.warning(
+                        "stats stream transient failure (cid:{}) retry {}/{} in {:.1f}s: {!r}",
+                        short_cid,
+                        retries,
+                        _STATS_STREAM_MAX_RETRIES,
+                        wait,
+                        e,
+                    )
+                    await asyncio.sleep(wait)
+                    backoff = min(
+                        backoff * _STATS_STREAM_BACKOFF_FACTOR,
+                        _STATS_STREAM_MAX_BACKOFF,
+                    )
+                    continue
+                except DockerError as e:
+                    # 404 / container removed / etc. — stop cleanly.
+                    log.debug("stats stream ended (cid:{}): {!r}", short_cid, e)
+                    return
+                # Normal upstream-closed exit (e.g. container removed).
+                if consumed_any:
+                    # Reset backoff after a successful run; stream may just have
+                    # ended because the container was removed.
+                    return
+                # Stream ended before yielding any frame — treat as transient.
+                if retries >= _STATS_STREAM_MAX_RETRIES:
+                    return
+                retries += 1
+                await asyncio.sleep(min(backoff, _STATS_STREAM_MAX_BACKOFF))
+                backoff = min(
+                    backoff * _STATS_STREAM_BACKOFF_FACTOR,
+                    _STATS_STREAM_MAX_BACKOFF,
+                )
         finally:
             self._latest.pop(container_id, None)
+            event = self._first_sample_events.pop(container_id, None)
+            if event is not None:
+                # Unblock any pending waiters; they'll observe no cached sample.
+                event.set()
+
+    async def _consume_stream(self, container_id: str) -> bool:
+        """Consume one docker stats stream iterator. Returns True if at least
+        one frame was received before the stream ended normally."""
+        container = DockerContainer(self._docker, id=container_id)
+        consumed_any = False
+        async for frame in container.stats(stream=True):
+            validated = _validate_stats_entry(frame)
+            if validated is not None:
+                self._latest[container_id] = validated
+                consumed_any = True
+                event = self._first_sample_events.get(container_id)
+                if event is not None and not event.is_set():
+                    event.set()
+        return consumed_any
 
 
 # Pseudo-plugins for intrinsic devices (CPU and the main memory)
@@ -300,6 +447,12 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
+
+    async def notify_container_started(self, container_id: str) -> None:
+        self._stats_streamer.start(container_id)
+
+    async def notify_container_destroyed(self, container_id: str) -> None:
+        await self._stats_streamer.stop(container_id)
 
     async def list_devices(self) -> Collection[CPUDevice]:
         cores = await libnuma.get_available_cores()
@@ -626,6 +779,12 @@ class MemoryPlugin(AbstractComputePlugin):
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
 
+    async def notify_container_started(self, container_id: str) -> None:
+        self._stats_streamer.start(container_id)
+
+    async def notify_container_destroyed(self, container_id: str) -> None:
+        await self._stats_streamer.stop(container_id)
+
     async def list_devices(self) -> Collection[MemoryDevice]:
         memory_size = psutil.virtual_memory().total
         overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
@@ -829,7 +988,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 return None
             container = DockerContainer(self._docker, id=container_id)
             try:
-                async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
+                async with asyncio.timeout(_CONTAINER_INSPECT_TIMEOUT):
                     data = await container.show()
                     container_pid: int = data.get("State", {}).get("Pid", _INVALID_PID)
             except TimeoutError:

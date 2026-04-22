@@ -44,6 +44,9 @@ from .resources import (
     ResourceAllocationError,
     ResourceOverAllocatedError,
 )
+from .stats import (
+    ContainerStatsStreamError,
+)
 
 __all__ = [
     # agent
@@ -85,4 +88,6 @@ __all__ = [
     "InvalidResourceConfigError",
     "ResourceAllocationError",
     "ResourceOverAllocatedError",
+    # stats
+    "ContainerStatsStreamError",
 ]
