@@ -67,13 +67,16 @@ Summary matrix:
   natural composite key `(scope_type, scope_id, name)`. A scope can hold
   any number of named documents; clients address them explicitly by name
   (no hierarchical fall-through lookup — see §6).
-- **Writes split into create / update / delete.** `createAppConfig`
-  inserts a new row (or revives a soft-deleted one); `updateAppConfig`
-  replaces an existing `ALIVE` row's stored JSON wholesale; neither
-  does partial update / deep-merge / key-level removal at the write
-  boundary. There is no upsert. Identification uses the
-  `(scope, scopeId, name)` natural key, never Relay `id`. Record-level
-  removal is `deleteAppConfig` (soft-delete, see below).
+- **Writes split into create / update / delete / restore.**
+  `createAppConfig` strictly inserts a new row (errors if any row
+  already exists for the key, even a soft-deleted one);
+  `updateAppConfig` replaces an existing `ALIVE` row's stored JSON
+  wholesale; `deleteAppConfig` soft-deletes (`ALIVE → DELETED`);
+  `restoreAppConfig` is the explicit inverse of delete
+  (`DELETED → ALIVE`, value unchanged). Neither `create` nor
+  `update` does partial update / deep-merge / key-level removal at
+  the write boundary. There is no upsert. Identification uses the
+  `(scope, scopeId, name)` natural key, never Relay `id`.
 - **Soft delete**: rows carry a `status` column
   (`ALIVE` / `DELETED`). Record-level delete flips `status = DELETED`
   rather than dropping the row, so audit / undo flows stay possible.
@@ -165,10 +168,10 @@ single row per natural key. A scope can hold any number of distinct
 
 All read paths filter `status = ALIVE` by default. `DELETED` rows are
 visible only to dedicated admin recovery / audit endpoints (out of
-scope for this BEP). `createAppConfig` on a soft-deleted natural key
-flips `status` back to `ALIVE` and replaces the stored value with the
-provided JSON (that is the one supported revival path);
-`updateAppConfig` errors on a `DELETED` row.
+scope for this BEP). Revival uses the dedicated `restoreAppConfig`
+mutation, which flips `status = DELETED → ALIVE` while preserving
+the stored value; `createAppConfig` errors on any pre-existing row
+(ALIVE or DELETED), and `updateAppConfig` errors on a `DELETED` row.
 
 ---
 
@@ -196,10 +199,10 @@ repositories/app_config/
 
 | Repository                              | Methods                                                                                                              |
 |-----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `PublicAppConfigRepository`             | `get(name)`, `list()`, `create(name, extra_config)`, `update(name, extra_config)`, `soft_delete(name)`                                             |
-| `DomainAppConfigRepository`             | `get(domain_name, name)`, `list(domain_name)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)` |
-| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `list(domain_name)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)` |
-| `UserAppConfigRepository`               | `get(user_id, name)`, `list(user_id)`, `create(user_id, name, extra_config)`, `update(user_id, name, extra_config)`, `soft_delete(user_id, name)`, `get_merged(user_id, name)`, `list_merged(user_id)` |
+| `PublicAppConfigRepository`             | `get(name)`, `list()`, `create(name, extra_config)`, `update(name, extra_config)`, `soft_delete(name)`, `restore(name)`                                             |
+| `DomainAppConfigRepository`             | `get(domain_name, name)`, `list(domain_name)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)` |
+| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `list(domain_name)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)` |
+| `UserAppConfigRepository`               | `get(user_id, name)`, `list(user_id)`, `create(user_id, name, extra_config)`, `update(user_id, name, extra_config)`, `soft_delete(user_id, name)`, `restore(user_id, name)`, `get_merged(user_id, name)`, `list_merged(user_id)` |
 
 `DomainUserDefaultsAppConfigRepository` mirrors
 `DomainAppConfigRepository` (admin-only, same call shape) but operates
@@ -236,10 +239,9 @@ class AppConfigDBSource:
         key: AppConfigKey,
         extra_config: Mapping[str, Any],
     ) -> AppConfigRow:
-        # Insert a new ALIVE row with `extra_config`. If a DELETED row
-        # already exists with the same natural key, flip it back to
-        # ALIVE and replace its value (the one supported revival path).
-        # Errors if an ALIVE row already exists for the natural key.
+        # Strict insert. Errors if any row already exists for the
+        # natural key, regardless of status (to revive a DELETED row,
+        # use `restore` instead).
         async with self._db.begin_session() as db_sess:
             ...
 
@@ -256,6 +258,12 @@ class AppConfigDBSource:
 
     async def soft_delete(self, key: AppConfigKey) -> AppConfigRow | None:
         # Sets status = DELETED. No-op if the row doesn't exist or is already DELETED.
+        async with self._db.begin_session() as db_sess:
+            ...
+
+    async def restore(self, key: AppConfigKey) -> AppConfigRow:
+        # Sets status = ALIVE, value unchanged. Errors if no row
+        # exists or the row is already ALIVE.
         async with self._db.begin_session() as db_sess:
             ...
 ```
@@ -600,26 +608,26 @@ of scope for this BEP.)
 
 ### Mutations
 
-Writes are expressed as three separate mutations — **create**,
-**update**, **delete** — so that each has an unambiguous
-precondition (no upsert magic). Each accepts an `AppConfigKey` and
-covers every scope (admin writes in any scope, as well as users
-writing their own USER rows). Per-scope branching lives in the
-**internal layer** only: queries are split for typing ergonomics
-(`Domain.appConfigs`, `UserNode.appConfigs`, `myAppConfigs`,
-`publicAppConfigs`, `adminAppConfigs`), and the repository / service
-split in §2 routes the write to the right backend. Scope-dependent
-authorization is enforced in the **service layer** (see permission
-rules below).
+Writes are expressed as four separate mutations — **create**,
+**update**, **delete**, **restore** — so that each has an
+unambiguous precondition (no upsert magic; revival is explicit).
+Each accepts an `AppConfigKey` and covers every scope (admin writes
+in any scope, as well as users writing their own USER rows).
+Per-scope branching lives in the **internal layer** only: queries
+are split for typing ergonomics (`Domain.appConfigs`,
+`UserNode.appConfigs`, `myAppConfigs`, `publicAppConfigs`,
+`adminAppConfigs`), and the repository / service split in §2 routes
+the write to the right backend. Scope-dependent authorization is
+enforced in the **service layer** (see permission rules below).
 
 ```graphql
 type Mutation {
   """
   Create a new app config document. Identified by
-  `AppConfigKey { scope, scopeId, name }`. Errors if an `ALIVE` row
-  already exists for the natural key. If a `DELETED` row exists, it
-  is revived to `ALIVE` and its stored value replaced with the input
-  (the one supported revival path — there is no upsert).
+  `AppConfigKey { scope, scopeId, name }`. Strictly an insert —
+  errors if any row already exists for the natural key, regardless
+  of `status` (to revive a soft-deleted document, use
+  `restoreAppConfig`).
 
   For `USER` scope the input `config` is stored as
   `userCustomizedConfig`; the merged view is recomputed on the next
@@ -646,12 +654,21 @@ type Mutation {
 
   """
   Soft-delete an app config document (`status = DELETED`). Same
-  scope-dependent authorization as `createAppConfig` /
-  `updateAppConfig`. The row is preserved for audit;
-  `createAppConfig` on the same key revives it. Idempotent — silent
-  no-op if the row is absent or already `DELETED`.
+  scope-dependent authorization as the other write mutations. The
+  row is preserved for audit; call `restoreAppConfig` on the same
+  key to bring it back. Idempotent — silent no-op if the row is
+  absent or already `DELETED`.
   """
   deleteAppConfig(input: DeleteAppConfigInput!): DeleteAppConfigPayload!
+
+  """
+  Restore a soft-deleted app config document (`status = DELETED →
+  ALIVE`). The stored value is preserved as-is — to change the
+  value, follow up with `updateAppConfig`. Same scope-dependent
+  authorization as the other write mutations. Errors if the row is
+  missing or already `ALIVE`.
+  """
+  restoreAppConfig(input: RestoreAppConfigInput!): RestoreAppConfigPayload!
 }
 
 enum AppConfigScopeGQL {
@@ -720,12 +737,17 @@ input DeleteAppConfigInput {
   key: AppConfigKey!
 }
 
+input RestoreAppConfigInput {
+  """Target row identifier."""
+  key: AppConfigKey!
+}
+
 # ── Payload ──────────────────────────────────────────────────
 
 """
-Result of `createAppConfig`. Exposes the created (or revived) row
-via the generic `AppConfig`. For `USER`-scope writes, clients that
-need the recomputed merged view should re-query `myAppConfigs` or
+Result of `createAppConfig`. Exposes the newly created row via the
+generic `AppConfig`. For `USER`-scope writes, clients that need the
+recomputed merged view should re-query `myAppConfigs` or
 `UserNode.appConfigs`.
 """
 type CreateAppConfigPayload {
@@ -750,6 +772,14 @@ Result of `deleteAppConfig`. The returned row reflects the post
 soft-delete state (`status = DELETED`).
 """
 type DeleteAppConfigPayload {
+  appConfig: AppConfig!
+}
+
+"""
+Result of `restoreAppConfig`. The returned row reflects the post
+restore state (`status = ALIVE`, stored value unchanged).
+"""
+type RestoreAppConfigPayload {
   appConfig: AppConfig!
 }
 
@@ -785,8 +815,8 @@ Queries:
 | `adminAppConfigs`        | ❌        | ❌         | ✅    |
 
 Write mutations (`createAppConfig`, `updateAppConfig`,
-`deleteAppConfig`) share the same scope-dependent rule based on
-`input.key.scope`:
+`deleteAppConfig`, `restoreAppConfig`) share the same
+scope-dependent rule based on `input.key.scope`:
 
 | `input.key.scope`        | Anonymous | User                                             | Admin |
 |--------------------------|-----------|--------------------------------------------------|-------|
@@ -796,11 +826,11 @@ Write mutations (`createAppConfig`, `updateAppConfig`,
 | `USER`                   | ❌        | ✅ *only if* `input.key.scopeId == current_user.user_id` | ✅    |
 
 Where the checks live:
-- `createAppConfig` / `updateAppConfig` / `deleteAppConfig` resolver:
-  thin pass-through to the service layer. The service dispatches on
-  `input.key.scope`, routes to the matching repository (§2), and
-  enforces the scope-dependent rule above — admin-only for
-  non-`USER` scopes; for `USER`, admin *or*
+- `createAppConfig` / `updateAppConfig` / `deleteAppConfig` /
+  `restoreAppConfig` resolver: thin pass-through to the service
+  layer. The service dispatches on `input.key.scope`, routes to the
+  matching repository (§2), and enforces the scope-dependent rule
+  above — admin-only for non-`USER` scopes; for `USER`, admin *or*
   `scopeId == current_user.user_id`. Any other caller combination
   returns a permission error; there is no silent reinterpretation of
   `scopeId`.
@@ -824,8 +854,11 @@ conventions in `api/rest/v2/CLAUDE.md`.
 ### Endpoints
 
 Write endpoints map 1:1 onto the GQL mutations: `POST` = create
-(errors `409` if an `ALIVE` row exists; revives a `DELETED` row),
-`PUT` = update (errors `404` if no `ALIVE` row).
+(strict insert; errors `409` if any row exists), `PUT` = update
+(errors `404` if no `ALIVE` row), `DELETE` = soft-delete, and a
+dedicated `POST {path}:restore` action reverses the soft-delete
+(`DELETED → ALIVE`, value unchanged; errors `404` / `409` if
+missing / already `ALIVE`).
 
 | Method | Path                                                                  | Access     | Description                                          |
 |--------|-----------------------------------------------------------------------|------------|------------------------------------------------------|
@@ -836,22 +869,26 @@ Write endpoints map 1:1 onto the GQL mutations: `POST` = create
 | POST   | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Create one of a domain's own documents               |
 | PUT    | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Replace one of a domain's own documents              |
 | DELETE | `/v2/app-configs/domains/{domain_name}/{name}`                        | Admin      | Soft-delete one of a domain's own documents          |
+| POST   | `/v2/app-configs/domains/{domain_name}/{name}:restore`                | Admin      | Restore a soft-deleted domain document               |
 | GET    | `/v2/app-configs/domains/{domain_name}/user-defaults`                 | Admin      | List a domain's user-defaults documents              |
 | GET    | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Read one user-defaults document                      |
 | POST   | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Create one user-defaults document                    |
 | PUT    | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Replace one user-defaults document                   |
 | DELETE | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}`          | Admin      | Soft-delete one user-defaults document               |
+| POST   | `/v2/app-configs/domains/{domain_name}/user-defaults/{name}:restore`  | Admin      | Restore a soft-deleted user-defaults document        |
 | GET    | `/v2/app-configs/users/{user_id}`                                     | Admin      | List a user's documents                              |
 | GET    | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Read one of a user's documents (raw)                 |
 | POST   | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Create one of a user's documents                     |
 | PUT    | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Replace one of a user's documents                    |
 | DELETE | `/v2/app-configs/users/{user_id}/{name}`                              | Admin      | Soft-delete one of a user's documents                |
+| POST   | `/v2/app-configs/users/{user_id}/{name}:restore`                      | Admin      | Restore a soft-deleted user document                 |
 | POST   | `/v2/app-configs/search`                                              | Admin      | Cross-scope search (filter / order / paginate)       |
 | GET    | `/v2/app-configs/my`                                                  | User       | List own documents (each with merged result)         |
 | GET    | `/v2/app-configs/my/{name}`                                           | User       | Read own document (with merged result)               |
 | POST   | `/v2/app-configs/my/{name}`                                           | User       | Create own document                                  |
 | PUT    | `/v2/app-configs/my/{name}`                                           | User       | Replace own document                                 |
 | DELETE | `/v2/app-configs/my/{name}`                                           | User       | Soft-delete own document                             |
+| POST   | `/v2/app-configs/my/{name}:restore`                                   | User       | Restore own soft-deleted document                    |
 
 `POST /v2/app-configs/search` accepts the same input schema as the
 GQL `adminAppConfigs` field (`filter` / `orderBy` / pagination
@@ -864,9 +901,11 @@ arguments) in the request body and returns the same result.
 > `user_customized_config` in REST); there is no input field that
 > can target another user.
 
-> Read endpoints filter to `status = ALIVE` by default. PUT on a
-> soft-deleted document revives it (`status = ALIVE`) and overwrites
-> the stored value with the provided JSON.
+> Read endpoints filter to `status = ALIVE` by default. Revival
+> goes through the dedicated `POST {path}:restore` action;
+> `PUT`/`POST` on a soft-deleted natural key does *not* revive and
+> instead errors (`404` for PUT since no ALIVE row, `409` for POST
+> since a row already exists).
 
 ---
 
@@ -1207,10 +1246,10 @@ mutation CreateAppConfig($input: CreateAppConfigInput!) {
 - Authorization: admin required — the service rejects non-admin
   writes to `DOMAIN_USER_DEFAULTS` (and to `DOMAIN` / `PUBLIC`).
 - Internally, the service routes to the matching repository (§2)
-  and inserts a new `ALIVE` row. If a `DELETED` row already exists
-  with this key, it is revived (status flipped to `ALIVE`, value
-  replaced). If an `ALIVE` row already exists, the call errors —
-  the admin should use `updateAppConfig` instead.
+  and strictly inserts a new `ALIVE` row. Errors if any row (ALIVE
+  or DELETED) already exists for the key — the admin either uses
+  `updateAppConfig` (when ALIVE) or `restoreAppConfig` (when
+  DELETED) instead.
 - Effect: every user in the domain picks up the new defaults on the
   next `myAppConfigs` read (merged per §5).
 
@@ -1320,10 +1359,11 @@ mutation RemoveDomainLegacyMenu($input: DeleteAppConfigInput!) {
   reads (`Domain.appConfigs`, `UserNode.appConfigs`,
   `adminAppConfigs`, etc.) hide the document.
 - **Idempotent**: no-op when the row is absent or already `DELETED`.
-- **Recoverable**: `createAppConfig` on the same `key` revives the
-  row to `ALIVE` and replaces the stored value with the provided
-  JSON. `updateAppConfig` does *not* revive — it errors on a
-  `DELETED` row.
+- **Recoverable**: `restoreAppConfig` on the same `key` flips the
+  row back to `ALIVE` with its stored value unchanged. To change
+  the value after restoring, chain an `updateAppConfig` call.
+  `createAppConfig` does *not* revive — it errors on any
+  pre-existing row.
 
 A user removing their own document uses the same `deleteAppConfig`
 mutation with `key.scope = USER` and `key.scopeId =
