@@ -1102,11 +1102,10 @@ four views (snake_case: `user_customized_config`,
 ## 6. Client Integration — WebUI bootstrap
 
 The WebUI requests configs by addressing them explicitly with
-`(scope, scopeId, name)`. There is no server-side hierarchical
-fall-through — clients know which scope they are asking about. The
-list of public documents the WebUI must load before login is owned
-entirely by the frontend (hard-coded or shipped in the WebUI
-bundle) — the server does not publish a bootstrap list.
+`(scope, scopeId, name)`. The list of public documents the WebUI
+must load before login is owned entirely by the frontend
+(hard-coded or shipped in the WebUI bundle) — the server does not
+publish a bootstrap list.
 
 ### Bootstrap flow
 
