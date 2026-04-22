@@ -90,9 +90,14 @@ Summary matrix:
 
 ### Schema changes
 
-Add `name`, `status`, and `user_app_config_defaults` columns to
-`app_configs`. The natural-key uniqueness constraint becomes
-`(scope_type, scope_id, name)`.
+Add `name` and `status` columns to `app_configs`. The natural-key
+uniqueness constraint becomes `(scope_type, scope_id, name)`.
+
+Per-domain user-defaults (the merge base for users in a domain) are
+not a column on a DOMAIN row but a separate scope —
+`DOMAIN_USER_DEFAULTS` — so every row carries exactly one
+`extra_config` payload and the table has no scope-conditional sparse
+columns. See §5 for the merge semantics.
 
 `scope_type` and `status` use the project's standard `StrEnumType`
 TypeDecorator (`src/ai/backend/manager/models/base.py`), which stores
@@ -109,6 +114,7 @@ change.
 class AppConfigScopeType(enum.StrEnum):
     GLOBAL = "global"
     DOMAIN = "domain"
+    DOMAIN_USER_DEFAULTS = "domain_user_defaults"   # per-domain defaults applied to users in that domain
     PROJECT = "project"
     USER = "user"
 
@@ -141,12 +147,7 @@ class AppConfigRow(Base):
     scope_id: Mapped[str]                     # global: literal "global"; otherwise domain_name / user_id
     name: Mapped[str]                         # NEW — config document name (e.g. "theme", "menu")
 
-    extra_config: Mapped[dict[str, Any]]      # shared across all scopes
-
-    # NEW — used only on DOMAIN rows; left empty otherwise.
-    user_app_config_defaults: Mapped[dict[str, Any]] = mapped_column(
-        pgsql.JSONB, nullable=False, default=dict
-    )
+    extra_config: Mapped[dict[str, Any]]      # the only payload column; meaning per scope
 
     # NEW — soft-delete marker. Default ALIVE; record-delete sets DELETED.
     status: Mapped[AppConfigStatus] = mapped_column(
@@ -168,11 +169,12 @@ class AppConfigRow(Base):
 
 ### Scope ID convention
 
-| `scope_type` | `scope_id` value          | Row count                   |
-|--------------|---------------------------|-----------------------------|
-| `global`     | literal string `"global"` | one per `name`              |
-| `domain`     | `domain_name`             | one per `(domain, name)`    |
-| `user`       | `user_id` (UUID string)   | one per `(user_id, name)`   |
+| `scope_type`            | `scope_id` value          | Row count                   | Meaning of `extra_config`                                    |
+|-------------------------|---------------------------|-----------------------------|--------------------------------------------------------------|
+| `global`                | literal string `"global"` | one per `name`              | global-scope value of the document                            |
+| `domain`                | `domain_name`             | one per `(domain, name)`    | the domain's own value of the document                        |
+| `domain_user_defaults`  | `domain_name`             | one per `(domain, name)`    | merge base for users in that domain (per-document)            |
+| `user`                  | `user_id` (UUID string)   | one per `(user_id, name)`   | user-customized value of the document                         |
 
 `UniqueConstraint` on `(scope_type, scope_id, name)` guarantees a
 single row per natural key. A scope can hold any number of distinct
@@ -203,17 +205,25 @@ repositories/app_config/
 │   └── cache_source.py
 ├── global_app_config_repository.py
 ├── domain_app_config_repository.py
+├── domain_user_defaults_app_config_repository.py
 ├── user_app_config_repository.py
-└── repositories.py                    # exports all three repos
+└── repositories.py                    # exports all four repos
 ```
 
 ### Repository responsibility split
 
-| Repository                  | Methods                                                                                                              |
-|-----------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `GlobalAppConfigRepository` | `get(name)`, `list()`, `upsert(name, extra_config)`, `soft_delete(name)`                                             |
-| `DomainAppConfigRepository` | `get(domain_name, name)`, `list(domain_name)`, `upsert(domain_name, name, extra_config, user_app_config_defaults)`, `soft_delete(domain_name, name)` |
-| `UserAppConfigRepository`   | `get(user_id, name)`, `list(user_id)`, `upsert(user_id, name, extra_config)`, `soft_delete(user_id, name)`, `get_merged(user_id, name)`, `list_merged(user_id)` |
+| Repository                              | Methods                                                                                                              |
+|-----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| `GlobalAppConfigRepository`             | `get(name)`, `list()`, `upsert(name, extra_config)`, `soft_delete(name)`                                             |
+| `DomainAppConfigRepository`             | `get(domain_name, name)`, `list(domain_name)`, `upsert(domain_name, name, extra_config)`, `soft_delete(domain_name, name)` |
+| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `list(domain_name)`, `upsert(domain_name, name, extra_config)`, `soft_delete(domain_name, name)` |
+| `UserAppConfigRepository`               | `get(user_id, name)`, `list(user_id)`, `upsert(user_id, name, extra_config)`, `soft_delete(user_id, name)`, `get_merged(user_id, name)`, `list_merged(user_id)` |
+
+`DomainUserDefaultsAppConfigRepository` mirrors
+`DomainAppConfigRepository` (admin-only, same call shape) but operates
+on `(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name)` rows.
+Splitting it from `DomainAppConfigRepository` keeps each repository
+mapped to exactly one scope, matching the rest of the layout.
 
 All getters/listers filter `status = ALIVE`.
 
@@ -243,7 +253,6 @@ class AppConfigDBSource:
         self,
         key: AppConfigKey,
         extra_config: Mapping[str, Any],
-        user_app_config_defaults: Mapping[str, Any] | None = None,  # DOMAIN only
     ) -> AppConfigRow:
         # On natural-key conflict: deep-merge into the existing row and
         # reset status = ALIVE (revives soft-deleted records).
@@ -296,7 +305,7 @@ type GlobalAppConfig implements Node {
   modifiedAt: DateTime!
 }
 
-"""Domain config document. Admin read & write."""
+"""Domain config document. Admin read & write. The domain's own value."""
 type DomainAppConfig implements Node {
   id: ID!
 
@@ -309,15 +318,18 @@ type DomainAppConfig implements Node {
   """Stored config value for this document."""
   config: JSON!
 
-  """Per-user preference defaults — merge base for users in the domain
-  for the document with the matching `name`."""
-  userAppConfigDefaults: JSON!
-
   createdAt: DateTime!
   modifiedAt: DateTime!
 }
 
-"""User personal config document. Owner/Admin read; owner or admin can write."""
+"""User personal config document. Owner/Admin read; owner or admin can write.
+
+`DOMAIN_USER_DEFAULTS` rows are not exposed as their own Node type —
+their value enters this graph through `domainDefaultConfig` below
+(plus the merged `mergedConfig`). Admin-side direct manipulation of
+`DOMAIN_USER_DEFAULTS` rows still goes through `adminAppConfigs` /
+`adminUpdateAppConfig` / `node(id)` returning the generic `AppConfig`.
+"""
 type UserAppConfig implements Node {
   id: ID!
 
@@ -331,11 +343,19 @@ type UserAppConfig implements Node {
   userCustomizedConfig: JSON!
 
   """
-  Effective applied value: deep merge of the same-`name`
-  `DomainAppConfig.userAppConfigDefaults` with this row's
+  Raw value of the matching same-`name`
+  `(scope=DOMAIN_USER_DEFAULTS, scopeId=user.domain_name)` row's
+  `extra_config`. `null` when no such defaults row exists. Lets the
+  WebUI distinguish "what the domain provides" from "what the user
+  changed".
+  """
+  domainDefaultConfig: JSON
+
+  """
+  Effective applied value: deep merge of `domainDefaultConfig` ⊕
   `userCustomizedConfig`. Clients render the UI from this value.
   """
-  config: JSON!
+  mergedConfig: JSON!
 
   createdAt: DateTime!
   modifiedAt: DateTime!
@@ -350,10 +370,17 @@ entities, the following fields are added. No separate root queries —
 so the caller can filter, order, and paginate (single-document
 retrieval is `appConfigs(filter: { name: { equals: "..." } })`).
 
-| Location   | Field                                                                | Access path                                                                  |
-|------------|----------------------------------------------------------------------|------------------------------------------------------------------------------|
-| `Domain`   | `appConfigs(filter, orderBy, ...pagination): DomainAppConfigConnection!` | `domain(name) { appConfigs(filter: { name: { equals: "theme" } }) { ... } }` |
-| `UserNode` | `appConfigs(filter, orderBy, ...pagination): UserAppConfigConnection!`   | `user_node(id) { appConfigs { ... } }`                                       |
+| Location   | Field                                                                                  | Access path                                                                  |
+|------------|----------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| `Domain`   | `appConfigs(filter, orderBy, ...pagination): DomainAppConfigConnection!`               | `domain(name) { appConfigs(filter: { name: { equals: "theme" } }) { ... } }` |
+| `UserNode` | `appConfigs(filter, orderBy, ...pagination): UserAppConfigConnection!`                 | `user_node(id) { appConfigs { ... } }`                                       |
+
+`DOMAIN_USER_DEFAULTS` rows are **not** exposed as a typed child of
+`Domain`. Admin manipulates them via the cross-scope
+`adminAppConfigs(filter: { scope: { equals: DOMAIN_USER_DEFAULTS } })`
+and the unified mutations; their value flows into the user-facing
+graph through `UserAppConfig.domainDefaultConfig` /
+`UserAppConfig.mergedConfig`.
 
 ### Permissions
 
@@ -376,10 +403,10 @@ Schema definition:
 ```graphql
 extend type Domain {
   """
-  App config documents owned by this domain. Admin only.
-  Filter by `name` (or any combination) to retrieve a single document.
-  `filter.scope` / `filter.scopeId` are ignored — already pinned to
-  this domain.
+  App config documents owned by this domain (DOMAIN scope rows).
+  Admin only. Filter by `name` (or any combination) to retrieve a
+  single document. `filter.scope` / `filter.scopeId` are ignored —
+  already pinned to this domain.
   """
   appConfigs(
     filter: AppConfigFilterGQL = null
@@ -440,22 +467,6 @@ type Query {
   `name` to retrieve a single document.
   """
   myAppConfigs(
-    filter: AppConfigFilterGQL = null
-    orderBy: [AppConfigOrderByGQL!] = null
-    before: String = null
-    after: String = null
-    first: Int = null
-    last: Int = null
-    limit: Int = null
-    offset: Int = null
-  ): UserAppConfigConnection!
-
-  """
-  All app config documents owned by a specific user (Admin only).
-  Returns a Relay Connection.
-  """
-  userAppConfigs(
-    userId: ID!
     filter: AppConfigFilterGQL = null
     orderBy: [AppConfigOrderByGQL!] = null
     before: String = null
@@ -543,30 +554,43 @@ type UserAppConfigEdge {
 
 # ── Filter / OrderBy (shared by all Connections) ──────────────
 
-"""AppConfig search filter. All fields are AND-combined."""
+"""
+AppConfig search filter. Scalar fields at the top level are
+AND-combined. For arbitrary boolean shapes, nest predicates under
+`AND` / `OR` / `NOT`.
+"""
 input AppConfigFilterGQL {
   """
   Filter by scope type. Meaningful only on `adminAppConfigs`; on
   per-scope Connections (`globalAppConfigs`, `Domain.appConfigs`,
-  `UserNode.appConfigs`, `myAppConfigs`, `userAppConfigs`) the scope
+  `UserNode.appConfigs`, `myAppConfigs`) the scope
   is already pinned by the field, so this filter is ignored.
   """
-  scope: AppConfigScopeEnumFilter
+  scope: AppConfigScopeEnumFilter = null
 
   """
   Exact match on `scope_id`. Same constraint as `scope` above —
   ignored on per-scope Connections where `scope_id` is implied.
   """
-  scopeId: StringFilter
+  scopeId: StringFilter = null
 
   """Filter on document `name`."""
-  name: StringFilter
+  name: StringFilter = null
 
   """`created_at` range filter."""
-  createdAt: DateTimeFilter
+  createdAt: DateTimeFilter = null
 
   """`modified_at` range filter."""
-  modifiedAt: DateTimeFilter
+  modifiedAt: DateTimeFilter = null
+
+  """All sub-filters must match (AND combination)."""
+  AND: [AppConfigFilterGQL!] = null
+
+  """At least one sub-filter must match (OR combination)."""
+  OR: [AppConfigFilterGQL!] = null
+
+  """None of the sub-filters may match (NOT combination)."""
+  NOT: [AppConfigFilterGQL!] = null
 }
 
 """EnumFilter for AppConfigScopeGQL (equals / in / not_equals / not_in)."""
@@ -657,6 +681,7 @@ type Mutation {
 enum AppConfigScopeGQL {
   GLOBAL
   DOMAIN
+  DOMAIN_USER_DEFAULTS
   USER
 }
 
@@ -693,20 +718,14 @@ input AdminUpdateAppConfigInput {
   stored value — keys present in the input are merged in, keys absent
   are left unchanged, and leaf `null` values are written as JSON null
   (not deletions). Use `adminDeleteAppConfigKeys` to remove keys.
-  Omit the field entirely to leave `config` untouched.
-  - GLOBAL/DOMAIN scope: patches the document's `config` field.
+  Omit (or pass `{}`) to leave the row's `config` untouched (no-op).
+  - GLOBAL / DOMAIN / DOMAIN_USER_DEFAULTS scope: patches the
+    document's `config` field directly.
   - USER scope: patches that user's `userCustomizedConfig`
     (the merged `config` is read-only computed and cannot be written
     directly).
   """
   config: JSON
-
-  """
-  DOMAIN scope rows only — partial update of `userAppConfigDefaults`
-  via the same deep-merge semantics as `config`. Omit to leave
-  `userAppConfigDefaults` untouched.
-  """
-  userAppConfigDefaults: JSON
 }
 
 input AdminDeleteAppConfigKeysInput {
@@ -719,9 +738,6 @@ input AdminDeleteAppConfigKeysInput {
   Removing a non-leaf path removes the entire subtree.
   """
   configKeys: [String!]
-
-  """DOMAIN scope rows only — key paths to remove from `userAppConfigDefaults`."""
-  userAppConfigDefaultsKeys: [String!]
 }
 
 input AdminDeleteAppConfigInput {
@@ -741,6 +757,10 @@ input AdminDeleteAppConfigInput {
 #
 # `adminDeleteAppConfig` is idempotent: marking an already-DELETED
 # row as DELETED is a no-op.
+#
+# Per-domain user-defaults are written by setting
+# `key.scope = DOMAIN_USER_DEFAULTS` and `key.scopeId = <domain_name>`
+# — they go through the same admin mutations as any other scope.
 
 # ── My (self) input ──────────────────────────────────────────
 
@@ -820,11 +840,11 @@ type AppConfig implements Node {
   name: String!
   status: AppConfigStatusGQL!
 
-  """Raw stored value. For USER scope, equivalent to `userCustomizedConfig`."""
+  """
+  Raw stored value (`extra_config`). For USER scope this is the
+  user-customized value, not the merged result.
+  """
   config: JSON!
-
-  """Populated only on DOMAIN scope rows."""
-  userAppConfigDefaults: JSON
 
   createdAt: DateTime!
   modifiedAt: DateTime!
@@ -839,7 +859,6 @@ type AppConfig implements Node {
 | `myAppConfigs`                       | ❌        | ✅ (self)  | ✅    |
 | `Domain.appConfigs`                  | ❌        | ❌         | ✅    |
 | `UserNode.appConfigs`                | ❌        | ✅ (self)  | ✅    |
-| `userAppConfigs`                     | ❌        | ❌         | ✅    |
 | `adminAppConfigs`                    | ❌        | ❌         | ✅    |
 | `adminUpdateAppConfig`               | ❌        | ❌         | ✅    |
 | `adminDeleteAppConfigKeys`           | ❌        | ❌         | ✅    |
@@ -915,12 +934,14 @@ arguments) in the request body and returns the same result.
 - `user_app_config.extra_config` (the DB column, exposed as
   `userCustomizedConfig` in GQL) stores **only the values the user has
   explicitly set** — for the named document.
-- Domain-provided defaults (`user_app_config_defaults`) are *not*
-  copied into user rows — to avoid having to rewrite every user row
-  whenever the domain admin changes a default.
-- Defaults are applied **per-name**: `(scope=domain, name=X)`'s
-  `user_app_config_defaults` is the merge base for `(scope=user,
-  name=X)`'s `userCustomizedConfig`. Different `name`s are independent.
+- Domain-provided defaults live in their own scope:
+  `(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name,
+  name=N)`'s `extra_config`. They are *not* copied into user rows —
+  to avoid having to rewrite every user row whenever the domain admin
+  changes a default.
+- Defaults are applied **per-name**: a `DOMAIN_USER_DEFAULTS` row's
+  `extra_config` is the merge base for the same-`name` `USER` row's
+  `userCustomizedConfig`. Different `name`s are independent.
 
 ### Read (Merge)
 
@@ -928,15 +949,18 @@ The merge — for a given `(user_id, name)` — proceeds as follows in a
 single transaction:
 
 1. Look up the `domain_name` for `user_id` from `users`.
-2. Read the `(scope_type=domain, scope_id=domain_name, name=name)` row
-   to get `user_app_config_defaults`.
+2. Read the
+   `(scope_type=domain_user_defaults, scope_id=domain_name, name=name)`
+   row to get its `extra_config` (the user-defaults).
 3. Read the `(scope_type=user, scope_id=user_id, name=name)` row to
    get `extra_config` (= `userCustomizedConfig`).
 4. **Deep merge**: nested objects are merged recursively per key; at
    leaf keys, the user value wins over the domain default. Lists are
    treated as leaves and replaced wholesale by the user value
    (element-level merge of arrays has no unambiguous semantics). The
-   result is exposed as `UserAppConfig.config`.
+   result is exposed as `UserAppConfig.mergedConfig`; the raw
+   defaults row's `extra_config` is exposed as
+   `UserAppConfig.domainDefaultConfig`.
 
 A list variant returns one merged result per `name` for which either
 a domain row or a user row exists.
@@ -968,7 +992,7 @@ class AppConfigDBSource:
                     AppConfigRow.name == name,
                     sa.or_(
                         sa.and_(
-                            AppConfigRow.scope_type == AppConfigScopeType.DOMAIN,
+                            AppConfigRow.scope_type == AppConfigScopeType.DOMAIN_USER_DEFAULTS,
                             AppConfigRow.scope_id == domain_name,
                         ),
                         sa.and_(
@@ -979,17 +1003,20 @@ class AppConfigDBSource:
                 )
             )).scalars().all()
 
-        domain_row = next((r for r in rows if r.scope_type == AppConfigScopeType.DOMAIN), None)
+        defaults_row = next(
+            (r for r in rows if r.scope_type == AppConfigScopeType.DOMAIN_USER_DEFAULTS), None
+        )
         user_row = next((r for r in rows if r.scope_type == AppConfigScopeType.USER), None)
 
-        domain_defaults = domain_row.user_app_config_defaults if domain_row else {}
+        domain_defaults = defaults_row.extra_config if defaults_row else {}
         user_customized = user_row.extra_config if user_row else {}
         return MergedAppConfig(
             domain_name=domain_name,
             user_id=user_id,
             name=name,
             user_customized_config=user_customized,
-            config=deep_merge(domain_defaults, user_customized),  # GQL: UserAppConfig.config
+            domain_default_config=domain_defaults,                # GQL: UserAppConfig.domainDefaultConfig
+            merged_config=deep_merge(domain_defaults, user_customized),  # GQL: UserAppConfig.mergedConfig
         )
 
 
@@ -1005,11 +1032,19 @@ class UserAppConfigRepository:
 
 ### Exposure
 
-The merged value is returned in the GQL `UserAppConfig.config` field
-and the REST `GET /v2/app_config/user/me/{name}` response. The same
-node also exposes `userCustomizedConfig` (the raw user-customized
-value), so the WebUI can distinguish "what the user explicitly
-changed" from "what will actually be applied".
+`UserAppConfig` exposes three views of the same logical document so
+the WebUI can render and edit cleanly:
+
+- `userCustomizedConfig` — what the user explicitly set (raw)
+- `domainDefaultConfig` — the matching `DOMAIN_USER_DEFAULTS` row's
+  raw `extra_config` (what the domain provides as the default; `null`
+  if no defaults row exists)
+- `mergedConfig` — `domainDefaultConfig` ⊕ `userCustomizedConfig`,
+  what the UI actually applies
+
+The REST `GET /v2/app_config/user/me/{name}` response carries the
+same three views (snake_case in REST: `user_customized_config`,
+`domain_default_config`, `merged_config`).
 
 ### What this is *not*
 
@@ -1017,9 +1052,9 @@ changed" from "what will actually be applied".
   `(scope=domain, name="theme")` does not silently fall back to
   `(scope=global, name="theme")`. Each `(scope, scopeId, name)` is an
   independently addressed document.
-- The only cross-scope read merge is the per-`name` user / domain
-  merge described above, which exists to power
-  `userAppConfigDefaults`.
+- The only cross-scope read merge is the per-`name`
+  `DOMAIN_USER_DEFAULTS` × `USER` merge described above, which exists
+  to power per-domain user defaults.
 
 ---
 
@@ -1055,7 +1090,7 @@ bootstrap_global = ["theme", "branding"]
    `GET /v2/app_config/user/me` to fetch *all* of the caller's user
    documents in one round trip. Each entry includes the merged
    `config` (per-`name` merge with the matching
-   `userAppConfigDefaults`).
+   `DOMAIN_USER_DEFAULTS` row).
 
 3. **Domain-scoped reads** (admin UI) — the WebUI calls
    `GET /v2/app_config/domain/{domain_name}` /
@@ -1070,8 +1105,8 @@ bootstrap_global = ["theme", "branding"]
 - The WebUI already knows which scope it is targeting at each call
   site; explicit addressing keeps that intent visible in code review
   and request logs.
-- The user/domain `userAppConfigDefaults` merge (§5) covers the only
-  cross-scope composition that this BEP needs to support.
+- The `DOMAIN_USER_DEFAULTS` × `USER` per-`name` merge (§5) covers
+  the only cross-scope composition that this BEP needs to support.
 
 ---
 
@@ -1115,7 +1150,8 @@ query BootstrapMe {
       node {
         name
         userCustomizedConfig
-        config
+        domainDefaultConfig
+        mergedConfig
         modifiedAt
       }
     }
@@ -1129,11 +1165,14 @@ query BootstrapMe {
 - Server: `myAppConfigs` resolver identifies the caller via
   `current_user()`, lists all `(scope=USER, scope_id=current_user)`
   rows that are `ALIVE`, and for each row deep-merges the same-`name`
-  `userAppConfigDefaults` into `userCustomizedConfig`, exposing the
-  result as `config`.
-- The WebUI initializes UI state from `config` per document, and keeps
-  `userCustomizedConfig` around separately so the Settings page can
-  show only "what the user explicitly changed" in the edit form.
+  `DOMAIN_USER_DEFAULTS` row's `extra_config` into
+  `userCustomizedConfig`, exposing the result as `mergedConfig`.
+  `domainDefaultConfig` exposes that defaults row's raw value
+  separately.
+- The WebUI initializes UI state from `mergedConfig` per document, and
+  keeps `userCustomizedConfig` and `domainDefaultConfig` around
+  separately so the Settings page can show "what the user explicitly
+  changed" against "what the domain provides".
 
 ### S3. The user patches part of one of their own documents
 
@@ -1145,7 +1184,8 @@ mutation SaveMyTheme($input: UpdateMyAppConfigInput!) {
     appConfig {
       name
       userCustomizedConfig
-      config
+      domainDefaultConfig
+      mergedConfig
       modifiedAt
     }
   }
@@ -1171,38 +1211,49 @@ mutation SaveMyTheme($input: UpdateMyAppConfigInput!) {
   uses `deleteMyAppConfigKeys` separately.
 - **Upsert**: if the user has never written `theme` before, the row is
   created with this patch as the initial value (and `status = ALIVE`).
-- `appConfig.config` in the response already reflects the re-computed
-  read-merge of the patched `userCustomizedConfig` with the same-`name`
-  domain `userAppConfigDefaults`.
+- `appConfig.mergedConfig` in the response already reflects the
+  re-computed read-merge of the patched `userCustomizedConfig` with
+  the same-`name` `DOMAIN_USER_DEFAULTS` row.
 
-### S4. Admin patches part of a domain's document and user defaults
+### S4. Admin patches a domain's document and the user-defaults document
 
-An admin patches a specific subtree of the domain's `theme` `config`
-and a specific key of its `userAppConfigDefaults`. Single-step —
-identified by `AppConfigKey`, no preliminary id lookup needed:
+The domain's own value and the per-user defaults are now two separate
+rows in two scopes — patched via two `adminUpdateAppConfig` calls (or
+one batched mutation client-side). Single-step per row, identified by
+`AppConfigKey`, no preliminary id lookup needed:
 
 ```graphql
 mutation UpdateDomainTheme($input: AdminUpdateAppConfigInput!) {
   adminUpdateAppConfig(input: $input) {
-    appConfig { id scope scopeId name status config userAppConfigDefaults modifiedAt }
+    appConfig { id scope scopeId name status config modifiedAt }
   }
 }
 ```
+
+Step A — patch the domain's own `theme`:
 
 ```json
 {
   "input": {
     "key": { "scope": "DOMAIN", "scopeId": "default", "name": "theme" },
-    "config": { "sectionA": { "optionX": "new-value" } },
-    "userAppConfigDefaults": { "sectionB": "default-value" }
+    "config": { "sectionA": { "optionX": "new-value" } }
   }
 }
 ```
 
-- Server: `check_admin_only()` → locates the row by
-  `(scope_type=domain, scope_id="default", name="theme")` →
-  deep-merges the input into the existing `config` and
-  `userAppConfigDefaults` independently.
+Step B — patch the user-defaults `theme` for the same domain:
+
+```json
+{
+  "input": {
+    "key": { "scope": "DOMAIN_USER_DEFAULTS", "scopeId": "default", "name": "theme" },
+    "config": { "sectionB": "default-value" }
+  }
+}
+```
+
+- Server: `check_admin_only()` → locates each row by its full key →
+  deep-merges the input into that row's `extra_config`.
 - **Upsert**: if the document doesn't exist yet, one is created with
   the provided JSON as the initial value.
 - **Revive**: if the row was previously soft-deleted, `status` flips
@@ -1210,9 +1261,10 @@ mutation UpdateDomainTheme($input: AdminUpdateAppConfigInput!) {
   provided JSON.
 - **Partial**: unrelated keys (`sectionA.optionY`, `sectionC.*`, …)
   are left untouched.
-- Effect: on the next `myAppConfigs` call, every user in that domain
-  receives the updated `theme` defaults merged with their own
-  `theme` `userCustomizedConfig`.
+- Effect of Step B: on the next `myAppConfigs` call, every user in
+  that domain receives the updated `theme` defaults merged with their
+  own `theme` `userCustomizedConfig`. Step A only affects readers of
+  `Domain.appConfigs` (the admin view of the domain's own value).
 
 ### S5. Admin patches a specific user's document on their behalf
 
@@ -1251,24 +1303,31 @@ mutation OverrideUserPrefs($input: AdminUpdateAppConfigInput!) {
 
 ### S6. Admin lists every document of a single user
 
-Operational case — "what's stored in user A's app configs?":
+Operational case — "what's stored in user A's app configs?". Use the
+typed parent-node child Connection on `UserNode`:
 
 ```graphql
-query ListUserConfigs($userId: ID!) {
-  userAppConfigs(userId: $userId, first: 50) {
-    edges {
-      cursor
-      node { id name userCustomizedConfig config modifiedAt }
+query ListUserConfigs($userId: String!) {
+  user_node(id: $userId) {
+    appConfigs(first: 50) {
+      edges {
+        cursor
+        node { id name userCustomizedConfig domainDefaultConfig mergedConfig modifiedAt }
+      }
+      pageInfo { hasNextPage endCursor }
+      count
     }
-    pageInfo { hasNextPage endCursor }
-    count
   }
 }
 ```
 
-- `check_admin_only()` → returns all `ALIVE` rows where
-  `scope_type=user` and `scope_id=userId`. Each `node.config` is the
-  per-`name` merged value.
+- `user_node` resolver enforces "owner or admin". Admin reaches any
+  user, so this works for the operational use case. Each
+  `node.mergedConfig` is the per-`name` merged value;
+  `node.userCustomizedConfig` / `node.domainDefaultConfig` show the
+  raw inputs to the merge.
+- For cross-user audits use `adminAppConfigs(filter: { scope: { equals: USER }, ... })`
+  in S7 instead.
 
 ### S7. Admin audits all AppConfigs (cross-scope search)
 
@@ -1365,8 +1424,8 @@ mutation RemoveDomainLegacyMenu($input: AdminDeleteAppConfigInput!) {
 ```
 
 - Server: `check_admin_only()` → flips `status = DELETED` on the
-  matching row. Subsequent reads (`Domain.appConfigs`, `userAppConfigs`,
-  etc.) hide the document.
+  matching row. Subsequent reads (`Domain.appConfigs`,
+  `UserNode.appConfigs`, `adminAppConfigs`, etc.) hide the document.
 - **Idempotent**: no-op when the row is absent or already `DELETED`.
 - **Recoverable**: `adminUpdateAppConfig` on the same key revives the
   row to `ALIVE`, overwriting the stored value with the provided JSON.
