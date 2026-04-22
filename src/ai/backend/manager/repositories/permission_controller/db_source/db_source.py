@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections import defaultdict
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -1164,7 +1165,7 @@ class PermissionDBSource:
 
         combined_query = sa.union_all(scope_chain_query, self_scope_query)
 
-        permissions: dict[str, set[OperationType]] = {eid: set() for eid in data.target_entity_ids}
+        permissions: defaultdict[str, set[OperationType]] = defaultdict(set)
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.execute(combined_query)
             for row in result:

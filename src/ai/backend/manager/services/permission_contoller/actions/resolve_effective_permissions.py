@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType, OperationType, RBACElementType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
 @dataclass
-class ResolveEffectivePermissionsAction(RoleAction):
+class ResolveEffectivePermissionsAction(BaseAction):
     """Action to resolve effective permissions per entity for a given user.
 
     Given a user ID, an element type, and a list of entity IDs, returns the
@@ -30,6 +30,11 @@ class ResolveEffectivePermissionsAction(RoleAction):
 
     @override
     @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.PERMISSION
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
@@ -38,7 +43,7 @@ class ResolveEffectivePermissionsAction(RoleAction):
 class ResolveEffectivePermissionsActionResult(BaseActionResult):
     """Result containing the effective permissions per entity."""
 
-    permissions: dict[str, set[OperationType]] = field(default_factory=dict)
+    permissions: Mapping[str, set[OperationType]] = field(default_factory=dict)
 
     @override
     def entity_id(self) -> str | None:

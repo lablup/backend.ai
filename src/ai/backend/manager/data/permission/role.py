@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -113,7 +114,7 @@ class EffectivePermissionsInput:
 class EffectivePermissionsResult:
     """Mapping from entity ID to the set of operations the user is authorized to perform."""
 
-    permissions: dict[str, set[OperationType]]
+    permissions: Mapping[str, set[OperationType]]
 
 
 @dataclass(frozen=True)
