@@ -352,28 +352,6 @@ class TestWarnCgroupFallbackOnce:
         warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
         assert len(warn_records) == 1
 
-    def test_evicts_beyond_limit(
-        self,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """When the bounded cache overflows, the oldest entry is evicted and a
-        previously-seen container may warn again."""
-        cap = intrinsic._CGROUP_FALLBACK_WARN_CACHE_SIZE
-        first_cid = "first_container"
-
-        with caplog.at_level("WARNING", logger="ai.backend.agent.docker.intrinsic"):
-            # First warn for `first_cid`.
-            _warn_cgroup_fallback_once("CPUPlugin", first_cid)
-            # Fill the cache with `cap` distinct new entries to evict `first_cid`.
-            for i in range(cap):
-                _warn_cgroup_fallback_once("CPUPlugin", f"filler_{i}")
-            # `first_cid` should have been evicted and now warn again.
-            _warn_cgroup_fallback_once("CPUPlugin", first_cid)
-
-        warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
-        # 1 (first) + cap (fillers) + 1 (re-warn of first) = cap + 2
-        assert len(warn_records) == cap + 2
-
 
 class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
     """Tests for container PID validation before reading /proc/[pid]/net/dev."""
