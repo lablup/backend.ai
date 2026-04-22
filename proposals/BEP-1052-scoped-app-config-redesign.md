@@ -66,16 +66,14 @@ Summary matrix:
   natural composite key `(scope_type, scope_id, name)`. A scope can hold
   any number of named documents; clients address them explicitly by name
   (no hierarchical fall-through lookup — see §6).
-- **Write mutations split admin/user, update and delete as separate
-  operations.** `admin_update_app_config` / `update_my_app_config`
-  apply a **deep-merge partial update** (JSON Merge Patch with `null`
-  interpreted as a plain JSON value, *not* as a deletion sentinel),
-  with **upsert semantics** — the target row is created on first write
-  if it does not yet exist. Identification uses the
-  `(scope, scopeId, name)` natural key, never Relay `id`. Two flavors
-  of removal exist: `*_delete_app_config_keys` removes specific JSON
-  key paths inside a row, and `*_delete_app_config` soft-deletes the
-  whole record.
+- **Write mutations split admin/user.** `admin_update_app_config` /
+  `update_my_app_config` **replace** the stored JSON wholesale with
+  the input — there is no partial update / deep-merge / key-level
+  removal at the write boundary. Upsert semantics: the target row is
+  created on first write if it does not yet exist. Identification uses
+  the `(scope, scopeId, name)` natural key, never Relay `id`.
+  Record-level removal is `*_delete_app_config` (soft-delete, see
+  below).
 - **Soft delete**: rows carry a `status` column
   (`ALIVE` / `DELETED`). Record-level delete flips `status = DELETED`
   rather than dropping the row, so audit / undo flows stay possible.
@@ -237,8 +235,9 @@ class AppConfigDBSource:
         key: AppConfigKey,
         extra_config: Mapping[str, Any],
     ) -> AppConfigRow:
-        # On natural-key conflict: deep-merge into the existing row and
-        # reset status = ALIVE (revives soft-deleted records).
+        # On natural-key conflict: replace the existing row's value
+        # with `extra_config` and reset status = ALIVE (revives
+        # soft-deleted records).
         async with self._db.begin_session() as db_sess:
             ...
 
@@ -575,38 +574,28 @@ of scope for this BEP.)
 ### Mutations
 
 Write mutations come in two flavors that match the access model. Each
-flavor exposes three operations:
+flavor exposes two operations:
 
-- **update** — deep-merge a partial JSON into the named document
-  (upsert).
-- **delete-keys** — remove specific JSON key paths *inside* the
-  document (the document itself stays).
-- **delete** — soft-delete the entire document
-  (`status = DELETED`).
+- **update** — replace the named document's stored JSON wholesale
+  with the input (upsert: creates the row on first write, revives it
+  if soft-deleted).
+- **delete** — soft-delete the entire document (`status = DELETED`).
 
-Identification of admin mutations is by the **`AppConfigKey` input
-type** that bundles `(scope, scopeId, name)` — the GQL surface of
-the same natural-key identifier used by the repository / db_source
-layer (Python dataclass `AppConfigKey`). Self mutations only take
+Admin mutations identify rows by the **`AppConfigKey` input type**
+that bundles `(scope, scopeId, name)`. Self mutations only take
 `name` — the server fixes `scope = USER` and
 `scopeId = current_user.user_id`.
 
 ```graphql
 type Mutation {
   """
-  App config update (Admin only). Identifies a row of any scope by
-  `AppConfigKey { scope, scopeId, name }` and deep-merges the provided
-  JSON into it. Creates the row if it does not exist (upsert); revives
-  the row to `status = ALIVE` if it was previously soft-deleted.
+  App config write (Admin only). Identifies a row of any scope by
+  `AppConfigKey { scope, scopeId, name }` and replaces its stored
+  JSON with the input. Creates the row if it does not exist (upsert);
+  revives the row to `status = ALIVE` if it was previously
+  soft-deleted.
   """
   adminUpdateAppConfig(input: AdminUpdateAppConfigInput!): UpdateAppConfigPayload!
-
-  """
-  Remove specified JSON key paths from an app config document (Admin
-  only). Identified by `AppConfigKey`. Silent no-op if the row does
-  not exist or is soft-deleted.
-  """
-  adminDeleteAppConfigKeys(input: AdminDeleteAppConfigKeysInput!): DeleteAppConfigKeysPayload!
 
   """
   Soft-delete an entire app config document (Admin only). Sets
@@ -616,11 +605,8 @@ type Mutation {
   """
   adminDeleteAppConfig(input: AdminDeleteAppConfigInput!): DeleteAppConfigPayload!
 
-  """Self user_app_config partial update for the named document. Target is the caller."""
+  """Self user_app_config write for the named document. Target is the caller."""
   updateMyAppConfig(input: UpdateMyAppConfigInput!): UpdateMyAppConfigPayload!
-
-  """Remove specified JSON key paths from the caller's named document."""
-  deleteMyAppConfigKeys(input: DeleteMyAppConfigKeysInput!): DeleteMyAppConfigKeysPayload!
 
   """Soft-delete the caller's named document."""
   deleteMyAppConfig(input: DeleteMyAppConfigInput!): DeleteMyAppConfigPayload!
@@ -662,30 +648,15 @@ input AdminUpdateAppConfigInput {
   key: AppConfigKey!
 
   """
-  Partial update. The provided JSON is deep-merged into the existing
-  stored value — keys present in the input are merged in, keys absent
-  are left unchanged, and leaf `null` values are written as JSON null
-  (not deletions). Use `adminDeleteAppConfigKeys` to remove keys.
-  Omit (or pass `{}`) to leave the row's `config` untouched (no-op).
-  - GLOBAL / DOMAIN / DOMAIN_USER_DEFAULTS scope: patches the
+  New stored value — replaces the row's content wholesale. Pass `{}`
+  to clear the document while keeping the row.
+  - GLOBAL / DOMAIN / DOMAIN_USER_DEFAULTS scope: replaces the
     document's `config` field directly.
-  - USER scope: patches that user's `userCustomizedConfig`
+  - USER scope: replaces that user's `userCustomizedConfig`
     (the merged `config` is read-only computed and cannot be written
     directly).
   """
-  config: JSON
-}
-
-input AdminDeleteAppConfigKeysInput {
-  """Target row identifier."""
-  key: AppConfigKey!
-
-  """
-  JSON key paths to remove from `config` (dot-notation, e.g.
-  `"sectionA.optionX"`). Missing paths are silently ignored.
-  Removing a non-leaf path removes the entire subtree.
-  """
-  configKeys: [String!]
+  config: JSON!
 }
 
 input AdminDeleteAppConfigInput {
@@ -704,23 +675,10 @@ input UpdateMyAppConfigInput {
   name: String!
 
   """
-  Partial update of UserAppConfig.userCustomizedConfig for the named
-  document. Deep-merged into the caller's existing value; keys absent
-  from the input are preserved; leaf `null` values are written as JSON
-  null (not deletions). Use `deleteMyAppConfigKeys` to remove keys.
+  New stored value — replaces the caller's `userCustomizedConfig`
+  for the named document wholesale. Pass `{}` to clear it.
   """
   userCustomizedConfig: JSON!
-}
-
-input DeleteMyAppConfigKeysInput {
-  """Document name (server-fixed scope as above)."""
-  name: String!
-
-  """
-  JSON key paths to remove from the caller's `userCustomizedConfig`
-  (dot-notation). Missing paths are silently ignored.
-  """
-  keys: [String!]!
 }
 
 input DeleteMyAppConfigInput {
@@ -735,11 +693,6 @@ type UpdateAppConfigPayload {
   appConfig: AppConfig!
 }
 
-"""Result of `adminDeleteAppConfigKeys`."""
-type DeleteAppConfigKeysPayload {
-  appConfig: AppConfig!
-}
-
 """
 Result of `adminDeleteAppConfig`. The returned row reflects the post
 soft-delete state (`status = DELETED`).
@@ -748,13 +701,8 @@ type DeleteAppConfigPayload {
   appConfig: AppConfig!
 }
 
-"""Result of `updateMyAppConfig` (includes the merged `config`)."""
+"""Result of `updateMyAppConfig` (includes `mergedConfig`)."""
 type UpdateMyAppConfigPayload {
-  appConfig: UserAppConfig!
-}
-
-"""Result of `deleteMyAppConfigKeys` (includes the merged `config`)."""
-type DeleteMyAppConfigKeysPayload {
   appConfig: UserAppConfig!
 }
 
@@ -792,10 +740,8 @@ type AppConfig implements Node {
 | `UserNode.appConfigs`                | ❌        | ✅ (self)  | ✅    |
 | `adminAppConfigs`                    | ❌        | ❌         | ✅    |
 | `adminUpdateAppConfig`               | ❌        | ❌         | ✅    |
-| `adminDeleteAppConfigKeys`           | ❌        | ❌         | ✅    |
 | `adminDeleteAppConfig`               | ❌        | ❌         | ✅    |
 | `updateMyAppConfig`                  | ❌        | ✅ (self)  | ✅    |
-| `deleteMyAppConfigKeys`              | ❌        | ✅ (self)  | ✅    |
 | `deleteMyAppConfig`                  | ❌        | ✅ (self)  | ✅    |
 
 Where the checks live:
@@ -832,13 +778,11 @@ users have a self-service path `/v2/app_config/user/me/{name}`.
 | GET    | `/v2/app_config/user/{user_id}`                            | Admin      | List all documents of a user                         |
 | GET    | `/v2/app_config/user/{user_id}/{name}`                     | Admin      | Read one user document                               |
 | POST   | `/v2/app_config/admin/search`                              | Admin      | Cross-scope search (filter / order / paginate)       |
-| PATCH  | `/v2/app_config/{scope_type}/{scope_id}/{name}`            | Admin      | Partial update (deep merge, upsert) of one document  |
-| POST   | `/v2/app_config/{scope_type}/{scope_id}/{name}/delete-keys`| Admin      | Remove specified key paths from one document         |
+| PUT    | `/v2/app_config/{scope_type}/{scope_id}/{name}`            | Admin      | Replace one document (upsert)                        |
 | DELETE | `/v2/app_config/{scope_type}/{scope_id}/{name}`            | Admin      | Soft-delete one document                             |
 | GET    | `/v2/app_config/user/me`                                   | User       | List all own documents (each with merged result)     |
 | GET    | `/v2/app_config/user/me/{name}`                            | User       | Read one own document (with merged result)           |
-| PATCH  | `/v2/app_config/user/me/{name}`                            | User       | Partial update of one own document                   |
-| POST   | `/v2/app_config/user/me/{name}/delete-keys`                | User       | Remove specified key paths from one own document     |
+| PUT    | `/v2/app_config/user/me/{name}`                            | User       | Replace one own document                             |
 | DELETE | `/v2/app_config/user/me/{name}`                            | User       | Soft-delete one own document                         |
 
 `POST /v2/app_config/admin/search` accepts the same input schema as
@@ -847,12 +791,12 @@ arguments) in the request body and returns the same result.
 
 > `/v2/app_config/user/me/...` follows the `my_` self-service
 > convention — the adapter resolves `current_user()` internally and
-> fixes `scope_id` to the caller's `user_id`. The body for PATCH
+> fixes `scope_id` to the caller's `user_id`. The body for PUT
 > accepts only `userCustomizedConfig` (snake-case
 > `user_customized_config` in REST); there is no input field that can
 > target another user.
 
-> Read endpoints filter to `status = ALIVE` by default. PATCH on a
+> Read endpoints filter to `status = ALIVE` by default. PUT on a
 > soft-deleted document revives it (`status = ALIVE`) and overwrites
 > the stored value with the provided JSON.
 
@@ -1084,9 +1028,9 @@ query BootstrapMe {
   separately so the Settings page can show "what the user explicitly
   changed" against "what the domain provides".
 
-### S3. The user patches part of one of their own documents
+### S3. The user saves their own document
 
-The user updates a subset of keys in their `theme` document.
+The user replaces their `theme` document.
 
 ```graphql
 mutation SaveMyTheme($input: UpdateMyAppConfigInput!) {
@@ -1114,23 +1058,23 @@ mutation SaveMyTheme($input: UpdateMyAppConfigInput!) {
 }
 ```
 
-- Server fixes `scope = USER`, `scope_id = current_user.user_id`. Only
-  `name` is taken from the input.
-- **Partial update** semantics: other keys the user previously saved
-  in this same document (e.g. `sectionC.*`) are preserved. Key removal
-  uses `deleteMyAppConfigKeys` separately.
-- **Upsert**: if the user has never written `theme` before, the row is
-  created with this patch as the initial value (and `status = ALIVE`).
+- Server fixes `scope = USER`, `scope_id = current_user.user_id`.
+  Only `name` is taken from the input.
+- **Replace** semantics: the document's `userCustomizedConfig` is set
+  to the input as-is. Anything the caller wants to keep must be sent
+  in the same payload — there is no partial-merge or per-key patch.
+- **Upsert**: if the user has never written `theme` before, the row
+  is created with this value (and `status = ALIVE`).
 - `appConfig.mergedConfig` in the response already reflects the
-  re-computed read-merge of the patched `userCustomizedConfig` with
-  the same-`name` `DOMAIN_USER_DEFAULTS` row.
+  re-computed read-merge of the new `userCustomizedConfig` with the
+  same-`name` `DOMAIN_USER_DEFAULTS` row.
 
-### S4. Admin patches a domain's document and the user-defaults document
+### S4. Admin writes a domain's document and the user-defaults document
 
-The domain's own value and the per-user defaults are now two separate
-rows in two scopes — patched via two `adminUpdateAppConfig` calls (or
-one batched mutation client-side). Single-step per row, identified by
-`AppConfigKey`, no preliminary id lookup needed:
+The domain's own value and the per-user defaults are two separate
+rows in two scopes — written via two `adminUpdateAppConfig` calls
+(or one batched mutation client-side). Single-step per row,
+identified by `AppConfigKey`:
 
 ```graphql
 mutation UpdateDomainTheme($input: AdminUpdateAppConfigInput!) {
@@ -1140,7 +1084,7 @@ mutation UpdateDomainTheme($input: AdminUpdateAppConfigInput!) {
 }
 ```
 
-Step A — patch the domain's own `theme`:
+Step A — replace the domain's own `theme`:
 
 ```json
 {
@@ -1151,7 +1095,7 @@ Step A — patch the domain's own `theme`:
 }
 ```
 
-Step B — patch the user-defaults `theme` for the same domain:
+Step B — replace the user-defaults `theme` for the same domain:
 
 ```json
 {
@@ -1163,23 +1107,20 @@ Step B — patch the user-defaults `theme` for the same domain:
 ```
 
 - Server: `check_admin_only()` → locates each row by its full key →
-  deep-merges the input into that row's `extra_config`.
-- **Upsert**: if the document doesn't exist yet, one is created with
-  the provided JSON as the initial value.
+  replaces that row's `extra_config` with the input wholesale.
+- **Upsert**: if the document doesn't exist yet, the row is created
+  with this value.
 - **Revive**: if the row was previously soft-deleted, `status` flips
-  back to `ALIVE` and the stored value is overwritten with the
-  provided JSON.
-- **Partial**: unrelated keys (`sectionA.optionY`, `sectionC.*`, …)
-  are left untouched.
+  back to `ALIVE`.
 - Effect of Step B: on the next `myAppConfigs` call, every user in
   that domain receives the updated `theme` defaults merged with their
   own `theme` `userCustomizedConfig`. Step A only affects readers of
   `Domain.appConfigs` (the admin view of the domain's own value).
 
-### S5. Admin patches a specific user's document on their behalf
+### S5. Admin writes a specific user's document on their behalf
 
-For a support request, an admin patches a subset of keys in user A's
-`preferences` `userCustomizedConfig`:
+For a support request, an admin overwrites user A's `preferences`
+`userCustomizedConfig`:
 
 ```graphql
 mutation OverrideUserPrefs($input: AdminUpdateAppConfigInput!) {
@@ -1202,12 +1143,12 @@ mutation OverrideUserPrefs($input: AdminUpdateAppConfigInput!) {
 }
 ```
 
-- For the USER scope, the `config` input is deep-merged into that
-  user's `userCustomizedConfig` for the `preferences` document (the
-  merged `config` is read-only computed).
+- For the USER scope, the `config` input replaces that user's
+  `userCustomizedConfig` for the `preferences` document wholesale
+  (the merged `config` is read-only computed).
 - **Upsert**: creates the row if user A has never saved `preferences`
   before.
-- The next time that user calls `myAppConfigs`, the updated
+- The next time that user calls `myAppConfigs`, the new
   `preferences` `userCustomizedConfig` is merged with the matching
   domain defaults in the response.
 
@@ -1278,41 +1219,7 @@ query AuditConfigs(
   the sort order is pinned to the cursor key. By default returns
   `ALIVE` rows only.
 
-### S8. Operator clears specific keys (or subtrees) within a document
-
-Key removal is explicit via the dedicated key-delete mutation —
-update never deletes, and document-delete (S9) tears the whole record
-down.
-
-```graphql
-mutation ClearDomainThemeKeys($input: AdminDeleteAppConfigKeysInput!) {
-  adminDeleteAppConfigKeys(input: $input) {
-    appConfig { id scope scopeId name config modifiedAt }
-  }
-}
-```
-
-```json
-{
-  "input": {
-    "key": { "scope": "DOMAIN", "scopeId": "default", "name": "theme" },
-    "configKeys": ["sectionA", "sectionB.optionX"]
-  }
-}
-```
-
-- `sectionA` — full subtree removed from the document's `config`.
-- `sectionB.optionX` — only that leaf removed; sibling keys under
-  `sectionB` are preserved.
-- Missing paths are silently ignored (idempotent).
-- The document row itself is never deleted by this mutation; if no
-  ALIVE row exists for the target key, the call is a silent no-op.
-
-The self-service equivalent is `deleteMyAppConfigKeys`, which takes a
-`name` plus a flat `keys: [String!]!` array targeting that named
-document of the caller.
-
-### S9. Operator removes an entire document (soft-delete)
+### S8. Operator removes an entire document (soft-delete)
 
 Removing a stale or deprecated document — e.g. retiring an old
 `legacy_menu` document for a domain:
