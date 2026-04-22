@@ -69,32 +69,9 @@ class BulkActionProcessor[
 
         self._validators = validators or []
 
-    async def _run_validator(
+    def _filter_by_validation(
         self,
-        validator: BulkActionValidator,
         action: TBulkAction,
-        meta: BaseActionTriggerMeta,
-    ) -> BulkValidationResult:
-        """Invoke one validator and emit its timing/trace log.
-
-        Timing and per-validator logging live here rather than inside each
-        validator implementation so the cross-cutting concern has one home.
-        """
-        started_at = datetime.now(UTC)
-        validation = await validator.validate(action, meta)
-        duration = (datetime.now(UTC) - started_at).total_seconds()
-        log.debug(
-            "bulk validator {} saw {} ids, denied {} in {:.3f}s",
-            validator.name(),
-            len(action.entity_ids),
-            len(validation.denied_entities),
-            duration,
-        )
-        return validation
-
-    def _process_action(
-        self,
-        current_action: TBulkAction,
         validation: BulkValidationResult,
     ) -> TBulkAction:
         """Return a new action narrowed to the IDs this validator permitted.
@@ -105,33 +82,30 @@ class BulkActionProcessor[
         immutable.
         """
         if not validation.denied_entities:
-            return current_action
+            return action
         allowed_set = set(validation.allowed_entity_ids)
-        filtered_ids = [eid for eid in current_action.entity_ids if eid in allowed_set]
-        return type(current_action)(entity_ids=filtered_ids)
+        filtered_ids = [eid for eid in action.entity_ids if eid in allowed_set]
+        return type(action)(entity_ids=filtered_ids)
 
     async def _run(self, action: TBulkAction) -> BulkProcessResult[TBulkActionResult]:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
         action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
 
-        # Run every validator over the surviving ID set, then invoke the
-        # service function once on the final narrowed action — the service
-        # must only see IDs that passed every validator.
-        current_action: TBulkAction = action
+        filtered_action: TBulkAction = action
         decisions: list[ValidatorDecision] = []
 
         for validator in self._validators:
-            validation = await self._run_validator(validator, current_action, action_trigger_meta)
+            validation = await validator.validate(filtered_action, action_trigger_meta)
             decisions.append(
                 ValidatorDecision(
                     validator_name=validator.name(),
                     results=validation,
                 )
             )
-            current_action = self._process_action(current_action, validation)
+            filtered_action = self._filter_by_validation(filtered_action, validation)
 
-        action_result = await self._runner.run(current_action, action_trigger_meta)
+        action_result = await self._runner.run(filtered_action, action_trigger_meta)
         return BulkProcessResult(result=action_result, validator_decisions=decisions)
 
     async def wait_for_complete(self, action: TBulkAction) -> BulkProcessResult[TBulkActionResult]:
