@@ -93,23 +93,6 @@ Summary matrix:
 Add `name` and `status` columns to `app_configs`. The natural-key
 uniqueness constraint becomes `(scope_type, scope_id, name)`.
 
-Per-domain user-defaults (the merge base for users in a domain) are
-not a column on a DOMAIN row but a separate scope —
-`DOMAIN_USER_DEFAULTS` — so every row carries exactly one
-`extra_config` payload and the table has no scope-conditional sparse
-columns. See §5 for the merge semantics.
-
-`scope_type` and `status` use the project's standard `StrEnumType`
-TypeDecorator (`src/ai/backend/manager/models/base.py`), which stores
-the column as `VARCHAR(length)` while transparently coercing values
-to/from a Python `enum.StrEnum` at the ORM boundary. We deliberately
-avoid the Postgres native ENUM type (the deprecated `EnumType`)
-because adding/removing enum members would otherwise require an
-alembic migration every time, and these enum values are only ever set
-by server code (no direct external input). New scopes (e.g. `project`,
-future `team`) and new statuses become usable with a code-only
-change.
-
 ```python
 class AppConfigScopeType(enum.StrEnum):
     GLOBAL = "global"
@@ -275,16 +258,6 @@ layer.
 
 ## 3. GraphQL Schema — per-entity exposure
 
-Two exposure strategies depending on the scope:
-
-- **`global_app_config`**: no parent entity, so it is exposed as
-  standalone root fields (`globalAppConfig` / `globalAppConfigs`)
-  (no auth required).
-- **`domain_app_config` / `user_app_config`**: exposed as child fields
-  on the `Domain` / `UserNode` so they can be queried in the same round
-  trip as the parent entity. The Relay `Node` interface still supports
-  direct access by ID (`node(id: $id)`).
-
 ### Types
 
 Each type carries `name` so callers can disambiguate between the
@@ -364,41 +337,16 @@ type UserAppConfig implements Node {
 
 ### Added/extended fields (Relationship)
 
-To make the types above naturally traversable from their parent
-entities, the following fields are added. No separate root queries —
-**access via the parent node**. Each child field is a Relay Connection
-so the caller can filter, order, and paginate (single-document
-retrieval is `appConfigs(filter: { name: { equals: "..." } })`).
-
-| Location   | Field                                                                                  | Access path                                                                  |
-|------------|----------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| `Domain`   | `appConfigs(filter, orderBy, ...pagination): DomainAppConfigConnection!`               | `domain(name) { appConfigs(filter: { name: { equals: "theme" } }) { ... } }` |
-| `UserNode` | `appConfigs(filter, orderBy, ...pagination): UserAppConfigConnection!`                 | `user_node(id) { appConfigs { ... } }`                                       |
-
-`DOMAIN_USER_DEFAULTS` rows are **not** exposed as a typed child of
-`Domain`. Admin manipulates them via the cross-scope
-`adminAppConfigs(filter: { scope: { equals: DOMAIN_USER_DEFAULTS } })`
-and the unified mutations; their value flows into the user-facing
-graph through `UserAppConfig.domainDefaultConfig` /
-`UserAppConfig.mergedConfig`.
+| Location   | Field                                                                                  |
+|------------|----------------------------------------------------------------------------------------|
+| `Domain`   | `appConfigs(filter, orderBy, ...pagination): DomainAppConfigConnection!`               |
+| `UserNode` | `appConfigs(filter, orderBy, ...pagination): UserAppConfigConnection!`                 |
 
 ### Permissions
 
-The rule is simple — **if you have access to the parent entity, you
-can access its `appConfig(s)`**.
-
-- `UserNode.appConfigs`: the user can reach their own `UserNode` (via
-  `user_node(id)`), so they can read their own configs. Admins can
-  reach any `UserNode`, so they can read any user's configs.
-- `Domain.appConfigs`: only admins can read `Domain` nodes per the
-  existing policy, so only admins can read these.
-- `globalAppConfigs`: no parent → no permission constraints; anyone,
-  including anonymous callers, can access.
-
-There is no separate permission check on the `appConfigs` field; it
-inherits the parent resolver's policy.
-
-Schema definition:
+Each `appConfigs` child field inherits the parent resolver's
+permission policy — see the permission matrix below for the resulting
+access rules.
 
 ```graphql
 extend type Domain {
@@ -745,23 +693,6 @@ input AdminDeleteAppConfigInput {
   key: AppConfigKey!
 }
 
-# ↑ Upsert semantics: `adminUpdateAppConfig` creates the row on first
-# write if it does not yet exist, using the provided JSON as the
-# initial value. If the row exists with `status = DELETED`, the upsert
-# revives it (`status = ALIVE`) and overwrites its content with the
-# provided JSON (no merge with the soft-deleted value).
-#
-# `adminDeleteAppConfigKeys` is a silent no-op when the target row is
-# absent or `DELETED` (the desired post-condition — "these keys are
-# absent" — already holds).
-#
-# `adminDeleteAppConfig` is idempotent: marking an already-DELETED
-# row as DELETED is a no-op.
-#
-# Per-domain user-defaults are written by setting
-# `key.scope = DOMAIN_USER_DEFAULTS` and `key.scopeId = <domain_name>`
-# — they go through the same admin mutations as any other scope.
-
 # ── My (self) input ──────────────────────────────────────────
 
 input UpdateMyAppConfigInput {
@@ -1046,16 +977,6 @@ The REST `GET /v2/app_config/user/me/{name}` response carries the
 same three views (snake_case in REST: `user_customized_config`,
 `domain_default_config`, `merged_config`).
 
-### What this is *not*
-
-- There is **no hierarchical fall-through lookup**. A request for
-  `(scope=domain, name="theme")` does not silently fall back to
-  `(scope=global, name="theme")`. Each `(scope, scopeId, name)` is an
-  independently addressed document.
-- The only cross-scope read merge is the per-`name`
-  `DOMAIN_USER_DEFAULTS` × `USER` merge described above, which exists
-  to power per-domain user defaults.
-
 ---
 
 ## 6. Client Integration — WebUI bootstrap
@@ -1096,17 +1017,6 @@ bootstrap_global = ["theme", "branding"]
    `GET /v2/app_config/domain/{domain_name}` /
    `GET /v2/app_config/domain/{domain_name}/{name}` directly with
    admin credentials.
-
-### Why no fall-through
-
-- Document semantics differ across scopes (global theme ≠ domain
-  theme ≠ user theme). Implicitly substituting one for another would
-  hide intent and complicate cache invalidation.
-- The WebUI already knows which scope it is targeting at each call
-  site; explicit addressing keeps that intent visible in code review
-  and request logs.
-- The `DOMAIN_USER_DEFAULTS` × `USER` per-`name` merge (§5) covers
-  the only cross-scope composition that this BEP needs to support.
 
 ---
 
