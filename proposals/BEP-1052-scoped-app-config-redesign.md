@@ -186,7 +186,9 @@ single row per natural key. A scope can hold any number of distinct
 `*Update*` errors if no row exists. The only exposed deletion verb is
 `*Purge*` (admin-only) — used for cleanup of misconfigured rows; see
 §3. Outside of purge, rows persist once created, and callers "clear"
-a document by `*Update*`-ing it to an empty JSON (`{}`).
+a document by `*Update*`-ing it to an empty JSON (`{}`). A cleared
+row still exists in the DB; subsequent reads surface its `config`
+as `null` (GQL/REST projections normalize empty to `null`, §3).
 
 **A matching `app_config_policies` row is required for any write**
 (see "App Config Policy table" below). The service layer enforces:
@@ -320,8 +322,8 @@ repositories/app_config_policy/
 
 | Repository                   | Methods                                                                                                              |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(filter, pagination)` for a bound scope, `admin_search(filter, pagination)` for cross-scope (admin). Plus merge-specific reads that serve the resolved view (`AppConfig`): `get_resolved_config(user_id, name, chain)`, `search_user_resolved_configs(user_id, filter, pagination, chain_for_name)` — see §5. |
-| `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(filter, pagination)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigSource` row still references the `config_name`. |
+| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(scope, querier)` for a bound scope (via `AppConfigSourceSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, name, chain)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`; chain derived in SQL via policy join) — see §5. |
+| `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(querier)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigSource` row still references the `config_name`. |
 
 `AppConfigSourceRepository` plays a **dual role** — raw row CRUD
 across every scope (served to GQL as `AppConfigSource`) + read-side
@@ -379,23 +381,50 @@ class AppConfigSourceDBSource:
 
     async def search(
         self,
-        scope_type: AppConfigScopeType,
-        scope_id: str,
-        filter: AppConfigSourceFilter,
-        pagination: Pagination,
-    ) -> AppConfigSourcePage:
-        # Within-scope search — bound to (scope_type, scope_id) and
-        # applies filter / pagination in SQL. Cross-scope search has
-        # a separate `admin_search(filter, pagination)` overload
-        # (omitted). The merge-specific search lives in §5.
+        scope: AppConfigSourceSearchScope,
+        querier: BatchQuerier,
+    ) -> AppConfigSourceSearchResult:
+        # Within-scope search — binds (scope_type, scope_id) via the
+        # `scope`'s `to_condition()` and delegates the rest to the
+        # shared `execute_batch_querier` helper (conditions, orders,
+        # and pagination). Cross-scope search is `admin_search` below.
+        # The merge-specific search lives in §5.
         async with self._db.begin_readonly_session() as db_sess:
-            ...
+            query = sa.select(AppConfigSourceRow)
+            result = await execute_batch_querier(
+                db_sess, query, querier, scope=scope,
+            )
+            items = [row.AppConfigSourceRow.to_data() for row in result.rows]
+            return AppConfigSourceSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def admin_search(
+        self,
+        querier: BatchQuerier,
+    ) -> AppConfigSourceSearchResult:
+        # Cross-scope admin search — no scope binding. Authorization
+        # is enforced at the service layer before this is reached.
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(AppConfigSourceRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.AppConfigSourceRow.to_data() for row in result.rows]
+            return AppConfigSourceSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 ```
 
-Listing is expressed via the `search` primitive — each scope
-repository's `search(...)` is a thin-delegate that binds
-`scope_type` / `scope_id`. Permission checks and scope validation
-are performed in the service layer.
+Listing is expressed via the `search` primitive — callers build a
+`AppConfigSourceSearchScope(scope_type, scope_id)` plus a
+`BatchQuerier` and pass both in. Permission checks and scope
+validation are performed in the service layer; the db_source only
+runs the resulting SQL.
 
 **Bulk mutation orchestration**: all AppConfigSource bulk mutations
 (`adminBulk{Create,Update,Purge}AppConfigSources`,
@@ -424,14 +453,31 @@ per-item / partial-success pattern against `AppConfigPolicyRepository`.
 referencing `AppConfigSource` rows, preserving the required-policy
 invariant for the rows that remain.
 
-`AppConfigSourceFilter` / `AppConfigSourcePage` / `Pagination` are internal
-containers at the repository / service layer — Python dataclasses
-corresponding 1:1 to the GraphQL `AppConfigSourceFilter` (§3) at the
-adapter boundary. Same name on purpose: GraphQL input is the wire
-format, the Python dataclass is the in-process DTO. Concrete
-definitions are intentionally left to the implementation phase
-(expected location: a small companion module under
-`repositories/app_config/`).
+Search inputs align with the shared **BatchQuerier** pattern used
+by other repositories (`repositories/base/querier.py`):
+
+- `AppConfigSourceSearchScope(SearchScope)` — a
+  `@dataclass(frozen=True)` carrying `scope_type` + `scope_id`; its
+  `to_condition()` emits the `(AppConfigSourceRow.scope_type == … AND
+  AppConfigSourceRow.scope_id == …)` predicate, and
+  `existence_checks` is empty (no FK lookup to validate).
+  Lives alongside `AppConfigSourceSearchResult` in
+  `repositories/app_config_source/types.py`.
+- `BatchQuerier` — shared container for `conditions` (derived from
+  the GraphQL `AppConfigSourceFilter` at the adapter boundary),
+  `orders`, and `pagination`. Built by the service/adapter before
+  calling the repository; the db_source passes it through to
+  `execute_batch_querier`.
+- `AppConfigSourceSearchResult` — `@dataclass` with `items`,
+  `total_count`, `has_next_page`, `has_previous_page`, matching the
+  shape used by `GroupSearchResult` / `UserSearchResult`.
+
+The GraphQL `AppConfigSourceFilter` (§3) remains the wire-format
+input; the adapter translates it into `BatchQuerier.conditions`
+plus `AppConfigSourceSearchScope` for per-scope reads, or
+into `BatchQuerier.conditions` alone for `admin_search`. Concrete
+filter-to-condition translation is left to the implementation
+phase.
 
 ### Policy repository
 
@@ -535,9 +581,12 @@ type AppConfig implements Node {
   """
   Effective applied value: deep merge of `sources` in order (left =
   lowest priority, right = highest). Clients render the UI from this
-  value.
+  value. `null` when the merge result is empty — every contributing
+  `sources` row has an empty stored `config`, so there is no applied
+  value. Clients treat `null` identically to "no value configured"
+  and fall back to their built-in defaults.
   """
-  mergedConfig: JSON!
+  mergedConfig: JSON
 }
 ```
 
@@ -1242,9 +1291,13 @@ type AppConfigSource implements Node {
 
   """
   Raw stored value (`extra_config`). For USER scope this is the
-  user-customized value, not the merged result.
+  user-customized value, not the merged result. `null` when the
+  stored value is empty — e.g. a row that was cleared via `*Update*`
+  with an empty payload (see §1 "Write semantics"). The DB still
+  holds the row; the GraphQL projection normalizes "empty" to
+  `null` so clients never see a bare `{}`.
   """
-  config: JSON!
+  config: JSON
 
   """
   The matching `AppConfigPolicy` (joined by `name` = `config_name`).
@@ -1502,7 +1555,10 @@ projection of the GQL `AppConfig`):
 The `sources` list is ordered low → high priority (same order as the
 matching policy's `scope_sources`, or `[DOMAIN_USER_DEFAULTS, USER]`
 when no policy exists). Elements appear only for scopes whose row
-exists for this `(user, name)`.
+exists for this `(user, name)`. Each source's `config` and the
+top-level `merged_config` are `null` when the corresponding value
+is empty — the REST projection mirrors the GraphQL nullability
+(§3) so clients never see a bare `{}`.
 
 #### Admin writes (bulk-only)
 
@@ -1625,7 +1681,7 @@ the chain as a parameter (a list of `(scope_type, scope_id_expr)`
 pairs) derived from the policy:
 
 1. The service resolves the chain for `name` via the policy lookup.
-2. `AppConfigSourceDBSource.get_user_resolved_config(user_id, name, chain)`
+2. `AppConfigSourceDBSource.get_user_app_config(user_id, name, chain)`
    — single SQL resolves `domain_name` via a `users` subquery once
    and pulls one row per scope in the chain where it exists.
 3. The resulting rows are ordered per the chain (absent rows contribute
@@ -1638,15 +1694,26 @@ pairs) derived from the policy:
 The Connection query (`myAppConfigs`) is backed by the search-specific
 method on `AppConfigSourceDBSource` — the same single-SQL approach,
 generalized to return one resolved entry per `name` for which at
-least one row in the chain exists. When the caller's filter pins a
-specific `name`, the resolver consults the policy for that name to
-derive the chain; otherwise each resulting `name` is resolved
-independently (policies may differ across `name`s).
+least one row in the user-readable set exists. The chain per `name`
+is resolved **inside SQL** by joining `app_config_sources` with
+`app_config_policies` on `name = config_name`: the scope filter
+becomes `scope_type = ANY(policy.scope_sources)` and the merge
+order is `array_position(policy.scope_sources, scope_type)`.
+Policies may differ across `name`s, but the join evaluates each
+`name`'s chain independently without the service having to precompute
+a per-name chain map.
 
-`MergedAppConfig` / `MergedAppConfigPage` are service-layer return
-dataclasses — 1:1 mappings to the GraphQL `AppConfig` /
-`AppConfigSourceConnection`. `AppConfigSourceFilter` / `Pagination` are the
-same internal containers introduced for `db_source.search` in §2.
+`AppConfigData` is the service-layer return dataclass for a
+single resolved document; `AppConfigSearchResult` is its
+search counterpart with the standard `items` / `total_count` /
+`has_next_page` / `has_previous_page` shape (same as every other
+repository's `*SearchResult`, §2). Search inputs reuse the shared
+**BatchQuerier** — conditions on `name`, orders, and pagination —
+plus a `UserAppConfigSearchScope(SearchScope)` pinning
+`user_id` (its `to_condition()` scopes the underlying SELECT to
+rows readable for that user: PUBLIC, user's DOMAIN /
+DOMAIN_USER_DEFAULTS, and USER rows). No Python callable is
+threaded through — chain derivation lives entirely in SQL.
 
 ```python
 class AppConfigSourceDBSource:
@@ -1655,12 +1722,12 @@ class AppConfigSourceDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get_user_resolved_config(
+    async def get_user_app_config(
         self,
         user_id: str,
         name: str,
         chain: list[AppConfigScopeType],
-    ) -> MergedAppConfig:
+    ) -> AppConfigData:
         # `chain` is the ordered list of scopes — derived by the
         # service from the matching policy's `scope_sources`
         # (required-policy invariant, §1).
@@ -1698,30 +1765,46 @@ class AppConfigSourceDBSource:
         ordered_sources = [
             by_scope[scope_type] for scope_type in chain if scope_type in by_scope
         ]
-        merged = {}
+        merged: dict = {}
         for row in ordered_sources:
             merged = deep_merge(merged, row.extra_config)
 
-        return MergedAppConfig(
+        return AppConfigData(
             user_id=user_id,
             name=name,
             sources=ordered_sources,                # AppConfig.sources
-            merged_config=merged,                   # AppConfig.mergedConfig
+            # Normalize empty merge to None — `AppConfig.mergedConfig`
+            # and `AppConfigSource.config` both surface empty as `null`
+            # (§3 types) so clients never have to distinguish `{}` from
+            # "no value configured".
+            merged_config=merged or None,           # AppConfig.mergedConfig
         )
 
-    async def search_user_resolved_configs(
+    async def search_user_app_configs(
         self,
-        user_id: str,
-        filter: AppConfigSourceFilter,
-        pagination: Pagination,
-        chain_for_name: Callable[[str], list[AppConfigScopeType]],
-    ) -> MergedAppConfigPage:
-        # Connection-shaped counterpart — derives the chain per
-        # `name` via `chain_for_name` (service-provided closure that
-        # reads the policy cache; every `name` is guaranteed to have
-        # a policy). Pagination uses `name` as a stable cursor key
-        # applied in SQL. Full implementation lives in the §3
-        # Connection resolver.
+        scope: UserAppConfigSearchScope,
+        querier: BatchQuerier,
+    ) -> AppConfigSearchResult:
+        # Connection-shaped counterpart — `scope.user_id` pins the
+        # reader; `querier` applies conditions / orders / pagination
+        # over `name`. The chain per `name` is derived **in SQL** by
+        # joining with `app_config_policies`:
+        #
+        #   SELECT s.*, p.scope_sources
+        #   FROM app_config_sources AS s
+        #   JOIN app_config_policies AS p ON s.name = p.config_name
+        #   WHERE <scope.to_condition()>   -- user-readable rows
+        #     AND s.scope_type::text = ANY(p.scope_sources)
+        #   ORDER BY s.name,
+        #     array_position(p.scope_sources, s.scope_type::text)
+        #
+        # Rows come back grouped by `name`, each group already sorted
+        # low→high priority. `execute_batch_querier` paginates at the
+        # distinct-`name` level (using `name` as the stable cursor
+        # key). For each group the deep-merge runs in Python; each
+        # group becomes one `AppConfigData`. No service-side callable
+        # is needed — the required-policy invariant (§1) guarantees
+        # the join always resolves.
         ...
 
 
@@ -1766,50 +1849,40 @@ class AppConfigSourceRepository:
 
     async def search(
         self,
-        scope_type: AppConfigScopeType,
-        scope_id: str,
-        filter: AppConfigSourceFilter,
-        pagination: Pagination,
-    ) -> AppConfigSourcePage:
+        scope: AppConfigSourceSearchScope,
+        querier: BatchQuerier,
+    ) -> AppConfigSourceSearchResult:
         # Scope-bound search. Cross-scope (admin) uses `admin_search`.
-        return await self._db_source.search(
-            scope_type=scope_type,
-            scope_id=scope_id,
-            filter=filter,
-            pagination=pagination,
-        )
+        return await self._db_source.search(scope=scope, querier=querier)
 
     async def admin_search(
         self,
-        filter: AppConfigSourceFilter,
-        pagination: Pagination,
-    ) -> AppConfigSourcePage:
-        return await self._db_source.admin_search(filter, pagination)
+        querier: BatchQuerier,
+    ) -> AppConfigSourceSearchResult:
+        return await self._db_source.admin_search(querier)
 
     # ── Resolved view (AppConfig) ──────────────────────────
     # `AppConfigSourceDBSource`'s merge-specific method performs the
     # users-subquery resolution inside a single SQL, so the
     # repository here is a thin delegate.
 
-    async def get_resolved(
+    async def get_app_config(
         self,
         user_id: str,
         name: str,
         chain: list[AppConfigScopeType],
-    ) -> MergedAppConfig:
-        return await self._db_source.get_user_resolved_config(
+    ) -> AppConfigData:
+        return await self._db_source.get_user_app_config(
             user_id, name, chain
         )
 
-    async def search_resolved(
+    async def search_app_configs(
         self,
-        user_id: str,
-        filter: AppConfigSourceFilter,
-        pagination: Pagination,
-        chain_for_name: Callable[[str], list[AppConfigScopeType]],
-    ) -> MergedAppConfigPage:
-        return await self._db_source.search_user_resolved_configs(
-            user_id, filter, pagination, chain_for_name
+        scope: UserAppConfigSearchScope,
+        querier: BatchQuerier,
+    ) -> AppConfigSearchResult:
+        return await self._db_source.search_user_app_configs(
+            scope, querier,
         )
 ```
 
@@ -1822,8 +1895,13 @@ the resolution plus the deep-merge result:
   priority, matching the chain). Absent scopes simply do not appear.
   The list is empty only when no scope in the chain has a row, in
   which case the `name` would not appear in `myAppConfigs` at all.
+  Each source's `config` is `null` when the stored value is empty
+  (a row cleared via `*Update*` with `{}`); callers treat `null` as
+  "this scope contributes nothing".
 - `mergedConfig` — the deep-merge of `sources` in order; the value
-  the UI actually applies.
+  the UI actually applies. `null` when every contributing row is
+  empty and the merge result collapses to `{}` — clients fall back
+  to their built-in defaults in that case.
 
 Clients that need to distinguish "admin-provided per-user default"
 from "what the user changed" do so by inspecting each source row's
@@ -2035,7 +2113,8 @@ mutation PublishThemePolicy(
     `user_writable = false`.
   - `myAppConfigs` entries for `theme` are resolved through the
     chain `[DOMAIN]` (single-scope — `sources` has at most one
-    element and `mergedConfig` equals that element's `config`).
+    element, and `mergedConfig` equals that element's `config`
+    or is `null` when the element's `config` is `null`, §3).
 - Subsequent edits use `adminBulkUpdateAppConfigPolicies` with the
   same `configName`.
 
