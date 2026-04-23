@@ -59,10 +59,16 @@ Summary matrix:
 > to a user's resolved view is an **admin decision expressed through
 > `AppConfigPolicy.scope_sources`** (§1, §5) — not a property of the
 > scope type itself. The split is an organizing convention for admin
-> tooling: use `domain` for values semantically owned by the domain,
-> `domain_user_defaults` for values positioned as per-user seed
-> defaults. Both can participate in any resolved chain when the
-> policy says so.
+> tooling:
+> - `domain` — values semantically owned by the domain, often
+>   admin-only (e.g. a `theme` policy with `scope_sources=["domain"]`
+>   and `userWritable=false`; see §7 S3.5).
+> - `domain_user_defaults` — values positioned as per-user seeds the
+>   user can override (e.g. a `preferences` policy with
+>   `scope_sources=["domain_user_defaults", "user"]` and
+>   `userWritable=true`; see §7 S3.6 and S4).
+>
+> Both can participate in any resolved chain when the policy says so.
 
 ## Design Principles
 
@@ -287,7 +293,7 @@ to catch the paths that don't go through the orchestrator.
 
 ---
 
-## 2. Repository Layer — split per scope
+## 2. Repository Layer — single AppConfigSourceRepository
 
 Keep `models/app_config_source/row.py`'s `AppConfigSourceRow` as a
 single class, and use **a single `AppConfigSourceRepository`** for
@@ -544,10 +550,10 @@ type AppConfig implements Node {
 
 ### Permissions
 
-Each `appConfigs` child field enforces its own access rule (not
+Each `appConfigSources` child field enforces its own access rule (not
 simply inherited from the parent node) — see the permission matrix
-below. In short: `DomainV2.appConfigs` is same-domain users or
-admin; `UserV2.appConfigs` is owner or admin. Writes (mutations) on
+below. In short: `DomainV2.appConfigSources` is same-domain users or
+admin; `UserV2.appConfigSources` is owner or admin. Writes (mutations) on
 both are admin-only.
 
 ```graphql
@@ -559,7 +565,7 @@ extend type DomainV2 {
   single document. `filter.scopeType` / `filter.scopeId` are ignored —
   already pinned to this domain.
   """
-  appConfigs(
+  appConfigSources(
     filter: AppConfigSourceFilter = null
     orderBy: [AppConfigSourceOrderBy!] = null
     before: String = null
@@ -577,7 +583,7 @@ extend type UserV2 {
   Filter by `name` to retrieve a single document. `filter.scopeType` /
   `filter.scopeId` are ignored — already pinned to this user.
   """
-  appConfigs(
+  appConfigSources(
     filter: AppConfigSourceFilter = null
     orderBy: [AppConfigSourceOrderBy!] = null
     before: String = null
@@ -592,7 +598,7 @@ extend type UserV2 {
 
 A root field `myAppConfigs` (Connection) returns the current user's
 **merged view** (`AppConfig`) — different from the raw USER rows
-exposed by `UserV2.appConfigs` (raw `AppConfigSource`). Merging only
+exposed by `UserV2.appConfigSources` (raw `AppConfigSource`). Merging only
 happens on this path (§5).
 
 ### Queries
@@ -686,7 +692,7 @@ Filter and orderBy types are unified — a single `AppConfigSourceFilter`
 and `AppConfigSourceOrderBy` are reused across all Connections. With the
 per-scope types collapsed into one, the same `AppConfigSourceConnection`
 backs every raw-row query — `publicAppConfigSources`, `adminAppConfigSources`,
-`DomainV2.appConfigs`, and `UserV2.appConfigs`. Each call pins the
+`DomainV2.appConfigSources`, and `UserV2.appConfigSources`. Each call pins the
 relevant `scopeType` / `scopeId` internally and returns the same
 Edge / node shape.
 
@@ -736,8 +742,8 @@ AND-combined. For arbitrary boolean shapes, nest predicates under
 input AppConfigSourceFilter {
   """
   Filter by scope type. Meaningful only on `adminAppConfigSources`; on
-  per-scope Connections (`publicAppConfigSources`, `DomainV2.appConfigs`,
-  `UserV2.appConfigs`, `myAppConfigs`) the scope
+  per-scope Connections (`publicAppConfigSources`, `DomainV2.appConfigSources`,
+  `UserV2.appConfigSources`, `myAppConfigs`) the scope
   is already pinned by the field, so this filter is ignored.
   """
   scopeType: AppConfigScopeTypeEnumFilter = null
@@ -1313,8 +1319,8 @@ Queries:
 |------------------------------------|-----------|----------------------------------|-------|
 | `publicAppConfigSources`                 | ✅        | ✅                               | ✅    |
 | `myAppConfigs`                     | ❌        | ✅ (self)                        | ✅    |
-| `DomainV2.appConfigs`              | ❌        | ✅ (same domain only)            | ✅    |
-| `UserV2.appConfigs`                | ❌        | ✅ (self)                        | ✅    |
+| `DomainV2.appConfigSources`              | ❌        | ✅ (same domain only)            | ✅    |
+| `UserV2.appConfigSources`                | ❌        | ✅ (self)                        | ✅    |
 | `adminAppConfigSources`                  | ❌        | ❌                               | ✅    |
 | `appConfigPolicy` / `appConfigPolicies` | ❌   | ✅                               | ✅    |
 | `node(id)` → `AppConfigSource`           | ✅ iff row `scopeType = PUBLIC` | ✅ (PUBLIC always; DOMAIN / DOMAIN_USER_DEFAULTS same-domain only; USER self only) | ✅ |
@@ -1363,13 +1369,13 @@ Where the checks live:
   `current_user` and delegate each item to
   `AppConfigSourceRepository.{create|update}` —
   `scopeId` is not part of the input and is injected server-side.
-- `DomainV2.appConfigs` field resolver: if the caller is not admin
+- `DomainV2.appConfigSources` field resolver: if the caller is not admin
   and the parent `DomainV2.domain_name` differs from
   `current_user.domain_name`, raise a permission error (helper in
   `src/ai/backend/manager/api/gql/utils.py` raises
   `web.HTTPForbidden`). Same-domain users and admins are allowed
   through. Writes (mutations) remain admin-only.
-- `UserV2.appConfigs` field resolver: raises a permission error
+- `UserV2.appConfigSources` field resolver: raises a permission error
   when the parent node's `user_id` differs from `current_user` and
   the caller is not an admin.
 
@@ -1568,7 +1574,7 @@ reads, and a single policy object for the `{config_name}` GET.
 
 > The merge semantics here apply **only to `AppConfig`**. The
 > raw `AppConfigSource` type (returned from `publicAppConfigSources`,
-> `adminAppConfigSources`, `DomainV2.appConfigs`, `UserV2.appConfigs`)
+> `adminAppConfigSources`, `DomainV2.appConfigSources`, `UserV2.appConfigSources`)
 > exposes `extra_config` as a single `config` field — no merge.
 
 ### Storage
@@ -1826,7 +1832,7 @@ the admin-provided default; a row with `scopeType = USER` is the
 user's customization). This replaces the previous fixed
 `domainDefaultConfig` / `userCustomizedConfig` fields.
 
-The REST `GET /v2/app-configs/my/{name}` response carries the same shape
+The REST `GET /v2/app-configs/my/{name}` response carries the same
 shape (snake_case `sources` + `merged_config`) — see §4.
 
 ---
@@ -1855,7 +1861,7 @@ publish a bootstrap list.
    use the same query for their own session (admins are also users
    for the purpose of personal settings). `DOMAIN` scope does not
    participate in the default merge chain, so an admin UI that needs
-   to manage domain policy issues a separate `DomainV2.appConfigs` /
+   to manage domain policy issues a separate `DomainV2.appConfigSources` /
    `adminAppConfigSources` query. See S2 in §7.
 
 ---
@@ -1911,11 +1917,11 @@ query BootstrapMe {
 ```
 
 - Server: `myAppConfigs` returns one entry per `name` for which at
-  least one source row in the merge chain exists. The chain comes
-  from the matching `AppConfigPolicy.scope_sources` when present,
-  and defaults to `[DOMAIN_USER_DEFAULTS, USER]` (caller / caller's
-  domain) otherwise. `sources` carries the raw rows in chain order;
-  `mergedConfig` is their deep merge. See §5.
+  least one source row in the merge chain exists. Every such `name`
+  is backed by a policy (§1 required-policy invariant), so the chain
+  always comes from `AppConfigPolicy.scope_sources` — there is no
+  implicit fallback chain. `sources` carries the raw rows in chain
+  order; `mergedConfig` is their deep merge. See §5.
 - The WebUI initializes UI state from `mergedConfig` per document
   and keeps the `sources` list around so the Settings page can
   distinguish user-changed (`scopeType = USER`) from admin-provided
@@ -1975,7 +1981,7 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigSourceInput!) {
   `USER ∉ scope_sources` or `user_writable = False`, the item is
   appended to `failed` with a policy-violation message. Clients can
   discover this ahead of time by reading the policy via
-  `appConfigPolicy(name:)`.
+  `appConfigPolicy(configName:)`.
 - **First write vs. subsequent writes**: `bulkUpdateMyAppConfigSources`
   places items with no USER row into `failed`. For the very first
   save of a given `name`, the client calls `bulkCreateMyAppConfigSources`
@@ -2102,7 +2108,7 @@ mutation PromoteThemePolicy(
 - Effect:
   - No data migration — the existing `DOMAIN` row for `theme` stays
     as-is.
-  - Users can now call `bulkCreate/UpdateMyAppConfigs` targeting
+  - Users can now call `bulkCreate/UpdateMyAppConfigSources` targeting
     `theme` and write their own `USER` row.
   - The next `myAppConfigs` call returns `theme` entries whose
     `sources` is `[<DOMAIN row>, <USER row if present>]` and whose
@@ -2170,21 +2176,19 @@ mutation PurgeBadPolicy($input: AdminBulkPurgeAppConfigPolicyInput!) {
 
 ### S4. Admin publishes a per-user default for a domain
 
-The domain admin publishes a new `theme` document that every user
-in the domain inherits as the merge base — `theme` is admin-only
-per the user stories, so this is the only path by which the
-domain's theme reaches users. The first publish uses
-`adminBulkCreateAppConfigSources` with `key.scopeType = DOMAIN_USER_DEFAULTS`;
-later edits use `adminBulkUpdateAppConfigSources` with the identical input
-shape. Multiple domains can be seeded in one call by passing
-multiple items. `DOMAIN`-scope publishes (admin-enforced policy,
-e.g. a domain-internal config document) use the same mutations with
-`key.scopeType = DOMAIN` — but DOMAIN values are not included in the
-`myAppConfigs` merge, so any document users must be able to read
-should be published under `DOMAIN_USER_DEFAULTS` instead.
+The domain admin publishes the `preferences` document's per-user
+default — every user in the domain inherits it at merge time as the
+base for their own `USER` row. The policy for `preferences` (S3.6's
+"`[domain_user_defaults, user]` + `userWritable=true`" shape) admits
+both admin-written `DOMAIN_USER_DEFAULTS` entries and user overrides;
+this scenario exercises the admin side. The first publish uses
+`adminBulkCreateAppConfigSources` with `key.scopeType =
+DOMAIN_USER_DEFAULTS`; later edits use
+`adminBulkUpdateAppConfigSources` with the identical input shape.
+Multiple domains can be seeded in one call by passing multiple items.
 
 ```graphql
-mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigSourceInput!) {
+mutation AdminCreateAppConfigSources($input: AdminBulkCreateAppConfigSourceInput!) {
   adminBulkCreateAppConfigSources(input: $input) {
     created { id scopeType scopeId name config updatedAt }
     failed { index scopeType scopeId name message }
@@ -2200,9 +2204,9 @@ mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigSourceInput!) {
         "key": {
           "scopeType": "DOMAIN_USER_DEFAULTS",
           "scopeId": "default",
-          "name": "theme"
+          "name": "preferences"
         },
-        "config": { "mode": "dark", "accent": "#6f5ae8" }
+        "config": { "language": "ko", "density": "comfortable" }
       }
     ]
   }
@@ -2211,16 +2215,17 @@ mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigSourceInput!) {
 
 - Authorization: admin required — the service rejects non-admin
   calls on any admin-path mutation.
-- Internally, the service dispatches each item on `item.key.scopeType`
-  to the matching repository (§2) and strictly inserts a new row.
-  Items whose key already has a row land in `failed` — the admin
-  falls back to `adminBulkUpdateAppConfigSources`.
-- Policy: if an `AppConfigPolicy` exists for `theme` and
-  `DOMAIN_USER_DEFAULTS ∉ scope_sources`, the item is rejected with
-  a policy-violation message. The typical setup for a document like
-  `theme` — as shown in S3.5 — lists
-  `scope_sources=["domain_user_defaults"]`, which admits this
-  write.
+- Internally, the service forwards each item to
+  `AppConfigSourceRepository.create` (§2). Items whose key already
+  has a row land in `failed` — the admin falls back to
+  `adminBulkUpdateAppConfigSources`.
+- Policy: the write's `scope_type` must be in the policy's
+  `scope_sources`. The `preferences`-style policy lists
+  `DOMAIN_USER_DEFAULTS`, so this write passes. A stricter policy
+  that omits the scope (e.g. the `theme` policy from S3.5, which
+  lists only `["domain"]`) would reject the same write with a
+  policy-violation message — in that case the admin would target
+  `DOMAIN` instead.
 - Effect: every user in the domain picks up the new defaults on the
   next `myAppConfigs` read (merged per §5).
 
@@ -2275,7 +2280,7 @@ mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigSourceInpu
   domain defaults) on the next `myAppConfigs` read from that user's
   session.
 
-### S6. Admin audits all AppConfigs (cross-scope search)
+### S6. Admin audits all AppConfigSources (cross-scope search)
 
 Cases such as "list every domain that touched `theme` in the last
 week" or "every domain that customized the `menu` document":
