@@ -403,7 +403,7 @@ class TestUserRepository:
         assert result.keypair is not None
         assert result.keypair.access_key is not None
 
-    async def test_create_user_validated_maps_project_member_role(
+    async def test_create_user_validated_syncs_rbac_with_project_assignment(
         self,
         user_repository: UserRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -412,9 +412,17 @@ class TestUserRepository:
         default_keypair_resource_policy: str,
         sample_group_id: str,
     ) -> None:
-        """New users must be mapped to their project's member role so that
-        project-scoped RBAC checks (vfolder listing, folder count, user
-        storage usage) succeed immediately after creation.
+        """Creating a user with a project assignment must produce the same
+        RBAC state as the modifyGroup / modify_user add paths:
+
+        - business association (`association_groups_users`),
+        - project-scope entity binding (`association_scopes_entities`,
+          scope=PROJECT, entity=USER),
+        - user-role mapping to the project's member role (and only the
+          member role — the admin role must not be granted).
+
+        Mirrors test_update_user_validated_group_ids_syncs_rbac so that
+        the create path is held to the same RBAC invariants.
         """
         spec = UserCreatorSpec(
             username=f"newuser-{uuid.uuid4().hex[:8]}",
@@ -440,21 +448,64 @@ class TestUserRepository:
             creator,
             group_ids=[sample_group_id],
         )
+        user_uuid = result.user.uuid
+        project_id = uuid.UUID(sample_group_id)
 
-        member_role_name = f"project-{sample_group_id[:8]}-member"
         async with db_with_cleanup.begin_readonly_session() as session:
-            mapped_role_name = await session.scalar(
-                sa.select(RoleRow.name)
-                .join(UserRoleRow, UserRoleRow.role_id == RoleRow.id)
-                .where(
-                    UserRoleRow.user_id == result.user.uuid,
-                    RoleRow.name == member_role_name,
+            business_assoc = await session.scalar(
+                sa.select(AssocGroupUserRow).where(
+                    AssocGroupUserRow.user_id == user_uuid,
+                    AssocGroupUserRow.group_id == project_id,
                 )
             )
-        assert mapped_role_name == member_role_name, (
-            f"newly created user {result.user.uuid} was not mapped to the "
-            f"project's member role {member_role_name}"
-        )
+            assert business_assoc is not None, (
+                "association_groups_users row missing for (user, project)"
+            )
+
+            scope_binding = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+                )
+            )
+            assert scope_binding is not None, (
+                "association_scopes_entities (PROJECT, USER) binding missing"
+            )
+
+            member_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(project_id)[:8]}-member")
+            )
+            assert member_role_id is not None, "project member role not found"
+
+            member_mappings = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == user_uuid,
+                        UserRoleRow.role_id == member_role_id,
+                    )
+                )
+            ).all()
+            assert len(member_mappings) == 1, (
+                "newly created user must be mapped to the project's member role"
+            )
+
+            admin_role_id = await session.scalar(
+                sa.select(RoleRow.id).where(RoleRow.name == f"project-{str(project_id)[:8]}-admin")
+            )
+            assert admin_role_id is not None
+            admin_mappings = (
+                await session.scalars(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == user_uuid,
+                        UserRoleRow.role_id == admin_role_id,
+                    )
+                )
+            ).all()
+            assert len(admin_mappings) == 0, (
+                "create_user must not grant the project admin role to new members."
+            )
 
     async def test_create_user_validated_domain_not_exists(
         self,
