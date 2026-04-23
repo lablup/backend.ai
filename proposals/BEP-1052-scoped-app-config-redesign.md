@@ -54,11 +54,15 @@ Summary matrix:
 | Per-user personal settings                          | `user`                 | Owner/Admin                     | Owner/Admin |
 
 > Difference between `domain` and `domain_user_defaults`: both are
-> admin-write and readable by users of the domain, but only
-> `domain_user_defaults` participates in the `myAppConfigs` merge as
-> a base. Use `domain_user_defaults` for values a user can override
-> in their own USER row; use `domain` for values that must not be
-> user-overridable — see §5 for the full merge rules.
+> admin-write and readable by users of the domain, with the same
+> row-level access rules. Whether either scope (or both) contributes
+> to a user's resolved view is an **admin decision expressed through
+> `AppConfigPolicy.scope_sources`** (§1, §5) — not a property of the
+> scope type itself. The split is an organizing convention for admin
+> tooling: use `domain` for values semantically owned by the domain,
+> `domain_user_defaults` for values positioned as per-user seed
+> defaults. Both can participate in any resolved chain when the
+> policy says so.
 
 ## Design Principles
 
@@ -186,7 +190,7 @@ document by `*Update*`-ing it to an empty JSON (`{}`).
 If a matching `app_config_policies` row (see below) exists for the
 `name`, the service layer additionally enforces:
 
-- `scope_type` must be in the policy's `allowed_scopes`; writes to
+- `scope_type` must be in the policy's `scope_sources`; writes to
   other scopes are rejected as a per-item failure.
 - When the write is on the `USER` scope via a `bulk*MyAppConfigs`
   mutation, the policy's `user_writable` must be `True`; otherwise the
@@ -199,28 +203,33 @@ is applied and the write proceeds under the natural-key rules above.
 ### App Config Policy table
 
 A separate `app_config_policies` table holds advisory rules per
-document `name` — who may write at which scopes, and the merge order
-for `ResolvedAppConfig` (§5). Policies are **decoupled** from
-`app_configs` rows at the schema level: no foreign key, no cascade
-semantics, no shared lifecycle. The service layer joins at runtime on
-matching `name` and applies whatever policy row it finds.
+document — which app-config rows get merged as sources into the
+resolved view, and which scopes may be written. Policies are
+**decoupled** from `app_configs` rows at the schema level: no foreign
+key, no cascade semantics, no shared lifecycle. The service layer
+joins at runtime on matching `config_name` / `name` and applies
+whatever policy row it finds.
 
 ```python
 class AppConfigPolicyRow(Base):
     __tablename__ = "app_config_policies"
 
     id: Mapped[uuid.UUID]
-    name: Mapped[str]                         # UNIQUE — joined to
+    config_name: Mapped[str]                  # UNIQUE — joined to
                                               # `app_configs.name` by value only
                                               # (no FK, no lifecycle coupling).
                                               # Mutable — rename is allowed.
-    description: Mapped[str | None]
-    allowed_scopes: Mapped[list[str]]         # Dual meaning:
-                                              #   (1) scopes where this name may
-                                              #       be written (writes to other
-                                              #       scopes are rejected)
-                                              #   (2) merge order, low → high
-                                              #       priority (later wins)
+    scope_sources: Mapped[list[str]]          # Dual meaning:
+                                              #   (1) which `app_configs` rows
+                                              #       (by scope) are merged as
+                                              #       sources into the resolved
+                                              #       view, in order
+                                              #   (2) the corresponding write
+                                              #       allow-list — writes to
+                                              #       scopes outside the list
+                                              #       are rejected
+                                              # Order is low → high priority
+                                              # (later wins on deep merge).
                                               # Values align with
                                               # `AppConfigScopeType` but stored
                                               # as strings so that adding a new
@@ -235,18 +244,18 @@ class AppConfigPolicyRow(Base):
     updated_at: Mapped[datetime]
 
     __table_args__ = (
-        sa.UniqueConstraint("name", name="uq_app_config_policies_name"),
+        sa.UniqueConstraint("config_name", name="uq_app_config_policies_config_name"),
     )
 ```
 
 **Lifecycle decoupling**: there is no FK between `app_configs` and
 `app_config_policies`. A policy row may be deleted without touching
-the configs that matched it by `name`; configs may exist without a
-corresponding policy. Policies may be created before or after the
-configs they govern. The merge path (§5) likewise uses the policy's
-`allowed_scopes` as the chain order when present, and falls back to
-`DOMAIN_USER_DEFAULTS ⊕ USER` when absent. Policies are advisory, not
-authoritative.
+the configs that matched it by `config_name`; configs may exist
+without a corresponding policy. Policies may be created before or
+after the configs they govern. The merge path (§5) likewise uses the
+policy's `scope_sources` as the chain order when present, and falls
+back to `DOMAIN_USER_DEFAULTS ⊕ USER` when absent. Policies are
+advisory, not authoritative.
 
 ---
 
@@ -282,7 +291,7 @@ repositories/app_config_policy/
 | `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `search(domain_name, filter, pagination)` |
 | `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `search(domain_name, filter, pagination)` |
 | `UserAppConfigRepository`               | CRUD: `get / get_by_id / create / update / search` (all take `user_id` + `name`; `search` additionally takes `filter` + `pagination`). Plus merge-specific: `get_merged(user_id, name)`, `search_merged(user_id, filter, pagination)` — see the note below for roles. |
-| `AppConfigPolicyRepository`             | `get(name)`, `get_by_id(id)`, `create(name, description, allowed_scopes, user_writable)`, `update(name, description, allowed_scopes, user_writable)`, `search(filter, pagination)` — CRUD for the separate `app_config_policies` table (§1). Not joined to `app_configs` at the DB level; callers look policies up by `name` at runtime. |
+| `AppConfigPolicyRepository`             | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `search(filter, pagination)` — CRUD for the separate `app_config_policies` table (§1). Not joined to `app_configs` at the DB level; callers look policies up by `config_name` at runtime. |
 
 `DomainUserDefaultsAppConfigRepository` mirrors
 `DomainAppConfigRepository` (admin write + same-domain user read,
@@ -401,12 +410,12 @@ together. The policy repository exposes the same six-operation shape
 Write orchestration for `app_configs` consults the policy repository
 at the **service layer**, not inside `AppConfigRepository`. For each
 batch, the service collects the distinct `name`s, calls
-`AppConfigPolicyRepository.get(name)` (caching within the batch so a
-single policy is read once), and threads the result into per-item
-validation:
+`AppConfigPolicyRepository.get(config_name)` (caching within the
+batch so a single policy is read once), and threads the result into
+per-item validation:
 
 - If the policy row is present and `item.key.scopeType ∉
-  allowed_scopes`, the item is appended to `failed_list` with a
+  scope_sources`, the item is appended to `failed_list` with a
   policy-violation message — `AppConfigRepository.{create,update}` is
   not called for that item.
 - If the item is on the `bulk*MyAppConfigs` path, the policy is
@@ -495,7 +504,7 @@ type UserAppConfig implements Node {
 Resolved app-config view from the current user's perspective —
 accessible via `myAppConfigs` or `node(id)`. Deep-merges same-`name`
 source rows in the order prescribed by the matching
-`AppConfigPolicy.allowed_scopes`. When no policy exists for a name,
+`AppConfigPolicy.scope_sources`. When no policy exists for a name,
 the merge falls back to the BEP default chain
 (`DOMAIN_USER_DEFAULTS` → `USER`; admin-only `DOMAIN` is excluded).
 An entry appears whenever at least one source row exists.
@@ -521,7 +530,7 @@ type ResolvedAppConfig implements Node {
   """
   Raw source rows that contributed to `mergedConfig`, in merge order
   (low → high priority; later wins). The list matches the order of
-  the matching policy's `allowed_scopes`; when no policy exists it
+  the matching policy's `scope_sources`; when no policy exists it
   contains the subset of `[DOMAIN_USER_DEFAULTS, USER]` rows that
   exist. Each element is a raw `AppConfig` so callers can distinguish
   "admin-provided per-user default" from "what the user changed" by
@@ -652,10 +661,11 @@ type Query {
   ): AppConfigConnection!
 
   """
-  Single app-config policy by `name`. Any authenticated user may
-  read; policies are advisory and not secret.
+  Single app-config policy by the governed document's `configName`.
+  Any authenticated user may read; policies are advisory and not
+  secret.
   """
-  appConfigPolicy(name: String!): AppConfigPolicy
+  appConfigPolicy(configName: String!): AppConfigPolicy
 
   """
   Relay Connection over app-config policies. Any authenticated user
@@ -780,15 +790,6 @@ input AppConfigFilter {
   """Filter on document `name`."""
   name: StringFilter = null
 
-  """
-  Filter on the matching `AppConfigPolicy.name`. Since `AppConfig`
-  and `AppConfigPolicy` are joined by `name` value only (no FK, §1),
-  this is functionally equivalent to `name`; it is exposed as a
-  separate field so queries can read as "configs governed by
-  policy X" regardless of how the join is later realized.
-  """
-  policyName: StringFilter = null
-
   """`created_at` range filter."""
   createdAt: DateTimeFilter = null
 
@@ -836,8 +837,8 @@ enum AppConfigOrderField {
 
 """Filter for `appConfigPolicies`."""
 input AppConfigPolicyFilter {
-  """Filter on `name`."""
-  name: StringFilter = null
+  """Filter on `config_name` (the governed document's name)."""
+  configName: StringFilter = null
 
   """Filter on `user_writable`."""
   userWritable: BooleanFilter = null
@@ -859,7 +860,7 @@ input AppConfigPolicyOrderBy {
 }
 
 enum AppConfigPolicyOrderField {
-  NAME
+  CONFIG_NAME
   UPDATED_AT
   CREATED_AT
 }
@@ -883,10 +884,9 @@ verbs for six total:
   documents. Returns a list of recomputed `ResolvedAppConfig` + a list of
   per-item failures.
 - `adminBulk{Create,Update}AppConfigPolicies`: each item carries
-  `name` + policy fields (`description`, `allowedScopes`,
-  `userWritable`). **Admin-only**. Returns a list of
-  `AppConfigPolicy` + a list of per-item failures. There is no
-  my-path for policies.
+  `configName` + policy fields (`scopeSources`, `userWritable`).
+  **Admin-only**. Returns a list of `AppConfigPolicy` + a list of
+  per-item failures. There is no my-path for policies.
 
 **Partial success**: every bulk mutation runs each item in its own
 DB transaction — a single failure does not abort the rest, and the
@@ -1114,14 +1114,14 @@ type BulkUpdateMyAppConfigsPayload {
 
 """Per-item input for `adminBulkCreate/UpdateAppConfigPolicies`."""
 input AdminAppConfigPolicyItemInput {
-  """Target policy `name` (unique across the table)."""
-  name: String!
+  """Governed document's `configName` (unique across the policies table)."""
+  configName: String!
 
-  """Human-readable description."""
-  description: String = null
-
-  """Scopes where this name may be written, in merge order."""
-  allowedScopes: [String!]!
+  """
+  Scopes whose rows are merged as sources into the resolved view,
+  in order (low → high priority). Also acts as the write allow-list.
+  """
+  scopeSources: [String!]!
 
   """Whether the owner may write their own `USER`-scope row."""
   userWritable: Boolean!
@@ -1140,8 +1140,8 @@ Per-item error info for a failed item in an admin policy bulk write.
 Shared by both admin policy bulk mutations.
 """
 type AdminAppConfigPolicyError {
-  """Name of the failed item."""
-  name: String!
+  """`configName` of the failed item."""
+  configName: String!
 
   """Error message describing the failure."""
   message: String!
@@ -1197,12 +1197,12 @@ type AppConfig implements Node {
 # ── App Config Policy ────────────────────────────────────────
 
 """
-Advisory policy for an app-config document `name` — controls which
-scopes may hold a row for that name and the merge order used when
-building `ResolvedAppConfig` (§5). Policies are decoupled from
-`AppConfig` rows at the schema level (§1 "App Config Policy table"):
-there is no FK, and configs and policies are joined by `name` value
-only at runtime.
+Advisory policy for an app-config document — controls which scopes'
+rows are merged as sources into `ResolvedAppConfig` (§5) and which
+scopes may be written. Policies are decoupled from `AppConfig` rows
+at the schema level (§1 "App Config Policy table"): there is no FK,
+and configs and policies are joined by `configName` value only at
+runtime.
 
 Read: any authenticated user. Write: admin only, via
 `adminBulkCreate/UpdateAppConfigPolicies`.
@@ -1214,28 +1214,26 @@ type AppConfigPolicy implements Node {
   id: ID!
 
   """
-  Document name this policy applies to (unique across the table).
+  The governed document's `name` (unique across the policies table).
   Joined to `AppConfig.name` by value only — no FK. Mutable; rename
   is allowed and does not cascade.
   """
-  name: String!
-
-  """Human-readable description of what the document governs."""
-  description: String
+  configName: String!
 
   """
-  Dual meaning: (1) the scopes where a row with this `name` may be
-  written (writes to other scopes are rejected), and (2) the merge
-  order for `ResolvedAppConfig` — low → high priority, i.e. the last
-  element wins on deep merge. Values align with `AppConfigScopeType`
-  but are stored as strings so that adding a new scope does not
-  require migrating this column.
+  Dual meaning: (1) which `AppConfig` rows (by `scopeType`) are
+  merged as sources into the resolved view, in order, and (2) the
+  corresponding write allow-list — writes to scopes outside the list
+  are rejected. Order is low → high priority; the last element wins
+  on deep merge. Values align with `AppConfigScopeType` but are
+  stored as strings so that adding a new scope does not require
+  migrating this column.
   """
-  allowedScopes: [String!]!
+  scopeSources: [String!]!
 
   """
   Whether the owner may write their own `USER`-scope row for this
-  `name` via the `bulk*MyAppConfigs` path. The admin path is not
+  document via the `bulk*MyAppConfigs` path. The admin path is not
   gated by this flag — admins may seed USER rows regardless.
   """
   userWritable: Boolean!
@@ -1424,7 +1422,7 @@ projection of the GQL `ResolvedAppConfig`):
 ```
 
 The `sources` list is ordered low → high priority (same order as the
-matching policy's `allowed_scopes`, or `[DOMAIN_USER_DEFAULTS, USER]`
+matching policy's `scope_sources`, or `[DOMAIN_USER_DEFAULTS, USER]`
 when no policy exists). Elements appear only for scopes whose row
 exists for this `(user, name)`.
 
@@ -1481,14 +1479,14 @@ are available to any authenticated user; writes are admin-only.
 | Method | Path                                         | Access | Maps to                               |
 |--------|----------------------------------------------|--------|---------------------------------------|
 | GET    | `/v2/app-config-policies`                    | User   | `appConfigPolicies` (Connection)      |
-| GET    | `/v2/app-config-policies/{name}`             | User   | `appConfigPolicy(name)`               |
+| GET    | `/v2/app-config-policies/{config_name}`      | User   | `appConfigPolicy(configName)`         |
 | POST   | `/v2/app-config-policies/bulk-create`        | Admin  | `adminBulkCreateAppConfigPolicies`    |
 | POST   | `/v2/app-config-policies/bulk-update`        | Admin  | `adminBulkUpdateAppConfigPolicies`    |
 
 Request / response bodies are the snake_case projection of the
 corresponding GQL input / payload — `items[]` for writes, a
 `{ data: [...], page_info: {...}, count: N }` envelope for list
-reads, and a single policy object for the `{name}` GET.
+reads, and a single policy object for the `{config_name}` GET.
 
 ---
 
@@ -1520,11 +1518,11 @@ unaffected by whatever rows exist for `theme`.
 ### Chain order (policy-driven)
 
 The merge chain for a given `(user_id, name)` is determined at read
-time by the matching `AppConfigPolicy.allowed_scopes` (§1):
+time by the matching `AppConfigPolicy.scope_sources` (§1):
 
 1. Service looks up the policy by `name` —
    `AppConfigPolicyRepository.get(name)`.
-2. If the policy is present, the chain is exactly its `allowed_scopes`
+2. If the policy is present, the chain is exactly its `scope_sources`
    in order (low → high priority; later elements win on deep merge).
    Each scope contributes its natural `scope_id` — `PUBLIC` uses the
    literal `"public"`, `DOMAIN` / `DOMAIN_USER_DEFAULTS` use the
@@ -1534,7 +1532,7 @@ time by the matching `AppConfigPolicy.allowed_scopes` (§1):
    admin-only policy and stays out of the resolved view.
 
 A policy may therefore define chains of any length — a single-scope
-policy (`allowed_scopes=["domain_user_defaults"]` for admin-only
+policy (`scope_sources=["domain_user_defaults"]` for admin-only
 documents like `theme`), the default 2-chain, or wider chains that
 pull in `PUBLIC` or `DOMAIN` when the use case calls for it.
 
@@ -1586,7 +1584,7 @@ class AppConfigDBSource:
         chain: list[AppConfigScopeType],
     ) -> MergedAppConfig:
         # `chain` is the ordered list of scopes — derived by the
-        # service either from the matching policy's `allowed_scopes`
+        # service either from the matching policy's `scope_sources`
         # or from the BEP-1052 default `[DOMAIN_USER_DEFAULTS, USER]`.
         # A single SQL resolves the caller's domain_name via a `users`
         # subquery and pulls one row per scope in `chain` where it
@@ -1835,7 +1833,7 @@ query BootstrapMe {
 
 - Server: `myAppConfigs` returns one entry per `name` for which at
   least one source row in the merge chain exists. The chain comes
-  from the matching `AppConfigPolicy.allowed_scopes` when present,
+  from the matching `AppConfigPolicy.scope_sources` when present,
   and defaults to `[DOMAIN_USER_DEFAULTS, USER]` (caller / caller's
   domain) otherwise. `sources` carries the raw rows in chain order;
   `mergedConfig` is their deep merge. See §5.
@@ -1895,7 +1893,7 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
   sent in the same payload — there is no partial-merge or per-key
   patch.
 - **Policy**: if an `AppConfigPolicy` exists for `name` and either
-  `USER ∉ allowed_scopes` or `user_writable = False`, the item is
+  `USER ∉ scope_sources` or `user_writable = False`, the item is
   appended to `failed` with a policy-violation message. Clients can
   discover this ahead of time by reading the policy via
   `appConfigPolicy(name:)`.
@@ -1908,20 +1906,25 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
 
 ### S3.5. Admin publishes an app-config policy
 
-Before the `theme` document can be published under
-`DOMAIN_USER_DEFAULTS` (S4 below), an admin establishes a policy for
-`theme` that restricts writes to the admin-only scope and forbids
-per-user customization. This policy is optional — without it, writes
-proceed under the natural-key rules alone — but publishing it makes
-"theme is admin-only" enforceable as data rather than convention.
+Before the `theme` document can be published (S4 below), an admin
+establishes a policy for `theme` that restricts writes to an
+admin-only scope and forbids per-user customization. This policy is
+optional — without it, writes proceed under the natural-key rules
+alone — but publishing it makes "theme is admin-only" enforceable as
+data rather than convention.
+
+The choice of scope for the admin-owned value — `domain` vs
+`domain_user_defaults` — is up to the admin; the two scopes carry
+identical access rules and either can participate in the resolved
+merge through the policy. The example below uses `domain`.
 
 ```graphql
 mutation PublishThemePolicy(
   $input: AdminBulkCreateAppConfigPolicyInput!
 ) {
   adminBulkCreateAppConfigPolicies(input: $input) {
-    created { id name allowedScopes userWritable }
-    failed { name message }
+    created { id configName scopeSources userWritable }
+    failed { configName message }
   }
 }
 ```
@@ -1931,9 +1934,8 @@ mutation PublishThemePolicy(
   "input": {
     "items": [
       {
-        "name": "theme",
-        "description": "Branding + theme document for the domain. Admin-only, readable by users through the merged view.",
-        "allowedScopes": ["domain_user_defaults"],
+        "configName": "theme",
+        "scopeSources": ["domain"],
         "userWritable": false
       }
     ]
@@ -1943,16 +1945,96 @@ mutation PublishThemePolicy(
 
 - Authorization: admin required.
 - Effect:
-  - Writes to `theme` at any scope other than `DOMAIN_USER_DEFAULTS`
-    are rejected at the service layer.
+  - Writes to `theme` at any scope other than `DOMAIN` are rejected
+    at the service layer.
   - `bulk*MyAppConfigs` calls targeting `theme` are rejected because
     `user_writable = false`.
   - `myAppConfigs` entries for `theme` are resolved through the
-    chain `[DOMAIN_USER_DEFAULTS]` (single-scope — `sources` has at
-    most one element and `mergedConfig` equals that element's
-    `config`).
+    chain `[DOMAIN]` (single-scope — `sources` has at most one
+    element and `mergedConfig` equals that element's `config`).
 - Subsequent edits use `adminBulkUpdateAppConfigPolicies` with the
-  same `name`.
+  same `configName`.
+
+### S3.6. Varied policy shapes
+
+Same mechanics as S3.5 with different `scopeSources` / `userWritable`
+combinations. Each shape backs a different product decision:
+
+- **`[user]`, `userWritable=true`** — purely user-local document.
+  Admin seeding and domain defaults play no role; the resolved view
+  is either the user's own row or nothing. Fits "this tab's column
+  order", "editor keybindings", or other state the user alone
+  authors.
+- **`[domain]`, `userWritable=false`** — strict admin-owned document
+  with no per-user override. Fits the default `theme` setup used in
+  S3.5 / S4.
+- **`[domain, user]`, `userWritable=true`** — admin establishes a
+  baseline at `DOMAIN`, users may override it on their own `USER`
+  row. The per-user merge produces the domain value plus whatever
+  the user set on top. Site operators pick this shape when they want
+  a default everyone starts with but individuals can customize.
+- **`[domain, domain_user_defaults, user]`, `userWritable=true`** —
+  three-layer chain. The admin can publish a domain-wide value
+  (`DOMAIN`) as the strongest admin signal, a softer per-user seed
+  (`DOMAIN_USER_DEFAULTS`) that newcomers inherit at boot, and then
+  the user's own override (`USER`). Useful when the admin wants a
+  "floor" (`DOMAIN`) separate from an "initial value" shipped to
+  each user.
+
+Any of the above may be switched live: an admin editing
+`adminBulkUpdateAppConfigPolicies` for `theme` from `[domain]` +
+`userWritable=false` to `[domain, user]` + `userWritable=true`
+immediately loosens the document — existing admin rows remain, and
+from the next `bulkUpdateMyAppConfigs` onward users can layer their
+own customization on top (§7 S3.7).
+
+### S3.7. Promoting a document from admin-only to user-customizable
+
+A site operator initially published `theme` under the strict policy
+from S3.5 (`scopeSources=["domain"]`, `userWritable=false`). After
+user feedback, they decide individual users should be able to tweak
+accent colors on top of the domain's theme.
+
+```graphql
+mutation PromoteThemePolicy(
+  $input: AdminBulkUpdateAppConfigPolicyInput!
+) {
+  adminBulkUpdateAppConfigPolicies(input: $input) {
+    updated { id configName scopeSources userWritable }
+    failed { configName message }
+  }
+}
+```
+
+```json
+{
+  "input": {
+    "items": [
+      {
+        "configName": "theme",
+        "scopeSources": ["domain", "user"],
+        "userWritable": true
+      }
+    ]
+  }
+}
+```
+
+- Authorization: admin required.
+- Effect:
+  - No data migration — the existing `DOMAIN` row for `theme` stays
+    as-is.
+  - Users can now call `bulkCreate/UpdateMyAppConfigs` targeting
+    `theme` and write their own `USER` row.
+  - The next `myAppConfigs` call returns `theme` entries whose
+    `sources` is `[<DOMAIN row>, <USER row if present>]` and whose
+    `mergedConfig` is `domain ⊕ user`.
+- Reversibility: flipping the policy back to
+  `scopeSources=["domain"]` + `userWritable=false` blocks new user
+  writes and excludes `USER` rows from the resolved view, but leaves
+  any pre-existing `USER` rows untouched at the DB level (they
+  simply stop being read). Admins who want those rows gone need a
+  one-off cleanup — not part of this BEP.
 
 ### S4. Admin publishes a per-user default for a domain
 
@@ -2002,10 +2084,10 @@ mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigInput!) {
   Items whose key already has a row land in `failed` — the admin
   falls back to `adminBulkUpdateAppConfigs`.
 - Policy: if an `AppConfigPolicy` exists for `theme` and
-  `DOMAIN_USER_DEFAULTS ∉ allowed_scopes`, the item is rejected with
+  `DOMAIN_USER_DEFAULTS ∉ scope_sources`, the item is rejected with
   a policy-violation message. The typical setup for a document like
   `theme` — as shown in S3.5 — lists
-  `allowed_scopes=["domain_user_defaults"]`, which admits this
+  `scope_sources=["domain_user_defaults"]`, which admits this
   write.
 - Effect: every user in the domain picks up the new defaults on the
   next `myAppConfigs` read (merged per §5).
@@ -2051,10 +2133,10 @@ mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigInput!) {
 - `adminBulkCreateAppConfigs` fails the item if a row already exists
   for the key; use `adminBulkUpdateAppConfigs` instead to overwrite.
 - Policy: if an `AppConfigPolicy` for `preferences` has `USER ∉
-  allowed_scopes`, the admin path still rejects the item
-  (`allowed_scopes` applies to both paths — admins just bypass
+  scope_sources`, the admin path still rejects the item
+  (`scope_sources` applies to both paths — admins just bypass
   `user_writable`, not the scope list). With the usual
-  `preferences`-style policy (`allowed_scopes` includes `USER`) this
+  `preferences`-style policy (`scope_sources` includes `USER`) this
   write passes.
 - The response is a list of raw `AppConfig`; the target user's
   resolved view reflects the new USER row (merged with the matching
@@ -2098,10 +2180,6 @@ query AuditConfigs(
 
 - Server: service-layer admin check → Connection search. In cursor
   mode the sort order is pinned to the cursor key.
-- Filters can also key off `policyName` — e.g. `"policyName": {
-  "equals": "theme" }` returns every `AppConfig` whose `name` matches
-  the `theme` policy, which is identical to filtering by `name` but
-  reads as "configs governed by policy X".
 
 ---
 
@@ -2115,10 +2193,13 @@ may become a follow-up BEP if it earns its own motivation.
   part of a migration so the advisory layer is populated on first
   deploy. This BEP does not prescribe a seed; the operational team
   picks whether to seed and with which values.
-- **Mutable vs. immutable policy `name`** — currently mutable. If
+- **Mutable vs. immutable `config_name`** — currently mutable. If
   client-breaking renames become a concern, a future change can mark
-  `name` immutable (block `update` on that field) without any wire-
-  format change.
+  `config_name` immutable (block `update` on that field) without any
+  wire-format change.
+- **Policy `description`** — intentionally dropped from the initial
+  table. A human-readable summary is useful for admin UIs listing
+  policies; adding it later is a non-breaking column addition.
 - **JSON-schema validation** — a natural extension to
   `AppConfigPolicy` is a `json_schema` field that the service runs
   each write against. Deferred to a follow-up so this BEP stays
@@ -2129,10 +2210,10 @@ may become a follow-up BEP if it earns its own motivation.
   accept that existing rows become policy-less. A `deprecated` flag
   is a reasonable future extension.
 - **Policy audit trail** — history of changes to an
-  `AppConfigPolicy` (who changed `allowed_scopes` from X to Y, when)
+  `AppConfigPolicy` (who changed `scope_sources` from X to Y, when)
   is not modelled here. If audit becomes important, a paired
   `app_config_policy_audit_log` table is the natural fit.
 - **Invariant: `user_writable = True` requires `USER ∈
-  allowed_scopes`** — not enforced today; the two fields are kept
+  scope_sources`** — not enforced today; the two fields are kept
   independent. A future BEP may add the invariant if the combination
   is shown to confuse operators.
