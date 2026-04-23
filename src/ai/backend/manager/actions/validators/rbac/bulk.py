@@ -1,6 +1,7 @@
 from typing import Any, override
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.validator.bulk import (
@@ -9,7 +10,6 @@ from ai.backend.manager.actions.validator.bulk import (
     DeniedEntity,
 )
 from ai.backend.manager.data.permission.role import BulkPermissionCheckInput
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -35,7 +35,7 @@ class BulkActionRBACValidator(BulkActionValidator):
     ) -> BulkValidationResult:
         user = current_user()
         if user is None:
-            raise UserNotFound("User not found in context")
+            raise UnreachableError("User context is not available")
         entity_ids = list(action.entity_ids)
         if user.is_superadmin:
             return BulkValidationResult(
