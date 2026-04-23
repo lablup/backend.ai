@@ -9,6 +9,7 @@ from ai.backend.manager.actions.validator.bulk import (
     BulkValidationResult,
     DeniedEntity,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.role import BulkPermissionCheckInput
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -21,8 +22,10 @@ class BulkActionRBACValidator(BulkActionValidator):
     def __init__(
         self,
         repository: PermissionControllerRepository,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._repository = repository
+        self._config_provider = config_provider
 
     @classmethod
     @override
@@ -33,10 +36,16 @@ class BulkActionRBACValidator(BulkActionValidator):
     async def validate(
         self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
+        entity_ids = list(action.entity_ids)
+        if not self._config_provider.config.manager.rbac.enforcement_enabled:
+            return BulkValidationResult(
+                allowed_entity_ids=entity_ids,
+                denied_entities=[],
+            )
+
         user = current_user()
         if user is None:
             raise UnreachableError("User context is not available")
-        entity_ids = list(action.entity_ids)
         if user.is_superadmin:
             return BulkValidationResult(
                 allowed_entity_ids=entity_ids,
