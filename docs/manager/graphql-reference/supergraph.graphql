@@ -3689,6 +3689,22 @@ input CreateRoleInput
   scopes: [ScopeInput!] = null
 }
 
+"""Added in UNRELEASED. Input for creating role invitations."""
+input CreateRoleInvitationInput
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID!
+  emails: [String!]!
+}
+
+"""Added in UNRELEASED. Payload for role invitation creation."""
+type CreateRoleInvitationPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Always true for a successful request"""
+  ok: Boolean!
+}
+
 """Added in 26.4.2. Input for creating a runtime variant."""
 input CreateRuntimeVariantInput
   @join__type(graph: STRAWBERRY)
@@ -10961,6 +10977,18 @@ type Mutation
   """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
   adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload! @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. Create role invitations by email."""
+  createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Accept a pending role invitation."""
+  acceptRoleInvitation(invitationId: UUID!): RoleInvitation! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Reject a pending role invitation."""
+  rejectRoleInvitation(invitationId: UUID!): RoleInvitation! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Cancel a pending role invitation (admin only)."""
+  adminCancelRoleInvitation(invitationId: UUID!): RoleInvitation! @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
   adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInputGQL!): CreateKeypairResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
 
@@ -13516,6 +13544,14 @@ type Query
   """
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection! @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. List the current user's role invitations."""
+  myRoleInvitations(limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. List invitations for a specific role (admin only).
+  """
+  adminRoleInvitations(roleId: UUID!, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection! @join__field(graph: STRAWBERRY)
 
@@ -15288,6 +15324,66 @@ input RoleFilter
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
+}
+
+"""Added in UNRELEASED. A role invitation."""
+type RoleInvitation implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Inviter user ID."""
+  inviterUserId: UUID
+
+  """Invitee user ID."""
+  inviteeUserId: UUID!
+
+  """Role ID."""
+  roleId: UUID!
+
+  """Invitation state."""
+  state: RoleInvitationState!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Role invitation connection."""
+type RoleInvitationConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleInvitationEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RoleInvitationEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RoleInvitation!
+}
+
+"""Added in UNRELEASED. Role invitation state."""
+enum RoleInvitationState
+  @join__type(graph: STRAWBERRY)
+{
+  PENDING @join__enumValue(graph: STRAWBERRY)
+  ACCEPTED @join__enumValue(graph: STRAWBERRY)
+  REJECTED @join__enumValue(graph: STRAWBERRY)
+  CANCELED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.3.0. Order by specification for roles"""
