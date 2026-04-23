@@ -312,7 +312,7 @@ class TestAcceptRejectCancelInvitation:
             )
         )
         # Find via role search
-        search_result = await admin_v2_registry.role_invitation.role_search(
+        search_result = await admin_v2_registry.role_invitation.search_by_role(
             target_role.role.id, SearchRoleInvitationsInput()
         )
         pending = [inv for inv in search_result.items if inv.state == "pending"]
@@ -370,7 +370,7 @@ class TestAcceptRejectCancelInvitation:
                 emails=[regular_user_fixture.email],
             )
         )
-        search_result = await admin_v2_registry.role_invitation.role_search(
+        search_result = await admin_v2_registry.role_invitation.search_by_role(
             target_role.role.id, SearchRoleInvitationsInput()
         )
         pending = [inv for inv in search_result.items if inv.state == "pending"]
@@ -423,7 +423,7 @@ class TestSearchInvitations:
                 emails=[regular_user_fixture.email],
             )
         )
-        result = await admin_v2_registry.role_invitation.role_search(
+        result = await admin_v2_registry.role_invitation.search_by_role(
             target_role.role.id, SearchRoleInvitationsInput()
         )
         assert isinstance(result, SearchRoleInvitationsPayload)

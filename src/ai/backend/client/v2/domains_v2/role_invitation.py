@@ -69,7 +69,7 @@ class V2RoleInvitationClient(BaseDomainClient):
             response_model=SearchRoleInvitationsPayload,
         )
 
-    async def role_search(
+    async def search_by_role(
         self,
         role_id: UUID,
         request: SearchRoleInvitationsInput,

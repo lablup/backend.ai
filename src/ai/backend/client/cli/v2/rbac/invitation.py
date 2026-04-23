@@ -162,7 +162,7 @@ def role_search(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.role_invitation.role_search(
+            result = await registry.role_invitation.search_by_role(
                 role_id,
                 SearchRoleInvitationsInput(order=orders, limit=limit, offset=offset),
             )
