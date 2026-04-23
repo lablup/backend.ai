@@ -50,7 +50,6 @@ from ai.backend.manager.models.group import (
     AssocGroupUserRow,
     GroupRow,
     ProjectType,
-    association_groups_users,
 )
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -198,16 +197,15 @@ class UserDBSource:
             project_ids = await self._get_project_scope_ids_for_user(
                 db_session, domain_name, [UUID(gid) for gid in group_ids or []]
             )
-            project_scope_refs = [
-                RBACElementRef(RBACElementType.PROJECT, str(pid)) for pid in project_ids
-            ]
 
-            # Insert user with RBAC scope associations (domain + projects)
+            # Insert user with RBAC scope association at domain scope.
+            # Project-scope associations are created below by
+            # _add_user_to_project_in_session, sharing the same path as
+            # modifyGroup / modify_user.
             rbac_creator = RBACEntityCreator(
                 spec=creator.spec,
                 element_type=RBACElementType.USER,
                 scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_name),
-                additional_scope_refs=project_scope_refs,
             )
             result = await execute_rbac_entity_creator(db_session, rbac_creator)
             row = result.row
@@ -246,12 +244,16 @@ class UserDBSource:
             row.main_access_key = kp_data.access_key
             created_user.main_access_key = kp_data.access_key
 
-            # Add user to groups (using already-resolved project_ids)
-            if project_ids:
-                await self._add_user_to_groups(db_session, created_user.uuid, project_ids)
+            # Add user to each project using the same RBAC-aware path as
+            # modifyGroup / modify_user. This inserts association_groups_users,
+            # creates the project-scope RBAC binding, and maps the user to the
+            # project's member role.
+            for project_id in project_ids:
+                await self._add_user_to_project_in_session(
+                    db_session, created_user.uuid, project_id
+                )
 
             # Create RBAC role and map user to role
-            # Note: Entity-Scope association is handled by RBACEntityCreator above
             role = await self._role_manager.create_system_role(db_session, created_user)
             user_role_creator = Creator(
                 spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
@@ -298,16 +300,15 @@ class UserDBSource:
         project_ids = await self._get_project_scope_ids_for_user(
             db_session, spec.domain_name, [UUID(gid) for gid in item.group_ids or []]
         )
-        project_scope_refs = [
-            RBACElementRef(RBACElementType.PROJECT, str(pid)) for pid in project_ids
-        ]
 
-        # Insert user with RBAC scope associations (domain + projects)
+        # Insert user with RBAC scope association at domain scope.
+        # Project-scope associations are created below by
+        # _add_user_to_project_in_session, sharing the same path as
+        # modifyGroup / modify_user.
         rbac_creator = RBACEntityCreator(
             spec=item.creator.spec,
             element_type=RBACElementType.USER,
             scope_ref=RBACElementRef(RBACElementType.DOMAIN, spec.domain_name),
-            additional_scope_refs=project_scope_refs,
         )
         result = await execute_rbac_entity_creator(db_session, rbac_creator)
         row = result.row
@@ -345,9 +346,10 @@ class UserDBSource:
         row.main_access_key = kp_data.access_key
         created_user.main_access_key = kp_data.access_key
 
-        # Add user to groups (using already-resolved project_ids)
-        if project_ids:
-            await self._add_user_to_groups(db_session, created_user.uuid, project_ids)
+        # Add user to each project using the same RBAC-aware path as
+        # modifyGroup / modify_user.
+        for project_id in project_ids:
+            await self._add_user_to_project_in_session(db_session, created_user.uuid, project_id)
 
         # Create RBAC role and map user to role
         role = await self._role_manager.create_system_role(db_session, created_user)
@@ -868,18 +870,6 @@ class UserDBSource:
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return cast(UserRow, res)
-
-    async def _add_user_to_groups(
-        self, db_session: SASession, user_uuid: UUID, project_ids: Iterable[UUID]
-    ) -> None:
-        """Add user to groups using pre-resolved project IDs.
-
-        Note: RBAC scope associations are handled by RBACEntityCreator in create_user_validated().
-        This method only handles the association_groups_users table.
-        """
-        group_data = [{"user_id": user_uuid, "group_id": pid} for pid in project_ids]
-        if group_data:
-            await db_session.execute(sa.insert(association_groups_users).values(group_data))
 
     async def _get_project_scope_ids_for_user(
         self, db_session: SASession, domain_name: str, project_ids: Iterable[UUID]

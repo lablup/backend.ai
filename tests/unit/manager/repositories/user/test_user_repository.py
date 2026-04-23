@@ -403,6 +403,59 @@ class TestUserRepository:
         assert result.keypair is not None
         assert result.keypair.access_key is not None
 
+    async def test_create_user_validated_maps_project_member_role(
+        self,
+        user_repository: UserRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+        sample_group_id: str,
+    ) -> None:
+        """New users must be mapped to their project's member role so that
+        project-scoped RBAC checks (vfolder listing, folder count, user
+        storage usage) succeed immediately after creation.
+        """
+        spec = UserCreatorSpec(
+            username=f"newuser-{uuid.uuid4().hex[:8]}",
+            email=f"newuser-{uuid.uuid4().hex[:8]}@example.com",
+            password=create_test_password_info("new_password"),
+            need_password_change=False,
+            full_name="New User",
+            description="New User Description",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+        creator = Creator(spec=spec)
+
+        result = await user_repository.create_user_validated(
+            creator,
+            group_ids=[sample_group_id],
+        )
+
+        member_role_name = f"project-{sample_group_id[:8]}-member"
+        async with db_with_cleanup.begin_readonly_session() as session:
+            mapped_role_name = await session.scalar(
+                sa.select(RoleRow.name)
+                .join(UserRoleRow, UserRoleRow.role_id == RoleRow.id)
+                .where(
+                    UserRoleRow.user_id == result.user.uuid,
+                    RoleRow.name == member_role_name,
+                )
+            )
+        assert mapped_role_name == member_role_name, (
+            f"newly created user {result.user.uuid} was not mapped to the "
+            f"project's member role {member_role_name}"
+        )
+
     async def test_create_user_validated_domain_not_exists(
         self,
         user_repository: UserRepository,
