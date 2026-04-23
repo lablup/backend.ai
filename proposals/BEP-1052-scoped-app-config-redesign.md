@@ -82,11 +82,11 @@ Summary matrix:
 - **All writes are bulk-only.** There are no single-item mutations —
   callers pass a list (even a 1-element list for a single write) and
   get a partial-success payload back. The admin path exposes three
-  verbs (`create` / `update` / `purge`) — `adminBulkCreateAppConfigs`
-  and siblings cover every scope, admin-only, return raw `AppConfig`
+  verbs (`create` / `update` / `purge`) — `adminBulkCreateAppConfigSources`
+  and siblings cover every scope, admin-only, return raw `AppConfigSource`
   lists. The self-service (my) path exposes two verbs
-  (`create` / `update`) — `bulkCreateMyAppConfigs` and siblings, with
-  `USER` + `current_user` implicit and merged `ResolvedAppConfig` in
+  (`create` / `update`) — `bulkCreateMyAppConfigSources` and siblings, with
+  `USER` + `current_user` implicit and merged `AppConfig` in
   the response. `create` strictly inserts (per-item failure if any
   row exists for the key); `update` replaces the existing row's
   stored JSON wholesale; `purge` is an **admin-only cleanup verb**
@@ -96,17 +96,17 @@ Summary matrix:
   failure does not abort the rest. Identification uses the
   `(scope, scopeId, name)` natural key, never Relay `id` — my-path
   mutations have scope/scopeId injected by the server.
-- **Single source-of-truth table**: a single `app_configs` table holds
+- **Single source-of-truth table**: a single `app_config_sources` table holds
   every scope; only the exposure layer is split.
 - **Relay style**: Input/Payload conventions and the Node interface.
 
 ---
 
-## 1. DB Layer — `app_configs` table
+## 1. DB Layer — `app_config_sources` table
 
 ### Schema changes
 
-Add a `name` column to `app_configs`. The natural-key uniqueness
+Add a `name` column to `app_config_sources`. The natural-key uniqueness
 constraint becomes `(scope_type, scope_id, name)`.
 
 ```python
@@ -118,9 +118,9 @@ class AppConfigScopeType(enum.StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class AppConfigKey:
+class AppConfigSourceKey:
     """
-    Natural-key identifier for a single app_configs row.
+    Natural-key identifier for a single app_config_sources row.
     Used everywhere the trio `(scope_type, scope_id, name)` would
     otherwise appear together as parameters.
     """
@@ -129,8 +129,8 @@ class AppConfigKey:
     name: str
 
 
-class AppConfigRow(Base):
-    __tablename__ = "app_configs"
+class AppConfigSourceRow(Base):
+    __tablename__ = "app_config_sources"
 
     id: Mapped[uuid.UUID]
 
@@ -156,7 +156,7 @@ class AppConfigRow(Base):
 
     __table_args__ = (
         sa.UniqueConstraint(
-            "scope_type", "scope_id", "name", name="uq_app_configs_scope_name"
+            "scope_type", "scope_id", "name", name="uq_app_config_sources_scope_name"
         ),
     )
 ```
@@ -190,13 +190,13 @@ a document by `*Update*`-ing it to an empty JSON (`{}`).
   is not called.
 - `scope_type` must be in the policy's `scope_sources`; writes to
   other scopes are rejected as a per-item failure.
-- When the write is on the `USER` scope via a `bulk*MyAppConfigs`
+- When the write is on the `USER` scope via a `bulk*MyAppConfigSources`
   mutation, the policy's `user_writable` must be `True`; otherwise
   the item is rejected. The admin-path mutations are not gated by
   `user_writable` — admins may seed USER rows regardless of the
   flag.
 
-Because every AppConfig row is created under a matching policy, the
+Because every AppConfigSource row is created under a matching policy, the
 resolved merge (§5) always has a chain to follow — there is no
 "policy-less fallback" path.
 
@@ -206,7 +206,7 @@ A separate `app_config_policies` table holds the rules per document
 — which app-config rows get merged as sources into the resolved
 view, and which scopes may be written. Configs and policies are
 joined by `config_name` value, backed by a **FK** on
-`app_configs.name → app_config_policies.config_name` with no
+`app_config_sources.name → app_config_policies.config_name` with no
 `ON DELETE` / `ON UPDATE` action (Postgres default `NO ACTION`).
 The **service layer also enforces the required-policy invariant**
 explicitly with friendly per-item errors; the FK is defense-in-depth
@@ -218,15 +218,15 @@ class AppConfigPolicyRow(Base):
 
     id: Mapped[uuid.UUID]
     config_name: Mapped[str]                  # UNIQUE — referenced by
-                                              # `app_configs.name` via FK.
+                                              # `app_config_sources.name` via FK.
                                               # IMMUTABLE — rename is rejected
                                               # at the service layer. To "fix"
                                               # a wrongly-named policy, admins
                                               # purge the policy (and any
-                                              # AppConfig rows that used it)
+                                              # AppConfigSource rows that used it)
                                               # and create a new policy.
     scope_sources: Mapped[list[str]]          # Dual meaning:
-                                              #   (1) which `app_configs` rows
+                                              #   (1) which `app_config_sources` rows
                                               #       (by scope) are merged as
                                               #       sources into the resolved
                                               #       view, in order
@@ -243,7 +243,7 @@ class AppConfigPolicyRow(Base):
                                               # this column.
     user_writable: Mapped[bool]               # Whether the USER may write their
                                               # own USER-scope row via the
-                                              # `bulk*MyAppConfigs` path. Admin-
+                                              # `bulk*MyAppConfigSources` path. Admin-
                                               # path writes are not gated by
                                               # this flag.
     created_at: Mapped[datetime]
@@ -258,7 +258,7 @@ class AppConfigPolicyRow(Base):
 
 - **Create**: the service layer rejects an item with a friendly
   policy-not-found message when no policy exists for `config_name`.
-  If that check is ever bypassed, the FK `app_configs.name →
+  If that check is ever bypassed, the FK `app_config_sources.name →
   app_config_policies.config_name` still raises a foreign-key
   violation at the DB level.
 - **Policy rename**: not allowed. `config_name` is immutable —
@@ -268,19 +268,19 @@ class AppConfigPolicyRow(Base):
 - **Policy deletion**: there is no `update`-level policy deletion.
   The only removal path is `adminBulkPurgeAppConfigPolicies` (§3),
   and the service rejects the purge with a per-item error unless no
-  AppConfig row references the policy's `config_name`. If such rows
-  exist, the admin purges them first via `adminBulkPurgeAppConfigs`,
+  AppConfigSource row references the policy's `config_name`. If such rows
+  exist, the admin purges them first via `adminBulkPurgeAppConfigSources`,
   then the policy. The FK's `ON DELETE NO ACTION` is a second line
   of defense that would raise at commit time if the service check
   were ever bypassed.
-- **AppConfig deletion**: `adminBulkPurgeAppConfigs` is an
+- **AppConfig deletion**: `adminBulkPurgeAppConfigSources` is an
   admin-only cleanup verb for misconfigured rows. It is **not** a
   general "delete" — the BEP's user-facing contract is still that
   rows persist once written; purge is the escape hatch for fixing
   mistakes.
 
 The FK without cascade keeps the two tables weakly linked: the
-schema forbids orphan AppConfig rows and refuses to drop a policy
+schema forbids orphan AppConfigSource rows and refuses to drop a policy
 while its configs live, but it never silently deletes data. Service
 orchestration is still the primary enforcement point — the FK exists
 to catch the paths that don't go through the orchestrator.
@@ -289,20 +289,19 @@ to catch the paths that don't go through the orchestrator.
 
 ## 2. Repository Layer — split per scope
 
-Keep `models/app_config/row.py`'s `AppConfigRow` as a single class, but
-**split the repository into four classes per scope**. Their access
-policies and call patterns differ enough that combining them would make
-method signatures unwieldy.
+Keep `models/app_config_source/row.py`'s `AppConfigSourceRow` as a
+single class, and use **a single `AppConfigSourceRepository`** for
+all scopes. Prior drafts split the repository four ways (one per
+scope); the split added surface without real benefit because each
+scope variant was a thin `scope_type` / `scope_id` binding on the
+same table. One scope-parameterized repository is simpler.
 
 ```
-repositories/app_config/
+repositories/app_config_source/
 ├── db_source/
-│   └── db_source.py         # single db_source
-├── public_app_config_repository.py
-├── domain_app_config_repository.py
-├── domain_user_defaults_app_config_repository.py
-├── user_app_config_repository.py     # USER row CRUD + merged view (ResolvedAppConfig)
-└── repositories.py                   # exports all four repos
+│   └── db_source.py                  # single db_source
+├── app_config_source_repository.py   # all scopes; AppConfigSourceKey-addressed
+└── repositories.py
 
 repositories/app_config_policy/
 ├── db_source/
@@ -313,31 +312,21 @@ repositories/app_config_policy/
 
 ### Repository responsibility split
 
-| Repository                              | Methods                                                                                                              |
-|-----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `PublicAppConfigRepository`             | `get(name)`, `get_by_id(id)`, `create(name, extra_config)`, `update(name, extra_config)`, `purge(name)`, `search(filter, pagination)`                                             |
-| `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `purge(domain_name, name)`, `search(domain_name, filter, pagination)` |
-| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `purge(domain_name, name)`, `search(domain_name, filter, pagination)` |
-| `UserAppConfigRepository`               | CRUD: `get / get_by_id / create / update / purge / search` (all take `user_id` + `name`; `search` additionally takes `filter` + `pagination`). Plus merge-specific: `get_merged(user_id, name)`, `search_merged(user_id, filter, pagination)` — see the note below for roles. |
-| `AppConfigPolicyRepository`             | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(filter, pagination)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any AppConfig row still references the `config_name`. |
+| Repository                   | Methods                                                                                                              |
+|------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(filter, pagination)` for a bound scope, `admin_search(filter, pagination)` for cross-scope (admin). Plus merge-specific reads that serve the resolved view (`AppConfig`): `get_resolved_config(user_id, name, chain)`, `search_user_resolved_configs(user_id, filter, pagination, chain_for_name)` — see §5. |
+| `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(filter, pagination)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigSource` row still references the `config_name`. |
 
-`DomainUserDefaultsAppConfigRepository` mirrors
-`DomainAppConfigRepository` (admin write + same-domain user read,
-same call shape) but operates on
-`(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name)` rows.
-Splitting it from `DomainAppConfigRepository` keeps each repository
-mapped to exactly one scope, matching the rest of the layout.
-
-`UserAppConfigRepository` plays a **dual role** — raw `USER` row CRUD
-(returned to GQL as `AppConfig`) + read-side merged view (returned
-as `ResolvedAppConfig`, see §5). It takes a single
-`AppConfigDBSource` like the other scope repositories; the
-user → domain_name resolution needed by the merge is done inside the
-merge-specific DB method via a `users` subquery in a single SQL, so
-no separate `UserDBSource` is injected at the repository level. The
-GraphQL schema exposes raw `AppConfig` rows (regardless of scope)
-and the merged `ResolvedAppConfig` as separate types, but internally
-they share one repository — there is no `ResolvedAppConfigRepository`.
+`AppConfigSourceRepository` plays a **dual role** — raw row CRUD
+across every scope (served to GQL as `AppConfigSource`) + read-side
+merged view (served as `AppConfig`, see §5). It takes a single
+`AppConfigSourceDBSource`; the user → domain_name resolution needed
+by the merge is done inside the merge-specific DB method via a
+`users` subquery in a single SQL, so no separate `UserDBSource` is
+injected. The GraphQL schema exposes raw `AppConfigSource` rows
+(regardless of scope) and the merged `AppConfig` as separate types,
+but internally they share this one repository — there is no separate
+`AppConfigRepository`.
 
 
 ### `db_source` is a single module
@@ -346,17 +335,17 @@ The underlying table is the same, so the ORM query builder is managed
 in one place.
 
 ```python
-class AppConfigDBSource:
+class AppConfigSourceDBSource:
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get(self, key: AppConfigKey) -> AppConfigRow | None:
+    async def get(self, key: AppConfigSourceKey) -> AppConfigSourceRow | None:
         async with self._db.begin_readonly_session() as db_sess:
             ...
 
-    async def get_by_id(self, id: uuid.UUID) -> AppConfigRow | None:
+    async def get_by_id(self, id: uuid.UUID) -> AppConfigSourceRow | None:
         # ID-based lookup for Actions that have already resolved the
         # natural key to a row id (see §3 "Name → ID resolution").
         async with self._db.begin_readonly_session() as db_sess:
@@ -364,9 +353,9 @@ class AppConfigDBSource:
 
     async def create(
         self,
-        key: AppConfigKey,
+        key: AppConfigSourceKey,
         extra_config: Mapping[str, Any],
-    ) -> AppConfigRow:
+    ) -> AppConfigSourceRow:
         # Strict insert. Errors if any row already exists for the
         # natural key.
         async with self._db.begin_session() as db_sess:
@@ -374,9 +363,9 @@ class AppConfigDBSource:
 
     async def update(
         self,
-        key: AppConfigKey,
+        key: AppConfigSourceKey,
         extra_config: Mapping[str, Any],
-    ) -> AppConfigRow:
+    ) -> AppConfigSourceRow:
         # Replace the existing row's value with `extra_config`.
         # Errors if no row exists for the natural key.
         async with self._db.begin_session() as db_sess:
@@ -386,9 +375,9 @@ class AppConfigDBSource:
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-        filter: AppConfigFilter,
+        filter: AppConfigSourceFilter,
         pagination: Pagination,
-    ) -> AppConfigPage:
+    ) -> AppConfigSourcePage:
         # Within-scope search — bound to (scope_type, scope_id) and
         # applies filter / pagination in SQL. Cross-scope search has
         # a separate `admin_search(filter, pagination)` overload
@@ -402,9 +391,9 @@ repository's `search(...)` is a thin-delegate that binds
 `scope_type` / `scope_id`. Permission checks and scope validation
 are performed in the service layer.
 
-**Bulk mutation orchestration**: all AppConfig bulk mutations
-(`adminBulk{Create,Update,Purge}AppConfigs`,
-`bulk{Create,Update}MyAppConfigs`) follow the same service-layer
+**Bulk mutation orchestration**: all AppConfigSource bulk mutations
+(`adminBulk{Create,Update,Purge}AppConfigSources`,
+`bulk{Create,Update}MyAppConfigSources`) follow the same service-layer
 orchestration — each item runs in its own DB transaction so a
 single failure doesn't abort the rest (partial success), successes
 and failures collected into `BulkActionResult(success_list,
@@ -413,8 +402,9 @@ in the input list so the GQL/REST adapters can populate the
 per-verb error type's `index` field (see §3 error types), matching
 the existing `BulkCreateUserV2Error` / `BulkPurgeUserV2Error`
 convention elsewhere in the codebase. Admin bulk dispatches each
-item on `item.key.scopeType` to the matching scope repository; my
-bulk dispatches directly to `UserAppConfigRepository`. Not optimized
+item on `item.key` to `AppConfigSourceRepository.{create,update,purge}`;
+my bulk does the same with `item.key.scopeType = USER` +
+`scopeId = current_user.user_id` injected server-side. Not optimized
 as a single SQL batch: items split by scope can fail for
 heterogeneous reasons (unique-key violations, authorization errors,
 …), and representing partial success in one SQL statement is
@@ -425,12 +415,12 @@ The admin policy bulk mutations
 per-item / partial-success pattern against `AppConfigPolicyRepository`.
 `Update` rejects items that attempt to change `configName`
 (immutable, §1). `Purge` rejects items whose `configName` still has
-referencing `AppConfig` rows, preserving the required-policy
+referencing `AppConfigSource` rows, preserving the required-policy
 invariant for the rows that remain.
 
-`AppConfigFilter` / `AppConfigPage` / `Pagination` are internal
+`AppConfigSourceFilter` / `AppConfigSourcePage` / `Pagination` are internal
 containers at the repository / service layer — Python dataclasses
-corresponding 1:1 to the GraphQL `AppConfigFilter` (§3) at the
+corresponding 1:1 to the GraphQL `AppConfigSourceFilter` (§3) at the
 adapter boundary. Same name on purpose: GraphQL input is the wire
 format, the Python dataclass is the in-process DTO. Concrete
 definitions are intentionally left to the implementation phase
@@ -442,13 +432,13 @@ definitions are intentionally left to the implementation phase
 `AppConfigPolicyRepository` lives under
 `repositories/app_config_policy/` with its own
 `AppConfigPolicyDBSource`. It is intentionally kept separate from
-`AppConfigDBSource` — the tables share no FK and no joined query
+`AppConfigSourceDBSource` — the tables share no FK and no joined query
 surface, so collapsing them would bind two independent lifecycles
 together. The policy repository exposes the same six-operation shape
 (`get` / `get_by_id` / `create` / `update` / `search`; `delete` /
 `purge` omitted per the BEP-1052 write policy).
 
-Write orchestration for `app_configs` consults the policy repository
+Write orchestration for `app_config_sources` consults the policy repository
 at the **service layer**, not inside `AppConfigRepository`. For each
 batch, the service collects the distinct `name`s, calls
 `AppConfigPolicyRepository.get(config_name)` (caching within the
@@ -461,19 +451,19 @@ per-item validation:
 - If the policy row is present and `item.key.scopeType ∉
   scope_sources`, the item is appended to `failed_list` with a
   policy-violation message.
-- If the item is on the `bulk*MyAppConfigs` path, the policy is
+- If the item is on the `bulk*MyAppConfigSources` path, the policy is
   present, and `user_writable` is `False`, the item is likewise
   rejected without touching `AppConfigRepository`.
 
 The policy repository's own `update` method refuses to change
 `config_name` (immutable per §1). `AppConfigPolicyRepository.purge`
-first runs a reference check via `AppConfigDBSource` — if any
-`app_configs` row exists with matching `name`, the purge is rejected
+first runs a reference check via `AppConfigSourceDBSource` — if any
+`app_config_sources` row exists with matching `name`, the purge is rejected
 so the required-policy invariant cannot be broken retroactively.
 
 Reads do not consult the policy repository from within
 `AppConfigRepository`. The merge service (§5) performs its own policy
-lookup when assembling a `ResolvedAppConfig` because the chain order
+lookup when assembling a `AppConfig` because the chain order
 depends on it; per-scope raw reads do not.
 
 ---
@@ -484,18 +474,18 @@ depends on it; per-scope raw reads do not.
 
 There are two GQL types for app-config data:
 
-- `AppConfig` — one raw row from `app_configs`, regardless of scope.
+- `AppConfigSource` — one raw row from `app_config_sources`, regardless of scope.
   Carries `scopeType` + `scopeId` + `name` + `config` + `policy` so
   callers can disambiguate across scopes at read time. Defined
   further below (after the inputs/payloads that also reference it).
-- `ResolvedAppConfig` — the merged per-user view backed by the
+- `AppConfig` — the merged per-user view backed by the
   matching `AppConfigPolicy.scope_sources` chain (§5).
 
 Per-scope wrapper types (historical `PublicAppConfig`,
 `DomainAppConfig`, `UserAppConfig`) are **not** defined — they offered
-no information a single `AppConfig` type doesn't and added three
+no information a single `AppConfigSource` type doesn't and added three
 Connection / Edge / filter triples of boilerplate. Callers
-disambiguate scope by reading `AppConfig.scopeType` instead.
+disambiguate scope by reading `AppConfigSource.scopeType` instead.
 
 ```graphql
 """
@@ -507,18 +497,18 @@ backed by a policy (§1 required-policy invariant), so the chain is
 always defined by data. An entry appears whenever at least one
 source row exists.
 
-Although derived, `ResolvedAppConfig` implements `Node` — the
+Although derived, `AppConfig` implements `Node` — the
 `(user_id, name)` composite is encoded as a server-side global ID
-(`base64("ResolvedAppConfig:{user_id}:{name}")`). The `node(id)`
+(`base64("AppConfig:{user_id}:{name}")`). The `node(id)`
 resolver decodes the id and returns the merged view only when
 `decoded.user_id == current_user.id`. There is no admin override:
-`ResolvedAppConfig` is strictly the *current user's* resolved view,
+`AppConfig` is strictly the *current user's* resolved view,
 and admins do not get a path to see another user's resolved
 configuration through this type.
 """
-type ResolvedAppConfig implements Node {
+type AppConfig implements Node {
   """
-  Server-encoded global ID — `base64("ResolvedAppConfig:{user_id}:{name}")`.
+  Server-encoded global ID — `base64("AppConfig:{user_id}:{name}")`.
   """
   id: ID!
 
@@ -530,11 +520,11 @@ type ResolvedAppConfig implements Node {
   (low → high priority; later wins). The list matches the order of
   the matching policy's `scope_sources` — every `name` returned
   through `myAppConfigs` has a policy (§1). Each element is a raw
-  `AppConfig` so callers can distinguish
+  `AppConfigSource` so callers can distinguish
   "admin-provided per-user default" from "what the user changed" by
   inspecting `scopeType`.
   """
-  sources: [AppConfig!]!
+  sources: [AppConfigSource!]!
 
   """
   Effective applied value: deep merge of `sources` in order (left =
@@ -549,8 +539,8 @@ type ResolvedAppConfig implements Node {
 
 | Location      | Field                                                                                  |
 |---------------|----------------------------------------------------------------------------------------|
-| `DomainV2` | `appConfigs(filter, orderBy, ...pagination): AppConfigConnection!` (`scopeType = DOMAIN`, `scopeId = domain_name` pinned) |
-| `UserV2`   | `appConfigs(filter, orderBy, ...pagination): AppConfigConnection!` (`scopeType = USER`, `scopeId = user_id` pinned)       |
+| `DomainV2` | `appConfigs(filter, orderBy, ...pagination): AppConfigSourceConnection!` (`scopeType = DOMAIN`, `scopeId = domain_name` pinned) |
+| `UserV2`   | `appConfigs(filter, orderBy, ...pagination): AppConfigSourceConnection!` (`scopeType = USER`, `scopeId = user_id` pinned)       |
 
 ### Permissions
 
@@ -570,15 +560,15 @@ extend type DomainV2 {
   already pinned to this domain.
   """
   appConfigs(
-    filter: AppConfigFilter = null
-    orderBy: [AppConfigOrderBy!] = null
+    filter: AppConfigSourceFilter = null
+    orderBy: [AppConfigSourceOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): AppConfigConnection!
+  ): AppConfigSourceConnection!
 }
 
 extend type UserV2 {
@@ -588,21 +578,21 @@ extend type UserV2 {
   `filter.scopeId` are ignored — already pinned to this user.
   """
   appConfigs(
-    filter: AppConfigFilter = null
-    orderBy: [AppConfigOrderBy!] = null
+    filter: AppConfigSourceFilter = null
+    orderBy: [AppConfigSourceOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): AppConfigConnection!
+  ): AppConfigSourceConnection!
 }
 ```
 
 A root field `myAppConfigs` (Connection) returns the current user's
-**merged view** (`ResolvedAppConfig`) — different from the raw USER rows
-exposed by `UserV2.appConfigs` (raw `AppConfig`). Merging only
+**merged view** (`AppConfig`) — different from the raw USER rows
+exposed by `UserV2.appConfigs` (raw `AppConfigSource`). Merging only
 happens on this path (§5).
 
 ### Queries
@@ -613,16 +603,16 @@ type Query {
   Public config documents (no auth). Filter by `name` to retrieve a
   single document.
   """
-  publicAppConfigs(
-    filter: AppConfigFilter = null
-    orderBy: [AppConfigOrderBy!] = null
+  publicAppConfigSources(
+    filter: AppConfigSourceFilter = null
+    orderBy: [AppConfigSourceOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): AppConfigConnection!
+  ): AppConfigSourceConnection!
 
   """
   Current user's merged app-config view (auth required). Deep-merges
@@ -633,30 +623,30 @@ type Query {
   are ignored here — the scope is pinned.
   """
   myAppConfigs(
-    filter: AppConfigFilter = null
-    orderBy: [AppConfigOrderBy!] = null
+    filter: AppConfigSourceFilter = null
+    orderBy: [AppConfigSourceOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): ResolvedAppConfigConnection!
+  ): AppConfigSourceConnection!
 
   """
-  Cross-scope AppConfig search (Admin only). Returns a Relay
+  Cross-scope AppConfigSource search (Admin only). Returns a Relay
   Connection with filter / order / pagination applied.
   """
-  adminAppConfigs(
-    filter: AppConfigFilter = null
-    orderBy: [AppConfigOrderBy!] = null
+  adminAppConfigSources(
+    filter: AppConfigSourceFilter = null
+    orderBy: [AppConfigSourceOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): AppConfigConnection!
+  ): AppConfigSourceConnection!
 
   """
   Single app-config policy by the governed document's `configName`.
@@ -692,10 +682,10 @@ type Query {
 
 #### Connection / Filter / OrderBy
 
-Filter and orderBy types are unified — a single `AppConfigFilter`
-and `AppConfigOrderBy` are reused across all Connections. With the
-per-scope types collapsed into one, the same `AppConfigConnection`
-backs every raw-row query — `publicAppConfigs`, `adminAppConfigs`,
+Filter and orderBy types are unified — a single `AppConfigSourceFilter`
+and `AppConfigSourceOrderBy` are reused across all Connections. With the
+per-scope types collapsed into one, the same `AppConfigSourceConnection`
+backs every raw-row query — `publicAppConfigSources`, `adminAppConfigSources`,
 `DomainV2.appConfigs`, and `UserV2.appConfigs`. Each call pins the
 relevant `scopeType` / `scopeId` internally and returns the same
 Edge / node shape.
@@ -703,26 +693,26 @@ Edge / node shape.
 ```graphql
 # ── Connections ───────────────────────────────────────────────
 
-"""Relay Connection holding raw `AppConfig` rows from any scope."""
-type AppConfigConnection {
-  edges: [AppConfigEdge!]!
+"""Relay Connection holding raw `AppConfigSource` rows from any scope."""
+type AppConfigSourceConnection {
+  edges: [AppConfigSourceEdge!]!
   pageInfo: PageInfo!
   count: Int!
 }
-type AppConfigEdge {
+type AppConfigSourceEdge {
   cursor: String!
-  node: AppConfig!
+  node: AppConfigSource!
 }
 
 """Relay Connection holding the current user's merged view — backs `myAppConfigs`."""
-type ResolvedAppConfigConnection {
-  edges: [ResolvedAppConfigEdge!]!
+type AppConfigSourceConnection {
+  edges: [AppConfigSourceEdge!]!
   pageInfo: PageInfo!
   count: Int!
 }
-type ResolvedAppConfigEdge {
+type AppConfigSourceEdge {
   cursor: String!
-  node: ResolvedAppConfig!
+  node: AppConfig!
 }
 
 """Relay Connection of app-config policies."""
@@ -739,14 +729,14 @@ type AppConfigPolicyEdge {
 # ── Filter / OrderBy (shared by all Connections) ──────────────
 
 """
-AppConfig search filter. Scalar fields at the top level are
+AppConfigSource search filter. Scalar fields at the top level are
 AND-combined. For arbitrary boolean shapes, nest predicates under
 `AND` / `OR` / `NOT`.
 """
-input AppConfigFilter {
+input AppConfigSourceFilter {
   """
-  Filter by scope type. Meaningful only on `adminAppConfigs`; on
-  per-scope Connections (`publicAppConfigs`, `DomainV2.appConfigs`,
+  Filter by scope type. Meaningful only on `adminAppConfigSources`; on
+  per-scope Connections (`publicAppConfigSources`, `DomainV2.appConfigs`,
   `UserV2.appConfigs`, `myAppConfigs`) the scope
   is already pinned by the field, so this filter is ignored.
   """
@@ -768,13 +758,13 @@ input AppConfigFilter {
   updatedAt: DateTimeFilter = null
 
   """All sub-filters must match (AND combination)."""
-  AND: [AppConfigFilter!] = null
+  AND: [AppConfigSourceFilter!] = null
 
   """At least one sub-filter must match (OR combination)."""
-  OR: [AppConfigFilter!] = null
+  OR: [AppConfigSourceFilter!] = null
 
   """None of the sub-filters may match (NOT combination)."""
-  NOT: [AppConfigFilter!] = null
+  NOT: [AppConfigSourceFilter!] = null
 }
 
 """EnumFilter for AppConfigScopeType (equals / in / notEquals / notIn)."""
@@ -785,20 +775,20 @@ input AppConfigScopeTypeEnumFilter {
   notIn: [AppConfigScopeType!]
 }
 
-input AppConfigOrderBy {
-  field: AppConfigOrderField!
+input AppConfigSourceOrderBy {
+  field: AppConfigSourceOrderField!
   direction: OrderDirection! = ASC
 }
 
 """
-`SCOPE_TYPE` / `SCOPE_ID` are only useful on `adminAppConfigs`; on
+`SCOPE_TYPE` / `SCOPE_ID` are only useful on `adminAppConfigSources`; on
 per-scope Connections they degenerate to a constant and have no
 effect. `UPDATED_AT` / `CREATED_AT` apply to raw-row Connections
-only — `myAppConfigs` returns `ResolvedAppConfig` (derived) which does
+only — `myAppConfigs` returns `AppConfig` (derived) which does
 not expose timestamps, so these order keys fall back to `NAME`
 internally in that context.
 """
-enum AppConfigOrderField {
+enum AppConfigSourceOrderField {
   SCOPE_TYPE
   SCOPE_ID
   NAME
@@ -845,22 +835,22 @@ variants (pass a 1-element array if you only need one). Split into an
 path** (create / update only), plus an admin-only policy path
 (create / update / purge), for a total of eight mutations:
 
-- `adminBulk{Create,Update,Purge}AppConfigs`: each item carries an
-  `AppConfigKey { scopeType, scopeId, name }` — covers every scope.
+- `adminBulk{Create,Update,Purge}AppConfigSources`: each item carries an
+  `AppConfigSourceKey { scopeType, scopeId, name }` — covers every scope.
   **Admin-only**. `Create` / `Update` return a list of raw
-  `AppConfig`; `Purge` returns the purged key list. All three
+  `AppConfigSource`; `Purge` returns the purged key list. All three
   return per-item failures.
-- `bulk{Create,Update}MyAppConfigs`: each item carries only `name`
+- `bulk{Create,Update}MyAppConfigSources`: each item carries only `name`
   (scope is `USER` + `scopeId = current_user.user_id` injected
   server-side). Callable by any authenticated user for their own
-  documents. Returns a list of recomputed `ResolvedAppConfig` + a
+  documents. Returns a list of recomputed `AppConfig` + a
   list of per-item failures. **No `Purge` on the my-path** — users
   cannot delete rows; only admins do cleanup.
 - `adminBulk{Create,Update,Purge}AppConfigPolicies`: each item
   carries `configName` (+ policy fields on create/update).
   **Admin-only**. `Update` rejects any attempt to change
   `configName` (immutable — §1). `Purge` rejects any item whose
-  `configName` still has AppConfig rows referencing it.
+  `configName` still has AppConfigSource rows referencing it.
 
 **Partial success**: every bulk mutation runs each item in its own
 DB transaction — a single failure does not abort the rest, and the
@@ -868,12 +858,13 @@ payload separates successes from failures. Single-item callers get
 the same shape, so error handling is uniform.
 
 Routing:
-- Admin-path: the service dispatches on each item's `key.scopeType` and
-  routes to the matching scope repository (§2). Items across
-  different scopes may be mixed in one call.
+- Admin-path: the service forwards each item's `key` to
+  `AppConfigSourceRepository` — a single scope-parameterized
+  repository (§2). Items across different scopes may be mixed in
+  one call.
 - My-path: the server synthesizes
-  `(USER, current_user.id, item.name)` and calls
-  `UserAppConfigRepository` directly (no natural-key resolve step).
+  `(USER, current_user.id, item.name)` and calls the same
+  `AppConfigSourceRepository`.
 
 Authorization is enforced in the **service layer** (see permission
 matrix below).
@@ -888,23 +879,23 @@ type Mutation {
   that item fails. Items may target any scope; admin-side seeding
   of a `USER`-scope row is also done via this mutation.
   """
-  adminBulkCreateAppConfigs(input: AdminBulkCreateAppConfigInput!): AdminBulkCreateAppConfigsPayload!
+  adminBulkCreateAppConfigSources(input: AdminBulkCreateAppConfigSourceInput!): AdminBulkCreateAppConfigSourcesPayload!
 
   """
   Bulk-update app config documents (admin-only). Each item replaces
   the existing row's stored JSON wholesale. If no row exists for
   the natural key, that item fails.
   """
-  adminBulkUpdateAppConfigs(input: AdminBulkUpdateAppConfigInput!): AdminBulkUpdateAppConfigsPayload!
+  adminBulkUpdateAppConfigSources(input: AdminBulkUpdateAppConfigSourceInput!): AdminBulkUpdateAppConfigSourcesPayload!
 
   """
   Bulk-purge app config documents (admin-only). Each item is
-  identified by `AppConfigKey`; if no row exists for the key, the
+  identified by `AppConfigSourceKey`; if no row exists for the key, the
   item is no-oped (returned in `purged` with the key alone). Purge
-  is the only deletion verb for AppConfig — intended for cleaning up
+  is the only deletion verb for AppConfigSource — intended for cleaning up
   misconfigured rows; day-to-day writes should use create / update.
   """
-  adminBulkPurgeAppConfigs(input: AdminBulkPurgeAppConfigInput!): AdminBulkPurgeAppConfigsPayload!
+  adminBulkPurgeAppConfigSources(input: AdminBulkPurgeAppConfigSourceInput!): AdminBulkPurgeAppConfigSourcesPayload!
 
   # ── Self-service (my) path — USER + current_user implicit ────
 
@@ -915,13 +906,13 @@ type Mutation {
   insert — if a USER row already exists for a `name`, that item
   fails.
   """
-  bulkCreateMyAppConfigs(input: BulkCreateMyAppConfigInput!): BulkCreateMyAppConfigsPayload!
+  bulkCreateMyAppConfigSources(input: BulkCreateMyAppConfigSourceInput!): BulkCreateMyAppConfigSourcesPayload!
 
   """
   Bulk-replace the current user's `USER`-scope documents (auth
   required). Items whose USER row is missing fail.
   """
-  bulkUpdateMyAppConfigs(input: BulkUpdateMyAppConfigInput!): BulkUpdateMyAppConfigsPayload!
+  bulkUpdateMyAppConfigSources(input: BulkUpdateMyAppConfigSourceInput!): BulkUpdateMyAppConfigSourcesPayload!
 
   # ── Admin policy path — admin-only ─────────────────────────
 
@@ -946,9 +937,9 @@ type Mutation {
 
   """
   Bulk-purge app-config policies (admin-only). An item fails if any
-  `AppConfig` row still references its `configName` (the
+  `AppConfigSource` row still references its `configName` (the
   required-policy invariant must hold for the remaining rows);
-  admins clean such rows up first via `adminBulkPurgeAppConfigs`.
+  admins clean such rows up first via `adminBulkPurgeAppConfigSources`.
   """
   adminBulkPurgeAppConfigPolicies(
     input: AdminBulkPurgeAppConfigPolicyInput!
@@ -966,7 +957,7 @@ enum AppConfigScopeType {
 
 """
 Natural composite key identifying a single app config row.
-Mirrors the Python `AppConfigKey` dataclass used by the repository /
+Mirrors the Python `AppConfigSourceKey` dataclass used by the repository /
 db_source layer.
 - `PUBLIC`:               `scopeId` is the literal string `"public"`.
 - `DOMAIN`:               `scopeId` is `domain_name`.
@@ -974,7 +965,7 @@ db_source layer.
 - `USER`:                 `scopeId` is `user_id` (UUID string).
 - `name` is the document name (unique within the scope).
 """
-input AppConfigKey {
+input AppConfigSourceKey {
   scopeType: AppConfigScopeType!
   scopeId: String!
   name: String!
@@ -983,69 +974,69 @@ input AppConfigKey {
 # ── Admin Inputs — per-item + bulk wrappers ──────────────────
 
 """Per-item input for admin bulk create/update (key + config)."""
-input AdminAppConfigItemInput {
+input AdminAppConfigSourceItemInput {
   """Target row identifier."""
-  key: AppConfigKey!
+  key: AppConfigSourceKey!
 
   """
   Stored value — initial on create, wholesale replacement on update.
   Pass `{}` to clear.
   - `PUBLIC` / `DOMAIN` / `DOMAIN_USER_DEFAULTS`: the document's `config`.
   - `USER`: that user's customized value for this `name` (the
-    `ResolvedAppConfig` merged view is read-only computed).
+    `AppConfig` merged view is read-only computed).
   """
   config: JSON!
 }
 
-input AdminBulkCreateAppConfigInput {
+input AdminBulkCreateAppConfigSourceInput {
   """Items to create. No schema-level cap; service applies a reasonable one."""
-  items: [AdminAppConfigItemInput!]!
+  items: [AdminAppConfigSourceItemInput!]!
 }
 
-input AdminBulkUpdateAppConfigInput {
+input AdminBulkUpdateAppConfigSourceInput {
   """Items to update."""
-  items: [AdminAppConfigItemInput!]!
+  items: [AdminAppConfigSourceItemInput!]!
 }
 
 """
-Per-item input for `adminBulkPurgeAppConfigs`. Identified by key
+Per-item input for `adminBulkPurgeAppConfigSources`. Identified by key
 alone — there is no `config` payload.
 """
-input AdminBulkPurgeAppConfigInput {
+input AdminBulkPurgeAppConfigSourceInput {
   """Keys identifying the rows to purge."""
-  keys: [AppConfigKey!]!
+  keys: [AppConfigSourceKey!]!
 }
 
 # ── My Inputs — scope=USER, scopeId=current_user.user_id implicit ──
 
 """Per-item input for my bulk create/update (name + config)."""
-input MyAppConfigItemInput {
+input MyAppConfigSourceItemInput {
   """Document name (unique within the current user)."""
   name: String!
 
   """
   Value to store on the caller's `USER` row for this `name` —
   initial on create, wholesale replacement on update. Pass `{}` to
-  clear. `ResolvedAppConfig.mergedConfig` is read-only computed and
+  clear. `AppConfig.mergedConfig` is read-only computed and
   cannot be written.
   """
   config: JSON!
 }
 
-input BulkCreateMyAppConfigInput {
+input BulkCreateMyAppConfigSourceInput {
   """Items to create."""
-  items: [MyAppConfigItemInput!]!
+  items: [MyAppConfigSourceItemInput!]!
 }
 
-input BulkUpdateMyAppConfigInput {
+input BulkUpdateMyAppConfigSourceInput {
   """Items to update."""
-  items: [MyAppConfigItemInput!]!
+  items: [MyAppConfigSourceItemInput!]!
 }
 
-# ── Admin Payloads — return lists of raw AppConfig ───────────
+# ── Admin Payloads — return lists of raw AppConfigSource ───────────
 
-"""Per-item error info for `adminBulkCreateAppConfigs`."""
-type AdminBulkCreateAppConfigError {
+"""Per-item error info for `adminBulkCreateAppConfigSources`."""
+type AdminBulkCreateAppConfigSourceError {
   """Original position in the input list."""
   index: Int!
   scopeType: AppConfigScopeType!
@@ -1054,8 +1045,8 @@ type AdminBulkCreateAppConfigError {
   message: String!
 }
 
-"""Per-item error info for `adminBulkUpdateAppConfigs`."""
-type AdminBulkUpdateAppConfigError {
+"""Per-item error info for `adminBulkUpdateAppConfigSources`."""
+type AdminBulkUpdateAppConfigSourceError {
   """Original position in the input list."""
   index: Int!
   scopeType: AppConfigScopeType!
@@ -1064,8 +1055,8 @@ type AdminBulkUpdateAppConfigError {
   message: String!
 }
 
-"""Per-item error info for `adminBulkPurgeAppConfigs`."""
-type AdminBulkPurgeAppConfigError {
+"""Per-item error info for `adminBulkPurgeAppConfigSources`."""
+type AdminBulkPurgeAppConfigSourceError {
   """Original position in the input list."""
   index: Int!
   scopeType: AppConfigScopeType!
@@ -1074,70 +1065,70 @@ type AdminBulkPurgeAppConfigError {
   message: String!
 }
 
-"""Result of `adminBulkCreateAppConfigs`. Partial success."""
-type AdminBulkCreateAppConfigsPayload {
+"""Result of `adminBulkCreateAppConfigSources`. Partial success."""
+type AdminBulkCreateAppConfigSourcesPayload {
   """Successfully created rows."""
+  created: [AppConfigSource!]!
+
+  """Per-item errors for entries that failed to create."""
+  failed: [AdminBulkCreateAppConfigSourceError!]!
+}
+
+"""Result of `adminBulkUpdateAppConfigSources`. Partial success."""
+type AdminBulkUpdateAppConfigSourcesPayload {
+  """Rows after replacement."""
+  updated: [AppConfigSource!]!
+
+  """Per-item errors for entries that failed to update."""
+  failed: [AdminBulkUpdateAppConfigSourceError!]!
+}
+
+"""Result of `adminBulkPurgeAppConfigSources`. Partial success."""
+type AdminBulkPurgeAppConfigSourcesPayload {
+  """Keys of rows actually removed (or already absent → no-op)."""
+  purged: [AppConfigSourceKey!]!
+
+  """Per-item errors for entries that failed to purge."""
+  failed: [AdminBulkPurgeAppConfigSourceError!]!
+}
+
+# ── My Payloads — return lists of resolved AppConfig ────
+
+"""
+Per-item error info for `bulkCreateMyAppConfigSources`. (scope / scopeId
+are server-injected, so `name` is the only identifier.)
+"""
+type BulkCreateMyAppConfigSourceError {
+  """Original position in the input list."""
+  index: Int!
+  name: String!
+  message: String!
+}
+
+"""Per-item error info for `bulkUpdateMyAppConfigSources`."""
+type BulkUpdateMyAppConfigSourceError {
+  """Original position in the input list."""
+  index: Int!
+  name: String!
+  message: String!
+}
+
+"""Result of `bulkCreateMyAppConfigSources`. Partial success."""
+type BulkCreateMyAppConfigSourcesPayload {
+  """Recomputed `AppConfig` list after the writes."""
   created: [AppConfig!]!
 
   """Per-item errors for entries that failed to create."""
-  failed: [AdminBulkCreateAppConfigError!]!
+  failed: [BulkCreateMyAppConfigSourceError!]!
 }
 
-"""Result of `adminBulkUpdateAppConfigs`. Partial success."""
-type AdminBulkUpdateAppConfigsPayload {
-  """Rows after replacement."""
+"""Result of `bulkUpdateMyAppConfigSources`. Partial success."""
+type BulkUpdateMyAppConfigSourcesPayload {
+  """Recomputed `AppConfig` list after the writes."""
   updated: [AppConfig!]!
 
   """Per-item errors for entries that failed to update."""
-  failed: [AdminBulkUpdateAppConfigError!]!
-}
-
-"""Result of `adminBulkPurgeAppConfigs`. Partial success."""
-type AdminBulkPurgeAppConfigsPayload {
-  """Keys of rows actually removed (or already absent → no-op)."""
-  purged: [AppConfigKey!]!
-
-  """Per-item errors for entries that failed to purge."""
-  failed: [AdminBulkPurgeAppConfigError!]!
-}
-
-# ── My Payloads — return lists of resolved ResolvedAppConfig ────
-
-"""
-Per-item error info for `bulkCreateMyAppConfigs`. (scope / scopeId
-are server-injected, so `name` is the only identifier.)
-"""
-type BulkCreateMyAppConfigError {
-  """Original position in the input list."""
-  index: Int!
-  name: String!
-  message: String!
-}
-
-"""Per-item error info for `bulkUpdateMyAppConfigs`."""
-type BulkUpdateMyAppConfigError {
-  """Original position in the input list."""
-  index: Int!
-  name: String!
-  message: String!
-}
-
-"""Result of `bulkCreateMyAppConfigs`. Partial success."""
-type BulkCreateMyAppConfigsPayload {
-  """Recomputed `ResolvedAppConfig` list after the writes."""
-  created: [ResolvedAppConfig!]!
-
-  """Per-item errors for entries that failed to create."""
-  failed: [BulkCreateMyAppConfigError!]!
-}
-
-"""Result of `bulkUpdateMyAppConfigs`. Partial success."""
-type BulkUpdateMyAppConfigsPayload {
-  """Recomputed `ResolvedAppConfig` list after the writes."""
-  updated: [ResolvedAppConfig!]!
-
-  """Per-item errors for entries that failed to update."""
-  failed: [BulkUpdateMyAppConfigError!]!
+  failed: [BulkUpdateMyAppConfigSourceError!]!
 }
 
 # ── Admin Policy Inputs / Payloads ──────────────────────────
@@ -1225,17 +1216,17 @@ type AdminBulkPurgeAppConfigPoliciesPayload {
 }
 
 """
-Generic AppConfig type shared by the admin-path payloads,
-`adminAppConfigs`, and `node(id)`. Exposes the raw stored value.
+Generic AppConfigSource type shared by the admin-path payloads,
+`adminAppConfigSources`, and `node(id)`. Exposes the raw stored value.
 Thin by design — no back-references to the parent `DomainV2` /
 `UserV2`; callers that need the parent object re-query
 `domain_v2(name:)` / `admin_user_v2(user_id:)` explicitly.
 """
-type AppConfig implements Node {
+type AppConfigSource implements Node {
   """
-  Relay global ID — `base64("AppConfig:<row_uuid>")`. The distinct
-  prefix lets `node(id)` dispatch correctly between `AppConfig` and
-  `ResolvedAppConfig`.
+  Relay global ID — `base64("AppConfigSource:<row_uuid>")`. The distinct
+  prefix lets `node(id)` dispatch correctly between `AppConfigSource` and
+  `AppConfig`.
   """
   id: ID!
 
@@ -1252,7 +1243,7 @@ type AppConfig implements Node {
   """
   The matching `AppConfigPolicy` (joined by `name` = `config_name`).
   Non-null because the required-policy invariant (§1) guarantees a
-  policy exists for every AppConfig row. Resolved via a per-request
+  policy exists for every AppConfigSource row. Resolved via a per-request
   `DataLoader` keyed on `name`, so selecting this field inside a
   Connection does not N+1 — a single batched lookup covers the page.
   Callers that just want the raw row can omit the selection.
@@ -1267,8 +1258,8 @@ type AppConfig implements Node {
 
 """
 Advisory policy for an app-config document — controls which scopes'
-rows are merged as sources into `ResolvedAppConfig` (§5) and which
-scopes may be written. Policies are decoupled from `AppConfig` rows
+rows are merged as sources into `AppConfig` (§5) and which
+scopes may be written. Policies are decoupled from `AppConfigSource` rows
 at the schema level (§1 "App Config Policy table"): there is no FK,
 and configs and policies are joined by `configName` value only at
 runtime.
@@ -1284,7 +1275,7 @@ type AppConfigPolicy implements Node {
 
   """
   The governed document's `name` (unique across the policies table).
-  Joined to `AppConfig.name` by value only — no FK. **Immutable** —
+  Joined to `AppConfigSource.name` by value only — no FK. **Immutable** —
   `update` cannot change this field. A wrongly-named policy is fixed
   by purging (along with any referencing rows) and recreating — see
   §7 S3.8.
@@ -1292,7 +1283,7 @@ type AppConfigPolicy implements Node {
   configName: String!
 
   """
-  Dual meaning: (1) which `AppConfig` rows (by `scopeType`) are
+  Dual meaning: (1) which `AppConfigSource` rows (by `scopeType`) are
   merged as sources into the resolved view, in order, and (2) the
   corresponding write allow-list — writes to scopes outside the list
   are rejected. Order is low → high priority; the last element wins
@@ -1304,7 +1295,7 @@ type AppConfigPolicy implements Node {
 
   """
   Whether the owner may write their own `USER`-scope row for this
-  document via the `bulk*MyAppConfigs` path. The admin path is not
+  document via the `bulk*MyAppConfigSources` path. The admin path is not
   gated by this flag — admins may seed USER rows regardless.
   """
   userWritable: Boolean!
@@ -1320,37 +1311,37 @@ Queries:
 
 | Operation                          | Anonymous | User                             | Admin |
 |------------------------------------|-----------|----------------------------------|-------|
-| `publicAppConfigs`                 | ✅        | ✅                               | ✅    |
+| `publicAppConfigSources`                 | ✅        | ✅                               | ✅    |
 | `myAppConfigs`                     | ❌        | ✅ (self)                        | ✅    |
 | `DomainV2.appConfigs`              | ❌        | ✅ (same domain only)            | ✅    |
 | `UserV2.appConfigs`                | ❌        | ✅ (self)                        | ✅    |
-| `adminAppConfigs`                  | ❌        | ❌                               | ✅    |
+| `adminAppConfigSources`                  | ❌        | ❌                               | ✅    |
 | `appConfigPolicy` / `appConfigPolicies` | ❌   | ✅                               | ✅    |
-| `node(id)` → `AppConfig`           | ✅ iff row `scopeType = PUBLIC` | ✅ (PUBLIC always; DOMAIN / DOMAIN_USER_DEFAULTS same-domain only; USER self only) | ✅ |
-| `node(id)` → `ResolvedAppConfig`   | ❌        | ✅ (id's `user_id` is self)      | ✅ (id's `user_id` is self) |
+| `node(id)` → `AppConfigSource`           | ✅ iff row `scopeType = PUBLIC` | ✅ (PUBLIC always; DOMAIN / DOMAIN_USER_DEFAULTS same-domain only; USER self only) | ✅ |
+| `node(id)` → `AppConfig`   | ❌        | ✅ (id's `user_id` is self)      | ✅ (id's `user_id` is self) |
 | `node(id)` → `AppConfigPolicy`     | ❌        | ✅                               | ✅    |
 
 Write mutations split into two paths with distinct rules. All
 bulk-only.
 
-**Admin path** — `adminBulkCreateAppConfigs`,
-`adminBulkUpdateAppConfigs`. Admin regardless of each item's
+**Admin path** — `adminBulkCreateAppConfigSources`,
+`adminBulkUpdateAppConfigSources`. Admin regardless of each item's
 `key.scopeType`:
 
 | Operation                                  | Anonymous | User | Admin |
 |--------------------------------------------|-----------|------|-------|
-| `adminBulk{Create,Update,Purge}AppConfigs` | ❌        | ❌   | ✅    |
+| `adminBulk{Create,Update,Purge}AppConfigSources` | ❌        | ❌   | ✅    |
 
-**Self-service (my) path** — `bulkCreateMyAppConfigs`,
-`bulkUpdateMyAppConfigs`. Imply `scope = USER` +
+**Self-service (my) path** — `bulkCreateMyAppConfigSources`,
+`bulkUpdateMyAppConfigSources`. Imply `scope = USER` +
 `scopeId = current_user.user_id`:
 
 | Operation              | Anonymous | User (self) | Admin (self) |
 |------------------------|-----------|-------------|--------------|
-| `bulk*MyAppConfigs`    | ❌        | ✅          | ✅           |
+| `bulk*MyAppConfigSources`    | ❌        | ✅          | ✅           |
 
 > Admins operating on another user's `USER` row must use the admin
-> path with an explicit `AppConfigKey { scopeType: USER, scopeId:
+> path with an explicit `AppConfigSourceKey { scopeType: USER, scopeId:
 > target_user_id, name }` on each item — the my path cannot target
 > another user.
 
@@ -1370,7 +1361,7 @@ Where the checks live:
   rejected up-front.
 - My-path resolvers: reject anonymous callers, then resolve
   `current_user` and delegate each item to
-  `UserAppConfigRepository.{create|update}` —
+  `AppConfigSourceRepository.{create|update}` —
   `scopeId` is not part of the input and is injected server-side.
 - `DomainV2.appConfigs` field resolver: if the caller is not admin
   and the parent `DomainV2.domain_name` differs from
@@ -1398,11 +1389,11 @@ natural key. For each item of a bulk input:
    failure on this item lands in `failed` while the remaining items
    continue.
 
-My-path mutations (`bulkCreateMyAppConfigs`, etc.) **skip this step**:
+My-path mutations (`bulkCreateMyAppConfigSources`, etc.) **skip this step**:
 scope / scopeId are fixed server-side (`USER`,
 `current_user.user_id`), RBAC only needs to confirm "authenticated
 self", and each item calls
-`UserAppConfigRepository.{create|update}` with
+`AppConfigSourceRepository.{create|update}` with
 `user_id` + `item.name` directly.
 
 The result: admin-path Actions stay uniform (ID-only) while the API
@@ -1415,24 +1406,34 @@ look up the policy row's id before dispatching the update Action.
 
 ---
 
-## 4. REST Schema — `/v2/app-configs/...`
+## 4. REST Schema
 
-Mounted under the existing `app-configs` prefix
-(`RouteRegistry.create("app-configs", ...)` in
-`src/ai/backend/manager/api/rest/v2/app_config/registry.py`), matching the project-wide v2
-conventions in `src/ai/backend/manager/api/rest/v2/CLAUDE.md`.
+REST exposes three prefix trees that mirror the GQL surface:
 
-### Endpoints
+- `/v2/app-config-sources/...` — raw source row operations (admin
+  CRUD, cross-scope search, per-scope reads, my-path writes).
+- `/v2/app-configs/my[/{name}]` — **merged `AppConfig` view** per
+  user (read-only; writes go through the source prefix).
+- `/v2/app-config-policies/...` — policy CRUD + reads.
+
+Mounted via `RouteRegistry.create("app-config-sources", ...)`,
+`RouteRegistry.create("app-configs", ...)`, and
+`RouteRegistry.create("app-config-policies", ...)` respectively,
+matching the project-wide v2 conventions in
+`src/ai/backend/manager/api/rest/v2/CLAUDE.md`.
+
+### App Config Source endpoints
 
 REST mirrors the GQL admin / my split — the scope-parameterized
-path handles **admin writes + per-scope read rules** (maps to GQL
-`adminBulk*AppConfigs` mutations and the scoped queries), and the `/my`
-path is **self-only** (maps to GQL `bulk*MyAppConfigs` mutations).
+path handles **admin writes + per-scope reads** (maps to GQL
+`adminBulk*AppConfigSources` mutations and the scoped queries), and
+the `/my` path is **self-only** (maps to GQL
+`bulk*MyAppConfigSources` mutations).
 
 #### Scope-parameterized path — admin writes / per-scope reads
 
 ```
-/v2/app-configs/{scope_type}/{scope_id}[/{name}]
+/v2/app-config-sources/{scope_type}/{scope_id}[/{name}]
 ```
 
 - `{scope_type}` ∈ `public | domain | domain_user_defaults | user`
@@ -1440,40 +1441,42 @@ path is **self-only** (maps to GQL `bulk*MyAppConfigs` mutations).
 - `{scope_id}` follows the §1 Scope ID convention — the literal
   `"public"` for `public`, `domain_name` for `domain` /
   `domain_user_defaults`, `user_id` (UUID) for `user`.
-- `{name}` is the document name (§1 format constraint).
+- `{name}` is the document name.
 
 Reads (`GET`) go through the scope-parameterized path — writes are
 handled exclusively via the bulk endpoints (see "Admin bulk" / "My
 bulk" below).
 
-| Method | Path                                             | Description                                        |
-|--------|--------------------------------------------------|----------------------------------------------------|
-| GET    | `/v2/app-configs/{scope_type}/{scope_id}`        | List documents in a scope                   |
-| GET    | `/v2/app-configs/{scope_type}/{scope_id}/{name}` | Read one document                                  |
+| Method | Path                                                    | Description                |
+|--------|---------------------------------------------------------|----------------------------|
+| GET    | `/v2/app-config-sources/{scope_type}/{scope_id}`        | List source rows in a scope |
+| GET    | `/v2/app-config-sources/{scope_type}/{scope_id}/{name}` | Read one source row         |
 
 Read permissions per-scope match the GQL permission matrix:
-- `/v2/app-configs/public/public[/{name}]` — anonymous allowed.
-- `/v2/app-configs/domain/{domain_name}[/{name}]` — admin or the
+- `/v2/app-config-sources/public/public[/{name}]` — anonymous allowed.
+- `/v2/app-config-sources/domain/{domain_name}[/{name}]` — admin or the
   caller whose `current_user.domain_name == {domain_name}`.
-- `/v2/app-configs/domain_user_defaults/{domain_name}[/{name}]` —
+- `/v2/app-config-sources/domain_user_defaults/{domain_name}[/{name}]` —
   same.
-- `/v2/app-configs/user/{user_id}[/{name}]` — admin or the caller
+- `/v2/app-config-sources/user/{user_id}[/{name}]` — admin or the caller
   whose `current_user.user_id == {user_id}`.
 
-#### My path — self-only (auth required)
+### Resolved view endpoint — `/v2/app-configs/my`
 
-The adapter resolves `current_user()` internally and pins
-`scope=USER` + `scope_id = current_user.user_id`. There is no input
-field capable of targeting another user.
+The merged per-user `AppConfig` lives at a **separate prefix** to
+make the "this is a resolved view, not a raw row" framing explicit
+in the URL. The adapter resolves `current_user()` internally and
+pins `scope=USER` + `scope_id = current_user.user_id` when reading.
+There is no input field capable of targeting another user, and
+there are no writes on this prefix — writing goes through
+`/v2/app-config-sources/my/bulk-*`.
 
 | Method | Path                                | Description                             |
 |--------|-------------------------------------|-----------------------------------------|
 | GET    | `/v2/app-configs/my[/{name}]`       | List / read own documents (merged view) |
 
-Writes use the "My bulk" endpoints below.
-
-Response body is the **resolved ResolvedAppConfig** (snake_case
-projection of the GQL `ResolvedAppConfig`):
+Response body is the **resolved AppConfig** (snake_case
+projection of the GQL `AppConfig`):
 
 ```json
 {
@@ -1497,11 +1500,11 @@ exists for this `(user, name)`.
 
 #### Admin writes (bulk-only)
 
-| Method | Path                              | Access | Maps to                         |
-|--------|-----------------------------------|--------|---------------------------------|
-| POST   | `/v2/app-configs/bulk-create`     | Admin  | `adminBulkCreateAppConfigs`     |
-| POST   | `/v2/app-configs/bulk-update`     | Admin  | `adminBulkUpdateAppConfigs`     |
-| POST   | `/v2/app-configs/bulk-purge`      | Admin  | `adminBulkPurgeAppConfigs`      |
+| Method | Path                                       | Access | Maps to                             |
+|--------|--------------------------------------------|--------|-------------------------------------|
+| POST   | `/v2/app-config-sources/bulk-create`       | Admin  | `adminBulkCreateAppConfigSources`   |
+| POST   | `/v2/app-config-sources/bulk-update`       | Admin  | `adminBulkUpdateAppConfigSources`   |
+| POST   | `/v2/app-config-sources/bulk-purge`        | Admin  | `adminBulkPurgeAppConfigSources`    |
 
 Request / response bodies are the snake_case projection of the
 corresponding GQL input / payload. Example (`bulk-create`):
@@ -1517,7 +1520,7 @@ corresponding GQL input / payload. Example (`bulk-create`):
 
 // Response
 {
-  "created": [ /* AppConfig objects */ ],
+  "created": [ /* AppConfigSource objects */ ],
   "failed": [
     { "scope_type": "USER", "scope_id": "...",
       "name": "...", "message": "..." }
@@ -1527,19 +1530,19 @@ corresponding GQL input / payload. Example (`bulk-create`):
 
 #### My writes (bulk-only)
 
-| Method | Path                                 | Access | Maps to                       |
-|--------|--------------------------------------|--------|-------------------------------|
-| POST   | `/v2/app-configs/my/bulk-create`     | User   | `bulkCreateMyAppConfigs`      |
-| POST   | `/v2/app-configs/my/bulk-update`     | User   | `bulkUpdateMyAppConfigs`      |
+| Method | Path                                          | Access | Maps to                          |
+|--------|-----------------------------------------------|--------|----------------------------------|
+| POST   | `/v2/app-config-sources/my/bulk-create`       | User   | `bulkCreateMyAppConfigSources`   |
+| POST   | `/v2/app-config-sources/my/bulk-update`       | User   | `bulkUpdateMyAppConfigSources`   |
 
 Response bodies are the snake_case projection of the corresponding
-GQL `Bulk*MyAppConfigsPayload` (a success list plus `failed`).
+GQL `Bulk*MyAppConfigSourcesPayload` (a success list plus `failed`).
 
 #### Admin cross-scope search
 
 | Method | Path                        | Access | Description                                                |
 |--------|-----------------------------|--------|------------------------------------------------------------|
-| POST   | `/v2/app-configs/search`    | Admin  | Cross-scope search — same body schema as `adminAppConfigs` |
+| POST   | `/v2/app-config-sources/search`    | Admin  | Cross-scope search — same body schema as `adminAppConfigSources` |
 
 ### App Config Policy endpoints
 
@@ -1561,11 +1564,11 @@ reads, and a single policy object for the `{config_name}` GET.
 
 ---
 
-## 5. `ResolvedAppConfig` — Merge policy
+## 5. `AppConfig` — Merge policy
 
-> The merge semantics here apply **only to `ResolvedAppConfig`**. The
-> raw `AppConfig` type (returned from `publicAppConfigs`,
-> `adminAppConfigs`, `DomainV2.appConfigs`, `UserV2.appConfigs`)
+> The merge semantics here apply **only to `AppConfig`**. The
+> raw `AppConfigSource` type (returned from `publicAppConfigSources`,
+> `adminAppConfigSources`, `DomainV2.appConfigs`, `UserV2.appConfigs`)
 > exposes `extra_config` as a single `config` field — no merge.
 
 ### Storage
@@ -1594,7 +1597,7 @@ time by the matching `AppConfigPolicy.scope_sources` (§1):
 1. Service looks up the policy by `name` —
    `AppConfigPolicyRepository.get(name)`. The required-policy
    invariant (§1) guarantees a hit for every `name` that has
-   AppConfig rows.
+   AppConfigSource rows.
 2. The chain is exactly the policy's `scope_sources` in order
    (low → high priority; later elements win on deep merge). Each
    scope contributes its natural `scope_id` — `PUBLIC` uses the
@@ -1609,25 +1612,25 @@ scopes when the use case calls for it.
 
 ### Read (Merge)
 
-Merge is owned by `UserAppConfigRepository`; DB access is performed
-by `AppConfigDBSource`'s merge-specific method — a single SQL that
+Merge is owned by `AppConfigSourceRepository`; DB access is performed
+by `AppConfigSourceDBSource`'s merge-specific method — a single SQL that
 pulls every row the chain needs in one snapshot. The method receives
 the chain as a parameter (a list of `(scope_type, scope_id_expr)`
 pairs) derived from the policy:
 
 1. The service resolves the chain for `name` via the policy lookup.
-2. `AppConfigDBSource.get_user_resolved_config(user_id, name, chain)`
+2. `AppConfigSourceDBSource.get_user_resolved_config(user_id, name, chain)`
    — single SQL resolves `domain_name` via a `users` subquery once
    and pulls one row per scope in the chain where it exists.
 3. The resulting rows are ordered per the chain (absent rows contribute
    `{}` to the deep merge) and deep-merged: nested objects recursively,
    leaf values replaced by the higher-priority scope, lists treated as
    leaves and replaced wholesale.
-4. The ordered rows become `ResolvedAppConfig.sources`; the deep-merge
-   result becomes `ResolvedAppConfig.mergedConfig`.
+4. The ordered rows become `AppConfig.sources`; the deep-merge
+   result becomes `AppConfig.mergedConfig`.
 
 The Connection query (`myAppConfigs`) is backed by the search-specific
-method on `AppConfigDBSource` — the same single-SQL approach,
+method on `AppConfigSourceDBSource` — the same single-SQL approach,
 generalized to return one resolved entry per `name` for which at
 least one row in the chain exists. When the caller's filter pins a
 specific `name`, the resolver consults the policy for that name to
@@ -1635,12 +1638,12 @@ derive the chain; otherwise each resulting `name` is resolved
 independently (policies may differ across `name`s).
 
 `MergedAppConfig` / `MergedAppConfigPage` are service-layer return
-dataclasses — 1:1 mappings to the GraphQL `ResolvedAppConfig` /
-`ResolvedAppConfigConnection`. `AppConfigFilter` / `Pagination` are the
+dataclasses — 1:1 mappings to the GraphQL `AppConfig` /
+`AppConfigSourceConnection`. `AppConfigSourceFilter` / `Pagination` are the
 same internal containers introduced for `db_source.search` in §2.
 
 ```python
-class AppConfigDBSource:
+class AppConfigSourceDBSource:
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
@@ -1672,15 +1675,15 @@ class AppConfigDBSource:
         }
         scope_predicates = [
             sa.and_(
-                AppConfigRow.scope_type == scope_type,
-                AppConfigRow.scope_id == scope_id_for[scope_type],
+                AppConfigSourceRow.scope_type == scope_type,
+                AppConfigSourceRow.scope_id == scope_id_for[scope_type],
             )
             for scope_type in chain
         ]
         async with self._db.begin_readonly_session() as db_sess:
             rows = (await db_sess.execute(
-                sa.select(AppConfigRow).where(
-                    AppConfigRow.name == name,
+                sa.select(AppConfigSourceRow).where(
+                    AppConfigSourceRow.name == name,
                     sa.or_(*scope_predicates),
                 )
             )).scalars().all()
@@ -1696,14 +1699,14 @@ class AppConfigDBSource:
         return MergedAppConfig(
             user_id=user_id,
             name=name,
-            sources=ordered_sources,                # ResolvedAppConfig.sources
-            merged_config=merged,                   # ResolvedAppConfig.mergedConfig
+            sources=ordered_sources,                # AppConfig.sources
+            merged_config=merged,                   # AppConfig.mergedConfig
         )
 
     async def search_user_resolved_configs(
         self,
         user_id: str,
-        filter: AppConfigFilter,
+        filter: AppConfigSourceFilter,
         pagination: Pagination,
         chain_for_name: Callable[[str], list[AppConfigScopeType]],
     ) -> MergedAppConfigPage:
@@ -1716,63 +1719,70 @@ class AppConfigDBSource:
         ...
 
 
-class UserAppConfigRepository:
+class AppConfigSourceRepository:
     """
-    Dual role: `USER` row CRUD (served as raw `AppConfig`) + read-side
-    merged view (serving `ResolvedAppConfig`). The merge path delegates to
-    `AppConfigDBSource`'s merge-specific method, which reads two
-    source rows in a single SQL while never touching DOMAIN. No
-    separate `ResolvedAppConfigRepository` — both roles live here.
+    Scope-parameterized CRUD for `app_config_sources` rows (served
+    to GQL as raw `AppConfigSource`) plus merge-specific reads that
+    back the resolved view (`AppConfig`, §5). Single repository for
+    every scope — items are addressed by `AppConfigSourceKey`.
+
+    Merge path delegates to `AppConfigSourceDBSource`'s merge-specific
+    method, which reads all rows on the policy-defined chain in a
+    single SQL. No separate `AppConfigRepository` — both roles live
+    here.
     """
 
-    _db_source: AppConfigDBSource
+    _db_source: AppConfigSourceDBSource
 
-    def __init__(self, db_source: AppConfigDBSource) -> None:
+    def __init__(self, db_source: AppConfigSourceDBSource) -> None:
         self._db_source = db_source
 
-    # ── USER row CRUD (raw AppConfig) ─────────────────────────────
+    # ── Raw source CRUD (AppConfigSource) ──────────────────────────
 
-    async def get(self, user_id: str, name: str) -> AppConfigRow | None:
-        return await self._db_source.get(
-            AppConfigKey(AppConfigScopeType.USER, user_id, name)
-        )
+    async def get(self, key: AppConfigSourceKey) -> AppConfigSourceRow | None:
+        return await self._db_source.get(key)
 
-    async def get_by_id(self, id: uuid.UUID) -> AppConfigRow | None:
+    async def get_by_id(self, id: uuid.UUID) -> AppConfigSourceRow | None:
         return await self._db_source.get_by_id(id)
 
     async def create(
-        self, user_id: str, name: str, extra_config: Mapping[str, Any]
-    ) -> AppConfigRow:
-        return await self._db_source.create(
-            AppConfigKey(AppConfigScopeType.USER, user_id, name),
-            extra_config,
-        )
+        self, key: AppConfigSourceKey, extra_config: Mapping[str, Any]
+    ) -> AppConfigSourceRow:
+        return await self._db_source.create(key, extra_config)
 
     async def update(
-        self, user_id: str, name: str, extra_config: Mapping[str, Any]
-    ) -> AppConfigRow:
-        return await self._db_source.update(
-            AppConfigKey(AppConfigScopeType.USER, user_id, name),
-            extra_config,
-        )
+        self, key: AppConfigSourceKey, extra_config: Mapping[str, Any]
+    ) -> AppConfigSourceRow:
+        return await self._db_source.update(key, extra_config)
+
+    async def purge(self, key: AppConfigSourceKey) -> AppConfigSourceRow | None:
+        return await self._db_source.purge(key)
 
     async def search(
         self,
-        user_id: str,
-        filter: AppConfigFilter,
+        scope_type: AppConfigScopeType,
+        scope_id: str,
+        filter: AppConfigSourceFilter,
         pagination: Pagination,
-    ) -> AppConfigPage:
-        # Raw USER row search pinned to scope=USER + scope_id=user_id.
+    ) -> AppConfigSourcePage:
+        # Scope-bound search. Cross-scope (admin) uses `admin_search`.
         return await self._db_source.search(
-            scope_type=AppConfigScopeType.USER,
-            scope_id=user_id,
+            scope_type=scope_type,
+            scope_id=scope_id,
             filter=filter,
             pagination=pagination,
         )
 
-    # ── Resolved view (ResolvedAppConfig) ──────────────────────────
-    # `AppConfigDBSource`'s merge-specific method already performs
-    # the users-subquery resolution inside a single SQL, so the
+    async def admin_search(
+        self,
+        filter: AppConfigSourceFilter,
+        pagination: Pagination,
+    ) -> AppConfigSourcePage:
+        return await self._db_source.admin_search(filter, pagination)
+
+    # ── Resolved view (AppConfig) ──────────────────────────
+    # `AppConfigSourceDBSource`'s merge-specific method performs the
+    # users-subquery resolution inside a single SQL, so the
     # repository here is a thin delegate.
 
     async def get_resolved(
@@ -1788,7 +1798,7 @@ class UserAppConfigRepository:
     async def search_resolved(
         self,
         user_id: str,
-        filter: AppConfigFilter,
+        filter: AppConfigSourceFilter,
         pagination: Pagination,
         chain_for_name: Callable[[str], list[AppConfigScopeType]],
     ) -> MergedAppConfigPage:
@@ -1799,10 +1809,10 @@ class UserAppConfigRepository:
 
 ### Exposure
 
-`ResolvedAppConfig` exposes the raw source rows that contributed to
+`AppConfig` exposes the raw source rows that contributed to
 the resolution plus the deep-merge result:
 
-- `sources` — the ordered list of `AppConfig` source rows (low → high
+- `sources` — the ordered list of `AppConfigSource` source rows (low → high
   priority, matching the chain). Absent scopes simply do not appear.
   The list is empty only when no scope in the chain has a row, in
   which case the `name` would not appear in `myAppConfigs` at all.
@@ -1816,7 +1826,7 @@ the admin-provided default; a row with `scopeType = USER` is the
 user's customization). This replaces the previous fixed
 `domainDefaultConfig` / `userCustomizedConfig` fields.
 
-The REST `GET /v2/app-configs/my/{name}` response carries the same
+The REST `GET /v2/app-configs/my/{name}` response carries the same shape
 shape (snake_case `sources` + `merged_config`) — see §4.
 
 ---
@@ -1832,7 +1842,7 @@ publish a bootstrap list.
 ### Bootstrap flow
 
 1. **Pre-login (anonymous)** — for each document the WebUI wants
-   before login, it issues a `publicAppConfigs` query with a `name`
+   before login, it issues a `publicAppConfigSources` query with a `name`
    filter (no auth). The `theme` / `branding` shapes are pulled via
    a single document fetch each — see S1 in §7. On no-edge /
    network error the WebUI falls back to its built-in defaults for
@@ -1840,13 +1850,13 @@ publish a bootstrap list.
 
 2. **Post-login** — the WebUI issues a single `myAppConfigs` query
    to fetch *all* of the caller's resolved documents in one round
-   trip. Each entry carries `sources` (raw `AppConfig` rows per scope
+   trip. Each entry carries `sources` (raw `AppConfigSource` rows per scope
    in merge order) and the deep-merged `mergedConfig` (§5). Admins
    use the same query for their own session (admins are also users
    for the purpose of personal settings). `DOMAIN` scope does not
    participate in the default merge chain, so an admin UI that needs
    to manage domain policy issues a separate `DomainV2.appConfigs` /
-   `adminAppConfigs` query. See S2 in §7.
+   `adminAppConfigSources` query. See S2 in §7.
 
 ---
 
@@ -1864,7 +1874,7 @@ frontend; backend stores it opaquely.)
 
 ```graphql
 query LoadPublicTheme {
-  publicAppConfigs(filter: { name: { equals: "theme" } }) {
+  publicAppConfigSources(filter: { name: { equals: "theme" } }) {
     edges { node { name config updatedAt } }
   }
 }
@@ -1894,7 +1904,7 @@ query BootstrapMe {
       }
     }
   }
-  publicAppConfigs {
+  publicAppConfigSources {
     edges { node { name config } }
   }
 }
@@ -1915,16 +1925,16 @@ query BootstrapMe {
 
 The user replaces their `preferences` document — e.g. language,
 experimental-feature toggles, visible-column choices per table. They
-call the self-service `bulkUpdateMyAppConfigs` — each item carries
+call the self-service `bulkUpdateMyAppConfigSources` — each item carries
 only `name` + `config`, with `scopeType` / `scopeId` injected server-side
 as `USER` + `current_user.user_id`. Even a single-item write goes
 through the bulk path (1-element `items` array); the recomputed
-`ResolvedAppConfig` comes back as `updated[0]`, so no separate
+`AppConfig` comes back as `updated[0]`, so no separate
 `myAppConfigs` re-query is needed.
 
 ```graphql
-mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
-  bulkUpdateMyAppConfigs(input: $input) {
+mutation SaveMyConfig($input: BulkUpdateMyAppConfigSourceInput!) {
+  bulkUpdateMyAppConfigSources(input: $input) {
     updated {
       name
       sources { scopeType scopeId name config updatedAt }
@@ -1954,9 +1964,9 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
 - Authorization: authenticated user. The server injects `scopeId =
   current_user.user_id`, so the mutation cannot touch another user's
   row (admins operating on other users use
-  `adminBulkUpdateAppConfigs`).
+  `adminBulkUpdateAppConfigSources`).
 - The input `config` replaces the USER row's stored JSON wholesale.
-  `ResolvedAppConfig.mergedConfig` is read-only computed and cannot
+  `AppConfig.mergedConfig` is read-only computed and cannot
   be written.
 - **Replace** semantics: anything the caller wants to keep must be
   sent in the same payload — there is no partial-merge or per-key
@@ -1966,9 +1976,9 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
   appended to `failed` with a policy-violation message. Clients can
   discover this ahead of time by reading the policy via
   `appConfigPolicy(name:)`.
-- **First write vs. subsequent writes**: `bulkUpdateMyAppConfigs`
+- **First write vs. subsequent writes**: `bulkUpdateMyAppConfigSources`
   places items with no USER row into `failed`. For the very first
-  save of a given `name`, the client calls `bulkCreateMyAppConfigs`
+  save of a given `name`, the client calls `bulkCreateMyAppConfigSources`
   with the same shape. Clients can disambiguate by checking whether
   the `myAppConfigs` entry for that `name` already has a `USER` row
   in its `sources` list.
@@ -1978,7 +1988,7 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
 Before the `theme` document can be published (S4 below), an admin
 establishes a policy for `theme` that restricts writes to an
 admin-only scope and forbids per-user customization. The policy is
-**required** (§1 required-policy invariant) — no AppConfig row for
+**required** (§1 required-policy invariant) — no AppConfigSource row for
 `theme` can be created until this step runs.
 
 The choice of scope for the admin-owned value — `domain` vs
@@ -2015,7 +2025,7 @@ mutation PublishThemePolicy(
 - Effect:
   - Writes to `theme` at any scope other than `DOMAIN` are rejected
     at the service layer.
-  - `bulk*MyAppConfigs` calls targeting `theme` are rejected because
+  - `bulk*MyAppConfigSources` calls targeting `theme` are rejected because
     `user_writable = false`.
   - `myAppConfigs` entries for `theme` are resolved through the
     chain `[DOMAIN]` (single-scope — `sources` has at most one
@@ -2053,7 +2063,7 @@ Any of the above may be switched live: an admin editing
 `adminBulkUpdateAppConfigPolicies` for `theme` from `[domain]` +
 `userWritable=false` to `[domain, user]` + `userWritable=true`
 immediately loosens the document — existing admin rows remain, and
-from the next `bulkUpdateMyAppConfigs` onward users can layer their
+from the next `bulkUpdateMyAppConfigSources` onward users can layer their
 own customization on top (§7 S3.7).
 
 ### S3.7. Promoting a document from admin-only to user-customizable
@@ -2102,7 +2112,7 @@ mutation PromoteThemePolicy(
   writes and excludes `USER` rows from the resolved view, but leaves
   any pre-existing `USER` rows untouched at the DB level (they
   simply stop being read). Admins who want those rows gone target
-  them with `adminBulkPurgeAppConfigs` (see S3.8).
+  them with `adminBulkPurgeAppConfigSources` (see S3.8).
 
 ### S3.8. Admin fixes a misconfigured policy or config
 
@@ -2111,17 +2121,17 @@ cannot be fixed by renaming. The admin's recovery path is a **purge
 and rebuild** workflow. The mutations run in a specific order because
 of the required-policy invariant:
 
-1. If any AppConfig rows already exist under the wrong `config_name`,
+1. If any AppConfigSource rows already exist under the wrong `config_name`,
    purge them first — the policy cannot be purged while references
    exist.
 2. Purge the wrong policy.
 3. Create the correct policy.
-4. Re-create any AppConfig rows under the correct `config_name`.
+4. Re-create any AppConfigSource rows under the correct `config_name`.
 
 ```graphql
-# Step 1 — purge the bad AppConfig rows (keys identify them).
-mutation PurgeBadConfigs($input: AdminBulkPurgeAppConfigInput!) {
-  adminBulkPurgeAppConfigs(input: $input) {
+# Step 1 — purge the bad AppConfigSource rows (keys identify them).
+mutation PurgeBadConfigs($input: AdminBulkPurgeAppConfigSourceInput!) {
+  adminBulkPurgeAppConfigSources(input: $input) {
     purged { scopeType scopeId name }
     failed { index scopeType scopeId name message }
   }
@@ -2152,7 +2162,7 @@ mutation PurgeBadPolicy($input: AdminBulkPurgeAppConfigPolicyInput!) {
 
 - Authorization: admin required on both mutations.
 - Step 2 rejects the item if step 1 was skipped (or missed a row) —
-  the service checks for remaining AppConfig references under that
+  the service checks for remaining AppConfigSource references under that
   `config_name` before purging.
 - Purge is the only deletion verb in the BEP; day-to-day writes
   still flow through create / update and never remove rows on their
@@ -2164,8 +2174,8 @@ The domain admin publishes a new `theme` document that every user
 in the domain inherits as the merge base — `theme` is admin-only
 per the user stories, so this is the only path by which the
 domain's theme reaches users. The first publish uses
-`adminBulkCreateAppConfigs` with `key.scopeType = DOMAIN_USER_DEFAULTS`;
-later edits use `adminBulkUpdateAppConfigs` with the identical input
+`adminBulkCreateAppConfigSources` with `key.scopeType = DOMAIN_USER_DEFAULTS`;
+later edits use `adminBulkUpdateAppConfigSources` with the identical input
 shape. Multiple domains can be seeded in one call by passing
 multiple items. `DOMAIN`-scope publishes (admin-enforced policy,
 e.g. a domain-internal config document) use the same mutations with
@@ -2174,8 +2184,8 @@ e.g. a domain-internal config document) use the same mutations with
 should be published under `DOMAIN_USER_DEFAULTS` instead.
 
 ```graphql
-mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigInput!) {
-  adminBulkCreateAppConfigs(input: $input) {
+mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigSourceInput!) {
+  adminBulkCreateAppConfigSources(input: $input) {
     created { id scopeType scopeId name config updatedAt }
     failed { index scopeType scopeId name message }
   }
@@ -2204,7 +2214,7 @@ mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigInput!) {
 - Internally, the service dispatches each item on `item.key.scopeType`
   to the matching repository (§2) and strictly inserts a new row.
   Items whose key already has a row land in `failed` — the admin
-  falls back to `adminBulkUpdateAppConfigs`.
+  falls back to `adminBulkUpdateAppConfigSources`.
 - Policy: if an `AppConfigPolicy` exists for `theme` and
   `DOMAIN_USER_DEFAULTS ∉ scope_sources`, the item is rejected with
   a policy-violation message. The typical setup for a document like
@@ -2218,15 +2228,15 @@ mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigInput!) {
 
 For a support request, an admin seeds user A's `preferences` USER row
 for the first time. Since the target is another user's row, this
-must use the admin path — `adminBulkCreateAppConfigs` with
+must use the admin path — `adminBulkCreateAppConfigSources` with
 `key.scopeType = USER` and `key.scopeId = user A's user_id`, not the
 self-service bulk path.
 Items whose key already has a row land in `failed`, in which case
-the admin falls back to `adminBulkUpdateAppConfigs`.
+the admin falls back to `adminBulkUpdateAppConfigSources`.
 
 ```graphql
-mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigInput!) {
-  adminBulkCreateAppConfigs(input: $input) {
+mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigSourceInput!) {
+  adminBulkCreateAppConfigSources(input: $input) {
     created { id scopeType scopeId name config updatedAt }
     failed { index scopeType scopeId name message }
   }
@@ -2252,15 +2262,15 @@ mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigInput!) {
 
 - For `USER` scope the `config` input is stored as the user's
   customization for that `name`.
-- `adminBulkCreateAppConfigs` fails the item if a row already exists
-  for the key; use `adminBulkUpdateAppConfigs` instead to overwrite.
+- `adminBulkCreateAppConfigSources` fails the item if a row already exists
+  for the key; use `adminBulkUpdateAppConfigSources` instead to overwrite.
 - Policy: if an `AppConfigPolicy` for `preferences` has `USER ∉
   scope_sources`, the admin path still rejects the item
   (`scope_sources` applies to both paths — admins just bypass
   `user_writable`, not the scope list). With the usual
   `preferences`-style policy (`scope_sources` includes `USER`) this
   write passes.
-- The response is a list of raw `AppConfig`; the target user's
+- The response is a list of raw `AppConfigSource`; the target user's
   resolved view reflects the new USER row (merged with the matching
   domain defaults) on the next `myAppConfigs` read from that user's
   session.
@@ -2272,12 +2282,12 @@ week" or "every domain that customized the `menu` document":
 
 ```graphql
 query AuditConfigs(
-  $filter: AppConfigFilter!
-  $orderBy: [AppConfigOrderBy!]
+  $filter: AppConfigSourceFilter!
+  $orderBy: [AppConfigSourceOrderBy!]
   $first: Int
   $after: String
 ) {
-  adminAppConfigs(filter: $filter, orderBy: $orderBy, first: $first, after: $after) {
+  adminAppConfigSources(filter: $filter, orderBy: $orderBy, first: $first, after: $after) {
     edges {
       cursor
       node {
