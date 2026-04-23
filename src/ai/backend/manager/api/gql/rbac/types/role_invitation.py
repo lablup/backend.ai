@@ -141,6 +141,4 @@ class CreateRoleInvitationInput(PydanticInputMixin[CreateRoleInvitationInputDTO]
     name="CreateRoleInvitationPayload",
 )
 class CreateRoleInvitationPayload(PydanticOutputMixin[CreateRoleInvitationPayloadDTO]):
-    items: list[RoleInvitationGQL] = gql_field(
-        description="List of created role invitations."
-    )
+    items: list[RoleInvitationGQL] = gql_field(description="List of created role invitations.")

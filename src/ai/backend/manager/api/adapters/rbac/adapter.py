@@ -1558,11 +1558,13 @@ class RBACAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        result = await self._processors.permission_controller.create_role_invitation.wait_for_complete(
-            CreateInvitationServiceAction(
-                role_id=input.role_id,
-                invitee_emails=input.emails,
-                inviter_user_id=me.user_id,
+        result = (
+            await self._processors.permission_controller.create_role_invitation.wait_for_complete(
+                CreateInvitationServiceAction(
+                    role_id=input.role_id,
+                    invitee_emails=input.emails,
+                    inviter_user_id=me.user_id,
+                )
             )
         )
         return CreateRoleInvitationPayload(

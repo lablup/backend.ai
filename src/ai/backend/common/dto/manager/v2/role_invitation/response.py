@@ -35,9 +35,7 @@ class RoleInvitationNode(BaseResponseModel):
 class CreateRoleInvitationPayload(BaseResponseModel):
     """Payload for role invitation creation."""
 
-    items: list[RoleInvitationNode] = Field(
-        description="List of created role invitations."
-    )
+    items: list[RoleInvitationNode] = Field(description="List of created role invitations.")
 
 
 class SearchRoleInvitationsPayload(BaseResponseModel):
