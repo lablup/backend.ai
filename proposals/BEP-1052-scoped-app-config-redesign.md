@@ -174,22 +174,6 @@ class AppConfigRow(Base):
 single row per natural key. A scope can hold any number of distinct
 `name`s.
 
-### `name` length constraint
-
-`name` is bounded to `1 ≤ len ≤ 255` (non-empty, reasonable cap to
-protect DB index / prevent oversized payloads). No character-set
-restriction; any string within the length bound is legal.
-
-Callers are expected to escape `name` when embedding it in transport
-layers:
-- **REST path segment**: standard URL encoding (`%20`, `%3A`, etc.).
-- **`ResolvedAppConfig.id`**: the implementation encodes the
-  `(user_id, name)` pair unambiguously (e.g., left-splitting on the
-  fixed-length UUID part, or JSON-packing before base64) so `name`
-  can contain any character.
-
-Enforced by pydantic validation at the API layer.
-
 ### Write semantics
 
 `*Create*` errors if a row already exists for the natural key;
@@ -345,15 +329,15 @@ Splitting it from `DomainAppConfigRepository` keeps each repository
 mapped to exactly one scope, matching the rest of the layout.
 
 `UserAppConfigRepository` plays a **dual role** — raw `USER` row CRUD
-(serving `UserAppConfig`) + read-side merged view (serving
-`ResolvedAppConfig`, see §5). It takes a single `AppConfigDBSource` like
-the other scope repositories; the user → domain_name resolution
-needed by the merge is done inside the merge-specific DB method via a
-`users` subquery in a single SQL, so no separate `UserDBSource` is
-injected at the repository level. The GraphQL schema exposes
-`UserAppConfig` (raw) and `ResolvedAppConfig` (merged) as separate types,
-but internally they share one repository — there is no
-`ResolvedAppConfigRepository`.
+(returned to GQL as `AppConfig`) + read-side merged view (returned
+as `ResolvedAppConfig`, see §5). It takes a single
+`AppConfigDBSource` like the other scope repositories; the
+user → domain_name resolution needed by the merge is done inside the
+merge-specific DB method via a `users` subquery in a single SQL, so
+no separate `UserDBSource` is injected at the repository level. The
+GraphQL schema exposes raw `AppConfig` rows (regardless of scope)
+and the merged `ResolvedAppConfig` as separate types, but internally
+they share one repository — there is no `ResolvedAppConfigRepository`.
 
 
 ### `db_source` is a single module
@@ -498,71 +482,22 @@ depends on it; per-scope raw reads do not.
 
 ### Types
 
-Each type carries `name` so callers can disambiguate between the
-multiple named documents within a scope.
+There are two GQL types for app-config data:
+
+- `AppConfig` — one raw row from `app_configs`, regardless of scope.
+  Carries `scopeType` + `scopeId` + `name` + `config` + `policy` so
+  callers can disambiguate across scopes at read time. Defined
+  further below (after the inputs/payloads that also reference it).
+- `ResolvedAppConfig` — the merged per-user view backed by the
+  matching `AppConfigPolicy.scope_sources` chain (§5).
+
+Per-scope wrapper types (historical `PublicAppConfig`,
+`DomainAppConfig`, `UserAppConfig`) are **not** defined — they offered
+no information a single `AppConfig` type doesn't and added three
+Connection / Edge / filter triples of boilerplate. Callers
+disambiguate scope by reading `AppConfig.scopeType` instead.
 
 ```graphql
-"""Public config document. Readable without authentication."""
-type PublicAppConfig implements Node {
-  id: ID!
-
-  """Document name (unique within the public scope)."""
-  name: String!
-
-  """Stored config value."""
-  config: JSON!
-
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
-"""Domain config document. Admin read & write. The domain's own value."""
-type DomainAppConfig implements Node {
-  id: ID!
-
-  """Owning domain (back-reference). Lookup only."""
-  domain: DomainV2!
-
-  """Document name (unique within this domain)."""
-  name: String!
-
-  """Stored config value for this document."""
-  config: JSON!
-
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
-"""
-User personal config document — a single `USER`-scope row, exposing
-only the raw stored value (no domain merge). Shaped like the other
-scope types (`PublicAppConfig`, `DomainAppConfig`) — a single
-`config` field.
-
-For the merged view, use `myAppConfigs` (returns `ResolvedAppConfig`) —
-see §5.
-
-Read: owner or admin. Writes go through the bulk paths —
-`bulk*MyAppConfigs` (owner writing their own row) or
-`adminBulk*AppConfigs` with `key.scopeType = USER` (admin writing
-another user's row). There is no single-item write mutation.
-"""
-type UserAppConfig implements Node {
-  id: ID!
-
-  """Owning user (back-reference)."""
-  user: UserV2!
-
-  """Document name (unique within this user)."""
-  name: String!
-
-  """Raw stored value — the user's customized config for this `name`."""
-  config: JSON!
-
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
 """
 Resolved app-config view from the current user's perspective —
 accessible via `myAppConfigs` or `node(id)`. Deep-merges same-`name`
@@ -614,8 +549,8 @@ type ResolvedAppConfig implements Node {
 
 | Location      | Field                                                                                  |
 |---------------|----------------------------------------------------------------------------------------|
-| `DomainV2` | `appConfigs(filter, orderBy, ...pagination): DomainAppConfigConnection!`               |
-| `UserV2`   | `appConfigs(filter, orderBy, ...pagination): UserAppConfigConnection!`                 |
+| `DomainV2` | `appConfigs(filter, orderBy, ...pagination): AppConfigConnection!` (`scopeType = DOMAIN`, `scopeId = domain_name` pinned) |
+| `UserV2`   | `appConfigs(filter, orderBy, ...pagination): AppConfigConnection!` (`scopeType = USER`, `scopeId = user_id` pinned)       |
 
 ### Permissions
 
@@ -643,7 +578,7 @@ extend type DomainV2 {
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): DomainAppConfigConnection!
+  ): AppConfigConnection!
 }
 
 extend type UserV2 {
@@ -661,13 +596,13 @@ extend type UserV2 {
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): UserAppConfigConnection!
+  ): AppConfigConnection!
 }
 ```
 
 A root field `myAppConfigs` (Connection) returns the current user's
 **merged view** (`ResolvedAppConfig`) — different from the raw USER rows
-exposed by `UserV2.appConfigs` (`UserAppConfig`). Merging only
+exposed by `UserV2.appConfigs` (raw `AppConfig`). Merging only
 happens on this path (§5).
 
 ### Queries
@@ -687,7 +622,7 @@ type Query {
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): PublicAppConfigConnection!
+  ): AppConfigConnection!
 
   """
   Current user's merged app-config view (auth required). Deep-merges
@@ -758,14 +693,17 @@ type Query {
 #### Connection / Filter / OrderBy
 
 Filter and orderBy types are unified — a single `AppConfigFilter`
-and `AppConfigOrderBy` are reused across all Connections (admin
-cross-scope and per-scope typed). Connection types themselves remain
-typed per scope so the `node` payload carries the right concrete type.
+and `AppConfigOrderBy` are reused across all Connections. With the
+per-scope types collapsed into one, the same `AppConfigConnection`
+backs every raw-row query — `publicAppConfigs`, `adminAppConfigs`,
+`DomainV2.appConfigs`, and `UserV2.appConfigs`. Each call pins the
+relevant `scopeType` / `scopeId` internally and returns the same
+Edge / node shape.
 
 ```graphql
-# ── Connections (typed per scope) ─────────────────────────────
+# ── Connections ───────────────────────────────────────────────
 
-"""Relay Connection holding AppConfig rows from any scope."""
+"""Relay Connection holding raw `AppConfig` rows from any scope."""
 type AppConfigConnection {
   edges: [AppConfigEdge!]!
   pageInfo: PageInfo!
@@ -774,36 +712,6 @@ type AppConfigConnection {
 type AppConfigEdge {
   cursor: String!
   node: AppConfig!
-}
-
-type PublicAppConfigConnection {
-  edges: [PublicAppConfigEdge!]!
-  pageInfo: PageInfo!
-  count: Int!
-}
-type PublicAppConfigEdge {
-  cursor: String!
-  node: PublicAppConfig!
-}
-
-type DomainAppConfigConnection {
-  edges: [DomainAppConfigEdge!]!
-  pageInfo: PageInfo!
-  count: Int!
-}
-type DomainAppConfigEdge {
-  cursor: String!
-  node: DomainAppConfig!
-}
-
-type UserAppConfigConnection {
-  edges: [UserAppConfigEdge!]!
-  pageInfo: PageInfo!
-  count: Int!
-}
-type UserAppConfigEdge {
-  cursor: String!
-  node: UserAppConfig!
 }
 
 """Relay Connection holding the current user's merged view — backs `myAppConfigs`."""
@@ -1418,11 +1326,8 @@ Queries:
 | `UserV2.appConfigs`                | ❌        | ✅ (self)                        | ✅    |
 | `adminAppConfigs`                  | ❌        | ❌                               | ✅    |
 | `appConfigPolicy` / `appConfigPolicies` | ❌   | ✅                               | ✅    |
-| `node(id)` → `AppConfig`           | ❌        | ❌                               | ✅    |
+| `node(id)` → `AppConfig`           | ✅ iff row `scopeType = PUBLIC` | ✅ (PUBLIC always; DOMAIN / DOMAIN_USER_DEFAULTS same-domain only; USER self only) | ✅ |
 | `node(id)` → `ResolvedAppConfig`   | ❌        | ✅ (id's `user_id` is self)      | ✅ (id's `user_id` is self) |
-| `node(id)` → `PublicAppConfig`     | ✅        | ✅                               | ✅    |
-| `node(id)` → `DomainAppConfig`     | ❌        | ✅ (same-domain rows only)       | ✅    |
-| `node(id)` → `UserAppConfig`       | ❌        | ✅ (self)                        | ✅    |
 | `node(id)` → `AppConfigPolicy`     | ❌        | ✅                               | ✅    |
 
 Write mutations split into two paths with distinct rules. All
@@ -1658,10 +1563,10 @@ reads, and a single policy object for the `{config_name}` GET.
 
 ## 5. `ResolvedAppConfig` — Merge policy
 
-> The merge semantics here apply **only to `ResolvedAppConfig`**. Other
-> scope types (`PublicAppConfig` / `DomainAppConfig` /
-> `UserAppConfig`) expose the raw `extra_config` as a single
-> `config` field.
+> The merge semantics here apply **only to `ResolvedAppConfig`**. The
+> raw `AppConfig` type (returned from `publicAppConfigs`,
+> `adminAppConfigs`, `DomainV2.appConfigs`, `UserV2.appConfigs`)
+> exposes `extra_config` as a single `config` field — no merge.
 
 ### Storage
 
@@ -1813,7 +1718,7 @@ class AppConfigDBSource:
 
 class UserAppConfigRepository:
     """
-    Dual role: `USER` row CRUD (serving `UserAppConfig`) + read-side
+    Dual role: `USER` row CRUD (served as raw `AppConfig`) + read-side
     merged view (serving `ResolvedAppConfig`). The merge path delegates to
     `AppConfigDBSource`'s merge-specific method, which reads two
     source rows in a single SQL while never touching DOMAIN. No
@@ -1825,7 +1730,7 @@ class UserAppConfigRepository:
     def __init__(self, db_source: AppConfigDBSource) -> None:
         self._db_source = db_source
 
-    # ── USER row CRUD (UserAppConfig) ─────────────────────────────
+    # ── USER row CRUD (raw AppConfig) ─────────────────────────────
 
     async def get(self, user_id: str, name: str) -> AppConfigRow | None:
         return await self._db_source.get(
