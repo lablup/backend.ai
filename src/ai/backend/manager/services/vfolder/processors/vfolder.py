@@ -92,6 +92,10 @@ from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
     CreateUploadSessionV2ActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
+    CreateVFolderInProjectAction,
+    CreateVFolderInProjectActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     DeleteVFolderV2ActionResult,
@@ -163,6 +167,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     delete_v2: SingleEntityActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
     purge_v2: SingleEntityActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
     clone_v2: ActionProcessor[CloneVFolderV2Action, CloneVFolderV2ActionResult]
+    create_vfolder_in_project: ScopeActionProcessor[
+        CreateVFolderInProjectAction, CreateVFolderInProjectActionResult
+    ]
 
     def __init__(
         self,
@@ -261,6 +268,11 @@ class VFolderProcessors(AbstractProcessorPackage):
             service.purge_v2, action_monitors, validators=single_entity_rbac_validators
         )
         self.clone_v2 = ActionProcessor(service.clone_v2, action_monitors)
+        self.create_vfolder_in_project = ScopeActionProcessor(
+            service.create_in_project,
+            action_monitors,
+            validators=scope_rbac_validators,
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -300,4 +312,5 @@ class VFolderProcessors(AbstractProcessorPackage):
             DeleteVFolderV2Action.spec(),
             PurgeVFolderV2Action.spec(),
             CloneVFolderV2Action.spec(),
+            CreateVFolderInProjectAction.spec(),
         ]

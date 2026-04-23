@@ -30,6 +30,7 @@ __all__ = (
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
+    "CreateVFolderInScopeInput",
     "CreateVFolderInput",
     "DeleteFilesInput",
     "DeleteInvitationInput",
@@ -72,6 +73,38 @@ class CreateVFolderInput(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
     unmanaged_path: str | None = Field(default=None, description="Path for unmanaged vfolders")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_and_validate_name(cls, v: object) -> object:
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("name must not be blank or whitespace-only")
+            return stripped
+        return v
+
+
+class CreateVFolderInScopeInput(BaseRequestModel):
+    """Scope-agnostic body for vfolder creation under a specific scope.
+
+    The owning scope (project, user, domain, …) is supplied externally by
+    the transport layer (REST path segment, GraphQL mutation argument)
+    and is NOT part of this body. This keeps the body reusable across
+    scope-specific endpoints without forcing clients to duplicate the
+    scope identifier.
+    """
+
+    name: VFolderName = Field(description="VFolder name")
+    host: str | None = Field(default=None, description="Storage host for the vfolder")
+    usage_mode: VFolderUsageMode = Field(
+        default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
+    )
+    permission: VFolderPermissionField = Field(
+        default=VFolderPermissionField.READ_WRITE,
+        description="Default permission of the vfolder",
+    )
+    cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
 
     @field_validator("name", mode="before")
     @classmethod

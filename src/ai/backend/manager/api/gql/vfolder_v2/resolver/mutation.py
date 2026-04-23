@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
     CloneVFolderInputGQL,
     CloneVFolderPayloadGQL,
     CreateVFolderInputGQL,
+    CreateVFolderInScopeInputGQL,
     CreateVFolderPayloadGQL,
     DeleteFilesInputGQL,
     DeleteFilesPayloadGQL,
@@ -243,6 +244,26 @@ async def bulk_delete_vfolders_v2(
     dto = input.to_pydantic()
     payload = await ctx.adapters.vfolder.bulk_delete(dto)
     return BulkDeleteVFoldersPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Create a virtual folder owned by the specified project. "
+            "Requires project-scoped CREATE permission."
+        ),
+    ),
+    name="createVFolderInProject",
+)  # type: ignore[misc]
+async def create_vfolder_in_project(
+    info: Info[StrawberryGQLContext],
+    project_id: UUID,
+    input: CreateVFolderInScopeInputGQL,
+) -> CreateVFolderPayloadGQL:
+    """Create a new virtual folder scoped to a project."""
+    payload = await info.context.adapters.vfolder.create_in_project(project_id, input.to_pydantic())
+    return CreateVFolderPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(

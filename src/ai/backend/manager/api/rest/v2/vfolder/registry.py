@@ -118,6 +118,12 @@ def register_v2_vfolder_routes(
     )
     registry.add(
         "POST",
+        "/projects/{project_id}/create",
+        handler.project_create,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/delete",
         handler.bulk_delete,
         middlewares=[auth_required],

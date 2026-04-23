@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
     CreateVFolderInput,
+    CreateVFolderInScopeInput,
     DeleteFilesInput,
     DeployVFolderInput,
     ListFilesInput,
@@ -126,6 +127,9 @@ from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
 )
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
+)
+from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
+    CreateVFolderInProjectAction,
 )
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
@@ -361,6 +365,32 @@ class VFolderAdapter(BaseAdapter):
             cloneable=input.cloneable,
         )
         result = await self._processors.vfolder.create_vfolder_v2.wait_for_complete(action)
+        return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+
+    async def create_in_project(
+        self,
+        project_id: UUID,
+        input: CreateVFolderInScopeInput,
+    ) -> CreateVFolderPayload:
+        """Create a vfolder owned by the given project.
+
+        Uses ``CreateVFolderInProjectAction`` which is PROJECT-scoped so the
+        caller must hold CREATE permission on the project.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = CreateVFolderInProjectAction(
+            project_id=project_id,
+            user_id=me.user_id,
+            domain_name=me.domain_name,
+            name=input.name,
+            host=input.host,
+            usage_mode=VFolderUsageMode(input.usage_mode.value),
+            permission=VFolderPermission(input.permission.value),
+            cloneable=input.cloneable,
+        )
+        result = await self._processors.vfolder.create_vfolder_in_project.wait_for_complete(action)
         return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
 
     async def create_upload_session(

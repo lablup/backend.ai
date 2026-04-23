@@ -2469,6 +2469,26 @@ type CreateVFSStoragePayload {
   vfsStorage: VFSStorage!
 }
 
+"""
+Added in UNRELEASED. Scope-agnostic body for vfolder creation. The owning scope is supplied as a separate mutation argument.
+"""
+input CreateVFolderInScopeInput {
+  """VFolder name."""
+  name: String!
+
+  """Storage host for the vfolder."""
+  host: String = null
+
+  """Usage mode of the vfolder."""
+  usageMode: VFolderUsageMode! = GENERAL
+
+  """Default mount permission of the vfolder."""
+  permission: VFolderMountPermission! = READ_WRITE
+
+  """Whether the vfolder is cloneable."""
+  cloneable: Boolean! = false
+}
+
 """Added in 26.4.2. Input for creating a new virtual folder."""
 input CreateVFolderV2Input {
   """VFolder name."""
@@ -6787,6 +6807,11 @@ type Mutation {
 
   """Added in 26.4.2. Create a new virtual folder."""
   createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload!
+
+  """
+  Added in UNRELEASED. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
+  """
+  createVFolderInProject(projectId: UUID!, input: CreateVFolderInScopeInput!): CreateVFolderV2Payload!
 
   """Added in 26.4.2. Soft-delete a virtual folder (move to trash)."""
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!

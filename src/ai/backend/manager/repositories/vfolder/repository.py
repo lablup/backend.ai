@@ -23,6 +23,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -60,7 +61,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
@@ -806,11 +807,8 @@ class VfolderRepository:
     @vfolder_repository_resilience.apply()
     async def get_group_resource_info(
         self, group_id_or_name: str | uuid.UUID, domain_name: str
-    ) -> tuple[uuid.UUID, int, int, ProjectType] | None:
-        """
-        Get group resource information by group ID or name.
-        Returns (group_uuid, max_vfolder_count, max_quota_scope_size, group_type) or None.
-        """
+    ) -> ProjectResourceInfo | None:
+        """Get group resource information by group ID or name."""
 
         async with self._db.begin_readonly_session_read_committed() as session:
             if isinstance(group_id_or_name, str):
@@ -836,11 +834,11 @@ class VfolderRepository:
             if not group_row:
                 return None
 
-            return (
-                group_row.id,
-                group_row.resource_policy_row.max_vfolder_count,
-                group_row.resource_policy_row.max_quota_scope_size,
-                group_row.type,
+            return ProjectResourceInfo(
+                project_id=group_row.id,
+                max_vfolder_count=group_row.resource_policy_row.max_vfolder_count,
+                max_quota_scope_size=group_row.resource_policy_row.max_quota_scope_size,
+                project_type=group_row.type,
             )
 
     @vfolder_repository_resilience.apply()
