@@ -407,12 +407,17 @@ are performed in the service layer.
 orchestration — each item runs in its own DB transaction so a
 single failure doesn't abort the rest (partial success), successes
 and failures collected into `BulkActionResult(success_list,
-failed_list)`. Admin bulk dispatches each item on
-`item.key.scopeType` to the matching scope repository; my bulk
-dispatches directly to `UserAppConfigRepository`. Not optimized as
-a single SQL batch: items split by scope can fail for heterogeneous
-reasons (unique-key violations, authorization errors, …), and
-representing partial success in one SQL statement is awkward.
+failed_list)`. The service preserves each item's original position
+in the input list so the GQL/REST adapters can populate the
+per-verb error type's `index` field (see §3 error types), matching
+the existing `BulkCreateUserV2Error` / `BulkPurgeUserV2Error`
+convention elsewhere in the codebase. Admin bulk dispatches each
+item on `item.key.scopeType` to the matching scope repository; my
+bulk dispatches directly to `UserAppConfigRepository`. Not optimized
+as a single SQL batch: items split by scope can fail for
+heterogeneous reasons (unique-key violations, authorization errors,
+…), and representing partial success in one SQL statement is
+awkward.
 
 The admin policy bulk mutations
 (`adminBulk{Create,Update,Purge}AppConfigPolicies`) follow the same
@@ -1114,22 +1119,33 @@ input BulkUpdateMyAppConfigInput {
 
 # ── Admin Payloads — return lists of raw AppConfig ───────────
 
-"""
-Per-item error info for a failed item in an admin bulk write.
-Shared by all admin AppConfig bulk mutations (create / update /
-purge).
-"""
-type AdminAppConfigError {
-  """Scope of the failed item."""
+"""Per-item error info for `adminBulkCreateAppConfigs`."""
+type AdminBulkCreateAppConfigError {
+  """Original position in the input list."""
+  index: Int!
   scopeType: AppConfigScopeType!
-
-  """Scope ID of the failed item."""
   scopeId: String!
-
-  """Name of the failed item."""
   name: String!
+  message: String!
+}
 
-  """Error message describing the failure."""
+"""Per-item error info for `adminBulkUpdateAppConfigs`."""
+type AdminBulkUpdateAppConfigError {
+  """Original position in the input list."""
+  index: Int!
+  scopeType: AppConfigScopeType!
+  scopeId: String!
+  name: String!
+  message: String!
+}
+
+"""Per-item error info for `adminBulkPurgeAppConfigs`."""
+type AdminBulkPurgeAppConfigError {
+  """Original position in the input list."""
+  index: Int!
+  scopeType: AppConfigScopeType!
+  scopeId: String!
+  name: String!
   message: String!
 }
 
@@ -1139,7 +1155,7 @@ type AdminBulkCreateAppConfigsPayload {
   created: [AppConfig!]!
 
   """Per-item errors for entries that failed to create."""
-  failed: [AdminAppConfigError!]!
+  failed: [AdminBulkCreateAppConfigError!]!
 }
 
 """Result of `adminBulkUpdateAppConfigs`. Partial success."""
@@ -1148,7 +1164,7 @@ type AdminBulkUpdateAppConfigsPayload {
   updated: [AppConfig!]!
 
   """Per-item errors for entries that failed to update."""
-  failed: [AdminAppConfigError!]!
+  failed: [AdminBulkUpdateAppConfigError!]!
 }
 
 """Result of `adminBulkPurgeAppConfigs`. Partial success."""
@@ -1157,21 +1173,27 @@ type AdminBulkPurgeAppConfigsPayload {
   purged: [AppConfigKey!]!
 
   """Per-item errors for entries that failed to purge."""
-  failed: [AdminAppConfigError!]!
+  failed: [AdminBulkPurgeAppConfigError!]!
 }
 
 # ── My Payloads — return lists of resolved ResolvedAppConfig ────
 
 """
-Per-item error info for a failed item in a my bulk write. Shared by
-the my bulk mutations (create / update). (scope / scopeId are
-server-injected, so `name` is the only identifier.)
+Per-item error info for `bulkCreateMyAppConfigs`. (scope / scopeId
+are server-injected, so `name` is the only identifier.)
 """
-type MyAppConfigError {
-  """Name of the failed item."""
+type BulkCreateMyAppConfigError {
+  """Original position in the input list."""
+  index: Int!
   name: String!
+  message: String!
+}
 
-  """Error message describing the failure."""
+"""Per-item error info for `bulkUpdateMyAppConfigs`."""
+type BulkUpdateMyAppConfigError {
+  """Original position in the input list."""
+  index: Int!
+  name: String!
   message: String!
 }
 
@@ -1181,7 +1203,7 @@ type BulkCreateMyAppConfigsPayload {
   created: [ResolvedAppConfig!]!
 
   """Per-item errors for entries that failed to create."""
-  failed: [MyAppConfigError!]!
+  failed: [BulkCreateMyAppConfigError!]!
 }
 
 """Result of `bulkUpdateMyAppConfigs`. Partial success."""
@@ -1190,7 +1212,7 @@ type BulkUpdateMyAppConfigsPayload {
   updated: [ResolvedAppConfig!]!
 
   """Per-item errors for entries that failed to update."""
-  failed: [MyAppConfigError!]!
+  failed: [BulkUpdateMyAppConfigError!]!
 }
 
 # ── Admin Policy Inputs / Payloads ──────────────────────────
@@ -1226,15 +1248,27 @@ input AdminBulkPurgeAppConfigPolicyInput {
   configNames: [String!]!
 }
 
-"""
-Per-item error info for a failed item in an admin policy bulk write.
-Shared by all admin policy bulk mutations (create / update / purge).
-"""
-type AdminAppConfigPolicyError {
-  """`configName` of the failed item."""
+"""Per-item error info for `adminBulkCreateAppConfigPolicies`."""
+type AdminBulkCreateAppConfigPolicyError {
+  """Original position in the input list."""
+  index: Int!
   configName: String!
+  message: String!
+}
 
-  """Error message describing the failure."""
+"""Per-item error info for `adminBulkUpdateAppConfigPolicies`."""
+type AdminBulkUpdateAppConfigPolicyError {
+  """Original position in the input list."""
+  index: Int!
+  configName: String!
+  message: String!
+}
+
+"""Per-item error info for `adminBulkPurgeAppConfigPolicies`."""
+type AdminBulkPurgeAppConfigPolicyError {
+  """Original position in the input list."""
+  index: Int!
+  configName: String!
   message: String!
 }
 
@@ -1244,7 +1278,7 @@ type AdminBulkCreateAppConfigPoliciesPayload {
   created: [AppConfigPolicy!]!
 
   """Per-item errors for entries that failed to create."""
-  failed: [AdminAppConfigPolicyError!]!
+  failed: [AdminBulkCreateAppConfigPolicyError!]!
 }
 
 """Result of `adminBulkUpdateAppConfigPolicies`. Partial success."""
@@ -1253,7 +1287,7 @@ type AdminBulkUpdateAppConfigPoliciesPayload {
   updated: [AppConfigPolicy!]!
 
   """Per-item errors for entries that failed to update."""
-  failed: [AdminAppConfigPolicyError!]!
+  failed: [AdminBulkUpdateAppConfigPolicyError!]!
 }
 
 """Result of `adminBulkPurgeAppConfigPolicies`. Partial success."""
@@ -1262,7 +1296,7 @@ type AdminBulkPurgeAppConfigPoliciesPayload {
   purgedConfigNames: [String!]!
 
   """Per-item errors for entries that failed to purge."""
-  failed: [AdminAppConfigPolicyError!]!
+  failed: [AdminBulkPurgeAppConfigPolicyError!]!
 }
 
 """
@@ -1964,7 +1998,7 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
       sources { scopeType scopeId name config updatedAt }
       mergedConfig
     }
-    failed { name message }
+    failed { index name message }
   }
 }
 ```
@@ -2026,7 +2060,7 @@ mutation PublishThemePolicy(
 ) {
   adminBulkCreateAppConfigPolicies(input: $input) {
     created { id configName scopeSources userWritable }
-    failed { configName message }
+    failed { index configName message }
   }
 }
 ```
@@ -2103,7 +2137,7 @@ mutation PromoteThemePolicy(
 ) {
   adminBulkUpdateAppConfigPolicies(input: $input) {
     updated { id configName scopeSources userWritable }
-    failed { configName message }
+    failed { index configName message }
   }
 }
 ```
@@ -2157,7 +2191,7 @@ of the required-policy invariant:
 mutation PurgeBadConfigs($input: AdminBulkPurgeAppConfigInput!) {
   adminBulkPurgeAppConfigs(input: $input) {
     purged { scopeType scopeId name }
-    failed { scopeType scopeId name message }
+    failed { index scopeType scopeId name message }
   }
 }
 
@@ -2165,7 +2199,7 @@ mutation PurgeBadConfigs($input: AdminBulkPurgeAppConfigInput!) {
 mutation PurgeBadPolicy($input: AdminBulkPurgeAppConfigPolicyInput!) {
   adminBulkPurgeAppConfigPolicies(input: $input) {
     purgedConfigNames
-    failed { configName message }
+    failed { index configName message }
   }
 }
 ```
@@ -2211,7 +2245,7 @@ should be published under `DOMAIN_USER_DEFAULTS` instead.
 mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigInput!) {
   adminBulkCreateAppConfigs(input: $input) {
     created { id scopeType scopeId name config updatedAt }
-    failed { scopeType scopeId name message }
+    failed { index scopeType scopeId name message }
   }
 }
 ```
@@ -2262,7 +2296,7 @@ the admin falls back to `adminBulkUpdateAppConfigs`.
 mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigInput!) {
   adminBulkCreateAppConfigs(input: $input) {
     created { id scopeType scopeId name config updatedAt }
-    failed { scopeType scopeId name message }
+    failed { index scopeType scopeId name message }
   }
 }
 ```
