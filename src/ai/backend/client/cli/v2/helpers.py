@@ -156,27 +156,6 @@ def parse_order_options(
     return orders
 
 
-def parse_order_options_raw(
-    order_by: tuple[str, ...],
-    order_class: type,
-) -> list[Any]:
-    """Parse ``--order-by field:direction`` options without an enum for the field name."""
-    from ai.backend.common.dto.manager.v2.common import OrderDirection
-
-    orders: list[Any] = []
-    for spec in order_by:
-        parts = spec.split(":", 1)
-        field_name = parts[0]
-        direction_str = parts[1].upper() if len(parts) > 1 else "ASC"
-        orders.append(
-            order_class(
-                field=field_name,
-                direction=OrderDirection(direction_str),
-            )
-        )
-    return orders
-
-
 def print_result(data: Any) -> None:
     """Print a Pydantic model or dict as formatted JSON."""
     if hasattr(data, "model_dump"):

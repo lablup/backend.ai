@@ -7,8 +7,11 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.role_invitation.types import RoleInvitationState
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.base.types import QueryOrder
 
@@ -106,5 +109,197 @@ class RoleInvitationConditions:
                 .scalar_subquery()
             )
             return RoleInvitationRow.created_at > subquery
+
+        return inner
+
+    # -- state filter --
+
+    @staticmethod
+    def by_state_equals(state: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleInvitationRow.state == state
+
+        return inner
+
+    @staticmethod
+    def by_state_in(states: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleInvitationRow.state.in_(states)
+
+        return inner
+
+    @staticmethod
+    def by_state_not_equals(state: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleInvitationRow.state != state
+
+        return inner
+
+    @staticmethod
+    def by_state_not_in(states: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleInvitationRow.state.not_in(states)
+
+        return inner
+
+    # -- nested role filter (EXISTS subquery) --
+
+    @staticmethod
+    def exists_role_with_conditions(role_conditions: list[QueryCondition]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(
+                RoleRow.id == RoleInvitationRow.role_id,
+            )
+            for cond in role_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
+    @staticmethod
+    def role_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = RoleRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = RoleRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def role_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(RoleRow.name) == spec.value.lower()
+            else:
+                condition = RoleRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def role_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = RoleRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = RoleRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def role_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = RoleRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = RoleRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def role_name_in(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.name.in_([spec.value])
+
+        return inner
+
+    # -- nested user filter helpers (for EXISTS subquery) --
+
+    @staticmethod
+    def _user_email_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.email.ilike(f"%{spec.value}%")
+            else:
+                condition = UserRow.email.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def _user_email_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.email) == spec.value.lower()
+            else:
+                condition = UserRow.email == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def _user_email_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.email.ilike(f"{spec.value}%")
+            else:
+                condition = UserRow.email.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def _user_email_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.email.ilike(f"%{spec.value}")
+            else:
+                condition = UserRow.email.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def _user_email_in(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.email.in_([spec.value])
+
+        return inner
+
+    @staticmethod
+    def exists_invitee_with_conditions(
+        user_conditions: list[QueryCondition],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(
+                UserRow.uuid == RoleInvitationRow.invitee_user_id,
+            )
+            for cond in user_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
+    @staticmethod
+    def exists_inviter_with_conditions(
+        user_conditions: list[QueryCondition],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(
+                UserRow.uuid == RoleInvitationRow.inviter_user_id,
+            )
+            for cond in user_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
 
         return inner

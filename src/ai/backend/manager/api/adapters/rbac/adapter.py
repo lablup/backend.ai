@@ -116,10 +116,22 @@ from ai.backend.common.dto.manager.v2.role_invitation.request import (
     CreateRoleInvitationInput as CreateRoleInvitationInputDTO,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleInvitationFilter as RoleInvitationFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
     RoleInvitationOrderBy as RoleInvitationOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleInvitationStateFilter as RoleInvitationStateFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleNestedFilter as InvitationRoleNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
     SearchRoleInvitationsInput as SearchRoleInvitationsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    UserNestedFilter as InvitationUserNestedFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.response import (
     CreateRoleInvitationPayload,
@@ -1607,6 +1619,89 @@ class RBACAdapter(BaseAdapter):
                 result.append(RoleInvitationOrders.state(ascending))
         return result
 
+    def _convert_invitation_filter(self, f: RoleInvitationFilterDTO) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if f.state is not None:
+            cond = self._convert_invitation_state_filter(f.state)
+            if cond is not None:
+                conditions.append(cond)
+        if f.role is not None:
+            conditions.extend(self._convert_invitation_role_nested_filter(f.role))
+        if f.inviter is not None:
+            conditions.extend(self._convert_invitation_user_nested_filter(f.inviter, "inviter"))
+        if f.invitee is not None:
+            conditions.extend(self._convert_invitation_user_nested_filter(f.invitee, "invitee"))
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_invitation_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_invitation_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_invitation_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
+    @staticmethod
+    def _convert_invitation_state_filter(
+        f: RoleInvitationStateFilterDTO,
+    ) -> QueryCondition | None:
+        if f.equals is not None:
+            return RoleInvitationConditions.by_state_equals(f.equals)
+        if f.in_ is not None:
+            return RoleInvitationConditions.by_state_in(f.in_)
+        if f.not_equals is not None:
+            return RoleInvitationConditions.by_state_not_equals(f.not_equals)
+        if f.not_in is not None:
+            return RoleInvitationConditions.by_state_not_in(f.not_in)
+        return None
+
+    def _convert_invitation_role_nested_filter(
+        self, f: InvitationRoleNestedFilterDTO
+    ) -> list[QueryCondition]:
+        role_conditions: list[QueryCondition] = []
+        if f.name is not None:
+            cond = self.convert_string_filter(
+                f.name,
+                contains_factory=RoleInvitationConditions.role_name_contains,
+                equals_factory=RoleInvitationConditions.role_name_equals,
+                starts_with_factory=RoleInvitationConditions.role_name_starts_with,
+                ends_with_factory=RoleInvitationConditions.role_name_ends_with,
+                in_factory=RoleInvitationConditions.role_name_in,
+            )
+            if cond is not None:
+                role_conditions.append(cond)
+        if role_conditions:
+            return [RoleInvitationConditions.exists_role_with_conditions(role_conditions)]
+        return []
+
+    def _convert_invitation_user_nested_filter(
+        self, f: InvitationUserNestedFilterDTO, relation: str
+    ) -> list[QueryCondition]:
+        user_conditions: list[QueryCondition] = []
+        if f.email is not None:
+            cond = self.convert_string_filter(
+                f.email,
+                contains_factory=RoleInvitationConditions._user_email_contains,
+                equals_factory=RoleInvitationConditions._user_email_equals,
+                starts_with_factory=RoleInvitationConditions._user_email_starts_with,
+                ends_with_factory=RoleInvitationConditions._user_email_ends_with,
+                in_factory=RoleInvitationConditions._user_email_in,
+            )
+            if cond is not None:
+                user_conditions.append(cond)
+        if not user_conditions:
+            return []
+        if relation == "inviter":
+            return [RoleInvitationConditions.exists_inviter_with_conditions(user_conditions)]
+        return [RoleInvitationConditions.exists_invitee_with_conditions(user_conditions)]
+
     async def my_search_role_invitations(
         self,
         input: SearchRoleInvitationsInputDTO,
@@ -1615,9 +1710,10 @@ class RBACAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
+        conditions = self._convert_invitation_filter(input.filter) if input.filter else []
         orders = self._convert_invitation_orders(input.order) if input.order else []
         querier = self._build_querier(
-            conditions=[],
+            conditions=conditions,
             orders=orders,
             pagination_spec=_invitation_pagination_spec(),
             first=input.first,
@@ -1649,9 +1745,10 @@ class RBACAdapter(BaseAdapter):
         input: SearchRoleInvitationsInputDTO,
     ) -> SearchRoleInvitationsPayload:
         """Search invitations for a specific role (admin/project-admin view)."""
+        conditions = self._convert_invitation_filter(input.filter) if input.filter else []
         orders = self._convert_invitation_orders(input.order) if input.order else []
         querier = self._build_querier(
-            conditions=[],
+            conditions=conditions,
             orders=orders,
             pagination_spec=_invitation_pagination_spec(),
             first=input.first,

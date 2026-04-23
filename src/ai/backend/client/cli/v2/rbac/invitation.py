@@ -107,13 +107,18 @@ def cancel(invitation_id: UUID) -> None:
 )
 def my_search(limit: int | None, offset: int | None, order_by: tuple[str, ...]) -> None:
     """Search your own invitations."""
-    from ai.backend.client.cli.v2.helpers import parse_order_options_raw
+    from ai.backend.client.cli.v2.helpers import parse_order_options
     from ai.backend.common.dto.manager.v2.role_invitation.request import (
         RoleInvitationOrderBy,
+        RoleInvitationOrderField,
         SearchRoleInvitationsInput,
     )
 
-    orders = parse_order_options_raw(order_by, RoleInvitationOrderBy) if order_by else None
+    orders = (
+        parse_order_options(order_by, RoleInvitationOrderField, RoleInvitationOrderBy)
+        if order_by
+        else None
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -141,13 +146,18 @@ def role_search(
     role_id: UUID, limit: int | None, offset: int | None, order_by: tuple[str, ...]
 ) -> None:
     """Search invitations for a specific role (admin view)."""
-    from ai.backend.client.cli.v2.helpers import parse_order_options_raw
+    from ai.backend.client.cli.v2.helpers import parse_order_options
     from ai.backend.common.dto.manager.v2.role_invitation.request import (
         RoleInvitationOrderBy,
+        RoleInvitationOrderField,
         SearchRoleInvitationsInput,
     )
 
-    orders = parse_order_options_raw(order_by, RoleInvitationOrderBy) if order_by else None
+    orders = (
+        parse_order_options(order_by, RoleInvitationOrderField, RoleInvitationOrderBy)
+        if order_by
+        else None
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
