@@ -183,6 +183,71 @@ Enforced by pydantic validation at the API layer.
 this BEP — rows persist once created, and callers "clear" a
 document by `*Update*`-ing it to an empty JSON (`{}`).
 
+If a matching `app_config_policies` row (see below) exists for the
+`name`, the service layer additionally enforces:
+
+- `scope_type` must be in the policy's `allowed_scopes`; writes to
+  other scopes are rejected as a per-item failure.
+- When the write is on the `USER` scope via a `bulk*MyAppConfigs`
+  mutation, the policy's `user_writable` must be `True`; otherwise the
+  item is rejected. The admin-path mutations are not gated by
+  `user_writable` — admins may seed USER rows regardless of the flag.
+
+If no policy row exists for the `name`, no policy-driven validation
+is applied and the write proceeds under the natural-key rules above.
+
+### App Config Policy table
+
+A separate `app_config_policies` table holds advisory rules per
+document `name` — who may write at which scopes, and the merge order
+for `ResolvedAppConfig` (§5). Policies are **decoupled** from
+`app_configs` rows at the schema level: no foreign key, no cascade
+semantics, no shared lifecycle. The service layer joins at runtime on
+matching `name` and applies whatever policy row it finds.
+
+```python
+class AppConfigPolicyRow(Base):
+    __tablename__ = "app_config_policies"
+
+    id: Mapped[uuid.UUID]
+    name: Mapped[str]                         # UNIQUE — joined to
+                                              # `app_configs.name` by value only
+                                              # (no FK, no lifecycle coupling).
+                                              # Mutable — rename is allowed.
+    description: Mapped[str | None]
+    allowed_scopes: Mapped[list[str]]         # Dual meaning:
+                                              #   (1) scopes where this name may
+                                              #       be written (writes to other
+                                              #       scopes are rejected)
+                                              #   (2) merge order, low → high
+                                              #       priority (later wins)
+                                              # Values align with
+                                              # `AppConfigScopeType` but stored
+                                              # as strings so that adding a new
+                                              # scope does not require migrating
+                                              # this column.
+    user_writable: Mapped[bool]               # Whether the USER may write their
+                                              # own USER-scope row via the
+                                              # `bulk*MyAppConfigs` path. Admin-
+                                              # path writes are not gated by
+                                              # this flag.
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+    __table_args__ = (
+        sa.UniqueConstraint("name", name="uq_app_config_policies_name"),
+    )
+```
+
+**Lifecycle decoupling**: there is no FK between `app_configs` and
+`app_config_policies`. A policy row may be deleted without touching
+the configs that matched it by `name`; configs may exist without a
+corresponding policy. Policies may be created before or after the
+configs they govern. The merge path (§5) likewise uses the policy's
+`allowed_scopes` as the chain order when present, and falls back to
+`DOMAIN_USER_DEFAULTS ⊕ USER` when absent. Policies are advisory, not
+authoritative.
+
 ---
 
 ## 2. Repository Layer — split per scope
@@ -199,8 +264,14 @@ repositories/app_config/
 ├── public_app_config_repository.py
 ├── domain_app_config_repository.py
 ├── domain_user_defaults_app_config_repository.py
-├── user_app_config_repository.py     # USER row CRUD + merged view (MyAppConfig)
+├── user_app_config_repository.py     # USER row CRUD + merged view (ResolvedAppConfig)
 └── repositories.py                   # exports all four repos
+
+repositories/app_config_policy/
+├── db_source/
+│   └── db_source.py                  # separate db_source (different table)
+├── app_config_policy_repository.py
+└── repositories.py
 ```
 
 ### Repository responsibility split
@@ -211,6 +282,7 @@ repositories/app_config/
 | `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `search(domain_name, filter, pagination)` |
 | `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `search(domain_name, filter, pagination)` |
 | `UserAppConfigRepository`               | CRUD: `get / get_by_id / create / update / search` (all take `user_id` + `name`; `search` additionally takes `filter` + `pagination`). Plus merge-specific: `get_merged(user_id, name)`, `search_merged(user_id, filter, pagination)` — see the note below for roles. |
+| `AppConfigPolicyRepository`             | `get(name)`, `get_by_id(id)`, `create(name, description, allowed_scopes, user_writable)`, `update(name, description, allowed_scopes, user_writable)`, `search(filter, pagination)` — CRUD for the separate `app_config_policies` table (§1). Not joined to `app_configs` at the DB level; callers look policies up by `name` at runtime. |
 
 `DomainUserDefaultsAppConfigRepository` mirrors
 `DomainAppConfigRepository` (admin write + same-domain user read,
@@ -314,6 +386,39 @@ format, the Python dataclass is the in-process DTO. Concrete
 definitions are intentionally left to the implementation phase
 (expected location: a small companion module under
 `repositories/app_config/`).
+
+### Policy repository
+
+`AppConfigPolicyRepository` lives under
+`repositories/app_config_policy/` with its own
+`AppConfigPolicyDBSource`. It is intentionally kept separate from
+`AppConfigDBSource` — the tables share no FK and no joined query
+surface, so collapsing them would bind two independent lifecycles
+together. The policy repository exposes the same six-operation shape
+(`get` / `get_by_id` / `create` / `update` / `search`; `delete` /
+`purge` omitted per the BEP-1052 write policy).
+
+Write orchestration for `app_configs` consults the policy repository
+at the **service layer**, not inside `AppConfigRepository`. For each
+batch, the service collects the distinct `name`s, calls
+`AppConfigPolicyRepository.get(name)` (caching within the batch so a
+single policy is read once), and threads the result into per-item
+validation:
+
+- If the policy row is present and `item.key.scopeType ∉
+  allowed_scopes`, the item is appended to `failed_list` with a
+  policy-violation message — `AppConfigRepository.{create,update}` is
+  not called for that item.
+- If the item is on the `bulk*MyAppConfigs` path, the policy is
+  present, and `user_writable` is `False`, the item is likewise
+  rejected without touching `AppConfigRepository`.
+- If the policy row is absent, the item flows through unchanged and
+  only the natural-key rules of §1 apply.
+
+Reads do not consult the policy repository from within
+`AppConfigRepository`. The merge service (§5) performs its own policy
+lookup when assembling a `ResolvedAppConfig` because the chain order
+depends on it; per-scope raw reads do not.
 
 ---
 
