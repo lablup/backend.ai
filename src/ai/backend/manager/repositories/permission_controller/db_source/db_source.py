@@ -72,7 +72,7 @@ from ai.backend.manager.errors.role_invitation import (
     RoleInvitationNotFound,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -214,6 +214,90 @@ class PermissionDBSource:
                         ase_remaining.scope_type == ase.scope_type,
                         ase_remaining.scope_id == ase.scope_id,
                         sa.cast(UserRoleRow.user_id, sa.String) == ase.entity_id,
+                    )
+                ),
+            )
+        )
+
+    @staticmethod
+    async def _sync_association_groups_users_on_assign(
+        db_session: SASession,
+        user_ids: Collection[uuid.UUID],
+    ) -> None:
+        """Ensure business-membership rows exist for every project-scoped role.
+
+        Inserts ``association_groups_users (user_id, group_id)`` pairs derived
+        from the user's assigned roles bound to a PROJECT scope.  Mirrors
+        :meth:`_sync_user_scopes_on_assign` so the legacy business-membership
+        table stays consistent with RBAC state.  Idempotent via
+        ``ON CONFLICT DO NOTHING``.
+
+        TODO: remove once ``association_groups_users`` is fully migrated to
+        ``association_scopes_entities``.
+        """
+        if not user_ids:
+            return
+        agu = AssocGroupUserRow
+        ase = AssociationScopesEntitiesRow
+        source = (
+            sa.select(
+                UserRoleRow.user_id.label("user_id"),
+                sa.cast(ase.scope_id, agu.group_id.type).label("group_id"),
+            )
+            .select_from(
+                sa.join(
+                    UserRoleRow,
+                    ase,
+                    sa.cast(UserRoleRow.role_id, sa.String) == ase.entity_id,
+                )
+            )
+            .where(
+                ase.entity_type == EntityType.ROLE,
+                ase.scope_type == ScopeType.PROJECT,
+                UserRoleRow.user_id.in_(user_ids),
+            )
+            .distinct()
+        )
+        await db_session.execute(
+            pg_insert(agu).from_select(["user_id", "group_id"], source).on_conflict_do_nothing()
+        )
+
+    @staticmethod
+    async def _sync_association_groups_users_on_revoke(
+        db_session: SASession,
+        user_ids: Collection[uuid.UUID],
+    ) -> None:
+        """Remove business-membership rows no longer covered by any project role.
+
+        Deletes ``association_groups_users`` rows for *user_ids* when no
+        remaining role of the user is bound to that project scope.  Mirrors
+        :meth:`_sync_user_scopes_on_revoke` so the legacy business-membership
+        table stays consistent with RBAC state.
+
+        TODO: remove once ``association_groups_users`` is fully migrated to
+        ``association_scopes_entities``.
+        """
+        if not user_ids:
+            return
+        agu = AssocGroupUserRow
+        ase = AssociationScopesEntitiesRow
+        await db_session.execute(
+            sa.delete(agu).where(
+                agu.user_id.in_(user_ids),
+                ~sa.exists(
+                    sa.select(sa.literal(1))
+                    .select_from(
+                        sa.join(
+                            UserRoleRow,
+                            ase,
+                            sa.cast(UserRoleRow.role_id, sa.String) == ase.entity_id,
+                        )
+                    )
+                    .where(
+                        UserRoleRow.user_id == agu.user_id,
+                        ase.entity_type == EntityType.ROLE,
+                        ase.scope_type == ScopeType.PROJECT,
+                        ase.scope_id == sa.cast(agu.group_id, sa.String),
                     )
                 ),
             )
@@ -395,6 +479,9 @@ class PermissionDBSource:
         )
         result = await execute_creator(db_session, creator)
         await self._sync_user_scopes_on_assign(db_session, [data.user_id])
+        # Idempotent with the service-layer bind_user_to_project path; required
+        # when called from accept_invitation which has no project_id upfront.
+        await self._sync_association_groups_users_on_assign(db_session, [data.user_id])
         return result.row
 
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -1137,6 +1224,7 @@ class PermissionDBSource:
                     failures.append(BulkRoleRevocationFailure(user_id=user_id, message=str(e)))
             revoked_user_ids = [s.user_id for s in successes]
             await self._sync_user_scopes_on_revoke(db_session, revoked_user_ids)
+            await self._sync_association_groups_users_on_revoke(db_session, revoked_user_ids)
 
         return BulkRoleRevocationResultData(successes=successes, failures=failures)
 
