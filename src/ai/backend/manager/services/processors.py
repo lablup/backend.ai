@@ -149,10 +149,10 @@ if TYPE_CHECKING:
         ManagerAdminService,  # pants: no-infer-dep
     )
     from ai.backend.manager.services.metric.processors import (
-        UtilizationMetricProcessors,  # pants: no-infer-dep
+        MetricProcessors,  # pants: no-infer-dep
     )
     from ai.backend.manager.services.metric.service import (
-        UtilizationMetricService,  # pants: no-infer-dep
+        MetricService,  # pants: no-infer-dep
     )
     from ai.backend.manager.services.model_card.processors import (
         ModelCardProcessors,  # pants: no-infer-dep
@@ -396,7 +396,7 @@ class Services:
     model_card: ModelCardService
     resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
-    utilization_metric: UtilizationMetricService
+    metric: MetricService
     model_serving: ModelServingService
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
@@ -461,7 +461,7 @@ class Processors(AbstractProcessorPackage):
     model_card: ModelCardProcessors
     resource_usage: ResourceUsageProcessors
     scaling_group: ScalingGroupProcessors
-    utilization_metric: UtilizationMetricProcessors
+    metric: MetricProcessors
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
     auth: AuthProcessors
@@ -519,7 +519,7 @@ class Processors(AbstractProcessorPackage):
             *self.model_card.supported_actions(),
             *self.resource_usage.supported_actions(),
             *self.scaling_group.supported_actions(),
-            *self.utilization_metric.supported_actions(),
+            *self.metric.supported_actions(),
             *self.model_serving.supported_actions(),
             *self.model_serving_auto_scaling.supported_actions(),
             *self.auth.supported_actions(),

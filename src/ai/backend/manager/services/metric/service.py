@@ -14,7 +14,7 @@ from .actions.live_stat import KernelLiveStatAction, KernelLiveStatActionResult
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class UtilizationMetricService:
+class MetricService:
     _metric_repository: MetricRepository
 
     def __init__(

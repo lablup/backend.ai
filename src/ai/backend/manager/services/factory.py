@@ -60,8 +60,8 @@ from ai.backend.manager.services.login_client_type.processors import (
 from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
-from ai.backend.manager.services.metric.processors import UtilizationMetricProcessors
-from ai.backend.manager.services.metric.service import UtilizationMetricService
+from ai.backend.manager.services.metric.processors import MetricProcessors
+from ai.backend.manager.services.metric.service import MetricService
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
@@ -294,7 +294,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.scaling_group.repository,
             appproxy_client_pool=args.appproxy_client_pool,
         ),
-        utilization_metric=UtilizationMetricService(
+        metric=MetricService(
             metric_repository=repositories.metric.repository,
         ),
         model_serving=ModelServingService(
@@ -477,9 +477,7 @@ def create_processors(
             services.resource_usage, action_monitors, validators
         ),
         scaling_group=ScalingGroupProcessors(services.scaling_group, action_monitors, validators),
-        utilization_metric=UtilizationMetricProcessors(
-            services.utilization_metric, action_monitors, validators
-        ),
+        metric=MetricProcessors(services.metric, action_monitors, validators),
         model_serving=ModelServingProcessors(services.model_serving, action_monitors, validators),
         model_serving_auto_scaling=ModelServingAutoScalingProcessors(
             services.model_serving_auto_scaling, action_monitors, validators

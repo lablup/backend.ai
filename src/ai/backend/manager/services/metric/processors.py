@@ -14,10 +14,10 @@ from ai.backend.manager.services.metric.actions.live_stat import (
     KernelLiveStatAction,
     KernelLiveStatActionResult,
 )
-from ai.backend.manager.services.metric.service import UtilizationMetricService
+from ai.backend.manager.services.metric.service import MetricService
 
 
-class UtilizationMetricProcessors(AbstractProcessorPackage):
+class MetricProcessors(AbstractProcessorPackage):
     query_container: ActionProcessor[ContainerMetricAction, ContainerMetricActionResult]
     query_container_metadata: ActionProcessor[
         ContainerMetricMetadataAction, ContainerMetricMetadataActionResult
@@ -26,7 +26,7 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
 
     def __init__(
         self,
-        service: UtilizationMetricService,
+        service: MetricService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:

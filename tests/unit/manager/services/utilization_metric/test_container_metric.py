@@ -23,7 +23,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     PrometheusConnectionError,
 )
-from ai.backend.manager.data.metric.types import UtilizationMetricType, ValueType
+from ai.backend.manager.data.metric.types import MetricType, ValueType
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
@@ -468,7 +468,7 @@ class TestMetricTypeDetection:
         metric_type = metric_repository._get_metric_type(
             "cpu_util", ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
         )
-        assert metric_type == UtilizationMetricType.DIFF
+        assert metric_type == MetricType.DIFF
 
     def test_network_metrics_detected_as_rate_type(
         self, metric_repository: MetricRepository
@@ -477,7 +477,7 @@ class TestMetricTypeDetection:
             metric_type = metric_repository._get_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
-            assert metric_type == UtilizationMetricType.RATE
+            assert metric_type == MetricType.RATE
 
     def test_memory_metrics_detected_as_gauge_type(
         self, metric_repository: MetricRepository
@@ -486,7 +486,7 @@ class TestMetricTypeDetection:
             metric_type = metric_repository._get_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
-            assert metric_type == UtilizationMetricType.GAUGE
+            assert metric_type == MetricType.GAUGE
 
 
 class TestContainerMetricDataTypes:

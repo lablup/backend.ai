@@ -70,15 +70,11 @@ class UserUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
         param: MetricQueryParameter,
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
-        action_result = (
-            await graph_ctx.processors.utilization_metric.query_container.wait_for_complete(
-                ContainerMetricAction(
-                    metric_name=param.metric_name,
-                    labels=ContainerMetricOptionalLabel(
-                        user_id=user_id, value_type=param.value_type
-                    ),
-                    time_range=QueryTimeRange(start=param.start, end=param.end, step=param.step),
-                )
+        action_result = await graph_ctx.processors.metric.query_container.wait_for_complete(
+            ContainerMetricAction(
+                metric_name=param.metric_name,
+                labels=ContainerMetricOptionalLabel(user_id=user_id, value_type=param.value_type),
+                time_range=QueryTimeRange(start=param.start, end=param.end, step=param.step),
             )
         )
         metrics = []

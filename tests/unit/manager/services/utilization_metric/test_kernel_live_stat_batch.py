@@ -7,7 +7,7 @@ from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.metric.types import KernelLiveStatBatchResult
 from ai.backend.manager.services.metric.actions.live_stat import KernelLiveStatAction
-from ai.backend.manager.services.metric.service import UtilizationMetricService
+from ai.backend.manager.services.metric.service import MetricService
 
 
 class TestKernelLiveStatBatch:
@@ -18,15 +18,15 @@ class TestKernelLiveStatBatch:
         return Mock()
 
     @pytest.fixture()
-    def metric_service(self, mock_metric_repository: Mock) -> UtilizationMetricService:
-        return UtilizationMetricService(
+    def metric_service(self, mock_metric_repository: Mock) -> MetricService:
+        return MetricService(
             metric_repository=mock_metric_repository,
         )
 
     async def test_collects_and_assembles_batch_result(
         self,
         mock_metric_repository: Mock,
-        metric_service: UtilizationMetricService,
+        metric_service: MetricService,
     ) -> None:
         """Service assembles KernelLiveStatBatchResult from repository response."""
         kid = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
@@ -60,7 +60,7 @@ class TestKernelLiveStatBatch:
     async def test_empty_kernel_returns_empty_entry(
         self,
         mock_metric_repository: Mock,
-        metric_service: UtilizationMetricService,
+        metric_service: MetricService,
     ) -> None:
         """A kernel with no Prometheus samples must yield an empty entry."""
         empty_kernel = KernelId(UUID("00000000-0000-0000-0000-000000000000"))
@@ -76,7 +76,7 @@ class TestKernelLiveStatBatch:
     async def test_empty_kernel_ids_returns_empty_result(
         self,
         mock_metric_repository: Mock,
-        metric_service: UtilizationMetricService,
+        metric_service: MetricService,
     ) -> None:
         """No kernel_ids -> empty result from repository."""
         batch_result = KernelLiveStatBatchResult.empty([])
@@ -90,7 +90,7 @@ class TestKernelLiveStatBatch:
     async def test_multiple_kernels_grouped_correctly(
         self,
         mock_metric_repository: Mock,
-        metric_service: UtilizationMetricService,
+        metric_service: MetricService,
     ) -> None:
         """Values from multiple kernels are grouped into separate entries."""
         kid1 = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))

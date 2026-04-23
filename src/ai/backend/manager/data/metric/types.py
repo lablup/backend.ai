@@ -14,12 +14,12 @@ __all__ = [
     "KernelLiveStatEntry",
     "MetricValue",
     "RATE_METRICS",
-    "UtilizationMetricType",
+    "MetricType",
     "ValueType",
 ]
 
 
-class UtilizationMetricType(StrEnum):
+class MetricType(StrEnum):
     """
     Specifies the type of a metric value.
     """
@@ -41,7 +41,7 @@ class UtilizationMetricType(StrEnum):
     """
 
 
-# Metric-name -> UtilizationMetricType classification rules.
+# Metric-name -> MetricType classification rules.
 # TODO: Refactor to query metric metadata from the repository layer once
 #       the metadata persistence is available.
 DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})

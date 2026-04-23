@@ -30,7 +30,7 @@ from ai.backend.manager.data.metric.types import (
     DIFF_METRICS,
     RATE_METRICS,
     KernelLiveStatBatchResult,
-    UtilizationMetricType,
+    MetricType,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.metric.types import (
@@ -144,17 +144,17 @@ class MetricRepository:
         gauge, diff, rate = await asyncio.gather(
             self._query_kernel_live_stat(
                 kernel_ids,
-                metric_type=UtilizationMetricType.GAUGE,
+                metric_type=MetricType.GAUGE,
             ),
             self._query_kernel_live_stat(
                 kernel_ids,
-                metric_type=UtilizationMetricType.DIFF,
+                metric_type=MetricType.DIFF,
                 metric_name_filter=DIFF_METRICS,
                 value_type_filter=ValueType.CURRENT,
             ),
             self._query_kernel_live_stat(
                 kernel_ids,
-                metric_type=UtilizationMetricType.RATE,
+                metric_type=MetricType.RATE,
                 metric_name_filter=RATE_METRICS,
                 value_type_filter=ValueType.CURRENT,
             ),
@@ -166,7 +166,7 @@ class MetricRepository:
         self,
         kernel_ids: Sequence[KernelId],
         *,
-        metric_type: UtilizationMetricType,
+        metric_type: MetricType,
         metric_name_filter: frozenset[str] | None = None,
         value_type_filter: ValueType | None = None,
     ) -> KernelMetricValuesByKernel:
@@ -183,14 +183,14 @@ class MetricRepository:
         self,
         metric_name: str,
         label: ContainerMetricOptionalLabel,
-    ) -> UtilizationMetricType:
+    ) -> MetricType:
         # TODO: Refactor to query metric metadata from DB Source
         #       once the metadata persistence is available.
         if metric_name in DIFF_METRICS and label.value_type == ValueType.CURRENT:
-            return UtilizationMetricType.DIFF
+            return MetricType.DIFF
         if metric_name in RATE_METRICS:
-            return UtilizationMetricType.RATE
-        return UtilizationMetricType.GAUGE
+            return MetricType.RATE
+        return MetricType.GAUGE
 
     def _build_container_metric_preset(
         self,
@@ -210,18 +210,18 @@ class MetricRepository:
         match metric_type:
             # TODO: Define device metadata for each metric
             # TODO: Refactor metric template retrieval to query metric metadata from DB Source
-            case UtilizationMetricType.GAUGE:
+            case MetricType.GAUGE:
                 template = (
                     "sum by ({group_by})(" + CONTAINER_UTILIZATION_METRIC_NAME + "{{{labels}}})"
                 )
-            case UtilizationMetricType.RATE:
+            case MetricType.RATE:
                 template = (
                     "sum by ({group_by})(rate("
                     + CONTAINER_UTILIZATION_METRIC_NAME
                     + "{{{labels}}}[{window}]))"
                     " / " + str(UTILIZATION_METRIC_INTERVAL)
                 )
-            case UtilizationMetricType.DIFF:
+            case MetricType.DIFF:
                 template = (
                     "sum by ({group_by})(rate("
                     + CONTAINER_UTILIZATION_METRIC_NAME
@@ -240,7 +240,7 @@ class MetricRepository:
         self,
         kernel_ids: Sequence[KernelId],
         *,
-        metric_type: UtilizationMetricType,
+        metric_type: MetricType,
         metric_name_filter: frozenset[str] | None = None,
         value_type_filter: ValueType | None = None,
     ) -> MetricPreset:
@@ -255,11 +255,11 @@ class MetricRepository:
             labels["value_type"] = LabelMatcher.exact(value_type_filter.value)
 
         match metric_type:
-            case UtilizationMetricType.GAUGE:
+            case MetricType.GAUGE:
                 template = _GAUGE_TEMPLATE
-            case UtilizationMetricType.RATE:
+            case MetricType.RATE:
                 template = _RATE_TEMPLATE
-            case UtilizationMetricType.DIFF:
+            case MetricType.DIFF:
                 template = _DIFF_TEMPLATE
             case _:
                 raise UnreachableError(f"Unsupported metric type: {metric_type}")
