@@ -484,7 +484,7 @@ type UserAppConfig implements Node {
   """Document name (unique within this user)."""
   name: String!
 
-  """Raw stored value — the user's `userCustomizedConfig`."""
+  """Raw stored value — the user's customized config for this `name`."""
   config: JSON!
 
   createdAt: DateTime!
@@ -997,8 +997,8 @@ input AdminAppConfigItemInput {
   Stored value — initial on create, wholesale replacement on update.
   Pass `{}` to clear.
   - `PUBLIC` / `DOMAIN` / `DOMAIN_USER_DEFAULTS`: the document's `config`.
-  - `USER`: that user's `userCustomizedConfig` (merged view is
-    read-only computed).
+  - `USER`: that user's customized value for this `name` (the
+    `ResolvedAppConfig` merged view is read-only computed).
   """
   config: JSON!
 }
@@ -1021,10 +1021,10 @@ input MyAppConfigItemInput {
   name: String!
 
   """
-  `userCustomizedConfig` value — initial on create, wholesale
-  replacement on update. Pass `{}` to clear.
-  `ResolvedAppConfig.mergedConfig` is read-only computed and cannot be
-  written.
+  Value to store on the caller's `USER` row for this `name` —
+  initial on create, wholesale replacement on update. Pass `{}` to
+  clear. `ResolvedAppConfig.mergedConfig` is read-only computed and
+  cannot be written.
   """
   config: JSON!
 }
@@ -1501,49 +1501,71 @@ reads, and a single policy object for the `{name}` GET.
 
 ### Storage
 
-- `user_app_config.extra_config` (the DB column, exposed as
-  `UserAppConfig.config` = `ResolvedAppConfig.userCustomizedConfig`) stores
-  **only the values the user has explicitly set** for the named
-  document.
-- The domain-side merge input is a single row:
-  `(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name, name=N)`
-  — the admin-provided per-user default. Not copied into user rows,
-  so editing the default never requires rewriting every user row.
-- Domain-side values are applied **per-name**: the
-  `DOMAIN_USER_DEFAULTS` row for a given `name` is the merge base
-  for the same-`name` `USER` row's `userCustomizedConfig`. Different
-  `name`s are independent.
+Each scope holds its **own** row for a given `name`; rows are never
+copied between scopes. Editing an admin-provided default never
+requires rewriting every user row — the merge materializes the final
+value at read time.
+
+- `(scope_type=USER, scope_id=user_id, name=N)` stores the values
+  the user has explicitly set for document `N`.
+- `(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name, name=N)`
+  stores the per-domain default value admins publish for document
+  `N`.
+- Other scopes (`PUBLIC`, `DOMAIN`, or any future scope) hold one
+  row each for `N` when admissible.
+
+Different `name`s are independent — the merge for `preferences` is
+unaffected by whatever rows exist for `theme`.
+
+### Chain order (policy-driven)
+
+The merge chain for a given `(user_id, name)` is determined at read
+time by the matching `AppConfigPolicy.allowed_scopes` (§1):
+
+1. Service looks up the policy by `name` —
+   `AppConfigPolicyRepository.get(name)`.
+2. If the policy is present, the chain is exactly its `allowed_scopes`
+   in order (low → high priority; later elements win on deep merge).
+   Each scope contributes its natural `scope_id` — `PUBLIC` uses the
+   literal `"public"`, `DOMAIN` / `DOMAIN_USER_DEFAULTS` use the
+   caller's `domain_name`, and `USER` uses the caller's `user_id`.
+3. If no policy exists for `name`, the chain falls back to the
+   BEP-1052 default `[DOMAIN_USER_DEFAULTS, USER]` — `DOMAIN` is
+   admin-only policy and stays out of the resolved view.
+
+A policy may therefore define chains of any length — a single-scope
+policy (`allowed_scopes=["domain_user_defaults"]` for admin-only
+documents like `theme`), the default 2-chain, or wider chains that
+pull in `PUBLIC` or `DOMAIN` when the use case calls for it.
 
 ### Read (Merge)
 
-Merge is owned by `UserAppConfigRepository`, with DB access performed
-in a single call to `AppConfigDBSource`'s merge-specific method —
-**one SQL query** that reads `DOMAIN_USER_DEFAULTS` + `USER` in the
-same snapshot. Bounded to at most 2 rows thanks to the natural-key
-`UniqueConstraint`. For a given `(user_id, name)`:
+Merge is owned by `UserAppConfigRepository`; DB access is performed
+by `AppConfigDBSource`'s merge-specific method — a single SQL that
+pulls every row the chain needs in one snapshot. The method receives
+the chain as a parameter (a list of `(scope_type, scope_id_expr)`
+pairs) so the same code serves both policy-driven chains and the
+2-scope fallback:
 
-1. Call `AppConfigDBSource.get_user_merged_config(user_id, name)` —
-   a single SQL resolves the user's `domain_name` via a `users`
-   subquery and pulls both source rows from `app_configs` together:
-   - `(scope_type=DOMAIN_USER_DEFAULTS, scope_id=<user's domain_name>, name=name)`
-     → the per-user default.
-   - `(scope_type=USER, scope_id=user_id, name=name)` → the user's
-     customized value.
-2. Deep-merge the rows, low → high priority:
-   `domain_user_defaults ⊕ userCustomizedConfig`. Nested objects are
-   merged recursively per key; at leaf keys the higher-priority value
-   wins. Lists are treated as leaves and replaced wholesale by the
-   higher-priority value (element-level array merge has no
-   unambiguous semantics). The result is exposed as
-   `ResolvedAppConfig.mergedConfig`; each source row's raw `extra_config`
-   is exposed as `ResolvedAppConfig.domainDefaultConfig` /
-   `ResolvedAppConfig.userCustomizedConfig`.
+1. The service resolves the chain for `name` (policy lookup → ordered
+   list of scopes, or fallback).
+2. `AppConfigDBSource.get_user_resolved_config(user_id, name, chain)`
+   — single SQL resolves `domain_name` via a `users` subquery once
+   and pulls one row per scope in the chain where it exists.
+3. The resulting rows are ordered per the chain (absent rows contribute
+   `{}` to the deep merge) and deep-merged: nested objects recursively,
+   leaf values replaced by the higher-priority scope, lists treated as
+   leaves and replaced wholesale.
+4. The ordered rows become `ResolvedAppConfig.sources`; the deep-merge
+   result becomes `ResolvedAppConfig.mergedConfig`.
 
 The Connection query (`myAppConfigs`) is backed by the search-specific
-method on `AppConfigDBSource` — a single SQL applies filter /
-pagination in the query and returns one merged result per `name` for
-which at least one of the two scopes (`DOMAIN_USER_DEFAULTS`, `USER`)
-has a row.
+method on `AppConfigDBSource` — the same single-SQL approach,
+generalized to return one resolved entry per `name` for which at
+least one row in the chain exists. When the caller's filter pins a
+specific `name`, the resolver consults the policy for that name to
+derive the chain; otherwise each resulting `name` is resolved
+independently (policies may differ across `name`s).
 
 `MergedAppConfig` / `MergedAppConfigPage` are service-layer return
 dataclasses — 1:1 mappings to the GraphQL `ResolvedAppConfig` /
@@ -1557,68 +1579,73 @@ class AppConfigDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get_user_merged_config(
-        self, user_id: str, name: str
+    async def get_user_resolved_config(
+        self,
+        user_id: str,
+        name: str,
+        chain: list[AppConfigScopeType],
     ) -> MergedAppConfig:
+        # `chain` is the ordered list of scopes — derived by the
+        # service either from the matching policy's `allowed_scopes`
+        # or from the BEP-1052 default `[DOMAIN_USER_DEFAULTS, USER]`.
         # A single SQL resolves the caller's domain_name via a `users`
-        # subquery and pulls both source rows (DOMAIN_USER_DEFAULTS on
-        # that domain_name, USER on user_id) together — bounded to at
-        # most 2 rows by the natural-key UniqueConstraint. DOMAIN is
-        # admin-only policy and intentionally excluded from the merge.
+        # subquery and pulls one row per scope in `chain` where it
+        # exists. Bounded to `len(chain)` rows by the natural-key
+        # UniqueConstraint.
         user_domain_sq = (
             sa.select(UserRow.domain_name)
             .where(UserRow.id == sa.cast(user_id, sa.UUID))
             .scalar_subquery()
         )
+        scope_id_for = {
+            AppConfigScopeType.PUBLIC: sa.literal("public"),
+            AppConfigScopeType.DOMAIN: user_domain_sq,
+            AppConfigScopeType.DOMAIN_USER_DEFAULTS: user_domain_sq,
+            AppConfigScopeType.USER: sa.literal(user_id),
+        }
+        scope_predicates = [
+            sa.and_(
+                AppConfigRow.scope_type == scope_type,
+                AppConfigRow.scope_id == scope_id_for[scope_type],
+            )
+            for scope_type in chain
+        ]
         async with self._db.begin_readonly_session() as db_sess:
             rows = (await db_sess.execute(
                 sa.select(AppConfigRow).where(
                     AppConfigRow.name == name,
-                    sa.or_(
-                        sa.and_(
-                            AppConfigRow.scope_type
-                                == AppConfigScopeType.DOMAIN_USER_DEFAULTS,
-                            AppConfigRow.scope_id == user_domain_sq,
-                        ),
-                        sa.and_(
-                            AppConfigRow.scope_type == AppConfigScopeType.USER,
-                            AppConfigRow.scope_id == user_id,
-                        ),
-                    ),
+                    sa.or_(*scope_predicates),
                 )
             )).scalars().all()
 
         by_scope = {row.scope_type: row for row in rows}
-        domain_defaults_row = by_scope.get(AppConfigScopeType.DOMAIN_USER_DEFAULTS)
-        user_row = by_scope.get(AppConfigScopeType.USER)
-
-        domain_defaults = domain_defaults_row.extra_config if domain_defaults_row else None
-        user_customized = user_row.extra_config if user_row else {}
+        ordered_sources = [
+            by_scope[scope_type] for scope_type in chain if scope_type in by_scope
+        ]
+        merged = {}
+        for row in ordered_sources:
+            merged = deep_merge(merged, row.extra_config)
 
         return MergedAppConfig(
             user_id=user_id,
             name=name,
-            user_customized_config=user_customized,                 # ResolvedAppConfig.userCustomizedConfig
-            domain_default_config=domain_defaults,                  # ResolvedAppConfig.domainDefaultConfig
-            merged_config=deep_merge(                               # ResolvedAppConfig.mergedConfig
-                domain_defaults or {},
-                user_customized,
-            ),
+            sources=ordered_sources,                # ResolvedAppConfig.sources
+            merged_config=merged,                   # ResolvedAppConfig.mergedConfig
         )
 
-    async def search_user_merged_configs(
+    async def search_user_resolved_configs(
         self,
         user_id: str,
         filter: AppConfigFilter,
         pagination: Pagination,
+        chain_for_name: Callable[[str], list[AppConfigScopeType]],
     ) -> MergedAppConfigPage:
-        # A single SQL resolves domain_name (users subquery) + pulls
-        # rows for both scopes (DOMAIN_USER_DEFAULTS, USER) —
-        # same WHERE shape as `get_user_merged_config`, with the `name`
-        # filter generalized to `filter`. Pagination uses `name` as a
-        # stable cursor key (unique within the pinned scope) applied
-        # in SQL. Full implementation lives in the §3 Connection
-        # resolver.
+        # Connection-shaped counterpart — derives the chain per
+        # `name` via `chain_for_name` (service-provided closure that
+        # reads the policy cache and falls back to the 2-chain
+        # default). Pagination uses `name` as a stable cursor key
+        # applied in SQL. Full implementation lives in the §3
+        # Connection resolver.
         ...
 
 
@@ -1681,36 +1708,49 @@ class UserAppConfigRepository:
     # the users-subquery resolution inside a single SQL, so the
     # repository here is a thin delegate.
 
-    async def get_merged(self, user_id: str, name: str) -> MergedAppConfig:
-        return await self._db_source.get_user_merged_config(user_id, name)
+    async def get_resolved(
+        self,
+        user_id: str,
+        name: str,
+        chain: list[AppConfigScopeType],
+    ) -> MergedAppConfig:
+        return await self._db_source.get_user_resolved_config(
+            user_id, name, chain
+        )
 
-    async def search_merged(
+    async def search_resolved(
         self,
         user_id: str,
         filter: AppConfigFilter,
         pagination: Pagination,
+        chain_for_name: Callable[[str], list[AppConfigScopeType]],
     ) -> MergedAppConfigPage:
-        return await self._db_source.search_user_merged_configs(
-            user_id, filter, pagination
+        return await self._db_source.search_user_resolved_configs(
+            user_id, filter, pagination, chain_for_name
         )
 ```
 
 ### Exposure
 
-`ResolvedAppConfig` exposes three views of the same logical document so
-the WebUI can render and edit cleanly:
+`ResolvedAppConfig` exposes the raw source rows that contributed to
+the resolution plus the deep-merge result:
 
-- `userCustomizedConfig` — what the user explicitly set (raw; `{}`
-  when no USER row exists)
-- `domainDefaultConfig` — the matching `DOMAIN_USER_DEFAULTS` row's
-  raw `extra_config` — admin-provided per-user default (`null` when
-  no row exists)
-- `mergedConfig` — `domainDefaultConfig ⊕ userCustomizedConfig`,
-  what the UI actually applies
+- `sources` — the ordered list of `AppConfig` source rows (low → high
+  priority, matching the chain). Absent scopes simply do not appear.
+  The list is empty only when no scope in the chain has a row, in
+  which case the `name` would not appear in `myAppConfigs` at all.
+- `mergedConfig` — the deep-merge of `sources` in order; the value
+  the UI actually applies.
+
+Clients that need to distinguish "admin-provided per-user default"
+from "what the user changed" do so by inspecting each source row's
+`scopeType` (e.g. a row with `scopeType = DOMAIN_USER_DEFAULTS` is
+the admin-provided default; a row with `scopeType = USER` is the
+user's customization). This replaces the previous fixed
+`domainDefaultConfig` / `userCustomizedConfig` fields.
 
 The REST `GET /v2/app-configs/my/{name}` response carries the same
-three views (snake_case: `user_customized_config`,
-`domain_default_config`, `merged_config`).
+shape (snake_case `sources` + `merged_config`) — see §4.
 
 ---
 
@@ -1732,13 +1772,13 @@ publish a bootstrap list.
    that document.
 
 2. **Post-login** — the WebUI issues a single `myAppConfigs` query
-   to fetch *all* of the caller's user documents in one round trip.
-   Each entry carries `userCustomizedConfig`, `domainDefaultConfig`,
-   and the 2-way merged `mergedConfig` (§5). Admins use the same
-   query for their own session (admins are also users for the
-   purpose of personal settings). DOMAIN-scope policy does not
-   participate in the merge, so an admin UI that needs to manage
-   domain policy issues a separate `DomainV2.appConfigs` /
+   to fetch *all* of the caller's resolved documents in one round
+   trip. Each entry carries `sources` (raw `AppConfig` rows per scope
+   in merge order) and the deep-merged `mergedConfig` (§5). Admins
+   use the same query for their own session (admins are also users
+   for the purpose of personal settings). `DOMAIN` scope does not
+   participate in the default merge chain, so an admin UI that needs
+   to manage domain policy issues a separate `DomainV2.appConfigs` /
    `adminAppConfigs` query. See S2 in §7.
 
 ---
@@ -1782,8 +1822,7 @@ query BootstrapMe {
     edges {
       node {
         name
-        userCustomizedConfig
-        domainDefaultConfig
+        sources { scopeType scopeId name config updatedAt }
         mergedConfig
       }
     }
@@ -1794,14 +1833,16 @@ query BootstrapMe {
 }
 ```
 
-- Server: `myAppConfigs` returns one entry per `name` for which
-  at least one source row (`USER`, `DOMAIN_USER_DEFAULTS` — keyed to
-  the caller / caller's domain) exists. Rows that are absent
-  contribute `{}` to the merge. `DOMAIN`-scope is excluded from the
-  merge. Merge per §5.
+- Server: `myAppConfigs` returns one entry per `name` for which at
+  least one source row in the merge chain exists. The chain comes
+  from the matching `AppConfigPolicy.allowed_scopes` when present,
+  and defaults to `[DOMAIN_USER_DEFAULTS, USER]` (caller / caller's
+  domain) otherwise. `sources` carries the raw rows in chain order;
+  `mergedConfig` is their deep merge. See §5.
 - The WebUI initializes UI state from `mergedConfig` per document
-  and keeps the raw views around so the Settings page can show
-  user-changed vs. domain-default.
+  and keeps the `sources` list around so the Settings page can
+  distinguish user-changed (`scopeType = USER`) from admin-provided
+  defaults (`scopeType = DOMAIN_USER_DEFAULTS`, etc.).
 
 ### S3. The user saves their own document
 
@@ -1819,8 +1860,7 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
   bulkUpdateMyAppConfigs(input: $input) {
     updated {
       name
-      userCustomizedConfig
-      domainDefaultConfig
+      sources { scopeType scopeId name config updatedAt }
       mergedConfig
     }
     failed { name message }
@@ -1848,18 +1888,71 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
   current_user.user_id`, so the mutation cannot touch another user's
   row (admins operating on other users use
   `adminBulkUpdateAppConfigs`).
-- The input `config` replaces the USER row's `userCustomizedConfig`
-  wholesale. `ResolvedAppConfig.mergedConfig` is read-only computed and
-  cannot be written.
+- The input `config` replaces the USER row's stored JSON wholesale.
+  `ResolvedAppConfig.mergedConfig` is read-only computed and cannot
+  be written.
 - **Replace** semantics: anything the caller wants to keep must be
   sent in the same payload — there is no partial-merge or per-key
   patch.
+- **Policy**: if an `AppConfigPolicy` exists for `name` and either
+  `USER ∉ allowed_scopes` or `user_writable = False`, the item is
+  appended to `failed` with a policy-violation message. Clients can
+  discover this ahead of time by reading the policy via
+  `appConfigPolicy(name:)`.
 - **First write vs. subsequent writes**: `bulkUpdateMyAppConfigs`
   places items with no USER row into `failed`. For the very first
   save of a given `name`, the client calls `bulkCreateMyAppConfigs`
   with the same shape. Clients can disambiguate by checking whether
-  the `myAppConfigs` entry for that `name` already has a
-  `userCustomizedConfig`.
+  the `myAppConfigs` entry for that `name` already has a `USER` row
+  in its `sources` list.
+
+### S3.5. Admin publishes an app-config policy
+
+Before the `theme` document can be published under
+`DOMAIN_USER_DEFAULTS` (S4 below), an admin establishes a policy for
+`theme` that restricts writes to the admin-only scope and forbids
+per-user customization. This policy is optional — without it, writes
+proceed under the natural-key rules alone — but publishing it makes
+"theme is admin-only" enforceable as data rather than convention.
+
+```graphql
+mutation PublishThemePolicy(
+  $input: AdminBulkCreateAppConfigPolicyInput!
+) {
+  adminBulkCreateAppConfigPolicies(input: $input) {
+    created { id name allowedScopes userWritable }
+    failed { name message }
+  }
+}
+```
+
+```json
+{
+  "input": {
+    "items": [
+      {
+        "name": "theme",
+        "description": "Branding + theme document for the domain. Admin-only, readable by users through the merged view.",
+        "allowedScopes": ["domain_user_defaults"],
+        "userWritable": false
+      }
+    ]
+  }
+}
+```
+
+- Authorization: admin required.
+- Effect:
+  - Writes to `theme` at any scope other than `DOMAIN_USER_DEFAULTS`
+    are rejected at the service layer.
+  - `bulk*MyAppConfigs` calls targeting `theme` are rejected because
+    `user_writable = false`.
+  - `myAppConfigs` entries for `theme` are resolved through the
+    chain `[DOMAIN_USER_DEFAULTS]` (single-scope — `sources` has at
+    most one element and `mergedConfig` equals that element's
+    `config`).
+- Subsequent edits use `adminBulkUpdateAppConfigPolicies` with the
+  same `name`.
 
 ### S4. Admin publishes a per-user default for a domain
 
@@ -1908,16 +2001,22 @@ mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigInput!) {
   to the matching repository (§2) and strictly inserts a new row.
   Items whose key already has a row land in `failed` — the admin
   falls back to `adminBulkUpdateAppConfigs`.
+- Policy: if an `AppConfigPolicy` exists for `theme` and
+  `DOMAIN_USER_DEFAULTS ∉ allowed_scopes`, the item is rejected with
+  a policy-violation message. The typical setup for a document like
+  `theme` — as shown in S3.5 — lists
+  `allowed_scopes=["domain_user_defaults"]`, which admits this
+  write.
 - Effect: every user in the domain picks up the new defaults on the
   next `myAppConfigs` read (merged per §5).
 
 ### S5. Admin seeds a specific user's document on their behalf
 
-For a support request, an admin seeds user A's `preferences`
-`userCustomizedConfig` for the first time. Since the target is
-another user's row, this must use the admin path —
-`adminBulkCreateAppConfigs` with `key.scopeType = USER` and
-`key.scopeId = user A's user_id`, not the self-service bulk path.
+For a support request, an admin seeds user A's `preferences` USER row
+for the first time. Since the target is another user's row, this
+must use the admin path — `adminBulkCreateAppConfigs` with
+`key.scopeType = USER` and `key.scopeId = user A's user_id`, not the
+self-service bulk path.
 Items whose key already has a row land in `failed`, in which case
 the admin falls back to `adminBulkUpdateAppConfigs`.
 
@@ -1947,14 +2046,20 @@ mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigInput!) {
 }
 ```
 
-- For `USER` scope the `config` input is stored as that user's
-  `userCustomizedConfig`.
+- For `USER` scope the `config` input is stored as the user's
+  customization for that `name`.
 - `adminBulkCreateAppConfigs` fails the item if a row already exists
   for the key; use `adminBulkUpdateAppConfigs` instead to overwrite.
+- Policy: if an `AppConfigPolicy` for `preferences` has `USER ∉
+  allowed_scopes`, the admin path still rejects the item
+  (`allowed_scopes` applies to both paths — admins just bypass
+  `user_writable`, not the scope list). With the usual
+  `preferences`-style policy (`allowed_scopes` includes `USER`) this
+  write passes.
 - The response is a list of raw `AppConfig`; the target user's
-  merged view reflects the new `userCustomizedConfig` (merged with
-  the matching domain defaults) on the next `myAppConfigs` read from
-  that user's session.
+  resolved view reflects the new USER row (merged with the matching
+  domain defaults) on the next `myAppConfigs` read from that user's
+  session.
 
 ### S6. Admin audits all AppConfigs (cross-scope search)
 
@@ -1993,3 +2098,41 @@ query AuditConfigs(
 
 - Server: service-layer admin check → Connection search. In cursor
   mode the sort order is pinned to the cursor key.
+- Filters can also key off `policyName` — e.g. `"policyName": {
+  "equals": "theme" }` returns every `AppConfig` whose `name` matches
+  the `theme` policy, which is identical to filtering by `name` but
+  reads as "configs governed by policy X".
+
+---
+
+## 8. Future Considerations
+
+Items considered for this BEP but explicitly **out of scope**; each
+may become a follow-up BEP if it earns its own motivation.
+
+- **Policy seed migration** — operationally it may be useful to ship
+  an initial set of policies (`theme`, `preferences`, `menu`, …) as
+  part of a migration so the advisory layer is populated on first
+  deploy. This BEP does not prescribe a seed; the operational team
+  picks whether to seed and with which values.
+- **Mutable vs. immutable policy `name`** — currently mutable. If
+  client-breaking renames become a concern, a future change can mark
+  `name` immutable (block `update` on that field) without any wire-
+  format change.
+- **JSON-schema validation** — a natural extension to
+  `AppConfigPolicy` is a `json_schema` field that the service runs
+  each write against. Deferred to a follow-up so this BEP stays
+  focused on "who may write what where."
+- **Policy deprecation** — because there is no lifecycle coupling
+  (§1), the only way to "retire" a policy today is to update it so
+  nothing can satisfy its constraints or to simply delete it and
+  accept that existing rows become policy-less. A `deprecated` flag
+  is a reasonable future extension.
+- **Policy audit trail** — history of changes to an
+  `AppConfigPolicy` (who changed `allowed_scopes` from X to Y, when)
+  is not modelled here. If audit becomes important, a paired
+  `app_config_policy_audit_log` table is the natural fit.
+- **Invariant: `user_writable = True` requires `USER ∈
+  allowed_scopes`** — not enforced today; the two fields are kept
+  independent. A future BEP may add the invariant if the combination
+  is shown to confuse operators.
