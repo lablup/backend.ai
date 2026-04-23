@@ -143,7 +143,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     search_my_role_invitations: ScopeActionProcessor[
         SearchMyRoleInvitationsAction, SearchMyRoleInvitationsActionResult
     ]
-    search_role_invitations_by_role: ActionProcessor[
+    search_role_invitations_by_role: ScopeActionProcessor[
         SearchRoleInvitationsByRoleAction, SearchRoleInvitationsByRoleActionResult
     ]
 
@@ -204,8 +204,10 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=invitation_scope_validators,
         )
-        self.search_role_invitations_by_role = ActionProcessor(
-            service.search_role_invitations_by_role, action_monitors
+        self.search_role_invitations_by_role = ScopeActionProcessor(
+            service.search_role_invitations_by_role,
+            action_monitors,
+            validators=invitation_scope_validators,
         )
 
     @override

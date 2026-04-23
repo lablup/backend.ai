@@ -67,6 +67,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleNotAssigned, RoleNotFound
 from ai.backend.manager.errors.role_invitation import (
+    DuplicateRoleInvitationError,
     RoleInvitationInvalidState,
     RoleInvitationNotFound,
 )
@@ -1238,20 +1239,41 @@ class PermissionDBSource:
         """
         async with self._db.begin_session_read_committed() as session:
             email_to_user_id = await self._resolve_invitation_emails(session, invitee_emails)
-            specs = [
-                RoleInvitationCreatorSpec(
-                    inviter_user_id=inviter_user_id,
-                    invitee_user_id=user_id,
-                    role_id=role_id,
+            creators = [
+                RBACEntityCreator(
+                    spec=RoleInvitationCreatorSpec(
+                        inviter_user_id=inviter_user_id,
+                        invitee_user_id=invitee_user_id,
+                        role_id=role_id,
+                    ),
+                    element_type=RBACElementType.ROLE_ASSIGNMENT,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.USER,
+                        element_id=str(invitee_user_id),
+                    ),
+                    additional_scope_refs=[
+                        RBACElementRef(
+                            element_type=RBACElementType.ROLE,
+                            element_id=str(role_id),
+                        ),
+                    ],
                 )
                 for email in invitee_emails
-                if (user_id := email_to_user_id.get(email)) is not None
+                if (invitee_user_id := email_to_user_id.get(email)) is not None
             ]
-            if not specs:
+            if not creators:
                 return CreateRoleInvitationResult()
-            result = await execute_bulk_creator_partial(session, BulkCreator(specs=specs))
+
+            created_rows: list[RoleInvitationRow] = []
+            for creator in creators:
+                async with session.begin_nested():
+                    try:
+                        row = (await execute_rbac_entity_creator(session, creator)).row
+                    except DuplicateRoleInvitationError:
+                        continue
+                    created_rows.append(row)
             return CreateRoleInvitationResult(
-                created=[row.to_data() for row in result.successes],
+                created=[row.to_data() for row in created_rows],
             )
 
     async def search_invitations_by_invitee(

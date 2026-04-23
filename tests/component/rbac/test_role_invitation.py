@@ -12,7 +12,9 @@ import yarl
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
+from ai.backend.client.v2.exceptions import InvalidRequestError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.v2.rbac.request import SearchRoleAssignmentsInput
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
     CreateRoleInvitationInput,
     SearchRoleInvitationsInput,
@@ -226,6 +228,41 @@ class TestAcceptRejectCancelInvitation:
         assert result.state == "accepted"
         assert result.role_id == target_role.role.id
 
+    async def test_accept_assigns_role_to_user(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Accept invitation must create a role assignment for the invitee."""
+        # Admin creates invitation
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        # User finds and accepts the invitation
+        search_result = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput()
+        )
+        pending = [
+            inv
+            for inv in search_result.items
+            if inv.role_id == target_role.role.id and inv.state == "pending"
+        ]
+        assert len(pending) >= 1
+        await user_v2_registry.role_invitation.accept(pending[0].id)
+
+        # Verify the role is actually assigned to the user
+        assignments = await user_v2_registry.rbac.my_search_assignments(
+            SearchRoleAssignmentsInput()
+        )
+        assigned_role_ids = [a.role_id for a in assignments.items]
+        assert target_role.role.id in assigned_role_ids
+
     async def test_reject_transitions_to_rejected(
         self,
         admin_v2_registry: V2ClientRegistry,
@@ -286,6 +323,64 @@ class TestAcceptRejectCancelInvitation:
         result = await admin_v2_registry.role_invitation.cancel(invitation_id)
         assert isinstance(result, RoleInvitationNode)
         assert result.state == "canceled"
+
+    async def test_accept_rejected_invitation_fails(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Cannot accept an invitation that has already been rejected."""
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        search_result = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput()
+        )
+        pending = [
+            inv
+            for inv in search_result.items
+            if inv.role_id == target_role.role.id and inv.state == "pending"
+        ]
+        assert len(pending) >= 1
+        invitation_id = pending[0].id
+
+        await user_v2_registry.role_invitation.reject(invitation_id)
+
+        with pytest.raises(InvalidRequestError):
+            await user_v2_registry.role_invitation.accept(invitation_id)
+
+    async def test_accept_canceled_invitation_fails(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Cannot accept an invitation that has already been canceled."""
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        search_result = await admin_v2_registry.role_invitation.role_search(
+            target_role.role.id, SearchRoleInvitationsInput()
+        )
+        pending = [inv for inv in search_result.items if inv.state == "pending"]
+        assert len(pending) >= 1
+        invitation_id = pending[0].id
+
+        await admin_v2_registry.role_invitation.cancel(invitation_id)
+
+        with pytest.raises(InvalidRequestError):
+            await user_v2_registry.role_invitation.accept(invitation_id)
 
 
 class TestSearchInvitations:
