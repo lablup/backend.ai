@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.role_invitation.types import RoleInvitationState
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.user import UserRow
@@ -208,12 +209,7 @@ class RoleInvitationConditions:
 
         return inner
 
-    @staticmethod
-    def role_name_in(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RoleRow.name.in_([spec.value])
-
-        return inner
+    role_name_in = staticmethod(make_string_in_factory(RoleRow.name))
 
     # -- nested user filter helpers (for EXISTS subquery) --
 
@@ -269,12 +265,7 @@ class RoleInvitationConditions:
 
         return inner
 
-    @staticmethod
-    def _user_email_in(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRow.email.in_([spec.value])
-
-        return inner
+    _user_email_in = staticmethod(make_string_in_factory(UserRow.email))
 
     @staticmethod
     def exists_invitee_with_conditions(
