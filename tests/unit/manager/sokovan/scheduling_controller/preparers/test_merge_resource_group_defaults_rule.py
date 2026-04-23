@@ -15,12 +15,11 @@ Verifies the one-shot RG-default merge that replaces the prior split
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
 
 import pytest
 
 from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.types import ClusterMode, ResourceSlot
+from ai.backend.common.types import ClusterMode, ResourceSlotEntry
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -65,7 +64,7 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         default_kernel_execution_spec=KernelExecutionSpec(
             image_id=rg_image_id,
-            resources=ResourceSlot({"cpu": Decimal("2")}),
+            resources=[ResourceSlotEntry(resource_type="cpu", quantity="2")],
             resource_opts=ResourceOpts(),
             environ={"RG_BASE": "1"},
             startup_command="rg-start",
@@ -132,7 +131,7 @@ class TestMergeResourceGroupDefaultsRule:
         assert result.options.kernel_groups is not None
         merged = result.options.kernel_groups[0].execution_spec
         assert merged.image_id == rg_image_id
-        assert merged.resources == ResourceSlot({"cpu": Decimal("2")})
+        assert merged.resources == (ResourceSlotEntry(resource_type="cpu", quantity="2"),)
         assert merged.environ == {"RG_BASE": "1"}
         assert merged.startup_command == "rg-start"
         assert merged.bootstrap_script == "rg-bootstrap"
@@ -164,7 +163,7 @@ class TestMergeResourceGroupDefaultsRule:
         assert merged.image_id == caller_image
         assert merged.environ == {"CALLER": "yes"}
         # Unset fields still picked up from RG.
-        assert merged.resources == ResourceSlot({"cpu": Decimal("2")})
+        assert merged.resources == (ResourceSlotEntry(resource_type="cpu", quantity="2"),)
         assert merged.startup_command == "rg-start"
 
     async def test_noop_group_merge_when_rg_has_no_default(

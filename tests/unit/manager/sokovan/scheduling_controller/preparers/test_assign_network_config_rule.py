@@ -41,7 +41,7 @@ def _context(
 ) -> SessionSpecPreparationContext:
     return SessionSpecPreparationContext(
         resource_group_defaults=DefaultSessionOptions(),
-        scaling_group_network=(
+        resource_group_network=(
             ScalingGroupNetworkInfo(use_host_network=use_host_network) if scaling_group else None
         ),
     )

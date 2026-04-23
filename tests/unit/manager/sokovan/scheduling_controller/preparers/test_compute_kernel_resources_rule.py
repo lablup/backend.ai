@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.common.types import BinarySize, ResourceSlotEntry
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -91,9 +91,9 @@ class TestComputeKernelResourcesRule:
 
         assert result.options.kernel_groups is not None
         resources = result.options.kernel_groups[0].execution_spec.resources
-        assert resources is not None
-        assert resources["cpu"] == Decimal("2")
-        assert resources["mem"] >= Decimal("512") * Decimal(1024 * 1024)
+        resource_map = {entry.resource_type: Decimal(entry.quantity) for entry in resources}
+        assert resource_map["cpu"] == Decimal("2")
+        assert resource_map["mem"] >= Decimal("512") * Decimal(1024 * 1024)
 
     async def test_preserves_caller_slot_values(self, rule: ComputeKernelResourcesRule) -> None:
         """Caller-set cpu / mem slots win over image minimums."""
@@ -104,7 +104,7 @@ class TestComputeKernelResourcesRule:
                 replica_count=1,
                 execution_spec=KernelExecutionSpecDraft(
                     image_id=image_id,
-                    resources=ResourceSlot({"cpu": Decimal("8")}),
+                    resources=(ResourceSlotEntry(resource_type="cpu", quantity="8"),),
                 ),
             ),
         )
@@ -113,8 +113,8 @@ class TestComputeKernelResourcesRule:
 
         assert result.options.kernel_groups is not None
         resources = result.options.kernel_groups[0].execution_spec.resources
-        assert resources is not None
-        assert resources["cpu"] == Decimal("8")
+        resource_map = {entry.resource_type: Decimal(entry.quantity) for entry in resources}
+        assert resource_map["cpu"] == Decimal("8")
 
     async def test_shmem_defaults_from_image_label(self, rule: ComputeKernelResourcesRule) -> None:
         """Shmem resolves from ``ai.backend.resource.preferred.shmem`` image label."""
@@ -144,7 +144,7 @@ class TestComputeKernelResourcesRule:
     async def test_shmem_preserves_caller_value(self, rule: ComputeKernelResourcesRule) -> None:
         """Caller-set shmem survives the resolution pass."""
         image_id = ImageID(uuid.uuid4())
-        caller_shmem = BinarySize.from_str("4g")
+        caller_shmem = BinarySize(BinarySize.from_str("4g"))
         draft = _draft(
             KernelGroupDraft(
                 role="main",
@@ -183,7 +183,7 @@ class TestComputeKernelResourcesRule:
 
         assert result.options.kernel_groups is not None
         merged = result.options.kernel_groups[0].execution_spec
-        assert merged.resources is None
+        assert merged.resources == ()
         assert merged.resource_opts is None
 
     async def test_noop_when_kernel_groups_unset(self, rule: ComputeKernelResourcesRule) -> None:

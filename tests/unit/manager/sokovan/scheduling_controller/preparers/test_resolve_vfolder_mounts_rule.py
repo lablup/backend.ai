@@ -11,7 +11,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.draft import KernelSpecDraft, SessionSpecDraft
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecPreparationContext,
@@ -33,23 +33,32 @@ def _mount(name: str = "data") -> VFolderMount:
     )
 
 
-def _context(*mounts: VFolderMount) -> SessionSpecPreparationContext:
+def _context(
+    vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] | None = None,
+) -> SessionSpecPreparationContext:
     return SessionSpecPreparationContext(
         resource_group_defaults=DefaultSessionOptions(),
-        vfolder_mounts=tuple(mounts),
+        vfolder_mounts_by_role=vfolder_mounts_by_role or {},
     )
 
 
 class TestResolveVFolderMountsRule:
     async def test_noop_when_context_empty(self) -> None:
         rule = ResolveVFolderMountsRule()
-        draft = SessionSpecDraft()
+        draft = SessionSpecDraft(kernel_specs=(KernelSpecDraft(cluster_role="main"),))
         result = await rule.prepare(draft, _context())
-        assert result.vfolder_mounts == ()
+        assert result is draft
+        assert result.kernel_specs[0].vfolder_mounts == ()
 
-    async def test_copies_resolved_mounts_from_context(self) -> None:
+    async def test_stamps_per_role_mounts_onto_matching_kernels(self) -> None:
         rule = ResolveVFolderMountsRule()
-        draft = SessionSpecDraft()
         mount = _mount("data")
-        result = await rule.prepare(draft, _context(mount))
-        assert result.vfolder_mounts == (mount,)
+        draft = SessionSpecDraft(
+            kernel_specs=(
+                KernelSpecDraft(cluster_role="main"),
+                KernelSpecDraft(cluster_role="worker"),
+            ),
+        )
+        result = await rule.prepare(draft, _context({"main": (mount,)}))
+        assert result.kernel_specs[0].vfolder_mounts == (mount,)
+        assert result.kernel_specs[1].vfolder_mounts == ()

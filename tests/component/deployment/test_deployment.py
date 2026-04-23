@@ -315,12 +315,19 @@ class TestDeactivateRevision:
 
 class TestStatusMapping:
     def test_lifecycle_to_status_mapping(self) -> None:
-        """Verify EndpointLifecycle maps correctly to ModelDeploymentStatus."""
+        """Verify EndpointLifecycle maps correctly to ModelDeploymentStatus.
+
+        After the scaling_state split, the lifecycle axis is monotonic and
+        SCALING is no longer surfaced through ModelDeploymentStatus — legacy
+        ``lifecycle=SCALING`` rows (and the deprecated CREATED) fold into
+        READY. Replica reconciliation is exposed via the orthogonal
+        ``scaling_state`` field on the deployment node instead.
+        """
         mapping = {
             EndpointLifecycle.PENDING: ModelDeploymentStatus.PENDING,
             EndpointLifecycle.CREATED: ModelDeploymentStatus.READY,
             EndpointLifecycle.READY: ModelDeploymentStatus.READY,
-            EndpointLifecycle.SCALING: ModelDeploymentStatus.SCALING,
+            EndpointLifecycle.SCALING: ModelDeploymentStatus.READY,
             EndpointLifecycle.DEPLOYING: ModelDeploymentStatus.DEPLOYING,
             EndpointLifecycle.DESTROYING: ModelDeploymentStatus.STOPPING,
             EndpointLifecycle.DESTROYED: ModelDeploymentStatus.STOPPED,

@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from decimal import Decimal
 
 import pytest
 
@@ -27,7 +26,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionTypes
+from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlotEntry, SessionTypes
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -101,7 +100,7 @@ def minimal_kernel_group(image_id: ImageID) -> KernelGroupDraft:
         replica_count=1,
         execution_spec=KernelExecutionSpecDraft(
             image_id=image_id,
-            resources=ResourceSlot({"cpu": Decimal("1")}),
+            resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
         ),
     )
 
@@ -144,7 +143,7 @@ def complete_draft(image_id: ImageID, minimal_kernel_group: KernelGroupDraft) ->
                 local_rank=0,
                 execution_spec=KernelExecutionSpecDraft(
                     image_id=image_id,
-                    resources=ResourceSlot({"cpu": Decimal("1")}),
+                    resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
                 ),
             ),
         ),
@@ -238,7 +237,9 @@ class TestFinalization:
         """An empty draft surfaces every required-spec field as a missing path."""
         with pytest.raises(IncompleteSessionSpec) as exc_info:
             await preparer.prepare(SessionSpecDraft(), context)
-        missing: list[str] = exc_info.value.extra_data["missing"]
+        extra_data = exc_info.value.extra_data
+        assert extra_data is not None
+        missing: list[str] = extra_data["missing"]
         # Representative sample from every grouping.
         assert "identity.session_id" in missing
         assert "identity.creation_id" in missing
@@ -311,7 +312,9 @@ class TestFinalization:
         )
         with pytest.raises(IncompleteSessionSpec) as exc_info:
             await preparer.prepare(draft, context)
-        missing: list[str] = exc_info.value.extra_data["missing"]
+        extra_data = exc_info.value.extra_data
+        assert extra_data is not None
+        missing: list[str] = extra_data["missing"]
         assert "identity.session_name" in missing
         assert "identity.session_id" not in missing
         assert "identity.access_key" not in missing
@@ -331,13 +334,15 @@ class TestFinalization:
             local_rank=0,
             execution_spec=KernelExecutionSpecDraft(
                 image_id=image_id,
-                resources=ResourceSlot({"cpu": Decimal("1")}),
+                resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
             ),
         )
         draft = complete_draft.model_copy(update={"kernel_specs": (broken_kernel,)})
         with pytest.raises(IncompleteSessionSpec) as exc_info:
             await preparer.prepare(draft, context)
-        missing: list[str] = exc_info.value.extra_data["missing"]
+        extra_data = exc_info.value.extra_data
+        assert extra_data is not None
+        missing: list[str] = extra_data["missing"]
         assert "kernel_specs[0].cluster_role" in missing
 
     async def test_kernel_execution_spec_nested_path(
@@ -354,11 +359,13 @@ class TestFinalization:
             local_rank=0,
             execution_spec=KernelExecutionSpecDraft(
                 # image_id intentionally unset
-                resources=ResourceSlot({"cpu": Decimal("1")}),
+                resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
             ),
         )
         draft = complete_draft.model_copy(update={"kernel_specs": (broken_kernel,)})
         with pytest.raises(IncompleteSessionSpec) as exc_info:
             await preparer.prepare(draft, context)
-        missing: list[str] = exc_info.value.extra_data["missing"]
+        extra_data = exc_info.value.extra_data
+        assert extra_data is not None
+        missing: list[str] = extra_data["missing"]
         assert "kernel_specs[0].execution_spec.image_id" in missing

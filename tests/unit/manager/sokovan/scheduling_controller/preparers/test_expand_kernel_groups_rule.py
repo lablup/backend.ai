@@ -10,12 +10,11 @@ replica.
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
 
 import pytest
 
 from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlotEntry
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -46,7 +45,7 @@ def context() -> SessionSpecPreparationContext:
 def _make_execution_spec(image_id: ImageID, cpu: str = "1") -> KernelExecutionSpecDraft:
     return KernelExecutionSpecDraft(
         image_id=image_id,
-        resources=ResourceSlot({"cpu": Decimal(cpu)}),
+        resources=(ResourceSlotEntry(resource_type="cpu", quantity=cpu),),
     )
 
 
@@ -169,7 +168,9 @@ class TestExpandKernelGroupsRule:
 
         for kernel in result.kernel_specs:
             assert kernel.execution_spec.image_id == image_id
-            assert kernel.execution_spec.resources == ResourceSlot({"cpu": Decimal("4")})
+            assert kernel.execution_spec.resources == (
+                ResourceSlotEntry(resource_type="cpu", quantity="4"),
+            )
 
     async def test_empty_groups_tuple_produces_empty_kernel_specs(
         self,
