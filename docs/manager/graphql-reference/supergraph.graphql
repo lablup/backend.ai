@@ -4066,6 +4066,157 @@ type DealiasImage
 scalar Decimal
   @join__type(graph: STRAWBERRY)
 
+"""
+Added in UNRELEASED. A single (handler_name, timeout_sec) entry response for session timeouts.
+"""
+type DefaultSessionHandlerTimeoutEntryInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
+  handlerName: String!
+
+  """
+  Timeout in seconds; `null` means this handler is unbounded regardless of the `default` timeout.
+  """
+  timeoutSec: Int
+}
+
+"""
+Added in UNRELEASED. A single (handler_name, timeout_sec) entry for session timeouts.
+"""
+input DefaultSessionHandlerTimeoutEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  handlerName: String!
+  timeoutSec: Int = null
+}
+
+"""Added in UNRELEASED. Baseline kernel execution spec response."""
+type DefaultSessionKernelExecutionSpecInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Container image identifier, or `null` if not resolved."""
+  imageId: String
+
+  """Quantitative resource request entries."""
+  resources: [ResourceSlotEntry!]
+
+  """Qualitative resource hints."""
+  resourceOpts: DefaultSessionResourceOptsInfo
+
+  """Command executed after kernel bootstrap."""
+  startupCommand: String
+
+  """Shell script executed before `startup_command`."""
+  bootstrapScript: String
+
+  """Earliest start time for the kernel."""
+  startsAt: DateTime
+
+  """Soft deadline for BATCH-session user payload."""
+  batchTimeoutSec: Int
+}
+
+"""
+Added in UNRELEASED. Baseline kernel execution spec input used as the resource-group default.
+"""
+input DefaultSessionKernelExecutionSpecInput
+  @join__type(graph: STRAWBERRY)
+{
+  imageId: String = null
+  resources: [ResourceSlotEntryInput!] = null
+  resourceOpts: DefaultSessionResourceOptsInput = null
+  startupCommand: String = null
+  bootstrapScript: String = null
+  startsAt: DateTime = null
+  batchTimeoutSec: Int = null
+}
+
+"""Added in UNRELEASED. Resource-group default session options response."""
+type DefaultSessionOptionsInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Default scheduling priority."""
+  priority: Int!
+
+  """Default preemption flag."""
+  isPreemptible: Boolean!
+
+  """Default cluster mode."""
+  clusterMode: String!
+
+  """
+  Resource-group fallback `failure_policy`; applied to each kernel group whose `failure_policy` and the session's `default_failure_policy` are both unset.
+  """
+  defaultFailurePolicy: SessionFailurePolicy!
+
+  """
+  Baseline kernel execution spec. `null` if the resource group does not pre-configure one.
+  """
+  defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInfo
+
+  """Default timeout policy."""
+  timeouts: DefaultSessionTimeoutsInfo!
+
+  """Default agent selection policy."""
+  agentSelectionPolicy: SessionAgentSelectionPolicy!
+}
+
+"""
+Added in UNRELEASED. Resource-group default session options input payload.
+"""
+input DefaultSessionOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  priority: Int = null
+  isPreemptible: Boolean = null
+  clusterMode: String = null
+  defaultFailurePolicy: SessionFailurePolicy = null
+  defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInput = null
+  timeouts: DefaultSessionTimeoutsInput = null
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
+}
+
+"""Added in UNRELEASED. Qualitative resource hints response."""
+type DefaultSessionResourceOptsInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Shared-memory size as a human-readable string (e.g. '64m'). `null` means 'use the runtime default'.
+  """
+  shmem: String
+}
+
+"""
+Added in UNRELEASED. Qualitative resource hints for session-level defaults (shared memory, ...).
+"""
+input DefaultSessionResourceOptsInput
+  @join__type(graph: STRAWBERRY)
+{
+  shmem: BinarySizeInput = null
+}
+
+"""Added in UNRELEASED. Session timeout policy response."""
+type DefaultSessionTimeoutsInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Fallback timeout in seconds applied to handlers not listed in `by_handler`; `null` means unbounded.
+  """
+  default: Int
+
+  """Per-handler timeout overrides."""
+  byHandler: [DefaultSessionHandlerTimeoutEntryInfo!]!
+}
+
+"""Added in UNRELEASED. Session timeout policy input (handler-keyed)."""
+input DefaultSessionTimeoutsInput
+  @join__type(graph: STRAWBERRY)
+{
+  default: Int = null
+  byHandler: [DefaultSessionHandlerTimeoutEntryInput!] = null
+}
+
 """Added in 25.15.0. """
 input DelegateeTarget
   @join__type(graph: STRAWBERRY)
@@ -4735,6 +4886,11 @@ type DeploymentHistory implements Node
   createdAt: DateTime!
   updatedAt: DateTime!
 
+  """
+  Added in UNRELEASED. Handler category that produced this row. ``lifecycle`` for monotonic lifecycle transitions; ``scaling`` for replica-reconcile transitions; ``health`` is reserved.
+  """
+  category: String!
+
   """Added in 26.4.3. The deployment this history record belongs to."""
   deployment: ModelDeployment
 }
@@ -4795,6 +4951,21 @@ enum DeploymentHistoryOrderField
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. Deployment options payload response."""
+type DeploymentOptionsInfoGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Handler timeout policy."""
+  timeouts: DeploymentTimeoutsInfoGQL!
+}
+
+"""Added in UNRELEASED. Deployment options payload input."""
+input DeploymentOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  timeouts: DeploymentTimeoutsInput!
 }
 
 """Added in 25.19.0. """
@@ -5046,6 +5217,25 @@ enum DeploymentStrategyType
 {
   ROLLING @join__enumValue(graph: STRAWBERRY)
   BLUE_GREEN @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. Deployment timeout policy response."""
+type DeploymentTimeoutsInfoGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Fallback timeout in seconds; null means unbounded."""
+  default: Int
+
+  """Per-handler timeout overrides."""
+  byHandler: [HandlerTimeoutEntryInfoGQL!]!
+}
+
+"""Added in UNRELEASED. Deployment timeout policy input."""
+input DeploymentTimeoutsInput
+  @join__type(graph: STRAWBERRY)
+{
+  default: Int = null
+  byHandler: [HandlerTimeoutEntryInput!] = null
 }
 
 """Added in 26.4.2. Input for deploying a model card as a new deployment."""
@@ -6298,7 +6488,7 @@ type ExtraVFolderMountInfoGQL
   mountDestination: String
 
   """
-  The concrete permission snapshot fixed at revision-write time. ``INHERIT`` policies are resolved against the vfolder's current permission at that point, so this value is immutable and does not change when the vfolder's permission later changes.
+  The concrete permission snapshot fixed at revision-write time. ``INHERIT`` policies are resolved against the vfolder's current permission at that point, so this value is immutable and does not change when the vfolder's permission later changes. ``None`` when the caller left it unset to inherit the vfolder's stored permission at session-creation time (task #83).
   """
   mountPerm: MountPermission!
 }
@@ -6567,6 +6757,27 @@ Added in 25.3.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_a
 """
 scalar GroupPermissionField
   @join__type(graph: GRAPHENE)
+
+"""
+Added in UNRELEASED. A single (handler_name, timeout_sec) entry response.
+"""
+type HandlerTimeoutEntryInfoGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Handler identifier."""
+  handlerName: String!
+
+  """Timeout in seconds; null means this handler is unbounded."""
+  timeoutSec: Int
+}
+
+"""Added in UNRELEASED. A single (handler_name, timeout_sec) entry."""
+input HandlerTimeoutEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  handlerName: String!
+  timeoutSec: Int = null
+}
 
 """Added in 25.14.0. HuggingFace registry node."""
 type HuggingFaceRegistry implements Node
@@ -8755,6 +8966,12 @@ type ModelDeployment implements Node
   defaultDeploymentStrategy: DeploymentStrategyGQL!
   replicaState: ReplicaState!
   createdUserId: ID!
+  options: DeploymentOptionsInfoGQL!
+
+  """
+  Added in UNRELEASED. Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle). ``SCALING`` while the replica reconciler is adjusting replica count; ``STABLE`` once holding at the desired count.
+  """
+  scalingState: ScalingState!
 
   """
   Added in 26.4.3. The current active revision of this deployment, resolved via DataLoader.
@@ -9211,7 +9428,11 @@ Added in 25.19.0. Runtime configuration for the inference framework. Includes th
 type ModelRuntimeConfig
   @join__type(graph: STRAWBERRY)
 {
-  runtimeVariant: String!
+  """
+  Added in UNRELEASED. The runtime variant referenced by this runtime config.
+  """
+  runtimeVariant: RuntimeVariant
+  runtimeVariantId: UUID!
   inferenceRuntimeConfig: JSON
   environ: EnvironmentVariables
 }
@@ -9220,7 +9441,7 @@ type ModelRuntimeConfig
 input ModelRuntimeConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  runtimeVariant: String!
+  runtimeVariantId: UUID!
   inferenceRuntimeConfig: JSON = null
 
   """Environment variables for the service."""
@@ -10529,6 +10750,16 @@ type Mutation
   Added in 26.4.2. Update allowed projects for a resource group (admin only).
   """
   adminUpdateAllowedProjectsForResourceGroupV2(input: UpdateAllowedProjectsForResourceGroupInput!): AllowedProjectsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Fully replace a resource group's ``default_deployment_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New deployments created in this resource group snapshot the new default; existing deployments are not affected.
+  """
+  replaceResourceGroupDefaultDeploymentOptions(input: ReplaceResourceGroupDefaultDeploymentOptionsInput!): ReplaceResourceGroupDefaultDeploymentOptionsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Fully replace a resource group's ``default_session_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New sessions created in this resource group consult the new default via the scheduling controller's options resolver at enqueue time; already-enqueued sessions keep the frozen options they were enqueued with.
+  """
+  replaceResourceGroupDefaultSessionOptions(input: ReplaceResourceGroupDefaultSessionOptionsInput!): ReplaceResourceGroupDefaultSessionOptionsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
@@ -13920,6 +14151,58 @@ type RejectArtifactPayload
   artifactRevision: ArtifactRevision!
 }
 
+"""
+Added in UNRELEASED. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
+"""
+input ReplaceResourceGroupDefaultDeploymentOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Target resource group name."""
+  resourceGroupName: String!
+
+  """New default deployment options payload."""
+  options: DeploymentOptionsInput!
+}
+
+"""
+Added in UNRELEASED. Payload returned after replacing a resource group's default_deployment_options surface.
+"""
+type ReplaceResourceGroupDefaultDeploymentOptionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the resource group whose default options were replaced."""
+  resourceGroupName: String!
+
+  """The newly persisted ``default_deployment_options`` surface."""
+  defaultDeploymentOptions: DeploymentOptionsInfoGQL!
+}
+
+"""
+Added in UNRELEASED. Input for the replaceResourceGroupDefaultSessionOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
+"""
+input ReplaceResourceGroupDefaultSessionOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Target resource group name."""
+  resourceGroupName: String!
+
+  """New default session options payload."""
+  options: DefaultSessionOptionsInput!
+}
+
+"""
+Added in UNRELEASED. Payload returned after replacing a resource group's default_session_options surface.
+"""
+type ReplaceResourceGroupDefaultSessionOptionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the resource group whose default options were replaced."""
+  resourceGroupName: String!
+
+  """The newly persisted ``default_session_options`` surface."""
+  defaultSessionOptions: DefaultSessionOptionsInfo!
+}
+
 """Added in 25.19.0. """
 input ReplicaFilter
   @join__type(graph: STRAWBERRY)
@@ -14134,6 +14417,16 @@ type ResourceGroup implements Node
   Added in 26.2.0. Scheduler configuration for the resource group. Use scheduler.type to check if fair-share scheduling is enabled.
   """
   scheduler: ResourceGroupSchedulerConfig!
+
+  """
+  Added in UNRELEASED. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
+  """
+  defaultDeploymentOptions: DeploymentOptionsInfoGQL!
+
+  """
+  Added in UNRELEASED. Default session options used as the fallback layer for the scheduling controller's options resolver at session enqueue time.
+  """
+  defaultSessionOptions: DefaultSessionOptionsInfo!
 
   """
   Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.
@@ -15625,6 +15918,16 @@ type ScalingGroupNode implements Node
 }
 
 """
+Added in UNRELEASED. Replica scaling axis for a deployment, orthogonal to the lifecycle status. ``SCALING`` while the replica reconciler is adjusting replica count against desired_replica_count; ``STABLE`` once holding at the desired count.
+"""
+enum ScalingState
+  @join__type(graph: STRAWBERRY)
+{
+  STABLE @join__enumValue(graph: STRAWBERRY)
+  SCALING @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
 Added in 24.09.0. Input for batch scanning of specific models from external registries.
 
 Scans multiple specified models and retrieves detailed information including
@@ -16061,6 +16364,16 @@ type ServicePorts
   entries: [ServicePortEntry!]!
 }
 
+"""
+Added in UNRELEASED. Scheduling constraint applied to designated agents for a session.
+"""
+enum SessionAgentSelectionPolicy
+  @join__type(graph: STRAWBERRY)
+{
+  STRICT @join__enumValue(graph: STRAWBERRY)
+  PREFERRED @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 26.4.2. Batch session specific configuration."""
 input SessionBatchConfigInput
   @join__type(graph: STRAWBERRY)
@@ -16081,6 +16394,17 @@ enum SessionClusterMode
 {
   SINGLE_NODE @join__enumValue(graph: STRAWBERRY)
   MULTI_NODE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Policy for how a kernel group's startup failures affect the owning session.
+"""
+enum SessionFailurePolicy
+  @join__type(graph: STRAWBERRY)
+{
+  STRICT @join__enumValue(graph: STRAWBERRY)
+  BOOT_ALL @join__enumValue(graph: STRAWBERRY)
+  TOLERANT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.4.2. A virtual folder mount specification."""
