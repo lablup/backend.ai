@@ -1068,9 +1068,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if not requested:
             return
         container_info = await container.show()
-        networks = container_info.get("NetworkSettings", {}).get("Networks", {}) or {}
+        networks = {}
+        if (network_settings := container_info.get("NetworkSettings")) is not None:
+            if (networks_dict := network_settings.get("Networks")) is not None:
+                networks = networks_dict
         already_attached = set(networks.keys()) | {
-            n["NetworkID"] for n in networks.values() if n.get("NetworkID")
+            n["NetworkID"] for n in networks.values() if n is not None and n.get("NetworkID")
         }
         for ref in requested - already_attached:
             network = await docker.networks.get(ref)

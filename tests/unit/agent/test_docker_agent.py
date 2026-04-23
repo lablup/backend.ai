@@ -14,11 +14,11 @@ from aiodocker.exceptions import DockerError
 from ai.backend.agent.docker.agent import DockerKernelCreationContext
 
 
-def _make_container_show_response(networks: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _make_container_show_response(networks: dict[str, dict[str, Any] | None]) -> dict[str, Any]:
     return {"NetworkSettings": {"Networks": networks}}
 
 
-def _make_container_mock(networks: dict[str, dict[str, Any]]) -> MagicMock:
+def _make_container_mock(networks: dict[str, dict[str, Any] | None]) -> MagicMock:
     container = MagicMock()
     container._id = "container-id"
     container.show = AsyncMock(return_value=_make_container_show_response(networks))
@@ -142,6 +142,24 @@ class TestAttachAdditionalNetworks:
 
         with pytest.raises(DockerError):
             await context._attach_additional_networks(docker, container, {"bridge"})
+
+    async def test_tolerates_none_network_entry_in_container_show(
+        self,
+        context: DockerKernelCreationContext,
+    ) -> None:
+        """container.show() may return None for a network entry value."""
+        container = _make_container_mock(
+            networks={"bridge": None},
+        )
+        connect_mock = AsyncMock()
+        network = MagicMock()
+        network.connect = connect_mock
+        docker = _make_docker_mock(network_get=AsyncMock(return_value=network))
+
+        await context._attach_additional_networks(docker, container, {"macvlan-roce-0"})
+
+        docker.networks.get.assert_awaited_once_with("macvlan-roce-0")
+        connect_mock.assert_awaited_once()
 
     async def test_reraises_403_when_message_does_not_match(
         self,
