@@ -3262,28 +3262,13 @@ class ArtifactRegistryConfig(BaseConfigSchema):
 
 
 class DeploymentConfig(BaseConfigSchema):
-    enable_model_definition_override: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "enable-model-definition-override", "enable_model_definition_override"
-            ),
-            serialization_alias="enable-model-definition-override",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enable custom model definition override from storage for non-CUSTOM runtime variants. "
-                "When enabled, after generating the standard model definition programmatically, the "
-                "system attempts to fetch a custom definition from storage if model_definition_path "
-                "is specified in the model revision. The custom definition overrides the generated "
-                "one if found; otherwise, the generated definition is used as fallback. This allows "
-                "customizing model serving configurations while maintaining automatic defaults."
-            ),
-            added_version="25.8.0",
-            example=ConfigExample(local="false", prod="true"),
-        ),
-    ]
+    """Deployment-wide configuration.
+
+    The schema is intentionally empty: all per-variant model-definition
+    handling now lives on the runtime variant rows (via
+    ``reads_vfolder_config_files`` and ``default_model_definition``) rather
+    than a global override toggle.
+    """
 
 
 class ExportConfig(BaseConfigSchema):

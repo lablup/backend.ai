@@ -24,7 +24,7 @@ from ai.backend.manager.api.rest.v2.path_params import AccessKeyPathParam
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.user import UserAdapter
+    from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

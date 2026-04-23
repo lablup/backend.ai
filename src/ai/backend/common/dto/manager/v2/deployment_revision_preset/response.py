@@ -8,6 +8,8 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 class EnvironEntryInfo(BaseResponseModel):
@@ -37,7 +39,7 @@ class PresetResourceAllocation(BaseResponseModel):
 
 
 class PresetExecutionSpec(BaseResponseModel):
-    image_id: UUID | None = Field(default=None, description="Container image UUID.")
+    image_id: ImageID | None = Field(default=None, description="Container image UUID.")
     startup_command: str | None = Field(default=None, description="Startup command.")
     bootstrap_script: str | None = Field(default=None, description="Bootstrap script.")
     environ: list[EnvironEntryInfo] = Field(
@@ -79,7 +81,7 @@ class PresetDeploymentDefaults(BaseResponseModel):
 
 class DeploymentRevisionPresetNode(BaseResponseModel):
     id: UUID = Field(description="Preset ID.")
-    runtime_variant_id: UUID = Field(description="Runtime variant ID.")
+    runtime_variant_id: RuntimeVariantID = Field(description="Runtime variant ID.")
     name: str = Field(description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
     rank: int = Field(description="Display order rank.")

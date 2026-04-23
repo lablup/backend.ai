@@ -53,6 +53,11 @@ from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import scan_gpu_alloc_map
+from ai.backend.agent.rpc.health.registry import register_health_domain
+from ai.backend.agent.rpc.hwinfo.registry import register_hwinfo_domain
+from ai.backend.agent.rpc.kernel.registry import register_kernel_domain
+from ai.backend.agent.rpc.middlewares.metric import build_metric_middleware
+from ai.backend.agent.rpc.routing import AgentRPCRegistry
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.agent.types import AgentBackend
 from ai.backend.common import config, identity, msgpack, utils
@@ -434,6 +439,24 @@ class AgentRPCServer(aobject):
 
         # Start periodic health checking
         await self.health_probe.start()
+
+        # v3 pydantic-typed RPC methods — handlers are registered
+        # explicitly via per-domain registrar functions (see
+        # ``agent/rpc/routing.py`` and the per-domain ``registry.py``
+        # modules under ``agent/rpc/<domain>/``). Must run after
+        # ``self.health_probe`` is initialised above, since
+        # ``register_health_domain`` captures the probe at registration
+        # time. Middleware providers are injected here so cross-cutting
+        # concerns (metrics, …) compose at setup time rather than being
+        # hard-coded.
+        self._rpc_registry = AgentRPCRegistry(
+            runtime=self.runtime,
+            middlewares=[build_metric_middleware(RPCMetricObserver.instance())],
+        )
+        register_kernel_domain(self._rpc_registry)
+        register_health_domain(self._rpc_registry, health_probe=self.health_probe)
+        register_hwinfo_domain(self._rpc_registry)
+        self._rpc_registry.bind_to_rpc(self.rpc_server)
 
     async def status_snapshot_request_handler(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter

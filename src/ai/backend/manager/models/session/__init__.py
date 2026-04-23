@@ -8,8 +8,6 @@ from .row import (
     DEAD_SESSION_STATUSES,
     DEFAULT_SESSION_ORDERING,
     PRIVATE_SESSION_TYPES,
-    SESSION_KERNEL_STATUS_MAPPING,
-    SESSION_STATUS_TRANSITION_MAP,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ConcurrencyUsed,
     KernelLoadingStrategy,
@@ -21,7 +19,6 @@ from .row import (
     by_status,
     by_user_id,
     check_all_dependencies,
-    determine_session_status_by_kernels,
     handle_session_exception,
 )
 from .row import (
@@ -40,8 +37,6 @@ __all__ = (
     "DEAD_SESSION_STATUSES",
     "DEFAULT_SESSION_ORDERING",
     "PRIVATE_SESSION_TYPES",
-    "SESSION_KERNEL_STATUS_MAPPING",
-    "SESSION_STATUS_TRANSITION_MAP",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "ConcurrencyUsed",
     "KernelLoadingStrategy",
@@ -59,6 +54,5 @@ __all__ = (
     "by_status",
     "by_user_id",
     "check_all_dependencies",
-    "determine_session_status_by_kernels",
     "handle_session_exception",
 )

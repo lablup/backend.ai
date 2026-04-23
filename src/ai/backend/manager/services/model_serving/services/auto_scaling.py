@@ -95,7 +95,7 @@ class AutoScalingService:
 
         # Validate access to the endpoint first
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.endpoint_id
+            action.deployment_id
         )
         if not validation_data:
             raise EndpointNotFound
@@ -104,7 +104,7 @@ class AutoScalingService:
 
         # Create auto scaling rule (access already validated)
         created_rule = await self._repository.create_auto_scaling_rule(
-            endpoint_id=action.endpoint_id,
+            endpoint_id=action.deployment_id,
             metric_source=action.creator.metric_source,
             metric_name=action.creator.metric_name,
             threshold=_threshold,

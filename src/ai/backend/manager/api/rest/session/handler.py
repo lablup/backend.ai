@@ -63,7 +63,6 @@ from ai.backend.common.dto.manager.session.response import (
     ListFilesResponse,
     MatchSessionsResponse,
     StartServiceResponse,
-    TransitSessionStatusResponse,
 )
 from ai.backend.common.dto.manager.session.types import (
     CreationConfigV1,
@@ -83,13 +82,12 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     KernelId,
-    SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.dto.context import RequestCtx
-from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.errors.user import UserNotFound
@@ -99,9 +97,6 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
 )
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
-)
-from ai.backend.manager.services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusAction,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -164,9 +159,6 @@ from ai.backend.manager.services.session.actions.match_sessions import (
 )
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
-)
-from ai.backend.manager.services.session.actions.restart_session import (
-    RestartSessionAction,
 )
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
@@ -570,46 +562,21 @@ class SessionHandler:
     # ------------------------------------------------------------------
     # check_and_transit_status (POST /_/transit-status)
     # ------------------------------------------------------------------
+    # Manual status reconciliation is no longer supported — the sokovan
+    # scheduler's coordinator runs a reconciliation loop that keeps
+    # session and kernel statuses in sync without external triggers.
+    # The endpoint is retained as a 501 stub for wire compatibility.
 
     async def check_and_transit_status(
         self,
         body: BodyParam[TransitSessionStatusRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
-        request = ctx.request
-        params = body.parsed
-        session_ids = [SessionId(id_) for id_ in params.ids]
-        user_role = cast(UserRole, request["user"]["role"])
-        user_id = cast(UUID, request["user"]["uuid"])
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
-                owner_access_key=None,
-            )
-        )
-        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
-        log.info(
-            "TRANSIT_STATUS (ak:{}/{}, s:{})",
-            requester_access_key,
-            owner_access_key,
-            session_ids,
-        )
-
-        session_status_map: dict[SessionId, str] = {}
-        for session_id in session_ids:
-            result = await self._session.check_and_transit_status.wait_for_complete(
-                CheckAndTransitStatusAction(
-                    user_id=user_id,
-                    user_role=user_role,
-                    session_id=session_id,
-                )
-            )
-            session_status_map.update(result.result)
-        return APIResponse.build(
-            HTTPStatus.OK,
-            TransitSessionStatusResponse(session_status_map=session_status_map),
+        raise NotImplementedAPI(
+            extra_msg=(
+                "Manual session status reconciliation is no longer supported. "
+                "Session status is automatically reconciled by the scheduler."
+            ),
         )
 
     # ------------------------------------------------------------------
@@ -653,41 +620,22 @@ class SessionHandler:
     # ------------------------------------------------------------------
     # restart (PATCH /{session_name})
     # ------------------------------------------------------------------
+    # Session restart is no longer supported — the sokovan scheduler's
+    # lifecycle handlers do not restart containers in place; terminate
+    # the session and enqueue a new one instead. The endpoint is
+    # retained as a 501 stub for wire compatibility.
 
     async def restart(
         self,
         query: QueryParam[RestartSessionRequest],
         ctx: RequestCtx,
     ) -> web.Response:
-        request = ctx.request
-        params = query.parsed
-        session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
-                owner_access_key=params.owner_access_key,
-            )
+        raise NotImplementedAPI(
+            extra_msg=(
+                "Session restart is no longer supported. "
+                "Terminate the session and enqueue a new one instead."
+            ),
         )
-        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
-        log.info(
-            "RESTART (ak:{0}/{1}, s:{2})",
-            requester_access_key,
-            owner_access_key,
-            session_name,
-        )
-        try:
-            await self._session.restart_session.wait_for_complete(
-                RestartSessionAction(
-                    session_name=session_name,
-                    owner_access_key=owner_access_key,
-                )
-            )
-        except BackendAIError:
-            log.exception("RESTART: exception")
-            raise
-        return web.Response(status=HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # destroy (DELETE /{session_name})

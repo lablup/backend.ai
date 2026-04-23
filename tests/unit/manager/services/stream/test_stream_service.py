@@ -29,10 +29,6 @@ from ai.backend.manager.services.stream.actions.interrupt_in_stream import (
     InterruptInStreamAction,
     InterruptInStreamActionResult,
 )
-from ai.backend.manager.services.stream.actions.restart_in_stream import (
-    RestartInStreamAction,
-    RestartInStreamActionResult,
-)
 from ai.backend.manager.services.stream.actions.start_service_in_stream import (
     StartServiceInStreamAction,
     StartServiceInStreamActionResult,
@@ -246,27 +242,6 @@ class TestInterruptInStream(TestStreamService):
         assert isinstance(result, InterruptInStreamActionResult)
         assert result.result == {"status": "interrupted"}
         mock_registry.interrupt_session.assert_awaited_once_with(mock_session)
-
-
-class TestRestartInStream(TestStreamService):
-    async def test_restart_calls_registry(
-        self,
-        stream_service: StreamService,
-        mock_repository: AsyncMock,
-        mock_registry: AsyncMock,
-        mock_session: MagicMock,
-    ) -> None:
-        mock_repository.get_streaming_session.return_value = mock_session
-        mock_registry.restart_session.return_value = None
-        action = RestartInStreamAction(
-            session_name="my-session",
-            access_key=FAKE_ACCESS_KEY,
-        )
-
-        result = await stream_service.restart_in_stream(action)
-
-        assert isinstance(result, RestartInStreamActionResult)
-        mock_registry.restart_session.assert_awaited_once_with(mock_session)
 
 
 class TestStartServiceInStream(TestStreamService):

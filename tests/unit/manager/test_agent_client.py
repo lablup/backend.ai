@@ -15,6 +15,11 @@ from ai.backend.common.types import (
 from ai.backend.manager.clients.agent.client import AgentClient
 
 
+def _v2_hwinfo_response() -> dict[str, list[dict[str, object]]]:
+    """Minimal ``GatherHwinfoResp``-shaped dict for the v3 mock round-trip."""
+    return {"devices": []}
+
+
 @pytest.fixture
 def mock_peer() -> MagicMock:
     """Create a mock PeerInvoker with async call methods."""
@@ -27,11 +32,13 @@ class TestAgentClientPassesAgentId:
     async def test_gather_hwinfo_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("test-agent"))
 
-        mock_peer.call.gather_hwinfo = AsyncMock(return_value={})
+        mock_peer.call.gather_hwinfo_v2 = AsyncMock(return_value=_v2_hwinfo_response())
 
         await client.gather_hwinfo()
 
-        mock_peer.call.gather_hwinfo.assert_called_once_with(agent_id=AgentId("test-agent"))
+        mock_peer.call.gather_hwinfo_v2.assert_called_once_with(
+            req={}, agent_id=AgentId("test-agent")
+        )
 
     async def test_scan_gpu_alloc_map_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("gpu-agent"))
@@ -139,12 +146,12 @@ class TestAgentClientPassesAgentId:
         client1 = AgentClient(mock_peer, AgentId("agent-1"))
         client2 = AgentClient(mock_peer, AgentId("agent-2"))
 
-        mock_peer.call.gather_hwinfo = AsyncMock(return_value={})
+        mock_peer.call.gather_hwinfo_v2 = AsyncMock(return_value=_v2_hwinfo_response())
 
         await client1.gather_hwinfo()
         await client2.gather_hwinfo()
 
-        calls = mock_peer.call.gather_hwinfo.call_args_list
+        calls = mock_peer.call.gather_hwinfo_v2.call_args_list
         assert len(calls) == 2
         assert calls[0].kwargs["agent_id"] == AgentId("agent-1")
         assert calls[1].kwargs["agent_id"] == AgentId("agent-2")

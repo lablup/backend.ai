@@ -186,3 +186,12 @@ def runtime_variant_preset() -> None:
 )
 def model_card() -> None:
     """Admin model card commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.scheduling_handler:scheduling_handler",
+    name="scheduling-handler",
+)
+def scheduling_handler() -> None:
+    """Admin scheduling handler commands."""

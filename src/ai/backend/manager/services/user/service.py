@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -101,6 +100,7 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -117,6 +117,7 @@ class UserService:
     _valkey_stat_client: ValkeyStatClient
     _agent_registry: AgentRegistry
     _user_repository: UserRepository
+    _scheduling_controller: SchedulingController
 
     def __init__(
         self,
@@ -124,11 +125,13 @@ class UserService:
         valkey_stat_client: ValkeyStatClient,
         agent_registry: AgentRegistry,
         user_repository: UserRepository,
+        scheduling_controller: SchedulingController,
     ) -> None:
         self._storage_manager = storage_manager
         self._valkey_stat_client = valkey_stat_client
         self._user_repository = user_repository
         self._agent_registry = agent_registry
+        self._scheduling_controller = scheduling_controller
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
         user_data_result = await self._user_repository.create_user_validated(
@@ -248,22 +251,11 @@ class UserService:
 
         # Handle active sessions
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
-            tasks = [
-                asyncio.create_task(
-                    self._agent_registry.destroy_session(
-                        session,
-                        forced=True,
-                        reason=KernelLifecycleEventReason.USER_PURGED,
-                    )
-                )
-                for session in active_sessions
-            ]
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for sess, result in zip(active_sessions, results, strict=True):
-                if isinstance(result, Exception):
-                    log.warning(f"Session {sess.id} not terminated properly: {result}")
+            await self._scheduling_controller.mark_sessions_for_termination(
+                [session.id for session in active_sessions],
+                reason=KernelLifecycleEventReason.USER_PURGED.value,
+                forced=True,
+            )
 
         # Delete vfolders
         await self._user_repository.delete_user_vfolders(
@@ -321,22 +313,11 @@ class UserService:
 
         # Handle active sessions
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
-            tasks = [
-                asyncio.create_task(
-                    self._agent_registry.destroy_session(
-                        session,
-                        forced=True,
-                        reason=KernelLifecycleEventReason.USER_PURGED,
-                    )
-                )
-                for session in active_sessions
-            ]
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for sess, result in zip(active_sessions, results, strict=True):
-                if isinstance(result, Exception):
-                    log.warning(f"Session {sess.id} not terminated properly: {result}")
+            await self._scheduling_controller.mark_sessions_for_termination(
+                [session.id for session in active_sessions],
+                reason=KernelLifecycleEventReason.USER_PURGED.value,
+                forced=True,
+            )
 
         # Delete vfolders
         await self._user_repository.delete_user_vfolders(

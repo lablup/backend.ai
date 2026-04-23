@@ -22,7 +22,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.user import UserAdapter
+    from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

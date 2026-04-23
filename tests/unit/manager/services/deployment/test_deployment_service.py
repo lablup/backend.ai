@@ -61,9 +61,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 
 
 class DeploymentServiceBaseFixtures:
@@ -80,31 +77,15 @@ class DeploymentServiceBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        """Mock RevisionGeneratorRegistry for testing."""
-        return MagicMock(spec=RevisionGeneratorRegistry)
-
-    @pytest.fixture
-    def mock_model_definition_generator_registry(self) -> AsyncMock:
-        """Mock ModelDefinitionGeneratorRegistry."""
-        registry = AsyncMock()
-        registry.generate_model_definition.return_value = ModelDefinitionDraft()
-        return registry
-
-    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
-        mock_model_definition_generator_registry: AsyncMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
-            revision_generator_registry=mock_revision_generator_registry,
-            model_definition_generator_registry=mock_model_definition_generator_registry,
         )
 
     @pytest.fixture

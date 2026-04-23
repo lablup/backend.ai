@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.manager.api.adapters.pagination import (
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions as PaginationOptions,
 )
-from ai.backend.manager.api.adapters.pagination import (
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec as PaginationSpec,
 )
-from ai.backend.manager.api.adapters.pagination import build_pagination
+from ai.backend.manager.api.adapter_options.pagination.pagination import build_pagination
 from ai.backend.manager.repositories.base import BatchQuerier, QueryOrder
 
 

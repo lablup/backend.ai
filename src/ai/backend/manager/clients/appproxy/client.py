@@ -13,6 +13,14 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
+    BulkCreateEndpointRequest,
+    BulkDeleteEndpointRequest,
+)
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
+    BulkCreateEndpointResponse,
+    BulkDeleteEndpointResponse,
+)
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -107,6 +115,29 @@ class AppProxyClient:
             return result
 
     @appproxy_client_resilience.apply()
+    async def create_endpoints_bulk(
+        self,
+        body: BulkCreateEndpointRequest,
+    ) -> BulkCreateEndpointResponse:
+        """Create or sync multiple endpoints in a single coordinator call.
+
+        The coordinator processes all entries inside one transaction and
+        initializes freshly created circuits with one propagation call,
+        so this is the preferred way to register many deployments at
+        once (e.g. from the deployment provisioning handler).
+        """
+        async with self._client_session.post(
+            "/v2/endpoints/bulk",
+            json=body.model_dump(mode="json"),
+            headers={
+                "X-BackendAI-Token": self._token,
+            },
+        ) as resp:
+            resp.raise_for_status()
+            payload = await resp.json()
+            return BulkCreateEndpointResponse.model_validate(payload)
+
+    @appproxy_client_resilience.apply()
     async def delete_endpoint(
         self,
         endpoint_id: UUID,
@@ -118,3 +149,26 @@ class AppProxyClient:
             },
         ):
             pass
+
+    @appproxy_client_resilience.apply()
+    async def delete_endpoints_bulk(
+        self,
+        body: BulkDeleteEndpointRequest,
+    ) -> BulkDeleteEndpointResponse:
+        """Delete multiple endpoints in a single coordinator call.
+
+        The coordinator continues past per-entry failures and returns a
+        per-endpoint result in input order, so the caller can decide how
+        to treat partial failures (retry, log, etc.).
+        """
+        async with self._client_session.request(
+            "DELETE",
+            "/v2/endpoints/bulk",
+            json=body.model_dump(mode="json"),
+            headers={
+                "X-BackendAI-Token": self._token,
+            },
+        ) as resp:
+            resp.raise_for_status()
+            payload = await resp.json()
+            return BulkDeleteEndpointResponse.model_validate(payload)

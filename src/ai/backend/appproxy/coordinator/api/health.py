@@ -29,6 +29,11 @@ from .utils import auth_required
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+# NOTE: Coordinator no longer tracks per-route health state (removed along with
+# HealthCheckEngine). HTTP health is handled by Traefik's loadBalancer.healthCheck
+# and TCP health by the worker-side RoutePool. These endpoints remain for wire
+# compatibility with external consumers but report routes as `unknown`.
+
 
 class RouteHealthStatusModel(BaseModel):
     """Model for individual route health status"""
@@ -141,12 +146,7 @@ async def get_health_summary(request: web.Request) -> PydanticResponse[HealthSta
             for route in circuit.route_info:
                 if route.route_id:  # Only count routes with IDs (health-checkable)
                     total_routes += 1
-                    if route.health_status == ModelServiceStatus.HEALTHY:
-                        healthy_routes += 1
-                    elif route.health_status == ModelServiceStatus.UNHEALTHY:
-                        unhealthy_routes += 1
-                    else:
-                        unknown_routes += 1
+                    unknown_routes += 1
 
         summary = HealthSummaryModel(
             total_endpoints=total_endpoints,
@@ -184,13 +184,7 @@ async def get_endpoints_health(request: web.Request) -> PydanticResponse[HealthS
 
                 for route in circuit.route_info:
                     if route.route_id:  # Only include routes with IDs (health-checkable)
-                        if route.health_status == ModelServiceStatus.HEALTHY:
-                            healthy_count += 1
-                        elif route.health_status == ModelServiceStatus.UNHEALTHY:
-                            unhealthy_count += 1
-                        else:
-                            unknown_count += 1
-
+                        unknown_count += 1
                         route_models.append(
                             RouteHealthStatusModel(
                                 route_id=route.route_id,
@@ -198,9 +192,9 @@ async def get_endpoints_health(request: web.Request) -> PydanticResponse[HealthS
                                 kernel_host=route.kernel_host,
                                 kernel_port=route.kernel_port,
                                 protocol=route.protocol.value,
-                                health_status=route.health_status,
-                                last_health_check=route.last_health_check,
-                                consecutive_failures=route.consecutive_failures,
+                                health_status=None,
+                                last_health_check=None,
+                                consecutive_failures=0,
                                 created_at=circuit.created_at,
                                 updated_at=circuit.updated_at,
                             )
@@ -264,15 +258,9 @@ async def get_circuit_health(
                 all_routes=[],
             )
         else:
-            # Get route health from circuit's route_info JSON
-            healthy_count = 0
             route_models = []
-
             for route in circuit.route_info:
                 if route.route_id:  # Only include routes with IDs (health-checkable)
-                    if route.health_status == ModelServiceStatus.HEALTHY:
-                        healthy_count += 1
-
                     route_models.append(
                         RouteHealthStatusModel(
                             route_id=route.route_id,
@@ -280,9 +268,9 @@ async def get_circuit_health(
                             kernel_host=route.kernel_host,
                             kernel_port=route.kernel_port,
                             protocol=route.protocol.value,
-                            health_status=route.health_status,
-                            last_health_check=route.last_health_check,
-                            consecutive_failures=route.consecutive_failures,
+                            health_status=None,
+                            last_health_check=None,
+                            consecutive_failures=0,
                             created_at=circuit.created_at,
                             updated_at=circuit.updated_at,
                         )
@@ -292,7 +280,7 @@ async def get_circuit_health(
                 circuit_id=circuit.id,
                 endpoint_id=circuit.endpoint_id,
                 total_routes=len(route_models),
-                healthy_routes=healthy_count,
+                healthy_routes=0,
                 all_routes=route_models,
             )
 

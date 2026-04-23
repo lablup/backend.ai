@@ -132,7 +132,7 @@ class UnregisterStorageNamespacePayload:
     BackendAIGQLMeta(
         added_version="25.15.0", description="Registers a new namespace within a storage"
     )
-)  # type: ignore[misc]
+)
 async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> RegisterStorageNamespacePayload:
@@ -144,7 +144,7 @@ async def register_storage_namespace(
     BackendAIGQLMeta(
         added_version="25.15.0", description="Unregisters an existing namespace from a storage"
     )
-)  # type: ignore[misc]
+)
 async def unregister_storage_namespace(
     input: UnregisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> UnregisterStorageNamespacePayload:

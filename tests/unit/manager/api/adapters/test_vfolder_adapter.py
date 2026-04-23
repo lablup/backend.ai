@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     VFolderFilter,
 )
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
-from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPermission,

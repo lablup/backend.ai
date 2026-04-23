@@ -1,6 +1,7 @@
 from .access_token import access_token
 from .auto_scaling_rule import auto_scaling_rule
 from .commands import deployment as deployment
+from .options import options
 from .policy import policy
 from .replica import replica
 from .revision import revision
@@ -13,5 +14,6 @@ deployment.add_command(policy)
 deployment.add_command(revision_preset)
 deployment.add_command(access_token)
 deployment.add_command(auto_scaling_rule)
+deployment.add_command(options)
 
 __all__ = ("deployment",)

@@ -30,9 +30,6 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.testutils.scenario import ScenarioBase
 
@@ -121,10 +118,6 @@ class TestGetModelServiceInfo:
         return mock
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        return MagicMock(spec=RevisionGeneratorRegistry)
-
-    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -138,7 +131,6 @@ class TestGetModelServiceInfo:
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
-        mock_revision_generator_registry: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -152,7 +144,6 @@ class TestGetModelServiceInfo:
             deployment_repository=mock_deployment_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
-            revision_generator_registry=mock_revision_generator_registry,
         )
 
     @pytest.fixture

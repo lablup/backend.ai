@@ -20,7 +20,9 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode, MountPermission, RuntimeVariant
 
 from .types import DeploymentOrder, RevisionOrder, RouteOrder
 
@@ -211,7 +213,7 @@ class DeploymentStrategyInput(BaseRequestModel):
 class ImageInput(BaseRequestModel):
     """Container image input."""
 
-    id: UUID = Field(description="Image ID")
+    id: ImageID = Field(description="Image ID")
 
 
 class ClusterConfigInput(BaseRequestModel):
@@ -236,7 +238,7 @@ class ResourceConfigInput(BaseRequestModel):
 class ModelMountConfigInput(BaseRequestModel):
     """Model mount configuration input."""
 
-    vfolder_id: UUID = Field(description="Model vfolder ID")
+    vfolder_id: VFolderUUID = Field(description="Model vfolder ID")
     mount_destination: str = Field(default="/models", description="Mount destination path")
     definition_path: str = Field(description="Model definition file path within vfolder")
 
@@ -256,8 +258,16 @@ class ModelRuntimeConfigInput(BaseRequestModel):
 class ExtraVFolderMountInput(BaseRequestModel):
     """Extra vfolder mount input."""
 
-    vfolder_id: UUID = Field(description="VFolder ID to mount")
+    vfolder_id: VFolderUUID = Field(description="VFolder ID to mount")
     mount_destination: str | None = Field(default=None, description="Mount destination path")
+    mount_perm: MountPermission | None = Field(
+        default=None,
+        description=(
+            "Optional permission override. ``null`` (default) uses the vfolder's own "
+            "stored permission; a concrete value (e.g. ``ro``) forces that permission "
+            "regardless of what the vfolder grants."
+        ),
+    )
 
 
 class RevisionInput(BaseRequestModel):

@@ -23,7 +23,6 @@ from ai.backend.manager.data.deployment.types import (
     MountMetadata,
     ResourceSpec,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
 from ai.backend.manager.data.model_serving.types import (
     ModelServicePrepareCtx,
@@ -43,9 +42,6 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.testutils.scenario import ScenarioBase
 
@@ -116,10 +112,6 @@ class TestCreateModelService:
     def _stub_model_revision_spec(self) -> ModelRevisionSpec:
         return ModelRevisionSpec(
             image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
-            image_identifier=ImageIdentifier(
-                canonical="ai.backend/python:3.9",
-                architecture="x86_64",
-            ),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -165,12 +157,6 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        # RevisionGenerator is now a variant validator — creation tests do not
-        # exercise it, but the service constructor still requires a registry.
-        return MagicMock(spec=RevisionGeneratorRegistry)
-
-    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -184,7 +170,6 @@ class TestCreateModelService:
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
-        mock_revision_generator_registry: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -198,7 +183,6 @@ class TestCreateModelService:
             deployment_repository=mock_deployment_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
-            revision_generator_registry=mock_revision_generator_registry,
         )
 
     @pytest.fixture
@@ -650,10 +634,6 @@ class TestCreateWithDeploymentConfigOverrides:
         """Revision spec that would come from deployment config via RevisionGenerator."""
         return ModelRevisionSpec(
             image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
-            image_identifier=ImageIdentifier(
-                canonical="service-def-image:v1",
-                architecture="arm64",
-            ),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -672,13 +652,6 @@ class TestCreateWithDeploymentConfigOverrides:
         )
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        # RevisionGenerator is now a variant validator only; the merge result
-        # is produced by DeploymentController.resolve_legacy_revision_spec,
-        # which is mocked on mock_deployment_controller above.
-        return MagicMock(spec=RevisionGeneratorRegistry)
-
-    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -692,7 +665,6 @@ class TestCreateWithDeploymentConfigOverrides:
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
-        mock_revision_generator_registry: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -706,7 +678,6 @@ class TestCreateWithDeploymentConfigOverrides:
             deployment_repository=mock_deployment_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
-            revision_generator_registry=mock_revision_generator_registry,
         )
 
     @pytest.fixture
@@ -838,17 +809,9 @@ class TestCreateWithDeploymentConfigOverrides:
             action_with_api_request_values
         )
 
-        # Verify image resolution uses revision values (not API request values)
-        mock_resolve_image_for_endpoint_creation.assert_called_once()
-        image_identifiers = mock_resolve_image_for_endpoint_creation.call_args[0][0]
-        assert (
-            image_identifiers[0].canonical
-            == revision_from_deployment_config.image_identifier.canonical
-        )
-        assert (
-            image_identifiers[0].architecture
-            == revision_from_deployment_config.image_identifier.architecture
-        )
+        # Image canonical/architecture are now looked up by ``image_id`` via
+        # ``get_image_by_id`` after revision merge; the legacy
+        # ``resolve_image_for_endpoint_creation`` call has been removed.
 
         # Verify session creation config uses revision values (not API request values)
         mock_agent_registry.create_session.assert_called_once()

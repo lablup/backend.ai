@@ -4048,6 +4048,11 @@ type ExtraVFolderMountInfoGQL {
   vfolder: VirtualFolderNode!
   vfolderId: ID!
   mountDestination: String
+
+  """
+  The concrete permission snapshot fixed at revision-write time. ``INHERIT`` policies are resolved against the vfolder's current permission at that point, so this value is immutable and does not change when the vfolder's permission later changes.
+  """
+  mountPerm: MountPermission!
 }
 
 """Added in 25.19.0. """
@@ -6027,7 +6032,7 @@ enum ModelRevisionOrderField {
   CREATED_AT
   RESOURCE_GROUP
   CLUSTER_MODE
-  RUNTIME_VARIANT
+  RUNTIME_VARIANT_NAME
 }
 
 """
@@ -6141,6 +6146,15 @@ input ModifyQueryDefinitionOptionsInput {
 type ModifyQueryDefinitionPayload {
   """Updated query definition."""
   preset: QueryDefinition!
+}
+
+"""
+Added in 25.19.0. This enum represents the permission level for a mounted volume. It can be ro, rw, wd
+"""
+enum MountPermission {
+  READ_ONLY
+  READ_WRITE
+  RW_DELETE
 }
 
 """Added in 26.4.2. Input for moving a file inside a virtual folder."""
@@ -8238,6 +8252,11 @@ type Query {
 
   """Added in 26.4.2. Get a single resource group by name (admin only)."""
   adminResourceGroupV2(name: String!): ResourceGroup
+
+  """
+  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.timeouts.by_handler``.
+  """
+  schedulingHandlers: [SchedulingHandlerNode!]!
 
   """
   Added in 26.4.2. Get allowed resource groups for a domain (admin only).
@@ -10445,6 +10464,28 @@ type SchedulingBroadcastEventPayload {
 
   """Human-readable reason for this status transition."""
   reason: String!
+}
+
+enum SchedulingHandlerCategory {
+  LIFECYCLE
+  SCALING
+  HEALTH
+}
+
+"""
+Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.timeouts.by_handler``.
+"""
+type SchedulingHandlerNode {
+  """Stable handler key used in deployment timeout maps."""
+  name: String!
+
+  """Handler category classifying its scheduling axis."""
+  category: SchedulingHandlerCategory!
+
+  """
+  First line of the handler's docstring, if any. Null when the backing class has no docstring.
+  """
+  description: String
 }
 
 """Added in 26.3.0. Scheduling result status"""

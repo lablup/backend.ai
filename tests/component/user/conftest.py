@@ -60,6 +60,7 @@ def user_processors(
         valkey_stat_client=valkey_clients.stat,
         agent_registry=agent_registry,
         user_repository=user_repository,
+        scheduling_controller=AsyncMock(),
     )
     return UserProcessors(
         user_service=service, action_monitors=[], validators=_create_mock_validators()

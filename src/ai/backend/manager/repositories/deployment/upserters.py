@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     DeploymentPolicyRow,
@@ -25,7 +25,7 @@ class DeploymentPolicyUpserterSpec(UpserterSpec[DeploymentPolicyRow]):
     On conflict, updates strategy and strategy_spec.
     """
 
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
 
@@ -37,7 +37,7 @@ class DeploymentPolicyUpserterSpec(UpserterSpec[DeploymentPolicyRow]):
     @override
     def build_insert_values(self) -> dict[str, Any]:
         return {
-            "endpoint": self.endpoint_id,
+            "endpoint": self.deployment_id,
             "strategy": self.strategy,
             "strategy_spec": self.strategy_spec.model_dump(),
         }

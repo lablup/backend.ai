@@ -19,6 +19,8 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 __all__ = (
@@ -86,7 +88,10 @@ class ModelRuntimeConfigDTO(BaseModel):
 class ModelMountConfigDTO(BaseModel):
     """Model mount configuration for revision."""
 
-    vfolder_id: UUID = Field(description="VFolder ID for model")
+    # ``vfolder_id`` is null when the referenced vfolder has been deleted
+    # (``deployment_revisions.model`` SET NULL FK); the revision is kept
+    # for history but cannot be redeployed in that state.
+    vfolder_id: VFolderUUID | None = Field(description="VFolder ID for model")
     mount_destination: str | None = Field(description="Mount destination path")
     definition_path: str = Field(description="Model definition path")
 
@@ -108,7 +113,10 @@ class RevisionDTO(BaseModel):
     model_runtime_config: ModelRuntimeConfigDTO = Field(description="Model runtime configuration")
     model_mount_config: ModelMountConfigDTO = Field(description="Model mount configuration")
     created_at: datetime = Field(description="Creation timestamp")
-    image_id: UUID = Field(description="Image ID")
+    # ``image_id`` is null when the referenced image row has been deleted
+    # (``deployment_revisions.image`` SET NULL FK); the revision is kept for
+    # history but cannot be redeployed in that state.
+    image_id: ImageID | None = Field(description="Image ID")
 
 
 class DeploymentDTO(BaseModel):

@@ -42,6 +42,12 @@ from ai.backend.common.dto.manager.deployment import (
     UpsertDeploymentPolicyRequest,
     UpsertDeploymentPolicyResponse,
 )
+from ai.backend.common.dto.manager.deployment.response import DeploymentDTO, RevisionDTO
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.types import RuntimeVariant
+from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
+from ai.backend.manager.data.deployment.types import ModelDeploymentData, ModelRevisionData
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -108,14 +114,56 @@ class DeploymentAPIHandler:
         self,
         *,
         deployment: DeploymentProcessors,
+        runtime_variant_adapter: RuntimeVariantAdapter,
     ) -> None:
         self._deployment = deployment
-        self._deployment_adapter = DeploymentAdapter()
+        # ``RuntimeVariantAdapter`` supplies the id↔name bridge used by
+        # this legacy REST handler: incoming requests arrive with a
+        # name string (legacy contract) but the internal chain is
+        # id-typed, and outgoing responses must render the name again.
+        self._runtime_variant_adapter = runtime_variant_adapter
         self._revision_adapter = RevisionAdapter()
+        self._policy_adapter = DeploymentPolicyAdapter()
+        self._deployment_adapter = DeploymentAdapter(
+            revision_adapter=self._revision_adapter,
+            policy_adapter=self._policy_adapter,
+        )
         self._route_adapter = RouteAdapter()
         self._create_deployment_adapter = CreateDeploymentAdapter()
-        self._policy_adapter = DeploymentPolicyAdapter()
         self._add_revision_adapter = AddRevisionAdapter()
+
+    async def _resolve_runtime_variant_name(self, name: str) -> RuntimeVariantID:
+        """Legacy-path name→id bridge for request ingress."""
+        return await self._runtime_variant_adapter.resolve_by_name(name)
+
+    async def _revision_dto(self, data: ModelRevisionData) -> RevisionDTO:
+        """Render a revision DTO for the legacy response surface,
+        resolving the runtime-variant id back to its name so the legacy
+        shape stays stable.
+        """
+        variant_name = await self._resolve_revision_variant_name(data)
+        return self._revision_adapter.convert_to_dto(data, variant_name)
+
+    async def _resolve_revision_variant_name(self, data: ModelRevisionData) -> RuntimeVariant:
+        """Resolve the runtime-variant name from a revision's variant id."""
+        variant_node = await self._runtime_variant_adapter.get(
+            data.model_runtime_config.runtime_variant_id
+        )
+        return RuntimeVariant(variant_node.name)
+
+    async def _deployment_dto(self, data: ModelDeploymentData) -> DeploymentDTO:
+        """Render a deployment DTO with runtime-variant name pre-resolved.
+
+        ``DeploymentAdapter.convert_to_dto`` expects the caller to provide
+        the runtime-variant name; when no current revision exists the
+        value is an empty ``RuntimeVariant`` sentinel since the adapter
+        drops ``current_revision`` anyway.
+        """
+        if data.revision is None:
+            variant_name = RuntimeVariant("")
+        else:
+            variant_name = await self._resolve_revision_variant_name(data.revision)
+        return self._deployment_adapter.convert_to_dto(data, variant_name)
 
     # Deployment Endpoints
 
@@ -125,10 +173,13 @@ class DeploymentAPIHandler:
         user_ctx: UserContext,
     ) -> APIResponse:
         """Create a new deployment."""
-        # Build creator from request using adapter
+        runtime_variant_id = await self._resolve_runtime_variant_name(
+            body.parsed.initial_revision.model_runtime_config.runtime_variant
+        )
         creator = self._create_deployment_adapter.build_creator(
             body.parsed,
             user_uuid=user_ctx.user_uuid,
+            runtime_variant_id=runtime_variant_id,
         )
 
         # Call service action
@@ -137,9 +188,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = CreateDeploymentResponse(
-            deployment=self._deployment_adapter.convert_to_dto(action_result.data)
-        )
+        resp = CreateDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_deployments(
@@ -156,10 +205,9 @@ class DeploymentAPIHandler:
         )
 
         # Build response
+        deployment_dtos = [await self._deployment_dto(dep) for dep in action_result.data]
         resp = ListDeploymentsResponse(
-            deployments=[
-                self._deployment_adapter.convert_to_dto(dep) for dep in action_result.data
-            ],
+            deployments=deployment_dtos,
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -179,9 +227,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = GetDeploymentResponse(
-            deployment=self._deployment_adapter.convert_to_dto(action_result.data)
-        )
+        resp = GetDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def update_deployment(
@@ -218,9 +264,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = UpdateDeploymentResponse(
-            deployment=self._deployment_adapter.convert_to_dto(action_result.data)
-        )
+        resp = UpdateDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def destroy_deployment(
@@ -230,7 +274,7 @@ class DeploymentAPIHandler:
         """Destroy a deployment."""
         # Call service action
         action_result = await self._deployment.destroy_deployment.wait_for_complete(
-            DestroyDeploymentAction(endpoint_id=path.parsed.deployment_id)
+            DestroyDeploymentAction(deployment_id=DeploymentID(path.parsed.deployment_id))
         )
 
         # Build response
@@ -245,8 +289,15 @@ class DeploymentAPIHandler:
         body: BodyParam[AddRevisionRequest],
     ) -> APIResponse:
         """Add a new revision to an existing deployment."""
-        # Build revision creator from request using adapter
-        revision_creator = self._add_revision_adapter.build_revision_creator(body.parsed.revision)
+        # Legacy-path name→id bridge: request carries a runtime-variant
+        # name string, but the internal revision creator and every layer
+        # below it consume a typed ``RuntimeVariantID``.
+        runtime_variant_id = await self._resolve_runtime_variant_name(
+            body.parsed.revision.model_runtime_config.runtime_variant
+        )
+        revision_creator = self._add_revision_adapter.build_revision_creator(
+            body.parsed.revision, runtime_variant_id
+        )
 
         # Call service action
         action_result = await self._deployment.add_model_revision.wait_for_complete(
@@ -265,9 +316,7 @@ class DeploymentAPIHandler:
             )
 
         # Build response
-        resp = AddRevisionResponse(
-            revision=self._revision_adapter.convert_to_dto(action_result.revision)
-        )
+        resp = AddRevisionResponse(revision=await self._revision_dto(action_result.revision))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_revisions(
@@ -291,7 +340,7 @@ class DeploymentAPIHandler:
 
         # Build response
         resp = ListRevisionsResponse(
-            revisions=[self._revision_adapter.convert_to_dto(rev) for rev in action_result.data],
+            revisions=[await self._revision_dto(rev) for rev in action_result.data],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -311,9 +360,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = GetRevisionResponse(
-            revision=self._revision_adapter.convert_to_dto(action_result.data)
-        )
+        resp = GetRevisionResponse(revision=await self._revision_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def activate_revision(
@@ -428,7 +475,7 @@ class DeploymentAPIHandler:
     ) -> APIResponse:
         """Get a deployment policy for a deployment."""
         action_result = await self._deployment.get_deployment_policy.wait_for_complete(
-            GetDeploymentPolicyAction(endpoint_id=path.parsed.deployment_id)
+            GetDeploymentPolicyAction(deployment_id=DeploymentID(path.parsed.deployment_id))
         )
 
         resp = GetDeploymentPolicyResponse(

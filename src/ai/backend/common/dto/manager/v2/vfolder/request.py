@@ -11,6 +11,7 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -363,7 +364,7 @@ class DeployVFolderInput(BaseRequestModel):
         description="Target project UUID where the deployment will be created. "
         "Must be a general project, not MODEL_STORE.",
     )
-    revision_preset_id: UUID = Field(
+    revision_preset_id: DeploymentPresetID = Field(
         description="Deployment revision preset UUID that provides image, "
         "runtime variant, resource slots, environ, and startup command.",
     )

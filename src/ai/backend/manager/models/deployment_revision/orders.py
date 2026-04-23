@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import cast
 
+import sqlalchemy as sa
+
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.repositories.base import QueryOrder
 
 
@@ -36,7 +39,16 @@ class RevisionOrders:
         return cast(QueryOrder, DeploymentRevisionRow.cluster_mode.desc())
 
     @staticmethod
-    def runtime_variant(ascending: bool = True) -> QueryOrder:
+    def runtime_variant_name(ascending: bool = True) -> QueryOrder:
+        # Sort by the human-readable variant name, resolved through a
+        # correlated subquery — the raw ``runtime_variant_id`` UUID has
+        # no meaningful ordering for API consumers.
+        subquery = (
+            sa.select(RuntimeVariantRow.name)
+            .where(RuntimeVariantRow.id == DeploymentRevisionRow.runtime_variant_id)
+            .correlate(DeploymentRevisionRow)
+            .scalar_subquery()
+        )
         if ascending:
-            return cast(QueryOrder, DeploymentRevisionRow.runtime_variant.asc())
-        return cast(QueryOrder, DeploymentRevisionRow.runtime_variant.desc())
+            return cast(QueryOrder, subquery.asc())
+        return cast(QueryOrder, subquery.desc())

@@ -71,9 +71,6 @@ from ai.backend.manager.services.deployment.actions.sync_replicas import (
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 
@@ -89,21 +86,14 @@ class DeploymentCRUDBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        return MagicMock(spec=RevisionGeneratorRegistry)
-
-    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
     ) -> DeploymentService:
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
-            revision_generator_registry=mock_revision_generator_registry,
-            model_definition_generator_registry=MagicMock(),
         )
 
     @pytest.fixture

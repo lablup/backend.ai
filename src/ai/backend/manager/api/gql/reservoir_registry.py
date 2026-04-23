@@ -211,7 +211,7 @@ class DeleteReservoirRegistryPayload(PydanticOutputMixin[DeleteReservoirRegistry
     id: UUID = gql_field(description="ID of the deleted Reservoir registry")
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create reservoir registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create reservoir registry."))
 async def create_reservoir_registry(
     input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateReservoirRegistryPayload:
@@ -221,7 +221,7 @@ async def create_reservoir_registry(
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update reservoir registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update reservoir registry."))
 async def update_reservoir_registry(
     input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateReservoirRegistryPayload:
@@ -231,7 +231,7 @@ async def update_reservoir_registry(
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete reservoir registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete reservoir registry."))
 async def delete_reservoir_registry(
     input: DeleteReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteReservoirRegistryPayload:

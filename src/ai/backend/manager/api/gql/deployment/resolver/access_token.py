@@ -20,7 +20,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 # Mutation resolvers
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create access token."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create access token."))
 async def create_access_token(
     input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
 ) -> CreateAccessTokenPayload:
@@ -29,7 +29,7 @@ async def create_access_token(
     return CreateAccessTokenPayload(access_token=AccessToken.from_pydantic(payload.access_token))
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Delete access token."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Delete access token."))
 async def delete_access_token(
     input: DeleteAccessTokenInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAccessTokenPayload:

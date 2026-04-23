@@ -1,11 +1,125 @@
 {
   "runtime_variants": [
-    {"name": "vllm", "description": "vLLM"},
-    {"name": "nim", "description": "NVIDIA NIM"},
-    {"name": "cmd", "description": "Predefined Image Command"},
-    {"name": "huggingface-tgi", "description": "Huggingface TGI"},
-    {"name": "sglang", "description": "SGLang"},
-    {"name": "modular-max", "description": "Modular MAX"},
-    {"name": "custom", "description": "Custom (Default)"}
+    {
+      "name": "vllm",
+      "description": "vLLM",
+      "default_model_definition": {
+        "models": [
+          {
+            "name": "vllm-model",
+            "service": {
+              "port": 8000,
+              "health_check": {
+                "path": "/health",
+                "interval": 10.0,
+                "max_retries": 10,
+                "initial_delay": 1800.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "nim",
+      "description": "NVIDIA NIM",
+      "default_model_definition": {
+        "models": [
+          {
+            "name": "nim-model",
+            "service": {
+              "port": 8000,
+              "health_check": {
+                "path": "/v1/health/ready",
+                "interval": 10.0,
+                "max_retries": 10,
+                "initial_delay": 1800.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "cmd",
+      "description": "Predefined Image Command",
+      "default_model_definition": {
+        "models": [
+          {
+            "name": "image-model",
+            "service": {
+              "port": 8000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "huggingface-tgi",
+      "description": "Huggingface TGI",
+      "default_model_definition": {
+        "models": [
+          {
+            "name": "tgi-model",
+            "service": {
+              "port": 3000,
+              "health_check": {
+                "path": "/info",
+                "interval": 10.0,
+                "max_retries": 10,
+                "initial_delay": 1800.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "sglang",
+      "description": "SGLang",
+      "default_model_definition": {
+        "models": [
+          {
+            "name": "sglang-model",
+            "service": {
+              "port": 9001,
+              "health_check": {
+                "path": "/health",
+                "interval": 10.0,
+                "max_retries": 10,
+                "initial_delay": 1800.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "modular-max",
+      "description": "Modular MAX",
+      "default_model_definition": {
+        "models": [
+          {
+            "name": "max-model",
+            "service": {
+              "port": 8000,
+              "health_check": {
+                "path": "/health",
+                "interval": 10.0,
+                "max_retries": 10,
+                "initial_delay": 1800.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "custom",
+      "description": "Custom (Default)",
+      "default_model_definition": {
+        "models": null
+      }
+    }
   ]
 }

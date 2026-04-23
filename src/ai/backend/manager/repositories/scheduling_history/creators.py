@@ -7,8 +7,10 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
@@ -95,10 +97,11 @@ class KernelSchedulingHistoryCreatorSpec(CreatorSpec[KernelSchedulingHistoryRow]
 class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
     """CreatorSpec for deployment history."""
 
-    deployment_id: UUID
+    deployment_id: DeploymentID
     phase: str  # DeploymentLifecycleType value
     result: SchedulingResult
     message: str
+    handler_category: DeploymentHandlerCategory = DeploymentHandlerCategory.LIFECYCLE
     from_status: EndpointLifecycle | None = None
     to_status: EndpointLifecycle | None = None
     error_code: str | None = None
@@ -108,6 +111,7 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
     def build_row(self) -> DeploymentHistoryRow:
         return DeploymentHistoryRow(
             deployment_id=self.deployment_id,
+            handler_category=self.handler_category,
             phase=self.phase,
             from_status=str(self.from_status.value) if self.from_status else None,
             to_status=str(self.to_status.value) if self.to_status else None,
@@ -124,7 +128,7 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
     """CreatorSpec for route history."""
 
     route_id: UUID
-    deployment_id: UUID
+    deployment_id: DeploymentID
     category: RouteHandlerCategory
     phase: str  # RouteLifecycleType value
     result: SchedulingResult

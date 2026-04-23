@@ -14,7 +14,7 @@ from uuid import UUID
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import AliasChoices, AnyUrl, BaseModel, Field
+from pydantic import AliasChoices, AnyUrl, BaseModel, ConfigDict, Field
 
 from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
 
@@ -85,18 +85,19 @@ type AppCreator = Callable[
 
 
 class RouteInfo(BaseModel):
-    """
-    Information about a route within a circuit.
+    """Information about a route within a circuit.
 
-    Health Status Evaluation:
-    Individual route health status is only evaluated and updated when the circuit
-    is in INFERENCE mode. For circuits in other modes (e.g., DEVELOPMENT, BATCH),
-    health checking is disabled and routes are assumed to be healthy.
-
-    Health status fields (health_status, last_health_check, consecutive_failures)
-    are managed by the HealthCheckEngine and stored directly in the circuit's
-    route_info JSON column for efficient filtering and atomic updates.
+    Routes describe a kernel endpoint (``kernel_host`` + ``kernel_port``)
+    that the proxy fans traffic to for a given session. Coordinator no
+    longer tracks per-route health state: HTTP traffic relies on
+    Traefik's loadBalancer.healthCheck; TCP traffic is filtered by the
+    worker-side ``RoutePool``. Legacy rows may still carry
+    ``health_status`` / ``last_health_check`` / ``consecutive_failures``
+    in their stored JSONB — ``extra="ignore"`` drops those on read so no
+    database migration is needed.
     """
+
+    model_config = ConfigDict(extra="ignore")
 
     route_id: Annotated[
         UUID | None,
@@ -147,27 +148,6 @@ class RouteInfo(BaseModel):
     ]
     protocol: ProxyProtocol
     traffic_ratio: Annotated[float, Field(default=1.0)]
-    health_status: Annotated[
-        ModelServiceStatus | None,
-        Field(
-            default=None,
-            description="Health status of this route - only evaluated in INFERENCE mode",
-        ),
-    ]
-    last_health_check: Annotated[
-        float | None,
-        Field(
-            default=None,
-            description="Timestamp of last health check - only updated in INFERENCE mode",
-        ),
-    ]
-    consecutive_failures: Annotated[
-        int,
-        Field(
-            default=0,
-            description="Number of consecutive health check failures - only tracked in INFERENCE mode",
-        ),
-    ]
 
     def __hash__(self) -> int:
         return hash(json.dumps(self.model_dump(mode="json")))

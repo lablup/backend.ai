@@ -270,7 +270,7 @@ class RouteCoordinator:
             success_history_specs = [
                 RouteHistoryCreatorSpec(
                     route_id=r.route_id,
-                    deployment_id=r.endpoint_id,
+                    deployment_id=r.deployment_id,
                     category=handler_category,
                     phase=handler_name,
                     result=SchedulingResult.SUCCESS,
@@ -304,7 +304,7 @@ class RouteCoordinator:
             failure_history_specs = [
                 RouteHistoryCreatorSpec(
                     route_id=e.route_info.route_id,
-                    deployment_id=e.route_info.endpoint_id,
+                    deployment_id=e.route_info.deployment_id,
                     category=handler_category,
                     phase=handler_name,
                     result=SchedulingResult.FAILURE,
@@ -338,7 +338,7 @@ class RouteCoordinator:
             stale_history_specs = [
                 RouteHistoryCreatorSpec(
                     route_id=r.route_id,
-                    deployment_id=r.endpoint_id,
+                    deployment_id=r.deployment_id,
                     category=handler_category,
                     phase=handler_name,
                     result=SchedulingResult.SUCCESS,

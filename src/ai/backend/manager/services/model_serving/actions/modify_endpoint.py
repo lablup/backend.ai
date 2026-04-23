@@ -1,8 +1,8 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -16,7 +16,7 @@ from ai.backend.manager.services.model_serving.actions.base import (
 
 @dataclass
 class ModifyEndpointAction(ModelServiceSingleEntityAction):
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     updater: Updater[EndpointRow]
 
     @override
@@ -26,19 +26,19 @@ class ModifyEndpointAction(ModelServiceSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.endpoint_id)
+        return str(self.deployment_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.MODEL_DEPLOYMENT, str(self.endpoint_id))
+        return RBACElementRef(RBACElementType.MODEL_DEPLOYMENT, str(self.deployment_id))
 
 
 @dataclass
 class ModifyEndpointActionResult(ModelServiceSingleEntityActionResult):
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     success: bool
     data: EndpointData | None
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.endpoint_id)
+        return str(self.deployment_id)

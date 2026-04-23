@@ -28,6 +28,9 @@ class RuntimeVariantRepository:
     async def get_by_id(self, variant_id: UUID) -> RuntimeVariantData:
         return await self._db_source.get_by_id(variant_id)
 
+    async def get_by_name(self, name: str) -> RuntimeVariantData:
+        return await self._db_source.get_by_name(name)
+
     async def update(self, updater: Updater[RuntimeVariantRow]) -> RuntimeVariantData:
         return await self._db_source.update(updater)
 

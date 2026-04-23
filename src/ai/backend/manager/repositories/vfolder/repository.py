@@ -12,6 +12,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -218,7 +219,7 @@ class VfolderRepository:
             query = sa.select(VFolderRow).where(VFolderConditions.by_ids(ids)())
             result = await session.execute(query)
             rows_by_id = {row.id: self._vfolder_row_to_data(row) for row in result.scalars().all()}
-            return [rows_by_id.get(vfolder_id) for vfolder_id in ids]
+            return [rows_by_id.get(VFolderUUID(vfolder_id)) for vfolder_id in ids]
 
     @vfolder_repository_resilience.apply()
     async def get_allowed_vfolder_hosts(
@@ -1342,7 +1343,7 @@ class VfolderRepository:
         Convert vfolder dictionary from query_accessible_vfolders to VFolderData.
         """
         return VFolderData(
-            id=vfolder_dict["id"],
+            id=VFolderUUID(vfolder_dict["id"]),
             name=vfolder_dict["name"],
             host=vfolder_dict["host"],
             domain_name=vfolder_dict["domain_name"],

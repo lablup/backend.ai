@@ -63,6 +63,7 @@ class TestUserServiceCompatibility:
             valkey_stat_client=mock_dependencies["valkey_client"],
             agent_registry=mock_dependencies["agent_registry"],
             user_repository=mock_dependencies["user_repository"],
+            scheduling_controller=MagicMock(),
         )
 
     @pytest.fixture

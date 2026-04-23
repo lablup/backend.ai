@@ -4,13 +4,12 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -46,6 +45,7 @@ from ai.backend.manager.repositories.deployment.repository import DeploymentRepo
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -53,10 +53,7 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-    RevisionGeneratorRegistryArgs,
-)
+from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
@@ -114,31 +111,24 @@ def deployment_processors(
             hook_plugin_ctx=hook_plugin_ctx,
         )
     )
-    revision_generator_registry = RevisionGeneratorRegistry(
-        RevisionGeneratorRegistryArgs(deployment_repository=repo)
-    )
-    model_definition_generator_registry = AsyncMock()
-    model_definition_generator_registry.generate_model_definition.return_value = (
-        ModelDefinitionDraft()
-    )
+    runtime_variant_repository = RuntimeVariantRepository(database_engine)
+    revision_draft_reader = RevisionDraftReader(deployment_repository=repo)
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(
             scheduling_controller=scheduling_controller,
             deployment_repository=repo,
+            runtime_variant_repository=runtime_variant_repository,
             config_provider=config_provider,
             storage_manager=storage_manager,
             event_producer=event_producer,
             valkey_schedule=valkey_clients.schedule,
-            revision_generator_registry=revision_generator_registry,
-            model_definition_generator_registry=model_definition_generator_registry,
+            revision_draft_reader=revision_draft_reader,
             deployment_revision_preset_repository=None,
         )
     )
     service = DeploymentService(
         deployment_controller,
         repo,
-        revision_generator_registry,
-        model_definition_generator_registry,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(

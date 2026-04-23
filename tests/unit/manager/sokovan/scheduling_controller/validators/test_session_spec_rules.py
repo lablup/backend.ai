@@ -1,0 +1,367 @@
+"""Tests for ``SessionSpec``-based validator rules."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import PurePosixPath
+from typing import Any
+
+import pytest
+
+from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.types import (
+    AccessKey,
+    BinarySize,
+    ClusterMode,
+    DefaultForUnspecified,
+    MountPermission,
+    ResourceSlot,
+    SessionTypes,
+    SlotName,
+    SlotTypes,
+    VFolderID,
+    VFolderMount,
+    VFolderUsageMode,
+)
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.data.session.options import (
+    KernelExecutionSpec,
+    ResourceOpts,
+    SchedulingTarget,
+    SessionOptions,
+    SessionTimeouts,
+)
+from ai.backend.manager.data.session.spec import (
+    KernelSpec,
+    SessionClassification,
+    SessionIdentity,
+    SessionNetwork,
+    SessionScope,
+    SessionSpec,
+)
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.kernel import QuotaExceeded
+from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
+from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
+from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
+    SessionSpecValidationContext,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_rules import (
+    ContainerLimitRule,
+    DotfileVFolderConflictRule,
+    InferenceModelFolderRule,
+    MountNameValidationRule,
+    ResourceLimitRule,
+    ServicePortRule,
+)
+
+
+def _vfolder_mount(
+    name: str = "data",
+    *,
+    kernel_path: str | None = None,
+    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL,
+) -> VFolderMount:
+    return VFolderMount(
+        name=name,
+        vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
+        vfsubpath=PurePosixPath("."),
+        host_path=PurePosixPath(f"/mnt/host/{name}"),
+        kernel_path=PurePosixPath(kernel_path or f"/home/work/{name}"),
+        mount_perm=MountPermission.READ_WRITE,
+        usage_mode=usage_mode,
+    )
+
+
+def _kernel(
+    image_id: ImageID,
+    *,
+    cpu: str = "1",
+    preopen_ports: tuple[int, ...] = (),
+    shmem: BinarySize | None = None,
+) -> KernelSpec:
+    return KernelSpec(
+        cluster_role="main",
+        cluster_idx=1,
+        cluster_hostname="main1",
+        local_rank=0,
+        preopen_ports=preopen_ports,
+        execution_spec=KernelExecutionSpec(
+            image_id=image_id,
+            resources=ResourceSlot({"cpu": Decimal(cpu), "mem": Decimal(1024 * 1024 * 1024)}),
+            resource_opts=ResourceOpts(shmem=shmem),
+        ),
+    )
+
+
+def _spec(
+    kernel_specs: tuple[KernelSpec, ...],
+    *,
+    session_type: SessionTypes = SessionTypes.INTERACTIVE,
+    vfolder_mounts: tuple[VFolderMount, ...] = (),
+) -> SessionSpec:
+    return SessionSpec(
+        identity=SessionIdentity(
+            session_id=SessionID(uuid.uuid4()),
+            creation_id="c-1",
+            session_name="s",
+            access_key=AccessKey("AK"),
+            user_uuid=uuid.uuid4(),
+        ),
+        scope=SessionScope(
+            domain_name=DomainName("default"),
+            project_id=ProjectID(uuid.uuid4()),
+            resource_group_name=ResourceGroupName("default"),
+        ),
+        classification=SessionClassification(session_type=session_type),
+        network=SessionNetwork(network_type=NetworkType.VOLATILE),
+        options=SessionOptions(
+            priority=10,
+            is_preemptible=True,
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=len(kernel_specs),
+            scheduling_target=SchedulingTarget(),
+            kernel_groups=[],
+            timeouts=SessionTimeouts(),
+        ),
+        kernel_specs=kernel_specs,
+        vfolder_mounts=vfolder_mounts,
+    )
+
+
+def _ctx(
+    *,
+    keypair_policy: KeyPairResourcePolicyData | None = None,
+    image_infos: dict[ImageID, ImageInfo] | None = None,
+    known_slot_types: dict[SlotName, SlotTypes] | None = None,
+    dotfile_data: dict[str, Any] | None = None,
+) -> SessionSpecValidationContext:
+    return SessionSpecValidationContext(
+        keypair_resource_policy=keypair_policy,
+        image_infos=image_infos or {},
+        known_slot_types=known_slot_types or {},
+        dotfile_data=dotfile_data or {},
+    )
+
+
+def _image_info(
+    image_id: ImageID,
+    *,
+    cpu_min: Any = "1",
+    mem_min: Any = "256m",
+    labels: dict[str, Any] | None = None,
+) -> ImageInfo:
+    return ImageInfo(
+        id=uuid.UUID(str(image_id)),
+        canonical="repo/img:tag",
+        architecture="x86_64",
+        registry="repo",
+        labels=labels or {},
+        resource_spec={
+            "cpu": {"min": cpu_min, "max": None},
+            "mem": {"min": mem_min, "max": None},
+        },
+    )
+
+
+def _keypair_policy(
+    *,
+    max_containers: int = 4,
+) -> KeyPairResourcePolicyData:
+    return KeyPairResourcePolicyData(
+        name="test",
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        default_for_unspecified=DefaultForUnspecified.LIMITED,
+        total_resource_slots=ResourceSlot(),
+        max_session_lifetime=0,
+        max_concurrent_sessions=10,
+        max_pending_session_count=None,
+        max_pending_session_resource_slots=None,
+        max_concurrent_sftp_sessions=0,
+        max_containers_per_session=max_containers,
+        idle_timeout=0,
+        allowed_vfolder_hosts={},
+    )
+
+
+class TestContainerLimitRule:
+    def test_within_limit(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img), _kernel(img)))
+        ContainerLimitRule().validate(spec, _ctx(keypair_policy=_keypair_policy(max_containers=4)))
+
+    def test_exceeds_limit(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img), _kernel(img), _kernel(img)))
+        with pytest.raises(QuotaExceeded):
+            ContainerLimitRule().validate(
+                spec, _ctx(keypair_policy=_keypair_policy(max_containers=2))
+            )
+
+    def test_noop_without_policy(self) -> None:
+        img = ImageID(uuid.uuid4())
+        ContainerLimitRule().validate(_spec((_kernel(img),)), _ctx())
+
+
+class TestResourceLimitRule:
+    def test_requested_meets_image_min(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, cpu="4"),))
+        ctx = _ctx(image_infos={img: _image_info(img, cpu_min="2")})
+        ResourceLimitRule().validate(spec, ctx)
+
+    def test_requested_below_image_min(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, cpu="1"),))
+        ctx = _ctx(image_infos={img: _image_info(img, cpu_min="8")})
+        with pytest.raises(InvalidAPIParameters):
+            ResourceLimitRule().validate(spec, ctx)
+
+    def test_shmem_below_memory(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, shmem=BinarySize.from_str("64m")),))
+        ctx = _ctx(image_infos={img: _image_info(img)})
+        ResourceLimitRule().validate(spec, ctx)
+
+    def test_shmem_exceeds_memory(self) -> None:
+        img = ImageID(uuid.uuid4())
+        # requested memory is 1GiB (see _kernel fixture).
+        spec = _spec((_kernel(img, shmem=BinarySize.from_str("2g")),))
+        ctx = _ctx(image_infos={img: _image_info(img)})
+        with pytest.raises(InvalidAPIParameters):
+            ResourceLimitRule().validate(spec, ctx)
+
+
+class TestServicePortRule:
+    def test_ok_when_no_preopen(self) -> None:
+        img = ImageID(uuid.uuid4())
+        ServicePortRule().validate(_spec((_kernel(img),)), _ctx())
+
+    def test_rejects_reserved_port(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, preopen_ports=(2200,)),))
+        with pytest.raises(InvalidAPIParameters):
+            ServicePortRule().validate(spec, _ctx())
+
+    def test_rejects_image_service_port(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, preopen_ports=(8080,)),))
+        ctx = _ctx(
+            image_infos={
+                img: _image_info(img, labels={"ai.backend.service-ports": "jupyter:http:8080"})
+            }
+        )
+        with pytest.raises(InvalidAPIParameters):
+            ServicePortRule().validate(spec, ctx)
+
+    def test_accepts_safe_preopen(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, preopen_ports=(9000, 9001)),))
+        ctx = _ctx(
+            image_infos={
+                img: _image_info(img, labels={"ai.backend.service-ports": "jupyter:http:8080"})
+            }
+        )
+        ServicePortRule().validate(spec, ctx)
+
+
+class TestMountNameValidationRule:
+    def test_unique_paths_pass(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec(
+            (_kernel(img),),
+            vfolder_mounts=(_vfolder_mount("a"), _vfolder_mount("b")),
+        )
+        MountNameValidationRule().validate(spec, _ctx())
+
+    def test_rejects_duplicate_mount_paths(self) -> None:
+        img = ImageID(uuid.uuid4())
+        first = _vfolder_mount("data")
+        dup = VFolderMount(
+            name="data-alt",
+            vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
+            vfsubpath=PurePosixPath("."),
+            host_path=PurePosixPath("/mnt/host/data-alt"),
+            kernel_path=PurePosixPath("/home/work/data"),
+            mount_perm=MountPermission.READ_WRITE,
+            usage_mode=VFolderUsageMode.GENERAL,
+        )
+        spec = _spec((_kernel(img),), vfolder_mounts=(first, dup))
+        with pytest.raises(InvalidAPIParameters):
+            MountNameValidationRule().validate(spec, _ctx())
+
+    def test_rejects_reserved_alias(self) -> None:
+        img = ImageID(uuid.uuid4())
+        reserved = VFolderMount(
+            name=".ssh",
+            vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
+            vfsubpath=PurePosixPath("."),
+            host_path=PurePosixPath("/mnt/host/ssh"),
+            kernel_path=PurePosixPath("/home/work/.ssh"),
+            mount_perm=MountPermission.READ_WRITE,
+            usage_mode=VFolderUsageMode.GENERAL,
+        )
+        spec = _spec((_kernel(img),), vfolder_mounts=(reserved,))
+        with pytest.raises(InvalidAPIParameters):
+            MountNameValidationRule().validate(spec, _ctx())
+
+
+class TestInferenceModelFolderRule:
+    def test_noop_for_non_inference(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),), session_type=SessionTypes.INTERACTIVE)
+        InferenceModelFolderRule().validate(spec, _ctx())
+
+    def test_rejects_inference_without_model_folder(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),), session_type=SessionTypes.INFERENCE)
+        with pytest.raises(InvalidAPIParameters):
+            InferenceModelFolderRule().validate(spec, _ctx())
+
+    def test_accepts_inference_with_model_folder(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec(
+            (_kernel(img),),
+            session_type=SessionTypes.INFERENCE,
+            vfolder_mounts=(_vfolder_mount("m", usage_mode=VFolderUsageMode.MODEL),),
+        )
+        InferenceModelFolderRule().validate(spec, _ctx())
+
+
+class TestDotfileVFolderConflictRule:
+    def test_noop_without_dotfiles(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),), vfolder_mounts=(_vfolder_mount("data"),))
+        DotfileVFolderConflictRule().validate(spec, _ctx())
+
+    def test_noop_without_mounts(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(dotfile_data={"dotfiles": [{"path": "/home/work/.bashrc"}]})
+        DotfileVFolderConflictRule().validate(spec, ctx)
+
+    def test_detects_conflict(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec(
+            (_kernel(img),),
+            vfolder_mounts=(_vfolder_mount("data", kernel_path="/home/work/.bashrc"),),
+        )
+        ctx = _ctx(dotfile_data={"dotfiles": [{"path": ".bashrc"}]})
+        with pytest.raises(DotfileVFolderPathConflict):
+            DotfileVFolderConflictRule().validate(spec, ctx)
+
+    def test_passes_when_no_overlap(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec(
+            (_kernel(img),),
+            vfolder_mounts=(_vfolder_mount("data", kernel_path="/home/work/data"),),
+        )
+        ctx = _ctx(dotfile_data={"dotfiles": [{"path": "/etc/profile"}]})
+        DotfileVFolderConflictRule().validate(spec, ctx)

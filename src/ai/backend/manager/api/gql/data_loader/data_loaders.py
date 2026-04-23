@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -359,7 +360,7 @@ class DataLoaders:
                 ModelDeployment as MD,
             )
 
-            dtos = await adapter.batch_load_by_ids(ids)
+            dtos = await adapter.batch_load_by_ids([DeploymentID(i) for i in ids])
             return [MD.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)

@@ -9,7 +9,7 @@ from uuid import uuid4
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
-from ai.backend.manager.api.adapters.deployment import (
+from ai.backend.manager.api.adapters.deployment.adapter import (
     DeploymentAdapter,
     _tristate_from_input,
 )

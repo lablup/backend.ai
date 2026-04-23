@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
     from tests.component.vfolder.conftest import VFolderFactory
 
-from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler

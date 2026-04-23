@@ -310,6 +310,8 @@ from .resource_group import (
     admin_update_allowed_resource_groups_for_project_v2,
     admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
+    replace_resource_group_default_deployment_options,
+    replace_resource_group_default_session_options,
     resource_groups,
     update_resource_group_fair_share_spec,
 )
@@ -366,6 +368,7 @@ from .runtime_variant_preset import (
 from .scheduler import (
     scheduling_events_by_session,
 )
+from .scheduling_handler import scheduling_handlers
 from .scheduling_history import (
     admin_deployment_histories,
     admin_route_histories,
@@ -471,6 +474,7 @@ class Query:
     # Admin APIs
     admin_resource_groups = admin_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
+    scheduling_handlers = scheduling_handlers
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
     admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
@@ -743,6 +747,10 @@ class Mutation:
     admin_update_allowed_projects_for_resource_group_v2 = (
         admin_update_allowed_projects_for_resource_group_v2
     )
+    replace_resource_group_default_deployment_options = (
+        replace_resource_group_default_deployment_options
+    )
+    replace_resource_group_default_session_options = replace_resource_group_default_session_options
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # Domain V2 APIs

@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    ReplaceDeploymentOptionsInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -39,6 +40,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     SearchAllocatedResourceSlotsInput,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import (
     DeploymentIdPathParam,
@@ -58,7 +60,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
+    from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -144,6 +146,23 @@ class V2DeploymentHandler:
     ) -> APIResponse:
         """Delete a deployment."""
         result = await self._adapter.delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def replace_options(
+        self,
+        path: PathParam[DeploymentIdPathParam],
+        body: BodyParam[ReplaceDeploymentOptionsInput],
+    ) -> APIResponse:
+        """Fully replace a deployment's ``options`` surface.
+
+        User-accessible — a regular user may replace options on their own
+        deployment. Permission enforcement happens through the usual RBAC
+        single-entity validator wrapped around the service action.
+        """
+        result = await self._adapter.replace_options(
+            deployment_id=DeploymentID(path.parsed.deployment_id),
+            input=body.parsed,
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # ------------------------------------------------------------------

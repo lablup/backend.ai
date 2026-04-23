@@ -33,6 +33,8 @@ def setup_api(
     adapters = Adapters.create(
         r.processing.processors,
         r.bootstrap.config_provider.config.auth,
+        deployment_coordinator=r.orchestration.sokovan_orchestrator.deployment_coordinator,
+        schedule_coordinator=r.orchestration.sokovan_orchestrator.coordinator,
         config_provider=r.bootstrap.config_provider,
     )
     gql_context_deps = GQLContextDeps(

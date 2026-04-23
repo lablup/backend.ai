@@ -132,6 +132,7 @@ class TestDeployingProvisioningHandler:
                 deploying_revision_id=deploying_rev_id,
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
             ),
+            last_history=None,
         )
 
     async def test_registers_endpoint_for_deployment_created_without_revision(
@@ -164,7 +165,7 @@ class TestDeployingProvisioningHandler:
             info,
             network=dataclasses.replace(info.network, url="http://already-registered/v1"),
         )
-        deployment = DeploymentWithHistory(deployment_info=info_with_url)
+        deployment = DeploymentWithHistory(deployment_info=info_with_url, last_history=None)
 
         await handler.execute([deployment])
 
@@ -179,7 +180,7 @@ class TestDeployingProvisioningHandler:
         """Deployments with no deploying_revision_id must be filtered out."""
         info = deployment_created_without_revision.deployment_info
         info_no_rev = dataclasses.replace(info, deploying_revision_id=None)
-        deployment = DeploymentWithHistory(deployment_info=info_no_rev)
+        deployment = DeploymentWithHistory(deployment_info=info_no_rev, last_history=None)
 
         await handler.execute([deployment])
 

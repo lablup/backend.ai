@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     DeploymentHistoryData,
     RouteHistoryData,
 )
@@ -22,7 +23,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SubStepResult,
 )
-from ai.backend.manager.models.base import GUID, Base, PydanticListColumn
+from ai.backend.manager.models.base import GUID, Base, PydanticListColumn, StrEnumType
 
 __all__ = (
     "DeploymentHistoryRow",
@@ -180,6 +181,14 @@ class DeploymentHistoryRow(Base):  # type: ignore[misc]
         "deployment_id", GUID, nullable=False, index=True
     )
 
+    handler_category: Mapped[DeploymentHandlerCategory] = mapped_column(
+        "handler_category",
+        StrEnumType(DeploymentHandlerCategory),
+        nullable=False,
+        default=DeploymentHandlerCategory.LIFECYCLE,
+        server_default=DeploymentHandlerCategory.LIFECYCLE.value,
+    )
+
     phase: Mapped[str] = mapped_column("phase", sa.String(length=64), nullable=False)
     from_status: Mapped[str | None] = mapped_column(
         "from_status", sa.String(length=64), nullable=True
@@ -214,23 +223,11 @@ class DeploymentHistoryRow(Base):  # type: ignore[misc]
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(self, new_row: DeploymentHistoryRow) -> bool:
-        """Check if a new entry should be merged with this one.
-
-        Merge conditions:
-        - Same phase, error_code, and to_status -> merge (increment attempts)
-        - from_status and result (success/failure) do not affect merge decision
-        """
-        return (
-            self.phase == new_row.phase
-            and self.error_code == new_row.error_code
-            and self.to_status == new_row.to_status
-        )
-
     def to_data(self) -> DeploymentHistoryData:
         return DeploymentHistoryData(
             id=self.id,
             deployment_id=self.deployment_id,
+            handler_category=self.handler_category,
             phase=self.phase,
             from_status=ModelDeploymentStatus(self.from_status) if self.from_status else None,
             to_status=ModelDeploymentStatus(self.to_status) if self.to_status else None,

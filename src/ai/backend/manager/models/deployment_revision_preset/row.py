@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -10,6 +9,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
     EnvironEntryData,
@@ -42,15 +44,20 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         sa.Index("ix_deployment_revision_presets_variant_rank", "runtime_variant", "rank"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[DeploymentPresetID] = mapped_column(
+        "id",
+        GUID(DeploymentPresetID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
-    runtime_variant: Mapped[uuid.UUID] = mapped_column("runtime_variant", GUID, nullable=False)
+    runtime_variant: Mapped[RuntimeVariantID] = mapped_column(
+        "runtime_variant", GUID(RuntimeVariantID), nullable=False
+    )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     rank: Mapped[int] = mapped_column("rank", sa.Integer, nullable=False)
 
-    image_id: Mapped[uuid.UUID] = mapped_column("image_id", GUID, nullable=False)
+    image_id: Mapped[ImageID] = mapped_column("image_id", GUID(ImageID), nullable=False)
     model_definition: Mapped[ModelDefinition | None] = mapped_column(
         "model_definition", PydanticColumn(ModelDefinition), nullable=True
     )

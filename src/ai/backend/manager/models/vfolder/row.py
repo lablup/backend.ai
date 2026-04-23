@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -289,8 +290,11 @@ class VFolderCloneInfo(NamedTuple):
 class VFolderRow(Base):  # type: ignore[misc]
     __tablename__ = "vfolders"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[VFolderUUID] = mapped_column(
+        "id",
+        GUID(VFolderUUID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     # host will be '' if vFolder is unmanaged
     host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
@@ -491,9 +495,9 @@ class VFolderInvitationRow(Base):  # type: ignore[misc]
         nullable=True,
         onupdate=sa.func.current_timestamp(),
     )
-    vfolder: Mapped[uuid.UUID] = mapped_column(
+    vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",
-        GUID,
+        GUID(VFolderUUID),
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -516,9 +520,9 @@ class VFolderPermissionRow(Base):  # type: ignore[misc]
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
     )
-    vfolder: Mapped[uuid.UUID] = mapped_column(
+    vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",
-        GUID,
+        GUID(VFolderUUID),
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -1545,7 +1549,7 @@ _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
 # RBAC
 @dataclass
 class VFolderPermissionContext(
-    AbstractPermissionContext[VFolderRBACPermission, VFolderRow, uuid.UUID]
+    AbstractPermissionContext[VFolderRBACPermission, VFolderRow, VFolderUUID]
 ):
     host_permission_ctx: StorageHostPermissionContext | None = None
 

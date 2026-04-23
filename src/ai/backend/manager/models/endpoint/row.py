@@ -35,14 +35,15 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
-    EndpointId,
     ResourceSlot,
-    RuntimeVariant,
     SessionTypes,
     VFolderID,
     VFolderMount,
@@ -67,6 +68,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentState,
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
@@ -79,6 +81,7 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointData,
     EndpointLifecycle,
     EndpointTokenData,
+    ScalingState,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -88,8 +91,7 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     DecimalType,
-    EndpointIDColumnType,
-    EnumValueType,
+    PydanticColumn,
     StrEnumType,
 )
 from ai.backend.manager.models.routing import RouteStatus
@@ -186,8 +188,8 @@ class EndpointRow(Base):  # type: ignore[misc]
         ),
     )
 
-    id: Mapped[EndpointId] = mapped_column(
-        "id", EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[DeploymentID] = mapped_column(
+        "id", GUID(DeploymentID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
     created_user: Mapped[UUID] = mapped_column("created_user", GUID, nullable=False)
@@ -220,9 +222,16 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
     lifecycle_stage: Mapped[EndpointLifecycle] = mapped_column(
         "lifecycle_stage",
-        EnumValueType(EndpointLifecycle),
+        StrEnumType(EndpointLifecycle),
         nullable=False,
         default=EndpointLifecycle.PENDING,
+    )
+    scaling_state: Mapped[ScalingState] = mapped_column(
+        "scaling_state",
+        StrEnumType(ScalingState),
+        nullable=False,
+        default=ScalingState.STABLE,
+        server_default=ScalingState.STABLE.value,
     )
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
     open_to_public: Mapped[bool | None] = mapped_column("open_to_public", sa.Boolean, default=False)
@@ -244,9 +253,11 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
 
     # Revision management columns
-    current_revision: Mapped[UUID | None] = mapped_column("current_revision", GUID, nullable=True)
-    deploying_revision: Mapped[UUID | None] = mapped_column(
-        "deploying_revision", GUID, nullable=True
+    current_revision: Mapped[DeploymentRevisionID | None] = mapped_column(
+        "current_revision", GUID(DeploymentRevisionID), nullable=True
+    )
+    deploying_revision: Mapped[DeploymentRevisionID | None] = mapped_column(
+        "deploying_revision", GUID(DeploymentRevisionID), nullable=True
     )
     sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
         "sub_step",
@@ -259,6 +270,14 @@ class EndpointRow(Base):  # type: ignore[misc]
         sa.Integer,
         nullable=False,
         server_default=sa.text("10"),
+    )
+    # Per-deployment operational options (snapshot from the scaling
+    # group's ``default_deployment_options`` at create time).
+    options: Mapped[DeploymentOptions] = mapped_column(
+        "options",
+        PydanticColumn(DeploymentOptions),
+        nullable=False,
+        default=DeploymentOptions,
     )
 
     routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
@@ -393,7 +412,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     async def batch_load(
         cls,
         session: AsyncSession,
-        endpoint_ids: Sequence[EndpointId],
+        endpoint_ids: Sequence[DeploymentID],
         domain: str | None = None,
         project: UUID | None = None,
         user_uuid: UUID | None = None,
@@ -675,10 +694,15 @@ class EndpointRow(Base):  # type: ignore[misc]
         """Convert to EndpointData.
 
         Requires revisions and revisions.image_row to be eagerly loaded
-        via selectinload for revision field population. During the initial
-        DEPLOYING phase ``current_revision`` is unset, so the fields fall
-        back to ``deploying_revision`` so callers see the spec being
-        deployed instead of empty values.
+        via selectinload for revision field population.
+        ``_find_active_revision`` prefers ``current_revision`` and falls
+        back to ``deploying_revision`` so the projection reflects the
+        spec currently being deployed during the initial DEPLOYING
+        phase. When neither pointer is set (PENDING endpoint without a
+        revision yet, or leftover orphan data), revision-derived fields
+        degrade to ``None`` / sentinel defaults and
+        ``runtime_variant_id`` stays ``None``; legacy response surfaces
+        render that as the historical blank state.
         """
         current_rev = self._find_active_revision()
         return EndpointData(
@@ -686,7 +710,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             name=self.name,
             image=(
                 current_rev.image_row.to_dataclass()
-                if current_rev and current_rev.image_row
+                if current_rev is not None and current_rev.image_row is not None
                 else None
             ),
             domain=self.domain,
@@ -695,12 +719,20 @@ class EndpointRow(Base):  # type: ignore[misc]
             resource_slots=ResourceSlot({
                 r.slot_name: r.quantity for r in current_rev.resource_slot_rows
             })
-            if current_rev
+            if current_rev is not None
             else ResourceSlot({}),
             url=self.url or "",
-            model=current_rev.model or uuid.UUID(int=0) if current_rev else uuid.UUID(int=0),
-            model_definition_path=current_rev.model_definition_path if current_rev else None,
-            model_mount_destination=(current_rev.model_mount_destination if current_rev else None),
+            model=(
+                current_rev.model or uuid.UUID(int=0)
+                if current_rev is not None
+                else uuid.UUID(int=0)
+            ),
+            model_definition_path=(
+                current_rev.model_definition_path if current_rev is not None else None
+            ),
+            model_mount_destination=(
+                current_rev.model_mount_destination if current_rev is not None else None
+            ),
             created_user_id=self.created_user,
             created_user_email=(
                 self.created_user_row.email if self.created_user_row is not None else None
@@ -708,31 +740,35 @@ class EndpointRow(Base):  # type: ignore[misc]
             session_owner_id=self.session_owner,
             session_owner_email=self.session_owner_row.email if self.session_owner_row else "",
             tag=self.tag,
-            startup_command=current_rev.startup_command if current_rev else None,
-            bootstrap_script=current_rev.bootstrap_script if current_rev else None,
+            startup_command=current_rev.startup_command if current_rev is not None else None,
+            bootstrap_script=current_rev.bootstrap_script if current_rev is not None else None,
             callback_url=(
                 yarl.URL(current_rev.callback_url)
-                if current_rev and current_rev.callback_url
+                if current_rev is not None and current_rev.callback_url
                 else None
             ),
-            environ=current_rev.environ if current_rev else None,
-            resource_opts=current_rev.resource_opts if current_rev else None,
+            environ=current_rev.environ if current_rev is not None else None,
+            resource_opts=current_rev.resource_opts if current_rev is not None else None,
             replicas=self.replicas,
             cluster_mode=(
-                ClusterMode(current_rev.cluster_mode) if current_rev else ClusterMode.SINGLE_NODE
+                ClusterMode(current_rev.cluster_mode)
+                if current_rev is not None
+                else ClusterMode.SINGLE_NODE
             ),
-            cluster_size=current_rev.cluster_size if current_rev else 1,
+            cluster_size=current_rev.cluster_size if current_rev is not None else 1,
             open_to_public=self.open_to_public if self.open_to_public is not None else False,
             created_at=self.created_at,
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
-            runtime_variant=(
-                RuntimeVariant(current_rev.runtime_variant)
-                if current_rev
-                else RuntimeVariant("custom")
+            runtime_variant_id=(
+                RuntimeVariantID(current_rev.runtime_variant_id)
+                if current_rev is not None
+                else None
             ),
-            extra_mounts=current_rev.extra_mounts if current_rev else [],
+            extra_mounts=current_rev.extra_mounts if current_rev is not None else [],
+            scaling_state=self.scaling_state,
+            model_definition=current_rev.model_definition if current_rev is not None else None,
             routings=[routing.to_data() for routing in self.routings]
             if self.routings is not None
             else [],
@@ -800,6 +836,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             ),
             state=DeploymentState(
                 lifecycle=self.lifecycle_stage,
+                scaling_state=self.scaling_state,
                 retry_count=self.retries,
             ),
             replica_spec=ReplicaSpec(
@@ -811,6 +848,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 url=self.url,
             ),
             model_revisions=list(model_revisions),
+            options=self.options,
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
             sub_step=self.sub_step,
@@ -825,7 +863,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     token: Mapped[str] = mapped_column("token", sa.String(), nullable=False)
-    endpoint: Mapped[UUID | None] = mapped_column("endpoint", GUID, nullable=True)
+    endpoint: Mapped[DeploymentID | None] = mapped_column("endpoint", GUID, nullable=True)
     session_owner: Mapped[UUID] = mapped_column("session_owner", GUID, nullable=False)
     domain: Mapped[str] = mapped_column(
         "domain",
@@ -857,7 +895,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         self,
         id: UUID,
         token: str,
-        endpoint: UUID,
+        endpoint: DeploymentID,
         domain: str,
         project: UUID,
         session_owner: UUID,
@@ -982,7 +1020,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    endpoint: Mapped[UUID] = mapped_column(
+    endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",
         GUID,
         sa.ForeignKey("endpoints.id", ondelete="CASCADE"),

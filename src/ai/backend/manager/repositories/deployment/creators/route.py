@@ -6,6 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
@@ -20,11 +21,11 @@ from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
 class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     """CreatorSpec for route creation.
 
-    Routes are created for deployment endpoints to serve traffic.
+    Routes are created for deployments to serve traffic.
     Each route can be associated with a specific revision.
     """
 
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     session_owner_id: uuid.UUID
     domain: str
     project_id: uuid.UUID
@@ -36,7 +37,7 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     def build_row(self) -> RoutingRow:
         return RoutingRow(
             id=uuid.uuid4(),
-            endpoint=self.endpoint_id,
+            endpoint=self.deployment_id,
             session=None,
             session_owner=self.session_owner_id,
             domain=self.domain,

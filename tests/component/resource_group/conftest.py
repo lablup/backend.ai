@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
+from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.resource_group.handler import V2ResourceGroupHandler

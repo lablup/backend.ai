@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.resource_usage import ResourceUsageAdapter
+    from ai.backend.manager.api.adapters.resource_usage.adapter import ResourceUsageAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

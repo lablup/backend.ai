@@ -43,6 +43,7 @@ import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -53,6 +54,13 @@ from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import GenericNotImplementedError, InvalidIpAddressValue
+
+# Deprecated re-export: new code should import ``ImageID`` from
+# ``ai.backend.common.identifier.image``. This line lets existing
+# ``from ai.backend.common.types import ImageID`` sites keep working and
+# will be removed once call sites are migrated.
+from .identifier.image import ImageID
+from .identifier.vfolder import VFolderUUID
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
@@ -83,12 +91,12 @@ __all__ = (
     "DeviceId",
     "DeviceModelInfo",
     "DeviceName",
-    "EndpointId",
     "HandlerForUnknownSlotName",
     "HardwareMetadata",
     "HostPID",
     "HostPortPair",
     "ImageConfig",
+    "ImageID",
     "ImageRegistry",
     "IntrinsicSlotNames",
     "ItemResult",
@@ -102,6 +110,7 @@ __all__ = (
     "ModelServiceProfile",
     "ModelServiceStatus",
     "MountExpression",
+    "MountInfoEntry",
     "MountPermission",
     "MountPermissionLiteral",
     "MountPoint",
@@ -306,7 +315,6 @@ HostPID = NewType("HostPID", PID)
 ContainerPID = NewType("ContainerPID", PID)
 
 ContainerId = NewType("ContainerId", str)
-EndpointId = NewType("EndpointId", UUID)
 RuleId = NewType("RuleId", UUID)
 SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
@@ -381,7 +389,6 @@ SecretKey = NewType("SecretKey", str)
 
 ClusterRole = NewType("ClusterRole", str)
 
-ImageID = NewType("ImageID", UUID)
 ImageCanonical = NewType("ImageCanonical", str)
 
 
@@ -609,8 +616,66 @@ class MountPermission(enum.StrEnum):
     READ_WRITE = "rw"
     RW_DELETE = "wd"
 
+    def cap(self, other: MountPermission | None) -> MountPermission:
+        """Cap ``other`` at ``self`` — return the more restrictive of the two.
+
+        Used at revision-write time so a caller cannot elevate beyond
+        what the vfolder itself grants: call as
+        ``vfolder_perm.cap(user_perm)``. If ``user_perm`` exceeds
+        ``vfolder_perm``, ``vfolder_perm`` is returned (silent
+        downgrade); otherwise ``user_perm`` passes through.
+
+        ``other=None`` expresses "no caller override", which is treated
+        the same as an override exceeding the cap — ``self`` is
+        returned. This lets call sites skip the surrounding ``is None``
+        branch.
+
+        Ordering: ``READ_ONLY`` < ``READ_WRITE`` < ``RW_DELETE``.
+        """
+        if other is None:
+            return self
+        order = _MOUNT_PERMISSION_ORDER
+        return self if order[other] > order[self] else other
+
+
+_MOUNT_PERMISSION_ORDER: dict[MountPermission, int] = {
+    MountPermission.READ_ONLY: 0,
+    MountPermission.READ_WRITE: 1,
+    MountPermission.RW_DELETE: 2,
+}
+
 
 MountPermissionLiteral = Literal["ro", "rw", "wd"]
+
+
+class MountInfoEntry(BaseModel):
+    """Revision-stored form of a user-supplied extra mount.
+
+    The row column persists only these three fields; everything else
+    (``name``, ``vfsubpath``, ``host_path``, ``usage_mode``) that
+    ``VFolderMount`` carries is re-derived at session creation via
+    ``prepare_vfolder_mounts``, so storing it would just be dead weight.
+
+    ``mount_destination`` is ``None`` when the caller did not provide one —
+    ``prepare_vfolder_mounts`` then defaults it to ``/home/work/{vfolder_name}``
+    at session creation time. The historical internal term ``kernel_path``
+    is accepted as a validation alias so legacy rows using that key still
+    decode.
+
+    ``mount_perm`` is ``None`` when the caller leaves permission
+    unspecified — the scheduler repository's ``prepare_vfolder_mounts``
+    then adopts the vfolder's stored permission at resolve time. A
+    concrete value here overrides the stored permission for this mount
+    and is frozen onto deployment revision rows so later vfolder
+    permission changes cannot retroactively alter already-spawned
+    sessions.
+    """
+
+    vfolder_id: VFolderUUID
+    mount_destination: str | None = Field(
+        validation_alias=AliasChoices("mount_destination", "kernel_path"),
+    )
+    mount_perm: MountPermission | None = Field(default=None)
 
 
 class MountTypes(enum.StrEnum):
@@ -1181,6 +1246,41 @@ class SlotQuantity:
 
     slot_name: str
     quantity: Decimal
+
+
+class ResourceSlotEntry(BaseModel):
+    """List-friendly shared form of a single resource slot allocation.
+
+    The preferred replacement for the ``ResourceSlot`` ``UserDict`` in new
+    code paths — kept as a Pydantic model so ``data/`` layer types can
+    carry it without pulling in the legacy dict mechanics. Mirrors the
+    shape of :class:`ai.backend.common.dto.manager.v2.common.ResourceSlotEntryInput`
+    and :class:`ai.backend.manager.models.base.ResourceSlotEntry` so the
+    same entry list flows through API, service, data, and repository
+    layers without re-shaping.
+    """
+
+    resource_type: str = Field(description="Resource type identifier (e.g., 'cpu', 'mem').")
+    quantity: str = Field(description="Quantity of the resource as a decimal string.")
+
+    @classmethod
+    def from_resource_slot(cls, slot: ResourceSlot) -> list[ResourceSlotEntry]:
+        """Project a legacy ``ResourceSlot`` into an entry list."""
+        return [
+            cls(resource_type=str(k), quantity=_stringify_number(Decimal(v)))
+            for k, v in slot.items()
+            if v is not None
+        ]
+
+    @classmethod
+    def to_resource_slot(cls, entries: Sequence[ResourceSlotEntry]) -> ResourceSlot:
+        """Collapse an entry list back into the legacy ``ResourceSlot``.
+
+        Transitional helper: repository layer still writes ``ResourceSlot``
+        to the DB column, so the final boundary converts back. New
+        in-memory pipelines should stay on the entry-list form.
+        """
+        return ResourceSlot({e.resource_type: Decimal(e.quantity) for e in entries})
 
 
 class ResourceSlotState(enum.StrEnum):

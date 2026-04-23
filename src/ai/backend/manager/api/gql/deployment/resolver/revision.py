@@ -147,7 +147,7 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 # Mutation resolvers
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))
 async def add_model_revision(
     input: AddRevisionInput,
     info: Info[StrawberryGQLContext],
@@ -166,7 +166,7 @@ async def add_model_revision(
         added_version="25.19.0",
         description="Activate a specific revision to be the current revision",
     )
-)  # type: ignore[misc]
+)
 async def activate_deployment_revision(
     input: ActivateRevisionInputGQL,
     info: Info[StrawberryGQLContext, None],

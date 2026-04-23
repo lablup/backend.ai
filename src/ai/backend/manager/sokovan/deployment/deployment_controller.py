@@ -1,6 +1,7 @@
 """Deployment controller for managing model services and deployments."""
 
 import dataclasses
+import functools
 import logging
 import uuid
 from dataclasses import dataclass
@@ -11,7 +12,15 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.types import (
+    ClusterMode,
+    MountInfoEntry,
+    ResourceSlot,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import (
@@ -25,17 +34,16 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentNetworkSpec,
-    ExecutionSpec,
+    ImageIdentifierDraft,
     ModelRevisionData,
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
+    MountInfo,
     MountMetadata,
     ReplicaSpec,
-    ResourceSpec,
     RevisionDraft,
     RouteInfo,
     RouteTrafficStatus,
-    merge_revision_drafts,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
@@ -66,23 +74,11 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentUpdaterSpec,
     RouteUpdaterSpec,
 )
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.deployment.exceptions import (
     DeploymentAlreadyInProgress,
     InvalidEndpointState,
 )
-from ai.backend.manager.sokovan.deployment.revision_draft import (
-    DeploymentConfigDraftGenerator,
-    ModelDefinitionDraftGenerator,
-    PresetDraftGenerator,
-    revision_draft_from_creator,
-    revision_draft_from_spec,
-)
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
+from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.types import (
     ActivateRevisionResult,
     DeploymentLifecycleType,
@@ -109,8 +105,7 @@ class DeploymentControllerArgs:
     storage_manager: StorageSessionManager
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
-    revision_generator_registry: RevisionGeneratorRegistry
-    model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    revision_draft_reader: RevisionDraftReader
     deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
 
 
@@ -132,12 +127,8 @@ class DeploymentController:
     _storage_manager: StorageSessionManager
     _event_producer: EventProducer
     _valkey_schedule: ValkeyScheduleClient
-    _revision_generator_registry: RevisionGeneratorRegistry
-    _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    _revision_draft_reader: RevisionDraftReader
     _deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
-    _deployment_config_draft_generator: DeploymentConfigDraftGenerator
-    _model_definition_draft_generator: ModelDefinitionDraftGenerator
-    _preset_draft_generator: PresetDraftGenerator | None
 
     def __init__(self, args: DeploymentControllerArgs) -> None:
         """Initialize the deployment controller with required services."""
@@ -147,20 +138,8 @@ class DeploymentController:
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
         self._valkey_schedule = args.valkey_schedule
-        self._revision_generator_registry = args.revision_generator_registry
-        self._model_definition_generator_registry = args.model_definition_generator_registry
+        self._revision_draft_reader = args.revision_draft_reader
         self._deployment_revision_preset_repository = args.deployment_revision_preset_repository
-        self._deployment_config_draft_generator = DeploymentConfigDraftGenerator(
-            args.deployment_repository
-        )
-        self._model_definition_draft_generator = ModelDefinitionDraftGenerator(
-            args.model_definition_generator_registry
-        )
-        self._preset_draft_generator = (
-            PresetDraftGenerator(args.deployment_revision_preset_repository)
-            if args.deployment_revision_preset_repository is not None
-            else None
-        )
 
     async def create_deployment(
         self,
@@ -191,6 +170,17 @@ class DeploymentController:
                 "_apply_deployment_level_preset must populate replica_spec, network, "
                 "and revision_history_limit"
             )
+        # Resolve ``options`` by snapshot-copying the resource group's
+        # ``default_deployment_options``. ``creator.options`` will
+        # eventually let the API caller override this (commit C); for
+        # now it is always ``None`` and we use the RG default verbatim.
+        options = creator.options
+        if options is None:
+            options = (
+                await self._deployment_repository.get_resource_group_default_deployment_options(
+                    ResourceGroupName(metadata.resource_group)
+                )
+            )
         creator_spec = DeploymentCreatorSpec(
             metadata=DeploymentMetadataFields(
                 name=metadata.name,
@@ -210,6 +200,7 @@ class DeploymentController:
                 open_to_public=network_spec.open_to_public,
                 url=network_spec.url,
             ),
+            options=options,
             revision=None,
         )
         rbac_creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
@@ -228,46 +219,34 @@ class DeploymentController:
     ) -> tuple[NewDeploymentCreator, ModelRevisionCreator]:
         """Resolve a legacy ``DeploymentCreationDraft`` into v2 (creator, revision).
 
-        Performs DB-touching resolution so the higher-level service layer can
-        compose ``create_deployment`` + ``add_deployment_revision`` uniformly:
-
-        - Resolves ``image_identifier`` (canonical + arch) → ``image_id`` (UUID).
-        - Pulls ``default_architecture`` from the scaling group as the lowest-
-          priority fallback for the revision draft.
-        - Validates the resolved revision spec via the runtime-variant
-          validator and the scheduling controller, preserving legacy fast-fail
-          semantics before any endpoint row is written.
+        Delegates draft ingestion to ``RevisionDraftReader`` (one read pass
+        per source) and relies on ``RevisionDraft.merge`` for the layered
+        combination. The caller's ``image_identifier`` is resolved to an
+        ``ImageID`` up front because the draft chain now carries a single
+        image pointer (no canonical + architecture pair).
         """
         log.info(
             "Building creator from legacy draft '{}' in project {}",
             draft.name,
             draft.project,
         )
-        default_architecture = (
-            await self._deployment_repository.get_default_architecture_from_scaling_group(
-                draft.metadata.resource_group
-            )
+        image_id = await self._resolve_draft_image_id(
+            draft.draft_model_revision.image_identifier,
+            resource_group=draft.metadata.resource_group,
         )
-        request_draft = revision_draft_from_spec(draft.draft_model_revision)
-        merged = await self._build_revision_draft(
+        request_draft = draft.draft_model_revision.to_draft(image_id)
+        drafts = await self._revision_draft_reader.read_for_legacy_model_service_deployment(
             request_draft=request_draft,
             mounts=draft.draft_model_revision.mounts,
             execution=draft.draft_model_revision.execution,
             preset_id=None,
-            default_architecture=default_architecture,
         )
-        model_revision_spec = self._revision_spec_from_draft(
-            merged, mounts=draft.draft_model_revision.mounts
+        merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
+        model_revision_spec = merged.to_model_revision_spec(
+            mounts=draft.draft_model_revision.mounts
         )
-        validator = self._revision_generator_registry.get(
-            model_revision_spec.execution.runtime_variant
-        )
-        await validator.validate_revision(model_revision_spec)
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision_spec)
-        )
-        image_id = await self._deployment_repository.get_image_id(
-            model_revision_spec.image_identifier
         )
         creator = NewDeploymentCreator(
             metadata=draft.metadata,
@@ -276,15 +255,28 @@ class DeploymentController:
             model_revision=None,
             policy=None,
         )
-        # Carry the merged draft form forward; ``add_deployment_revision``
-        # re-merges and resolves at its own persistence boundary.
+        # ``draft.draft_model_revision.mounts.extra_mounts`` is already
+        # ``list[MountInfoEntry]`` because the legacy validator pre-resolved
+        # via ``prepare_vfolder_mounts``. Project into ``MountInfo`` with
+        # the concrete ``mount_perm`` carried over as an explicit
+        # override; ``add_deployment_revision`` then uses it directly
+        # without re-reading the vfolder.
+        legacy_extra_mounts = [
+            MountInfo(
+                vfolder_id=m.vfolder_id,
+                mount_destination=m.mount_destination,
+                mount_perm=m.mount_perm,
+            )
+            for m in draft.draft_model_revision.mounts.extra_mounts
+        ]
         revision = ModelRevisionCreator(
-            image_id=image_id,
+            image_id=merged.image_id,
             resource_spec=model_revision_spec.resource_spec,
             mounts=VFolderMountsCreator(
                 model_vfolder_id=model_revision_spec.mounts.model_vfolder_id,
                 model_definition_path=model_revision_spec.mounts.model_definition_path,
                 model_mount_destination=model_revision_spec.mounts.model_mount_destination,
+                extra_mounts=legacy_extra_mounts,
             ),
             execution=model_revision_spec.execution,
             model_definition=merged.model_definition,
@@ -367,75 +359,68 @@ class DeploymentController:
 
     async def add_revision(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         overrides: RevisionDraft,
         mounts: MountMetadata,
-        preset_id: uuid.UUID | None = None,
-        base: RevisionDraft | None = None,
+        preset_id: DeploymentPresetID | None = None,
     ) -> ModelRevisionData:
         """Create a new immutable revision on an existing deployment.
 
         Revisions are immutable — every mutation (legacy ModifyEndpoint included)
-        must go through this single entry point. Callers control the base by
-        passing ``base`` (``None`` for fresh add, a current-revision draft for
-        modify). ``mounts`` carries the vfolder context required by file-based
-        draft generators and is not part of the merged RevisionDraft — mount
-        identity is not a merge candidate.
+        must go through this single entry point. ``mounts`` carries the vfolder
+        context required by file-based draft sources and is not part of the
+        merged RevisionDraft — mount identity is not a merge candidate.
 
-        Merge order (low → high):
-            1. preset (if ``preset_id`` is supplied)
-            2. base (caller-provided — e.g. current revision on modify)
-            3. deployment-config.yaml
-            4. model-definition.yaml (``model_definition`` field only)
+        Merge order (low → high) is assembled by ``RevisionDraftReader``:
+            1. runtime-variant baseline model definition
+            2. revision preset (if ``preset_id`` is supplied)
+            3. deployment-config.yaml   (only when the variant reads vfolder files)
+            4. model-definition.yaml    (only when the variant reads vfolder files)
             5. overrides (highest — explicit user input)
         """
         log.info("Adding revision to deployment {}", endpoint_id)
 
-        runtime_variant = overrides.runtime_variant or (
-            base.runtime_variant if base is not None else None
-        )
-        if runtime_variant is None:
-            raise InvalidAPIParameters("runtime_variant is required to add a revision")
-        context_environ = overrides.environ or (base.environ if base is not None else None)
-        context_execution = ExecutionSpec(
-            runtime_variant=runtime_variant,
-            environ=dict(context_environ) if context_environ else None,
-        )
+        if overrides.runtime_variant_id is None:
+            raise InvalidAPIParameters("runtime_variant_id is required to add a revision")
+        runtime_variant_id = overrides.runtime_variant_id
 
-        merged = await self._build_revision_draft(
+        drafts = await self._revision_draft_reader.read_for_deployment_revision(
+            runtime_variant_id=runtime_variant_id,
             request_draft=overrides,
             mounts=mounts,
-            execution=context_execution,
             preset_id=preset_id,
-            default_architecture=None,
-            base=base,
         )
+        merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
 
         endpoint_info = await self._deployment_repository.get_endpoint_info(endpoint_id)
+        if merged.image_id is None:
+            raise InvalidAPIParameters("image_id is required to add a revision")
+        if merged.model_definition is None:
+            raise InvalidAPIParameters(
+                "model_definition is required to add a revision; provide it in the request,"
+                " revision preset, or via a model-definition.yaml in the model vfolder"
+            )
+        resolved_model_definition = merged.model_definition.to_resolved()
+        if not resolved_model_definition.models:
+            raise InvalidAPIParameters("model_definition.models must contain at least one entry")
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=endpoint_id,
+            deployment_id=DeploymentID(endpoint_id),
             image_id=merged.image_id,
             resource_group=endpoint_info.metadata.resource_group,
             resource_slots=ResourceSlot(merged.resource_slots or {}),
             resource_opts=dict(merged.resource_opts) if merged.resource_opts else {},
             cluster_mode=(merged.cluster_mode or ClusterMode.SINGLE_NODE).value,
             cluster_size=merged.cluster_size or 1,
-            model_id=mounts.model_vfolder_id,
+            model_vfolder_id=mounts.model_vfolder_id,
             model_mount_destination=mounts.model_mount_destination,
             model_definition_path=mounts.model_definition_path,
-            # Resolve the merged draft into a strict ModelDefinition; this is
-            # the single point where required-field validation runs.
-            model_definition=(
-                merged.model_definition.to_resolved()
-                if merged.model_definition is not None
-                else None
-            ),
+            model_definition=resolved_model_definition,
             startup_command=merged.startup_command,
             bootstrap_script=merged.bootstrap_script,
             environ=dict(merged.environ) if merged.environ else {},
             callback_url=str(merged.callback_url) if merged.callback_url else None,
-            runtime_variant=merged.runtime_variant or runtime_variant,
-            extra_mounts=(),
+            runtime_variant_id=runtime_variant_id,
+            extra_mounts=list(mounts.extra_mounts),
             preset_values=[
                 PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
                 for pv in (merged.preset_values or [])
@@ -459,7 +444,7 @@ class DeploymentController:
 
     async def add_deployment_revision(
         self,
-        deployment_id: uuid.UUID,
+        deployment_id: DeploymentID,
         revision: ModelRevisionCreator,
         *,
         auto_activate: bool,
@@ -473,14 +458,34 @@ class DeploymentController:
         ``activate_revision`` to set ``deploying_revision`` and trigger the
         DEPLOYING lifecycle.
         """
+        # Snapshot each extra mount's permission at revision-write time.
+        # The vfolder's current stored permission is always read and caps
+        # the caller's request so a mount cannot be elevated beyond what
+        # the vfolder grants (``vfolder_perm.cap(user_perm)``). Entries
+        # with ``mount_perm is None`` fall through to the vfolder's own
+        # permission. The resolved ``MountInfoEntry`` is frozen on the
+        # row so later vfolder permission changes cannot retroactively
+        # alter sessions spawned from this revision.
+        vfolder_perms = await self._deployment_repository.resolve_vfolder_permissions([
+            m.vfolder_id for m in revision.mounts.extra_mounts
+        ])
+        extra_mount_entries = [
+            MountInfoEntry(
+                vfolder_id=m.vfolder_id,
+                mount_destination=m.mount_destination,
+                mount_perm=vfolder_perms[m.vfolder_id].cap(m.mount_perm),
+            )
+            for m in revision.mounts.extra_mounts
+        ]
         mounts = MountMetadata(
             model_vfolder_id=revision.mounts.model_vfolder_id,
             model_definition_path=revision.mounts.model_definition_path,
             model_mount_destination=revision.mounts.model_mount_destination,
+            extra_mounts=extra_mount_entries,
         )
         revision_data = await self.add_revision(
             endpoint_id=deployment_id,
-            overrides=revision_draft_from_creator(revision),
+            overrides=revision.to_draft(),
             mounts=mounts,
             preset_id=revision.revision_preset_id,
         )
@@ -557,108 +562,66 @@ class DeploymentController:
     async def resolve_legacy_revision_spec(
         self,
         draft_revision: ModelRevisionSpecDraft,
-        default_architecture: str | None = None,
+        resource_group: str,
     ) -> ModelRevisionSpec:
-        """Build a final ``ModelRevisionSpec`` from a legacy draft via the unified
-        4-way merge pipeline (deployment-config.yaml + model-definition.yaml
-        + request, plus default architecture as the lowest-priority fallback).
+        """Build a final ``ModelRevisionSpec`` from a legacy draft via the
+        ``RevisionDraftReader`` pipeline.
+
+        ``resource_group`` feeds the lowest-priority architecture fallback
+        when the caller supplies only the image canonical (no architecture):
+        the scaling-group's most common live-agent architecture is used.
 
         Public entry point used by callers that still need a ``ModelRevisionSpec``
-        outside the ``create_deployment`` flow (e.g. model_serving create / try_start).
+        outside the ``create_deployment`` flow (e.g. model_serving create /
+        try_start).
         """
-        request_draft = revision_draft_from_spec(draft_revision)
-        merged = await self._build_revision_draft(
+        image_id = await self._resolve_draft_image_id(
+            draft_revision.image_identifier, resource_group=resource_group
+        )
+        request_draft = draft_revision.to_draft(image_id)
+        drafts = await self._revision_draft_reader.read_for_legacy_model_service_deployment(
             request_draft=request_draft,
             mounts=draft_revision.mounts,
             execution=draft_revision.execution,
             preset_id=None,
-            default_architecture=default_architecture,
         )
-        spec = self._revision_spec_from_draft(merged, mounts=draft_revision.mounts)
-        validator = self._revision_generator_registry.get(spec.execution.runtime_variant)
-        await validator.validate_revision(spec)
-        return spec
+        merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
+        return merged.to_model_revision_spec(mounts=draft_revision.mounts)
 
     # ========== Revision Private Helpers ==========
 
-    async def _build_revision_draft(
+    async def _resolve_draft_image_id(
         self,
-        request_draft: RevisionDraft,
-        mounts: MountMetadata,
-        execution: ExecutionSpec,
-        preset_id: uuid.UUID | None,
-        default_architecture: str | None,
-        base: RevisionDraft | None = None,
-    ) -> RevisionDraft:
-        """Collect RevisionDrafts from each independent source and merge them.
+        image_identifier: ImageIdentifierDraft,
+        resource_group: str,
+    ) -> ImageID | None:
+        """Resolve the (canonical, architecture) request to an ``ImageID``.
 
-        Merge order (later overrides earlier):
-            1. default architecture (legacy create fallback; lowest)
-            2. revision preset (optional)
-            3. caller-provided base (e.g. current revision on modify)
-            4. deployment-config.yaml in the model vfolder
-            5. model-definition.yaml in the model vfolder (model_definition only)
-            6. request (highest priority)
+        When the caller supplies ``canonical`` but omits ``architecture``, the
+        scaling group's default architecture (most common live-agent arch)
+        is used as a fallback. Returns ``None`` if the caller supplied no
+        canonical reference at all (e.g. preset is expected to carry the
+        image id later).
         """
-        drafts: list[RevisionDraft] = []
-        if default_architecture is not None:
-            drafts.append(RevisionDraft(image_architecture=default_architecture))
-        if preset_id is not None and self._preset_draft_generator is not None:
-            drafts.append(await self._preset_draft_generator.generate(preset_id))
-        if base is not None:
-            drafts.append(base)
-        drafts.append(
-            await self._deployment_config_draft_generator.generate(
-                mounts.model_vfolder_id, execution.runtime_variant
+        if image_identifier is None or image_identifier.canonical is None:
+            return None
+        architecture = image_identifier.architecture
+        if not architecture:
+            architecture = (
+                await self._deployment_repository.get_default_architecture_from_scaling_group(
+                    resource_group
+                )
             )
-        )
-        drafts.append(await self._model_definition_draft_generator.generate(mounts, execution))
-        drafts.append(request_draft)
-        return merge_revision_drafts(*drafts)
-
-    def _revision_spec_from_draft(
-        self,
-        merged: RevisionDraft,
-        mounts: MountMetadata,
-    ) -> ModelRevisionSpec:
-        """Assemble a ModelRevisionSpec from a fully merged RevisionDraft.
-
-        Used by the legacy creation flow where the image is identified by
-        (canonical, architecture) rather than by a pre-resolved image id.
-        """
-        if not merged.image_canonical:
-            raise InvalidAPIParameters("image canonical is required to build a revision")
-        runtime_variant: RuntimeVariant | None = merged.runtime_variant
-        if runtime_variant is None:
-            raise InvalidAPIParameters("runtime_variant is required to build a revision")
-        image_identifier = ImageIdentifier(
-            canonical=merged.image_canonical,
-            architecture=merged.image_architecture or "",
-        )
-        return ModelRevisionSpec(
-            image_identifier=image_identifier,
-            resource_spec=ResourceSpec(
-                cluster_mode=merged.cluster_mode or ClusterMode.SINGLE_NODE,
-                cluster_size=merged.cluster_size or 1,
-                resource_slots=merged.resource_slots or {},
-                resource_opts=merged.resource_opts,
-            ),
-            mounts=mounts,
-            execution=ExecutionSpec(
-                startup_command=merged.startup_command,
-                bootstrap_script=merged.bootstrap_script,
-                environ=dict(merged.environ) if merged.environ else None,
-                runtime_variant=runtime_variant,
-                callback_url=merged.callback_url,
-                inference_runtime_config=merged.inference_runtime_config,
-            ),
-            # Resolve the merged draft into a strict ModelDefinition (legacy
-            # ``ModelRevisionSpec`` carries the strict type).
-            model_definition=(
-                merged.model_definition.to_resolved()
-                if merged.model_definition is not None
-                else None
-            ),
+            if architecture is None:
+                raise InvalidAPIParameters(
+                    "architecture is required for image resolution and no default "
+                    f"architecture is available in scaling group '{resource_group}'."
+                )
+        return await self._deployment_repository.get_image_id(
+            ImageIdentifier(
+                canonical=image_identifier.canonical,
+                architecture=architecture,
+            )
         )
 
     async def _prune_revision_history(

@@ -84,7 +84,7 @@ class SchedulingBroadcastEventPayloadGQL:
         return Session(id=strawberry.ID(session_global_id))
 
 
-@gql_subscription(  # type: ignore[misc]
+@gql_subscription(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description=(

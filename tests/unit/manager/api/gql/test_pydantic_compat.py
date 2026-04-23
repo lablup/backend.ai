@@ -22,7 +22,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     ContainerRegistryNode,
 )
-from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.registry import Adapters
 from ai.backend.manager.api.gql.container_registry.types import (
     ContainerRegistryGQL,

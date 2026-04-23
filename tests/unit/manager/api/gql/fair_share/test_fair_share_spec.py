@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceWeightEntryInfo,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
+from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.types.common import FairShareSpecGQL
 from ai.backend.manager.data.fair_share.types import FairShareSpec
 

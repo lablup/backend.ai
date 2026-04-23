@@ -13,10 +13,10 @@ from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordina
 
 
 def _make_coordinator(
-    *, active_endpoint_ids: list[UUID], update_side_effect: object = None
+    *, active_deployment_ids: list[UUID], update_side_effect: object = None
 ) -> tuple[DeploymentCoordinator, AsyncMock, AsyncMock]:
     mock_repo = AsyncMock(spec=DeploymentRepository)
-    mock_repo.list_active_endpoint_ids = AsyncMock(return_value=active_endpoint_ids)
+    mock_repo.search_deployment_ids = AsyncMock(return_value=active_deployment_ids)
     if update_side_effect is not None:
         mock_repo.update_endpoint_route_info = AsyncMock(side_effect=update_side_effect)
     else:
@@ -35,7 +35,7 @@ def _make_coordinator(
 
 class TestSyncRouteInfoToAppproxy:
     async def test_noop_when_no_active_endpoints(self) -> None:
-        coordinator, repo, producer = _make_coordinator(active_endpoint_ids=[])
+        coordinator, repo, producer = _make_coordinator(active_deployment_ids=[])
 
         await coordinator.sync_route_info_to_appproxy()
 
@@ -44,7 +44,7 @@ class TestSyncRouteInfoToAppproxy:
 
     async def test_pushes_each_active_endpoint(self) -> None:
         endpoint_ids = [uuid4(), uuid4(), uuid4()]
-        coordinator, repo, producer = _make_coordinator(active_endpoint_ids=endpoint_ids)
+        coordinator, repo, producer = _make_coordinator(active_deployment_ids=endpoint_ids)
 
         await coordinator.sync_route_info_to_appproxy()
 
@@ -71,7 +71,7 @@ class TestSyncRouteInfoToAppproxy:
                 raise RuntimeError("redis down")
 
         coordinator, repo, producer = _make_coordinator(
-            active_endpoint_ids=endpoint_ids, update_side_effect=update_side_effect
+            active_deployment_ids=endpoint_ids, update_side_effect=update_side_effect
         )
 
         await coordinator.sync_route_info_to_appproxy()

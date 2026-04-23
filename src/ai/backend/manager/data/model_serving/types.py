@@ -9,18 +9,22 @@ from typing import TYPE_CHECKING, Any
 import yarl
 from pydantic import HttpUrl
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
+    MountInfoEntry,
     MountPermission,
     MountTypes,
     QuotaScopeID,
     ResourceSlot,
-    RuntimeVariant,
     VFolderMount,
 )
 from ai.backend.manager.data.image.types import ImageData
@@ -36,6 +40,7 @@ __all__ = [
     "EndpointLifecycle",
     "EndpointTokenData",
     "RoutingData",
+    "ScalingState",
     "ServiceSearchItem",
     "ServiceSearchResult",
 ]
@@ -81,8 +86,19 @@ class EndpointData:
     destroyed_at: datetime | None
     retries: int
     lifecycle_stage: EndpointLifecycle
-    runtime_variant: RuntimeVariant
-    extra_mounts: Sequence[VFolderMount]
+    # Projected from whichever revision is currently active —
+    # ``current_revision`` preferred, falling back to
+    # ``deploying_revision``. ``None`` when the endpoint has neither
+    # (e.g. a freshly-created PENDING endpoint before any revision is
+    # attached); legacy response surfaces render this as the historical
+    # "custom" fallback.
+    runtime_variant_id: RuntimeVariantID | None
+    # Snapshotted from the current revision's ``extra_mounts`` column.
+    # ``VFolderMount`` resolution happens later in the session-creation
+    # path; ``EndpointData`` carries the unresolved request entries.
+    extra_mounts: Sequence[MountInfoEntry]
+    scaling_state: ScalingState = ScalingState.STABLE
+    model_definition: ModelDefinition | None = None
     routings: Sequence[RoutingData] = field(default_factory=list)
 
 
@@ -151,7 +167,7 @@ class ScalingGroupData:
 class ModelServiceValidationContext:
     """Data resolved from DB during model service validation."""
 
-    model_id: uuid.UUID
+    model_vfolder_id: VFolderUUID
     model_folder_host: str
     model_folder_quota_scope_id: QuotaScopeID | None
     model_folder_usage_mode: str
@@ -163,11 +179,12 @@ class ModelServiceValidationContext:
     resource_policy: dict[str, Any]
     scaling_group: str
     extra_mounts: Sequence[VFolderMount]
+    variant_reads_vfolder_config_files: bool
 
 
 @dataclass
 class ModelServicePrepareCtx:
-    model_id: uuid.UUID
+    model_vfolder_id: VFolderUUID
     model_definition_path: str | None
     requester_access_key: AccessKey
     owner_access_key: AccessKey
@@ -234,9 +251,9 @@ class ServiceConfig:
 
 @dataclass
 class ServiceInfo:
-    endpoint_id: uuid.UUID
-    model_id: uuid.UUID
-    extra_mounts: Sequence[uuid.UUID]
+    deployment_id: DeploymentID
+    model_vfolder_id: VFolderUUID
+    extra_mounts: Sequence[VFolderUUID]
     name: str
     model_definition_path: str | None
     replicas: int
@@ -244,7 +261,7 @@ class ServiceInfo:
     active_routes: list[RouteInfo]
     service_endpoint: HttpUrl | None
     is_public: bool
-    runtime_variant: RuntimeVariant
+    runtime_variant_id: RuntimeVariantID
 
 
 @dataclass

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import override
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.models.endpoint import EndpointTokenRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
@@ -17,11 +18,11 @@ class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
     """CreatorSpec for endpoint access token creation.
 
     Creates an access token that can be used to authenticate requests
-    to a specific endpoint. Token ID and token value are generated
+    to a specific deployment. Token ID and token value are generated
     automatically in build_row().
     """
 
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     domain: str
     project_id: uuid.UUID
     session_owner_id: uuid.UUID
@@ -32,7 +33,7 @@ class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
         return EndpointTokenRow(
             id=uuid.uuid4(),
             token=secrets.token_urlsafe(32),
-            endpoint=self.endpoint_id,
+            endpoint=self.deployment_id,
             domain=self.domain,
             project=self.project_id,
             session_owner=self.session_owner_id,

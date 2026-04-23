@@ -6296,6 +6296,11 @@ type ExtraVFolderMountInfoGQL
   vfolder: VirtualFolderNode!
   vfolderId: ID!
   mountDestination: String
+
+  """
+  The concrete permission snapshot fixed at revision-write time. ``INHERIT`` policies are resolved against the vfolder's current permission at that point, so this value is immutable and does not change when the vfolder's permission later changes.
+  """
+  mountPerm: MountPermission!
 }
 
 """Added in 25.19.0. """
@@ -9197,7 +9202,7 @@ enum ModelRevisionOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
   CLUSTER_MODE @join__enumValue(graph: STRAWBERRY)
-  RUNTIME_VARIANT @join__enumValue(graph: STRAWBERRY)
+  RUNTIME_VARIANT_NAME @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -9823,6 +9828,17 @@ input ModifyUserResourcePolicyInput
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+}
+
+"""
+Added in 25.19.0. This enum represents the permission level for a mounted volume. It can be ro, rw, wd
+"""
+enum MountPermission
+  @join__type(graph: STRAWBERRY)
+{
+  READ_ONLY @join__enumValue(graph: STRAWBERRY)
+  READ_WRITE @join__enumValue(graph: STRAWBERRY)
+  RW_DELETE @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.4.2. Input for moving a file inside a virtual folder."""
@@ -13037,6 +13053,11 @@ type Query
   adminResourceGroupV2(name: String!): ResourceGroup @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.timeouts.by_handler``.
+  """
+  schedulingHandlers: [SchedulingHandlerNode!]! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.2. Get allowed resource groups for a domain (admin only).
   """
   adminAllowedResourceGroupsForDomainV2(domainName: String!): AllowedResourceGroupsPayload! @join__field(graph: STRAWBERRY)
@@ -15699,6 +15720,32 @@ type SchedulingBroadcastEventPayload
 
   """Human-readable reason for this status transition."""
   reason: String!
+}
+
+enum SchedulingHandlerCategory
+  @join__type(graph: STRAWBERRY)
+{
+  LIFECYCLE @join__enumValue(graph: STRAWBERRY)
+  SCALING @join__enumValue(graph: STRAWBERRY)
+  HEALTH @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.timeouts.by_handler``.
+"""
+type SchedulingHandlerNode
+  @join__type(graph: STRAWBERRY)
+{
+  """Stable handler key used in deployment timeout maps."""
+  name: String!
+
+  """Handler category classifying its scheduling axis."""
+  category: SchedulingHandlerCategory!
+
+  """
+  First line of the handler's docstring, if any. Null when the backing class has no docstring.
+  """
+  description: String
 }
 
 """Added in 26.3.0. Scheduling result status"""

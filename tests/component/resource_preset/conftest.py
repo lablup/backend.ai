@@ -141,7 +141,7 @@ def user_processors(
     storage_manager: AsyncMock,
 ) -> UserProcessors:
     user_repo = UserRepository(database_engine)
-    service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo)
+    service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(
         user_service=service, action_monitors=[], validators=_create_mock_validators()
     )

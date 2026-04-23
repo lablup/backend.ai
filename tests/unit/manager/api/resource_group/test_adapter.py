@@ -18,8 +18,8 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
 )
-from ai.backend.manager.api.adapters.pagination import PaginationSpec
-from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
+from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow

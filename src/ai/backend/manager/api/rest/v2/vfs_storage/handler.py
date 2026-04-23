@@ -23,7 +23,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import StorageIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.vfs_storage import VFSStorageAdapter
+    from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

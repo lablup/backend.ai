@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-import dataclasses
 import enum
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
-from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     DeploymentStrategy,
@@ -23,6 +21,13 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 
 if TYPE_CHECKING:
@@ -32,77 +37,32 @@ if TYPE_CHECKING:
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
+    MountInfoEntry,
     MountPermission,
     ResourceSlot,
-    RuntimeVariant,
     SessionId,
-    VFolderMount,
 )
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
-from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
-from ai.backend.manager.data.image.types import ImageIdentifier
-
-
-class ImageEnvironment(BaseModel):
-    image: str = Field(
-        description="""
-        Container image to use for the model service.
-        """,
-        examples=[
-            "myregistry/myimage:latest",
-        ],
-    )
-    architecture: str = Field(
-        description="""
-        Architecture of the container image.
-        """,
-        examples=[
-            "x86_64",
-            "arm64",
-        ],
-    )
+from ai.backend.manager.data.deployment_revision_preset.types import (
+    DeploymentRevisionPresetData,
+    PresetValueData,
+    ResourceSlotEntryData,
+)
+from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 
 
 class DeploymentConfig(BaseModel):
-    environment: ImageEnvironment | None = Field(
-        default=None,
-        description="""
-        Environment in which the model service will run.
-        """,
-        examples=[
-            {
-                "image": "myregistry/myimage:latest",
-                "architecture": "x86_64",
-            }
-        ],
-    )
-    resource_slots: dict[str, Any] | None = Field(
-        default=None,
-        description="""
-        Resource slots used by the model service session.
-        """,
-        examples=[
-            {"cpu": 1, "mem": "2gb"},
-        ],
-    )
-    resource_opts: dict[str, Any] | None = Field(
-        default=None,
-        description="""
-        Resource options for the model service session (e.g., shmem).
-        """,
-        examples=[
-            {"shmem": "16g"},
-        ],
-    )
-    environ: dict[str, str] | None = Field(
-        default=None,
-        description="""
-        Environment variables to set for the model service.
-        """,
-        examples=[
-            {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
-        ],
-    )
+    """``deployment-config.yaml`` payload after repository-side resolution.
+
+    The raw yaml carries ``image`` + ``architecture`` strings; the repository
+    resolves that pair to ``image_id`` before constructing this type, so
+    downstream code never sees the canonical / architecture tuple.
+    """
+
+    image_id: ImageID | None = None
+    resource_slots: dict[str, Any] | None = None
+    resource_opts: dict[str, Any] | None = None
+    environ: dict[str, str] | None = None
 
 
 class RouteStatus(enum.Enum):
@@ -150,6 +110,30 @@ class RouteHandlerCategory(enum.StrEnum):
     HEALTH = "health"
 
 
+class DeploymentHandlerCategory(enum.StrEnum):
+    """Category of deployment-level handler for history separation.
+
+    Separate from :class:`RouteHandlerCategory` because deployment-level
+    handlers operate on the endpoint as a whole (lifecycle, replica
+    reconciliation, aggregate health) while route-level handlers act on
+    individual routes (provisioning, per-route health). Storing them
+    under distinct category sets keeps the history queryable by the
+    correct axis.
+    """
+
+    LIFECYCLE = "lifecycle"
+    """Lifecycle progression (PENDING → DEPLOYING → READY → DESTROYING → DESTROYED)."""
+    SCALING = "scaling"
+    """Replica reconciliation against ``desired_replica_count`` while the
+    endpoint's own lifecycle stays put at READY."""
+    HEALTH = "health"
+    """Deployment-level health aggregation (e.g. marking an endpoint
+    BLOCKED when every route is unhealthy). Reserved — no handler
+    currently emits this category; kept so the history axis is symmetric
+    with :class:`RouteHandlerCategory` and future aggregate-health
+    handlers can file under it without a schema change."""
+
+
 class RouteTrafficStatus(enum.StrEnum):
     """Traffic routing status for a route.
 
@@ -190,18 +174,32 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
 
 @dataclass(frozen=True)
 class DeploymentLifecycleStatus:
-    """Target lifecycle state for a deployment status transition.
+    """Target state for a deployment status transition.
 
-    Pairs an EndpointLifecycle with an optional sub-step to provide
-    context about which sub-step led to this transition.
+    All three axes (``lifecycle``, ``scaling_state``, ``sub_step``) are
+    independently optional — ``None`` on an axis means "leave this
+    dimension unchanged". Pure lifecycle handlers set ``lifecycle`` and
+    leave the scaling axis untouched; scaling-category handlers invert
+    that relationship so the same endpoint can move on the scaling axis
+    while its lifecycle (e.g. ``READY`` or ``DEPLOYING``) is preserved.
+
+    Endpoint-level aggregate health is tracked separately at the route
+    layer and is not part of this status — when the HEALTH handler
+    category is introduced it will add its own axis alongside a new
+    persisted column.
 
     Attributes:
-        lifecycle: The target endpoint lifecycle state
+        lifecycle: Target endpoint lifecycle state; ``None`` means
+            "do not touch the lifecycle dimension" (scaling-only
+            transitions).
+        scaling_state: Target scaling state; ``None`` means
+            "do not touch the scaling dimension".
         sub_step: Optional sub-step indicating what determined this
             transition (e.g. DEPLOYING_* members for DEPLOYING handlers).
     """
 
-    lifecycle: EndpointLifecycle
+    lifecycle: EndpointLifecycle | None = None
+    scaling_state: ScalingState | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
 
@@ -224,6 +222,29 @@ class DeploymentStatusTransitions:
     need_retry: DeploymentLifecycleStatus | None = None
     expired: DeploymentLifecycleStatus | None = None
     give_up: DeploymentLifecycleStatus | None = None
+
+
+@dataclass(frozen=True)
+class DeploymentTargetStatuses:
+    """Per-axis filter declaration for a deployment handler.
+
+    Each list enumerates the axis values the handler wants to be
+    dispatched against. Empty lists disable that axis's filter (the
+    coordinator simply omits the corresponding ``IN`` predicate).
+
+    Attributes:
+        lifecycle_stages: Lifecycle values the handler processes.
+        scaling_states: Scaling-state values; typically ``[STABLE]`` for
+            detectors (replica / reconcile) and ``[SCALING]`` for the
+            scaling handler. Empty means "do not restrict by scaling".
+        sub_steps: Sub-step values; used by DEPLOYING handlers to pick
+            the PROVISIONING vs ROLLING_BACK slice. Empty means "all
+            sub-steps".
+    """
+
+    lifecycle_stages: list[EndpointLifecycle]
+    scaling_states: list[ScalingState] = field(default_factory=list)
+    sub_steps: list[DeploymentLifecycleSubStep] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -286,43 +307,42 @@ class DeploymentMetadata:
 @dataclass
 class DeploymentState:
     lifecycle: EndpointLifecycle
+    # ``scaling_state`` is orthogonal to ``lifecycle``: the lifecycle axis
+    # records where the endpoint is in its monotonic DEPLOYING → READY →
+    # DESTROYING progression, while ``scaling_state`` tracks whether it is
+    # currently reconciling replica count (SCALING) or holding at the
+    # desired count (STABLE). Persisted NOT NULL on ``endpoints.scaling_state``
+    # (default STABLE) so this field is always populated on reads.
+    scaling_state: ScalingState
     retry_count: int
 
 
 @dataclass
-class MountSpec:
-    mounts: list[UUID]
-    mount_map: Mapping[UUID, str]
-    mount_options: Mapping[UUID, dict[str, Any]]
-
-
-@dataclass
 class MountInfo:
-    vfolder_id: UUID
-    kernel_path: PurePosixPath | None = None
+    """Input form for an extra mount — ``mount_perm=None`` means the
+    caller did not override and the revision-write step should pick up
+    the vfolder's own stored permission. An explicit value is used as
+    the override directly. Resolved to a concrete ``MountInfoEntry``
+    (non-nullable ``mount_perm``) before persisting so the stored row
+    becomes an immutable permission snapshot.
+    """
+
+    vfolder_id: VFolderUUID
+    mount_destination: str | None = None
+    mount_perm: MountPermission | None = None
 
 
 @dataclass
 class MountMetadata:
-    model_vfolder_id: UUID
-    model_definition_path: str | None = None
-    model_mount_destination: str = "/models"
-    extra_mounts: list[VFolderMount] = field(default_factory=list)
-
-    def to_mount_spec(self) -> MountSpec:
-        mounts = [
-            self.model_vfolder_id,
-            *[m.vfid.folder_id for m in self.extra_mounts],
-        ]
-        mount_map = {
-            self.model_vfolder_id: self.model_mount_destination,
-            **{m.vfid.folder_id: m.kernel_path.as_posix() for m in self.extra_mounts},
-        }
-        mount_options: dict[UUID, dict[str, MountPermission]] = {
-            self.model_vfolder_id: {"permission": MountPermission.READ_ONLY},
-            **{m.vfid.folder_id: {"permission": m.mount_perm} for m in self.extra_mounts},
-        }
-        return MountSpec(mounts=mounts, mount_map=mount_map, mount_options=mount_options)
+    # Non-nullable by design. ``MountMetadata`` is only constructed inside
+    # scheduling / deployment-building paths where a real model vfolder is
+    # guaranteed — callers must raise before reaching here when the vfolder
+    # is missing (SET NULL state on the persisted row is represented by
+    # ``ModelMountConfigData.vfolder_id``, not here).
+    model_vfolder_id: VFolderUUID
+    model_definition_path: str | None
+    model_mount_destination: str
+    extra_mounts: list[MountInfoEntry]
 
 
 @dataclass
@@ -341,6 +361,42 @@ class ConfiguredModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
+class DeploymentTimeouts(ConfiguredModel):
+    """Handler-keyed timeout thresholds in seconds.
+
+    Resolution order for a given ``handler_name``:
+    1. ``by_handler[handler_name]`` if the key is present (value may be
+       ``None`` to explicitly disable the timeout for that handler).
+    2. ``default`` otherwise.
+
+    ``None`` at either layer means "no timeout — handler may run
+    indefinitely." Constructing ``DeploymentTimeouts()`` with no args
+    yields a fully unbounded policy; the project's baseline policy
+    lives on the scaling group's ``default_deployment_options``.
+    """
+
+    default: int | None = None
+    by_handler: dict[str, int | None] = Field(default_factory=dict)
+
+    def resolve(self, handler_name: str) -> int | None:
+        if handler_name in self.by_handler:
+            return self.by_handler[handler_name]
+        return self.default
+
+
+class DeploymentOptions(ConfiguredModel):
+    """Per-deployment operational options.
+
+    Snapshot from the scaling group's ``default_deployment_options`` at
+    create time and persisted on the ``endpoints`` row so runtime
+    lookups do not need to join against the scaling group. Future
+    changes to the scaling group default therefore do not propagate to
+    existing deployments.
+    """
+
+    timeouts: DeploymentTimeouts = Field(default_factory=DeploymentTimeouts)
+
+
 class ResourceSpec(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
@@ -352,7 +408,7 @@ class ExecutionSpec(ConfiguredModel):
     startup_command: str | None = None
     bootstrap_script: str | None = None
     environ: dict[str, str] | None = None
-    runtime_variant: RuntimeVariant
+    runtime_variant_id: RuntimeVariantID
     callback_url: yarl.URL | None = None
     inference_runtime_config: Mapping[str, Any] | None = None
 
@@ -360,14 +416,17 @@ class ExecutionSpec(ConfiguredModel):
 class PresetValueSpec(ConfiguredModel):
     """A runtime variant preset value binding stored in a deployment revision."""
 
-    preset_id: UUID
+    preset_id: DeploymentPresetID
     value: str
 
 
 class ModelRevisionSpec(ConfiguredModel):
-    revision_id: UUID | None = None
-    image_id: UUID | None = None
-    image_identifier: ImageIdentifier
+    revision_id: DeploymentRevisionID | None = None
+    # Image reference is a single UUID pointer to the ``images`` row. The
+    # legacy canonical + architecture pair no longer lives on the spec;
+    # callers that need those strings should resolve them from the
+    # referenced ``ImageRow`` via the repository.
+    image_id: ImageID
     resource_spec: ResourceSpec
     mounts: MountMetadata
     execution: ExecutionSpec
@@ -375,15 +434,6 @@ class ModelRevisionSpec(ConfiguredModel):
     preset_values: list[PresetValueSpec] = Field(default_factory=list)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @field_validator("image_identifier")
-    @classmethod
-    def validate_image_identifier(cls, v: ImageIdentifier) -> ImageIdentifier:
-        if not v.canonical or v.canonical.strip() == "":
-            raise ValueError("Image canonical must be specified")
-        if not v.architecture or v.architecture.strip() == "":
-            raise ValueError("Image architecture must be specified")
-        return v
 
 
 class ImageIdentifierDraft(ConfiguredModel):
@@ -404,23 +454,47 @@ class ModelRevisionSpecDraft(ConfiguredModel):
     mounts: MountMetadata
     execution: ExecutionSpec
 
+    def to_draft(self, image_id: ImageID | None) -> RevisionDraft:
+        """Project this legacy spec draft onto a ``RevisionDraft`` layer.
+
+        ``image_id`` is resolved upstream from the spec's ``image_identifier``
+        (canonical + architecture) via the repository; mount-identifying
+        fields live on ``MountMetadata`` and are passed alongside into
+        ``add_revision`` rather than through the draft chain.
+        """
+        return RevisionDraft(
+            image_id=image_id,
+            resource_slots=self.resource_spec.resource_slots,
+            resource_opts=self.resource_spec.resource_opts,
+            cluster_mode=self.resource_spec.cluster_mode,
+            cluster_size=self.resource_spec.cluster_size,
+            startup_command=self.execution.startup_command,
+            bootstrap_script=self.execution.bootstrap_script,
+            environ=self.execution.environ,
+            runtime_variant_id=self.execution.runtime_variant_id,
+            callback_url=self.execution.callback_url,
+            inference_runtime_config=self.execution.inference_runtime_config,
+        )
+
 
 @dataclass
 class RevisionDraft:
     """Intermediate representation for revision creation with all fields optional.
 
-    Drafts are created independently from each source (deployment-config.yaml,
-    revision preset, model-definition.yaml, user request) and merged by
-    ``merge_revision_drafts`` with later drafts taking priority. Only non-None
-    fields participate in the merge. ``environ`` / ``resource_slots`` /
-    ``resource_opts`` are field-merged (dict merge); all other fields are
-    replaced by the latest non-None value.
+    Drafts are produced independently from each source (deployment-config.yaml,
+    revision preset, model-definition.yaml, user request) and layered together
+    via ``merge`` (``self`` is the lower-priority base, ``other`` overrides).
+    Only non-None fields on ``other`` participate in the merge. ``environ`` /
+    ``resource_slots`` / ``resource_opts`` are field-merged (dict union, later
+    keys win); all other fields are replaced by the latest non-None value.
     """
 
-    # Image
-    image_id: UUID | None = None
-    image_canonical: str | None = None
-    image_architecture: str | None = None
+    # Image.
+    # ``image_id is None`` signals either that no layer in the merge chain
+    # supplied an image yet, or that the backing image row has been deleted
+    # (see ``deployment_revisions.image`` SET NULL FK) — downstream
+    # resolvers must treat the latter as non-deployable.
+    image_id: ImageID | None = None
     # Resource
     resource_slots: Mapping[str, Any] | None = None
     resource_opts: Mapping[str, Any] | None = None
@@ -430,7 +504,7 @@ class RevisionDraft:
     startup_command: str | None = None
     bootstrap_script: str | None = None
     environ: Mapping[str, str] | None = None
-    runtime_variant: RuntimeVariant | None = None
+    runtime_variant_id: RuntimeVariantID | None = None
     callback_url: yarl.URL | None = None
     inference_runtime_config: Mapping[str, Any] | None = None
     # Model definition (draft form — partial fields allowed; merged then resolved
@@ -439,67 +513,144 @@ class RevisionDraft:
     # Preset values (carried alongside; not field-merged)
     preset_values: list[PresetValueData] | None = None
 
+    def merge(self, other: RevisionDraft) -> RevisionDraft:
+        """Return a new draft with ``other`` layered on top of ``self``."""
+        return RevisionDraft(
+            image_id=other.image_id if other.image_id is not None else self.image_id,
+            resource_slots=_merge_mappings(self.resource_slots, other.resource_slots),
+            resource_opts=_merge_mappings(self.resource_opts, other.resource_opts),
+            cluster_mode=other.cluster_mode
+            if other.cluster_mode is not None
+            else self.cluster_mode,
+            cluster_size=other.cluster_size
+            if other.cluster_size is not None
+            else self.cluster_size,
+            startup_command=other.startup_command
+            if other.startup_command is not None
+            else self.startup_command,
+            bootstrap_script=other.bootstrap_script
+            if other.bootstrap_script is not None
+            else self.bootstrap_script,
+            environ=_merge_mappings(self.environ, other.environ),
+            runtime_variant_id=other.runtime_variant_id
+            if other.runtime_variant_id is not None
+            else self.runtime_variant_id,
+            callback_url=other.callback_url
+            if other.callback_url is not None
+            else self.callback_url,
+            inference_runtime_config=other.inference_runtime_config
+            if other.inference_runtime_config is not None
+            else self.inference_runtime_config,
+            model_definition=_merge_model_definition(self.model_definition, other.model_definition),
+            preset_values=list(other.preset_values)
+            if other.preset_values is not None
+            else (list(self.preset_values) if self.preset_values is not None else None),
+        )
 
-def merge_revision_drafts(*drafts: RevisionDraft) -> RevisionDraft:
-    """Merge multiple RevisionDrafts with later drafts taking priority.
+    def to_model_revision_spec(self, mounts: MountMetadata) -> ModelRevisionSpec:
+        """Project the merged draft into a final ``ModelRevisionSpec``.
 
-    Replace semantics: later non-None value overwrites earlier for most fields.
-    Dict merge semantics: ``environ``, ``resource_slots``, ``resource_opts``
-    (later keys overwrite earlier keys within the dict).
+        Validates that the merge chain produced an ``image_id`` and a
+        ``runtime_variant_id`` — both are required at the persistence
+        boundary. Missing values surface as ``InvalidAPIParameters`` so
+        API callers get a 400 instead of a silent cascade of ``None`` s
+        downstream.
+        """
+        if self.image_id is None:
+            raise InvalidAPIParameters("image_id is required to build a revision")
+        if self.runtime_variant_id is None:
+            raise InvalidAPIParameters("runtime_variant_id is required to build a revision")
+        return ModelRevisionSpec(
+            image_id=self.image_id,
+            resource_spec=ResourceSpec(
+                cluster_mode=self.cluster_mode or ClusterMode.SINGLE_NODE,
+                cluster_size=self.cluster_size or 1,
+                resource_slots=self.resource_slots or {},
+                resource_opts=self.resource_opts,
+            ),
+            mounts=mounts,
+            execution=ExecutionSpec(
+                startup_command=self.startup_command,
+                bootstrap_script=self.bootstrap_script,
+                environ=dict(self.environ) if self.environ else None,
+                runtime_variant_id=self.runtime_variant_id,
+                callback_url=self.callback_url,
+                inference_runtime_config=self.inference_runtime_config,
+            ),
+            model_definition=(
+                self.model_definition.to_resolved() if self.model_definition is not None else None
+            ),
+        )
+
+
+def _merge_mappings(
+    lower: Mapping[str, Any] | None,
+    upper: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    if lower is None and upper is None:
+        return None
+    merged: dict[str, Any] = {}
+    if lower is not None:
+        merged.update(lower)
+    if upper is not None:
+        merged.update(upper)
+    return merged or None
+
+
+def _merge_model_definition(
+    lower: ModelDefinitionDraft | None,
+    upper: ModelDefinitionDraft | None,
+) -> ModelDefinitionDraft | None:
+    if upper is None:
+        return lower
+    if lower is None:
+        return upper
+    return lower.merge(upper)
+
+
+# ========== Revision-creation Read Bundles ==========
+#
+# Each bundle groups the DB-sourced draft ingredients that the revision
+# pipeline needs for one API path (legacy create, legacy modify, v2 add).
+# ``DeploymentRepository`` owns the single batched read method per bundle so
+# every query runs inside one session; the reader layer combines the bundle
+# with storage-backed files (deployment-config.yaml, model-definition.yaml)
+# before assembling the drafts list.
+
+
+@dataclass(frozen=True)
+class LegacyRevisionCreateReadBundle:
+    """DB reads for legacy model-serving create (no existing revision)."""
+
+    variant: RuntimeVariantData
+    preset: DeploymentRevisionPresetData | None
+    preset_resource_slots: list[ResourceSlotEntryData] | None
+
+
+@dataclass(frozen=True)
+class LegacyRevisionModifyReadBundle:
+    """DB reads for legacy model-serving modify.
+
+    ``base`` is the latest revision (highest ``revision_number``) already
+    attached to the endpoint, returned as the raw ``ModelRevisionData``. The
+    reader projects it into a merge-layer draft; v2 ``add_revision`` never
+    loads this because v2 treats each revision as a fresh full input rather
+    than a delta.
     """
-    result = RevisionDraft()
-    merged_environ: dict[str, str] = {}
-    merged_resource_slots: dict[str, Any] = {}
-    merged_resource_opts: dict[str, Any] = {}
 
-    for draft in drafts:
-        if draft.image_id is not None:
-            result = dataclasses.replace(result, image_id=draft.image_id)
-        if draft.image_canonical is not None:
-            result = dataclasses.replace(result, image_canonical=draft.image_canonical)
-        if draft.image_architecture is not None:
-            result = dataclasses.replace(result, image_architecture=draft.image_architecture)
-        if draft.resource_slots is not None:
-            merged_resource_slots.update(draft.resource_slots)
-        if draft.resource_opts is not None:
-            merged_resource_opts.update(draft.resource_opts)
-        if draft.cluster_mode is not None:
-            result = dataclasses.replace(result, cluster_mode=draft.cluster_mode)
-        if draft.cluster_size is not None:
-            result = dataclasses.replace(result, cluster_size=draft.cluster_size)
-        if draft.startup_command is not None:
-            result = dataclasses.replace(result, startup_command=draft.startup_command)
-        if draft.bootstrap_script is not None:
-            result = dataclasses.replace(result, bootstrap_script=draft.bootstrap_script)
-        if draft.environ is not None:
-            merged_environ.update(draft.environ)
-        if draft.runtime_variant is not None:
-            result = dataclasses.replace(result, runtime_variant=draft.runtime_variant)
-        if draft.callback_url is not None:
-            result = dataclasses.replace(result, callback_url=draft.callback_url)
-        if draft.inference_runtime_config is not None:
-            result = dataclasses.replace(
-                result, inference_runtime_config=draft.inference_runtime_config
-            )
-        if draft.model_definition is not None:
-            if result.model_definition is None:
-                result = dataclasses.replace(result, model_definition=draft.model_definition)
-            else:
-                result = dataclasses.replace(
-                    result,
-                    model_definition=result.model_definition.merge(draft.model_definition),
-                )
-        if draft.preset_values is not None:
-            result = dataclasses.replace(result, preset_values=list(draft.preset_values))
+    variant: RuntimeVariantData
+    preset: DeploymentRevisionPresetData | None
+    preset_resource_slots: list[ResourceSlotEntryData] | None
+    base: ModelRevisionData
 
-    if merged_resource_slots:
-        result = dataclasses.replace(result, resource_slots=merged_resource_slots)
-    if merged_resource_opts:
-        result = dataclasses.replace(result, resource_opts=merged_resource_opts)
-    if merged_environ:
-        result = dataclasses.replace(result, environ=merged_environ)
 
-    return result
+@dataclass(frozen=True)
+class DeploymentRevisionReadBundle:
+    """DB reads for v2 deployment ``add_revision`` (typed ids, no base)."""
+
+    variant: RuntimeVariantData
+    preset: DeploymentRevisionPresetData | None
+    preset_resource_slots: list[ResourceSlotEntryData] | None
 
 
 @dataclass
@@ -512,18 +663,19 @@ class DeploymentNetworkSpec:
 
 @dataclass
 class DeploymentInfo:
-    id: UUID
+    id: DeploymentID
     metadata: DeploymentMetadata
     state: DeploymentState
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
-    current_revision_id: UUID | None = None
+    options: DeploymentOptions
+    current_revision_id: DeploymentRevisionID | None = None
     policy: DeploymentPolicyData | None = None
-    deploying_revision_id: UUID | None = None
+    deploying_revision_id: DeploymentRevisionID | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
-    def resolve_revision_spec(self, revision_id: UUID) -> ModelRevisionSpec:
+    def resolve_revision_spec(self, revision_id: DeploymentRevisionID) -> ModelRevisionSpec:
         """Find a ModelRevisionSpec by revision_id from model_revisions.
 
         Raises:
@@ -536,25 +688,83 @@ class DeploymentInfo:
             f"Revision {revision_id} not found in model_revisions of deployment {self.id}"
         )
 
+    def is_transition_timed_out(
+        self,
+        started_at: datetime | None,
+        handler_name: str,
+        current_dbtime: datetime,
+    ) -> bool:
+        """Check whether the handler has exceeded its configured timeout
+        against this deployment's persisted :class:`DeploymentOptions`.
+
+        ``options.timeouts.resolve(handler_name)`` yields the allowed
+        seconds; ``None`` means unbounded. ``started_at`` ``None`` also
+        means "never started" so the answer is always ``False``. Both
+        timestamps originate from PostgreSQL ``timestamptz`` columns
+        and therefore share the same tzinfo — no conversion needed.
+        """
+        if started_at is None:
+            return False
+        timeout = self.options.timeouts.resolve(handler_name)
+        if timeout is None:
+            return False
+        elapsed = (current_dbtime - started_at).total_seconds()
+        return elapsed > timeout
+
+
+@dataclass(frozen=True)
+class DeploymentLastHistory:
+    """Most recent ``deployment_history`` row snapshot for one deployment.
+
+    Carried alongside :class:`DeploymentInfo` so the coordinator can
+    (a) decide per failure whether the prior phase matches the current
+    handler (retry counting / timeout classification) and (b) classify
+    a freshly built history spec as a merge (increment attempts on the
+    existing row) or a create (insert a new row).
+
+    Attributes:
+        id: Primary key of the row; used to target the UPDATE when
+            merging.
+        phase: The ``phase`` value recorded on that history row.
+        attempts: Retry counter accumulated on that row.
+        started_at: When the row was created — used as the phase start
+            timestamp for timeout classification.
+        error_code: Captured ``error_code``; merge only applies when
+            equal to the new spec's error_code.
+        to_status: Captured ``to_status`` (lifecycle string, or
+            ``None`` when the prior transition did not touch
+            lifecycle).
+    """
+
+    id: UUID
+    phase: str
+    attempts: int
+    started_at: datetime
+    error_code: str | None
+    to_status: str | None
+
 
 @dataclass
 class DeploymentWithHistory:
-    """Bundles a deployment with its scheduling history context.
+    """Bundles a deployment with the most recent history row in its
+    handler category.
 
     This is the primary data unit for deployment coordinator operations,
-    analogous to SessionWithKernels for session scheduling.
+    analogous to SessionWithKernels for session scheduling. History rows
+    are pre-filtered by ``handler_category`` at the repository layer;
+    the coordinator then compares ``last_history.phase`` with the
+    current handler name to derive retry metadata only when the two
+    match (otherwise the failure counts as a fresh attempt).
 
     Attributes:
         deployment_info: Deployment information including lifecycle data
-        phase_attempts: Number of attempts for current phase from scheduling history
-                       (used for failure classification: give_up when >= max_retries)
-        phase_started_at: When the current phase started from scheduling history
-                         (used for failure classification: expired when timeout exceeded)
+        last_history: Latest history row scoped to the current handler
+            category, or ``None`` when no prior row exists in that
+            category.
     """
 
     deployment_info: DeploymentInfo
-    phase_attempts: int = 0
-    phase_started_at: datetime | None = None
+    last_history: DeploymentLastHistory | None
 
 
 @dataclass
@@ -567,13 +777,7 @@ class DeploymentSessionSpec:
 class ScaleOutDecision:
     deployment_info: DeploymentInfo
     new_replica_count: int
-    target_revision_id: UUID | None = None
-
-
-@dataclass
-class DefinitionFiles:
-    deployment_config: dict[str, Any] | None
-    model_definition: dict[str, Any]
+    target_revision_id: DeploymentRevisionID | None = None
 
 
 _HEALTH_TERMINATION_PRIORITY: dict[RouteHealthStatus, int] = {
@@ -589,7 +793,7 @@ class RouteInfo:
     """Route information for deployment."""
 
     route_id: UUID
-    endpoint_id: UUID
+    deployment_id: DeploymentID
     session_id: SessionId | None
     status: RouteStatus
     health_status: RouteHealthStatus
@@ -679,22 +883,16 @@ class ResourceConfigData:
 
 @dataclass
 class ModelRuntimeConfigData:
-    runtime_variant: RuntimeVariant
+    runtime_variant_id: RuntimeVariantID
     inference_runtime_config: Mapping[str, Any] | None = None
     environ: dict[str, Any] | None = None
 
 
 @dataclass
 class ModelMountConfigData:
-    vfolder_id: UUID | None
+    vfolder_id: VFolderUUID | None
     mount_destination: str | None
     definition_path: str
-
-
-@dataclass
-class ExtraVFolderMountData:
-    vfolder_id: UUID
-    mount_destination: str  # PurePosixPath should be converted to str
 
 
 @dataclass
@@ -706,9 +904,45 @@ class ModelRevisionData:
     model_runtime_config: ModelRuntimeConfigData
     model_mount_config: ModelMountConfigData
     created_at: datetime
-    image_id: UUID
+    # ``image_id is None`` signals the backing image row has been deleted
+    # (SET NULL FK); the revision is kept for history but cannot be
+    # redeployed.
+    image_id: ImageID | None
     model_definition: ModelDefinition | None = None
-    extra_vfolder_mounts: list[ExtraVFolderMountData] = field(default_factory=list)
+    # Same type used for row storage, ``MountMetadata.extra_mounts``, and
+    # this data-layer projection — keeps ``mount_perm`` visible end-to-end
+    # so modify flows can carry it over without information loss.
+    extra_vfolder_mounts: list[MountInfoEntry] = field(default_factory=list)
+
+    def to_draft(self) -> RevisionDraft:
+        """Project this persisted revision onto a ``RevisionDraft`` layer.
+
+        Used as the base (lowest-priority-below-request) layer on the legacy
+        modify path so untouched fields survive when the user submits a partial
+        override. Fields that do not live on ``ModelRevisionData``
+        (``startup_command``, ``bootstrap_script``, ``callback_url``) remain
+        ``None`` — the reader pipeline resolves them from preset /
+        ``deployment-config.yaml`` / ``model-definition.yaml`` / user override.
+        """
+        environ = self.model_runtime_config.environ
+        resource_slots = dict(self.resource_config.resource_slot) or None
+        resource_opts = dict(self.resource_config.resource_opts) or None
+        model_definition_draft: ModelDefinitionDraft | None = (
+            ModelDefinitionDraft.model_validate(self.model_definition.model_dump(by_alias=True))
+            if self.model_definition is not None
+            else None
+        )
+        return RevisionDraft(
+            image_id=self.image_id,
+            resource_slots=resource_slots,
+            resource_opts=resource_opts,
+            cluster_mode=self.cluster_config.mode,
+            cluster_size=self.cluster_config.size,
+            environ={k: str(v) for k, v in environ.items()} if environ else None,
+            runtime_variant_id=self.model_runtime_config.runtime_variant_id,
+            inference_runtime_config=self.model_runtime_config.inference_runtime_config,
+            model_definition=model_definition_draft,
+        )
 
 
 @dataclass
@@ -730,16 +964,21 @@ class ReplicaStateData:
 
 @dataclass
 class ModelDeploymentData:
-    id: UUID
+    id: DeploymentID
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkSpec
     revision: ModelRevisionData | None
-    deploying_revision_id: UUID | None
-    revision_history_ids: list[UUID]
+    deploying_revision_id: DeploymentRevisionID | None
+    revision_history_ids: list[DeploymentRevisionID]
     scaling_rule_ids: list[UUID]
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
+    options: DeploymentOptions
+    # Orthogonal to ``metadata.status`` (the lifecycle axis): tracks
+    # whether the endpoint is currently reconciling its replica count
+    # (``SCALING``) or holding at the desired count (``STABLE``).
+    scaling_state: ScalingState
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
@@ -808,6 +1047,12 @@ class DeploymentHistoryData:
 
     id: UUID
     deployment_id: UUID
+
+    # Which axis produced this row. Lifecycle handlers advance the
+    # monotonic lifecycle (PENDING → ... → DESTROYED); scaling handlers
+    # operate on the orthogonal scaling_state axis. Persisted NOT NULL on
+    # ``deployment_history.handler_category`` so this field is always set.
+    handler_category: DeploymentHandlerCategory
 
     phase: str  # DeploymentLifecycleType value
     from_status: ModelDeploymentStatus | None

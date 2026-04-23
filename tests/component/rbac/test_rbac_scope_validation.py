@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO, ScopeInputDTO
-from ai.backend.manager.api.adapters.rbac import RBACAdapter
+from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 
 
