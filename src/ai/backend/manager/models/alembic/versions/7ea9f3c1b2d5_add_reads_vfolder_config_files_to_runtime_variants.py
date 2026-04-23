@@ -1,7 +1,7 @@
 """add reads_vfolder_config_files to runtime_variants
 
 Revision ID: 7ea9f3c1b2d5
-Revises: d3683e2703ff
+Revises: ad7acfe8aa1c
 Create Date: 2026-04-18
 
 """
@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "7ea9f3c1b2d5"
-down_revision = "d3683e2703ff"
+down_revision = "ad7acfe8aa1c"
 branch_labels = None
 depends_on = None
 
