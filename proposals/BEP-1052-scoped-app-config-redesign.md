@@ -864,16 +864,27 @@ enum AppConfigStatus {
 # ── Composite key shared by write mutations ──────────────────
 
 """
-Natural composite key identifying a single app config row.
-Mirrors the Python `AppConfigKey` dataclass used by the repository /
-db_source layer.
+Natural composite key identifying a single app config row —
+**input** type. Mirrors the Python `AppConfigKey` dataclass used by
+the repository / db_source layer.
 - `PUBLIC`:               `scopeId` is the literal string `"public"`.
 - `DOMAIN`:               `scopeId` is `domain_name`.
 - `DOMAIN_USER_DEFAULTS`: `scopeId` is `domain_name`.
 - `USER`:                 `scopeId` is `user_id` (UUID string).
 - `name` is the document name (unique within the scope).
 """
-input AppConfigKey {
+input AppConfigKeyInput {
+  scopeType: AppConfigScopeType!
+  scopeId: String!
+  name: String!
+}
+
+"""
+The same natural key exposed as a GQL **output** object type for
+reuse in payload contexts (error items, etc.). Field semantics match
+`AppConfigKeyInput`.
+"""
+type AppConfigKey {
   scopeType: AppConfigScopeType!
   scopeId: String!
   name: String!
@@ -884,7 +895,7 @@ input AppConfigKey {
 """Per-item input for admin bulk create/update (key + config)."""
 input AdminAppConfigItemInput {
   """Target row identifier."""
-  key: AppConfigKey!
+  key: AppConfigKeyInput!
 
   """
   Stored value — initial on create, wholesale replacement on update.
@@ -908,12 +919,12 @@ input AdminBulkUpdateAppConfigInput {
 
 input AdminBulkDeleteAppConfigInput {
   """Natural keys of the rows to soft-delete."""
-  keys: [AppConfigKey!]!
+  keys: [AppConfigKeyInput!]!
 }
 
 input AdminBulkRestoreAppConfigInput {
   """Natural keys of the rows to restore."""
-  keys: [AppConfigKey!]!
+  keys: [AppConfigKeyInput!]!
 }
 
 # ── My Inputs — scope=USER, scopeId=current_user.user_id implicit ──
@@ -959,14 +970,8 @@ Per-item error info for a failed item in an admin bulk write.
 Shared by all four admin bulk mutations.
 """
 type AdminAppConfigError {
-  """Scope of the failed item."""
-  scopeType: AppConfigScopeType!
-
-  """Scope ID of the failed item."""
-  scopeId: String!
-
-  """Name of the failed item."""
-  name: String!
+  """Natural key of the failed item (scopeType / scopeId / name)."""
+  key: AppConfigKey!
 
   """Error message describing the failure."""
   message: String!
@@ -1287,8 +1292,10 @@ corresponding GQL input / payload. Example (`bulk-create`):
 {
   "created": [ /* AppConfig objects */ ],
   "failed": [
-    { "scope_type": "USER", "scope_id": "...",
-      "name": "...", "message": "..." }
+    {
+      "key": { "scope_type": "USER", "scope_id": "...", "name": "..." },
+      "message": "..."
+    }
   ]
 }
 ```
@@ -1724,7 +1731,7 @@ should be published under `DOMAIN_USER_DEFAULTS` instead.
 mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigInput!) {
   adminBulkCreateAppConfigs(input: $input) {
     created { id scope scopeId name status config updatedAt }
-    failed { scope scopeId name message }
+    failed { key { scopeType scopeId name } message }
   }
 }
 ```
@@ -1772,7 +1779,7 @@ Items whose key already has a row (ALIVE or DELETED) land in
 mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigInput!) {
   adminBulkCreateAppConfigs(input: $input) {
     created { id scope scopeId name status config updatedAt }
-    failed { scope scopeId name message }
+    failed { key { scopeType scopeId name } message }
   }
 }
 ```
@@ -1853,7 +1860,7 @@ Removing a stale or deprecated document — e.g. retiring an old
 mutation RemoveDomainLegacyMenu($input: AdminBulkDeleteAppConfigInput!) {
   adminBulkDeleteAppConfigs(input: $input) {
     deleted { id scope scopeId name status updatedAt }
-    failed { scope scopeId name message }
+    failed { key { scopeType scopeId name } message }
   }
 }
 ```
