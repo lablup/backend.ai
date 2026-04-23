@@ -1554,21 +1554,20 @@ class RBACAdapter(BaseAdapter):
         self,
         input: CreateRoleInvitationInputDTO,
     ) -> CreateRoleInvitationPayload:
-        """Create role invitations by email.
-
-        The response is deliberately opaque to prevent user enumeration.
-        """
+        """Create role invitations by email."""
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        await self._processors.permission_controller.create_role_invitation.wait_for_complete(
+        result = await self._processors.permission_controller.create_role_invitation.wait_for_complete(
             CreateInvitationServiceAction(
                 role_id=input.role_id,
                 invitee_emails=input.emails,
                 inviter_user_id=me.user_id,
             )
         )
-        return CreateRoleInvitationPayload()
+        return CreateRoleInvitationPayload(
+            items=[self._invitation_data_to_node(d) for d in result.created],
+        )
 
     async def accept_role_invitation(
         self,

@@ -3701,8 +3701,8 @@ input CreateRoleInvitationInput
 type CreateRoleInvitationPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Always true for a successful request"""
-  ok: Boolean!
+  """List of created role invitations."""
+  items: [RoleInvitation!]!
 }
 
 """Added in 26.4.2. Input for creating a runtime variant."""

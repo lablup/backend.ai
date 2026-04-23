@@ -30,11 +30,7 @@ class V2RoleInvitationHandler:
         self,
         body: BodyParam[CreateRoleInvitationInput],
     ) -> APIResponse:
-        """Create role invitations by email.
-
-        Response is opaque: always 201 regardless of whether
-        the user existed or was eligible.
-        """
+        """Create role invitations by email."""
         result = await self._adapter.create_role_invitation(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 

@@ -2294,8 +2294,8 @@ input CreateRoleInvitationInput {
 
 """Added in UNRELEASED. Payload for role invitation creation."""
 type CreateRoleInvitationPayload {
-  """Always true for a successful request"""
-  ok: Boolean!
+  """List of created role invitations."""
+  items: [RoleInvitation!]!
 }
 
 """Added in 26.4.2. Input for creating a runtime variant."""

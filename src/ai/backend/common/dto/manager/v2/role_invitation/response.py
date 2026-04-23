@@ -33,13 +33,11 @@ class RoleInvitationNode(BaseResponseModel):
 
 
 class CreateRoleInvitationPayload(BaseResponseModel):
-    """Payload for role invitation creation.
+    """Payload for role invitation creation."""
 
-    The response is deliberately opaque: no distinction between
-    'user found' and 'user not found / not eligible'.
-    """
-
-    ok: bool = Field(default=True, description="Always true for a successful request")
+    items: list[RoleInvitationNode] = Field(
+        description="List of created role invitations."
+    )
 
 
 class SearchRoleInvitationsPayload(BaseResponseModel):

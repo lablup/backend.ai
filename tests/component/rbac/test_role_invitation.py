@@ -151,7 +151,10 @@ class TestCreateRoleInvitation:
             )
         )
         assert isinstance(result, CreateRoleInvitationPayload)
-        assert result.ok is True
+        assert len(result.items) == 1
+        node = result.items[0]
+        assert isinstance(node, RoleInvitationNode)
+        assert node.role_id == target_role.role.id
 
     async def test_create_invitation_nonexistent_user(
         self,
@@ -159,7 +162,7 @@ class TestCreateRoleInvitation:
         admin_registry: BackendAIClientRegistry,
         target_role: CreateRoleResponse,
     ) -> None:
-        """Create invitation for non-existent user: 201 returned (opaque), no row inserted."""
+        """Create invitation for non-existent user: 201, empty list (no matching user)."""
         fake_email = f"nobody-{secrets.token_hex(4)}@nonexistent.test"
         result = await admin_v2_registry.role_invitation.create(
             CreateRoleInvitationInput(
@@ -167,9 +170,8 @@ class TestCreateRoleInvitation:
                 emails=[fake_email],
             )
         )
-        # Opaque response — always 201 regardless of user existence
         assert isinstance(result, CreateRoleInvitationPayload)
-        assert result.ok is True
+        assert len(result.items) == 0
 
     async def test_create_duplicate_pending_invitation(
         self,
@@ -188,7 +190,7 @@ class TestCreateRoleInvitation:
         # Second invitation with the same parameters — should not create a new row
         result = await admin_v2_registry.role_invitation.create(input_dto)
         assert isinstance(result, CreateRoleInvitationPayload)
-        assert result.ok is True
+        assert len(result.items) == 0
 
 
 class TestAcceptRejectCancelInvitation:

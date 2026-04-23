@@ -141,4 +141,6 @@ class CreateRoleInvitationInput(PydanticInputMixin[CreateRoleInvitationInputDTO]
     name="CreateRoleInvitationPayload",
 )
 class CreateRoleInvitationPayload(PydanticOutputMixin[CreateRoleInvitationPayloadDTO]):
-    ok: bool = gql_field(description="Always true for a successful request.")
+    items: list[RoleInvitationGQL] = gql_field(
+        description="List of created role invitations."
+    )
