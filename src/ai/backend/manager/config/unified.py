@@ -539,8 +539,8 @@ class RBACConfig(BaseConfigSchema):
             description=(
                 "Whether to enable RBAC enforcement on the manager's read/validation path. "
                 "When true (default), all RBAC validators run normally. "
-                "When false, RBAC validators short-circuit and fall back to the legacy "
-                "permission path (user.role / is_admin / domain and project membership). "
+                "When false, RBAC validators short-circuit so that only the legacy "
+                "permission path (user.role / is_admin / domain and project membership) applies. "
                 "RBAC write paths continue to populate association and role-mapping rows "
                 "regardless of this flag, so re-enabling does not require data backfill."
             ),
