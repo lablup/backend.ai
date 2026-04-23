@@ -61,6 +61,14 @@ from .role import (
     RoleStatusGQL,
     UpdateRoleInput,
 )
+from .role_invitation import (
+    CreateRoleInvitationInput,
+    CreateRoleInvitationPayload,
+    RoleInvitationConnection,
+    RoleInvitationEdge,
+    RoleInvitationGQL,
+    RoleInvitationStateGQL,
+)
 from .scope import RBACElementTypeGQL, ScopeInputGQL
 
 __all__ = [
@@ -126,6 +134,13 @@ __all__ = [
     "EntityNode",
     "EntityEdge",
     "EntityConnection",
+    # Role invitation types
+    "RoleInvitationStateGQL",
+    "RoleInvitationGQL",
+    "RoleInvitationConnection",
+    "RoleInvitationEdge",
+    "CreateRoleInvitationInput",
+    "CreateRoleInvitationPayload",
     # Scope types
     "ScopeInputGQL",
     # Scope-entity combination
