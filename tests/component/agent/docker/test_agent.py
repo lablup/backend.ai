@@ -80,12 +80,8 @@ digest_mismatching_image_info = {
 
 async def test_auto_pull_digest_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(return_value=digest_matching_image_info)
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert not pull
     inspect_mock.assert_awaited_with(imgref.canonical)
@@ -93,12 +89,8 @@ async def test_auto_pull_digest_when_digest_matching(agent: DockerAgent, mocker:
 
 async def test_auto_pull_digest_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(return_value=digest_mismatching_image_info)
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert pull
     inspect_mock.assert_awaited_with(imgref.canonical)
@@ -106,17 +98,13 @@ async def test_auto_pull_digest_when_digest_mismatching(agent: DockerAgent, mock
 
 async def test_auto_pull_digest_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(
         side_effect=DockerError(
             status=HTTPStatus.NOT_FOUND,
             data={"message": "Simulated missing image"},
         ),
     )
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert pull
     inspect_mock.assert_called_with(imgref.canonical)
@@ -124,12 +112,8 @@ async def test_auto_pull_digest_when_missing(agent: DockerAgent, mocker: Any) ->
 
 async def test_auto_pull_tag_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(return_value=digest_matching_image_info)
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert not pull
     inspect_mock.assert_awaited_with(imgref.canonical)
@@ -137,12 +121,8 @@ async def test_auto_pull_tag_when_digest_matching(agent: DockerAgent, mocker: An
 
 async def test_auto_pull_tag_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(return_value=digest_mismatching_image_info)
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert not pull
     inspect_mock.assert_awaited_with(imgref.canonical)
@@ -150,17 +130,13 @@ async def test_auto_pull_tag_when_digest_mismatching(agent: DockerAgent, mocker:
 
 async def test_auto_pull_tag_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(
         side_effect=DockerError(
             status=HTTPStatus.NOT_FOUND,
             data={"message": "Simulated missing image"},
         ),
     )
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert pull
     inspect_mock.assert_called_with(imgref.canonical)
@@ -168,12 +144,8 @@ async def test_auto_pull_tag_when_missing(agent: DockerAgent, mocker: Any) -> No
 
 async def test_auto_pull_none_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(return_value=digest_matching_image_info)
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert not pull
     inspect_mock.assert_awaited_with(imgref.canonical)
@@ -181,12 +153,8 @@ async def test_auto_pull_none_when_digest_matching(agent: DockerAgent, mocker: A
 
 async def test_auto_pull_none_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(return_value=digest_mismatching_image_info)
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     pull = await agent.check_image(imgref, query_digest, behavior)
     assert not pull
     inspect_mock.assert_awaited_with(imgref.canonical)
@@ -194,17 +162,13 @@ async def test_auto_pull_none_when_digest_mismatching(agent: DockerAgent, mocker
 
 async def test_auto_pull_none_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
-    docker_mock = MagicMock()
-    docker_mock.close = AsyncMock()
-    docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(
         side_effect=DockerError(
             status=HTTPStatus.NOT_FOUND,
             data={"message": "Simulated missing image"},
         ),
     )
-    docker_mock.images.inspect = inspect_mock
-    mocker.patch("ai.backend.agent.docker.agent.Docker", return_value=docker_mock)
+    mocker.patch.object(agent.docker.images, "inspect", new=inspect_mock)
     with pytest.raises(ImageNotAvailable) as e:
         await agent.check_image(imgref, query_digest, behavior)
     assert e.value.args[0] is imgref
@@ -219,3 +183,68 @@ async def test_save_last_registry_exception(agent: DockerAgent, mocker: Any) -> 
     )
     await agent.save_last_registry()
     assert not registry_state_path.exists()
+
+
+@pytest.fixture
+async def unmanaged_agent(
+    local_config: Any, test_id: str, mocker: Any, socket_relay_image: Any
+) -> Any:
+    """
+    Like the ``agent`` fixture, but leaves shutdown entirely to the test so it
+    can assert against the lifecycle of the shared aiodocker client.
+    """
+    dummy_etcd = DummyEtcd()
+    mocked_etcd_get_prefix = AsyncMock(return_value={})
+    mocker.patch.object(dummy_etcd, "get_prefix", new=mocked_etcd_get_prefix)
+    test_case_id = secrets.token_hex(8)
+    kernel_registry = KernelRegistry()
+    agent = await DockerAgent.new(
+        dummy_etcd,
+        local_config,
+        stats_monitor=None,
+        error_monitor=None,
+        skip_initial_scan=True,
+        agent_public_key=None,
+        kernel_registry=kernel_registry,
+        computers={},
+        slots={},
+        agent_class=AgentClass.PRIMARY,
+    )
+    agent.local_instance_id = test_case_id
+    yield agent
+    # Best-effort cleanup: close the shared client if the test did not already
+    # trigger a full shutdown.  ``Docker.close`` -> ``ClientSession.close`` is
+    # safe to call on an already-closed session.
+    if not agent.docker.session.closed:
+        await agent.docker.close()
+
+
+async def test_shared_docker_client_open_after_ainit(unmanaged_agent: DockerAgent) -> None:
+    assert unmanaged_agent.docker.session.closed is False
+
+
+async def test_shared_docker_client_closed_after_shutdown(
+    unmanaged_agent: DockerAgent,
+) -> None:
+    assert unmanaged_agent.docker.session.closed is False
+    await unmanaged_agent.shutdown(signal.SIGTERM)
+    assert unmanaged_agent.docker.session.closed is True
+
+
+async def test_shared_docker_client_closed_when_super_shutdown_raises(
+    unmanaged_agent: DockerAgent, mocker: Any
+) -> None:
+    # Simulate the base Agent.shutdown raising mid-shutdown — the shared
+    # aiodocker client must still be closed so its aiohttp.ClientSession does
+    # not leak.
+    class _SimulatedShutdownError(Exception):
+        pass
+
+    mocker.patch(
+        "ai.backend.agent.agent.AbstractAgent.shutdown",
+        new=AsyncMock(side_effect=_SimulatedShutdownError("simulated")),
+    )
+    assert unmanaged_agent.docker.session.closed is False
+    with pytest.raises(_SimulatedShutdownError):
+        await unmanaged_agent.shutdown(signal.SIGTERM)
+    assert unmanaged_agent.docker.session.closed is True
