@@ -33,11 +33,11 @@ from ai.backend.manager.data.metric.types import (
     UtilizationMetricType,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.metric.types import KernelMetricValuesByKernel
-from ai.backend.manager.services.metric.types import (
+from ai.backend.manager.repositories.metric.types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
     ContainerMetricResult,
+    KernelMetricValuesByKernel,
     MetricResultValue,
 )
 
