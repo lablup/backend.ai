@@ -2328,9 +2328,6 @@ may become a follow-up BEP if it earns its own motivation.
   part of a migration so the invariant-required policies exist on
   first deploy. This BEP does not prescribe a seed; the operational
   team picks whether to seed and with which values.
-- **Policy `description`** — intentionally dropped from the initial
-  table. A human-readable summary is useful for admin UIs listing
-  policies; adding it later is a non-breaking column addition.
 - **Invariant: `user_writable = True` requires `USER ∈
   scope_sources`** — not enforced today; the two fields are kept
   independent. A future BEP may add the invariant if the combination
