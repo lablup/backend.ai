@@ -11,14 +11,14 @@ Implemented-Version:
 
 ## Overview
 
-A GraphQL / REST API schema proposal for the per-domain settings,
-public (pre-login) settings, and per-user personal settings used by
-the WebUI.
-
-A single scope (e.g. one domain, one user) can hold **multiple named
+This BEP redesigns that surface as **scoped entities** — one row per
+`(scope_type, scope_id, name)` — so access control and merge
+semantics live at the scope level, not at the field level. A single
+scope (e.g. one domain, one user) can hold **multiple named
 configuration documents** — for instance, a domain may publish
-`theme.json`, `menu.json`, and `branding.json` independently. Each
-document is identified by `(scope, scopeId, name)`.
+`theme.json`, `menu.json`, and `branding.json` independently — and
+each audience gets its own GraphQL type / REST path with permissions
+that fit its use.
 
 ## User Stories
 
@@ -81,7 +81,7 @@ Summary matrix:
   (`create` / `update` / `delete` / `restore`) are exposed
   symmetrically as admin-path mutations (`adminBulkCreateAppConfigs`, etc.
   — every scope, admin-only, return lists of raw `AppConfig`) and
-  self-service path mutations (`bulkCreateMyAppConfigs`, etc. — `USER` +
+  self-service path mutations (`myBulkCreateAppConfigs`, etc. — `USER` +
   `current_user` implicit, any authenticated user on their own rows,
   return lists of merged `MyAppConfig`). `create` strictly inserts
   (per-item failure if any row exists for the key, soft-deleted
@@ -189,8 +189,7 @@ single row per natural key. A scope can hold any number of distinct
   `MyAppConfig.id` encoding (`base64("MyAppConfig:{user_id}:{name}")`).
 - Keeps log / audit trails compact.
 
-Validation runs both at `AppConfigKey` construction (`__post_init__`)
-and at the service-layer entry point.
+Enforced by pydantic validation at the API layer.
 
 ### Status filtering
 
@@ -200,11 +199,10 @@ filter on Connections that expose one (`AppConfigFilter.status`
 in GraphQL — see §3) or the equivalent REST query parameter — this
 is used for admin recovery / audit flows and for checking whether a
 name is reusable after deletion. Revival uses the dedicated
-`adminBulkRestoreAppConfigs` / `bulkRestoreMyAppConfigs` mutations, which flip
+`adminBulkRestoreAppConfigs` / `myBulkRestoreAppConfigs` mutations, which flip
 `status = DELETED → ALIVE` while preserving the stored value;
 `*Create*` errors on any pre-existing row (ALIVE or DELETED), and
 `*Update*` errors on a `DELETED` row.
-
 ---
 
 ## 2. Repository Layer — split per scope
@@ -229,10 +227,10 @@ repositories/app_config/
 
 | Repository                              | Methods                                                                                                              |
 |-----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `PublicAppConfigRepository`             | `get(name)`, `get_by_id(id)`, `create(name, extra_config)`, `update(name, extra_config)`, `soft_delete(name)`, `restore(name)`, `search(filter)`                                             |
-| `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)`, `search(domain_name, filter)` |
-| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)`, `search(domain_name, filter)` |
-| `UserAppConfigRepository`               | CRUD: `get / get_by_id / create / update / soft_delete / restore / search` (all take `user_id` + `name`). Plus merge-specific: `get_merged(user_id, name)`, `search_merged(user_id, filter)` — see the note below for roles. |
+| `PublicAppConfigRepository`             | `get(name)`, `get_by_id(id)`, `create(name, extra_config)`, `update(name, extra_config)`, `soft_delete(name)`, `restore(name)`, `search(filter, pagination)`                                             |
+| `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)`, `search(domain_name, filter, pagination)` |
+| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)`, `search(domain_name, filter, pagination)` |
+| `UserAppConfigRepository`               | CRUD: `get / get_by_id / create / update / soft_delete / restore / search` (all take `user_id` + `name`; `search` additionally takes `filter` + `pagination`). Plus merge-specific: `get_merged(user_id, name)`, `search_merged(user_id, filter, pagination)` — see the note below for roles. |
 
 `DomainUserDefaultsAppConfigRepository` mirrors
 `DomainAppConfigRepository` (admin write + same-domain user read,
@@ -332,7 +330,7 @@ are performed in the service layer.
 
 **Bulk mutation orchestration**: all eight bulk mutations
 (`adminBulk{Create,Update,Delete,Restore}AppConfigs`,
-`bulk{Create,Update,Delete,Restore}MyAppConfigs`) follow the same
+`myBulk{Create,Update,Delete,Restore}AppConfigs`) follow the same
 service-layer orchestration — each item runs in its own DB
 transaction so a single failure doesn't abort the rest
 (partial success), successes and failures collected into
@@ -346,9 +344,12 @@ is awkward.
 
 `AppConfigFilter` / `AppConfigPage` / `Pagination` are internal
 containers at the repository / service layer — Python dataclasses
-corresponding to the GraphQL `AppConfigFilter`, intentionally
-left unspecified here (defined in a small companion module at
-implementation time).
+corresponding 1:1 to the GraphQL `AppConfigFilter` (§3) at the
+adapter boundary. Same name on purpose: GraphQL input is the wire
+format, the Python dataclass is the in-process DTO. Concrete
+definitions are intentionally left to the implementation phase
+(expected location: a small companion module under
+`repositories/app_config/`).
 
 ---
 
@@ -401,7 +402,10 @@ For the merged view (`domain_user_defaults ⊕ userCustomizedConfig`),
 use `myAppConfigs` (returns `MyAppConfig`) — see §5. `DOMAIN`-scope
 values do not participate in the merge (admin-enforced domain policy).
 
-Owner or Admin read; owner or Admin write.
+Read: owner or admin. Writes go through the bulk paths —
+`myBulk*AppConfigs` (owner writing their own row) or
+`adminBulk*AppConfigs` with `key.scopeType = USER` (admin writing
+another user's row). There is no single-item write mutation.
 """
 type UserAppConfig implements Node {
   id: ID!
@@ -431,7 +435,10 @@ Although derived, `MyAppConfig` implements `Node` — the `(user_id,
 name)` composite is encoded as a server-side global ID
 (`base64("MyAppConfig:{user_id}:{name}")`). The `node(id)` resolver
 decodes the id and returns the merged view only when
-`decoded.user_id == current_user.id` or the caller is admin.
+`decoded.user_id == current_user.id`. There is no admin override:
+`MyAppConfig` is strictly the *current user's* merged view, and
+admins do not get a path to see another user's merged configuration
+through this type.
 """
 type MyAppConfig implements Node {
   """
@@ -477,8 +484,9 @@ type MyAppConfig implements Node {
 
 Each `appConfigs` child field enforces its own access rule (not
 simply inherited from the parent node) — see the permission matrix
-below. In short: `DomainV2.appConfigs` is admin-only;
-`UserV2.appConfigs` is owner-or-admin.
+below. In short: `DomainV2.appConfigs` is same-domain users or
+admin; `UserV2.appConfigs` is owner or admin. Writes (mutations) on
+both are admin-only.
 
 ```graphql
 extend type DomainV2 {
@@ -752,10 +760,10 @@ variants (pass a 1-element array if you only need one). Split into an
 total of eight mutations:
 
 - `adminBulk*AppConfigs` (4): each item carries an
-  `AppConfigKey { scope, scopeId, name }` — covers every scope.
+  `AppConfigKey { scopeType, scopeId, name }` — covers every scope.
   **Admin-only**. Returns a list of raw `AppConfig` + a list of
   per-item failures.
-- `bulk*MyAppConfigs` (4): each item carries only `name` (scope is
+- `myBulk*AppConfigs` (4): each item carries only `name` (scope is
   `USER` + `scopeId = current_user.user_id` injected server-side).
   Callable by any authenticated user for their own documents. Returns
   a list of recomputed `MyAppConfig` + a list of per-item failures.
@@ -821,15 +829,15 @@ type Mutation {
   required). Each item has `name` + `config`;
   `scopeId = current_user.user_id` is injected server-side. Strict
   insert — if an `ALIVE` or `DELETED` USER row already exists for a
-  `name`, that item fails (revival is `bulkRestoreMyAppConfigs`).
+  `name`, that item fails (revival is `myBulkRestoreAppConfigs`).
   """
-  bulkCreateMyAppConfigs(input: BulkCreateMyAppConfigInput!): BulkCreateMyAppConfigsPayload!
+  myBulkCreateAppConfigs(input: MyBulkCreateAppConfigInput!): MyBulkCreateAppConfigsPayload!
 
   """
   Bulk-replace the current user's `USER`-scope documents (auth
   required). Items whose `ALIVE` USER row is missing fail.
   """
-  bulkUpdateMyAppConfigs(input: BulkUpdateMyAppConfigInput!): BulkUpdateMyAppConfigsPayload!
+  myBulkUpdateAppConfigs(input: MyBulkUpdateAppConfigInput!): MyBulkUpdateAppConfigsPayload!
 
   """
   Bulk soft-delete the current user's `USER`-scope documents (auth
@@ -838,15 +846,15 @@ type Mutation {
   remaining `DOMAIN_USER_DEFAULTS`, or `null` if no source remains).
   Idempotent.
   """
-  bulkDeleteMyAppConfigs(input: BulkDeleteMyAppConfigInput!): BulkDeleteMyAppConfigsPayload!
+  myBulkDeleteAppConfigs(input: MyBulkDeleteAppConfigInput!): MyBulkDeleteAppConfigsPayload!
 
   """
   Bulk restore the current user's soft-deleted USER documents
   (`DELETED → ALIVE`). Stored values are preserved — to change them,
-  follow up with `bulkUpdateMyAppConfigs`. Items whose row is missing
+  follow up with `myBulkUpdateAppConfigs`. Items whose row is missing
   or already `ALIVE` fail.
   """
-  bulkRestoreMyAppConfigs(input: BulkRestoreMyAppConfigInput!): BulkRestoreMyAppConfigsPayload!
+  myBulkRestoreAppConfigs(input: MyBulkRestoreAppConfigInput!): MyBulkRestoreAppConfigsPayload!
 }
 
 enum AppConfigScopeType {
@@ -932,22 +940,22 @@ input MyAppConfigItemInput {
   config: JSON!
 }
 
-input BulkCreateMyAppConfigInput {
+input MyBulkCreateAppConfigInput {
   """Items to create."""
   items: [MyAppConfigItemInput!]!
 }
 
-input BulkUpdateMyAppConfigInput {
+input MyBulkUpdateAppConfigInput {
   """Items to update."""
   items: [MyAppConfigItemInput!]!
 }
 
-input BulkDeleteMyAppConfigInput {
+input MyBulkDeleteAppConfigInput {
   """Document names to soft-delete."""
   names: [String!]!
 }
 
-input BulkRestoreMyAppConfigInput {
+input MyBulkRestoreAppConfigInput {
   """Document names to restore."""
   names: [String!]!
 }
@@ -1023,8 +1031,8 @@ type MyAppConfigError {
   message: String!
 }
 
-"""Result of `bulkCreateMyAppConfigs`. Partial success."""
-type BulkCreateMyAppConfigsPayload {
+"""Result of `myBulkCreateAppConfigs`. Partial success."""
+type MyBulkCreateAppConfigsPayload {
   """Recomputed `MyAppConfig` list after the writes."""
   created: [MyAppConfig!]!
 
@@ -1032,8 +1040,8 @@ type BulkCreateMyAppConfigsPayload {
   failed: [MyAppConfigError!]!
 }
 
-"""Result of `bulkUpdateMyAppConfigs`. Partial success."""
-type BulkUpdateMyAppConfigsPayload {
+"""Result of `myBulkUpdateAppConfigs`. Partial success."""
+type MyBulkUpdateAppConfigsPayload {
   """Recomputed `MyAppConfig` list after the writes."""
   updated: [MyAppConfig!]!
 
@@ -1057,8 +1065,8 @@ type DeletedMyAppConfigResult {
   myAppConfig: MyAppConfig
 }
 
-"""Result of `bulkDeleteMyAppConfigs`. Partial success."""
-type BulkDeleteMyAppConfigsPayload {
+"""Result of `myBulkDeleteAppConfigs`. Partial success."""
+type MyBulkDeleteAppConfigsPayload {
   """Per-item results (name + optional recomputed view)."""
   deleted: [DeletedMyAppConfigResult!]!
 
@@ -1066,8 +1074,8 @@ type BulkDeleteMyAppConfigsPayload {
   failed: [MyAppConfigError!]!
 }
 
-"""Result of `bulkRestoreMyAppConfigs`. Partial success."""
-type BulkRestoreMyAppConfigsPayload {
+"""Result of `myBulkRestoreAppConfigs`. Partial success."""
+type MyBulkRestoreAppConfigsPayload {
   """Recomputed `MyAppConfig` list after restore."""
   restored: [MyAppConfig!]!
 
@@ -1078,6 +1086,9 @@ type BulkRestoreMyAppConfigsPayload {
 """
 Generic AppConfig type shared by the admin-path payloads,
 `adminAppConfigs`, and `node(id)`. Exposes the raw stored value.
+Thin by design — no back-references to the parent `DomainV2` /
+`UserV2`; callers that need the parent object re-query
+`domain_v2(name:)` / `admin_user_v2(user_id:)` explicitly.
 """
 type AppConfig implements Node {
   """
@@ -1115,7 +1126,7 @@ Queries:
 | `UserV2.appConfigs`             | ❌        | ✅ (self)                        | ✅    |
 | `adminAppConfigs`               | ❌        | ❌                               | ✅    |
 | `node(id)` → `AppConfig`        | ❌        | ❌                               | ✅    |
-| `node(id)` → `MyAppConfig`      | ❌        | ✅ (id's `user_id` is self)      | ✅    |
+| `node(id)` → `MyAppConfig`      | ❌        | ✅ (id's `user_id` is self)      | ✅ (id's `user_id` is self) |
 | `node(id)` → `PublicAppConfig`  | ✅        | ✅                               | ✅    |
 | `node(id)` → `DomainAppConfig`  | ❌        | ✅ (same-domain rows only)       | ✅    |
 | `node(id)` → `UserAppConfig`    | ❌        | ✅ (self)                        | ✅    |
@@ -1131,16 +1142,16 @@ of each item's `key.scopeType`:
 |------------------------|-----------|------|-------|
 | `adminBulk*AppConfigs`     | ❌        | ❌   | ✅    |
 
-**Self-service (my) path** — `bulkCreateMyAppConfigs`,
-`bulkUpdateMyAppConfigs`, `bulkDeleteMyAppConfigs`, `bulkRestoreMyAppConfigs`.
+**Self-service (my) path** — `myBulkCreateAppConfigs`,
+`myBulkUpdateAppConfigs`, `myBulkDeleteAppConfigs`, `myBulkRestoreAppConfigs`.
 Imply `scope = USER` + `scopeId = current_user.user_id`:
 
 | Operation              | Anonymous | User (self) | Admin (self) |
 |------------------------|-----------|-------------|--------------|
-| `bulk*MyAppConfigs`        | ❌        | ✅          | ✅           |
+| `myBulk*AppConfigs`        | ❌        | ✅          | ✅           |
 
 > Admins operating on another user's `USER` row must use the admin
-> path with an explicit `AppConfigKey { scope: USER, scopeId:
+> path with an explicit `AppConfigKey { scopeType: USER, scopeId:
 > target_user_id, name }` on each item — the my path cannot target
 > another user.
 
@@ -1180,7 +1191,7 @@ natural key. For each item of a bulk input:
    the repository. A failure on this item lands in `failed` while
    the remaining items continue.
 
-My-path mutations (`bulkCreateMyAppConfigs`, etc.) **skip this step**:
+My-path mutations (`myBulkCreateAppConfigs`, etc.) **skip this step**:
 scope / scopeId are fixed server-side (`USER`,
 `current_user.user_id`), RBAC only needs to confirm "authenticated
 self", and each item calls
@@ -1205,7 +1216,7 @@ conventions in `src/ai/backend/manager/api/rest/v2/CLAUDE.md`.
 REST mirrors the GQL admin / my split — the scope-parameterized
 path handles **admin writes + per-scope read rules** (maps to GQL
 `adminBulk*AppConfigs` mutations and the scoped queries), and the `/my`
-path is **self-only** (maps to GQL `bulk*MyAppConfigs` mutations).
+path is **self-only** (maps to GQL `myBulk*AppConfigs` mutations).
 
 #### Scope-parameterized path — admin writes / per-scope reads
 
@@ -1300,13 +1311,13 @@ corresponding GQL input / payload. Example (`bulk-create`):
 
 | Method | Path                                 | Access | Maps to                       |
 |--------|--------------------------------------|--------|-------------------------------|
-| POST   | `/v2/app-configs/my/bulk-create`     | User   | `bulkCreateMyAppConfigs`          |
-| POST   | `/v2/app-configs/my/bulk-update`     | User   | `bulkUpdateMyAppConfigs`          |
-| POST   | `/v2/app-configs/my/bulk-delete`     | User   | `bulkDeleteMyAppConfigs`          |
-| POST   | `/v2/app-configs/my/bulk-restore`    | User   | `bulkRestoreMyAppConfigs`         |
+| POST   | `/v2/app-configs/my/bulk-create`     | User   | `myBulkCreateAppConfigs`          |
+| POST   | `/v2/app-configs/my/bulk-update`     | User   | `myBulkUpdateAppConfigs`          |
+| POST   | `/v2/app-configs/my/bulk-delete`     | User   | `myBulkDeleteAppConfigs`          |
+| POST   | `/v2/app-configs/my/bulk-restore`    | User   | `myBulkRestoreAppConfigs`         |
 
 Response bodies are the snake_case projection of the corresponding
-GQL `Bulk*MyAppConfigsPayload` (a success list plus `failed`). For
+GQL `MyBulk*AppConfigsPayload` (a success list plus `failed`). For
 `bulk-delete`, each success entry is
 `{ "name": "...", "my_app_config": { ... } | null }`.
 
@@ -1650,7 +1661,7 @@ query BootstrapMe {
 
 The user replaces their `preferences` document — e.g. language,
 experimental-feature toggles, visible-column choices per table. They
-call the self-service `bulkUpdateMyAppConfigs` — each item carries
+call the self-service `myBulkUpdateAppConfigs` — each item carries
 only `name` + `config`, with `scopeType` / `scopeId` injected server-side
 as `USER` + `current_user.user_id`. Even a single-item write goes
 through the bulk path (1-element `items` array); the recomputed
@@ -1658,8 +1669,8 @@ through the bulk path (1-element `items` array); the recomputed
 `myAppConfigs` re-query is needed.
 
 ```graphql
-mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
-  bulkUpdateMyAppConfigs(input: $input) {
+mutation SaveMyConfig($input: MyBulkUpdateAppConfigInput!) {
+  myBulkUpdateAppConfigs(input: $input) {
     updated {
       name
       userCustomizedConfig
@@ -1697,11 +1708,11 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
 - **Replace** semantics: anything the caller wants to keep must be
   sent in the same payload — there is no partial-merge or per-key
   patch.
-- **First write vs. subsequent writes**: `bulkUpdateMyAppConfigs`
+- **First write vs. subsequent writes**: `myBulkUpdateAppConfigs`
   places items with no `ALIVE` USER row into `failed`. For the very
   first save of a given `name`, the client calls
-  `bulkCreateMyAppConfigs` with the same shape (after a soft-delete,
-  use `bulkRestoreMyAppConfigs` followed by `bulkUpdateMyAppConfigs`).
+  `myBulkCreateAppConfigs` with the same shape (after a soft-delete,
+  use `myBulkRestoreAppConfigs` followed by `myBulkUpdateAppConfigs`).
   Clients can disambiguate by checking whether the `myAppConfigs`
   entry for that `name` already has a `userCustomizedConfig`.
 
@@ -1723,7 +1734,7 @@ should be published under `DOMAIN_USER_DEFAULTS` instead.
 ```graphql
 mutation AdminCreateAppConfigs($input: AdminBulkCreateAppConfigInput!) {
   adminBulkCreateAppConfigs(input: $input) {
-    created { id scope scopeId name status config updatedAt }
+    created { id scopeType scopeId name status config updatedAt }
     failed { scopeType scopeId name message }
   }
 }
@@ -1771,7 +1782,7 @@ Items whose key already has a row (ALIVE or DELETED) land in
 ```graphql
 mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigInput!) {
   adminBulkCreateAppConfigs(input: $input) {
-    created { id scope scopeId name status config updatedAt }
+    created { id scopeType scopeId name status config updatedAt }
     failed { scopeType scopeId name message }
   }
 }
@@ -1819,7 +1830,7 @@ query AuditConfigs(
   adminAppConfigs(filter: $filter, orderBy: $orderBy, first: $first, after: $after) {
     edges {
       cursor
-      node { id scope scopeId name status config updatedAt }
+      node { id scopeType scopeId name status config updatedAt }
     }
     pageInfo { hasNextPage endCursor }
     count
@@ -1852,7 +1863,7 @@ Removing a stale or deprecated document — e.g. retiring an old
 ```graphql
 mutation RemoveDomainLegacyMenu($input: AdminBulkDeleteAppConfigInput!) {
   adminBulkDeleteAppConfigs(input: $input) {
-    deleted { id scope scopeId name status updatedAt }
+    deleted { id scopeType scopeId name status updatedAt }
     failed { scopeType scopeId name message }
   }
 }
@@ -1880,15 +1891,15 @@ mutation RemoveDomainLegacyMenu($input: AdminBulkDeleteAppConfigInput!) {
   the value after restoring, chain an `adminBulkUpdateAppConfigs` call.
 
 A user removing their own document uses the self-service
-`bulkDeleteMyAppConfigs` — a `names` list is the only input; the
+`myBulkDeleteAppConfigs` — a `names` list is the only input; the
 server injects `scope = USER` + `scopeId = current_user.user_id`.
 Each entry in the response's `deleted[]` is a `name` + a recomputed
 `myAppConfig` (reflecting any remaining `DOMAIN_USER_DEFAULTS`, or
 `null` if no ALIVE source remains for that `name`).
 
 ```graphql
-mutation RemoveMyConfig($input: BulkDeleteMyAppConfigInput!) {
-  bulkDeleteMyAppConfigs(input: $input) {
+mutation RemoveMyConfig($input: MyBulkDeleteAppConfigInput!) {
+  myBulkDeleteAppConfigs(input: $input) {
     deleted {
       name
       myAppConfig {
