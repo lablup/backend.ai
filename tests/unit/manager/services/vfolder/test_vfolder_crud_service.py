@@ -245,10 +245,10 @@ class TestCreateVFolderAction:
     ) -> None:
         mock_vfolder_repository.get_group_resource_info = AsyncMock(
             return_value=ProjectResourceInfo(
-                group_uuid=group_uuid,
+                project_id=group_uuid,
                 max_vfolder_count=10,
                 max_quota_scope_size=0,
-                group_type=ProjectType.GENERAL,
+                project_type=ProjectType.GENERAL,
             )
         )
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
@@ -403,10 +403,10 @@ class TestCreateVFolderAction:
     ) -> None:
         mock_vfolder_repository.get_group_resource_info = AsyncMock(
             return_value=ProjectResourceInfo(
-                group_uuid=group_uuid,
+                project_id=group_uuid,
                 max_vfolder_count=10,
                 max_quota_scope_size=0,
-                group_type=ProjectType.MODEL_STORE,
+                project_type=ProjectType.MODEL_STORE,
             )
         )
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()

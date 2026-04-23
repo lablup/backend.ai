@@ -76,10 +76,10 @@ class GroupData:
 
 @dataclass(frozen=True)
 class ProjectResourceInfo:
-    group_uuid: uuid.UUID
+    project_id: uuid.UUID
     max_vfolder_count: int
     max_quota_scope_size: int
-    group_type: ProjectType
+    project_type: ProjectType
 
 
 @dataclass(frozen=True)

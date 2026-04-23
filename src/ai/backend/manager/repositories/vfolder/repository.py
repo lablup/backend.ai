@@ -835,10 +835,10 @@ class VfolderRepository:
                 return None
 
             return ProjectResourceInfo(
-                group_uuid=group_row.id,
+                project_id=group_row.id,
                 max_vfolder_count=group_row.resource_policy_row.max_vfolder_count,
                 max_quota_scope_size=group_row.resource_policy_row.max_quota_scope_size,
-                group_type=group_row.type,
+                project_type=group_row.type,
             )
 
     @vfolder_repository_resilience.apply()

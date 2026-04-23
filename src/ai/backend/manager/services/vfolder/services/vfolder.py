@@ -275,10 +275,10 @@ class VFolderService:
                 )
                 if not group_info:
                     raise ProjectNotFound(f"Project with {group_id_or_name} not found.")
-                group_uuid = group_info.group_uuid
+                group_uuid = group_info.project_id
                 max_vfolder_count = group_info.max_vfolder_count
                 max_quota_scope_size = group_info.max_quota_scope_size
-                group_type = group_info.group_type
+                group_type = group_info.project_type
                 container_uid = None
             case None:
                 user_info = await self._vfolder_repository.get_user_resource_info(user_uuid)
@@ -1569,10 +1569,10 @@ class VFolderService:
 
         if project_id is not None:
             project_info = await self._resolve_project_info(project_id, domain_name)
-            group_uuid = project_info.group_uuid
+            group_uuid = project_info.project_id
             max_vfolder_count = project_info.max_vfolder_count
             max_quota_scope_size = project_info.max_quota_scope_size
-            group_type = project_info.group_type
+            group_type = project_info.project_type
             container_uid = None
         else:
             user_info = await self._vfolder_repository.get_user_resource_info(user_uuid)
@@ -1703,10 +1703,10 @@ class VFolderService:
         self._check_name_parameter(action.name, is_group=True)
 
         project_info = await self._resolve_project_info(project_id, domain_name)
-        group_uuid = project_info.group_uuid
+        group_uuid = project_info.project_id
         max_vfolder_count = project_info.max_vfolder_count
         max_quota_scope_size = project_info.max_quota_scope_size
-        group_type = project_info.group_type
+        group_type = project_info.project_type
         quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, group_uuid)
 
         allowed_types = await self._check_ownership_allowed("group")
