@@ -120,8 +120,8 @@ def vfolder_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(rbac_permission_repo),
-                single_entity=SingleEntityActionRBACValidator(rbac_permission_repo),
+                scope=ScopeActionRBACValidator(rbac_permission_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(rbac_permission_repo, MagicMock()),
             )
         ),
     )

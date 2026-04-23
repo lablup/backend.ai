@@ -103,7 +103,9 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=MagicMock(),
     )
-    real_single_entity_validator = SingleEntityActionRBACValidator(rbac_permission_repo)
+    real_single_entity_validator = SingleEntityActionRBACValidator(
+        rbac_permission_repo, MagicMock()
+    )
     return VFolderProcessors(
         service=service,
         action_monitors=[],

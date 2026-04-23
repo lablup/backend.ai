@@ -16,6 +16,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -362,7 +363,7 @@ class TestScopeActionRBACValidator:
         superadmin_user: UserData,
     ) -> None:
         # No permission rows seeded; bypass must succeed regardless.
-        validator = ScopeActionRBACValidator(repository)
+        validator = ScopeActionRBACValidator(repository, MagicMock())
         with with_user(superadmin_user):
             await validator.validate(scope_action, trigger_meta)
 
@@ -372,7 +373,7 @@ class TestScopeActionRBACValidator:
         scope_action: _ProjectCreateAction,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
-        validator = ScopeActionRBACValidator(repository)
+        validator = ScopeActionRBACValidator(repository, MagicMock())
         with pytest.raises(UnreachableError):
             await validator.validate(scope_action, trigger_meta)
 
@@ -383,7 +384,7 @@ class TestScopeActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_with_project_create: UserData,
     ) -> None:
-        validator = ScopeActionRBACValidator(repository)
+        validator = ScopeActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_with_project_create):
             await validator.validate(scope_action, trigger_meta)
 
@@ -394,7 +395,7 @@ class TestScopeActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
     ) -> None:
-        validator = ScopeActionRBACValidator(repository)
+        validator = ScopeActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_without_permission):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(scope_action, trigger_meta)
@@ -408,7 +409,7 @@ class TestSingleEntityActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         superadmin_user: UserData,
     ) -> None:
-        validator = SingleEntityActionRBACValidator(repository)
+        validator = SingleEntityActionRBACValidator(repository, MagicMock())
         with with_user(superadmin_user):
             await validator.validate(single_entity_action, trigger_meta)
 
@@ -418,7 +419,7 @@ class TestSingleEntityActionRBACValidator:
         single_entity_action: _VfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
-        validator = SingleEntityActionRBACValidator(repository)
+        validator = SingleEntityActionRBACValidator(repository, MagicMock())
         with pytest.raises(UnreachableError):
             await validator.validate(single_entity_action, trigger_meta)
 
@@ -429,7 +430,7 @@ class TestSingleEntityActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_with_vfolder_update: UserData,
     ) -> None:
-        validator = SingleEntityActionRBACValidator(repository)
+        validator = SingleEntityActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_with_vfolder_update):
             await validator.validate(single_entity_action, trigger_meta)
 
@@ -440,7 +441,7 @@ class TestSingleEntityActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
     ) -> None:
-        validator = SingleEntityActionRBACValidator(repository)
+        validator = SingleEntityActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_without_permission):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(single_entity_action, trigger_meta)
@@ -545,7 +546,7 @@ class TestBulkActionRBACValidator:
         superadmin_user: UserData,
     ) -> None:
         # No permission rows seeded; bypass must approve every entity_id.
-        validator = BulkActionRBACValidator(repository)
+        validator = BulkActionRBACValidator(repository, MagicMock())
         with with_user(superadmin_user):
             result = await validator.validate(bulk_vfolder_action, trigger_meta)
 
@@ -558,7 +559,7 @@ class TestBulkActionRBACValidator:
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
-        validator = BulkActionRBACValidator(repository)
+        validator = BulkActionRBACValidator(repository, MagicMock())
         with pytest.raises(UnreachableError):
             await validator.validate(bulk_vfolder_action, trigger_meta)
 
@@ -569,7 +570,7 @@ class TestBulkActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_with_partial_bulk_vfolder_update: UserData,
     ) -> None:
-        validator = BulkActionRBACValidator(repository)
+        validator = BulkActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_with_partial_bulk_vfolder_update):
             result = await validator.validate(bulk_vfolder_action, trigger_meta)
 
@@ -585,7 +586,7 @@ class TestBulkActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
     ) -> None:
-        validator = BulkActionRBACValidator(repository)
+        validator = BulkActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_without_permission):
             result = await validator.validate(bulk_vfolder_action, trigger_meta)
 
@@ -601,7 +602,7 @@ class TestBulkActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
     ) -> None:
-        validator = BulkActionRBACValidator(repository)
+        validator = BulkActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_without_permission):
             result = await validator.validate(
                 _BulkVfolderUpdateAction(entity_ids=[]),
