@@ -81,20 +81,21 @@ Summary matrix:
   name (no hierarchical fall-through lookup).
 - **All writes are bulk-only.** There are no single-item mutations —
   callers pass a list (even a 1-element list for a single write) and
-  get a partial-success payload back. Two verbs (`create` / `update`)
-  are exposed symmetrically as admin-path mutations
-  (`adminBulkCreateAppConfigs`, etc. — every scope, admin-only,
-  return lists of raw `AppConfig`) and self-service path mutations
-  (`bulkCreateMyAppConfigs`, etc. — `USER` + `current_user` implicit,
-  any authenticated user on their own rows, return lists of merged
-  `ResolvedAppConfig`). `create` strictly inserts (per-item failure if any
+  get a partial-success payload back. The admin path exposes three
+  verbs (`create` / `update` / `purge`) — `adminBulkCreateAppConfigs`
+  and siblings cover every scope, admin-only, return raw `AppConfig`
+  lists. The self-service (my) path exposes two verbs
+  (`create` / `update`) — `bulkCreateMyAppConfigs` and siblings, with
+  `USER` + `current_user` implicit and merged `ResolvedAppConfig` in
+  the response. `create` strictly inserts (per-item failure if any
   row exists for the key); `update` replaces the existing row's
-  stored JSON wholesale. No partial update / deep-merge / key-level
-  removal / upsert / delete at the write boundary. Each item runs in
-  its own transaction so one failure does not abort the rest.
-  Identification uses the `(scope, scopeId, name)` natural key, never
-  Relay `id` — my-path mutations have scope/scopeId injected by the
-  server.
+  stored JSON wholesale; `purge` is an **admin-only cleanup verb**
+  (§3) for removing misconfigured rows — users cannot purge. No
+  partial update / deep-merge / key-level removal / upsert at the
+  write boundary. Each item runs in its own transaction so one
+  failure does not abort the rest. Identification uses the
+  `(scope, scopeId, name)` natural key, never Relay `id` — my-path
+  mutations have scope/scopeId injected by the server.
 - **Single source-of-truth table**: a single `app_configs` table holds
   every scope; only the exposure layer is split.
 - **Relay style**: Input/Payload conventions and the Node interface.
@@ -183,32 +184,38 @@ Enforced by pydantic validation at the API layer.
 ### Write semantics
 
 `*Create*` errors if a row already exists for the natural key;
-`*Update*` errors if no row exists. No deletion verb is exposed in
-this BEP — rows persist once created, and callers "clear" a
-document by `*Update*`-ing it to an empty JSON (`{}`).
+`*Update*` errors if no row exists. The only exposed deletion verb is
+`*Purge*` (admin-only) — used for cleanup of misconfigured rows; see
+§3. Outside of purge, rows persist once created, and callers "clear"
+a document by `*Update*`-ing it to an empty JSON (`{}`).
 
-If a matching `app_config_policies` row (see below) exists for the
-`name`, the service layer additionally enforces:
+**A matching `app_config_policies` row is required for any write**
+(see "App Config Policy table" below). The service layer enforces:
 
+- If no policy row exists for `name`, the item is rejected with a
+  policy-not-found message — `AppConfigRepository.{create,update}`
+  is not called.
 - `scope_type` must be in the policy's `scope_sources`; writes to
   other scopes are rejected as a per-item failure.
 - When the write is on the `USER` scope via a `bulk*MyAppConfigs`
-  mutation, the policy's `user_writable` must be `True`; otherwise the
-  item is rejected. The admin-path mutations are not gated by
-  `user_writable` — admins may seed USER rows regardless of the flag.
+  mutation, the policy's `user_writable` must be `True`; otherwise
+  the item is rejected. The admin-path mutations are not gated by
+  `user_writable` — admins may seed USER rows regardless of the
+  flag.
 
-If no policy row exists for the `name`, no policy-driven validation
-is applied and the write proceeds under the natural-key rules above.
+Because every AppConfig row is created under a matching policy, the
+resolved merge (§5) always has a chain to follow — there is no
+"policy-less fallback" path.
 
 ### App Config Policy table
 
-A separate `app_config_policies` table holds advisory rules per
-document — which app-config rows get merged as sources into the
-resolved view, and which scopes may be written. Policies are
-**decoupled** from `app_configs` rows at the schema level: no foreign
-key, no cascade semantics, no shared lifecycle. The service layer
-joins at runtime on matching `config_name` / `name` and applies
-whatever policy row it finds.
+A separate `app_config_policies` table holds the rules per document
+— which app-config rows get merged as sources into the resolved
+view, and which scopes may be written. Configs and policies are
+joined by `config_name` value only at runtime; there is no foreign
+key at the DB level. Instead, the **service layer enforces a
+required-policy invariant**: an `AppConfigRow` can only be created
+while a matching policy row exists (see "Write semantics" above).
 
 ```python
 class AppConfigPolicyRow(Base):
@@ -217,8 +224,13 @@ class AppConfigPolicyRow(Base):
     id: Mapped[uuid.UUID]
     config_name: Mapped[str]                  # UNIQUE — joined to
                                               # `app_configs.name` by value only
-                                              # (no FK, no lifecycle coupling).
-                                              # Mutable — rename is allowed.
+                                              # (no FK).
+                                              # IMMUTABLE — rename is rejected
+                                              # at the service layer. To "fix"
+                                              # a wrongly-named policy, admins
+                                              # purge the policy (and any
+                                              # AppConfig rows that used it)
+                                              # and create a new policy.
     scope_sources: Mapped[list[str]]          # Dual meaning:
                                               #   (1) which `app_configs` rows
                                               #       (by scope) are merged as
@@ -248,14 +260,29 @@ class AppConfigPolicyRow(Base):
     )
 ```
 
-**Lifecycle decoupling**: there is no FK between `app_configs` and
-`app_config_policies`. A policy row may be deleted without touching
-the configs that matched it by `config_name`; configs may exist
-without a corresponding policy. Policies may be created before or
-after the configs they govern. The merge path (§5) likewise uses the
-policy's `scope_sources` as the chain order when present, and falls
-back to `DOMAIN_USER_DEFAULTS ⊕ USER` when absent. Policies are
-advisory, not authoritative.
+**Integrity without FK**:
+
+- **Create**: rejected at the service layer unless a policy exists
+  for `config_name`. This is the primary guarantee that every
+  AppConfig row has a matching policy.
+- **Policy rename**: not allowed. `config_name` is immutable —
+  updates may change `scope_sources` / `user_writable` only. The
+  immutability removes the "rename orphans configs" failure mode.
+- **Policy deletion**: there is no `update`-level policy deletion.
+  The only removal path is `adminBulkPurgeAppConfigPolicies` (§3),
+  and the service rejects the purge unless no AppConfig row
+  references the policy's `config_name`. If such rows exist, the
+  admin purges them first via `adminBulkPurgeAppConfigs`, then the
+  policy.
+- **AppConfig deletion**: `adminBulkPurgeAppConfigs` is an
+  admin-only cleanup verb for misconfigured rows. It is **not** a
+  general "delete" — the BEP's user-facing contract is still that
+  rows persist once written; purge is the escape hatch for fixing
+  mistakes.
+
+This is the only coupling between the two tables — enforced outside
+the schema so future changes to one table's DB shape don't cascade
+through FK machinery.
 
 ---
 
@@ -287,11 +314,11 @@ repositories/app_config_policy/
 
 | Repository                              | Methods                                                                                                              |
 |-----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `PublicAppConfigRepository`             | `get(name)`, `get_by_id(id)`, `create(name, extra_config)`, `update(name, extra_config)`, `search(filter, pagination)`                                             |
-| `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `search(domain_name, filter, pagination)` |
-| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `search(domain_name, filter, pagination)` |
-| `UserAppConfigRepository`               | CRUD: `get / get_by_id / create / update / search` (all take `user_id` + `name`; `search` additionally takes `filter` + `pagination`). Plus merge-specific: `get_merged(user_id, name)`, `search_merged(user_id, filter, pagination)` — see the note below for roles. |
-| `AppConfigPolicyRepository`             | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `search(filter, pagination)` — CRUD for the separate `app_config_policies` table (§1). Not joined to `app_configs` at the DB level; callers look policies up by `config_name` at runtime. |
+| `PublicAppConfigRepository`             | `get(name)`, `get_by_id(id)`, `create(name, extra_config)`, `update(name, extra_config)`, `purge(name)`, `search(filter, pagination)`                                             |
+| `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `purge(domain_name, name)`, `search(domain_name, filter, pagination)` |
+| `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `purge(domain_name, name)`, `search(domain_name, filter, pagination)` |
+| `UserAppConfigRepository`               | CRUD: `get / get_by_id / create / update / purge / search` (all take `user_id` + `name`; `search` additionally takes `filter` + `pagination`). Plus merge-specific: `get_merged(user_id, name)`, `search_merged(user_id, filter, pagination)` — see the note below for roles. |
+| `AppConfigPolicyRepository`             | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(filter, pagination)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any AppConfig row still references the `config_name`. |
 
 `DomainUserDefaultsAppConfigRepository` mirrors
 `DomainAppConfigRepository` (admin write + same-domain user read,
@@ -374,8 +401,8 @@ repository's `search(...)` is a thin-delegate that binds
 `scope_type` / `scope_id`. Permission checks and scope validation
 are performed in the service layer.
 
-**Bulk mutation orchestration**: all four bulk mutations
-(`adminBulk{Create,Update}AppConfigs`,
+**Bulk mutation orchestration**: all AppConfig bulk mutations
+(`adminBulk{Create,Update,Purge}AppConfigs`,
 `bulk{Create,Update}MyAppConfigs`) follow the same service-layer
 orchestration — each item runs in its own DB transaction so a
 single failure doesn't abort the rest (partial success), successes
@@ -386,6 +413,14 @@ dispatches directly to `UserAppConfigRepository`. Not optimized as
 a single SQL batch: items split by scope can fail for heterogeneous
 reasons (unique-key violations, authorization errors, …), and
 representing partial success in one SQL statement is awkward.
+
+The admin policy bulk mutations
+(`adminBulk{Create,Update,Purge}AppConfigPolicies`) follow the same
+per-item / partial-success pattern against `AppConfigPolicyRepository`.
+`Update` rejects items that attempt to change `configName`
+(immutable, §1). `Purge` rejects items whose `configName` still has
+referencing `AppConfig` rows, preserving the required-policy
+invariant for the rows that remain.
 
 `AppConfigFilter` / `AppConfigPage` / `Pagination` are internal
 containers at the repository / service layer — Python dataclasses
@@ -414,15 +449,21 @@ batch, the service collects the distinct `name`s, calls
 batch so a single policy is read once), and threads the result into
 per-item validation:
 
+- If no policy row exists for `config_name`, the item is rejected
+  with a policy-not-found message — this enforces the
+  required-policy invariant (§1).
 - If the policy row is present and `item.key.scopeType ∉
   scope_sources`, the item is appended to `failed_list` with a
-  policy-violation message — `AppConfigRepository.{create,update}` is
-  not called for that item.
+  policy-violation message.
 - If the item is on the `bulk*MyAppConfigs` path, the policy is
   present, and `user_writable` is `False`, the item is likewise
   rejected without touching `AppConfigRepository`.
-- If the policy row is absent, the item flows through unchanged and
-  only the natural-key rules of §1 apply.
+
+The policy repository's own `update` method refuses to change
+`config_name` (immutable per §1). `AppConfigPolicyRepository.purge`
+first runs a reference check via `AppConfigDBSource` — if any
+`app_configs` row exists with matching `name`, the purge is rejected
+so the required-policy invariant cannot be broken retroactively.
 
 Reads do not consult the policy repository from within
 `AppConfigRepository`. The merge service (§5) performs its own policy
@@ -504,10 +545,10 @@ type UserAppConfig implements Node {
 Resolved app-config view from the current user's perspective —
 accessible via `myAppConfigs` or `node(id)`. Deep-merges same-`name`
 source rows in the order prescribed by the matching
-`AppConfigPolicy.scope_sources`. When no policy exists for a name,
-the merge falls back to the BEP default chain
-(`DOMAIN_USER_DEFAULTS` → `USER`; admin-only `DOMAIN` is excluded).
-An entry appears whenever at least one source row exists.
+`AppConfigPolicy.scope_sources`. Every `name` that appears here is
+backed by a policy (§1 required-policy invariant), so the chain is
+always defined by data. An entry appears whenever at least one
+source row exists.
 
 Although derived, `ResolvedAppConfig` implements `Node` — the
 `(user_id, name)` composite is encoded as a server-side global ID
@@ -530,9 +571,9 @@ type ResolvedAppConfig implements Node {
   """
   Raw source rows that contributed to `mergedConfig`, in merge order
   (low → high priority; later wins). The list matches the order of
-  the matching policy's `scope_sources`; when no policy exists it
-  contains the subset of `[DOMAIN_USER_DEFAULTS, USER]` rows that
-  exist. Each element is a raw `AppConfig` so callers can distinguish
+  the matching policy's `scope_sources` — every `name` returned
+  through `myAppConfigs` has a policy (§1). Each element is a raw
+  `AppConfig` so callers can distinguish
   "admin-provided per-user default" from "what the user changed" by
   inspecting `scopeType`.
   """
@@ -870,23 +911,26 @@ enum AppConfigPolicyOrderField {
 
 All write mutations are **bulk-only** — there are no single-item
 variants (pass a 1-element array if you only need one). Split into an
-**admin path** and a **self-service (my) path**, two verbs each for a
-total of four mutations, plus an admin-only policy path with two
-verbs for six total:
+**admin path** (create / update / purge) and a **self-service (my)
+path** (create / update only), plus an admin-only policy path
+(create / update / purge), for a total of eight mutations:
 
-- `adminBulk{Create,Update}AppConfigs`: each item carries an
+- `adminBulk{Create,Update,Purge}AppConfigs`: each item carries an
   `AppConfigKey { scopeType, scopeId, name }` — covers every scope.
-  **Admin-only**. Returns a list of raw `AppConfig` + a list of
-  per-item failures.
+  **Admin-only**. `Create` / `Update` return a list of raw
+  `AppConfig`; `Purge` returns the purged key list. All three
+  return per-item failures.
 - `bulk{Create,Update}MyAppConfigs`: each item carries only `name`
   (scope is `USER` + `scopeId = current_user.user_id` injected
   server-side). Callable by any authenticated user for their own
-  documents. Returns a list of recomputed `ResolvedAppConfig` + a list of
-  per-item failures.
-- `adminBulk{Create,Update}AppConfigPolicies`: each item carries
-  `configName` + policy fields (`scopeSources`, `userWritable`).
-  **Admin-only**. Returns a list of `AppConfigPolicy` + a list of
-  per-item failures. There is no my-path for policies.
+  documents. Returns a list of recomputed `ResolvedAppConfig` + a
+  list of per-item failures. **No `Purge` on the my-path** — users
+  cannot delete rows; only admins do cleanup.
+- `adminBulk{Create,Update,Purge}AppConfigPolicies`: each item
+  carries `configName` (+ policy fields on create/update).
+  **Admin-only**. `Update` rejects any attempt to change
+  `configName` (immutable — §1). `Purge` rejects any item whose
+  `configName` still has AppConfig rows referencing it.
 
 **Partial success**: every bulk mutation runs each item in its own
 DB transaction — a single failure does not abort the rest, and the
@@ -923,6 +967,15 @@ type Mutation {
   """
   adminBulkUpdateAppConfigs(input: AdminBulkUpdateAppConfigInput!): AdminBulkUpdateAppConfigsPayload!
 
+  """
+  Bulk-purge app config documents (admin-only). Each item is
+  identified by `AppConfigKey`; if no row exists for the key, the
+  item is no-oped (returned in `purged` with the key alone). Purge
+  is the only deletion verb for AppConfig — intended for cleaning up
+  misconfigured rows; day-to-day writes should use create / update.
+  """
+  adminBulkPurgeAppConfigs(input: AdminBulkPurgeAppConfigInput!): AdminBulkPurgeAppConfigsPayload!
+
   # ── Self-service (my) path — USER + current_user implicit ────
 
   """
@@ -953,12 +1006,23 @@ type Mutation {
 
   """
   Bulk-update app-config policies (admin-only). Each item replaces
-  the matching policy row by `name`; items whose `name` has no policy
-  row fail.
+  the matching policy row by `configName`; items whose `configName`
+  has no policy row fail. `configName` itself is immutable (§1) —
+  service rejects any attempt to change it.
   """
   adminBulkUpdateAppConfigPolicies(
     input: AdminBulkUpdateAppConfigPolicyInput!
   ): AdminBulkUpdateAppConfigPoliciesPayload!
+
+  """
+  Bulk-purge app-config policies (admin-only). An item fails if any
+  `AppConfig` row still references its `configName` (the
+  required-policy invariant must hold for the remaining rows);
+  admins clean such rows up first via `adminBulkPurgeAppConfigs`.
+  """
+  adminBulkPurgeAppConfigPolicies(
+    input: AdminBulkPurgeAppConfigPolicyInput!
+  ): AdminBulkPurgeAppConfigPoliciesPayload!
 }
 
 enum AppConfigScopeType {
@@ -1013,6 +1077,15 @@ input AdminBulkUpdateAppConfigInput {
   items: [AdminAppConfigItemInput!]!
 }
 
+"""
+Per-item input for `adminBulkPurgeAppConfigs`. Identified by key
+alone — there is no `config` payload.
+"""
+input AdminBulkPurgeAppConfigInput {
+  """Keys identifying the rows to purge."""
+  keys: [AppConfigKey!]!
+}
+
 # ── My Inputs — scope=USER, scopeId=current_user.user_id implicit ──
 
 """Per-item input for my bulk create/update (name + config)."""
@@ -1043,7 +1116,8 @@ input BulkUpdateMyAppConfigInput {
 
 """
 Per-item error info for a failed item in an admin bulk write.
-Shared by all four admin bulk mutations.
+Shared by all admin AppConfig bulk mutations (create / update /
+purge).
 """
 type AdminAppConfigError {
   """Scope of the failed item."""
@@ -1077,12 +1151,21 @@ type AdminBulkUpdateAppConfigsPayload {
   failed: [AdminAppConfigError!]!
 }
 
+"""Result of `adminBulkPurgeAppConfigs`. Partial success."""
+type AdminBulkPurgeAppConfigsPayload {
+  """Keys of rows actually removed (or already absent → no-op)."""
+  purged: [AppConfigKey!]!
+
+  """Per-item errors for entries that failed to purge."""
+  failed: [AdminAppConfigError!]!
+}
+
 # ── My Payloads — return lists of resolved ResolvedAppConfig ────
 
 """
 Per-item error info for a failed item in a my bulk write. Shared by
-all four my bulk mutations. (scope / scopeId are server-injected, so
-`name` is the only identifier.)
+the my bulk mutations (create / update). (scope / scopeId are
+server-injected, so `name` is the only identifier.)
 """
 type MyAppConfigError {
   """Name of the failed item."""
@@ -1136,8 +1219,16 @@ input AdminBulkUpdateAppConfigPolicyInput {
 }
 
 """
+Per-item input for `adminBulkPurgeAppConfigPolicies`. Identified by
+`configName` alone.
+"""
+input AdminBulkPurgeAppConfigPolicyInput {
+  configNames: [String!]!
+}
+
+"""
 Per-item error info for a failed item in an admin policy bulk write.
-Shared by both admin policy bulk mutations.
+Shared by all admin policy bulk mutations (create / update / purge).
 """
 type AdminAppConfigPolicyError {
   """`configName` of the failed item."""
@@ -1162,6 +1253,15 @@ type AdminBulkUpdateAppConfigPoliciesPayload {
   updated: [AppConfigPolicy!]!
 
   """Per-item errors for entries that failed to update."""
+  failed: [AdminAppConfigPolicyError!]!
+}
+
+"""Result of `adminBulkPurgeAppConfigPolicies`. Partial success."""
+type AdminBulkPurgeAppConfigPoliciesPayload {
+  """`configName`s of policies actually removed."""
+  purgedConfigNames: [String!]!
+
+  """Per-item errors for entries that failed to purge."""
   failed: [AdminAppConfigPolicyError!]!
 }
 
@@ -1215,8 +1315,10 @@ type AppConfigPolicy implements Node {
 
   """
   The governed document's `name` (unique across the policies table).
-  Joined to `AppConfig.name` by value only — no FK. Mutable; rename
-  is allowed and does not cascade.
+  Joined to `AppConfig.name` by value only — no FK. **Immutable** —
+  `update` cannot change this field. A wrongly-named policy is fixed
+  by purging (along with any referencing rows) and recreating — see
+  §7 S3.8.
   """
   configName: String!
 
@@ -1269,9 +1371,9 @@ bulk-only.
 `adminBulkUpdateAppConfigs`. Admin regardless of each item's
 `key.scopeType`:
 
-| Operation              | Anonymous | User | Admin |
-|------------------------|-----------|------|-------|
-| `adminBulk*AppConfigs` | ❌        | ❌   | ✅    |
+| Operation                                  | Anonymous | User | Admin |
+|--------------------------------------------|-----------|------|-------|
+| `adminBulk{Create,Update,Purge}AppConfigs` | ❌        | ❌   | ✅    |
 
 **Self-service (my) path** — `bulkCreateMyAppConfigs`,
 `bulkUpdateMyAppConfigs`. Imply `scope = USER` +
@@ -1287,11 +1389,12 @@ bulk-only.
 > another user.
 
 **Admin policy path** — `adminBulkCreateAppConfigPolicies`,
-`adminBulkUpdateAppConfigPolicies`:
+`adminBulkUpdateAppConfigPolicies`,
+`adminBulkPurgeAppConfigPolicies`:
 
-| Operation                         | Anonymous | User | Admin |
-|-----------------------------------|-----------|------|-------|
-| `adminBulk*AppConfigPolicies`     | ❌        | ❌   | ✅    |
+| Operation                                           | Anonymous | User | Admin |
+|-----------------------------------------------------|-----------|------|-------|
+| `adminBulk{Create,Update,Purge}AppConfigPolicies`   | ❌        | ❌   | ✅    |
 
 Where the checks live:
 - Admin-path resolvers: `check_admin_only()` at entry, then dispatch
@@ -1432,6 +1535,7 @@ exists for this `(user, name)`.
 |--------|-----------------------------------|--------|---------------------------------|
 | POST   | `/v2/app-configs/bulk-create`     | Admin  | `adminBulkCreateAppConfigs`     |
 | POST   | `/v2/app-configs/bulk-update`     | Admin  | `adminBulkUpdateAppConfigs`     |
+| POST   | `/v2/app-configs/bulk-purge`      | Admin  | `adminBulkPurgeAppConfigs`      |
 
 Request / response bodies are the snake_case projection of the
 corresponding GQL input / payload. Example (`bulk-create`):
@@ -1482,6 +1586,7 @@ are available to any authenticated user; writes are admin-only.
 | GET    | `/v2/app-config-policies/{config_name}`      | User   | `appConfigPolicy(configName)`         |
 | POST   | `/v2/app-config-policies/bulk-create`        | Admin  | `adminBulkCreateAppConfigPolicies`    |
 | POST   | `/v2/app-config-policies/bulk-update`        | Admin  | `adminBulkUpdateAppConfigPolicies`    |
+| POST   | `/v2/app-config-policies/bulk-purge`         | Admin  | `adminBulkPurgeAppConfigPolicies`     |
 
 Request / response bodies are the snake_case projection of the
 corresponding GQL input / payload — `items[]` for writes, a
@@ -1521,20 +1626,20 @@ The merge chain for a given `(user_id, name)` is determined at read
 time by the matching `AppConfigPolicy.scope_sources` (§1):
 
 1. Service looks up the policy by `name` —
-   `AppConfigPolicyRepository.get(name)`.
-2. If the policy is present, the chain is exactly its `scope_sources`
-   in order (low → high priority; later elements win on deep merge).
-   Each scope contributes its natural `scope_id` — `PUBLIC` uses the
+   `AppConfigPolicyRepository.get(name)`. The required-policy
+   invariant (§1) guarantees a hit for every `name` that has
+   AppConfig rows.
+2. The chain is exactly the policy's `scope_sources` in order
+   (low → high priority; later elements win on deep merge). Each
+   scope contributes its natural `scope_id` — `PUBLIC` uses the
    literal `"public"`, `DOMAIN` / `DOMAIN_USER_DEFAULTS` use the
    caller's `domain_name`, and `USER` uses the caller's `user_id`.
-3. If no policy exists for `name`, the chain falls back to the
-   BEP-1052 default `[DOMAIN_USER_DEFAULTS, USER]` — `DOMAIN` is
-   admin-only policy and stays out of the resolved view.
 
 A policy may therefore define chains of any length — a single-scope
-policy (`scope_sources=["domain_user_defaults"]` for admin-only
-documents like `theme`), the default 2-chain, or wider chains that
-pull in `PUBLIC` or `DOMAIN` when the use case calls for it.
+policy (`scope_sources=["domain"]` for admin-owned documents like
+`theme`), a 2-chain (`[domain, user]` for values the user can layer
+on top of an admin baseline), or wider chains that pull in additional
+scopes when the use case calls for it.
 
 ### Read (Merge)
 
@@ -1542,11 +1647,9 @@ Merge is owned by `UserAppConfigRepository`; DB access is performed
 by `AppConfigDBSource`'s merge-specific method — a single SQL that
 pulls every row the chain needs in one snapshot. The method receives
 the chain as a parameter (a list of `(scope_type, scope_id_expr)`
-pairs) so the same code serves both policy-driven chains and the
-2-scope fallback:
+pairs) derived from the policy:
 
-1. The service resolves the chain for `name` (policy lookup → ordered
-   list of scopes, or fallback).
+1. The service resolves the chain for `name` via the policy lookup.
 2. `AppConfigDBSource.get_user_resolved_config(user_id, name, chain)`
    — single SQL resolves `domain_name` via a `users` subquery once
    and pulls one row per scope in the chain where it exists.
@@ -1584,8 +1687,8 @@ class AppConfigDBSource:
         chain: list[AppConfigScopeType],
     ) -> MergedAppConfig:
         # `chain` is the ordered list of scopes — derived by the
-        # service either from the matching policy's `scope_sources`
-        # or from the BEP-1052 default `[DOMAIN_USER_DEFAULTS, USER]`.
+        # service from the matching policy's `scope_sources`
+        # (required-policy invariant, §1).
         # A single SQL resolves the caller's domain_name via a `users`
         # subquery and pulls one row per scope in `chain` where it
         # exists. Bounded to `len(chain)` rows by the natural-key
@@ -1640,8 +1743,8 @@ class AppConfigDBSource:
     ) -> MergedAppConfigPage:
         # Connection-shaped counterpart — derives the chain per
         # `name` via `chain_for_name` (service-provided closure that
-        # reads the policy cache and falls back to the 2-chain
-        # default). Pagination uses `name` as a stable cursor key
+        # reads the policy cache; every `name` is guaranteed to have
+        # a policy). Pagination uses `name` as a stable cursor key
         # applied in SQL. Full implementation lives in the §3
         # Connection resolver.
         ...
@@ -1908,10 +2011,9 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigInput!) {
 
 Before the `theme` document can be published (S4 below), an admin
 establishes a policy for `theme` that restricts writes to an
-admin-only scope and forbids per-user customization. This policy is
-optional — without it, writes proceed under the natural-key rules
-alone — but publishing it makes "theme is admin-only" enforceable as
-data rather than convention.
+admin-only scope and forbids per-user customization. The policy is
+**required** (§1 required-policy invariant) — no AppConfig row for
+`theme` can be created until this step runs.
 
 The choice of scope for the admin-owned value — `domain` vs
 `domain_user_defaults` — is up to the admin; the two scopes carry
@@ -2033,8 +2135,62 @@ mutation PromoteThemePolicy(
   `scopeSources=["domain"]` + `userWritable=false` blocks new user
   writes and excludes `USER` rows from the resolved view, but leaves
   any pre-existing `USER` rows untouched at the DB level (they
-  simply stop being read). Admins who want those rows gone need a
-  one-off cleanup — not part of this BEP.
+  simply stop being read). Admins who want those rows gone target
+  them with `adminBulkPurgeAppConfigs` (see S3.8).
+
+### S3.8. Admin fixes a misconfigured policy or config
+
+Since `configName` is immutable (§1), a typo at policy-creation time
+cannot be fixed by renaming. The admin's recovery path is a **purge
+and rebuild** workflow. The mutations run in a specific order because
+of the required-policy invariant:
+
+1. If any AppConfig rows already exist under the wrong `config_name`,
+   purge them first — the policy cannot be purged while references
+   exist.
+2. Purge the wrong policy.
+3. Create the correct policy.
+4. Re-create any AppConfig rows under the correct `config_name`.
+
+```graphql
+# Step 1 — purge the bad AppConfig rows (keys identify them).
+mutation PurgeBadConfigs($input: AdminBulkPurgeAppConfigInput!) {
+  adminBulkPurgeAppConfigs(input: $input) {
+    purged { scopeType scopeId name }
+    failed { scopeType scopeId name message }
+  }
+}
+
+# Step 2 — purge the mis-named policy.
+mutation PurgeBadPolicy($input: AdminBulkPurgeAppConfigPolicyInput!) {
+  adminBulkPurgeAppConfigPolicies(input: $input) {
+    purgedConfigNames
+    failed { configName message }
+  }
+}
+```
+
+```json
+// Step 1 input
+{
+  "input": {
+    "keys": [
+      { "scopeType": "DOMAIN", "scopeId": "default", "name": "thmee" }
+    ]
+  }
+}
+
+// Step 2 input
+{ "input": { "configNames": ["thmee"] } }
+```
+
+- Authorization: admin required on both mutations.
+- Step 2 rejects the item if step 1 was skipped (or missed a row) —
+  the service checks for remaining AppConfig references under that
+  `config_name` before purging.
+- Purge is the only deletion verb in the BEP; day-to-day writes
+  still flow through create / update and never remove rows on their
+  own. Users cannot call purge.
 
 ### S4. Admin publishes a per-user default for a domain
 
@@ -2190,20 +2346,12 @@ may become a follow-up BEP if it earns its own motivation.
 
 - **Policy seed migration** — operationally it may be useful to ship
   an initial set of policies (`theme`, `preferences`, `menu`, …) as
-  part of a migration so the advisory layer is populated on first
-  deploy. This BEP does not prescribe a seed; the operational team
-  picks whether to seed and with which values.
-- **Mutable vs. immutable `config_name`** — currently mutable. If
-  client-breaking renames become a concern, a future change can mark
-  `config_name` immutable (block `update` on that field) without any
-  wire-format change.
+  part of a migration so the invariant-required policies exist on
+  first deploy. This BEP does not prescribe a seed; the operational
+  team picks whether to seed and with which values.
 - **Policy `description`** — intentionally dropped from the initial
   table. A human-readable summary is useful for admin UIs listing
   policies; adding it later is a non-breaking column addition.
-- **JSON-schema validation** — a natural extension to
-  `AppConfigPolicy` is a `json_schema` field that the service runs
-  each write against. Deferred to a follow-up so this BEP stays
-  focused on "who may write what where."
 - **Policy deprecation** — because there is no lifecycle coupling
   (§1), the only way to "retire" a policy today is to update it so
   nothing can satisfy its constraints or to simply delete it and
