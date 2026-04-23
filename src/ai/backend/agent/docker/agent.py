@@ -1052,6 +1052,40 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 f"seccomp={json.dumps(seccomp_profile)}"
             ]
 
+    async def _attach_additional_networks(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        requested_networks: Iterable[str],
+    ) -> None:
+        """
+        Connect the container to each requested network, skipping any that
+        Docker has already attached (e.g. `bridge` auto-attached when
+        `NetworkMode` is unset). `requested_networks` may contain network
+        names or IDs per the `Resources.get_docker_networks` contract.
+        """
+        requested = set(requested_networks)
+        if not requested:
+            return
+        container_info = await container.show()
+        networks = {}
+        if (network_settings := container_info.get("NetworkSettings")) is not None:
+            if (networks_dict := network_settings.get("Networks")) is not None:
+                networks = networks_dict
+        already_attached = set(networks.keys()) | {
+            n["NetworkID"] for n in networks.values() if n is not None and n.get("NetworkID")
+        }
+        for ref in requested - already_attached:
+            network = await docker.networks.get(ref)
+            try:
+                await network.connect({"Container": container._id})
+            except DockerError as e:
+                # Defense against a race between container.show() and connect()
+                # where Docker may attach the network in between.
+                if e.status == HTTPStatus.FORBIDDEN and "already exists" in str(e.message):
+                    continue
+                raise
+
     @override
     async def start_container(
         self,
@@ -1320,9 +1354,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
                 additional_network_names |= set(n)
 
-            for name in additional_network_names:
-                network = await docker.networks.get(name)
-                await network.connect({"Container": container._id})
+            await self._attach_additional_networks(docker, container, additional_network_names)
 
             kernel_obj.set_container_id(ContainerId(cid))
             container_network_info: ContainerNetworkInfo | None = None
