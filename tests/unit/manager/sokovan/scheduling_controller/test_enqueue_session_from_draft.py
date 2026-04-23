@@ -35,6 +35,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import PASSED, HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
@@ -43,6 +44,7 @@ from ai.backend.common.types import (
     MountInfoEntry,
     MountPermission,
     ResourceSlot,
+    ResourceSlotEntry,
     SessionTypes,
     SlotName,
     SlotTypes,
@@ -50,6 +52,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
@@ -116,16 +119,19 @@ def draft(image_id: ImageID) -> SessionSpecDraft:
                     replica_count=1,
                     execution_spec=KernelExecutionSpecDraft(
                         image_id=image_id,
-                        resources=ResourceSlot({
-                            "cpu": Decimal(2),
-                            "mem": Decimal(2 * 1024 * 1024 * 1024),
-                        }),
+                        resources=(
+                            ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(2))),
+                            ResourceSlotEntry(
+                                resource_type="mem",
+                                quantity=str(Decimal(2 * 1024 * 1024 * 1024)),
+                            ),
+                        ),
                         resource_opts=ResourceOpts(),
                         mounts=(
                             MountInfoEntry(
-                                vfolder_id=VFolderID(
-                                    quota_scope_id=None, folder_id=uuid.uuid4()
-                                ).folder_id,
+                                vfolder_id=VFolderUUID(
+                                    VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()).folder_id
+                                ),
                                 mount_destination="/home/work/data",
                                 mount_perm=MountPermission.READ_WRITE,
                             ),
@@ -195,12 +201,12 @@ def _make_user() -> UserData:
 def _fetch_bundle(image_id: ImageID) -> SessionSpecContextFetch:
     return SessionSpecContextFetch(
         resource_group_defaults=DefaultSessionOptions(),
-        scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
+        resource_group_network=ScalingGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
         container_user_info=ContainerUserInfo(uid=1000, main_gid=1000, supplementary_gids=[]),
         image_infos={image_id: _image_info(image_id)},
-        scaling_group_allow_fractional=False,
-        vfolder_mounts=[_vfolder_mount()],
-        dotfile_data={"dotfiles": []},
+        resource_group_allow_fractional=False,
+        vfolder_mounts_by_role={"main": (_vfolder_mount(),)},
+        dotfile_data=DotfileBundle(),
         keypair_resource_policy=_keypair_policy(),
     )
 
@@ -267,12 +273,7 @@ class TestEnqueueSessionFromDraft:
         user = _make_user()
 
         with with_user(user):
-            returned_id = await controller.enqueue_session_from_draft(
-                draft,
-                sudo_session_enabled=True,
-                model_definition_path="model.yaml",
-                model_definition={"version": 1},
-            )
+            returned_id = await controller.enqueue_session_from_draft(draft)
 
         assert returned_id == expected_session_id
 
@@ -293,13 +294,9 @@ class TestEnqueueSessionFromDraft:
         kernel = enqueued_spec.kernel_specs[0]
         assert kernel.cluster_role == "main"
         assert kernel.execution_spec.image_id == image_id
-        # vfolder mounts flowed through context → resolved on the spec
-        assert len(enqueued_spec.vfolder_mounts) == 1
-        assert enqueued_spec.vfolder_mounts[0].kernel_path == PurePosixPath("/home/work/data")
-        # dotfile / sudo / model overlay landed in kernel internal_data
-        assert kernel.internal_data.get("sudo_session_enabled") is True
-        assert kernel.internal_data.get("model_definition_path") == "model.yaml"
-        assert kernel.internal_data.get("model_definition") == {"version": 1}
+        # vfolder mounts flowed through context → resolved on the kernel spec
+        assert len(kernel.vfolder_mounts) == 1
+        assert kernel.vfolder_mounts[0].kernel_path == PurePosixPath("/home/work/data")
 
         # PRE + POST hooks fired
         assert hook_plugin_ctx.dispatch.await_count == 1

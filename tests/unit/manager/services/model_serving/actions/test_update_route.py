@@ -20,6 +20,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
@@ -117,6 +118,10 @@ class TestUpdateRoute:
         return mock
 
     @pytest.fixture
+    def mock_runtime_variant_repository(self) -> MagicMock:
+        return MagicMock(spec=RuntimeVariantRepository)
+
+    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -128,6 +133,7 @@ class TestUpdateRoute:
         mock_valkey_live: MagicMock,
         mock_repositories: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
     ) -> ModelServingService:
@@ -141,6 +147,7 @@ class TestUpdateRoute:
             valkey_live=mock_valkey_live,
             repository=mock_repositories.repository,
             deployment_repository=mock_deployment_repository,
+            runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
         )

@@ -16,12 +16,15 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentState,
     ReplicaSpec,
 )
@@ -98,13 +101,13 @@ class TestDeployingProvisioningHandler:
         current_revision_id is None (no initial revision), deploying_revision_id is set
         (ActivateRevision assigned it), and url is None (check_pending was skipped).
         """
-        deploying_rev_id = uuid4()
+        deploying_rev_id = DeploymentRevisionID(uuid4())
         revision = MagicMock()
         revision.revision_id = deploying_rev_id
 
         return DeploymentWithHistory(
             deployment_info=DeploymentInfo(
-                id=uuid4(),
+                id=DeploymentID(uuid4()),
                 metadata=DeploymentMetadata(
                     name="test-deployment",
                     domain="default",
@@ -117,6 +120,7 @@ class TestDeployingProvisioningHandler:
                 ),
                 state=DeploymentState(
                     lifecycle=EndpointLifecycle.DEPLOYING,
+                    scaling_state=ScalingState.STABLE,
                     retry_count=0,
                 ),
                 replica_spec=ReplicaSpec(
@@ -131,6 +135,7 @@ class TestDeployingProvisioningHandler:
                 current_revision_id=None,
                 deploying_revision_id=deploying_rev_id,
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+                options=DeploymentOptions(),
             ),
             last_history=None,
         )

@@ -13,6 +13,9 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -38,6 +41,7 @@ from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, 
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
     DryRunModelServiceActionResult,
@@ -111,7 +115,7 @@ class TestDryRunModelService:
     @pytest.fixture
     def _stub_model_revision_spec(self) -> ModelRevisionSpec:
         return ModelRevisionSpec(
-            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            image_id=ImageID(uuid.UUID("88888888-8888-8888-8888-888888888888")),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -119,11 +123,13 @@ class TestDryRunModelService:
                 resource_opts=None,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                model_vfolder_id=VFolderUUID(uuid.UUID("77777777-7777-7777-7777-777777777777")),
                 model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 startup_command=None,
                 environ={},
             ),
@@ -157,6 +163,10 @@ class TestDryRunModelService:
         return mock
 
     @pytest.fixture
+    def mock_runtime_variant_repository(self) -> MagicMock:
+        return MagicMock(spec=RuntimeVariantRepository)
+
+    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -168,6 +178,7 @@ class TestDryRunModelService:
         mock_valkey_live: MagicMock,
         mock_repositories: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
     ) -> ModelServingService:
@@ -181,6 +192,7 @@ class TestDryRunModelService:
             valkey_live=mock_valkey_live,
             repository=mock_repositories.repository,
             deployment_repository=mock_deployment_repository,
+            runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
         )
@@ -287,7 +299,7 @@ class TestDryRunModelService:
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                     sudo_session_enabled=False,
                     model_service_prepare_ctx=ModelServicePrepareCtx(
-                        model_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                        model_vfolder_id=VFolderUUID(uuid.uuid4()),
                         model_definition_path=None,
                         requester_access_key=AccessKey("ACCESSKEY001"),
                         owner_access_key=AccessKey("ACCESSKEY001"),
@@ -351,7 +363,7 @@ class TestDryRunModelServiceActionWithRevision:
     @pytest.fixture
     def base_model_service_prepare_ctx(self) -> ModelServicePrepareCtx:
         return ModelServicePrepareCtx(
-            model_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+            model_vfolder_id=VFolderUUID(uuid.uuid4()),
             model_definition_path=None,
             requester_access_key=AccessKey("ACCESSKEY001"),
             owner_access_key=AccessKey("ACCESSKEY001"),
@@ -394,7 +406,7 @@ class TestDryRunModelServiceActionWithRevision:
     @pytest.fixture
     def revision_spec(self) -> ModelRevisionSpec:
         return ModelRevisionSpec(
-            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            image_id=ImageID(uuid.UUID("88888888-8888-8888-8888-888888888888")),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -402,11 +414,13 @@ class TestDryRunModelServiceActionWithRevision:
                 resource_opts=None,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                model_vfolder_id=VFolderUUID(uuid.UUID("11111111-1111-1111-1111-111111111111")),
                 model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 startup_command=None,
                 environ={"SERVICE_DEF_VAR": "service-def-value"},
             ),
@@ -501,7 +515,7 @@ class TestDryRunModelServiceActionWithRevision:
     @pytest.fixture
     def revision_spec_with_no_environ(self) -> ModelRevisionSpec:
         return ModelRevisionSpec(
-            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            image_id=ImageID(uuid.UUID("88888888-8888-8888-8888-888888888888")),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -509,11 +523,13 @@ class TestDryRunModelServiceActionWithRevision:
                 resource_opts=None,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                model_vfolder_id=VFolderUUID(uuid.UUID("11111111-1111-1111-1111-111111111111")),
                 model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 startup_command=None,
                 environ=None,
             ),
@@ -592,7 +608,7 @@ class TestDryRunWithDeploymentConfigOverrides:
     def revision_from_deployment_config(self) -> ModelRevisionSpec:
         """Revision spec that would come from deployment config via the pipeline."""
         return ModelRevisionSpec(
-            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            image_id=ImageID(uuid.UUID("88888888-8888-8888-8888-888888888888")),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -600,11 +616,13 @@ class TestDryRunWithDeploymentConfigOverrides:
                 resource_opts=None,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                model_vfolder_id=VFolderUUID(uuid.UUID("77777777-7777-7777-7777-777777777777")),
                 model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 startup_command=None,
                 environ={"SERVICE_DEF_VAR": "from-deployment-config"},
             ),
@@ -640,6 +658,10 @@ class TestDryRunWithDeploymentConfigOverrides:
         return mock
 
     @pytest.fixture
+    def mock_runtime_variant_repository(self) -> MagicMock:
+        return MagicMock(spec=RuntimeVariantRepository)
+
+    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -651,6 +673,7 @@ class TestDryRunWithDeploymentConfigOverrides:
         mock_valkey_live: MagicMock,
         mock_repositories: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
     ) -> ModelServingService:
@@ -664,6 +687,7 @@ class TestDryRunWithDeploymentConfigOverrides:
             valkey_live=mock_valkey_live,
             repository=mock_repositories.repository,
             deployment_repository=mock_deployment_repository,
+            runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
         )
@@ -769,7 +793,7 @@ class TestDryRunWithDeploymentConfigOverrides:
             request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
             sudo_session_enabled=False,
             model_service_prepare_ctx=ModelServicePrepareCtx(
-                model_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                model_vfolder_id=VFolderUUID(uuid.uuid4()),
                 model_definition_path=None,
                 requester_access_key=AccessKey("ACCESSKEY001"),
                 owner_access_key=AccessKey("ACCESSKEY001"),
@@ -881,7 +905,7 @@ class TestDryRunExtraMountsHandling:
     @pytest.fixture
     def _stub_model_revision_spec(self) -> ModelRevisionSpec:
         return ModelRevisionSpec(
-            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            image_id=ImageID(uuid.UUID("88888888-8888-8888-8888-888888888888")),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -889,11 +913,13 @@ class TestDryRunExtraMountsHandling:
                 resource_opts=None,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                model_vfolder_id=VFolderUUID(uuid.UUID("77777777-7777-7777-7777-777777777777")),
                 model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 startup_command=None,
                 environ={},
             ),
@@ -927,6 +953,10 @@ class TestDryRunExtraMountsHandling:
         return mock
 
     @pytest.fixture
+    def mock_runtime_variant_repository(self) -> MagicMock:
+        return MagicMock(spec=RuntimeVariantRepository)
+
+    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -938,6 +968,7 @@ class TestDryRunExtraMountsHandling:
         mock_valkey_live: MagicMock,
         mock_repositories: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
     ) -> ModelServingService:
@@ -951,6 +982,7 @@ class TestDryRunExtraMountsHandling:
             valkey_live=mock_valkey_live,
             repository=mock_repositories.repository,
             deployment_repository=mock_deployment_repository,
+            runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
         )
@@ -1068,7 +1100,7 @@ class TestDryRunExtraMountsHandling:
             request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
             sudo_session_enabled=False,
             model_service_prepare_ctx=ModelServicePrepareCtx(
-                model_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                model_vfolder_id=VFolderUUID(uuid.uuid4()),
                 model_definition_path=None,
                 requester_access_key=AccessKey("ACCESSKEY001"),
                 owner_access_key=AccessKey("ACCESSKEY001"),

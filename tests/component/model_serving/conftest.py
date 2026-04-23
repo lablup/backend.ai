@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -64,6 +64,7 @@ def model_serving_processors(
         valkey_live=valkey_clients.live,
         repository=ms_repo,
         deployment_repository=deployment_repo,
+        runtime_variant_repository=AsyncMock(),
         deployment_controller=AsyncMock(),
         scheduling_controller=AsyncMock(),
     )
@@ -154,6 +155,7 @@ def server_module_registries(
                 deployment=deployment_processors,
                 model_serving=model_serving_processors,
                 model_serving_auto_scaling=auto_scaling_processors,
+                runtime_variant=MagicMock(),
             ),
             route_deps,
         ),

@@ -80,10 +80,10 @@ class DomainRPCRegistry[THandler]:
     instance per (domain, agent) pair.
     """
 
-    _handler_factory: Callable[[AbstractAgent], THandler]
+    _handler_factory: Callable[[AbstractAgent[Any, Any]], THandler]
     _method_getters: dict[str, Callable[[THandler], HandlerMethod]]
 
-    def __init__(self, handler_factory: Callable[[AbstractAgent], THandler]) -> None:
+    def __init__(self, handler_factory: Callable[[AbstractAgent[Any, Any]], THandler]) -> None:
         self._handler_factory = handler_factory
         self._method_getters = {}
 
@@ -142,7 +142,7 @@ class AgentRPCRegistry:
 
     def create_domain(
         self,
-        handler_factory: Callable[[AbstractAgent], THandler],
+        handler_factory: Callable[[AbstractAgent[Any, Any]], THandler],
     ) -> DomainRPCRegistry[THandler]:
         """Create a new per-domain registry and attach it to this top-level
         registry.

@@ -16,15 +16,17 @@ responses.
 
 from __future__ import annotations
 
+from typing import Any
+
 from ai.backend.agent.agent import AbstractAgent
 
 
 class KernelRPCHandler:
     """Agent-bound RPC handler for kernel lifecycle operations."""
 
-    _agent: AbstractAgent
+    _agent: AbstractAgent[Any, Any]
 
-    def __init__(self, *, agent: AbstractAgent) -> None:
+    def __init__(self, *, agent: AbstractAgent[Any, Any]) -> None:
         self._agent = agent
 
     # Concrete handler methods land here as v3 endpoints are introduced.

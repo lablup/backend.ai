@@ -13,10 +13,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.config import ModelDefinitionDraft
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
@@ -32,6 +36,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
@@ -340,7 +345,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     @pytest.fixture
     def endpoint_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
-            id=deployment_id,
+            id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",
                 domain="default",
@@ -353,11 +358,13 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
             ),
             state=DeploymentState(
                 lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
             replica_spec=ReplicaSpec(replica_count=1),
             network=DeploymentNetworkSpec(open_to_public=False),
             model_revisions=[],
+            options=DeploymentOptions(),
         )
 
     @pytest.fixture
@@ -365,7 +372,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
         self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID
     ) -> ModelRevisionCreator:
         return ModelRevisionCreator(
-            image_id=image_id,
+            image_id=ImageID(image_id),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -373,15 +380,16 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_opts={"shmem": "1g"},
             ),
             mounts=VFolderMountsCreator(
-                model_vfolder_id=model_vfolder_id,
+                model_vfolder_id=VFolderUUID(model_vfolder_id),
                 model_definition_path="model-definition.yaml",
                 model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
                 startup_command="python serve.py",
                 bootstrap_script="pip install -r requirements.txt",
                 environ={"CUDA_VISIBLE_DEVICES": "0"},
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 callback_url=None,
             ),
             model_definition=ModelDefinitionDraft(),
@@ -401,14 +409,14 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             ),
             model_mount_config=ModelMountConfigData(
-                vfolder_id=model_vfolder_id,
+                vfolder_id=VFolderUUID(model_vfolder_id),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
             ),
-            image_id=image_id,
+            image_id=ImageID(image_id),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
@@ -418,7 +426,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     ) -> ModelRevisionCreator:
         """Creator with None environ and resource_opts for edge case testing."""
         return ModelRevisionCreator(
-            image_id=image_id,
+            image_id=ImageID(image_id),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -426,10 +434,13 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_opts=None,
             ),
             mounts=VFolderMountsCreator(
-                model_vfolder_id=model_vfolder_id,
+                model_vfolder_id=VFolderUUID(model_vfolder_id),
+                model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 environ=None,
             ),
             model_definition=ModelDefinitionDraft(),

@@ -22,6 +22,7 @@ from ai.backend.common.types import (
     DefaultForUnspecified,
     MountPermission,
     ResourceSlot,
+    ResourceSlotEntry,
     SessionTypes,
     SlotName,
     SlotTypes,
@@ -29,6 +30,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
@@ -50,16 +52,26 @@ from ai.backend.manager.errors.kernel import QuotaExceeded
 from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
+from ai.backend.manager.sokovan.scheduling_controller.validators.container_limit_rule import (
+    ContainerLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.dotfile_vfolder_conflict_rule import (
+    DotfileVFolderConflictRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.inference_model_folder_rule import (
+    InferenceModelFolderRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_validation_rule import (
+    MountNameValidationRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
+    ResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
+    ServicePortRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
     SessionSpecValidationContext,
-)
-from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_rules import (
-    ContainerLimitRule,
-    DotfileVFolderConflictRule,
-    InferenceModelFolderRule,
-    MountNameValidationRule,
-    ResourceLimitRule,
-    ServicePortRule,
 )
 
 
@@ -95,7 +107,10 @@ def _kernel(
         preopen_ports=preopen_ports,
         execution_spec=KernelExecutionSpec(
             image_id=image_id,
-            resources=ResourceSlot({"cpu": Decimal(cpu), "mem": Decimal(1024 * 1024 * 1024)}),
+            resources=[
+                ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(cpu))),
+                ResourceSlotEntry(resource_type="mem", quantity=str(Decimal(1024 * 1024 * 1024))),
+            ],
             resource_opts=ResourceOpts(shmem=shmem),
         ),
     )
@@ -107,6 +122,12 @@ def _spec(
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     vfolder_mounts: tuple[VFolderMount, ...] = (),
 ) -> SessionSpec:
+    # SessionSpec no longer carries session-level vfolder_mounts — they live
+    # per-kernel on KernelSpec.vfolder_mounts. Mirror the supplied mounts onto
+    # every kernel so existing tests keep the same semantics.
+    decorated_kernel_specs = tuple(
+        kernel.model_copy(update={"vfolder_mounts": vfolder_mounts}) for kernel in kernel_specs
+    )
     return SessionSpec(
         identity=SessionIdentity(
             session_id=SessionID(uuid.uuid4()),
@@ -131,8 +152,7 @@ def _spec(
             kernel_groups=[],
             timeouts=SessionTimeouts(),
         ),
-        kernel_specs=kernel_specs,
-        vfolder_mounts=vfolder_mounts,
+        kernel_specs=decorated_kernel_specs,
     )
 
 
@@ -141,13 +161,13 @@ def _ctx(
     keypair_policy: KeyPairResourcePolicyData | None = None,
     image_infos: dict[ImageID, ImageInfo] | None = None,
     known_slot_types: dict[SlotName, SlotTypes] | None = None,
-    dotfile_data: dict[str, Any] | None = None,
+    dotfile_data: DotfileBundle | None = None,
 ) -> SessionSpecValidationContext:
     return SessionSpecValidationContext(
         keypair_resource_policy=keypair_policy,
         image_infos=image_infos or {},
         known_slot_types=known_slot_types or {},
-        dotfile_data=dotfile_data or {},
+        dotfile_data=dotfile_data or DotfileBundle(),
     )
 
 
@@ -226,14 +246,14 @@ class TestResourceLimitRule:
 
     def test_shmem_below_memory(self) -> None:
         img = ImageID(uuid.uuid4())
-        spec = _spec((_kernel(img, shmem=BinarySize.from_str("64m")),))
+        spec = _spec((_kernel(img, shmem=BinarySize.finite_from_str("64m")),))
         ctx = _ctx(image_infos={img: _image_info(img)})
         ResourceLimitRule().validate(spec, ctx)
 
     def test_shmem_exceeds_memory(self) -> None:
         img = ImageID(uuid.uuid4())
         # requested memory is 1GiB (see _kernel fixture).
-        spec = _spec((_kernel(img, shmem=BinarySize.from_str("2g")),))
+        spec = _spec((_kernel(img, shmem=BinarySize.finite_from_str("2g")),))
         ctx = _ctx(image_infos={img: _image_info(img)})
         with pytest.raises(InvalidAPIParameters):
             ResourceLimitRule().validate(spec, ctx)
@@ -344,7 +364,11 @@ class TestDotfileVFolderConflictRule:
     def test_noop_without_mounts(self) -> None:
         img = ImageID(uuid.uuid4())
         spec = _spec((_kernel(img),))
-        ctx = _ctx(dotfile_data={"dotfiles": [{"path": "/home/work/.bashrc"}]})
+        ctx = _ctx(
+            dotfile_data=DotfileBundle(
+                dotfiles=(DotfileEntry(path="/home/work/.bashrc", perm="0644", data=""),),
+            )
+        )
         DotfileVFolderConflictRule().validate(spec, ctx)
 
     def test_detects_conflict(self) -> None:
@@ -353,7 +377,11 @@ class TestDotfileVFolderConflictRule:
             (_kernel(img),),
             vfolder_mounts=(_vfolder_mount("data", kernel_path="/home/work/.bashrc"),),
         )
-        ctx = _ctx(dotfile_data={"dotfiles": [{"path": ".bashrc"}]})
+        ctx = _ctx(
+            dotfile_data=DotfileBundle(
+                dotfiles=(DotfileEntry(path=".bashrc", perm="0644", data=""),),
+            )
+        )
         with pytest.raises(DotfileVFolderPathConflict):
             DotfileVFolderConflictRule().validate(spec, ctx)
 
@@ -363,5 +391,9 @@ class TestDotfileVFolderConflictRule:
             (_kernel(img),),
             vfolder_mounts=(_vfolder_mount("data", kernel_path="/home/work/data"),),
         )
-        ctx = _ctx(dotfile_data={"dotfiles": [{"path": "/etc/profile"}]})
+        ctx = _ctx(
+            dotfile_data=DotfileBundle(
+                dotfiles=(DotfileEntry(path="/etc/profile", perm="0644", data=""),),
+            )
+        )
         DotfileVFolderConflictRule().validate(spec, ctx)

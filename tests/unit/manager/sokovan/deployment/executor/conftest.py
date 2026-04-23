@@ -3,19 +3,24 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentState,
+    ModelRevisionSpec,
     ReplicaSpec,
     RouteHealthStatus,
     RouteStatus,
@@ -101,6 +106,7 @@ def deployment_executor(
     """Create DeploymentExecutor with mocked dependencies."""
     return DeploymentExecutor(
         deployment_repo=mock_deployment_repo,
+        runtime_variant_repo=AsyncMock(),
         scheduling_controller=mock_scheduling_controller,
         config_provider=mock_config_provider,
         client_pool=mock_client_pool,
@@ -131,7 +137,7 @@ def _create_deployment_info(
         revision.revision_id = rev_id
 
     return DeploymentInfo(
-        id=dep_id,
+        id=DeploymentID(dep_id),
         metadata=DeploymentMetadata(
             name="test-deployment",
             domain="default",
@@ -144,6 +150,7 @@ def _create_deployment_info(
         ),
         state=DeploymentState(
             lifecycle=lifecycle,
+            scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
         replica_spec=ReplicaSpec(
@@ -154,8 +161,9 @@ def _create_deployment_info(
             open_to_public=False,
             url=None,
         ),
-        model_revisions=[revision] if has_revision else [],  # type: ignore[list-item]
-        current_revision_id=rev_id if has_revision else None,
+        model_revisions=[cast(ModelRevisionSpec, revision)] if has_revision else [],
+        current_revision_id=DeploymentRevisionID(rev_id) if has_revision else None,
+        options=DeploymentOptions(),
     )
 
 
@@ -168,13 +176,13 @@ def _create_route_data(
     """Create RouteData for tests."""
     return RouteData(
         route_id=route_id or uuid4(),
-        endpoint_id=endpoint_id or uuid4(),
+        deployment_id=DeploymentID(endpoint_id or uuid4()),
         session_id=None,
         status=status,
         health_status=health_status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
-        revision_id=uuid4(),
+        revision_id=DeploymentRevisionID(uuid4()),
     )
 
 

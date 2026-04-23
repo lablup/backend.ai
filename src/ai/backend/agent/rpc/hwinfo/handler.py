@@ -17,6 +17,8 @@ scheduled separately.
 
 from __future__ import annotations
 
+from typing import Any
+
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.common.dto.agent.request import GatherHwinfoReq
 from ai.backend.common.dto.agent.response import (
@@ -29,9 +31,9 @@ from ai.backend.common.dto.agent.response import (
 class HwinfoRPCHandler:
     """Agent-bound RPC handler for hardware info gathering."""
 
-    _agent: AbstractAgent
+    _agent: AbstractAgent[Any, Any]
 
-    def __init__(self, *, agent: AbstractAgent) -> None:
+    def __init__(self, *, agent: AbstractAgent[Any, Any]) -> None:
         self._agent = agent
 
     async def gather_hwinfo(self, req: GatherHwinfoReq) -> GatherHwinfoResp:

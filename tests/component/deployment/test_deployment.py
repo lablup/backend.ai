@@ -38,6 +38,8 @@ from ai.backend.common.dto.manager.deployment import (
 )
 from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.services.deployment.service import _map_lifecycle_to_status
 
@@ -77,7 +79,7 @@ class TestSearchDeployments:
         group_fixture: uuid.UUID,
         domain_fixture: str,
         scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Search deployments with pagination returns correct page."""
         image_id, vfolder_id = deployment_seed_data
@@ -140,7 +142,7 @@ class TestGetDeployment:
         group_fixture: uuid.UUID,
         domain_fixture: str,
         scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Get deployment by ID returns correct deployment details."""
         image_id, vfolder_id = deployment_seed_data
@@ -252,7 +254,7 @@ class TestSearchRoutes:
         group_fixture: uuid.UUID,
         domain_fixture: str,
         scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Search routes for a deployment returns route list."""
         image_id, vfolder_id = deployment_seed_data

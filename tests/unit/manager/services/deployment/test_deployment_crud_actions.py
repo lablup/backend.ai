@@ -13,13 +13,17 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     LivenessStatus,
     ReadinessStatus,
 )
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SessionId
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
@@ -32,6 +36,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentState,
     ModelDeploymentAccessTokenData,
     ModelMountConfigData,
@@ -120,7 +125,7 @@ class DeploymentCRUDBaseFixtures:
     @pytest.fixture
     def endpoint_info(self, endpoint_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
-            id=endpoint_id,
+            id=DeploymentID(endpoint_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",
                 domain="default",
@@ -131,10 +136,15 @@ class DeploymentCRUDBaseFixtures:
                 created_at=datetime(2024, 1, 1, tzinfo=UTC),
                 revision_history_limit=10,
             ),
-            state=DeploymentState(lifecycle=EndpointLifecycle.READY, retry_count=0),
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
             replica_spec=ReplicaSpec(replica_count=2),
             network=DeploymentNetworkSpec(open_to_public=False),
             model_revisions=[],
+            options=DeploymentOptions(),
         )
 
     @pytest.fixture
@@ -235,7 +245,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.destroy_deployment = AsyncMock(return_value=True)
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = DestroyDeploymentAction(endpoint_id=endpoint_id)
+        action = DestroyDeploymentAction(deployment_id=DeploymentID(endpoint_id))
         result = await processors.destroy_deployment.wait_for_complete(action)
 
         assert result.success is True
@@ -254,7 +264,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
             side_effect=Exception("EndpointNotFound")
         )
 
-        action = DestroyDeploymentAction(endpoint_id=uuid.uuid4())
+        action = DestroyDeploymentAction(deployment_id=DeploymentID(uuid.uuid4()))
         with pytest.raises(Exception, match="EndpointNotFound"):
             await processors.destroy_deployment.wait_for_complete(action)
 
@@ -271,7 +281,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.destroy_deployment = AsyncMock(return_value=True)
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = DestroyDeploymentAction(endpoint_id=endpoint_id)
+        action = DestroyDeploymentAction(deployment_id=DeploymentID(endpoint_id))
         result = await processors.destroy_deployment.wait_for_complete(action)
 
         assert result.success is True
@@ -285,7 +295,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
     def route_info(self, endpoint_id: uuid.UUID) -> RouteInfo:
         return RouteInfo(
             route_id=uuid.uuid4(),
-            endpoint_id=endpoint_id,
+            deployment_id=DeploymentID(endpoint_id),
             session_id=SessionId(uuid.uuid4()),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -335,7 +345,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         """traffic_status=INACTIVE returned correctly."""
         inactive_route = RouteInfo(
             route_id=uuid.uuid4(),
-            endpoint_id=endpoint_id,
+            deployment_id=DeploymentID(endpoint_id),
             session_id=SessionId(uuid.uuid4()),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -360,7 +370,7 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
     def route_info(self, endpoint_id: uuid.UUID) -> RouteInfo:
         return RouteInfo(
             route_id=uuid.uuid4(),
-            endpoint_id=endpoint_id,
+            deployment_id=DeploymentID(endpoint_id),
             session_id=SessionId(uuid.uuid4()),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -559,14 +569,14 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             ),
             model_mount_config=ModelMountConfigData(
-                vfolder_id=uuid.uuid4(),
+                vfolder_id=VFolderUUID(uuid.uuid4()),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
             ),
-            image_id=uuid.uuid4(),
+            image_id=ImageID(uuid.uuid4()),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             extra_vfolder_mounts=[],
         )

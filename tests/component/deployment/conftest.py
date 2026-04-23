@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
@@ -20,6 +22,7 @@ from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACVali
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -45,10 +48,10 @@ from ai.backend.manager.repositories.deployment.repository import DeploymentRepo
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -60,8 +63,8 @@ from ai.backend.manager.sokovan.scheduling_controller import (
 )
 
 # Type aliases for fixture factories
-ImageFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
-VFolderFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
+ImageFactoryFunc = Callable[[], Coroutine[Any, Any, ImageID]]
+VFolderFactoryFunc = Callable[[], Coroutine[Any, Any, VFolderUUID]]
 
 
 @pytest.fixture(autouse=True)
@@ -111,13 +114,11 @@ def deployment_processors(
             hook_plugin_ctx=hook_plugin_ctx,
         )
     )
-    runtime_variant_repository = RuntimeVariantRepository(database_engine)
     revision_draft_reader = RevisionDraftReader(deployment_repository=repo)
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(
             scheduling_controller=scheduling_controller,
             deployment_repository=repo,
-            runtime_variant_repository=runtime_variant_repository,
             config_provider=config_provider,
             storage_manager=storage_manager,
             event_producer=event_producer,
@@ -151,9 +152,14 @@ def server_module_registries(
     deployment_processors: DeploymentProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for deployment-domain tests."""
+    runtime_variant_adapter = RuntimeVariantAdapter(MagicMock(spec=Processors))
     return [
         register_deployment_routes(
-            DeploymentAPIHandler(deployment=deployment_processors), route_deps
+            DeploymentAPIHandler(
+                deployment=deployment_processors,
+                runtime_variant_adapter=runtime_variant_adapter,
+            ),
+            route_deps,
         ),
     ]
 
@@ -188,10 +194,10 @@ async def image_factory(
     container_registry_fixture: uuid.UUID,
 ) -> AsyncIterator[ImageFactoryFunc]:
     """Factory that creates ImageRow entries for deployment tests."""
-    created_ids: list[uuid.UUID] = []
+    created_ids: list[ImageID] = []
 
-    async def _create() -> uuid.UUID:
-        image_id = uuid.uuid4()
+    async def _create() -> ImageID:
+        image_id = ImageID(uuid.uuid4())
         unique = secrets.token_hex(4)
         image_name = f"deployment-image-{unique}"
         canonical = f"registry.deployment.test.local/testproject/{image_name}:latest"
@@ -239,10 +245,10 @@ async def vfolder_factory(
     admin_user_fixture: Any,
 ) -> AsyncIterator[VFolderFactoryFunc]:
     """Factory that creates VFolder entries for deployment model mounts."""
-    created_ids: list[uuid.UUID] = []
+    created_ids: list[VFolderUUID] = []
 
-    async def _create() -> uuid.UUID:
-        vfolder_id = uuid.uuid4()
+    async def _create() -> VFolderUUID:
+        vfolder_id = VFolderUUID(uuid.uuid4())
         unique = secrets.token_hex(4)
         user_uuid = admin_user_fixture.user_uuid
         quota_scope_id = QuotaScopeID(
@@ -283,7 +289,7 @@ async def deployment_seed_data(
     domain_fixture: str,
     image_factory: ImageFactoryFunc,
     vfolder_factory: VFolderFactoryFunc,
-) -> AsyncIterator[tuple[uuid.UUID, uuid.UUID]]:
+) -> AsyncIterator[tuple[ImageID, VFolderUUID]]:
     """Create seed data and clean up endpoints created during the test.
 
     Endpoints reference domains/groups/scaling_groups with RESTRICT FK,

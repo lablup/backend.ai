@@ -9,7 +9,9 @@ import yarl
 
 from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.types import ClusterMode
 from ai.backend.manager.data.deployment.types import RevisionDraft
 from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
 
@@ -23,18 +25,19 @@ class TestRevisionDraftMerge:
         assert _merge_all() == RevisionDraft()
 
     def test_later_replaces_earlier_scalar_fields(self) -> None:
-        image_a = uuid4()
-        image_b = uuid4()
+        image_a = ImageID(uuid4())
+        image_b = ImageID(uuid4())
+        variant_id = RuntimeVariantID(uuid4())
         earlier = RevisionDraft(
-            image_id=image_a,  # type: ignore[arg-type]
+            image_id=image_a,
             cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             startup_command="echo a",
-            runtime_variant=RuntimeVariant("vllm"),
+            runtime_variant_id=variant_id,
             callback_url=yarl.URL("http://a"),
         )
         later = RevisionDraft(
-            image_id=image_b,  # type: ignore[arg-type]
+            image_id=image_b,
             cluster_size=2,
             startup_command="echo b",
             callback_url=yarl.URL("http://b"),
@@ -44,7 +47,7 @@ class TestRevisionDraftMerge:
         assert merged.cluster_mode == ClusterMode.SINGLE_NODE  # earlier preserved
         assert merged.cluster_size == 2
         assert merged.startup_command == "echo b"
-        assert merged.runtime_variant == RuntimeVariant("vllm")
+        assert merged.runtime_variant_id == variant_id
         assert merged.callback_url == yarl.URL("http://b")
 
     def test_none_in_later_does_not_override(self) -> None:

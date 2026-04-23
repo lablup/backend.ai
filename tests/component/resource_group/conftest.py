@@ -53,7 +53,11 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.scaling_group = scaling_group_processors
 
-    adapter = ResourceGroupAdapter(processors)
+    adapter = ResourceGroupAdapter(
+        processors,
+        deployment_coordinator=MagicMock(),
+        schedule_coordinator=MagicMock(),
+    )
     handler = V2ResourceGroupHandler(adapter=adapter)
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)

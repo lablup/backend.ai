@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
@@ -48,7 +49,7 @@ class TestVFolderAdapterMySearch:
     @pytest.fixture
     def vfolder_data(self) -> VFolderData:
         return VFolderData(
-            id=uuid4(),
+            id=VFolderUUID(uuid4()),
             name="test-vfolder",
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
@@ -141,7 +142,7 @@ class TestVFolderAdapterProjectSearch:
     def vfolder_data(self) -> VFolderData:
         group_id = uuid4()
         return VFolderData(
-            id=uuid4(),
+            id=VFolderUUID(uuid4()),
             name="project-vfolder",
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),

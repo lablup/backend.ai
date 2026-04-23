@@ -8,13 +8,15 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentState,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
@@ -43,7 +45,7 @@ if TYPE_CHECKING:
 def sample_deployment_info() -> DeploymentInfo:
     """Sample DeploymentInfo for testing."""
     return DeploymentInfo(
-        id=uuid4(),
+        id=DeploymentID(uuid4()),
         metadata=DeploymentMetadata(
             name="test-deployment",
             domain="default",
@@ -56,6 +58,7 @@ def sample_deployment_info() -> DeploymentInfo:
         ),
         state=DeploymentState(
             lifecycle=EndpointLifecycle.PENDING,
+            scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
         replica_spec=ReplicaSpec(
@@ -66,6 +69,7 @@ def sample_deployment_info() -> DeploymentInfo:
             open_to_public=False,
         ),
         model_revisions=[],
+        options=DeploymentOptions(),
     )
 
 
@@ -273,6 +277,7 @@ def coordinator_with_pending_deployments(
         valkey_schedule=mock_valkey_schedule,
         deployment_controller=mock_deployment_controller,
         deployment_repository=mock_deployment_repository,
+        runtime_variant_repository=MagicMock(),
         event_producer=mock_event_producer,
         lock_factory=mock_lock_factory,
         config_provider=mock_config_provider,
@@ -306,6 +311,7 @@ def coordinator_without_deployments(
         valkey_schedule=mock_valkey_schedule,
         deployment_controller=mock_deployment_controller,
         deployment_repository=mock_deployment_repository,
+        runtime_variant_repository=MagicMock(),
         event_producer=mock_event_producer,
         lock_factory=mock_lock_factory,
         config_provider=mock_config_provider,

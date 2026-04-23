@@ -33,6 +33,8 @@ from ai.backend.common.dto.manager.deployment import (
     UpdateDeploymentRequest,
 )
 from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 
 _RANDOM_DEPLOYMENT_ID = uuid.uuid4()
@@ -70,10 +72,10 @@ class TestCreateDeployment:
                     resource_group="nonexistent-sgroup",
                     resource_slots={"cpu": "1", "mem": "1073741824"},
                 ),
-                image=ImageInput(id=uuid.uuid4()),
+                image=ImageInput(id=ImageID(uuid.uuid4())),
                 model_runtime_config=ModelRuntimeConfigInput(),
                 model_mount_config=ModelMountConfigInput(
-                    vfolder_id=uuid.uuid4(),
+                    vfolder_id=VFolderUUID(uuid.uuid4()),
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
@@ -89,7 +91,7 @@ class TestCreateDeployment:
         group_fixture: uuid.UUID,
         domain_fixture: str,
         scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Creating a deployment with valid config returns deployment with initial status."""
         image_id, vfolder_id = deployment_seed_data
@@ -157,7 +159,7 @@ class TestUpdateDeployment:
         group_fixture: uuid.UUID,
         domain_fixture: str,
         scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Updating deployment config (name, desired_replicas) succeeds."""
         image_id, vfolder_id = deployment_seed_data
@@ -228,7 +230,7 @@ class TestDestroyDeployment:
         group_fixture: uuid.UUID,
         domain_fixture: str,
         scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Destroying a deployment terminates it successfully."""
         image_id, vfolder_id = deployment_seed_data
@@ -295,7 +297,7 @@ class TestRevisionManagement:
         group_fixture: uuid.UUID,
         domain_fixture: str,
         scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Adding a revision and searching revisions works correctly."""
         image_id, vfolder_id = deployment_seed_data
@@ -379,7 +381,7 @@ class TestReplicaManagement:
         group_fixture: uuid.UUID,
         domain_fixture: str,
         scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Changing desired_replicas updates the replica count."""
         image_id, vfolder_id = deployment_seed_data

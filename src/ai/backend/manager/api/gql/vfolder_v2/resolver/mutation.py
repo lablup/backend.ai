@@ -87,7 +87,7 @@ async def purge_vfolder_v2(
         description="Restore a trashed virtual folder. RBAC enforced via scope chain.",
     ),
     name="restoreVFolder",
-)  # type: ignore[misc]
+)
 async def restore_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -255,7 +255,7 @@ async def bulk_delete_vfolders_v2(
         ),
     ),
     name="createVFolderInProject",
-)  # type: ignore[misc]
+)
 async def create_vfolder_in_project(
     info: Info[StrawberryGQLContext],
     project_id: UUID,

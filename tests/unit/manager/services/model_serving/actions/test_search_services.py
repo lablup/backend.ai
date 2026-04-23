@@ -26,6 +26,7 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
     SearchServicesActionResult,
@@ -123,6 +124,10 @@ class TestSearchServices:
         return mock
 
     @pytest.fixture
+    def mock_runtime_variant_repository(self) -> MagicMock:
+        return MagicMock(spec=RuntimeVariantRepository)
+
+    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -134,6 +139,7 @@ class TestSearchServices:
         mock_valkey_live: MagicMock,
         mock_repositories: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
     ) -> ModelServingService:
@@ -147,6 +153,7 @@ class TestSearchServices:
             valkey_live=mock_valkey_live,
             repository=mock_repositories.repository,
             deployment_repository=mock_deployment_repository,
+            runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
         )

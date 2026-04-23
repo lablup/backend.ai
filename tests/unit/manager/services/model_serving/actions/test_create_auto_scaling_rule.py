@@ -125,7 +125,7 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "CPU based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    endpoint_id=DeploymentID(uuid.UUID("11111111-1111-1111-1111-111111111111")),
+                    deployment_id=DeploymentID(uuid.UUID("11111111-1111-1111-1111-111111111111")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.KERNEL,
                         metric_name="cpu_utilization",
@@ -145,7 +145,7 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "Request count based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    endpoint_id=DeploymentID(uuid.UUID("33333333-3333-3333-3333-333333333333")),
+                    deployment_id=DeploymentID(uuid.UUID("33333333-3333-3333-3333-333333333333")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.KERNEL,
                         metric_name="requests_per_second",
@@ -165,7 +165,7 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "Custom metric",
                 CreateEndpointAutoScalingRuleAction(
-                    endpoint_id=DeploymentID(uuid.UUID("55555555-5555-5555-5555-555555555555")),
+                    deployment_id=DeploymentID(uuid.UUID("55555555-5555-5555-5555-555555555555")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
                         metric_name="queue_length",
@@ -185,7 +185,7 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.failure(
                 "Endpoint not found",
                 CreateEndpointAutoScalingRuleAction(
-                    endpoint_id=DeploymentID(uuid.UUID("77777777-7777-7777-7777-777777777777")),
+                    deployment_id=DeploymentID(uuid.UUID("77777777-7777-7777-7777-777777777777")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.KERNEL,
                         metric_name="cpu_utilization",
@@ -202,7 +202,7 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "Memory utilization based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    endpoint_id=DeploymentID(uuid.UUID("88888888-8888-8888-8888-888888888888")),
+                    deployment_id=DeploymentID(uuid.UUID("88888888-8888-8888-8888-888888888888")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.KERNEL,
                         metric_name="memory_utilization",
@@ -252,7 +252,7 @@ class TestCreateEndpointAutoScalingRule:
             assert expected_result is not None
             mock_rule = MagicMock(
                 id=expected_result.data.id if expected_result.data else None,
-                endpoint_id=action.endpoint_id,
+                endpoint_id=action.deployment_id,
                 metric_source=action.creator.metric_source,
                 metric_name=action.creator.metric_name,
                 threshold=action.creator.threshold,
