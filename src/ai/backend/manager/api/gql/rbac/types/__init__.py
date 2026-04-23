@@ -67,6 +67,8 @@ from .role_invitation import (
     RoleInvitationConnection,
     RoleInvitationEdge,
     RoleInvitationGQL,
+    RoleInvitationOrderByGQL,
+    RoleInvitationOrderField,
     RoleInvitationStateGQL,
 )
 from .scope import RBACElementTypeGQL, ScopeInputGQL
@@ -139,6 +141,8 @@ __all__ = [
     "RoleInvitationGQL",
     "RoleInvitationConnection",
     "RoleInvitationEdge",
+    "RoleInvitationOrderField",
+    "RoleInvitationOrderByGQL",
     "CreateRoleInvitationInput",
     "CreateRoleInvitationPayload",
     # Scope types

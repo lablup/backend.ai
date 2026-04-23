@@ -116,6 +116,9 @@ from ai.backend.common.dto.manager.v2.role_invitation.request import (
     CreateRoleInvitationInput as CreateRoleInvitationInputDTO,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleInvitationOrderBy as RoleInvitationOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
     SearchRoleInvitationsInput as SearchRoleInvitationsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.response import (
@@ -171,6 +174,11 @@ from ai.backend.manager.models.rbac_models.orders import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.role_invitation.conditions import (
+    RoleInvitationConditions,
+    RoleInvitationOrders,
+)
+from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
@@ -309,6 +317,17 @@ def _entity_pagination_spec() -> PaginationSpec:
         forward_condition_factory=EntityScopeConditions.by_cursor_forward,
         backward_condition_factory=EntityScopeConditions.by_cursor_backward,
         tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _invitation_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=RoleInvitationOrders.created_at(ascending=False),
+        backward_order=RoleInvitationOrders.created_at(ascending=True),
+        forward_condition_factory=RoleInvitationConditions.by_cursor_forward,
+        backward_condition_factory=RoleInvitationConditions.by_cursor_backward,
+        tiebreaker_order=RoleInvitationRow.id.asc(),
     )
 
 
@@ -1575,6 +1594,19 @@ class RBACAdapter(BaseAdapter):
         )
         return self._invitation_data_to_node(result.data)
 
+    @staticmethod
+    def _convert_invitation_orders(orders: list[RoleInvitationOrderByDTO]) -> list[QueryOrder]:
+        result: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirectionV2.ASC
+            if o.field == "created_at":
+                result.append(RoleInvitationOrders.created_at(ascending))
+            elif o.field == "updated_at":
+                result.append(RoleInvitationOrders.updated_at(ascending))
+            elif o.field == "state":
+                result.append(RoleInvitationOrders.state(ascending))
+        return result
+
     async def my_search_role_invitations(
         self,
         input: SearchRoleInvitationsInputDTO,
@@ -1583,11 +1615,18 @@ class RBACAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        querier = BatchQuerier(
-            pagination=OffsetPagination(
-                limit=input.limit or 20,
-                offset=input.offset or 0,
-            ),
+        orders = self._convert_invitation_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=[],
+            orders=orders,
+            pagination_spec=_invitation_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[RoleInvitationConditions.by_invitee(me.user_id)],
         )
         action_result = await self._processors.permission_controller.search_my_role_invitations.wait_for_complete(
             SearchMyRoleInvitationsAction(
@@ -1610,11 +1649,18 @@ class RBACAdapter(BaseAdapter):
         input: SearchRoleInvitationsInputDTO,
     ) -> SearchRoleInvitationsPayload:
         """Search invitations for a specific role (admin/project-admin view)."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(
-                limit=input.limit or 20,
-                offset=input.offset or 0,
-            ),
+        orders = self._convert_invitation_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=[],
+            orders=orders,
+            pagination_spec=_invitation_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[RoleInvitationConditions.by_role(role_id)],
         )
         action_result = await self._processors.permission_controller.search_role_invitations_by_role.wait_for_complete(
             SearchRoleInvitationsByRoleAction(

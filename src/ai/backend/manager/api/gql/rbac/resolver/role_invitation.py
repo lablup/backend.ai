@@ -23,6 +23,7 @@ from ai.backend.manager.api.gql.rbac.types.role_invitation import (
     RoleInvitationConnection,
     RoleInvitationEdge,
     RoleInvitationGQL,
+    RoleInvitationOrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -38,11 +39,24 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def my_role_invitations(
     info: Info[StrawberryGQLContext],
+    order_by: list[RoleInvitationOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
 ) -> RoleInvitationConnection:
     result = await info.context.adapters.rbac.my_search_role_invitations(
-        SearchRoleInvitationsInput(limit=limit, offset=offset),
+        SearchRoleInvitationsInput(
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
     )
     edges = [
         RoleInvitationEdge(
@@ -72,13 +86,26 @@ async def my_role_invitations(
 async def admin_role_invitations(
     info: Info[StrawberryGQLContext],
     role_id: UUID,
+    order_by: list[RoleInvitationOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
 ) -> RoleInvitationConnection:
     check_admin_only()
     result = await info.context.adapters.rbac.role_search_invitations(
         role_id,
-        SearchRoleInvitationsInput(limit=limit, offset=offset),
+        SearchRoleInvitationsInput(
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
     )
     edges = [
         RoleInvitationEdge(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
@@ -10,6 +11,9 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
     CreateRoleInvitationInput as CreateRoleInvitationInputDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleInvitationOrderBy as RoleInvitationOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.response import (
     CreateRoleInvitationPayload as CreateRoleInvitationPayloadDTO,
@@ -19,6 +23,7 @@ from ai.backend.common.dto.manager.v2.role_invitation.response import (
 )
 from ai.backend.common.dto.manager.v2.role_invitation.types import RoleInvitationStateDTO
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -33,6 +38,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
+from ai.backend.manager.api.gql.types import GQLOrderBy
 
 RoleInvitationStateGQL: type[RoleInvitationStateDTO] = gql_enum(
     BackendAIGQLMeta(
@@ -81,6 +87,32 @@ class RoleInvitationConnection(Connection[RoleInvitationGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+# -- OrderBy --
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Role invitation ordering field.",
+    )
+)
+class RoleInvitationOrderField(StrEnum):
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    STATE = "state"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Order by specification for role invitations.",
+    ),
+)
+class RoleInvitationOrderByGQL(PydanticInputMixin[RoleInvitationOrderByDTO], GQLOrderBy):
+    field: RoleInvitationOrderField
+    direction: OrderDirection = OrderDirection.DESC
 
 
 # -- Inputs --

@@ -100,17 +100,26 @@ def cancel(invitation_id: UUID) -> None:
 @invitation.command(name="my-search")
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
-def my_search(limit: int | None, offset: int | None) -> None:
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., created_at:desc, state:asc).",
+)
+def my_search(limit: int | None, offset: int | None, order_by: tuple[str, ...]) -> None:
     """Search your own invitations."""
+    from ai.backend.client.cli.v2.helpers import parse_order_options_raw
     from ai.backend.common.dto.manager.v2.role_invitation.request import (
+        RoleInvitationOrderBy,
         SearchRoleInvitationsInput,
     )
+
+    orders = parse_order_options_raw(order_by, RoleInvitationOrderBy) if order_by else None
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.role_invitation.my_search(
-                SearchRoleInvitationsInput(limit=limit, offset=offset),
+                SearchRoleInvitationsInput(order=orders, limit=limit, offset=offset),
             )
             print_result(result)
         finally:
@@ -123,18 +132,29 @@ def my_search(limit: int | None, offset: int | None) -> None:
 @click.argument("role_id", type=click.UUID)
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
-def role_search(role_id: UUID, limit: int | None, offset: int | None) -> None:
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., created_at:desc, state:asc).",
+)
+def role_search(
+    role_id: UUID, limit: int | None, offset: int | None, order_by: tuple[str, ...]
+) -> None:
     """Search invitations for a specific role (admin view)."""
+    from ai.backend.client.cli.v2.helpers import parse_order_options_raw
     from ai.backend.common.dto.manager.v2.role_invitation.request import (
+        RoleInvitationOrderBy,
         SearchRoleInvitationsInput,
     )
+
+    orders = parse_order_options_raw(order_by, RoleInvitationOrderBy) if order_by else None
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.role_invitation.role_search(
                 role_id,
-                SearchRoleInvitationsInput(limit=limit, offset=offset),
+                SearchRoleInvitationsInput(order=orders, limit=limit, offset=offset),
             )
             print_result(result)
         finally:

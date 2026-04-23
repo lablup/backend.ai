@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 
 class CreateRoleInvitationInput(BaseRequestModel):
@@ -21,8 +22,20 @@ class CreateRoleInvitationInput(BaseRequestModel):
     )
 
 
+class RoleInvitationOrderBy(BaseRequestModel):
+    """Order by specification for role invitations."""
+
+    field: str
+    direction: OrderDirection = OrderDirection.DESC
+
+
 class SearchRoleInvitationsInput(BaseRequestModel):
     """Pagination search input for role invitations."""
 
+    order: list[RoleInvitationOrderBy] | None = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
     limit: int | None = None
     offset: int | None = None
