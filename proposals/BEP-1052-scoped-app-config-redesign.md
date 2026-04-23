@@ -2331,15 +2331,6 @@ may become a follow-up BEP if it earns its own motivation.
 - **Policy `description`** — intentionally dropped from the initial
   table. A human-readable summary is useful for admin UIs listing
   policies; adding it later is a non-breaking column addition.
-- **Policy deprecation** — because there is no lifecycle coupling
-  (§1), the only way to "retire" a policy today is to update it so
-  nothing can satisfy its constraints or to simply delete it and
-  accept that existing rows become policy-less. A `deprecated` flag
-  is a reasonable future extension.
-- **Policy audit trail** — history of changes to an
-  `AppConfigPolicy` (who changed `scope_sources` from X to Y, when)
-  is not modelled here. If audit becomes important, a paired
-  `app_config_policy_audit_log` table is the natural fit.
 - **Invariant: `user_writable = True` requires `USER ∈
   scope_sources`** — not enforced today; the two fields are kept
   independent. A future BEP may add the invariant if the combination
