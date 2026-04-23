@@ -41,9 +41,9 @@ class MetricService:
         )
         return ContainerMetricActionResult(result=result)
 
-    async def query_kernel_live_stat_batch(
+    async def query_kernel_live_stat_bulk(
         self,
         action: KernelLiveStatAction,
     ) -> KernelLiveStatActionResult:
-        stats = await self._metric_repository.query_kernel_live_stat_batch(action.kernel_ids)
+        stats = await self._metric_repository.query_kernel_live_stats(action.kernel_ids)
         return KernelLiveStatActionResult(stats=stats)

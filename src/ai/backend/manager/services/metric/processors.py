@@ -35,7 +35,7 @@ class MetricProcessors(AbstractProcessorPackage):
             service.query_container_metric_metadata, action_monitors
         )
         self.query_kernel_live_stat = ActionProcessor(
-            service.query_kernel_live_stat_batch, action_monitors
+            service.query_kernel_live_stat_bulk, action_monitors
         )
 
     @override

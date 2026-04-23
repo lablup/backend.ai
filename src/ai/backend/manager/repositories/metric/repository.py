@@ -119,28 +119,28 @@ class MetricRepository:
             for m in response.data.result
         ]
 
-    async def query_kernel_live_stat_batch(
+    async def query_kernel_live_stats(
         self,
         kernel_ids: Sequence[KernelId],
     ) -> KernelLiveStatBatchResult:
+        """Query Prometheus for live stats of the given kernels.
+
+        Issues three concurrent queries (gauge/diff/rate) and merges results.
+        Returns a KernelLiveStatBatchResult with per-kernel entries.
+        """
         if not kernel_ids:
             return KernelLiveStatBatchResult.empty(kernel_ids)
         try:
-            values_by_kernel = await self.query_kernel_live_stats(kernel_ids)
+            values_by_kernel = await self._query_kernel_live_stats(kernel_ids)
         except (PrometheusConnectionError, FailedToGetMetric):
             log.warning("Failed to query Prometheus for kernel live stats, returning empty results")
             return KernelLiveStatBatchResult.empty(kernel_ids)
         return KernelLiveStatBatchResult.from_metric_values(kernel_ids, values_by_kernel)
 
-    async def query_kernel_live_stats(
+    async def _query_kernel_live_stats(
         self,
         kernel_ids: Sequence[KernelId],
     ) -> dict[KernelId, list[MetricValue]]:
-        """Query Prometheus for live stats of the given kernels.
-
-        Issues three concurrent queries (gauge/diff/rate) and merges results.
-        Returns a mapping of kernel_id -> list of metric values.
-        """
         gauge, diff, rate = await asyncio.gather(
             self._query_kernel_live_stat(
                 kernel_ids,
