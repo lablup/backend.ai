@@ -1324,6 +1324,16 @@ type AppConfig implements Node {
   """
   config: JSON!
 
+  """
+  The matching `AppConfigPolicy` (joined by `name` = `config_name`).
+  Non-null because the required-policy invariant (§1) guarantees a
+  policy exists for every AppConfig row. Resolved via a per-request
+  `DataLoader` keyed on `name`, so selecting this field inside a
+  Connection does not N+1 — a single batched lookup covers the page.
+  Callers that just want the raw row can omit the selection.
+  """
+  policy: AppConfigPolicy!
+
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -2348,7 +2358,10 @@ query AuditConfigs(
   adminAppConfigs(filter: $filter, orderBy: $orderBy, first: $first, after: $after) {
     edges {
       cursor
-      node { id scopeType scopeId name config updatedAt }
+      node {
+        id scopeType scopeId name config updatedAt
+        policy { configName scopeSources userWritable }
+      }
     }
     pageInfo { hasNextPage endCursor }
     count
