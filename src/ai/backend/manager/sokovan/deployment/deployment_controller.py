@@ -377,12 +377,28 @@ class DeploymentController:
             3. deployment-config.yaml   (only when the variant reads vfolder files)
             4. model-definition.yaml    (only when the variant reads vfolder files)
             5. overrides (highest — explicit user input)
+
+        ``runtime_variant_id`` is resolved before the draft chain runs because
+        the runtime variant's baseline model definition is the first merge
+        layer. Callers that drive a revision entirely from a preset (model
+        card deploy) leave ``overrides.runtime_variant_id`` unset — in that
+        case the preset's ``runtime_variant_id`` is used as the effective id.
         """
         log.info("Adding revision to deployment {}", endpoint_id)
 
-        if overrides.runtime_variant_id is None:
-            raise InvalidAPIParameters("runtime_variant_id is required to add a revision")
         runtime_variant_id = overrides.runtime_variant_id
+        if runtime_variant_id is None and preset_id is not None:
+            if self._deployment_revision_preset_repository is None:
+                raise InvalidAPIParameters(
+                    "runtime_variant_id is required and preset repository is not available."
+                )
+            preset_data = await self._deployment_revision_preset_repository.get_by_id(preset_id)
+            runtime_variant_id = preset_data.runtime_variant_id
+        if runtime_variant_id is None:
+            raise InvalidAPIParameters(
+                "runtime_variant_id is required; provide it in the request "
+                "or via a revision preset that sets runtime_variant_id."
+            )
 
         drafts = await self._revision_draft_reader.read_for_deployment_revision(
             runtime_variant_id=runtime_variant_id,
