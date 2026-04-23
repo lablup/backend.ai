@@ -8710,12 +8710,12 @@ type Query {
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
   """Added in UNRELEASED. List the current user's role invitations."""
-  myRoleInvitations(limit: Int = null, offset: Int = null): RoleInvitationConnection!
+  myRoleInvitations(orderBy: [RoleInvitationOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
 
   """
   Added in UNRELEASED. List invitations for a specific role (admin only).
   """
-  adminRoleInvitations(roleId: UUID!, limit: Int = null, offset: Int = null): RoleInvitationConnection!
+  adminRoleInvitations(roleId: UUID!, orderBy: [RoleInvitationOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
 
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
@@ -10257,6 +10257,19 @@ type RoleInvitationEdge {
 
   """The item at the end of the edge"""
   node: RoleInvitation!
+}
+
+"""Added in UNRELEASED. Order by specification for role invitations."""
+input RoleInvitationOrderByGQL {
+  field: RoleInvitationOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in UNRELEASED. Role invitation ordering field."""
+enum RoleInvitationOrderField {
+  CREATED_AT
+  UPDATED_AT
+  STATE
 }
 
 """Added in UNRELEASED. Role invitation state."""
