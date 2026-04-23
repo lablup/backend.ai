@@ -138,7 +138,16 @@ class AppConfigRow(Base):
         StrEnumType(AppConfigScopeType, length=32), nullable=False, index=True
     )
     scope_id: Mapped[str]                     # public: literal "public"; otherwise domain_name / user_id
-    name: Mapped[str]                         # NEW — config document name (e.g. "theme", "menu")
+    name: Mapped[str] = mapped_column(        # NEW — config document name (e.g. "theme", "menu")
+        sa.ForeignKey(                        # FK to `app_config_policies.config_name`.
+            "app_config_policies.config_name",  # No `ON DELETE` / `ON UPDATE` specified →
+        ),                                    # Postgres default `NO ACTION`, which forbids
+                                              # deletion of a policy that still has
+                                              # referencing rows. `config_name` is
+                                              # immutable (see AppConfigPolicyRow), so
+                                              # `ON UPDATE` would never fire.
+        nullable=False,
+    )
 
     extra_config: Mapped[dict[str, Any]]      # the only payload column; meaning per scope
 
@@ -212,19 +221,20 @@ resolved merge (§5) always has a chain to follow — there is no
 A separate `app_config_policies` table holds the rules per document
 — which app-config rows get merged as sources into the resolved
 view, and which scopes may be written. Configs and policies are
-joined by `config_name` value only at runtime; there is no foreign
-key at the DB level. Instead, the **service layer enforces a
-required-policy invariant**: an `AppConfigRow` can only be created
-while a matching policy row exists (see "Write semantics" above).
+joined by `config_name` value, backed by a **FK** on
+`app_configs.name → app_config_policies.config_name` with no
+`ON DELETE` / `ON UPDATE` action (Postgres default `NO ACTION`).
+The **service layer also enforces the required-policy invariant**
+explicitly with friendly per-item errors; the FK is defense-in-depth
+for raw SQL or any service code path that bypasses the orchestrator.
 
 ```python
 class AppConfigPolicyRow(Base):
     __tablename__ = "app_config_policies"
 
     id: Mapped[uuid.UUID]
-    config_name: Mapped[str]                  # UNIQUE — joined to
-                                              # `app_configs.name` by value only
-                                              # (no FK).
+    config_name: Mapped[str]                  # UNIQUE — referenced by
+                                              # `app_configs.name` via FK.
                                               # IMMUTABLE — rename is rejected
                                               # at the service layer. To "fix"
                                               # a wrongly-named policy, admins
@@ -260,29 +270,36 @@ class AppConfigPolicyRow(Base):
     )
 ```
 
-**Integrity without FK**:
+**Integrity (FK + service layer)**:
 
-- **Create**: rejected at the service layer unless a policy exists
-  for `config_name`. This is the primary guarantee that every
-  AppConfig row has a matching policy.
+- **Create**: the service layer rejects an item with a friendly
+  policy-not-found message when no policy exists for `config_name`.
+  If that check is ever bypassed, the FK `app_configs.name →
+  app_config_policies.config_name` still raises a foreign-key
+  violation at the DB level.
 - **Policy rename**: not allowed. `config_name` is immutable —
   updates may change `scope_sources` / `user_writable` only. The
-  immutability removes the "rename orphans configs" failure mode.
+  immutability removes the "rename orphans configs" failure mode,
+  and means the FK's `ON UPDATE NO ACTION` default never fires.
 - **Policy deletion**: there is no `update`-level policy deletion.
   The only removal path is `adminBulkPurgeAppConfigPolicies` (§3),
-  and the service rejects the purge unless no AppConfig row
-  references the policy's `config_name`. If such rows exist, the
-  admin purges them first via `adminBulkPurgeAppConfigs`, then the
-  policy.
+  and the service rejects the purge with a per-item error unless no
+  AppConfig row references the policy's `config_name`. If such rows
+  exist, the admin purges them first via `adminBulkPurgeAppConfigs`,
+  then the policy. The FK's `ON DELETE NO ACTION` is a second line
+  of defense that would raise at commit time if the service check
+  were ever bypassed.
 - **AppConfig deletion**: `adminBulkPurgeAppConfigs` is an
   admin-only cleanup verb for misconfigured rows. It is **not** a
   general "delete" — the BEP's user-facing contract is still that
   rows persist once written; purge is the escape hatch for fixing
   mistakes.
 
-This is the only coupling between the two tables — enforced outside
-the schema so future changes to one table's DB shape don't cascade
-through FK machinery.
+The FK without cascade keeps the two tables weakly linked: the
+schema forbids orphan AppConfig rows and refuses to drop a policy
+while its configs live, but it never silently deletes data. Service
+orchestration is still the primary enforcement point — the FK exists
+to catch the paths that don't go through the orchestrator.
 
 ---
 
