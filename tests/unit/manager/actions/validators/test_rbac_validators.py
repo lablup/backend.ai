@@ -27,6 +27,7 @@ from ai.backend.common.data.permission.types import (
     ScopeType,
 )
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
@@ -46,7 +47,6 @@ from ai.backend.manager.actions.validators.rbac.single_entity import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
@@ -373,7 +373,7 @@ class TestScopeActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
         validator = ScopeActionRBACValidator(repository)
-        with pytest.raises(UserNotFound):
+        with pytest.raises(UnreachableError):
             await validator.validate(scope_action, trigger_meta)
 
     async def test_non_superadmin_with_permission_passes(
@@ -419,7 +419,7 @@ class TestSingleEntityActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
         validator = SingleEntityActionRBACValidator(repository)
-        with pytest.raises(UserNotFound):
+        with pytest.raises(UnreachableError):
             await validator.validate(single_entity_action, trigger_meta)
 
     async def test_non_superadmin_with_permission_passes(
@@ -465,7 +465,7 @@ class TestLegacySingleEntityActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
         validator = LegacySingleEntityActionRBACValidator(repository)
-        with pytest.raises(UserNotFound):
+        with pytest.raises(UnreachableError):
             await validator.validate(single_entity_action, trigger_meta)
 
     async def test_non_superadmin_with_permission_passes(
@@ -510,7 +510,7 @@ class TestLegacyScopeActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
         validator = LegacyScopeActionRBACValidator(repository)
-        with pytest.raises(UserNotFound):
+        with pytest.raises(UnreachableError):
             await validator.validate(scope_action, trigger_meta)
 
     async def test_non_superadmin_with_permission_passes(
@@ -559,7 +559,7 @@ class TestBulkActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
         validator = BulkActionRBACValidator(repository)
-        with pytest.raises(UserNotFound):
+        with pytest.raises(UnreachableError):
             await validator.validate(bulk_vfolder_action, trigger_meta)
 
     async def test_partial_permission_splits_allowed_and_denied(
