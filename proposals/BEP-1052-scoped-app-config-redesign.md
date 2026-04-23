@@ -46,17 +46,19 @@ document is identified by `(scope, scopeId, name)`.
 
 Summary matrix:
 
-| Story                                                         | Scope                  | Read              | Write       |
-|---------------------------------------------------------------|------------------------|-------------------|-------------|
-| Theme, Branding (must work before login)                      | `public`               | Anyone            | Admin       |
-| UI hide/show, menu config, per-user preference defaults       | `domain_user_defaults` | Logged-in users   | Admin       |
-| Domain-only internal management settings                      | `domain`               | Admin             | Admin       |
-| Per-user personal settings                                    | `user`                 | Owner/Admin       | Owner/Admin |
+| Story                                               | Scope                  | Read                            | Write       |
+|-----------------------------------------------------|------------------------|---------------------------------|-------------|
+| Theme, Branding (must work before login)            | `public`               | Anyone                          | Admin       |
+| UI hide/show, menu config                           | `domain`               | Logged-in users (same domain)   | Admin       |
+| Per-user preference defaults (per-domain)           | `domain_user_defaults` | Logged-in users (same domain)   | Admin       |
+| Per-user personal settings                          | `user`                 | Owner/Admin                     | Owner/Admin |
 
-> The `domain` scope is admin-only policy and does **not** participate
-> in the `myAppConfigs` merge. Documents users must be able to read
-> (UI hide/show, etc.) must be published under `domain_user_defaults`
-> so they reach users via the merge path — see §5 for the full split.
+> Difference between `domain` and `domain_user_defaults`: both are
+> admin-write and readable by users of the domain, but only
+> `domain_user_defaults` participates in the `myAppConfigs` merge as
+> a base. Use `domain_user_defaults` for values a user can override
+> in their own USER row; use `domain` for values that must not be
+> user-overridable — see §5 for the full merge rules.
 
 ## Design Principles
 
@@ -64,10 +66,11 @@ Summary matrix:
   structure and meaning of the configuration are owned by the frontend.
 - **Scope = Entity**: access control is expressed at the scope (entity)
   level, not the field level.
-  `public_app_config` (Anonymous read / Admin write), `domain_app_config`
-  (Admin read & write), `domain_user_defaults_app_config` (Admin write,
-  reaches users via merge), `user_app_config` (Owner/Admin read /
-  Owner-self + Admin write).
+  `public_app_config` (Anonymous read / Admin write),
+  `domain_app_config` (same-domain users read / Admin write),
+  `domain_user_defaults_app_config` (same-domain users read, merge
+  base participant / Admin write),
+  `user_app_config` (Owner/Admin read / Owner-self + Admin write).
 - **Named documents within a scope**: each row is identified by the
   natural composite key `(scope_type, scope_id, name)`. A scope can hold
   any number of named documents; clients address them explicitly by
@@ -173,6 +176,19 @@ class AppConfigRow(Base):
 single row per natural key. A scope can hold any number of distinct
 `name`s.
 
+### `name` format constraint
+
+`name` is restricted to alphanumeric + `_`, `-`, `.` (regex:
+`^[A-Za-z0-9_.\-]+$`, length 1–128). Reasons:
+- Fits directly in REST URL path segments (`/v2/app-configs/.../{name}`)
+  without escaping.
+- Avoids collision with the `:` delimiter used in the
+  `MyAppConfig.id` encoding (`base64("MyAppConfig:{user_id}:{name}")`).
+- Keeps log / audit trails compact.
+
+Validation runs both at `AppConfigKey` construction (`__post_init__`)
+and at the service-layer entry point.
+
 ### Status filtering
 
 All read paths filter `status = ALIVE` by default. Callers can
@@ -213,28 +229,25 @@ repositories/app_config/
 | `PublicAppConfigRepository`             | `get(name)`, `get_by_id(id)`, `create(name, extra_config)`, `update(name, extra_config)`, `soft_delete(name)`, `restore(name)`, `search(filter)`                                             |
 | `DomainAppConfigRepository`             | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)`, `search(domain_name, filter)` |
 | `DomainUserDefaultsAppConfigRepository` | `get(domain_name, name)`, `get_by_id(id)`, `create(domain_name, name, extra_config)`, `update(domain_name, name, extra_config)`, `soft_delete(domain_name, name)`, `restore(domain_name, name)`, `search(domain_name, filter)` |
-| `UserAppConfigRepository`               | `get(user_id, name)`, `get_by_id(id)`, `create(user_id, name, extra_config)`, `update(user_id, name, extra_config)`, `soft_delete(user_id, name)`, `restore(user_id, name)`, `search(user_id, filter)`, `get_merged(user_id, name)`, `search_merged(user_id, filter)` — the first group is `USER` row CRUD (serves `UserAppConfig`); the last two delegate to `AppConfigDBSource`'s merge-specific method, which reads `DOMAIN_USER_DEFAULTS` + `USER` in a single SQL and returns the deep-merged view (serves `MyAppConfig`, see §5). `DOMAIN` is not part of the merge. `search_merged` backs the `myAppConfigs` Connection. |
+| `UserAppConfigRepository`               | CRUD: `get / get_by_id / create / update / soft_delete / restore / search` (all take `user_id` + `name`). Plus merge-specific: `get_merged(user_id, name)`, `search_merged(user_id, filter)` — see the note below for roles. |
 
 `DomainUserDefaultsAppConfigRepository` mirrors
-`DomainAppConfigRepository` (admin-only, same call shape) but operates
-on `(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name)` rows.
+`DomainAppConfigRepository` (admin write + same-domain user read,
+same call shape) but operates on
+`(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name)` rows.
 Splitting it from `DomainAppConfigRepository` keeps each repository
 mapped to exactly one scope, matching the rest of the layout.
 
-`UserAppConfigRepository` plays a **dual role**: raw `USER` row CRUD
+`UserAppConfigRepository` plays a **dual role** — raw `USER` row CRUD
 (serving `UserAppConfig`) + read-side merged view (serving
-`MyAppConfig`). It takes a single `AppConfigDBSource` in its
-constructor like the other scope repositories — the user → domain_name
-resolution needed by the merge is performed inside
-`AppConfigDBSource`'s merge method in a single SQL (via a `users`
-subquery), so no separate `UserDBSource` is injected at the
-repository level. The GraphQL schema exposes `UserAppConfig` (raw)
-and `MyAppConfig` (merged) as separate types, but internally they
-share one repository — there is no `MyAppConfigRepository`. The
-`DOMAIN` scope is admin-enforced domain policy and therefore never
-participates in this merge; DOMAIN rows are only reachable via the
-admin read paths (`DomainV2.appConfigs` / `adminAppConfigs` /
-`node(id)`).
+`MyAppConfig`, see §5). It takes a single `AppConfigDBSource` like
+the other scope repositories; the user → domain_name resolution
+needed by the merge is done inside the merge-specific DB method via a
+`users` subquery in a single SQL, so no separate `UserDBSource` is
+injected at the repository level. The GraphQL schema exposes
+`UserAppConfig` (raw) and `MyAppConfig` (merged) as separate types,
+but internally they share one repository — there is no
+`MyAppConfigRepository`.
 
 All read methods default to filtering `status = ALIVE` unless the
 caller opts in via `filter.status` on `search(...)`.
@@ -293,15 +306,32 @@ class AppConfigDBSource:
         # exists or the row is already ALIVE.
         async with self._db.begin_session() as db_sess:
             ...
+
+    async def search(
+        self,
+        scope_type: AppConfigScopeType,
+        scope_id: str,
+        filter: AppConfigFilter,
+        pagination: Pagination,
+    ) -> AppConfigPage:
+        # Within-scope search — bound to (scope_type, scope_id) and
+        # applies filter / pagination in SQL. Cross-scope search has
+        # a separate `admin_search(filter, pagination)` overload
+        # (omitted). The merge-specific search lives in §5.
+        async with self._db.begin_readonly_session() as db_sess:
+            ...   # default status = ALIVE, extendable via filter.status
 ```
 
-Listing operations are not db_source primitives — listing is
-expressed as search (filter + pagination) at the Connection layer,
-which the service implements via a separate search path rather
-than a scoped-list on the db_source.
+Listing is expressed via the `search` primitive — each scope
+repository's `search(...)` is a thin-delegate that binds
+`scope_type` / `scope_id`. Permission checks and scope validation
+are performed in the service layer.
 
-Permission checks and scope validation are performed in the service
-layer.
+`AppConfigFilter` / `AppConfigPage` / `Pagination` are internal
+containers at the repository / service layer — Python dataclasses
+corresponding to the GraphQL `AppConfigFilterGQL`, intentionally
+left unspecified here (defined in a small companion module at
+implementation time).
 
 ---
 
@@ -374,32 +404,17 @@ type UserAppConfig implements Node {
 
 """
 Merged app-config view from the current user's perspective —
-accessible only via `myAppConfigs`.
+accessible via `myAppConfigs` or `node(id)`. Deep-merges same-`name`
+`(DOMAIN_USER_DEFAULTS, user.domain_name)` and
+`(USER, user.user_id)` (DOMAIN is admin policy and excluded — see
+§5). An entry appears whenever at least one is `ALIVE`; without a
+USER row, `userCustomizedConfig` is returned as `{}`.
 
-Serves a deep-merge of two same-`name` source rows
-`(DOMAIN_USER_DEFAULTS, user.domain_name)` and `(USER, user.user_id)`.
-An entry appears whenever at least one of these is `ALIVE`. Even
-without a USER row, `userCustomizedConfig` is returned as `{}`.
-
-`DOMAIN`-scope rows **do not participate** in this merge — they carry
-admin-enforced domain policy (values users cannot override), so they
-are never mixed with the user's defaults/overrides and are exposed
-only via admin-only paths (`DomainV2.appConfigs` / `adminAppConfigs`
-/ `node(id)`). By convention `UserAppConfig` /
-`DomainUserDefaultsAppConfig` do not carry DOMAIN-policy keys. Admins
-manage DOMAIN values via `adminCreateAppConfig` /
-`adminUpdateAppConfig` / `adminDeleteAppConfig` with the appropriate
-`key.scope`.
-
-Although derived, `MyAppConfig` implements `Node` — for refetch
-convenience it exposes the `(user_id, name)` composite as a
-server-encoded global ID (`base64("MyAppConfig:{user_id}:{name}")`).
-A `name` is only unique within a user scope, so pairing it with
-`user_id` is required for global uniqueness. The `node(id)` resolver
+Although derived, `MyAppConfig` implements `Node` — the `(user_id,
+name)` composite is encoded as a server-side global ID
+(`base64("MyAppConfig:{user_id}:{name}")`). The `node(id)` resolver
 decodes the id and returns the merged view only when
-`decoded.user_id == current_user.id` (or the caller is admin) —
-otherwise it would leak another user's merged view. Single-document
-retrieval: `myAppConfigs` with a `name` filter, or `node(id)`.
+`decoded.user_id == current_user.id` or the caller is admin.
 """
 type MyAppConfig implements Node {
   """
@@ -431,9 +446,6 @@ type MyAppConfig implements Node {
   priority, right = highest). Clients render the UI from this value.
   """
   mergedConfig: JSON!
-
-  """Max of participating source rows' `updatedAt`."""
-  updatedAt: DateTime!
 }
 ```
 
@@ -455,7 +467,8 @@ below. In short: `DomainV2.appConfigs` is admin-only;
 extend type DomainV2 {
   """
   App config documents owned by this domain (DOMAIN scope rows).
-  Admin only. Filter by `name` (or any combination) to retrieve a
+  Read access: same-domain users or admin. Write (via mutations) is
+  admin only. Filter by `name` (or any combination) to retrieve a
   single document. `filter.scope` / `filter.scopeId` are ignored —
   already pinned to this domain.
   """
@@ -656,7 +669,8 @@ input AppConfigFilterGQL {
   `ALIVE` rows. Pass `{ equals: DELETED }` (or `{ in: [ALIVE,
   DELETED] }`) to include soft-deleted rows — used by admin
   recovery / audit flows and by callers checking whether a name
-  is reusable after deletion.
+  is reusable after deletion. Ignored on `myAppConfigs` — the merge
+  only uses `ALIVE` rows.
   """
   status: AppConfigStatusEnumFilter = null
 
@@ -694,7 +708,10 @@ input AppConfigOrderByGQL {
 """
 `SCOPE` / `SCOPE_ID` are only useful on `adminAppConfigs`; on
 per-scope Connections they degenerate to a constant and have no
-effect.
+effect. `UPDATED_AT` / `CREATED_AT` apply to raw-row Connections
+only — `myAppConfigs` returns `MyAppConfig` (derived) which does
+not expose timestamps, so these order keys fall back to `NAME`
+internally in that context.
 """
 enum AppConfigOrderField {
   SCOPE
@@ -724,12 +741,15 @@ path**, for a total of eight mutations.
   Return the **merged `MyAppConfig`** — one round-trip to get the
   latest merged view after a write.
 
-Per-scope branching lives in the **internal layer** only: queries
-are split for typing ergonomics (`DomainV2.appConfigs`,
-`UserV2.appConfigs`, `myAppConfigs`, `publicAppConfigs`,
-`adminAppConfigs`), and the repository split in §2 routes the write
-to the right backend. Authorization is enforced in the **service
-layer** (see permission matrix below).
+Routing:
+- Admin-path: the service dispatches on `input.key.scope` and routes
+  to the matching scope repository (§2).
+- My-path: the server synthesizes
+  `(USER, current_user.user_id, input.name)` and calls
+  `UserAppConfigRepository` directly (no natural-key resolve step).
+
+Authorization is enforced in the **service layer** (see permission
+matrix below).
 
 ```graphql
 type Mutation {
@@ -979,9 +999,18 @@ type RestoreMyAppConfigPayload {
   myAppConfig: MyAppConfig!
 }
 
-"""Generic AppConfig type used in the admin mutation payload — exposes the raw stored value."""
+"""
+Generic AppConfig type shared by the admin-path payloads,
+`adminAppConfigs`, and `node(id)`. Exposes the raw stored value.
+"""
 type AppConfig implements Node {
+  """
+  Relay global ID — `base64("AppConfig:<row_uuid>")`. The distinct
+  prefix lets `node(id)` dispatch correctly between `AppConfig` and
+  `MyAppConfig`.
+  """
   id: ID!
+
   scope: AppConfigScopeGQL!
   scopeId: String!
   name: String!
@@ -1002,13 +1031,18 @@ type AppConfig implements Node {
 
 Queries:
 
-| Operation                | Anonymous | User       | Admin |
-|--------------------------|-----------|------------|-------|
-| `publicAppConfigs`       | ✅        | ✅         | ✅    |
-| `myAppConfigs`           | ❌        | ✅ (self)  | ✅    |
-| `DomainV2.appConfigs`      | ❌        | ❌         | ✅    |
-| `UserV2.appConfigs`    | ❌        | ✅ (self)  | ✅    |
-| `adminAppConfigs`        | ❌        | ❌         | ✅    |
+| Operation                       | Anonymous | User                             | Admin |
+|---------------------------------|-----------|----------------------------------|-------|
+| `publicAppConfigs`              | ✅        | ✅                               | ✅    |
+| `myAppConfigs`                  | ❌        | ✅ (self)                        | ✅    |
+| `DomainV2.appConfigs`           | ❌        | ✅ (same domain only)            | ✅    |
+| `UserV2.appConfigs`             | ❌        | ✅ (self)                        | ✅    |
+| `adminAppConfigs`               | ❌        | ❌                               | ✅    |
+| `node(id)` → `AppConfig`        | ❌        | ❌                               | ✅    |
+| `node(id)` → `MyAppConfig`      | ❌        | ✅ (id's `user_id` is self)      | ✅    |
+| `node(id)` → `PublicAppConfig`  | ✅        | ✅                               | ✅    |
+| `node(id)` → `DomainAppConfig`  | ❌        | ✅ (same-domain rows only)       | ✅    |
+| `node(id)` → `UserAppConfig`    | ❌        | ✅ (self)                        | ✅    |
 
 Write mutations split into two paths with distinct rules:
 
@@ -1041,20 +1075,22 @@ Where the checks live:
   `current_user` and delegate to
   `UserAppConfigRepository.{create|update|soft_delete|restore}` —
   `scopeId` is not part of the input and is injected server-side.
-- `DomainV2.appConfigs` field resolver: `check_admin_only()` at
-  entry — raises a permission error (the helper in
+- `DomainV2.appConfigs` field resolver: if the caller is not admin
+  and the parent `DomainV2.domain_name` differs from
+  `current_user.domain_name`, raise a permission error (helper in
   `src/ai/backend/manager/api/gql/utils.py` raises
-  `web.HTTPForbidden`) for non-admin callers; does not silently
-  return an empty Connection.
+  `web.HTTPForbidden`). Same-domain users and admins are allowed
+  through. Writes (mutations) remain admin-only.
 - `UserV2.appConfigs` field resolver: raises a permission error
   when the parent node's `user_id` differs from `current_user` and
   the caller is not an admin.
 
 #### Name → ID resolution and ID-based Actions
 
-The actions that implement search / update / mutate all operate on
-the **row ID** internally — never on the raw natural key.
-Resolution is one extra service-layer step before the RBAC check:
+**Admin path only.** The actions implementing the admin-path
+mutations operate on the **row ID** internally — never on the raw
+natural key. Resolution is one extra service-layer step before the
+RBAC check:
 
 1. Resolve `(scope, scopeId, name)` → row `id` via the matching
    repository. This lookup is **permission-agnostic** — it only
@@ -1065,8 +1101,15 @@ Resolution is one extra service-layer step before the RBAC check:
 3. Dispatch the ID-based Action (search, update, delete, restore,
    etc.) to the repository.
 
-This keeps Actions themselves uniform (ID-only) while still
-accepting natural-key identification at the API surface — clients
+My-path mutations (`createMyAppConfig`, etc.) **skip this step**:
+scope / scopeId are fixed server-side (`USER`,
+`current_user.user_id`), RBAC only needs to confirm "authenticated
+self", and the Action calls
+`UserAppConfigRepository.{create|update|soft_delete|restore}` with
+`user_id` + `name` directly.
+
+The result: admin-path Actions stay uniform (ID-only) while the
+API surface still accepts natural-key identification — clients
 never need to know row IDs.
 
 ---
@@ -1080,58 +1123,98 @@ conventions in `src/ai/backend/manager/api/rest/v2/CLAUDE.md`.
 
 ### Endpoints
 
-All scope-parameterized endpoints follow a single URL shape:
-`/v2/app-configs/{scope_type}/{scope_id}[/{name}]`, where
+REST mirrors the GQL admin / my split — the scope-parameterized
+path handles **admin writes + per-scope read rules** (maps to GQL
+`admin*AppConfig` mutations and the scoped queries), and the `/my`
+path is **self-only** (maps to GQL `*MyAppConfig` mutations).
+
+#### Scope-parameterized path — admin writes / per-scope reads
+
+```
+/v2/app-configs/{scope_type}/{scope_id}[/{name}]
+```
 
 - `{scope_type}` ∈ `public | domain | domain_user_defaults | user`
   (matches `AppConfigScopeType` in §1).
 - `{scope_id}` follows the §1 Scope ID convention — the literal
   `"public"` for `public`, `domain_name` for `domain` /
   `domain_user_defaults`, `user_id` (UUID) for `user`.
-- `{name}` is the document name.
+- `{name}` is the document name (§1 format constraint).
 
-Verbs map 1:1 onto the GQL mutations. `POST` / `PUT` accept a
-`{ "config": ... }` JSON body (same shape as
-`CreateAppConfigInput.config` / `UpdateAppConfigInput.config` in
-§3); `GET` / `DELETE` / `POST .../restore` take no body.
+| Method | Path                                                     | Description                                     |
+|--------|----------------------------------------------------------|-------------------------------------------------|
+| GET    | `/v2/app-configs/{scope_type}/{scope_id}`                | List documents in a scope (`status=ALIVE` default) |
+| GET    | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Read one document                               |
+| POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Create (strict insert; `409` if any row exists) |
+| PUT    | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Replace (`404` if no `ALIVE` row)               |
+| DELETE | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Soft-delete                                     |
+| POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}/restore` | Restore (`DELETED → ALIVE`, value unchanged)    |
 
-| Method | Path                                                     | Description                                             |
-|--------|----------------------------------------------------------|---------------------------------------------------------|
-| GET    | `/v2/app-configs/{scope_type}/{scope_id}`                | List documents in a scope (`status=ALIVE` default)      |
-| GET    | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Read one document                                       |
-| POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Create (strict insert; `409` if any row exists)         |
-| PUT    | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Replace (`404` if no `ALIVE` row)                       |
-| DELETE | `/v2/app-configs/{scope_type}/{scope_id}/{name}`         | Soft-delete                                             |
-| POST   | `/v2/app-configs/{scope_type}/{scope_id}/{name}/restore` | Restore (`DELETED → ALIVE`, value unchanged)            |
+Writes (`POST` / `PUT` / `DELETE`) are admin-only. `POST` / `PUT`
+body: `{ "config": <JSON> }` (same shape as the GQL
+`AdminCreateAppConfigInput.config` / `AdminUpdateAppConfigInput.config`).
+Response body: raw AppConfig JSON (snake_case projection of the GQL
+`AppConfig` type).
 
-Authorization follows the §3 permission matrix and the
-`input.key.scope` table — anonymous read is allowed only on
-`scope_type=public` reads; writes to non-`user` scopes require
-admin; for `scope_type=user`, admin or the owner
-(`{scope_id} == current_user.user_id`).
+Reads (`GET`) follow per-scope rules matching the GQL permission
+matrix:
+- `/v2/app-configs/public/public[/{name}]` — anonymous allowed.
+- `/v2/app-configs/domain/{domain_name}[/{name}]` — admin or the
+  caller whose `current_user.domain_name == {domain_name}`.
+- `/v2/app-configs/domain_user_defaults/{domain_name}[/{name}]` —
+  same.
+- `/v2/app-configs/user/{user_id}[/{name}]` — admin or the caller
+  whose `current_user.user_id == {user_id}`.
 
-Two shortcut endpoint families sit outside the scope-parameterized
-shape:
+#### My path — self-only (auth required)
 
-| Method | Path                                | Access | Description                                            |
-|--------|-------------------------------------|--------|--------------------------------------------------------|
-| GET    | `/v2/app-configs/my[/{name}]`       | User   | List / read own documents (with merged result)         |
-| POST   | `/v2/app-configs/my/{name}`         | User   | Create own document                                    |
-| PUT    | `/v2/app-configs/my/{name}`         | User   | Replace own document                                   |
-| DELETE | `/v2/app-configs/my/{name}`         | User   | Soft-delete own document                               |
-| POST   | `/v2/app-configs/my/{name}/restore` | User   | Restore own soft-deleted document                      |
-| POST   | `/v2/app-configs/search`            | Admin  | Cross-scope search — same body schema as `adminAppConfigs` |
+```
+/v2/app-configs/my[/{name}]
+```
+
+The adapter resolves `current_user()` internally and pins
+`scope=USER` + `scope_id = current_user.user_id`. There is no
+input field capable of targeting another user.
+
+| Method | Path                                | Description                              |
+|--------|-------------------------------------|------------------------------------------|
+| GET    | `/v2/app-configs/my[/{name}]`       | List / read own documents (merged view)  |
+| POST   | `/v2/app-configs/my/{name}`         | Create own document                      |
+| PUT    | `/v2/app-configs/my/{name}`         | Replace own document                     |
+| DELETE | `/v2/app-configs/my/{name}`         | Soft-delete own document                 |
+| POST   | `/v2/app-configs/my/{name}/restore` | Restore own soft-deleted document        |
+
+`POST` / `PUT` body: `{ "config": <JSON> }` (same shape as the GQL
+`CreateMyAppConfigInput.config` / `UpdateMyAppConfigInput.config` —
+semantically replaces `userCustomizedConfig`).
+
+Response body is the **merged MyAppConfig** (snake_case projection
+of the GQL `MyAppConfig`):
+
+```json
+{
+  "name": "preferences",
+  "user_customized_config": { ... },
+  "domain_default_config": { ... } | null,
+  "merged_config": { ... }
+}
+```
+
+For `DELETE`, the response either includes a `merged_config` built
+from whatever source rows remain (`user_customized_config={}`,
+`domain_default_config=null` if none) or returns `null` for the
+entry if no ALIVE source is left (aligned with the GQL
+`DeleteMyAppConfigPayload.myAppConfig` being nullable).
+
+#### Admin cross-scope search
+
+| Method | Path                        | Access | Description                                            |
+|--------|-----------------------------|--------|--------------------------------------------------------|
+| POST   | `/v2/app-configs/search`    | Admin  | Cross-scope search — same body schema as `adminAppConfigs` |
 
 `POST /v2/app-configs/search` accepts the same input schema as the
 GQL `adminAppConfigs` field (`filter` / `orderBy` / pagination
 arguments) in the request body and returns the same result.
-
-> `/v2/app-configs/my/...` follows the `my_` self-service convention
-> (`src/ai/backend/manager/api/rest/v2/CLAUDE.md`) — the adapter resolves `current_user()`
-> internally and fixes `scope_id` to the caller's `user_id`. The
-> body shape is the same `{ "config": ... }` as above (maps to
-> the user row's `user_customized_config` internally); there is no
-> input field that can target another user.
 
 > Read endpoints filter to `status = ALIVE` by default. Revival
 > goes through the dedicated `POST {path}/restore` action;
@@ -1143,33 +1226,21 @@ arguments) in the request body and returns the same result.
 
 ## 5. `MyAppConfig` — Merge policy
 
-> The merge semantics described here apply **only to `MyAppConfig`
-> (= the return type of `myAppConfigs`)**. `PublicAppConfig` /
-> `DomainAppConfig` / `UserAppConfig` (raw USER row view) are read
-> as-is — no cross-scope merge, no `mergedConfig` /
-> `domainDefaultConfig` companion views, just the raw stored
-> `extra_config` exposed as the single `config` field. `DOMAIN`-scope
-> values are admin-only policy and **do not participate in the
-> merge** — they are exposed only via admin paths.
+> The merge semantics here apply **only to `MyAppConfig`**. Other
+> scope types (`PublicAppConfig` / `DomainAppConfig` /
+> `UserAppConfig`) expose the raw `extra_config` as a single
+> `config` field.
 
 ### Storage
 
 - `user_app_config.extra_config` (the DB column, exposed as
   `UserAppConfig.config` = `MyAppConfig.userCustomizedConfig`) stores
-  **only the values the user has explicitly set** — for the named
+  **only the values the user has explicitly set** for the named
   document.
-- The domain-side merge input is a single scope:
+- The domain-side merge input is a single row:
   `(scope_type=DOMAIN_USER_DEFAULTS, scope_id=domain_name, name=N)`
-  (the admin-provided per-user default). Not copied into user rows —
-  to avoid having to rewrite every user row when the admin edits the
-  default.
-- `DOMAIN`-scope rows are admin-enforced policy and **do not
-  participate** in this merge — values users cannot override should
-  never be mixed with `DOMAIN_USER_DEFAULTS` / `USER`. By convention
-  `UserAppConfig` / `DomainUserDefaultsAppConfig` never carry
-  DOMAIN-policy keys. Management and exposure of DOMAIN values are
-  entirely via admin paths (`DomainV2.appConfigs` /
-  `adminAppConfigs`).
+  — the admin-provided per-user default. Not copied into user rows,
+  so editing the default never requires rewriting every user row.
 - Domain-side values are applied **per-name**: the
   `DOMAIN_USER_DEFAULTS` row for a given `name` is the merge base
   for the same-`name` `USER` row's `userCustomizedConfig`. Different
@@ -1198,30 +1269,18 @@ same snapshot. Bounded to at most 2 rows thanks to the natural-key
    unambiguous semantics). The result is exposed as
    `MyAppConfig.mergedConfig`; each source row's raw `extra_config`
    is exposed as `MyAppConfig.domainDefaultConfig` /
-   `MyAppConfig.userCustomizedConfig`. `MyAppConfig.updatedAt` is the
-   max of the participating rows' `updatedAt`.
-
-Since both rows are read inside a single read-only transaction,
-callers never see a half-applied state from concurrent admin writes.
-
-`DOMAIN`-scope rows are not read here — admin-enforced domain policy
-is kept out of user-facing merge to avoid mixing with user defaults
-and overrides. Management and reads go entirely through admin paths
-(`DomainV2.appConfigs` / `adminAppConfigs` / `node(id)`).
-`UserAppConfigRepository` therefore never reads DOMAIN rows, and no
-non-admin user can peek at DOMAIN content via the merge path.
-
-> Reading the `DOMAIN_USER_DEFAULTS` row for the merge is done
-> entirely inside `AppConfigDBSource` — the single SQL resolves the
-> caller's `domain_name` via a `users` subquery. No admin path is
-> involved and this is not an authorization hole: users can only
-> read their own domain's default, and only via the merge.
+   `MyAppConfig.userCustomizedConfig`.
 
 The Connection query (`myAppConfigs`) is backed by the search-specific
 method on `AppConfigDBSource` — a single SQL applies filter /
 pagination in the query and returns one merged result per `name` for
 which at least one of the two scopes (`DOMAIN_USER_DEFAULTS`, `USER`)
 has an `ALIVE` row.
+
+`MergedAppConfig` / `MergedAppConfigPage` are service-layer return
+dataclasses — 1:1 mappings to the GraphQL `MyAppConfig` /
+`MyAppConfigConnection`. `AppConfigFilter` / `Pagination` are the
+same internal containers introduced for `db_source.search` in §2.
 
 ```python
 class AppConfigDBSource:
@@ -1278,7 +1337,6 @@ class AppConfigDBSource:
                 domain_defaults or {},
                 user_customized,
             ),
-            updated_at=max_updated_at([domain_defaults_row, user_row]),
         )
 
     async def search_user_merged_configs(
@@ -1290,9 +1348,10 @@ class AppConfigDBSource:
         # A single SQL resolves domain_name (users subquery) + pulls
         # ALIVE rows for both scopes (DOMAIN_USER_DEFAULTS, USER) —
         # same WHERE shape as `get_user_merged_config`, with the `name`
-        # filter generalized to `filter`. Pagination uses `(name,
-        # updated_at)` as a stable cursor key applied in SQL. Full
-        # implementation lives in the §3 Connection resolver.
+        # filter generalized to `filter`. Pagination uses `name` as a
+        # stable cursor key (unique within the pinned scope) applied
+        # in SQL. Full implementation lives in the §3 Connection
+        # resolver.
         ...
 
 
@@ -1396,11 +1455,6 @@ The REST `GET /v2/app-configs/my/{name}` response carries the same
 three views (snake_case: `user_customized_config`,
 `domain_default_config`, `merged_config`).
 
-`DOMAIN`-scope rows are not exposed through this view at all —
-admins manage / read DOMAIN values via their dedicated path
-(`DomainV2.appConfigs` / `adminAppConfigs` / REST
-`/v2/app-configs/domain/...`).
-
 ---
 
 ## 6. Client Integration — WebUI bootstrap
@@ -1423,9 +1477,11 @@ publish a bootstrap list.
 2. **Post-login** — the WebUI issues a single `myAppConfigs` query
    to fetch *all* of the caller's user documents in one round trip.
    Each entry carries `userCustomizedConfig`, `domainDefaultConfig`,
-   and the 2-way merged `mergedConfig` (§5). DOMAIN-scope policy
-   does not participate in the merge, so an admin UI needing to
-   inspect domain policy issues a separate `DomainV2.appConfigs` /
+   and the 2-way merged `mergedConfig` (§5). Admins use the same
+   query for their own session (admins are also users for the
+   purpose of personal settings). DOMAIN-scope policy does not
+   participate in the merge, so an admin UI that needs to manage
+   domain policy issues a separate `DomainV2.appConfigs` /
    `adminAppConfigs` query. See S2 in §7.
 
 ---
@@ -1472,7 +1528,6 @@ query BootstrapMe {
         userCustomizedConfig
         domainDefaultConfig
         mergedConfig
-        updatedAt
       }
     }
   }
@@ -1509,7 +1564,6 @@ mutation SaveMyConfig($input: UpdateMyAppConfigInput!) {
       userCustomizedConfig
       domainDefaultConfig
       mergedConfig
-      updatedAt
     }
   }
 }
@@ -1726,7 +1780,6 @@ mutation RemoveMyConfig($input: DeleteMyAppConfigInput!) {
       userCustomizedConfig
       domainDefaultConfig
       mergedConfig
-      updatedAt
     }
   }
 }
