@@ -1,12 +1,12 @@
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 from ai.backend.manager.data.permission.role import ScopeChainPermissionCheckInput
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -23,7 +23,7 @@ class ScopeActionRBACValidator(ScopeActionValidator):
     async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
         user = current_user()
         if user is None:
-            raise UserNotFound("User not found in context")
+            raise UnreachableError("User context is not available")
         if user.is_superadmin:
             return
 
