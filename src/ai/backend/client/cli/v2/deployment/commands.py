@@ -227,15 +227,15 @@ def update(
 
 
 @deployment.command()
-@click.argument("deployment_id", type=str)
-def promote(deployment_id: str) -> None:
+@click.argument("deployment_id", type=click.UUID)
+def promote(deployment_id: UUID) -> None:
     """Manually promote a blue-green deployment awaiting promotion."""
 
     from ai.backend.common.dto.manager.v2.deployment.request import (
         PromoteDeploymentInput,
     )
 
-    body = PromoteDeploymentInput(deployment_id=UUID(deployment_id))
+    body = PromoteDeploymentInput(deployment_id=deployment_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
