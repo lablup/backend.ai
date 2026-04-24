@@ -113,14 +113,16 @@ class AppConfigPolicyDBSource:
         row exists for `config_name`.
         """
         async with self._db.begin_session() as db_sess:
-            row = await db_sess.scalar(
-                sa.select(AppConfigPolicyRow).where(AppConfigPolicyRow.config_name == config_name)
+            pk_value = await db_sess.scalar(
+                sa.select(AppConfigPolicyRow.id).where(
+                    AppConfigPolicyRow.config_name == config_name
+                )
             )
-            if row is None:
+            if pk_value is None:
                 return None
-            updater: Updater[AppConfigPolicyRow] = Updater(spec=spec, pk_value=row.id)
+            updater: Updater[AppConfigPolicyRow] = Updater(spec=spec, pk_value=pk_value)
             result = await execute_updater(db_sess, updater)
-            return result.row.to_data() if result is not None else row.to_data()
+            return result.row.to_data() if result is not None else None
 
     @app_config_policy_db_source_resilience.apply()
     async def purge(self, config_name: str) -> bool:
@@ -135,13 +137,15 @@ class AppConfigPolicyDBSource:
         Returns `True` when a row was actually removed, `False` otherwise.
         """
         async with self._db.begin_session() as db_sess:
-            row = await db_sess.scalar(
-                sa.select(AppConfigPolicyRow).where(AppConfigPolicyRow.config_name == config_name)
+            pk_value = await db_sess.scalar(
+                sa.select(AppConfigPolicyRow.id).where(
+                    AppConfigPolicyRow.config_name == config_name
+                )
             )
-            if row is None:
+            if pk_value is None:
                 return False
             purger: Purger[AppConfigPolicyRow] = Purger(
-                row_class=AppConfigPolicyRow, pk_value=row.id
+                row_class=AppConfigPolicyRow, pk_value=pk_value
             )
             result = await execute_purger(db_sess, purger)
             return result is not None
