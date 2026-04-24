@@ -117,7 +117,7 @@ class MetricRepository:
             for m in response.data.result
         ]
 
-    async def query_kernel_live_stats(
+    async def query_container_live_stats(
         self,
         kernel_ids: Sequence[KernelId],
     ) -> KernelLiveStatBatchResult:
@@ -129,28 +129,28 @@ class MetricRepository:
         if not kernel_ids:
             return KernelLiveStatBatchResult.empty(kernel_ids)
         try:
-            values_by_kernel = await self._query_kernel_live_stats(kernel_ids)
+            values_by_kernel = await self._query_container_live_stats(kernel_ids)
         except (PrometheusConnectionError, FailedToGetMetric):
             log.warning("Failed to query Prometheus for kernel live stats, returning empty results")
             return KernelLiveStatBatchResult.empty(kernel_ids)
         return KernelLiveStatBatchResult.from_metric_values(kernel_ids, values_by_kernel)
 
-    async def _query_kernel_live_stats(
+    async def _query_container_live_stats(
         self,
         kernel_ids: Sequence[KernelId],
     ) -> dict[KernelId, list[MetricValue]]:
         gauge, diff, rate = await asyncio.gather(
-            self._query_kernel_live_stat(
+            self._query_container_live_stat(
                 kernel_ids,
                 metric_type=MetricType.GAUGE,
             ),
-            self._query_kernel_live_stat(
+            self._query_container_live_stat(
                 kernel_ids,
                 metric_type=MetricType.DIFF,
                 metric_name_filter=DIFF_METRICS,
                 value_type_filter=ValueType.CURRENT,
             ),
-            self._query_kernel_live_stat(
+            self._query_container_live_stat(
                 kernel_ids,
                 metric_type=MetricType.RATE,
                 metric_name_filter=RATE_METRICS,
@@ -160,7 +160,7 @@ class MetricRepository:
         merged = gauge.merged_with(diff).merged_with(rate)
         return merged.values_by_kernel
 
-    async def _query_kernel_live_stat(
+    async def _query_container_live_stat(
         self,
         kernel_ids: Sequence[KernelId],
         *,

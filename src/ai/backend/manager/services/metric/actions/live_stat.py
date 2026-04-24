@@ -12,7 +12,7 @@ from ai.backend.manager.services.metric.actions.base import (
 
 
 @dataclass(frozen=True)
-class KernelLiveStatAction(QueryMetricAction):
+class ContainerLiveStatAction(QueryMetricAction):
     kernel_ids: Sequence[KernelId]
 
     @override
@@ -22,5 +22,5 @@ class KernelLiveStatAction(QueryMetricAction):
 
 
 @dataclass(frozen=True)
-class KernelLiveStatActionResult(QueryMetricActionResult):
+class ContainerLiveStatActionResult(QueryMetricActionResult):
     stats: KernelLiveStatBatchResult

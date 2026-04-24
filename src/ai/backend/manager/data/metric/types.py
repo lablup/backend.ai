@@ -126,7 +126,7 @@ class KernelLiveStatEntry:
 
 @dataclass(frozen=True)
 class KernelLiveStatBatchResult:
-    # Per-kernel bulk result for `query_kernel_live_stats`
+    # Per-kernel bulk result for `query_container_live_stats`
 
     entries: dict[KernelId, KernelLiveStatEntry]
 

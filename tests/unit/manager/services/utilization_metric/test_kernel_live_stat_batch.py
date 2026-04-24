@@ -6,7 +6,7 @@ import pytest
 from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.metric.types import KernelLiveStatBatchResult
-from ai.backend.manager.services.metric.actions.live_stat import KernelLiveStatAction
+from ai.backend.manager.services.metric.actions.live_stat import ContainerLiveStatAction
 from ai.backend.manager.services.metric.service import MetricService
 
 
@@ -45,10 +45,10 @@ class TestKernelLiveStatBatch:
                 ],
             },
         )
-        mock_metric_repository.query_kernel_live_stats = AsyncMock(return_value=batch_result)
+        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=batch_result)
 
-        result = await metric_service.query_kernel_live_stat_bulk(
-            KernelLiveStatAction(kernel_ids=[kid])
+        result = await metric_service.query_container_live_stats(
+            ContainerLiveStatAction(kernel_ids=[kid])
         )
         entry = result.stats.entries[kid]
         values_by_key = {(v.metric_name, v.value_type): v.value for v in entry.values}
@@ -65,10 +65,10 @@ class TestKernelLiveStatBatch:
         """A kernel with no Prometheus samples must yield an empty entry."""
         empty_kernel = KernelId(UUID("00000000-0000-0000-0000-000000000000"))
         batch_result = KernelLiveStatBatchResult.from_metric_values([empty_kernel], {})
-        mock_metric_repository.query_kernel_live_stats = AsyncMock(return_value=batch_result)
+        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=batch_result)
 
-        result = await metric_service.query_kernel_live_stat_bulk(
-            KernelLiveStatAction(kernel_ids=[empty_kernel])
+        result = await metric_service.query_container_live_stats(
+            ContainerLiveStatAction(kernel_ids=[empty_kernel])
         )
         entry = result.stats.entries[empty_kernel]
         assert entry.values == []
@@ -80,10 +80,10 @@ class TestKernelLiveStatBatch:
     ) -> None:
         """No kernel_ids -> empty result from repository."""
         batch_result = KernelLiveStatBatchResult.empty([])
-        mock_metric_repository.query_kernel_live_stats = AsyncMock(return_value=batch_result)
+        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=batch_result)
 
-        result = await metric_service.query_kernel_live_stat_bulk(
-            KernelLiveStatAction(kernel_ids=[])
+        result = await metric_service.query_container_live_stats(
+            ContainerLiveStatAction(kernel_ids=[])
         )
         assert result.stats.entries == {}
 
@@ -107,10 +107,10 @@ class TestKernelLiveStatBatch:
                 ],
             },
         )
-        mock_metric_repository.query_kernel_live_stats = AsyncMock(return_value=batch_result)
+        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=batch_result)
 
-        result = await metric_service.query_kernel_live_stat_bulk(
-            KernelLiveStatAction(kernel_ids=[kid1, kid2])
+        result = await metric_service.query_container_live_stats(
+            ContainerLiveStatAction(kernel_ids=[kid1, kid2])
         )
 
         values1 = {

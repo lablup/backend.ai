@@ -9,7 +9,7 @@ from .actions.container import (
     ContainerMetricMetadataAction,
     ContainerMetricMetadataActionResult,
 )
-from .actions.live_stat import KernelLiveStatAction, KernelLiveStatActionResult
+from .actions.live_stat import ContainerLiveStatAction, ContainerLiveStatActionResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -41,9 +41,9 @@ class MetricService:
         )
         return ContainerMetricActionResult(result=result)
 
-    async def query_kernel_live_stat_bulk(
+    async def query_container_live_stats(
         self,
-        action: KernelLiveStatAction,
-    ) -> KernelLiveStatActionResult:
-        stats = await self._metric_repository.query_kernel_live_stats(action.kernel_ids)
-        return KernelLiveStatActionResult(stats=stats)
+        action: ContainerLiveStatAction,
+    ) -> ContainerLiveStatActionResult:
+        stats = await self._metric_repository.query_container_live_stats(action.kernel_ids)
+        return ContainerLiveStatActionResult(stats=stats)
