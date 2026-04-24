@@ -23,6 +23,13 @@ directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on
 
 directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
 
+"""Added in UNRELEASED. Input for accepting a role invitation."""
+input AcceptRoleInvitationInput
+  @join__type(graph: STRAWBERRY)
+{
+  invitationId: UUID!
+}
+
 """Added in 25.16.0. An access token for model deployment."""
 type AccessToken implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -2169,6 +2176,13 @@ type CancelImportArtifactPayload
 {
   """Artifact revision with cancelled import."""
   artifactRevision: ArtifactRevision!
+}
+
+"""Added in UNRELEASED. Input for canceling a role invitation."""
+input CancelRoleInvitationInput
+  @join__type(graph: STRAWBERRY)
+{
+  invitationId: UUID!
 }
 
 """Added in 26.3.0. Filter input for querying query preset categories."""
@@ -13548,17 +13562,15 @@ type Query
   myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. List invitations for a specific role (RBAC scope-validated).
-  """
-  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
-
-  """
   Added in UNRELEASED. List all role invitations across the system (superadmin only).
   """
   adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. List invitations for a specific role."""
+  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
   rbacScopeEntityCombinations: [ScopeEntityCombination!]! @join__field(graph: STRAWBERRY)
@@ -14190,6 +14202,13 @@ type RejectArtifactPayload
 {
   """Rejected artifact revision."""
   artifactRevision: ArtifactRevision!
+}
+
+"""Added in UNRELEASED. Input for rejecting a role invitation."""
+input RejectRoleInvitationInput
+  @join__type(graph: STRAWBERRY)
+{
+  invitationId: UUID!
 }
 
 """
@@ -15356,6 +15375,19 @@ type RoleInvitation implements Node
 
   """Last update timestamp."""
   updatedAt: DateTime
+
+  """The user who sent this invitation. Null for system-issued invitations."""
+  inviter: UserV2
+
+  """
+  The user who received this invitation. Null if the user no longer exists.
+  """
+  invitee: UserV2
+
+  """
+  The role this invitation grants on acceptance. Null if the role no longer exists.
+  """
+  role: Role
 }
 
 """Added in UNRELEASED. Role invitation connection."""
@@ -15381,6 +15413,20 @@ type RoleInvitationEdge
   node: RoleInvitation!
 }
 
+"""Added in UNRELEASED. Filter for role invitations."""
+input RoleInvitationFilter
+  @join__type(graph: STRAWBERRY)
+{
+  state: RoleInvitationStateFilter = null
+  roleId: UUIDFilter = null
+  role: RoleInvitationRoleNestedFilter = null
+  inviter: RoleInvitationUserNestedFilter = null
+  invitee: RoleInvitationUserNestedFilter = null
+  AND: [RoleInvitationFilter!] = null
+  OR: [RoleInvitationFilter!] = null
+  NOT: [RoleInvitationFilter!] = null
+}
+
 """Added in UNRELEASED. Order by specification for role invitations."""
 input RoleInvitationOrderBy
   @join__type(graph: STRAWBERRY)
@@ -15398,6 +15444,15 @@ enum RoleInvitationOrderField
   STATE @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in UNRELEASED. Nested filter for the role associated with an invitation.
+"""
+input RoleInvitationRoleNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+}
+
 """Added in UNRELEASED. Role invitation state."""
 enum RoleInvitationState
   @join__type(graph: STRAWBERRY)
@@ -15413,58 +15468,24 @@ input RoleInvitationStateFilter
   @join__type(graph: STRAWBERRY)
 {
   equals: RoleInvitationState = null
+
+  """Match any of the provided states."""
   in: [RoleInvitationState!] = null
+
+  """Exclude exact state match."""
   notEquals: RoleInvitationState = null
+
+  """Exclude any of the provided states."""
   notIn: [RoleInvitationState!] = null
 }
 
-"""Added in UNRELEASED. Nested filter for the role associated with an invitation."""
-input RoleInvitationRoleNestedFilter
-  @join__type(graph: STRAWBERRY)
-{
-  name: StringFilter = null
-}
-
-"""Added in UNRELEASED. Nested filter for a user (inviter or invitee) of an invitation."""
+"""
+Added in UNRELEASED. Nested filter for a user (inviter or invitee) of an invitation.
+"""
 input RoleInvitationUserNestedFilter
   @join__type(graph: STRAWBERRY)
 {
   email: StringFilter = null
-}
-
-"""Added in UNRELEASED. Filter for role invitations."""
-input RoleInvitationFilter
-  @join__type(graph: STRAWBERRY)
-{
-  state: RoleInvitationStateFilter = null
-  roleId: UUIDFilter = null
-  role: RoleInvitationRoleNestedFilter = null
-  inviter: RoleInvitationUserNestedFilter = null
-  invitee: RoleInvitationUserNestedFilter = null
-  AND: [RoleInvitationFilter!] = null
-  OR: [RoleInvitationFilter!] = null
-  NOT: [RoleInvitationFilter!] = null
-}
-
-"""Added in UNRELEASED. Input for accepting a role invitation."""
-input AcceptRoleInvitationInput
-  @join__type(graph: STRAWBERRY)
-{
-  invitationId: UUID!
-}
-
-"""Added in UNRELEASED. Input for rejecting a role invitation."""
-input RejectRoleInvitationInput
-  @join__type(graph: STRAWBERRY)
-{
-  invitationId: UUID!
-}
-
-"""Added in UNRELEASED. Input for canceling a role invitation."""
-input CancelRoleInvitationInput
-  @join__type(graph: STRAWBERRY)
-{
-  invitationId: UUID!
 }
 
 """Added in 26.3.0. Order by specification for roles"""

@@ -6,6 +6,11 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@externa
   subscription: Subscription
 }
 
+"""Added in UNRELEASED. Input for accepting a role invitation."""
+input AcceptRoleInvitationInput {
+  invitationId: UUID!
+}
+
 """Added in 25.16.0. An access token for model deployment."""
 type AccessToken implements Node {
   """The Globally Unique ID of this object"""
@@ -1514,6 +1519,11 @@ Added in 25.14.0. Response payload for canceling artifact import operations. Con
 type CancelImportArtifactPayload {
   """Artifact revision with cancelled import."""
   artifactRevision: ArtifactRevision!
+}
+
+"""Added in UNRELEASED. Input for canceling a role invitation."""
+input CancelRoleInvitationInput {
+  invitationId: UUID!
 }
 
 """Added in 26.3.0. Filter input for querying query preset categories."""
@@ -8713,17 +8723,15 @@ type Query {
   myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
 
   """
-  Added in UNRELEASED. List invitations for a specific role (RBAC scope-validated).
-  """
-  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
-
-  """
   Added in UNRELEASED. List all role invitations across the system (superadmin only).
   """
   adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
 
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
+
+  """Added in UNRELEASED. List invitations for a specific role."""
+  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
   rbacScopeEntityCombinations: [ScopeEntityCombination!]!
@@ -9370,6 +9378,11 @@ Added in 25.14.0. Response payload for artifact revision rejection operations. C
 type RejectArtifactPayload {
   """Rejected artifact revision."""
   artifactRevision: ArtifactRevision!
+}
+
+"""Added in UNRELEASED. Input for rejecting a role invitation."""
+input RejectRoleInvitationInput {
+  invitationId: UUID!
 }
 
 """
@@ -10243,6 +10256,19 @@ type RoleInvitation implements Node {
 
   """Last update timestamp."""
   updatedAt: DateTime
+
+  """The user who sent this invitation. Null for system-issued invitations."""
+  inviter: UserV2
+
+  """
+  The user who received this invitation. Null if the user no longer exists.
+  """
+  invitee: UserV2
+
+  """
+  The role this invitation grants on acceptance. Null if the role no longer exists.
+  """
+  role: Role
 }
 
 """Added in UNRELEASED. Role invitation connection."""
@@ -10264,6 +10290,18 @@ type RoleInvitationEdge {
   node: RoleInvitation!
 }
 
+"""Added in UNRELEASED. Filter for role invitations."""
+input RoleInvitationFilter {
+  state: RoleInvitationStateFilter = null
+  roleId: UUIDFilter = null
+  role: RoleInvitationRoleNestedFilter = null
+  inviter: RoleInvitationUserNestedFilter = null
+  invitee: RoleInvitationUserNestedFilter = null
+  AND: [RoleInvitationFilter!] = null
+  OR: [RoleInvitationFilter!] = null
+  NOT: [RoleInvitationFilter!] = null
+}
+
 """Added in UNRELEASED. Order by specification for role invitations."""
 input RoleInvitationOrderBy {
   field: RoleInvitationOrderField!
@@ -10277,6 +10315,13 @@ enum RoleInvitationOrderField {
   STATE
 }
 
+"""
+Added in UNRELEASED. Nested filter for the role associated with an invitation.
+"""
+input RoleInvitationRoleNestedFilter {
+  name: StringFilter = null
+}
+
 """Added in UNRELEASED. Role invitation state."""
 enum RoleInvitationState {
   PENDING
@@ -10288,46 +10333,22 @@ enum RoleInvitationState {
 """Added in UNRELEASED. Filter for role invitation state."""
 input RoleInvitationStateFilter {
   equals: RoleInvitationState = null
+
+  """Match any of the provided states."""
   in: [RoleInvitationState!] = null
+
+  """Exclude exact state match."""
   notEquals: RoleInvitationState = null
+
+  """Exclude any of the provided states."""
   notIn: [RoleInvitationState!] = null
 }
 
-"""Added in UNRELEASED. Nested filter for the role associated with an invitation."""
-input RoleInvitationRoleNestedFilter {
-  name: StringFilter = null
-}
-
-"""Added in UNRELEASED. Nested filter for a user (inviter or invitee) of an invitation."""
+"""
+Added in UNRELEASED. Nested filter for a user (inviter or invitee) of an invitation.
+"""
 input RoleInvitationUserNestedFilter {
   email: StringFilter = null
-}
-
-"""Added in UNRELEASED. Filter for role invitations."""
-input RoleInvitationFilter {
-  state: RoleInvitationStateFilter = null
-  roleId: UUIDFilter = null
-  role: RoleInvitationRoleNestedFilter = null
-  inviter: RoleInvitationUserNestedFilter = null
-  invitee: RoleInvitationUserNestedFilter = null
-  AND: [RoleInvitationFilter!] = null
-  OR: [RoleInvitationFilter!] = null
-  NOT: [RoleInvitationFilter!] = null
-}
-
-"""Added in UNRELEASED. Input for accepting a role invitation."""
-input AcceptRoleInvitationInput {
-  invitationId: UUID!
-}
-
-"""Added in UNRELEASED. Input for rejecting a role invitation."""
-input RejectRoleInvitationInput {
-  invitationId: UUID!
-}
-
-"""Added in UNRELEASED. Input for canceling a role invitation."""
-input CancelRoleInvitationInput {
-  invitationId: UUID!
 }
 
 """Added in 26.3.0. Order by specification for roles"""
