@@ -2,8 +2,8 @@
 
 Covers the 3-table invariant (user_roles, association_scopes_entities,
 association_groups_users) for:
-- bulk_revoke_role (BA-5810: regression)
-- accept_invitation for project-scoped roles (BA-5810: regression)
+- bulk_revoke_role
+- accept_invitation for project-scoped roles
 - single assign and bulk_assign_role (repository-level sync).
 
 Single-user revoke_role is exercised at the service layer via
