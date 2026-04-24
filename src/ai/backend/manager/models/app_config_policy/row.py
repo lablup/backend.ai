@@ -7,6 +7,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
 from ai.backend.manager.models.base import GUID, Base
 
 
@@ -52,3 +53,12 @@ class AppConfigPolicyRow(Base):  # type: ignore[misc]
         nullable=True,
         onupdate=sa.func.current_timestamp(),
     )
+
+    def to_data(self) -> AppConfigPolicyData:
+        return AppConfigPolicyData(
+            id=self.id,
+            config_name=self.config_name,
+            scope_sources=list(self.scope_sources),
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )

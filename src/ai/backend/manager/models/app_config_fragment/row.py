@@ -9,7 +9,10 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
+from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentData,
+    AppConfigScopeType,
+)
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 
 
@@ -66,3 +69,14 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
         nullable=True,
         onupdate=sa.func.current_timestamp(),
     )
+
+    def to_data(self) -> AppConfigFragmentData:
+        return AppConfigFragmentData(
+            id=self.id,
+            scope_type=self.scope_type,
+            scope_id=self.scope_id,
+            name=self.name,
+            extra_config=dict(self.extra_config) if self.extra_config is not None else None,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
