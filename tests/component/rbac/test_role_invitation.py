@@ -945,8 +945,9 @@ class TestMySentSearchInvitations:
             )
         )
         sent = await user_v2_registry.role_invitation.my_sent_search(SearchRoleInvitationsInput())
-        # Invitation rows in which regular user is invitee should NOT appear in their my_sent.
-        assert all(inv.invitee_user_id != regular_user_fixture.user_uuid for inv in sent.items)
+        # Regular user has not sent any invitation — my_sent must be strictly empty.
+        assert sent.total_count == 0
+        assert sent.items == []
 
     async def test_my_sent_search_respects_filter_and_order(
         self,
