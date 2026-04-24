@@ -1,5 +1,8 @@
 # App Proxy Traefik 장애 분석
 
+## Reference
+- [https://lablup.sharepoint.com/:fl:/s/customersclients/IQBrld4ljSKMR7lLBBU7iliaAd7XpVwkzT9dQ6UVWhKImls?e=NbkwIN&nav=cz0lMkZzaXRlcyUyRmN1c3RvbWVyc2NsaWVudHMmZD1iJTIxb2xkZ0JWOVhORTY4WkEwSmV2MzRrc19NcERyc1BVMUFrWDZXOGNnLVpPeUlrNUdYU0hvOFFidWNpVjd1RllSdyZmPTAxV0tOWTdPRExTWFBDTERKQ1JSRDNTU1lFQ1U1WVVXRTImYz0lMkYmYT1Mb29wQXBwJnA9JTQwZmx1aWR4JTJGbG9vcC1wYWdlLWNvbnRhaW5lcg%3D%3D](20260331 Shinhan Bank Stale Router Issue)
+
 ## 장애 보고용 요약
 
 - 관측된 증상은 “모델 A 엔드포인트 요청에 모델 A/B 응답이 섞여 반환되고, `라우트 동기화` 후 즉시 정상화”였습니다.
@@ -667,3 +670,4 @@ fake etcd는 다음 메서드에 대해 실패 주입을 지원합니다.
 - etcd는 파생 상태로 취급하고
 - reconcile / outbox 기반으로 전파하며
 - 필요한 경우 distributed slot lock을 추가하는 구조
+
