@@ -1302,6 +1302,22 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
+    async def set_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> bool:
+        """Set current_revision on an endpoint that has none yet.
+
+        Used for the initial deployment path; skips the strategy FSM.
+
+        Returns:
+            ``True`` if updated, ``False`` if the endpoint already had a
+            current_revision (guard fired).
+        """
+        return await self._db_source.set_current_revision(endpoint_id, revision_id)
+
+    @deployment_repository_resilience.apply()
     async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
@@ -1641,13 +1657,15 @@ class DeploymentRepository:
         promote_route_ids: list[UUID],
         drain_route_ids: list[UUID],
     ) -> int:
-        """Promote a deployment by switching traffic from blue to green routes.
+        """Finalize a manually-promoted blue-green deployment.
 
-        Atomically promotes green routes (→ACTIVE), drains blue routes (→TERMINATING),
-        and swaps deploying_revision → current_revision.
+        Atomically promotes green routes (→ACTIVE), drains blue routes
+        (→TERMINATING), swaps deploying_revision → current_revision, and
+        transitions lifecycle DEPLOYING → READY. Manual promote bypasses
+        the FSM coordinator, so the lifecycle transition must happen here
+        rather than in a later handler tick.
 
-        Returns:
-            Number of deployments whose revision was swapped (0 or 1).
+        Returns the number of deployments whose revision was swapped (0 or 1).
         """
         promote: BatchUpdater[RoutingRow] | None = None
         if promote_route_ids:
@@ -1670,11 +1688,10 @@ class DeploymentRepository:
                 conditions=[RouteIdConditions.by_ids(drain_route_ids)],
             )
 
-        return await self._db_source.apply_strategy_mutations(
-            rollout=[],
-            drain=drain,
+        return await self._db_source.complete_manual_promote(
+            deployment_id=deployment_id,
             promote=promote,
-            completed_ids={deployment_id},
+            drain=drain,
         )
 
     @deployment_repository_resilience.apply()

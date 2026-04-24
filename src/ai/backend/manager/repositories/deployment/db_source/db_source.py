@@ -2477,6 +2477,38 @@ class DeploymentDBSource:
 
             return row.to_deployment_info()
 
+    async def set_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> bool:
+        """Set current_revision on an endpoint that has none yet.
+
+        Used for the initial deployment path: when ``create_deployment`` is
+        called with an ``initial_revision`` there is no prior "blue" revision
+        to swap from, so we skip the strategy FSM entirely and mark the
+        revision as current directly. Subsequent revision updates follow the
+        normal activate → deploying_revision → strategy-driven swap flow.
+
+        Uses ``current_revision IS NULL`` as a guard to prevent clobbering an
+        already-active revision.
+
+        Returns:
+            ``True`` if the endpoint was updated, ``False`` if it already had
+            a current_revision (guard fired).
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            update_query = (
+                sa.update(EndpointRow)
+                .where(
+                    EndpointRow.id == endpoint_id,
+                    EndpointRow.current_revision.is_(None),
+                )
+                .values(current_revision=revision_id)
+            )
+            result = await db_sess.execute(update_query)
+            return cast(CursorResult[Any], result).rowcount > 0
+
     async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
@@ -2934,6 +2966,41 @@ class DeploymentDBSource:
         )
         result = await db_sess.execute(query)
         return cast(CursorResult[Any], result).rowcount
+
+    async def complete_manual_promote(
+        self,
+        deployment_id: uuid.UUID,
+        promote: BatchUpdater[RoutingRow] | None,
+        drain: BatchUpdater[RoutingRow] | None,
+    ) -> int:
+        """Atomically finalize a manually-promoted deployment.
+
+        Manual promote bypasses the FSM coordinator, so the DB update must
+        perform every state change that the coordinator would have done
+        for an auto-promoted deployment: route mutations, revision swap,
+        sub_step clear, and the DEPLOYING → READY lifecycle transition —
+        all in one transaction.
+
+        Returns the number of deployments whose revision was swapped (0 or 1).
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            await self._promote_routes(db_sess, promote)
+            await self._drain_routes(db_sess, drain)
+            swap_query = (
+                sa.update(EndpointRow)
+                .where(
+                    EndpointRow.id == deployment_id,
+                    EndpointRow.deploying_revision.is_not(None),
+                )
+                .values(
+                    current_revision=EndpointRow.deploying_revision,
+                    deploying_revision=None,
+                    sub_step=None,
+                    lifecycle_stage=EndpointLifecycle.READY,
+                )
+            )
+            result = await db_sess.execute(swap_query)
+            return cast(CursorResult[Any], result).rowcount
 
     async def clear_deploying_revision(
         self,

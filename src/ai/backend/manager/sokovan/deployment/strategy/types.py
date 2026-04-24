@@ -26,13 +26,15 @@ class RouteChanges:
 
     rollout_specs: list[RBACEntityCreator[RoutingRow]] = field(default_factory=list)
     drain_route_ids: list[UUID] = field(default_factory=list)
+    promote_route_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass
 class StrategyCycleResult:
     """Result of evaluating a single deployment's strategy cycle.
 
-    ``sub_step`` indicates the next state: PROVISIONING or COMPLETED.
+    ``sub_step`` indicates the next state: PROVISIONING,
+    AWAITING_PROMOTION, or COMPLETED.
     """
 
     sub_step: DeploymentLifecycleSubStep

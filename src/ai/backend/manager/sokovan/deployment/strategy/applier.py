@@ -36,13 +36,18 @@ class StrategyApplyResult:
     routes_drained: int = 0
     """Number of routes marked for draining."""
 
+    routes_promoted: int = 0
+    """Number of routes promoted (traffic_status -> ACTIVE)."""
+
     def has_mutations(self) -> bool:
         """Check if there are any route mutations to persist.
 
         Returns True when at least one of the following is present:
-        new routes to roll out, routes to drain, or deployments completed.
+        new routes to roll out, routes to drain, routes to promote, or deployments completed.
         """
-        return bool(self.completed_ids or self.routes_created or self.routes_drained)
+        return bool(
+            self.completed_ids or self.routes_created or self.routes_drained or self.routes_promoted
+        )
 
 
 class StrategyResultApplier:
@@ -50,7 +55,8 @@ class StrategyResultApplier:
 
     Handles route mutations from a strategy evaluation cycle:
     1. Route rollout (create) and drain (terminate)
-    2. Revision swap for COMPLETED deployments
+    2. Route promotion (traffic_status -> ACTIVE)
+    3. Revision swap for COMPLETED deployments
 
     Sub-step transitions are handled exclusively by the coordinator.
     """
@@ -69,6 +75,7 @@ class StrategyResultApplier:
             completed_ids=completed_ids,
             routes_created=len(changes.rollout_specs),
             routes_drained=len(changes.drain_route_ids),
+            routes_promoted=len(changes.promote_route_ids),
         )
 
         drain: BatchUpdater[RoutingRow] | None = None
@@ -82,6 +89,16 @@ class StrategyResultApplier:
                 conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
             )
 
+        promote: BatchUpdater[RoutingRow] | None = None
+        if changes.promote_route_ids:
+            promote = BatchUpdater(
+                spec=RouteBatchUpdaterSpec(
+                    traffic_ratio=1.0,
+                    traffic_status=RouteTrafficStatus.ACTIVE,
+                ),
+                conditions=[RouteConditions.by_ids(changes.promote_route_ids)],
+            )
+
         rollout = changes.rollout_specs
 
         if not result.has_mutations():
@@ -90,14 +107,16 @@ class StrategyResultApplier:
         swapped = await self._deployment_repo.apply_strategy_mutations(
             rollout=rollout,
             drain=drain,
-            promote=None,
+            promote=promote,
             completed_ids=completed_ids,
         )
 
         log.debug(
-            "Applied evaluation: {} routes created, {} routes drained",
+            "Applied evaluation: {} assignments, {} routes created, {} routes drained, {} routes promoted",
+            len(summary.assignments),
             result.routes_created,
             result.routes_drained,
+            result.routes_promoted,
         )
         if completed_ids:
             log.info(

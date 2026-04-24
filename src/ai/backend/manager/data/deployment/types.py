@@ -616,6 +616,18 @@ class RouteInfo:
             return 0
         return _HEALTH_TERMINATION_PRIORITY.get(self.health_status, 0)
 
+    @property
+    def is_ready(self) -> bool:
+        """Return True if the route is RUNNING and HEALTHY.
+
+        Does NOT check traffic_status — blue-green green routes are INACTIVE
+        until promotion but must still be classified as "ready" for the
+        auto-promote health gate.
+        """
+        return (
+            self.status == RouteStatus.RUNNING and self.health_status == RouteHealthStatus.HEALTHY
+        )
+
 
 @dataclass
 class DeploymentInfoWithRoutes:

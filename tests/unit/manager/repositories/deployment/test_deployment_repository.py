@@ -3793,57 +3793,57 @@ class TestDeploymentRepositoryDuplicateName:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DomainRow:
+    ) -> AsyncGenerator[DomainRow, None]:
         """Create test domain."""
+        domain = DomainRow(
+            name=f"test-domain-{uuid.uuid4().hex[:8]}",
+            description="Test domain",
+            is_active=True,
+            total_resource_slots=ResourceSlot(),
+            allowed_vfolder_hosts={},
+            allowed_docker_registries=[],
+        )
         async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=f"test-domain-{uuid.uuid4().hex[:8]}",
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
             db_sess.add(domain)
             await db_sess.commit()
-            return domain
+        yield domain
 
     @pytest.fixture
     async def test_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> ScalingGroupRow:
+    ) -> AsyncGenerator[ScalingGroupRow, None]:
         """Create test scaling group."""
+        sgroup = ScalingGroupRow(
+            name=f"test-sgroup-{uuid.uuid4().hex[:8]}",
+            description="Test scaling group",
+            is_active=True,
+            driver="static",
+            driver_opts={},
+            scheduler="fifo",
+            scheduler_opts=ScalingGroupOpts(),
+        )
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
-                name=f"test-sgroup-{uuid.uuid4().hex[:8]}",
-                description="Test scaling group",
-                is_active=True,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
-            )
             db_sess.add(sgroup)
             await db_sess.commit()
-            return sgroup
+        yield sgroup
 
     @pytest.fixture
     async def default_project_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> ProjectResourcePolicyRow:
+    ) -> AsyncGenerator[ProjectResourcePolicyRow, None]:
         """Create default project resource policy."""
+        policy = ProjectResourcePolicyRow(
+            name="default",
+            max_vfolder_count=10,
+            max_quota_scope_size=0,
+            max_network_count=0,
+        )
         async with db_with_cleanup.begin_session() as db_sess:
-            policy = ProjectResourcePolicyRow(
-                name="default",
-                max_vfolder_count=10,
-                max_quota_scope_size=0,
-                max_network_count=0,
-            )
             db_sess.add(policy)
             await db_sess.commit()
-            return policy
+        yield policy
 
     @pytest.fixture
     async def test_group(
@@ -3851,21 +3851,21 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         default_project_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
+    ) -> AsyncGenerator[GroupRow, None]:
         """Create test group (project)."""
+        group = GroupRow(
+            id=uuid.uuid4(),
+            name=f"test-group-{uuid.uuid4().hex[:8]}",
+            domain_name=test_domain.name,
+            description="Test group",
+            is_active=True,
+            total_resource_slots=ResourceSlot(),
+            resource_policy=default_project_policy.name,
+        )
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
-                id=uuid.uuid4(),
-                name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain.name,
-                description="Test group",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                resource_policy=default_project_policy.name,
-            )
             db_sess.add(group)
             await db_sess.commit()
-            return group
+        yield group
 
     @pytest.fixture
     async def different_group(
@@ -3873,21 +3873,21 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         default_project_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
+    ) -> AsyncGenerator[GroupRow, None]:
         """Create a different group (project) for cross-project tests."""
+        group = GroupRow(
+            id=uuid.uuid4(),
+            name=f"different-group-{uuid.uuid4().hex[:8]}",
+            domain_name=test_domain.name,
+            description="Different group",
+            is_active=True,
+            total_resource_slots=ResourceSlot(),
+            resource_policy=default_project_policy.name,
+        )
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
-                id=uuid.uuid4(),
-                name=f"different-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain.name,
-                description="Different group",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                resource_policy=default_project_policy.name,
-            )
             db_sess.add(group)
             await db_sess.commit()
-            return group
+        yield group
 
     @pytest.fixture
     def deployment_repository(

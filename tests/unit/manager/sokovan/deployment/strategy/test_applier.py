@@ -70,47 +70,38 @@ def summary_with_rollout() -> StrategyEvaluationSummary:
 @pytest.fixture
 def summary_with_drain() -> StrategyEvaluationSummary:
     return _build_summary(
-        {uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
+        {uuid4(): DeploymentLifecycleSubStep.DEPLOYING_AWAITING_PROMOTION},
         route_changes=RouteChanges(drain_route_ids=[uuid4()]),
     )
 
 
 @pytest.fixture
 def completed_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
-    ep_id_1 = uuid4()
-    ep_id_2 = uuid4()
-    completed_ids = {ep_id_1, ep_id_2}
+    endpoint_id_1 = uuid4()
+    endpoint_id_2 = uuid4()
+    completed_ids = {endpoint_id_1, endpoint_id_2}
     summary = _build_summary({
-        ep_id_1: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
-        ep_id_2: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
+        endpoint_id_1: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
+        endpoint_id_2: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
     })
     return summary, completed_ids
 
 
 @pytest.fixture
-def rolled_back_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
-    ep_id = uuid4()
-    summary = _build_summary({ep_id: DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING})
-    return summary, {ep_id}
-
-
-@pytest.fixture
-def mixed_summary() -> tuple[StrategyEvaluationSummary, UUID, UUID, UUID]:
+def mixed_summary() -> tuple[StrategyEvaluationSummary, UUID, UUID]:
     provisioning_id = uuid4()
     completed_id = uuid4()
-    rolled_back_id = uuid4()
     summary = _build_summary(
         {
             provisioning_id: DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
             completed_id: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
-            rolled_back_id: DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
         },
         route_changes=RouteChanges(
             rollout_specs=[MagicMock()],
             drain_route_ids=[uuid4()],
         ),
     )
-    return summary, provisioning_id, completed_id, rolled_back_id
+    return summary, provisioning_id, completed_id
 
 
 # =============================================================================
@@ -211,9 +202,9 @@ class TestStrategyResultApplier:
         self,
         applier: StrategyResultApplier,
         mock_deployment_repo: AsyncMock,
-        mixed_summary: tuple[StrategyEvaluationSummary, UUID, UUID, UUID],
+        mixed_summary: tuple[StrategyEvaluationSummary, UUID, UUID],
     ) -> None:
-        summary, _provisioning_id, completed_id, _rolled_back_id = mixed_summary
+        summary, _provisioning_id, completed_id = mixed_summary
         mock_deployment_repo.apply_strategy_mutations.return_value = 1
 
         result = await applier.apply(summary)
