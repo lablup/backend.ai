@@ -305,8 +305,11 @@ class RouteExecutor:
 
         Reads RouteHealthRecord and classifies based on computed healthy/stale:
         - HEALTHY: record.healthy is True
-        - UNHEALTHY: record.healthy is False and not stale
-        - DEGRADED: record is stale or missing
+        - UNHEALTHY: record.healthy is False and not stale (only past initial_delay)
+        - DEGRADED: record is stale or missing (only past initial_delay)
+        - (no transition): within initial_delay without a successful probe yet —
+          the route keeps whatever health_status it already has so a transient
+          warmup failure does not downgrade it prematurely.
 
         The handler only reads and syncs to DB — all health check logic
         is in the RouteHealthObserver.
@@ -338,8 +341,22 @@ class RouteExecutor:
                 stale.append(route)
                 continue
 
+            within_initial_delay = current_time < record.initial_delay_until
+
+            # Success path always wins — a healthy probe transitions the route
+            # to HEALTHY even if initial_delay has not elapsed, so the kernel
+            # can start receiving traffic as soon as it is ready.
+            if record.last_check > 0 and not record.is_stale(current_time) and record.healthy:
+                successes.append(route)
+                continue
+
+            # Within initial_delay and no successful probe yet — hold the
+            # existing health_status (NOT_CHECKED/HEALTHY/UNHEALTHY/DEGRADED)
+            # by skipping classification entirely.
+            if within_initial_delay:
+                continue
+
             if record.last_check == 0:
-                # Never checked yet — keep as NOT_CHECKED (stale)
                 stale.append(route)
                 continue
 
@@ -347,17 +364,14 @@ class RouteExecutor:
                 stale.append(route)
                 continue
 
-            if record.healthy:
-                successes.append(route)
-            else:
-                errors.append(
-                    RouteExecutionError(
-                        route_info=route,
-                        reason="Route health check failed",
-                        error_detail="RouteHealthRecord reports unhealthy",
-                        error_code=None,
-                    )
+            errors.append(
+                RouteExecutionError(
+                    route_info=route,
+                    reason="Route health check failed",
+                    error_detail="RouteHealthRecord reports unhealthy",
+                    error_code=None,
                 )
+            )
 
         return RouteExecutionResult(
             successes=successes,
