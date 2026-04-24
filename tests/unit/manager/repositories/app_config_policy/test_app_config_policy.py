@@ -6,7 +6,6 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_policy.admin_repository import (
@@ -28,10 +27,7 @@ class TestAppConfigPolicyRepository:
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
             database_connection,
-            [
-                AppConfigPolicyRow,
-                AppConfigFragmentRow,  # FK target — must outlive policies
-            ],
+            [AppConfigPolicyRow],
         ):
             yield database_connection
 
@@ -92,10 +88,7 @@ class TestAppConfigPolicyAdminRepository:
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
             database_connection,
-            [
-                AppConfigPolicyRow,
-                AppConfigFragmentRow,
-            ],
+            [AppConfigPolicyRow],
         ):
             yield database_connection
 
