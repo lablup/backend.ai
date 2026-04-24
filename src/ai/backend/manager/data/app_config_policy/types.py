@@ -12,4 +12,4 @@ class AppConfigPolicyData:
     config_name: str
     scope_sources: Sequence[str]
     created_at: datetime
-    updated_at: datetime
+    updated_at: datetime | None

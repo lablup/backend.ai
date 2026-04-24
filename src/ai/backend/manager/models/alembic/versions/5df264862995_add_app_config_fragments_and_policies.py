@@ -54,8 +54,7 @@ def upgrade() -> None:
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
+            nullable=True,
         ),
         sa.UniqueConstraint(
             "config_name",
@@ -89,8 +88,7 @@ def upgrade() -> None:
         sa.Column(
             "extra_config",
             pgsql.JSONB(),
-            nullable=False,
-            server_default="{}",
+            nullable=True,
         ),
         sa.Column(
             "created_at",
@@ -101,8 +99,7 @@ def upgrade() -> None:
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
+            nullable=True,
         ),
         sa.UniqueConstraint(
             "scope_type",

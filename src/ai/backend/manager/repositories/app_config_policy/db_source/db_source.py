@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.engine.cursor import CursorResult
 
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
+from ai.backend.manager.models.app_config_policy.adapter import AppConfigPolicyAdapter
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_policy.types import (
@@ -36,7 +37,7 @@ class AppConfigPolicyDBSource:
             row = await db_sess.scalar(
                 sa.select(AppConfigPolicyRow).where(AppConfigPolicyRow.config_name == config_name)
             )
-            return row.to_data() if row is not None else None
+            return AppConfigPolicyAdapter.to_data(row) if row is not None else None
 
     async def get_by_id(self, id: uuid.UUID) -> AppConfigPolicyData | None:
         """Look up a policy by row id."""
@@ -44,7 +45,7 @@ class AppConfigPolicyDBSource:
             row = await db_sess.scalar(
                 sa.select(AppConfigPolicyRow).where(AppConfigPolicyRow.id == id)
             )
-            return row.to_data() if row is not None else None
+            return AppConfigPolicyAdapter.to_data(row) if row is not None else None
 
     async def create(
         self,
@@ -62,7 +63,7 @@ class AppConfigPolicyDBSource:
             db_sess.add(row)
             await db_sess.flush()
             await db_sess.refresh(row)
-            return row.to_data()
+            return AppConfigPolicyAdapter.to_data(row)
 
     async def update(
         self,
@@ -84,7 +85,7 @@ class AppConfigPolicyDBSource:
             row.scope_sources = list(scope_sources)
             await db_sess.flush()
             await db_sess.refresh(row)
-            return row.to_data()
+            return AppConfigPolicyAdapter.to_data(row)
 
     async def purge(self, config_name: str) -> bool:
         """Delete the policy identified by `config_name`. Returns `True`
@@ -106,7 +107,7 @@ class AppConfigPolicyDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(AppConfigPolicyRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.AppConfigPolicyRow.to_data() for row in result.rows]
+            items = [AppConfigPolicyAdapter.to_data(row.AppConfigPolicyRow) for row in result.rows]
             return AppConfigPolicySearchResult(
                 items=items,
                 total_count=result.total_count,

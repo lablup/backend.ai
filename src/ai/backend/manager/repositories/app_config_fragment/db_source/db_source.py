@@ -14,6 +14,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentKey,
     AppConfigScopeType,
 )
+from ai.backend.manager.models.app_config_fragment.adapter import AppConfigFragmentAdapter
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.models.user import UserRow
@@ -67,14 +68,14 @@ class AppConfigFragmentDBSource:
                     AppConfigFragmentRow.name == key.name,
                 )
             )
-            return row.to_data() if row is not None else None
+            return AppConfigFragmentAdapter.to_data(row) if row is not None else None
 
     async def get_by_id(self, id: uuid.UUID) -> AppConfigFragmentData | None:
         async with self._db.begin_readonly_session() as db_sess:
             row = await db_sess.scalar(
                 sa.select(AppConfigFragmentRow).where(AppConfigFragmentRow.id == id)
             )
-            return row.to_data() if row is not None else None
+            return AppConfigFragmentAdapter.to_data(row) if row is not None else None
 
     async def create(
         self,
@@ -92,7 +93,7 @@ class AppConfigFragmentDBSource:
             db_sess.add(row)
             await db_sess.flush()
             await db_sess.refresh(row)
-            return row.to_data()
+            return AppConfigFragmentAdapter.to_data(row)
 
     async def update(
         self,
@@ -114,7 +115,7 @@ class AppConfigFragmentDBSource:
             row.extra_config = dict(extra_config)
             await db_sess.flush()
             await db_sess.refresh(row)
-            return row.to_data()
+            return AppConfigFragmentAdapter.to_data(row)
 
     async def purge(self, key: AppConfigFragmentKey) -> bool:
         """Delete the fragment identified by the natural key. Returns
@@ -138,7 +139,7 @@ class AppConfigFragmentDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(AppConfigFragmentRow)
             result = await execute_batch_querier(db_sess, query, querier, scope=scope)
-            items = [row.AppConfigFragmentRow.to_data() for row in result.rows]
+            items = [AppConfigFragmentAdapter.to_data(row.AppConfigFragmentRow) for row in result.rows]
             return AppConfigFragmentSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -155,7 +156,7 @@ class AppConfigFragmentDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(AppConfigFragmentRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.AppConfigFragmentRow.to_data() for row in result.rows]
+            items = [AppConfigFragmentAdapter.to_data(row.AppConfigFragmentRow) for row in result.rows]
             return AppConfigFragmentSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -183,9 +184,11 @@ class AppConfigFragmentDBSource:
         ]
         merged: Mapping[str, Any] = {}
         for row in ordered:
+            if row.extra_config is None:
+                continue
             merged = deep_merge(merged, row.extra_config)
         return _MergedChain(
-            fragments=[row.to_data() for row in ordered],
+            fragments=[AppConfigFragmentAdapter.to_data(row) for row in ordered],
             config=(merged or None),
         )
 

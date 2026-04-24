@@ -9,11 +9,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.manager.data.app_config_fragment.types import (
-    AppConfigFragmentData,
-    AppConfigScopeType,
-)
-from ai.backend.manager.models.base import Base, StrEnumType
+from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
+from ai.backend.manager.models.base import GUID, Base, StrEnumType
 
 
 class AppConfigFragmentRow(Base):  # type: ignore[misc]
@@ -28,10 +25,7 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id",
-        pgsql.UUID(as_uuid=True),
-        primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     scope_type: Mapped[AppConfigScopeType] = mapped_column(
         "scope_type",
@@ -55,11 +49,10 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
         ),
         nullable=False,
     )
-    extra_config: Mapped[Mapping[str, Any]] = mapped_column(
+    extra_config: Mapped[Mapping[str, Any] | None] = mapped_column(
         "extra_config",
         pgsql.JSONB,
-        nullable=False,
-        default=dict,
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -67,21 +60,9 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=sa.func.now(),
     )
-    updated_at: Mapped[datetime] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         "updated_at",
         sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
+        nullable=True,
         onupdate=sa.func.current_timestamp(),
     )
-
-    def to_data(self) -> AppConfigFragmentData:
-        return AppConfigFragmentData(
-            id=self.id,
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
-            name=self.name,
-            extra_config=dict(self.extra_config),
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
