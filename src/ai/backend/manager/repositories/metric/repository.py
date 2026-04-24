@@ -121,11 +121,7 @@ class MetricRepository:
         self,
         kernel_ids: Sequence[KernelId],
     ) -> KernelLiveStatBatchResult:
-        """Query Prometheus for live stats of the given kernels.
-
-        Issues three concurrent queries (gauge/diff/rate) and merges results.
-        Returns a KernelLiveStatBatchResult with per-kernel entries.
-        """
+        """Query Prometheus for live stats of the given kernels."""
         if not kernel_ids:
             return KernelLiveStatBatchResult.empty(kernel_ids)
         try:
@@ -182,8 +178,8 @@ class MetricRepository:
         metric_name: str,
         label: ContainerMetricOptionalLabel,
     ) -> MetricType:
-        # TODO: Refactor to query metric metadata from DB Source
-        #       once the metadata persistence is available.
+        # TODO: Move metric classification and query templates to a built-in
+        #       metric definition layer when DB-backed definitions are introduced.
         if metric_name in DIFF_METRICS and label.value_type == ValueType.CURRENT:
             return MetricType.DIFF
         if metric_name in RATE_METRICS:
@@ -206,25 +202,12 @@ class MetricRepository:
             project_id=label.project_id,
         )
         match metric_type:
-            # TODO: Define device metadata for each metric
-            # TODO: Refactor metric template retrieval to query metric metadata from DB Source
             case MetricType.GAUGE:
-                template = (
-                    "sum by ({group_by})(" + CONTAINER_UTILIZATION_METRIC_NAME + "{{{labels}}})"
-                )
+                template = _GAUGE_TEMPLATE
             case MetricType.RATE:
-                template = (
-                    "sum by ({group_by})(rate("
-                    + CONTAINER_UTILIZATION_METRIC_NAME
-                    + "{{{labels}}}[{window}]))"
-                    " / " + str(UTILIZATION_METRIC_INTERVAL)
-                )
+                template = _RATE_TEMPLATE
             case MetricType.DIFF:
-                template = (
-                    "sum by ({group_by})(rate("
-                    + CONTAINER_UTILIZATION_METRIC_NAME
-                    + "{{{labels}}}[{window}]))"
-                )
+                template = _DIFF_TEMPLATE
             case _:
                 raise UnreachableError(f"Unknown metric type: {metric_type}")
         return MetricPreset(
