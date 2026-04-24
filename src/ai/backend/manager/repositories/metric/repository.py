@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from collections.abc import Sequence
 
@@ -102,9 +101,9 @@ class MetricRepository:
         kernel_ids: Sequence[KernelId],
     ) -> dict[KernelId, list[MetricValue]]:
         queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
-        gauge_response, diff_response, rate_response = await asyncio.gather(
-            *(self._prometheus_client.query_instant(preset) for preset in queries.to_list())
-        )
+        gauge_response = await self._prometheus_client.query_instant(queries.gauge)
+        diff_response = await self._prometheus_client.query_instant(queries.diff)
+        rate_response = await self._prometheus_client.query_instant(queries.rate)
         gauge = KernelMetricValuesByKernel.from_prometheus_response(gauge_response)
         diff = KernelMetricValuesByKernel.from_prometheus_response(diff_response)
         rate = KernelMetricValuesByKernel.from_prometheus_response(rate_response)
