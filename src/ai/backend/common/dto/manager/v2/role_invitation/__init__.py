@@ -3,7 +3,10 @@ Role invitation DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    AcceptRoleInvitationInput,
+    CancelRoleInvitationInput,
     CreateRoleInvitationInput,
+    RejectRoleInvitationInput,
     SearchRoleInvitationsInput,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.response import (
@@ -19,7 +22,10 @@ __all__ = (
     # Types
     "RoleInvitationStateDTO",
     # Input models (request)
+    "AcceptRoleInvitationInput",
+    "CancelRoleInvitationInput",
     "CreateRoleInvitationInput",
+    "RejectRoleInvitationInput",
     "SearchRoleInvitationsInput",
     # Node and Payload models (response)
     "CreateRoleInvitationPayload",

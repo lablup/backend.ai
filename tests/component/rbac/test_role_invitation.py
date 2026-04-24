@@ -14,9 +14,16 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import InvalidRequestError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.request import SearchRoleAssignmentsInput
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
     CreateRoleInvitationInput,
+    RoleInvitationFilter,
+    RoleInvitationOrderBy,
+    RoleInvitationOrderField,
+    RoleInvitationStateFilter,
+    RoleNestedFilter,
     SearchRoleInvitationsInput,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.response import (
@@ -24,6 +31,7 @@ from ai.backend.common.dto.manager.v2.role_invitation.response import (
     RoleInvitationNode,
     SearchRoleInvitationsPayload,
 )
+from ai.backend.common.dto.manager.v2.role_invitation.types import RoleInvitationStateDTO
 from ai.backend.manager.api.adapters.rbac import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -48,6 +56,7 @@ from ai.backend.manager.services.permission_contoller.service import PermissionC
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
+    from tests.component.rbac.conftest import RoleFactory
 
     from ai.backend.client.v2.registry import BackendAIClientRegistry
     from ai.backend.common.dto.manager.rbac.response import CreateRoleResponse
@@ -442,3 +451,350 @@ class TestSearchInvitations:
         assert isinstance(result, SearchRoleInvitationsPayload)
         assert result.total_count == 0
         assert result.items == []
+
+
+class TestSearchInvitationsPagination:
+    """Filter and order coverage for role invitation search endpoints."""
+
+    async def test_my_search_filter_state_equals_pending(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Filter state.equals=pending returns only pending invitations."""
+        pending_role = await role_factory()
+        rejected_role = await role_factory()
+        for role in (pending_role, rejected_role):
+            await admin_v2_registry.role_invitation.create(
+                CreateRoleInvitationInput(
+                    role_id=role.role.id,
+                    emails=[regular_user_fixture.email],
+                )
+            )
+        # Reject one invitation so not every invitation is PENDING
+        rejected_search = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    role=RoleNestedFilter(name=StringFilter(equals=rejected_role.role.name))
+                )
+            )
+        )
+        assert rejected_search.total_count == 1
+        await user_v2_registry.role_invitation.reject(rejected_search.items[0].id)
+
+        result = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    state=RoleInvitationStateFilter(equals=RoleInvitationStateDTO.PENDING),
+                )
+            )
+        )
+        assert result.total_count >= 1
+        assert all(inv.state == RoleInvitationStateDTO.PENDING for inv in result.items)
+        assert all(inv.role_id != rejected_role.role.id for inv in result.items)
+
+    async def test_role_search_filter_state_in_multiple(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Filter state.in=[REJECTED, CANCELED] excludes PENDING/ACCEPTED."""
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        # Move the only invitation to REJECTED
+        my_search = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    role=RoleNestedFilter(name=StringFilter(equals=target_role.role.name))
+                )
+            )
+        )
+        assert my_search.total_count == 1
+        await user_v2_registry.role_invitation.reject(my_search.items[0].id)
+
+        result = await admin_v2_registry.role_invitation.search_by_role(
+            target_role.role.id,
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    state=RoleInvitationStateFilter(
+                        in_=[RoleInvitationStateDTO.REJECTED, RoleInvitationStateDTO.CANCELED],
+                    ),
+                )
+            ),
+        )
+        assert result.total_count == 1
+        assert result.items[0].state == RoleInvitationStateDTO.REJECTED
+
+    async def test_my_search_filter_state_not_equals(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Filter state.not_equals=PENDING excludes pending invitations."""
+        pending_role = await role_factory()
+        canceled_role = await role_factory()
+        for role in (pending_role, canceled_role):
+            await admin_v2_registry.role_invitation.create(
+                CreateRoleInvitationInput(
+                    role_id=role.role.id,
+                    emails=[regular_user_fixture.email],
+                )
+            )
+        cancel_target = await admin_v2_registry.role_invitation.search_by_role(
+            canceled_role.role.id, SearchRoleInvitationsInput()
+        )
+        assert cancel_target.total_count == 1
+        await admin_v2_registry.role_invitation.cancel(cancel_target.items[0].id)
+
+        result = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    state=RoleInvitationStateFilter(not_equals=RoleInvitationStateDTO.PENDING),
+                )
+            )
+        )
+        assert all(inv.state != RoleInvitationStateDTO.PENDING for inv in result.items)
+        assert any(inv.role_id == canceled_role.role.id for inv in result.items)
+        assert all(inv.role_id != pending_role.role.id for inv in result.items)
+
+    async def test_my_search_filter_role_name_equals(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Nested filter role.name.equals narrows results to one role."""
+        wanted_role = await role_factory()
+        other_role = await role_factory()
+        for role in (wanted_role, other_role):
+            await admin_v2_registry.role_invitation.create(
+                CreateRoleInvitationInput(
+                    role_id=role.role.id,
+                    emails=[regular_user_fixture.email],
+                )
+            )
+        result = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    role=RoleNestedFilter(name=StringFilter(equals=wanted_role.role.name)),
+                )
+            )
+        )
+        assert result.total_count == 1
+        assert result.items[0].role_id == wanted_role.role.id
+
+    async def test_my_search_filter_role_name_contains(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Nested filter role.name.contains returns matches by substring."""
+        unique_token = secrets.token_hex(3)
+        prefixed_role = await role_factory(name=f"filter-contains-{unique_token}")
+        other_role = await role_factory()
+        for role in (prefixed_role, other_role):
+            await admin_v2_registry.role_invitation.create(
+                CreateRoleInvitationInput(
+                    role_id=role.role.id,
+                    emails=[regular_user_fixture.email],
+                )
+            )
+        result = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    role=RoleNestedFilter(name=StringFilter(contains=unique_token)),
+                )
+            )
+        )
+        assert result.total_count == 1
+        assert result.items[0].role_id == prefixed_role.role.id
+
+    async def test_my_search_filter_and_combines_conditions(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """AND combines state and role filters — only rows matching both remain."""
+        matching_role = await role_factory()
+        other_role = await role_factory()
+        for role in (matching_role, other_role):
+            await admin_v2_registry.role_invitation.create(
+                CreateRoleInvitationInput(
+                    role_id=role.role.id,
+                    emails=[regular_user_fixture.email],
+                )
+            )
+        result = await user_v2_registry.role_invitation.my_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    AND=[
+                        RoleInvitationFilter(
+                            state=RoleInvitationStateFilter(equals=RoleInvitationStateDTO.PENDING),
+                        ),
+                        RoleInvitationFilter(
+                            role=RoleNestedFilter(
+                                name=StringFilter(equals=matching_role.role.name)
+                            ),
+                        ),
+                    ]
+                )
+            )
+        )
+        assert result.total_count == 1
+        assert result.items[0].role_id == matching_role.role.id
+        assert result.items[0].state == RoleInvitationStateDTO.PENDING
+
+    async def test_role_search_order_created_at_asc_vs_desc(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: UserFixtureData,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Order by created_at ASC returns oldest first; DESC reverses the order."""
+        # Create two invitations at distinct timestamps for the same role
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[admin_user_fixture.email],
+            )
+        )
+        asc = await admin_v2_registry.role_invitation.search_by_role(
+            target_role.role.id,
+            SearchRoleInvitationsInput(
+                order=[
+                    RoleInvitationOrderBy(
+                        field=RoleInvitationOrderField.CREATED_AT,
+                        direction=OrderDirection.ASC,
+                    )
+                ],
+            ),
+        )
+        desc = await admin_v2_registry.role_invitation.search_by_role(
+            target_role.role.id,
+            SearchRoleInvitationsInput(
+                order=[
+                    RoleInvitationOrderBy(
+                        field=RoleInvitationOrderField.CREATED_AT,
+                        direction=OrderDirection.DESC,
+                    )
+                ],
+            ),
+        )
+        assert asc.total_count >= 2
+        assert desc.total_count >= 2
+        # Same result set, reversed cursor order
+        assert [inv.id for inv in asc.items] == list(reversed([inv.id for inv in desc.items]))
+        # ASC: non-decreasing timestamps
+        asc_ts = [inv.created_at for inv in asc.items]
+        assert asc_ts == sorted(asc_ts)
+
+    async def test_role_search_order_state(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        admin_user_fixture: UserFixtureData,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Order by state ASC produces a non-decreasing state sequence."""
+        role = await role_factory()
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=role.role.id,
+                emails=[admin_user_fixture.email],
+            )
+        )
+        # Cancel one so the two invitations have different states.
+        listed = await admin_v2_registry.role_invitation.search_by_role(
+            role.role.id, SearchRoleInvitationsInput()
+        )
+        assert listed.total_count == 2
+        await admin_v2_registry.role_invitation.cancel(listed.items[0].id)
+
+        result = await admin_v2_registry.role_invitation.search_by_role(
+            role.role.id,
+            SearchRoleInvitationsInput(
+                order=[
+                    RoleInvitationOrderBy(
+                        field=RoleInvitationOrderField.STATE,
+                        direction=OrderDirection.ASC,
+                    )
+                ],
+            ),
+        )
+        assert result.total_count == 2
+        states = [inv.state.value for inv in result.items]
+        assert states == sorted(states)
+
+    async def test_role_search_pagination_limit_offset(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: UserFixtureData,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """limit/offset walks through a stable-ordered page window without overlap."""
+        for user in (admin_user_fixture, regular_user_fixture):
+            await admin_v2_registry.role_invitation.create(
+                CreateRoleInvitationInput(
+                    role_id=target_role.role.id,
+                    emails=[user.email],
+                )
+            )
+        order = [
+            RoleInvitationOrderBy(
+                field=RoleInvitationOrderField.CREATED_AT,
+                direction=OrderDirection.ASC,
+            )
+        ]
+        first_page = await admin_v2_registry.role_invitation.search_by_role(
+            target_role.role.id,
+            SearchRoleInvitationsInput(limit=1, offset=0, order=order),
+        )
+        second_page = await admin_v2_registry.role_invitation.search_by_role(
+            target_role.role.id,
+            SearchRoleInvitationsInput(limit=1, offset=1, order=order),
+        )
+        assert first_page.total_count >= 2
+        assert len(first_page.items) == 1
+        assert len(second_page.items) == 1
+        assert first_page.items[0].id != second_page.items[0].id
+        assert first_page.items[0].created_at <= second_page.items[0].created_at

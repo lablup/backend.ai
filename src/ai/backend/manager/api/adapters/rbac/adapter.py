@@ -165,7 +165,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
-from ai.backend.manager.data.role_invitation.types import RoleInvitationData
+from ai.backend.manager.data.role_invitation.types import RoleInvitationData, RoleInvitationState
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -1654,13 +1654,19 @@ class RBACAdapter(BaseAdapter):
         f: RoleInvitationStateFilterDTO,
     ) -> QueryCondition | None:
         if f.equals is not None:
-            return RoleInvitationConditions.by_state_equals(f.equals)
+            return RoleInvitationConditions.by_state_equals(RoleInvitationState(f.equals.value))
         if f.in_ is not None:
-            return RoleInvitationConditions.by_state_in(f.in_)
+            return RoleInvitationConditions.by_state_in([
+                RoleInvitationState(s.value) for s in f.in_
+            ])
         if f.not_equals is not None:
-            return RoleInvitationConditions.by_state_not_equals(f.not_equals)
+            return RoleInvitationConditions.by_state_not_equals(
+                RoleInvitationState(f.not_equals.value)
+            )
         if f.not_in is not None:
-            return RoleInvitationConditions.by_state_not_in(f.not_in)
+            return RoleInvitationConditions.by_state_not_in([
+                RoleInvitationState(s.value) for s in f.not_in
+            ])
         return None
 
     def _convert_invitation_role_nested_filter(

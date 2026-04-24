@@ -12,6 +12,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.role_invitation.types import RoleInvitationStateDTO
 
 
 class CreateRoleInvitationInput(BaseRequestModel):
@@ -22,6 +23,24 @@ class CreateRoleInvitationInput(BaseRequestModel):
         min_length=1,
         description="Invitee email addresses",
     )
+
+
+class AcceptRoleInvitationInput(BaseRequestModel):
+    """Input for accepting a role invitation."""
+
+    invitation_id: UUID = Field(description="Invitation ID to accept")
+
+
+class RejectRoleInvitationInput(BaseRequestModel):
+    """Input for rejecting a role invitation."""
+
+    invitation_id: UUID = Field(description="Invitation ID to reject")
+
+
+class CancelRoleInvitationInput(BaseRequestModel):
+    """Input for canceling a role invitation."""
+
+    invitation_id: UUID = Field(description="Invitation ID to cancel")
 
 
 class RoleInvitationOrderField(StrEnum):
@@ -39,12 +58,23 @@ class RoleInvitationOrderBy(BaseRequestModel):
 
 
 class RoleInvitationStateFilter(BaseRequestModel):
-    """Filter for invitation state with equality and membership operators."""
+    """Filter for invitation state with equality and membership operators.
 
-    equals: str | None = None
-    in_: list[str] | None = Field(default=None, alias="in")
-    not_equals: str | None = None
-    not_in: list[str] | None = None
+    Follows the Strawberry GQL EnumFilter pattern.
+    """
+
+    equals: RoleInvitationStateDTO | None = Field(
+        default=None, description="Exact match for invitation state."
+    )
+    in_: list[RoleInvitationStateDTO] | None = Field(
+        default=None, alias="in", description="Match any of the provided states."
+    )
+    not_equals: RoleInvitationStateDTO | None = Field(
+        default=None, description="Exclude exact state match."
+    )
+    not_in: list[RoleInvitationStateDTO] | None = Field(
+        default=None, description="Exclude any of the provided states."
+    )
 
 
 class RoleNestedFilter(BaseRequestModel):

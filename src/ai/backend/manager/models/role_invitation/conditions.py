@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -116,28 +117,28 @@ class RoleInvitationConditions:
     # -- state filter --
 
     @staticmethod
-    def by_state_equals(state: str) -> QueryCondition:
+    def by_state_equals(state: RoleInvitationState) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleInvitationRow.state == state
 
         return inner
 
     @staticmethod
-    def by_state_in(states: list[str]) -> QueryCondition:
+    def by_state_in(states: Collection[RoleInvitationState]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleInvitationRow.state.in_(states)
 
         return inner
 
     @staticmethod
-    def by_state_not_equals(state: str) -> QueryCondition:
+    def by_state_not_equals(state: RoleInvitationState) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleInvitationRow.state != state
 
         return inner
 
     @staticmethod
-    def by_state_not_in(states: list[str]) -> QueryCondition:
+    def by_state_not_in(states: Collection[RoleInvitationState]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleInvitationRow.state.not_in(states)
 

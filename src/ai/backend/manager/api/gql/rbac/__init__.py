@@ -37,7 +37,7 @@ from .types import (
     BulkRevokeRolePayloadGQL,
     CreatePermissionInput,
     CreateRoleInput,
-    CreateRoleInvitationInput,
+    CreateRoleInvitationInputGQL,
     CreateRoleInvitationPayload,
     EntityActionInfoGQL,
     EntityConnection,
@@ -110,7 +110,7 @@ __all__ = (
     # Role invitation types
     "RoleInvitationGQL",
     "RoleInvitationConnection",
-    "CreateRoleInvitationInput",
+    "CreateRoleInvitationInputGQL",
     "CreateRoleInvitationPayload",
     # Connections
     "RoleConnection",

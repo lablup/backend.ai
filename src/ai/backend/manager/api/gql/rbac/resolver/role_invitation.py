@@ -18,10 +18,14 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.rbac.types.role_invitation import (
-    CreateRoleInvitationInput,
+    AcceptRoleInvitationInputGQL,
+    CancelRoleInvitationInputGQL,
+    CreateRoleInvitationInputGQL,
     CreateRoleInvitationPayload,
+    RejectRoleInvitationInputGQL,
     RoleInvitationConnection,
     RoleInvitationEdge,
+    RoleInvitationFilterGQL,
     RoleInvitationGQL,
     RoleInvitationOrderByGQL,
 )
@@ -39,6 +43,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def my_role_invitations(
     info: Info[StrawberryGQLContext],
+    filter: RoleInvitationFilterGQL | None = None,
     order_by: list[RoleInvitationOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -49,6 +54,7 @@ async def my_role_invitations(
 ) -> RoleInvitationConnection:
     result = await info.context.adapters.rbac.my_search_role_invitations(
         SearchRoleInvitationsInput(
+            filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
             after=after,
@@ -86,6 +92,7 @@ async def my_role_invitations(
 async def admin_role_invitations(
     info: Info[StrawberryGQLContext],
     role_id: UUID,
+    filter: RoleInvitationFilterGQL | None = None,
     order_by: list[RoleInvitationOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -98,6 +105,7 @@ async def admin_role_invitations(
     result = await info.context.adapters.rbac.role_search_invitations(
         role_id,
         SearchRoleInvitationsInput(
+            filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
             after=after,
@@ -137,7 +145,7 @@ async def admin_role_invitations(
 )  # type: ignore[misc]
 async def create_role_invitation(
     info: Info[StrawberryGQLContext],
-    input: CreateRoleInvitationInput,
+    input: CreateRoleInvitationInputGQL,
 ) -> CreateRoleInvitationPayload:
     result = await info.context.adapters.rbac.create_role_invitation(input.to_pydantic())
     return CreateRoleInvitationPayload.from_pydantic(result)
@@ -151,9 +159,10 @@ async def create_role_invitation(
 )  # type: ignore[misc]
 async def accept_role_invitation(
     info: Info[StrawberryGQLContext],
-    invitation_id: UUID,
+    input: AcceptRoleInvitationInputGQL,
 ) -> RoleInvitationGQL:
-    result = await info.context.adapters.rbac.accept_role_invitation(invitation_id)
+    dto = input.to_pydantic()
+    result = await info.context.adapters.rbac.accept_role_invitation(dto.invitation_id)
     return RoleInvitationGQL.from_pydantic(result)
 
 
@@ -165,9 +174,10 @@ async def accept_role_invitation(
 )  # type: ignore[misc]
 async def reject_role_invitation(
     info: Info[StrawberryGQLContext],
-    invitation_id: UUID,
+    input: RejectRoleInvitationInputGQL,
 ) -> RoleInvitationGQL:
-    result = await info.context.adapters.rbac.reject_role_invitation(invitation_id)
+    dto = input.to_pydantic()
+    result = await info.context.adapters.rbac.reject_role_invitation(dto.invitation_id)
     return RoleInvitationGQL.from_pydantic(result)
 
 
@@ -179,8 +189,9 @@ async def reject_role_invitation(
 )  # type: ignore[misc]
 async def admin_cancel_role_invitation(
     info: Info[StrawberryGQLContext],
-    invitation_id: UUID,
+    input: CancelRoleInvitationInputGQL,
 ) -> RoleInvitationGQL:
     check_admin_only()
-    result = await info.context.adapters.rbac.cancel_role_invitation(invitation_id)
+    dto = input.to_pydantic()
+    result = await info.context.adapters.rbac.cancel_role_invitation(dto.invitation_id)
     return RoleInvitationGQL.from_pydantic(result)
