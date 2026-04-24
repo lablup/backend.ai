@@ -62,11 +62,11 @@ Summary matrix:
 > tooling:
 > - `domain` — values semantically owned by the domain, often
 >   admin-only (e.g. a `theme` policy with `scope_sources=["domain"]`
->   and `userWritable=false`; see §7 S3.5).
+>   and `userWritable=false`; see §7 S4).
 > - `domain_user_defaults` — values positioned as per-user seeds the
 >   user can override (e.g. a `preferences` policy with
 >   `scope_sources=["domain_user_defaults", "user"]` and
->   `userWritable=true`; see §7 S3.6 and S4).
+>   `userWritable=true`; see §7 S5 and S8).
 >
 > Both can participate in any resolved chain when the policy says so.
 
@@ -1029,7 +1029,7 @@ type AppConfigPolicy implements Node {
 
   """
   Governed document name. Immutable (§1) — fix via purge + recreate
-  (see §7 S3.8).
+  (see §7 S7).
   """
   configName: String!
 
@@ -1719,9 +1719,9 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigFragmentInput!) {
   the `myAppConfigs` entry for that `name` already has a `USER` row
   in its `fragments` list.
 
-### S3.5. Admin publishes an app-config policy
+### S4. Admin publishes an app-config policy
 
-Before the `theme` document can be published (S4 below), an admin
+Before the `theme` document can be published (S8 below), an admin
 establishes a policy for `theme` that restricts writes to an
 admin-only scope and forbids per-user customization. The policy is
 **required** (§1 required-policy invariant) — no AppConfigFragment row for
@@ -1770,9 +1770,9 @@ mutation PublishThemePolicy(
 - Subsequent edits use `adminBulkUpdateAppConfigPolicies` with the
   same `configName`.
 
-### S3.6. Varied policy shapes
+### S5. Varied policy shapes
 
-Same mechanics as S3.5 with different `scopeSources` / `userWritable`
+Same mechanics as S4 with different `scopeSources` / `userWritable`
 combinations. Each shape backs a different product decision:
 
 - **`[user]`, `userWritable=true`** — purely user-local document.
@@ -1782,7 +1782,7 @@ combinations. Each shape backs a different product decision:
   authors.
 - **`[domain]`, `userWritable=false`** — strict admin-owned document
   with no per-user override. Fits the default `theme` setup used in
-  S3.5 / S4.
+  S4 / S8.
 - **`[domain, user]`, `userWritable=true`** — admin establishes a
   baseline at `DOMAIN`, users may override it on their own `USER`
   row. The per-user merge produces the domain value plus whatever
@@ -1801,12 +1801,12 @@ Any of the above may be switched live: an admin editing
 `userWritable=false` to `[domain, user]` + `userWritable=true`
 immediately loosens the document — existing admin rows remain, and
 from the next `bulkUpdateMyAppConfigFragments` onward users can layer their
-own customization on top (§7 S3.7).
+own customization on top (§7 S6).
 
-### S3.7. Promoting a document from admin-only to user-customizable
+### S6. Promoting a document from admin-only to user-customizable
 
 A site operator initially published `theme` under the strict policy
-from S3.5 (`scopeSources=["domain"]`, `userWritable=false`). After
+from S4 (`scopeSources=["domain"]`, `userWritable=false`). After
 user feedback, they decide individual users should be able to tweak
 accent colors on top of the domain's theme.
 
@@ -1849,9 +1849,9 @@ mutation PromoteThemePolicy(
   writes and excludes `USER` rows from the resolved view, but leaves
   any pre-existing `USER` rows untouched at the DB level (they
   simply stop being read). Admins who want those rows gone target
-  them with `adminBulkPurgeAppConfigFragments` (see S3.8).
+  them with `adminBulkPurgeAppConfigFragments` (see S7).
 
-### S3.8. Admin fixes a misconfigured policy or config
+### S7. Admin fixes a misconfigured policy or config
 
 Since `configName` is immutable (§1), a typo at policy-creation time
 cannot be fixed by renaming. The admin's recovery path is a **purge
@@ -1905,11 +1905,11 @@ mutation PurgeBadPolicy($input: AdminBulkPurgeAppConfigPolicyInput!) {
   still flow through create / update and never remove rows on their
   own. Users cannot call purge.
 
-### S4. Admin publishes a per-user default for a domain
+### S8. Admin publishes a per-user default for a domain
 
 The domain admin publishes the `preferences` document's per-user
 default — every user in the domain inherits it at merge time as the
-base for their own `USER` row. The policy for `preferences` (S3.6's
+base for their own `USER` row. The policy for `preferences` (S5's
 "`[domain_user_defaults, user]` + `userWritable=true`" shape) admits
 both admin-written `DOMAIN_USER_DEFAULTS` entries and user overrides;
 this scenario exercises the admin side. The first publish uses
@@ -1953,14 +1953,14 @@ mutation AdminCreateAppConfigFragments($input: AdminBulkCreateAppConfigFragmentI
 - Policy: the write's `scope_type` must be in the policy's
   `scope_sources`. The `preferences`-style policy lists
   `DOMAIN_USER_DEFAULTS`, so this write passes. A stricter policy
-  that omits the scope (e.g. the `theme` policy from S3.5, which
+  that omits the scope (e.g. the `theme` policy from S4, which
   lists only `["domain"]`) would reject the same write with a
   policy-violation message — in that case the admin would target
   `DOMAIN` instead.
 - Effect: every user in the domain picks up the new defaults on the
   next `myAppConfigs` read (merged per §5).
 
-### S5. Admin seeds a specific user's document on their behalf
+### S9. Admin seeds a specific user's document on their behalf
 
 For a support request, an admin seeds user A's `preferences` USER row
 for the first time. Since the target is another user's row, this
@@ -2011,7 +2011,7 @@ mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigFragmentIn
   domain defaults) on the next `myAppConfigs` read from that user's
   session.
 
-### S6. Admin audits all AppConfigFragments (cross-scope search)
+### S10. Admin audits all AppConfigFragments (cross-scope search)
 
 Cases such as "list every domain that touched `theme` in the last
 week" or "every domain that customized the `menu` document":
@@ -2064,7 +2064,3 @@ may become a follow-up BEP if it earns its own motivation.
   part of a migration so the invariant-required policies exist on
   first deploy. This BEP does not prescribe a seed; the operational
   team picks whether to seed and with which values.
-- **Invariant: `user_writable = True` requires `USER ∈
-  scope_sources`** — not enforced today; the two fields are kept
-  independent. A future BEP may add the invariant if the combination
-  is shown to confuse operators.
