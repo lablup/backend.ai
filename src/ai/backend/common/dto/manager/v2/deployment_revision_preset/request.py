@@ -12,6 +12,8 @@ from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrate
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 class EnvironEntryInput(BaseRequestModel):
@@ -30,12 +32,12 @@ class PresetValueInput(BaseRequestModel):
 
 
 class CreateDeploymentRevisionPresetInput(BaseRequestModel):
-    runtime_variant_id: UUID = Field(
+    runtime_variant_id: RuntimeVariantID = Field(
         description="ID of the runtime variant this preset belongs to."
     )
     name: str = Field(min_length=1, max_length=256, description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
-    image_id: UUID = Field(description="Container image UUID.")
+    image_id: ImageID = Field(description="Container image UUID.")
     model_definition: dict[str, Any] | None = Field(
         default=None, description="Model definition configuration."
     )
@@ -81,7 +83,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     name: str | None = Field(default=None, min_length=1, max_length=256)
     description: str | Sentinel | None = Field(default=SENTINEL)
     rank: int | None = Field(default=None, ge=0)
-    image_id: UUID | Sentinel | None = Field(default=SENTINEL)
+    image_id: ImageID | Sentinel | None = Field(default=SENTINEL)
     model_definition: dict[str, Any] | Sentinel | None = Field(default=SENTINEL)
     resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
     resource_opts: list[ResourceOptsEntryInput] | None = Field(default=None)
@@ -99,7 +101,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
-    runtime_variant_id: UUID | None = Field(default=None)
+    runtime_variant_id: RuntimeVariantID | None = Field(default=None)
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     OR: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     NOT: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

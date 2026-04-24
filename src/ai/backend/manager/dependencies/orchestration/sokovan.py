@@ -27,6 +27,7 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -75,6 +76,9 @@ class SokovanOrchestratorInput:
     # Prometheus
     prometheus_client: PrometheusClient
     prometheus_query_preset_repository: PrometheusQueryPresetRepository
+    # Runtime variant lookup (used by deployment executor to resolve id→name
+    # at the AppProxy wire boundary)
+    runtime_variant_repository: RuntimeVariantRepository
 
 
 class SokovanOrchestratorDependency(
@@ -132,6 +136,7 @@ class SokovanOrchestratorDependency(
             route_controller=setup_input.route_controller,
             prometheus_client=setup_input.prometheus_client,
             prometheus_query_preset_repository=setup_input.prometheus_query_preset_repository,
+            runtime_variant_repository=setup_input.runtime_variant_repository,
         )
 
         # Create route coordinator

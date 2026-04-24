@@ -49,6 +49,8 @@ from ai.backend.common.dto.manager.deployment.request import (
     RevisionInput,
     UpdateRouteTrafficStatusRequest,
 )
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 
 from .conftest import MockAuth
@@ -94,8 +96,8 @@ _SAMPLE_REVISION_ID = uuid4()
 _SAMPLE_ROUTE_ID = uuid4()
 _SAMPLE_PROJECT_ID = uuid4()
 _SAMPLE_USER_ID = uuid4()
-_SAMPLE_IMAGE_ID = uuid4()
-_SAMPLE_VFOLDER_ID = uuid4()
+_SAMPLE_IMAGE_ID = ImageID(uuid4())
+_SAMPLE_VFOLDER_ID = VFolderUUID(uuid4())
 
 _SAMPLE_DEPLOYMENT_DTO = {
     "id": str(_SAMPLE_DEPLOYMENT_ID),

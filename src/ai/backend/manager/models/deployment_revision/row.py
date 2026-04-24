@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -11,17 +10,20 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
+    MountInfoEntry,
     ResourceSlot,
-    RuntimeVariant,
-    VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     ExecutionSpec,
-    ExtraVFolderMountData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRevisionSpec,
@@ -31,12 +33,12 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     ResourceSpec,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.errors.deployment import RevisionNotDeployable
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    PydanticColumn,
     PydanticListColumn,
-    StructuredJSONObjectListColumn,
     URLColumn,
 )
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
@@ -46,6 +48,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.image import ImageRow
     from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
     from ai.backend.manager.models.routing import RoutingRow
+    from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
 __all__ = ("DeploymentRevisionRow",)
 
@@ -62,6 +65,12 @@ def _get_image_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.image import ImageRow
 
     return foreign(DeploymentRevisionRow.image) == ImageRow.id
+
+
+def _get_runtime_variant_join_condition() -> sa.sql.elements.ColumnElement[Any]:
+    from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+
+    return foreign(DeploymentRevisionRow.runtime_variant_id) == RuntimeVariantRow.id
 
 
 def _get_routings_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -90,17 +99,35 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         sa.Index("ix_deployment_revisions_endpoint", "endpoint"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[DeploymentRevisionID] = mapped_column(
+        "id",
+        GUID(DeploymentRevisionID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
-    endpoint: Mapped[uuid.UUID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[DeploymentID] = mapped_column("endpoint", GUID, nullable=False)
     revision_number: Mapped[int] = mapped_column("revision_number", sa.Integer, nullable=False)
 
-    # Image configuration
-    image: Mapped[uuid.UUID] = mapped_column("image", GUID, nullable=False)
+    # Image configuration.
+    # ``image IS NULL`` after the image row is deleted (SET NULL FK). The
+    # revision is kept for history but cannot be redeployed in that state
+    # — a new revision pointing at a live image must take over.
+    image: Mapped[ImageID | None] = mapped_column(
+        "image",
+        GUID(ImageID),
+        sa.ForeignKey("images.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
-    # Model configuration
-    model: Mapped[uuid.UUID | None] = mapped_column("model", GUID, nullable=True)
+    # Model vfolder.
+    # ``model IS NULL`` after the backing vfolder is deleted (SET NULL FK);
+    # same semantics as ``image``.
+    model: Mapped[VFolderUUID | None] = mapped_column(
+        "model",
+        GUID(VFolderUUID),
+        sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     model_mount_destination: Mapped[str] = mapped_column(
         "model_mount_destination",
         sa.String(length=1024),
@@ -111,8 +138,8 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     model_definition_path: Mapped[str | None] = mapped_column(
         "model_definition_path", sa.String(length=128), nullable=True
     )
-    model_definition: Mapped[dict[str, Any] | None] = mapped_column(
-        "model_definition", pgsql.JSONB(), nullable=True
+    model_definition: Mapped[ModelDefinition | None] = mapped_column(
+        "model_definition", PydanticColumn(ModelDefinition), nullable=True
     )
 
     # Resource configuration
@@ -146,17 +173,22 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     callback_url: Mapped[str | None] = mapped_column(
         "callback_url", URLColumn, nullable=True, default=sa.null()
     )
-    runtime_variant: Mapped[str] = mapped_column(
-        "runtime_variant",
-        sa.String(length=64),
+    runtime_variant_id: Mapped[RuntimeVariantID] = mapped_column(
+        "runtime_variant_id",
+        GUID(RuntimeVariantID),
+        sa.ForeignKey("runtime_variants.id", ondelete="RESTRICT"),
         nullable=False,
-        default="custom",
     )
 
-    # Mount configuration
-    extra_mounts: Mapped[list[VFolderMount]] = mapped_column(
+    # Mount configuration.
+    # Stores only the 3 fields that session creation actually consumes
+    # (``vfolder_id``, ``mount_destination``, ``mount_perm``); the other
+    # ``VFolderMount`` fields (``name``, ``vfsubpath``, ``host_path``,
+    # ``usage_mode``) are re-derived by ``prepare_vfolder_mounts`` at each
+    # session creation, so persisting them would only be dead weight.
+    extra_mounts: Mapped[list[MountInfoEntry]] = mapped_column(
         "extra_mounts",
-        StructuredJSONObjectListColumn(VFolderMount),
+        PydanticListColumn(MountInfoEntry),
         nullable=False,
         default=[],
         server_default="[]",
@@ -186,7 +218,6 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         lazy="selectin",
     )
 
-    # Relationships (without FK constraints)
     endpoint_row: Mapped[EndpointRow] = relationship(
         "EndpointRow",
         back_populates="revisions",
@@ -195,6 +226,12 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     image_row: Mapped[ImageRow] = relationship(
         "ImageRow",
         primaryjoin=_get_image_join_condition,
+    )
+    runtime_variant_row: Mapped[RuntimeVariantRow] = relationship(
+        "RuntimeVariantRow",
+        primaryjoin=_get_runtime_variant_join_condition,
+        lazy="joined",
+        innerjoin=True,
     )
     routings: Mapped[list[RoutingRow]] = relationship(
         "RoutingRow",
@@ -205,16 +242,24 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     def to_model_revision_spec(self) -> ModelRevisionSpec:
         """Convert to ModelRevisionSpec for deployment lifecycle operations.
 
-        Requires image_row to be eagerly loaded via selectinload.
+        Raises ``RevisionNotDeployable`` when the revision references
+        resources that have since been deleted — specifically when
+        ``self.image`` is NULL (the image row was removed via SET NULL
+        FK) or ``self.model`` is NULL (the model vfolder was removed).
+        The scheduler is expected to catch this and transition the
+        deployment to ``BLOCKED``.
         """
-        image_identifier = ImageIdentifier(
-            canonical=self.image_row.name,
-            architecture=self.image_row.architecture,
-        )
+        if self.image is None:
+            raise RevisionNotDeployable(
+                f"Revision {self.id} cannot be deployed: referenced image has been deleted."
+            )
+        if self.model is None:
+            raise RevisionNotDeployable(
+                f"Revision {self.id} cannot be deployed: referenced model vfolder has been deleted."
+            )
         return ModelRevisionSpec(
             revision_id=self.id,
             image_id=self.image,
-            image_identifier=image_identifier,
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode(self.cluster_mode),
                 cluster_size=self.cluster_size,
@@ -224,23 +269,19 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 resource_opts=self.resource_opts,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=self.model or uuid.UUID(int=0),
+                model_vfolder_id=self.model,
                 model_definition_path=self.model_definition_path,
                 model_mount_destination=self.model_mount_destination,
-                extra_mounts=self.extra_mounts or [],
+                extra_mounts=list(self.extra_mounts),
             ),
             execution=ExecutionSpec(
                 startup_command=self.startup_command,
                 bootstrap_script=self.bootstrap_script,
                 environ=self.environ,
-                runtime_variant=RuntimeVariant(self.runtime_variant),
+                runtime_variant_id=RuntimeVariantID(self.runtime_variant_id),
                 callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
             ),
-            model_definition=(
-                ModelDefinition.model_validate(self.model_definition)
-                if self.model_definition is not None
-                else None
-            ),
+            model_definition=self.model_definition,
             preset_values=[
                 PresetValueSpec(preset_id=pv.preset_id, value=pv.value)
                 for pv in (self.preset_values or [])
@@ -264,7 +305,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 resource_opts=self.resource_opts or {},
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant(self.runtime_variant),
+                runtime_variant_id=RuntimeVariantID(self.runtime_variant_id),
                 environ=self.environ,
             ),
             model_mount_config=ModelMountConfigData(
@@ -274,16 +315,6 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             ),
             created_at=self.created_at,
             image_id=self.image,
-            model_definition=(
-                ModelDefinition.model_validate(self.model_definition)
-                if self.model_definition is not None
-                else None
-            ),
-            extra_vfolder_mounts=[
-                ExtraVFolderMountData(
-                    vfolder_id=mount.vfid.folder_id,
-                    mount_destination=str(mount.kernel_path),
-                )
-                for mount in (self.extra_mounts or [])
-            ],
+            model_definition=self.model_definition,
+            extra_vfolder_mounts=list(self.extra_mounts),
         )

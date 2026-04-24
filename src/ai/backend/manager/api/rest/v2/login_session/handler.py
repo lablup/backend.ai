@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.login_session.request import (
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.login_session import LoginSessionAdapter
+    from ai.backend.manager.api.adapters.login_session.adapter import LoginSessionAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

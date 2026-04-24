@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.models.base import GUID, Base
 
@@ -51,9 +52,9 @@ class ModelCardRow(Base):  # type: ignore[misc]
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
-    vfolder: Mapped[uuid.UUID] = mapped_column(
+    vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",
-        GUID,
+        GUID(VFolderUUID),
         sa.ForeignKey("vfolders.id", ondelete="RESTRICT"),
         nullable=False,
     )

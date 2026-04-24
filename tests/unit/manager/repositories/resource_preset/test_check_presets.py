@@ -62,6 +62,7 @@ from ai.backend.manager.models.resource_slot import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
@@ -121,6 +122,7 @@ class TestCheckPresetsOccupiedSlots:
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -1197,6 +1199,7 @@ class TestCheckPresetsZeroValues:
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,

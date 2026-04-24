@@ -8,8 +8,13 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, PageInfo
 
-from ai.backend.common.dto.manager.v2.resource_group.request import AdminSearchResourceGroupsInput
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    AdminSearchResourceGroupsInput,
+    ReplaceResourceGroupDefaultDeploymentOptionsInput,
+    ReplaceResourceGroupDefaultSessionOptionsInput,
+)
 from ai.backend.common.dto.manager.v2.resource_group.response import DeleteResourceGroupPayload
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -27,6 +32,10 @@ from .types import (
     CreateResourceGroupInputGQL,
     CreateResourceGroupPayloadGQL,
     DeleteResourceGroupPayloadGQL,
+    ReplaceResourceGroupDefaultDeploymentOptionsInputGQL,
+    ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL,
+    ReplaceResourceGroupDefaultSessionOptionsInputGQL,
+    ReplaceResourceGroupDefaultSessionOptionsPayloadGQL,
     ResourceGroupFilterGQL,
     ResourceGroupGQL,
     ResourceGroupOrderByGQL,
@@ -163,7 +172,7 @@ async def resource_groups(
         added_version="26.2.0",
         description="Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_resource_group_fair_share_spec(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupFairShareSpecInput,
@@ -186,7 +195,7 @@ async def admin_update_resource_group_fair_share_spec(
         "Use admin_update_resource_group_fair_share_spec instead. "
         "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
     ),
-)  # type: ignore[misc]
+)
 async def update_resource_group_fair_share_spec(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupFairShareSpecInput,
@@ -203,7 +212,7 @@ async def update_resource_group_fair_share_spec(
         added_version="26.2.0",
         description="Update resource group configuration (admin only). Only provided fields are updated; others retain their existing values. Supports all configuration fields except fair_share (use separate mutation).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_resource_group(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupInput,
@@ -215,6 +224,75 @@ async def admin_update_resource_group(
     payload_dto = await info.context.adapters.resource_group.update_config(dto)
 
     return UpdateResourceGroupPayload.from_pydantic(payload_dto)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Fully replace a resource group's ``default_deployment_options`` (admin only)."
+            " Replace semantics — the supplied payload is the complete new value."
+            " New deployments created in this resource group snapshot the new default;"
+            " existing deployments are not affected."
+        ),
+    )
+)
+async def replace_resource_group_default_deployment_options(
+    info: Info[StrawberryGQLContext],
+    input: ReplaceResourceGroupDefaultDeploymentOptionsInputGQL,
+) -> ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL:
+    """Admin-only replacement of the resource group default deployment options.
+
+    Only the refreshed ``default_deployment_options`` surface is returned
+    (the server path uses ``UPDATE ... RETURNING`` and does not re-read
+    the surrounding resource group node).
+    """
+    check_admin_only()
+    gql_pydantic = input.to_pydantic()
+    rest_body = ReplaceResourceGroupDefaultDeploymentOptionsInput(
+        options=gql_pydantic.options,
+    )
+    payload_dto = (
+        await info.context.adapters.resource_group.admin_replace_default_deployment_options(
+            name=gql_pydantic.resource_group_name,
+            input=rest_body,
+        )
+    )
+    return ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL.from_pydantic(payload_dto)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Fully replace a resource group's ``default_session_options`` (admin only)."
+            " Replace semantics — the supplied payload is the complete new value."
+            " New sessions created in this resource group consult the new default via"
+            " the scheduling controller's options resolver at enqueue time;"
+            " already-enqueued sessions keep the frozen options they were enqueued with."
+        ),
+    )
+)
+async def replace_resource_group_default_session_options(
+    info: Info[StrawberryGQLContext],
+    input: ReplaceResourceGroupDefaultSessionOptionsInputGQL,
+) -> ReplaceResourceGroupDefaultSessionOptionsPayloadGQL:
+    """Admin-only replacement of the resource group default session options.
+
+    Only the refreshed ``default_session_options`` surface is returned
+    (the server path uses ``UPDATE ... RETURNING`` and does not re-read
+    the surrounding resource group node).
+    """
+    check_admin_only()
+    gql_pydantic = input.to_pydantic()
+    rest_body = ReplaceResourceGroupDefaultSessionOptionsInput(
+        options=gql_pydantic.options,
+    )
+    payload_dto = await info.context.adapters.resource_group.admin_replace_default_session_options(
+        name=gql_pydantic.resource_group_name,
+        input=rest_body,
+    )
+    return ReplaceResourceGroupDefaultSessionOptionsPayloadGQL.from_pydantic(payload_dto)
 
 
 @gql_root_field(
@@ -237,7 +315,7 @@ async def admin_resource_group_v2(
         added_version="26.4.2",
         description="Create a new resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: CreateResourceGroupInputGQL,
@@ -252,7 +330,7 @@ async def admin_create_resource_group_v2(
         added_version="26.4.2",
         description="Delete a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_resource_group_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -342,7 +420,7 @@ async def admin_allowed_projects_for_resource_group_v2(
         added_version="26.4.2",
         description="Update allowed resource groups for a domain (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_allowed_resource_groups_for_domain_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedResourceGroupsForDomainInputGQL,
@@ -359,7 +437,7 @@ async def admin_update_allowed_resource_groups_for_domain_v2(
         added_version="26.4.2",
         description="Update allowed resource groups for a project (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_allowed_resource_groups_for_project_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedResourceGroupsForProjectInputGQL,
@@ -376,7 +454,7 @@ async def admin_update_allowed_resource_groups_for_project_v2(
         added_version="26.4.2",
         description="Update allowed domains for a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_allowed_domains_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedDomainsForResourceGroupInputGQL,
@@ -393,7 +471,7 @@ async def admin_update_allowed_domains_for_resource_group_v2(
         added_version="26.4.2",
         description="Update allowed projects for a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_allowed_projects_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedProjectsForResourceGroupInputGQL,

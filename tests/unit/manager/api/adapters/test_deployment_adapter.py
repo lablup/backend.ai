@@ -8,8 +8,11 @@ from uuid import uuid4
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
-from ai.backend.manager.api.adapters.deployment import (
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode, ResourceSlot
+from ai.backend.manager.api.adapters.deployment.adapter import (
     DeploymentAdapter,
     _tristate_from_input,
 )
@@ -39,10 +42,10 @@ class TestRevisionDataToDTO:
                 resource_slot=ResourceSlot({"cpu": "2"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=RuntimeVariantID(uuid4()),
             ),
             model_mount_config=ModelMountConfigData(
-                vfolder_id=uuid4(),
+                vfolder_id=VFolderUUID(uuid4()),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
             ),
@@ -59,7 +62,7 @@ class TestRevisionDataToDTO:
                 ],
             ),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            image_id=uuid4(),
+            image_id=ImageID(uuid4()),
             extra_vfolder_mounts=[],
         )
 

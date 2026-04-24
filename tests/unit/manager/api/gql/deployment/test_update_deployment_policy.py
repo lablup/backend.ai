@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -239,7 +240,7 @@ class TestAdminUpdateDeploymentPolicyResolver:
         )
 
         # When
-        resolver_fn = policy_resolver.update_deployment_policy.base_resolver
+        resolver_fn = cast(Any, policy_resolver.update_deployment_policy).base_resolver
         result = await resolver_fn(rolling_update_input, mock_info)
 
         # Then
@@ -274,7 +275,7 @@ class TestAdminUpdateDeploymentPolicyResolver:
         )
 
         # When / Then
-        resolver_fn = policy_resolver.update_deployment_policy.base_resolver
+        resolver_fn = cast(Any, policy_resolver.update_deployment_policy).base_resolver
         with pytest.raises(web.HTTPForbidden):
             await resolver_fn(input_data, mock_info)
 

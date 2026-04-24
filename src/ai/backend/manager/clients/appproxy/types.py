@@ -1,55 +1,56 @@
-"""Type definitions for WSProxy client."""
+"""Manager-side request body for the single-endpoint AppProxy coordinator API.
+
+Shared tag models (``SessionTagsModel`` / ``EndpointTagsModel`` / ``TagsModel``)
+live in :mod:`ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types` —
+import them from there instead of this module.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+from pydantic import Field
 
-from pydantic import BaseModel, ConfigDict, Field
-
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import TagsModel
 
 
-class SessionTagsModel(BaseModel):
-    """Session information for endpoint creation."""
+class CreateEndpointRequestBody(BaseRequestModel):
+    """Request body for the legacy single-endpoint AppProxy create API.
 
-    model_config = ConfigDict(populate_by_name=True)
+    Kept for paths that still call ``POST /v2/endpoints/{endpoint_id}``
+    one deployment at a time. New code should prefer the bulk API
+    (``BulkCreateEndpointRequest``) so circuit propagation to workers
+    is batched per coordinator call.
+    """
 
-    user_uuid: str
-    group_id: str
-    domain_name: str
-
-
-class EndpointTagsModel(BaseModel):
-    """Endpoint metadata for endpoint creation."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    id: str
-    runtime_variant: str
-    existing_url: str | None = None
-
-
-class TagsModel(BaseModel):
-    """Combined tags for endpoint creation."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    session: SessionTagsModel
-    endpoint: EndpointTagsModel
-
-
-class CreateEndpointRequestBody(BaseModel):
-    """Request body for creating an endpoint in WSProxy."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    version: str = Field(default="v2", description="API version")
-    service_name: str = Field(description="Name of the service/endpoint")
-    tags: TagsModel = Field(description="Metadata tags for the endpoint")
-    apps: dict[str, Any] = Field(default_factory=dict, description="Application configuration")
+    version: str = Field(
+        default="v2",
+        description="Creation API version — always ``v2`` for this body.",
+    )
+    service_name: str = Field(
+        ...,
+        description=(
+            "Human-readable service / endpoint name. Used when selecting "
+            "a subdomain or building router names on the coordinator side."
+        ),
+    )
+    tags: TagsModel = Field(
+        ...,
+        description="Session + endpoint metadata tags attached to the endpoint.",
+    )
     open_to_public: bool = Field(
-        default=False, description="Whether the endpoint is publicly accessible"
+        default=False,
+        description=(
+            "If ``True``, AppProxy requires a valid API token on every "
+            "incoming request and does not expose the endpoint publicly "
+            "without authentication."
+        ),
     )
     health_check: ModelHealthCheck | None = Field(
-        default=None, description="Health check configuration"
+        default=None,
+        description=(
+            "Optional health check configuration. When present, the "
+            "coordinator configures the load balancer to probe model "
+            "service replicas using this path / interval / timeout."
+        ),
     )

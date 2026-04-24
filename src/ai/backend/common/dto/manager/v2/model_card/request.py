@@ -12,6 +12,8 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
 )
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 
 
 class ResourceSlotEntryInput(BaseRequestModel):
@@ -21,7 +23,7 @@ class ResourceSlotEntryInput(BaseRequestModel):
 
 class CreateModelCardInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=512, description="Model card name.")
-    vfolder_id: UUID = Field(description="VFolder ID containing the model.")
+    vfolder_id: VFolderUUID = Field(description="VFolder ID containing the model.")
     model_store_project_id: UUID = Field(
         description="MODEL_STORE project UUID where the model card belongs."
     )
@@ -118,7 +120,7 @@ class DeployModelCardInput(BaseRequestModel):
         description="Target project UUID where the deployment will be created. "
         "Must be a general project, not MODEL_STORE.",
     )
-    revision_preset_id: UUID = Field(
+    revision_preset_id: DeploymentPresetID = Field(
         description="Deployment revision preset UUID that provides image, "
         "runtime variant, resource slots, environ, and startup command.",
     )

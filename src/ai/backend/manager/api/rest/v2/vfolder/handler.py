@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+    from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 
 
 class V2VFolderHandler:

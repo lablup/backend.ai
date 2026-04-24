@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     SearchAllocatedResourceSlotsInput,
 )
-from ai.backend.manager.api.adapters.deployment_revision_preset import (
+from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
 

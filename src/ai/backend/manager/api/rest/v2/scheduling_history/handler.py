@@ -20,7 +20,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
+    from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

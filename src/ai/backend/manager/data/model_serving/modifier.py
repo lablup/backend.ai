@@ -3,12 +3,12 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, override
 
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
-    RuntimeVariant,
 )
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
@@ -47,8 +47,8 @@ class EndpointModifier(PartialModifier):
         default_factory=OptionalState[list[ExtraMount]].nop
     )
     environ: TriState[dict[str, str]] = field(default_factory=TriState[dict[str, str]].nop)
-    runtime_variant: OptionalState[RuntimeVariant] = field(
-        default_factory=OptionalState[RuntimeVariant].nop
+    runtime_variant_id: OptionalState[RuntimeVariantID] = field(
+        default_factory=OptionalState[RuntimeVariantID].nop
     )
 
     @override

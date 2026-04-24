@@ -4,10 +4,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, override
-from uuid import UUID
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -22,11 +23,11 @@ from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 @dataclass
 class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRow]):
-    runtime_variant_id: UUID
+    runtime_variant_id: RuntimeVariantID
     name: str
     description: str | None
     rank: int
-    image_id: UUID
+    image_id: ImageID
     model_definition: ModelDefinition | None
     resource_slots: list[ResourceSlotEntryData]
     resource_opts: list[ResourceOptsEntry]

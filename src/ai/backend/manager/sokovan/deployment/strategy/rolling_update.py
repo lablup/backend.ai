@@ -274,7 +274,7 @@ def _build_route_creators(
     creators: list[RBACEntityCreator[RoutingRow]] = []
     for _ in range(count):
         spec = RouteCreatorSpec(
-            endpoint_id=deployment.id,
+            deployment_id=deployment.id,
             session_owner_id=deployment.metadata.session_owner,
             domain=deployment.metadata.domain,
             project_id=deployment.metadata.project,

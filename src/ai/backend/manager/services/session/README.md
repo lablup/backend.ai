@@ -307,7 +307,6 @@ for entry in result.status_history["history"]:
 - **create_cluster**: Create multi-node session cluster
 - **modify_session**: Update session configuration
 - **rename_session**: Change session name
-- **restart_session**: Restart terminated session
 - **destroy_session**: Terminate and cleanup session
 
 ### Execution Actions
@@ -338,7 +337,6 @@ for entry in result.status_history["history"]:
 - **commit_session**: Create session snapshot
 - **convert_session_to_image**: Convert to container image
 - **get_commit_status**: Track image creation progress
-- **check_and_transit_status**: Update session status
 
 ## Best Practices
 

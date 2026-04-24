@@ -98,9 +98,6 @@ def mock_session_repository() -> MagicMock:
 def mock_agent_registry() -> MagicMock:
     mock = MagicMock()
     mock.increment_session_usage = AsyncMock()
-    mock.session_lifecycle_mgr = MagicMock()
-    mock.session_lifecycle_mgr.transit_session_status = AsyncMock(return_value=[])
-    mock.session_lifecycle_mgr.deregister_status_updatable_session = AsyncMock()
     return mock
 
 

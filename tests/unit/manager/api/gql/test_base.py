@@ -11,7 +11,7 @@ from graphql_relay.utils import base64
 
 from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
-from ai.backend.manager.api.adapters.cursor import CURSOR_VERSION
+from ai.backend.manager.api.adapter_options.cursor.cursor import CURSOR_VERSION
 from ai.backend.manager.api.gql.base import (
     decode_cursor,
     encode_cursor,

@@ -151,9 +151,6 @@ async def proxy(
                 protocol=params.protocol,
                 traffic_ratio=1.0,
                 route_id=None,
-                health_status=None,
-                last_health_check=None,
-                consecutive_failures=0,
             )
         ]
 

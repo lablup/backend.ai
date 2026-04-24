@@ -7,6 +7,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardAccessLevel
+from ai.backend.common.identifier.vfolder import VFolderUUID
 
 
 class ResourceSlotEntryInfo(BaseResponseModel):
@@ -30,7 +31,7 @@ class ModelCardMetadata(BaseResponseModel):
 class ModelCardNode(BaseResponseModel):
     id: UUID = Field(description="Model card ID.")
     name: str = Field(description="Model card name.")
-    vfolder_id: UUID = Field(description="VFolder ID.")
+    vfolder_id: VFolderUUID = Field(description="VFolder ID.")
     domain_name: str = Field(description="Domain name.")
     project_id: UUID = Field(description="Project ID.")
     creator_id: UUID = Field(description="Creator user ID.")

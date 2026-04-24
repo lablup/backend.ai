@@ -36,4 +36,4 @@ class GetModelServiceInfoActionResult(ModelServiceSingleEntityActionResult):
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.data.endpoint_id)
+        return str(self.data.deployment_id)

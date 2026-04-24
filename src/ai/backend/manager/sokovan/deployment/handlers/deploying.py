@@ -30,11 +30,14 @@ from collections.abc import Sequence
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
+    DeploymentTargetStatuses,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
@@ -100,6 +103,11 @@ class DeployingProvisioningHandler(DeploymentHandler):
     def name(cls) -> str:
         return "deploying-provisioning"
 
+    @classmethod
+    @override
+    def category(cls) -> DeploymentHandlerCategory:
+        return DeploymentHandlerCategory.LIFECYCLE
+
     @property
     @override
     def lock_id(self) -> LockID | None:
@@ -107,13 +115,11 @@ class DeployingProvisioningHandler(DeploymentHandler):
 
     @classmethod
     @override
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        return [
-            DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
-            ),
-        ]
+    def target_statuses(cls) -> DeploymentTargetStatuses:
+        return DeploymentTargetStatuses(
+            lifecycle_stages=[EndpointLifecycle.DEPLOYING],
+            sub_steps=[DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING],
+        )
 
     @classmethod
     @override
@@ -142,7 +148,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
         Returns IDs whose registration failed so the caller can exclude
         them from this tick's route provisioning.
         """
-        entries: list[tuple[DeploymentWithHistory, UUID]] = []
+        entries: list[tuple[DeploymentWithHistory, DeploymentRevisionID]] = []
         for deployment in deployments:
             info = deployment.deployment_info
             if info.network.url:
@@ -204,10 +210,10 @@ class DeployingProvisioningHandler(DeploymentHandler):
         skipped: list[DeploymentWithHistory] = []
 
         # COMPLETED → success (coordinator transitions to READY)
-        for endpoint_id in apply_result.completed_ids:
-            if endpoint_id in destroying_ids:
+        for deployment_id in apply_result.completed_ids:
+            if deployment_id in destroying_ids:
                 continue
-            deployment = deployment_map.get(endpoint_id)
+            deployment = deployment_map.get(deployment_id)
             if deployment is not None:
                 successes.append(deployment)
 
@@ -230,8 +236,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
         }
         has_route_mutations = bool(apply_result.routes_created or apply_result.routes_drained)
         for deployment in deployments:
-            endpoint_id = deployment.deployment_info.id
-            if endpoint_id in completed_or_error_ids or endpoint_id in destroying_ids:
+            deployment_id = deployment.deployment_info.id
+            if deployment_id in completed_or_error_ids or deployment_id in destroying_ids:
                 continue
             if has_route_mutations:
                 failures.append(
@@ -280,6 +286,11 @@ class DeployingRollingBackHandler(DeploymentHandler):
     def name(cls) -> str:
         return "deploying-rolling-back"
 
+    @classmethod
+    @override
+    def category(cls) -> DeploymentHandlerCategory:
+        return DeploymentHandlerCategory.LIFECYCLE
+
     @property
     @override
     def lock_id(self) -> LockID | None:
@@ -287,13 +298,11 @@ class DeployingRollingBackHandler(DeploymentHandler):
 
     @classmethod
     @override
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        return [
-            DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
-            )
-        ]
+    def target_statuses(cls) -> DeploymentTargetStatuses:
+        return DeploymentTargetStatuses(
+            lifecycle_stages=[EndpointLifecycle.DEPLOYING],
+            sub_steps=[DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK],
+        )
 
     @classmethod
     @override

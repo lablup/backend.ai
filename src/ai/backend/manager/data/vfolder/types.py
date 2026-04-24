@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import CIStrEnum, QuotaScopeID, VFolderID, VFolderUsageMode
 from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.errors.resource import DataTransformationFailed
@@ -148,7 +149,7 @@ class VFolderData:
     Used by repository layer for returning full VFolder information.
     """
 
-    id: uuid.UUID
+    id: VFolderUUID
     name: str
     host: str
     domain_name: str

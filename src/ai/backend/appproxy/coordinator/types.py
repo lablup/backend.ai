@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import itertools
 import logging
@@ -7,6 +9,7 @@ from contextlib import AbstractAsyncContextManager
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Protocol,
@@ -27,7 +30,6 @@ from ai.backend.appproxy.common.events import (
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
-from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -48,6 +50,9 @@ from .defs import LockID
 from .models import Circuit
 from .models.utils import ExtendedAsyncSAEngine
 from .models.worker import Worker
+
+if TYPE_CHECKING:
+    from .services.endpoint import EndpointService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -219,13 +224,15 @@ class CircuitManager:
     async def update_legacy_circuit_routes(
         self, circuit: Circuit, old_routes: list[RouteInfo]
     ) -> None:
-        # Get healthy routes for the circuit
-        healthy_routes = circuit.healthy_routes
-
+        # Propagate the full route list to the worker. Healthy-route filtering
+        # is now a worker-side concern: the worker's per-backend route pool
+        # tracks TCP reachability and excludes unhealthy upstreams from traffic
+        # selection. The coordinator ships the canonical DB state and the
+        # worker decides which routes to dispatch traffic to.
         event = AppProxyCircuitRouteUpdatedEvent(
             target_worker_authority=circuit.worker_row.authority,
             circuit=SerializableCircuit(**circuit.dump_model()),
-            routes=healthy_routes,
+            routes=circuit.route_info,
         )
         await self.event_producer.broadcast_event(event)
 
@@ -380,7 +387,7 @@ class RootContext:
     traefik_etcd: TraefikEtcd | None
 
     circuit_manager: CircuitManager
-    health_engine: HealthCheckEngine
+    endpoint_service: EndpointService
 
     metrics: CoordinatorMetricRegistry
     health_probe: HealthProbe

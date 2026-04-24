@@ -195,6 +195,7 @@ def create_services(args: ServiceArgs) -> Services:
             args.valkey_stat_client,
             args.agent_registry,
             repositories.user.repository,
+            args.scheduling_controller,
         ),
         image=ImageService(
             args.agent_registry, repositories.image.repository, args.config_provider
@@ -307,9 +308,9 @@ def create_services(args: ServiceArgs) -> Services:
             valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
             deployment_repository=repositories.deployment.repository,
+            runtime_variant_repository=repositories.runtime_variant.repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
-            revision_generator_registry=args.revision_generator_registry,
         ),
         model_serving_auto_scaling=AutoScalingService(
             repository=repositories.model_serving.repository,
@@ -379,8 +380,6 @@ def create_services(args: ServiceArgs) -> Services:
         deployment=DeploymentService(
             args.deployment_controller,
             repositories.deployment.repository,
-            args.revision_generator_registry,
-            args.model_definition_generator_registry,
             deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
         ),

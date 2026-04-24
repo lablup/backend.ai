@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -71,7 +72,7 @@ class TestAdminBulkAssignRole:
             role_id=role_id, user_ids=[user_id_success, user_id_fail]
         )
 
-        resolver_fn = role_resolver.admin_bulk_assign_role.base_resolver
+        resolver_fn = cast(Any, role_resolver.admin_bulk_assign_role).base_resolver
         result = await resolver_fn(mock_info, input_data)
 
         assert isinstance(result, BulkAssignRolePayloadGQL)
@@ -95,7 +96,7 @@ class TestAdminBulkAssignRole:
 
         input_data = BulkAssignRoleInputGQL(role_id=role_id, user_ids=user_ids)
 
-        resolver_fn = role_resolver.admin_bulk_assign_role.base_resolver
+        resolver_fn = cast(Any, role_resolver.admin_bulk_assign_role).base_resolver
         await resolver_fn(mock_info, input_data)
 
         mock_adapter.bulk_assign_role.assert_called_once()
@@ -145,7 +146,7 @@ class TestAdminBulkRevokeRole:
             role_id=role_id, user_ids=[user_id_success, user_id_fail]
         )
 
-        resolver_fn = role_resolver.admin_bulk_revoke_role.base_resolver
+        resolver_fn = cast(Any, role_resolver.admin_bulk_revoke_role).base_resolver
         result = await resolver_fn(mock_info, input_data)
 
         assert isinstance(result, BulkRevokeRolePayloadGQL)
@@ -169,7 +170,7 @@ class TestAdminBulkRevokeRole:
 
         input_data = BulkRevokeRoleInputGQL(role_id=role_id, user_ids=user_ids)
 
-        resolver_fn = role_resolver.admin_bulk_revoke_role.base_resolver
+        resolver_fn = cast(Any, role_resolver.admin_bulk_revoke_role).base_resolver
         await resolver_fn(mock_info, input_data)
 
         mock_adapter.bulk_revoke_role.assert_called_once()

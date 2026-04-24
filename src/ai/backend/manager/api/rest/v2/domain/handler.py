@@ -21,7 +21,7 @@ from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.domain import DomainAdapter
+    from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

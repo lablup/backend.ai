@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     RouteStatus,
@@ -79,7 +80,7 @@ class AutoScalingDecision:
 class RouteCreationSpec:
     """Specification for creating a new route and session."""
 
-    endpoint_id: UUID
+    deployment_id: DeploymentID
     endpoint_name: str
     traffic_ratio: float
     image_id: UUID

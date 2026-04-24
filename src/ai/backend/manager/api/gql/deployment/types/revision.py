@@ -101,6 +101,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -146,6 +147,7 @@ from .resource_slot import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.image.types import ImageV2GQL
+    from ai.backend.manager.api.gql.runtime_variant.types import RuntimeVariantGQL
 
     from .deployment import ModelDeployment
     from .policy import DeploymentPolicyGQL
@@ -235,8 +237,8 @@ class ResourceConfig:
     model=ModelRuntimeConfigInfoDTO,
 )
 class ModelRuntimeConfig:
-    runtime_variant: str = gql_field(
-        description="The inference runtime variant (e.g., vllm, triton)."
+    runtime_variant_id: UUID = gql_field(
+        description="The runtime variant row id. Clients can resolve the full variant node via the ``runtime_variant`` field resolver."
     )
     inference_runtime_config: JSON | None = gql_field(
         description="Framework-specific configuration in JSON format.", default=None
@@ -245,6 +247,24 @@ class ModelRuntimeConfig:
         description="Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0.",
         default=None,
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The runtime variant referenced by this runtime config.",
+        )
+    )  # type: ignore[misc]
+    async def runtime_variant(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            RuntimeVariantGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.runtime_variant.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
 
 
 @gql_pydantic_type(
@@ -282,6 +302,15 @@ class ExtraVFolderMountInfoGQL:
     vfolder_id: ID
     mount_destination: str | None = gql_field(
         description="Mount destination path inside the container.", default=None
+    )
+    mount_perm: MountPermission = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The concrete permission snapshot fixed at revision-write time; "
+                "later vfolder permission changes do not retroactively affect it."
+            ),
+        ),
     )
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
@@ -548,7 +577,7 @@ class ModelRevisionOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     RESOURCE_GROUP = "resource_group"
     CLUSTER_MODE = "cluster_mode"
-    RUNTIME_VARIANT = "runtime_variant"
+    RUNTIME_VARIANT_NAME = "runtime_variant_name"
 
 
 # Filter and Order Types
@@ -719,7 +748,7 @@ class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputD
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
-    runtime_variant: str
+    runtime_variant_id: UUID
     inference_runtime_config: JSON | None = None
     environ: EnvironmentVariablesInputGQL | None = gql_field(
         description="Environment variables for the service.", default=None

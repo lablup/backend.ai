@@ -47,10 +47,19 @@ class SessionHistoryNode(BaseResponseModel):
 
 
 class DeploymentHistoryNode(BaseResponseModel):
-    """Node model representing a deployment scheduling history record."""
+    """Node model representing a deployment scheduling history record.
+
+    ``category`` separates rows produced by lifecycle handlers (monotonic
+    lifecycle progression) from rows produced by scaling handlers
+    (reconciling replica count while lifecycle stays put). Clients
+    filter / group by this axis when rendering the history.
+    """
 
     id: UUID = Field(description="History record ID")
     deployment_id: UUID = Field(description="Deployment ID this history belongs to")
+    category: str = Field(
+        description="Handler category: 'lifecycle' or 'scaling' (HEALTH reserved)"
+    )
     phase: str = Field(description="Scheduling phase")
     from_status: str | None = Field(default=None, description="Status before transition")
     to_status: str | None = Field(default=None, description="Status after transition")

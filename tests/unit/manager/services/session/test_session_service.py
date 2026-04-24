@@ -48,10 +48,6 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusAction,
-    CheckAndTransitStatusActionResult,
-)
 from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
     CompleteActionResult,
@@ -95,10 +91,6 @@ from ai.backend.manager.services.session.actions.match_sessions import MatchSess
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
-)
-from ai.backend.manager.services.session.actions.restart_session import (
-    RestartSessionAction,
-    RestartSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
@@ -1013,62 +1005,6 @@ class TestRenameSession:
             await session_service.rename_session(action)
 
 
-# ==================== RestartSession Tests ====================
-
-
-class TestRestartSession:
-    """Test cases for SessionService.restart_session"""
-
-    async def test_success(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        sample_session_data: SessionData,
-        sample_access_key: AccessKey,
-    ) -> None:
-        """Test successfully restarting session"""
-        mock_session = MagicMock()
-        mock_session.to_dataclass.return_value = sample_session_data
-        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
-        mock_agent_registry.restart_session = AsyncMock()
-
-        action = RestartSessionAction(
-            session_name="test-session",
-            owner_access_key=sample_access_key,
-        )
-        result = await session_service.restart_session(action)
-
-        assert isinstance(result, RestartSessionActionResult)
-        assert result.session_data == sample_session_data
-        assert result.result is None
-        mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
-        mock_agent_registry.restart_session.assert_called_once_with(mock_session)
-
-    async def test_session_not_found(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        sample_access_key: AccessKey,
-    ) -> None:
-        """Test restarting session when session not found"""
-        mock_session_repository.get_session_validated = AsyncMock(
-            side_effect=SessionNotFound("Session not found")
-        )
-
-        action = RestartSessionAction(
-            session_name="nonexistent",
-            owner_access_key=sample_access_key,
-        )
-
-        with pytest.raises(SessionNotFound):
-            await session_service.restart_session(action)
-
-
-# ==================== ShutdownService Tests ====================
-
-
 class TestShutdownService:
     """Test cases for SessionService.shutdown_service"""
 
@@ -1440,161 +1376,6 @@ class TestGetContainerLogs:
 
         with pytest.raises(SessionNotFound):
             await session_service.get_container_logs(action)
-
-
-# ==================== CheckAndTransitStatus Tests ====================
-
-
-class TestCheckAndTransitStatus:
-    """Test cases for SessionService.check_and_transit_status"""
-
-    @pytest.fixture
-    def other_user_id(self) -> UUID:
-        """Create another user ID for ownership tests."""
-        return uuid4()
-
-    @pytest.fixture
-    def mock_session_for_transit(self, sample_session_id: SessionId) -> MagicMock:
-        """Create a mock session for transit status tests."""
-        mock_session = MagicMock()
-        mock_session.id = sample_session_id
-        mock_session.status = SessionStatus.RUNNING
-        mock_session.to_dataclass.return_value = MagicMock()
-        return mock_session
-
-    @pytest.fixture
-    def setup_transit_mocks(
-        self,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        mock_session_for_transit: MagicMock,
-    ) -> MagicMock:
-        """Setup common mocks for transit status tests that expect successful transit."""
-        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session_for_transit)
-        mock_session_repository.get_session_owner = AsyncMock(return_value=None)
-
-        mock_agent_registry.session_lifecycle_mgr = MagicMock()
-        mock_agent_registry.session_lifecycle_mgr.transit_session_status = AsyncMock(
-            return_value=[(mock_session_for_transit, True)]
-        )
-        mock_agent_registry.session_lifecycle_mgr.deregister_status_updatable_session = AsyncMock()
-
-        return mock_session_for_transit
-
-    async def test_check_and_transit_status_as_superadmin_success(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        sample_session_id: SessionId,
-        sample_user_id: UUID,
-        other_user_id: UUID,
-        setup_transit_mocks: MagicMock,
-    ) -> None:
-        """Test SUPERADMIN can transit status of other user's session."""
-        setup_transit_mocks.user_uuid = other_user_id  # Different user owns the session
-
-        action = CheckAndTransitStatusAction(
-            user_id=sample_user_id,
-            user_role=UserRole.SUPERADMIN,
-            session_id=sample_session_id,
-        )
-        result = await session_service.check_and_transit_status(action)
-
-        assert isinstance(result, CheckAndTransitStatusActionResult)
-        assert sample_session_id in result.result
-        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
-
-    async def test_check_and_transit_status_as_admin_success(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        sample_session_id: SessionId,
-        sample_user_id: UUID,
-        other_user_id: UUID,
-        setup_transit_mocks: MagicMock,
-    ) -> None:
-        """Test ADMIN can transit status of other user's session."""
-        setup_transit_mocks.user_uuid = other_user_id  # Different user owns the session
-
-        action = CheckAndTransitStatusAction(
-            user_id=sample_user_id,
-            user_role=UserRole.ADMIN,
-            session_id=sample_session_id,
-        )
-        result = await session_service.check_and_transit_status(action)
-
-        assert isinstance(result, CheckAndTransitStatusActionResult)
-        assert sample_session_id in result.result
-        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
-
-    async def test_check_and_transit_status_as_user_own_session_success(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        sample_session_id: SessionId,
-        sample_user_id: UUID,
-        setup_transit_mocks: MagicMock,
-    ) -> None:
-        """Test USER can transit status of their own session."""
-        setup_transit_mocks.user_uuid = sample_user_id  # Same user owns the session
-
-        action = CheckAndTransitStatusAction(
-            user_id=sample_user_id,
-            user_role=UserRole.USER,
-            session_id=sample_session_id,
-        )
-        result = await session_service.check_and_transit_status(action)
-
-        assert isinstance(result, CheckAndTransitStatusActionResult)
-        assert sample_session_id in result.result
-        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
-
-    async def test_check_and_transit_status_as_user_other_session_skipped(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        sample_session_id: SessionId,
-        sample_user_id: UUID,
-        other_user_id: UUID,
-        mock_session_for_transit: MagicMock,
-    ) -> None:
-        """Test USER cannot transit status of other user's session (returns empty result)."""
-        mock_session_for_transit.user_uuid = other_user_id  # Different user owns the session
-        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session_for_transit)
-
-        action = CheckAndTransitStatusAction(
-            user_id=sample_user_id,
-            user_role=UserRole.USER,
-            session_id=sample_session_id,
-        )
-        result = await session_service.check_and_transit_status(action)
-
-        assert isinstance(result, CheckAndTransitStatusActionResult)
-        # Result should be empty when user tries to transit other's session
-        assert result.result == {}
-        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
-        # transit_session_status should NOT be called
-        mock_agent_registry.session_lifecycle_mgr.transit_session_status.assert_not_called()
-
-    async def test_check_and_transit_status_session_not_found(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        sample_session_id: SessionId,
-        sample_user_id: UUID,
-    ) -> None:
-        """Test check_and_transit_status raises SessionNotFound for non-existent session."""
-        mock_session_repository.get_session_by_id = AsyncMock(return_value=None)
-
-        action = CheckAndTransitStatusAction(
-            user_id=sample_user_id,
-            user_role=UserRole.SUPERADMIN,
-            session_id=sample_session_id,
-        )
-
-        with pytest.raises(SessionNotFound):
-            await session_service.check_and_transit_status(action)
 
 
 # ==================== Search Tests ====================

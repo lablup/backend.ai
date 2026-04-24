@@ -319,12 +319,6 @@ if TYPE_CHECKING:
         VFSStorageService,  # pants: no-infer-dep
     )
     from ai.backend.manager.sokovan.deployment import DeploymentController  # pants: no-infer-dep
-    from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-        ModelDefinitionGeneratorRegistry,  # pants: no-infer-dep
-    )
-    from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-        RevisionGeneratorRegistry,  # pants: no-infer-dep
-    )
     from ai.backend.manager.sokovan.scheduling_controller import (
         SchedulingController,  # pants: no-infer-dep
     )
@@ -352,8 +346,6 @@ class ServiceArgs:
     hook_plugin_ctx: HookPluginContext
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
-    revision_generator_registry: RevisionGeneratorRegistry
-    model_definition_generator_registry: ModelDefinitionGeneratorRegistry
     event_producer: EventProducer
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter

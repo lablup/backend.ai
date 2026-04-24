@@ -257,7 +257,7 @@ async def domain_fair_shares(
         added_version="26.2.0",
         description="Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does",
     )
-)  # type: ignore[misc]
+)
 async def admin_upsert_domain_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: UpsertDomainFairShareWeightInput,
@@ -276,7 +276,7 @@ async def admin_upsert_domain_fair_share_weight(
         added_version="26.2.0",
         description="Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_upsert_domain_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: BulkUpsertDomainFairShareWeightInput,
@@ -297,7 +297,7 @@ async def admin_bulk_upsert_domain_fair_share_weight(
         description="Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does",
     ),
     deprecation_reason="Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def upsert_domain_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: UpsertDomainFairShareWeightInput,
@@ -319,7 +319,7 @@ async def upsert_domain_fair_share_weight(
         description="Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do",
     ),
     deprecation_reason="Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def bulk_upsert_domain_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: BulkUpsertDomainFairShareWeightInput,

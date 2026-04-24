@@ -125,7 +125,7 @@ async def my_login_sessions_v2(
         added_version="26.4.2",
         description="Revoke a login session. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_revoke_login_session(
     info: Info[StrawberryGQLContext],
     session_id: UUID,
@@ -142,7 +142,7 @@ async def admin_revoke_login_session(
         added_version="26.4.2",
         description="Revoke a login session owned by the current user.",
     )
-)  # type: ignore[misc]
+)
 async def my_revoke_login_session(
     info: Info[StrawberryGQLContext],
     session_id: UUID,
@@ -158,7 +158,7 @@ async def my_revoke_login_session(
         added_version="26.4.2",
         description="Clear the failed-login rate limit block for a user. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_unblock_user(
     info: Info[StrawberryGQLContext],
     username: str,

@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
     SearchRoleAssignmentsPayload,
 )
-from ai.backend.manager.api.adapters.rbac import RBACAdapter
+from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.rbac.handler import RBACHandler

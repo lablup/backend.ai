@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     DeploymentPolicyRow,
@@ -19,19 +19,19 @@ from ai.backend.manager.repositories.base import CreatorSpec
 class DeploymentPolicyCreatorSpec(CreatorSpec[DeploymentPolicyRow]):
     """CreatorSpec for deployment policy creation.
 
-    Each endpoint can have at most one deployment policy (1:1 relationship).
+    Each deployment can have at most one deployment policy (1:1 relationship).
     The policy defines the deployment strategy and its configuration.
     """
 
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
 
     @classmethod
-    def build_default(cls, endpoint_id: uuid.UUID) -> DeploymentPolicyCreatorSpec:
+    def build_default(cls, deployment_id: DeploymentID) -> DeploymentPolicyCreatorSpec:
         """Create a default rolling deployment policy spec."""
         return cls(
-            endpoint_id=endpoint_id,
+            deployment_id=deployment_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(),
         )
@@ -39,7 +39,7 @@ class DeploymentPolicyCreatorSpec(CreatorSpec[DeploymentPolicyRow]):
     @override
     def build_row(self) -> DeploymentPolicyRow:
         return DeploymentPolicyRow(
-            endpoint=self.endpoint_id,
+            endpoint=self.deployment_id,
             strategy=self.strategy,
             strategy_spec=self.strategy_spec.model_dump(),
         )

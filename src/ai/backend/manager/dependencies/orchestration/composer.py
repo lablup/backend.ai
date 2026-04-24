@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
@@ -68,6 +69,9 @@ class OrchestrationInput:
     # Prometheus
     prometheus_client: PrometheusClient
     prometheus_query_preset_repository: PrometheusQueryPresetRepository
+    # Runtime variant lookup (used by deployment executor for id→name
+    # resolution at the AppProxy wire boundary)
+    runtime_variant_repository: RuntimeVariantRepository
 
 
 @dataclass
@@ -143,6 +147,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             service_discovery=setup_input.service_discovery,
             prometheus_client=setup_input.prometheus_client,
             prometheus_query_preset_repository=setup_input.prometheus_query_preset_repository,
+            runtime_variant_repository=setup_input.runtime_variant_repository,
         )
         sokovan_orchestrator = await stack.enter_dependency(
             sokovan_dep,

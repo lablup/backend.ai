@@ -54,7 +54,6 @@ from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.common.events import (
     DoCheckUnusedPortEvent,
     DoCheckWorkerLostEvent,
-    DoHealthCheckEvent,
     DoReconcileTraefikRoutesEvent,
     WorkerLostEvent,
 )
@@ -118,7 +117,6 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import (
     AgentId,
     HostPortPair,
-    ModelServiceStatus,
     RedisProfileTarget,
     ServiceDiscoveryType,
 )
@@ -138,10 +136,11 @@ from .errors import (
     MissingTraefikConfigError,
 )
 from .health.database import DatabaseHealthChecker
-from .health_checker import HealthCheckEngine
 from .models import Circuit, Endpoint, Worker
 from .models.utils import connect_database, execute_with_txn_retry
 from .pglock import PgAdvisoryLock
+from .repositories.endpoint import EndpointRepository
+from .services.endpoint import EndpointService
 from .types import (
     CircuitManager,
     CleanupContext,
@@ -438,16 +437,6 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 initial_delay=15.0,
             )
         )
-    else:
-        task_specs.insert(
-            0,
-            EventTaskSpec(
-                name="health_check",
-                event_factory=lambda: DoHealthCheckEvent(),
-                interval=root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
-                initial_delay=5.0,
-            ),
-        )
 
     # Create and register LeaderCron
     leader_tasks: list[PeriodicTask] = [
@@ -592,11 +581,6 @@ async def on_route_update_event(
             for idx, route in enumerate(new_routes.values()):
                 ratio_bytes = traffic_ratios[idx]
                 route.traffic_ratio = float(ratio_bytes.decode("utf-8")) if ratio_bytes else 1.0
-            for route in old_routes:
-                if _duplicate_route := new_routes.get(route.session_id):
-                    _duplicate_route.health_status = route.health_status
-                    _duplicate_route.last_health_check = route.last_health_check
-                    _duplicate_route.consecutive_failures = route.consecutive_failures
         circuit.route_info = list(new_routes.values())
 
         endpoint.health_check_enabled = health_check_enabled
@@ -604,15 +588,8 @@ async def on_route_update_event(
 
         await db_sess.commit()
 
-        if not endpoint.health_check_enabled:
-            # mark all routes as healthy
-            # Publish health status transition events
-            await context.health_engine.publish_health_transition_events([
-                (r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info
-            ])
-
         # Propagate updated route information to AppProxy workers
-        await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
+        await context.circuit_manager.update_circuit_routes(circuit, old_routes)
 
     async with context.db.connect() as db_conn:
         await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
@@ -748,49 +725,6 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.distributed_lock_factory = init_lock_factory(root_ctx)
     yield
-
-
-@asynccontextmanager
-async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    health_engine = HealthCheckEngine(
-        root_ctx.db,
-        root_ctx.core_event_producer,
-        root_ctx.valkey_live,
-        root_ctx.circuit_manager,
-        root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
-        root_ctx.valkey_schedule,
-    )
-    root_ctx.health_engine = health_engine
-    await health_engine.start()
-
-    async def _check_health(_context: None, _src: AgentId, _event: DoHealthCheckEvent) -> None:
-        # In Traefik mode, the loadBalancer.healthCheck directive takes care of
-        # probing kernels directly; the coordinator must NOT run its own polling
-        # loop. The leader cron also skips publishing DoHealthCheckEvent in this
-        # mode, but we guard here as well so stray events are never actioned.
-        if root_ctx.local_config.proxy_coordinator.enable_traefik:
-            return
-        try:
-            # Check all endpoints with health checking enabled
-            # This now only performs individual route health checks
-            await health_engine.check_all_endpoints()
-            log.debug("Health check cycle completed - individual route health updated")
-
-        except Exception:
-            log.exception("Error during health check")
-            raise
-
-    health_check_evh = root_ctx.event_dispatcher.consume(
-        DoHealthCheckEvent,
-        None,
-        _check_health,
-    )
-    # Note: Timer is now managed by leader_election_ctx via LeaderCron
-    try:
-        yield
-    finally:
-        root_ctx.event_dispatcher.unconsume(health_check_evh)
-        await health_engine.stop()
 
 
 @asynccontextmanager
@@ -957,6 +891,16 @@ async def circuit_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log.info("Injecting traefik configuration of {} circuits", len(circuits))
             await root_ctx.circuit_manager.initialize_traefik_circuits(circuits)
 
+    yield
+
+
+@asynccontextmanager
+async def endpoint_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Wire the endpoint repository + service once, for API handlers to share."""
+    root_ctx.endpoint_service = EndpointService(
+        repository=EndpointRepository(root_ctx.db),
+        circuit_manager=root_ctx.circuit_manager,
+    )
     yield
 
 
@@ -1135,8 +1079,8 @@ def build_root_app(
             leader_election_ctx,
             etcd_ctx,
             circuit_manager_ctx,
+            endpoint_service_ctx,
             health_probe_ctx,
-            health_check_ctx,
             unused_port_collection_ctx,
             event_handler_ctx,
             service_discovery_ctx,

@@ -12,6 +12,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -54,7 +55,7 @@ class RoutingRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    endpoint: Mapped[uuid.UUID] = mapped_column(
+    endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="CASCADE"), nullable=False
     )
     session: Mapped[uuid.UUID | None] = mapped_column(
@@ -224,7 +225,7 @@ class RoutingRow(Base):  # type: ignore[misc]
     def __init__(
         self,
         id: uuid.UUID,
-        endpoint: uuid.UUID,
+        endpoint: DeploymentID,
         session: uuid.UUID | None,
         session_owner: uuid.UUID,
         domain: str,
@@ -263,7 +264,7 @@ class RoutingRow(Base):  # type: ignore[misc]
     def to_route_info(self) -> RouteInfo:
         return RouteInfo(
             route_id=self.id,
-            endpoint_id=self.endpoint,
+            deployment_id=self.endpoint,
             session_id=SessionId(self.session) if self.session else None,
             status=self.status,
             health_status=self.health_status,

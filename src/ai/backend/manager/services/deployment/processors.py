@@ -102,6 +102,10 @@ from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions
     RefreshDeploymentRevisionsAction,
     RefreshDeploymentRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
+    ReplaceDeploymentOptionsAction,
+    ReplaceDeploymentOptionsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
@@ -147,6 +151,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     ]
     update_deployment: SingleEntityActionProcessor[
         UpdateDeploymentAction, UpdateDeploymentActionResult
+    ]
+    replace_deployment_options: SingleEntityActionProcessor[
+        ReplaceDeploymentOptionsAction, ReplaceDeploymentOptionsActionResult
     ]
     destroy_deployment: SingleEntityActionProcessor[
         DestroyDeploymentAction, DestroyDeploymentActionResult
@@ -233,6 +240,11 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.update_deployment = SingleEntityActionProcessor(
             service.update_deployment, action_monitors, validators=rbac_single_entity_validators
         )
+        self.replace_deployment_options = SingleEntityActionProcessor(
+            service.replace_deployment_options,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
         self.destroy_deployment = SingleEntityActionProcessor(
             service.destroy_deployment, action_monitors, validators=rbac_single_entity_validators
         )
@@ -310,6 +322,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             CreateDeploymentAction.spec(),
             CreateLegacyDeploymentAction.spec(),
             UpdateDeploymentAction.spec(),
+            ReplaceDeploymentOptionsAction.spec(),
             DestroyDeploymentAction.spec(),
             SearchDeploymentsAction.spec(),
             SearchDeploymentsInProjectAction.spec(),

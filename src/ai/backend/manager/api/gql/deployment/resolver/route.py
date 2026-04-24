@@ -98,7 +98,7 @@ async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.19.0", description="Update the traffic status of a route")
-)  # type: ignore[misc]
+)
 async def update_route_traffic_status(
     input: UpdateRouteTrafficStatusInputGQL,
     info: Info[StrawberryGQLContext],

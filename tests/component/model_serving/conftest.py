@@ -35,10 +35,6 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-    RevisionGeneratorRegistryArgs,
-)
 
 
 @pytest.fixture()
@@ -58,9 +54,6 @@ def model_serving_processors(
         valkey_clients.live,
         valkey_clients.schedule,
     )
-    revision_gen = RevisionGeneratorRegistry(
-        RevisionGeneratorRegistryArgs(deployment_repository=deployment_repo)
-    )
     service = ModelServingService(
         agent_registry=AsyncMock(),
         background_task_manager=background_task_manager,
@@ -71,9 +64,9 @@ def model_serving_processors(
         valkey_live=valkey_clients.live,
         repository=ms_repo,
         deployment_repository=deployment_repo,
+        runtime_variant_repository=AsyncMock(),
         deployment_controller=AsyncMock(),
         scheduling_controller=AsyncMock(),
-        revision_generator_registry=revision_gen,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return ModelServingProcessors(
@@ -127,15 +120,9 @@ def deployment_processors(
         valkey_clients.schedule,
     )
     deployment_controller = AsyncMock()
-    revision_generator_registry = RevisionGeneratorRegistry(
-        RevisionGeneratorRegistryArgs(deployment_repository=repo)
-    )
-    model_definition_generator_registry = MagicMock()
     service = DeploymentService(
         deployment_controller,
         repo,
-        revision_generator_registry,
-        model_definition_generator_registry,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
@@ -168,6 +155,7 @@ def server_module_registries(
                 deployment=deployment_processors,
                 model_serving=model_serving_processors,
                 model_serving_auto_scaling=auto_scaling_processors,
+                runtime_variant=MagicMock(),
             ),
             route_deps,
         ),

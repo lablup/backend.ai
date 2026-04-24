@@ -2546,6 +2546,137 @@ input DateTimeFilter {
 scalar Decimal
 
 """
+Added in UNRELEASED. A single (handler_name, timeout_sec) entry response for session timeouts.
+"""
+type DefaultSessionHandlerTimeoutEntryInfo {
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
+  handlerName: String!
+
+  """
+  Timeout in seconds; `null` means this handler is unbounded regardless of the `default` timeout.
+  """
+  timeoutSec: Int
+}
+
+"""
+Added in UNRELEASED. A single (handler_name, timeout_sec) entry for session timeouts.
+"""
+input DefaultSessionHandlerTimeoutEntryInput {
+  handlerName: String!
+  timeoutSec: Int = null
+}
+
+"""Added in UNRELEASED. Baseline kernel execution spec response."""
+type DefaultSessionKernelExecutionSpecInfo {
+  """Container image identifier, or `null` if not resolved."""
+  imageId: String
+
+  """Quantitative resource request entries."""
+  resources: [ResourceSlotEntry!]
+
+  """Qualitative resource hints."""
+  resourceOpts: DefaultSessionResourceOptsInfo
+
+  """Command executed after kernel bootstrap."""
+  startupCommand: String
+
+  """Shell script executed before `startup_command`."""
+  bootstrapScript: String
+
+  """Earliest start time for the kernel."""
+  startsAt: DateTime
+
+  """Soft deadline for BATCH-session user payload."""
+  batchTimeoutSec: Int
+}
+
+"""
+Added in UNRELEASED. Baseline kernel execution spec input used as the resource-group default.
+"""
+input DefaultSessionKernelExecutionSpecInput {
+  imageId: String = null
+  resources: [ResourceSlotEntryInput!] = null
+  resourceOpts: DefaultSessionResourceOptsInput = null
+  startupCommand: String = null
+  bootstrapScript: String = null
+  startsAt: DateTime = null
+  batchTimeoutSec: Int = null
+}
+
+"""Added in UNRELEASED. Resource-group default session options response."""
+type DefaultSessionOptionsInfo {
+  """Default scheduling priority."""
+  priority: Int!
+
+  """Default preemption flag."""
+  isPreemptible: Boolean!
+
+  """Default cluster mode."""
+  clusterMode: String!
+
+  """
+  Resource-group fallback `failure_policy`; applied to each kernel group whose `failure_policy` and the session's `default_failure_policy` are both unset.
+  """
+  defaultFailurePolicy: SessionFailurePolicy!
+
+  """
+  Baseline kernel execution spec. `null` if the resource group does not pre-configure one.
+  """
+  defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInfo
+
+  """Default timeout policy."""
+  timeouts: DefaultSessionTimeoutsInfo!
+
+  """Default agent selection policy."""
+  agentSelectionPolicy: SessionAgentSelectionPolicy!
+}
+
+"""
+Added in UNRELEASED. Resource-group default session options input payload.
+"""
+input DefaultSessionOptionsInput {
+  priority: Int = null
+  isPreemptible: Boolean = null
+  clusterMode: String = null
+  defaultFailurePolicy: SessionFailurePolicy = null
+  defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInput = null
+  timeouts: DefaultSessionTimeoutsInput = null
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
+}
+
+"""Added in UNRELEASED. Qualitative resource hints response."""
+type DefaultSessionResourceOptsInfo {
+  """
+  Shared-memory size as a human-readable string (e.g. '64m'). `null` means 'use the runtime default'.
+  """
+  shmem: String
+}
+
+"""
+Added in UNRELEASED. Qualitative resource hints for session-level defaults (shared memory, ...).
+"""
+input DefaultSessionResourceOptsInput {
+  shmem: BinarySizeInput = null
+}
+
+"""Added in UNRELEASED. Session timeout policy response."""
+type DefaultSessionTimeoutsInfo {
+  """
+  Fallback timeout in seconds applied to handlers not listed in `by_handler`; `null` means unbounded.
+  """
+  default: Int
+
+  """Per-handler timeout overrides."""
+  byHandler: [DefaultSessionHandlerTimeoutEntryInfo!]!
+}
+
+"""Added in UNRELEASED. Session timeout policy input (handler-keyed)."""
+input DefaultSessionTimeoutsInput {
+  default: Int = null
+  byHandler: [DefaultSessionHandlerTimeoutEntryInput!] = null
+}
+
+"""
 Added in 24.09.0. Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
 Used to specify which artifact revisions should be imported from the remote registry source
 into the local reservoir registry storage.
@@ -3064,6 +3195,11 @@ type DeploymentHistory implements Node {
   createdAt: DateTime!
   updatedAt: DateTime!
 
+  """
+  Added in UNRELEASED. Handler category that produced this row. ``lifecycle`` for monotonic lifecycle transitions; ``scaling`` for replica-reconcile transitions; ``health`` is reserved.
+  """
+  category: String!
+
   """Added in 26.4.3. The deployment this history record belongs to."""
   deployment: ModelDeployment
 }
@@ -3114,6 +3250,17 @@ input DeploymentHistoryOrderBy {
 enum DeploymentHistoryOrderField {
   CREATED_AT
   UPDATED_AT
+}
+
+"""Added in UNRELEASED. Deployment options payload response."""
+type DeploymentOptionsInfoGQL {
+  """Handler timeout policy."""
+  timeouts: DeploymentTimeoutsInfoGQL!
+}
+
+"""Added in UNRELEASED. Deployment options payload input."""
+input DeploymentOptionsInput {
+  timeouts: DeploymentTimeoutsInput!
 }
 
 """Added in 25.19.0. """
@@ -3327,6 +3474,21 @@ Added in 25.19.0. This enum represents the deployment strategy type of a model d
 enum DeploymentStrategyType {
   ROLLING
   BLUE_GREEN
+}
+
+"""Added in UNRELEASED. Deployment timeout policy response."""
+type DeploymentTimeoutsInfoGQL {
+  """Fallback timeout in seconds; null means unbounded."""
+  default: Int
+
+  """Per-handler timeout overrides."""
+  byHandler: [HandlerTimeoutEntryInfoGQL!]!
+}
+
+"""Added in UNRELEASED. Deployment timeout policy input."""
+input DeploymentTimeoutsInput {
+  default: Int = null
+  byHandler: [HandlerTimeoutEntryInput!] = null
 }
 
 """
@@ -4048,6 +4210,11 @@ type ExtraVFolderMountInfoGQL {
   vfolder: VirtualFolderNode!
   vfolderId: ID!
   mountDestination: String
+
+  """
+  The concrete permission snapshot fixed at revision-write time. ``INHERIT`` policies are resolved against the vfolder's current permission at that point, so this value is immutable and does not change when the vfolder's permission later changes. ``None`` when the caller left it unset to inherit the vfolder's stored permission at session-creation time (task #83).
+  """
+  mountPerm: MountPermission!
 }
 
 """Added in 25.19.0. """
@@ -4163,6 +4330,23 @@ type GetPresignedUploadURLPayload {
 
 extend type GroupNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""
+Added in UNRELEASED. A single (handler_name, timeout_sec) entry response.
+"""
+type HandlerTimeoutEntryInfoGQL {
+  """Handler identifier."""
+  handlerName: String!
+
+  """Timeout in seconds; null means this handler is unbounded."""
+  timeoutSec: Int
+}
+
+"""Added in UNRELEASED. A single (handler_name, timeout_sec) entry."""
+input HandlerTimeoutEntryInput {
+  handlerName: String!
+  timeoutSec: Int = null
 }
 
 """Added in 25.14.0. HuggingFace registry node."""
@@ -5624,6 +5808,12 @@ type ModelDeployment implements Node {
   defaultDeploymentStrategy: DeploymentStrategyGQL!
   replicaState: ReplicaState!
   createdUserId: ID!
+  options: DeploymentOptionsInfoGQL!
+
+  """
+  Added in UNRELEASED. Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle). ``SCALING`` while the replica reconciler is adjusting replica count; ``STABLE`` once holding at the desired count.
+  """
+  scalingState: ScalingState!
 
   """
   Added in 26.4.3. The current active revision of this deployment, resolved via DataLoader.
@@ -6027,21 +6217,25 @@ enum ModelRevisionOrderField {
   CREATED_AT
   RESOURCE_GROUP
   CLUSTER_MODE
-  RUNTIME_VARIANT
+  RUNTIME_VARIANT_NAME
 }
 
 """
 Added in 25.19.0. Runtime configuration for the inference framework. Includes the runtime variant, framework-specific configuration, and environment variables.
 """
 type ModelRuntimeConfig {
-  runtimeVariant: String!
+  """
+  Added in UNRELEASED. The runtime variant referenced by this runtime config.
+  """
+  runtimeVariant: RuntimeVariant
+  runtimeVariantId: UUID!
   inferenceRuntimeConfig: JSON
   environ: EnvironmentVariables
 }
 
 """Added in 25.19.0. """
 input ModelRuntimeConfigInput {
-  runtimeVariant: String!
+  runtimeVariantId: UUID!
   inferenceRuntimeConfig: JSON = null
 
   """Environment variables for the service."""
@@ -6141,6 +6335,15 @@ input ModifyQueryDefinitionOptionsInput {
 type ModifyQueryDefinitionPayload {
   """Updated query definition."""
   preset: QueryDefinition!
+}
+
+"""
+Added in 25.19.0. This enum represents the permission level for a mounted volume. It can be ro, rw, wd
+"""
+enum MountPermission {
+  READ_ONLY
+  READ_WRITE
+  RW_DELETE
 }
 
 """Added in 26.4.2. Input for moving a file inside a virtual folder."""
@@ -6501,6 +6704,16 @@ type Mutation {
   Added in 26.4.2. Update allowed projects for a resource group (admin only).
   """
   adminUpdateAllowedProjectsForResourceGroupV2(input: UpdateAllowedProjectsForResourceGroupInput!): AllowedProjectsPayload!
+
+  """
+  Added in UNRELEASED. Fully replace a resource group's ``default_deployment_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New deployments created in this resource group snapshot the new default; existing deployments are not affected.
+  """
+  replaceResourceGroupDefaultDeploymentOptions(input: ReplaceResourceGroupDefaultDeploymentOptionsInput!): ReplaceResourceGroupDefaultDeploymentOptionsPayload!
+
+  """
+  Added in UNRELEASED. Fully replace a resource group's ``default_session_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New sessions created in this resource group consult the new default via the scheduling controller's options resolver at enqueue time; already-enqueued sessions keep the frozen options they were enqueued with.
+  """
+  replaceResourceGroupDefaultSessionOptions(input: ReplaceResourceGroupDefaultSessionOptionsInput!): ReplaceResourceGroupDefaultSessionOptionsPayload!
 
   """
   Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
@@ -8240,6 +8453,11 @@ type Query {
   adminResourceGroupV2(name: String!): ResourceGroup
 
   """
+  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.timeouts.by_handler``.
+  """
+  schedulingHandlers: [SchedulingHandlerNode!]!
+
+  """
   Added in 26.4.2. Get allowed resource groups for a domain (admin only).
   """
   adminAllowedResourceGroupsForDomainV2(domainName: String!): AllowedResourceGroupsPayload!
@@ -9117,6 +9335,50 @@ type RejectArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
+"""
+Added in UNRELEASED. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
+"""
+input ReplaceResourceGroupDefaultDeploymentOptionsInput {
+  """Target resource group name."""
+  resourceGroupName: String!
+
+  """New default deployment options payload."""
+  options: DeploymentOptionsInput!
+}
+
+"""
+Added in UNRELEASED. Payload returned after replacing a resource group's default_deployment_options surface.
+"""
+type ReplaceResourceGroupDefaultDeploymentOptionsPayload {
+  """Name of the resource group whose default options were replaced."""
+  resourceGroupName: String!
+
+  """The newly persisted ``default_deployment_options`` surface."""
+  defaultDeploymentOptions: DeploymentOptionsInfoGQL!
+}
+
+"""
+Added in UNRELEASED. Input for the replaceResourceGroupDefaultSessionOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
+"""
+input ReplaceResourceGroupDefaultSessionOptionsInput {
+  """Target resource group name."""
+  resourceGroupName: String!
+
+  """New default session options payload."""
+  options: DefaultSessionOptionsInput!
+}
+
+"""
+Added in UNRELEASED. Payload returned after replacing a resource group's default_session_options surface.
+"""
+type ReplaceResourceGroupDefaultSessionOptionsPayload {
+  """Name of the resource group whose default options were replaced."""
+  resourceGroupName: String!
+
+  """The newly persisted ``default_session_options`` surface."""
+  defaultSessionOptions: DefaultSessionOptionsInfo!
+}
+
 """Added in 25.19.0. """
 input ReplicaFilter {
   status: ReplicaStatusFilter = null
@@ -9284,6 +9546,16 @@ type ResourceGroup implements Node {
   Added in 26.2.0. Scheduler configuration for the resource group. Use scheduler.type to check if fair-share scheduling is enabled.
   """
   scheduler: ResourceGroupSchedulerConfig!
+
+  """
+  Added in UNRELEASED. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
+  """
+  defaultDeploymentOptions: DeploymentOptionsInfoGQL!
+
+  """
+  Added in UNRELEASED. Default session options used as the fallback layer for the scheduling controller's options resolver at session enqueue time.
+  """
+  defaultSessionOptions: DefaultSessionOptionsInfo!
 
   """
   Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.
@@ -10364,6 +10636,14 @@ extend type ScalingGroupNode @key(fields: "id") {
 }
 
 """
+Added in UNRELEASED. Replica scaling axis for a deployment, orthogonal to the lifecycle status. ``SCALING`` while the replica reconciler is adjusting replica count against desired_replica_count; ``STABLE`` once holding at the desired count.
+"""
+enum ScalingState {
+  STABLE
+  SCALING
+}
+
+"""
 Added in 24.09.0. Input for batch scanning of specific models from external registries.
 
 Scans multiple specified models and retrieves detailed information including
@@ -10445,6 +10725,28 @@ type SchedulingBroadcastEventPayload {
 
   """Human-readable reason for this status transition."""
   reason: String!
+}
+
+enum SchedulingHandlerCategory {
+  LIFECYCLE
+  SCALING
+  HEALTH
+}
+
+"""
+Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.timeouts.by_handler``.
+"""
+type SchedulingHandlerNode {
+  """Stable handler key used in deployment timeout maps."""
+  name: String!
+
+  """Handler category classifying its scheduling axis."""
+  category: SchedulingHandlerCategory!
+
+  """
+  First line of the handler's docstring, if any. Null when the backing class has no docstring.
+  """
+  description: String
 }
 
 """Added in 26.3.0. Scheduling result status"""
@@ -10672,6 +10974,14 @@ type ServicePorts {
   entries: [ServicePortEntry!]!
 }
 
+"""
+Added in UNRELEASED. Scheduling constraint applied to designated agents for a session.
+"""
+enum SessionAgentSelectionPolicy {
+  STRICT
+  PREFERRED
+}
+
 """Added in 26.4.2. Batch session specific configuration."""
 input SessionBatchConfigInput {
   """Shell command to execute."""
@@ -10688,6 +10998,15 @@ input SessionBatchConfigInput {
 enum SessionClusterMode {
   SINGLE_NODE
   MULTI_NODE
+}
+
+"""
+Added in UNRELEASED. Policy for how a kernel group's startup failures affect the owning session.
+"""
+enum SessionFailurePolicy {
+  STRICT
+  BOOT_ALL
+  TOLERANT
 }
 
 """Added in 26.4.2. A virtual folder mount specification."""

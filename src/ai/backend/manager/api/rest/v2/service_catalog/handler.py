@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.request import (
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
+    from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

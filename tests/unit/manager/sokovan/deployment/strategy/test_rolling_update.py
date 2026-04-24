@@ -20,14 +20,17 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentState,
     ReplicaSpec,
     RouteHealthStatus,
@@ -98,7 +101,7 @@ def make_deployment(
     endpoint_id: UUID = ENDPOINT_ID,
 ) -> DeploymentInfo:
     return DeploymentInfo(
-        id=endpoint_id,
+        id=DeploymentID(endpoint_id),
         metadata=DeploymentMetadata(
             name="test-deploy",
             domain="default",
@@ -111,6 +114,7 @@ def make_deployment(
         ),
         state=DeploymentState(
             lifecycle=EndpointLifecycle.DEPLOYING,
+            scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
         replica_spec=ReplicaSpec(
@@ -118,8 +122,9 @@ def make_deployment(
         ),
         network=DeploymentNetworkSpec(open_to_public=False),
         model_revisions=[],
-        current_revision_id=current_revision_id,
-        deploying_revision_id=deploying_revision_id,
+        options=DeploymentOptions(),
+        current_revision_id=DeploymentRevisionID(current_revision_id),
+        deploying_revision_id=DeploymentRevisionID(deploying_revision_id),
     )
 
 
@@ -133,7 +138,7 @@ def make_route(
 ) -> RouteInfo:
     return RouteInfo(
         route_id=route_id or uuid4(),
-        endpoint_id=endpoint_id,
+        deployment_id=DeploymentID(endpoint_id),
         session_id=SessionId(uuid4()),
         status=status,
         health_status=health_status,
@@ -782,7 +787,7 @@ class TestRouteCreatorSpecs:
         creator_spec = result.route_changes.rollout_specs[0].spec
         assert isinstance(creator_spec, RouteCreatorSpec)
         assert creator_spec.revision_id == NEW_REV
-        assert creator_spec.endpoint_id == ENDPOINT_ID
+        assert creator_spec.deployment_id == ENDPOINT_ID
         assert creator_spec.session_owner_id == USER_ID
         assert creator_spec.domain == "default"
         assert creator_spec.project_id == PROJECT_ID

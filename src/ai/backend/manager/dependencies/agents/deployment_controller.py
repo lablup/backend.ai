@@ -11,16 +11,11 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
+from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -41,8 +36,7 @@ class DeploymentControllerInput:
     storage_manager: StorageSessionManager
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
-    revision_generator_registry: RevisionGeneratorRegistry
-    model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    revision_draft_reader: RevisionDraftReader
     deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
 
 
@@ -75,8 +69,7 @@ class DeploymentControllerDependency(
                 storage_manager=setup_input.storage_manager,
                 event_producer=setup_input.event_producer,
                 valkey_schedule=setup_input.valkey_schedule,
-                revision_generator_registry=setup_input.revision_generator_registry,
-                model_definition_generator_registry=setup_input.model_definition_generator_registry,
+                revision_draft_reader=setup_input.revision_draft_reader,
                 deployment_revision_preset_repository=setup_input.deployment_revision_preset_repository,
             )
         )

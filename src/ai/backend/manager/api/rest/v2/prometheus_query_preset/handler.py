@@ -22,7 +22,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import PresetIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.prometheus_query_preset import PrometheusQueryPresetAdapter
+    from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
+        PrometheusQueryPresetAdapter,
+    )
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -143,7 +143,7 @@ async def project_sessions_v2(
         added_version="26.4.2",
         description="Enqueue a new compute session.",
     ),
-)  # type: ignore[misc]
+)
 async def enqueue_session(
     input: EnqueueSessionInputGQL,
     info: Info[StrawberryGQLContext],
@@ -171,7 +171,7 @@ async def enqueue_session(
         added_version="26.4.2",
         description="Terminate sessions within a project scope.",
     ),
-)  # type: ignore[misc]
+)
 async def terminate_project_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectSessionScopeGQL,

@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
@@ -53,7 +54,7 @@ def sample_user_uuid() -> uuid.UUID:
 @pytest.fixture
 def sample_vfolder_data(sample_vfolder_uuid: uuid.UUID) -> VFolderData:
     return VFolderData(
-        id=sample_vfolder_uuid,
+        id=VFolderUUID(sample_vfolder_uuid),
         name="test-vfolder",
         host="local:volume1",
         domain_name="default",

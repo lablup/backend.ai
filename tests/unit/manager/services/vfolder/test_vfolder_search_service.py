@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -57,7 +58,7 @@ class TestVFolderAdminServiceAdminSearchVFolders:
     @pytest.fixture
     def vfolder_1(self, user_id: uuid.UUID) -> VFolderData:
         return VFolderData(
-            id=uuid.uuid4(),
+            id=VFolderUUID(uuid.uuid4()),
             name="vfolder-1",
             host="local:volume1",
             domain_name="default",
@@ -83,7 +84,7 @@ class TestVFolderAdminServiceAdminSearchVFolders:
     @pytest.fixture
     def vfolder_2(self, user_id: uuid.UUID) -> VFolderData:
         return VFolderData(
-            id=uuid.uuid4(),
+            id=VFolderUUID(uuid.uuid4()),
             name="vfolder-2",
             host="local:volume1",
             domain_name="default",
@@ -161,7 +162,7 @@ class TestVFolderServiceSearchUserVFolders:
     @pytest.fixture
     def vfolder_1(self, user_id: uuid.UUID) -> VFolderData:
         return VFolderData(
-            id=uuid.uuid4(),
+            id=VFolderUUID(uuid.uuid4()),
             name="my-vfolder",
             host="local:volume1",
             domain_name="default",

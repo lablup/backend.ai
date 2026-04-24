@@ -33,7 +33,7 @@ from ai.backend.appproxy.worker.types import (
     InferenceAppInfo,
     PortFrontendInfo,
 )
-from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
+from ai.backend.common.types import RuntimeVariant
 
 SAMPLE_PROMETHEUS_OUTPUT = """\
 # HELP vllm:num_requests_running Number of requests running
@@ -56,9 +56,6 @@ def _make_route(
         kernel_port=kernel_port,
         protocol=ProxyProtocol.HTTP,
         traffic_ratio=1.0,
-        health_status=ModelServiceStatus.HEALTHY,
-        last_health_check=None,
-        consecutive_failures=0,
     )
 
 

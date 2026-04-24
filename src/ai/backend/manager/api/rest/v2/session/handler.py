@@ -30,7 +30,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.session import SessionAdapter
+    from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

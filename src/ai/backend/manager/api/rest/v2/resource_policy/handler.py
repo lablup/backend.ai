@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UpdateProjectResourcePolicyInput,
     UpdateUserResourcePolicyInput,
 )
-from ai.backend.manager.api.adapters.resource_policy import ResourcePolicyAdapter
+from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.api.rest.v2.path_params import ResourcePolicyNamePathParam
 
 

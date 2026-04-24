@@ -12,6 +12,7 @@ import aiohttp
 import pytest
 
 from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -150,7 +151,7 @@ def _make_vfolder_data(
     unmanaged_path: str | None = None,
 ) -> VFolderData:
     return VFolderData(
-        id=vfolder_id,
+        id=VFolderUUID(vfolder_id),
         name=name,
         host=host,
         domain_name="default",

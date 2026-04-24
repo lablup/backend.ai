@@ -202,7 +202,7 @@ class DeleteHuggingFaceRegistryPayload(PydanticOutputMixin[DeleteHuggingFaceRegi
     id: UUID = gql_field(description="ID of the deleted HuggingFace registry")
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create huggingface registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create huggingface registry."))
 async def create_huggingface_registry(
     input: CreateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateHuggingFaceRegistryPayload:
@@ -212,7 +212,7 @@ async def create_huggingface_registry(
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update huggingface registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update huggingface registry."))
 async def update_huggingface_registry(
     input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateHuggingFaceRegistryPayload:
@@ -222,7 +222,7 @@ async def update_huggingface_registry(
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete huggingface registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete huggingface registry."))
 async def delete_huggingface_registry(
     input: DeleteHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteHuggingFaceRegistryPayload:

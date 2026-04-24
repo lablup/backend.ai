@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
@@ -56,8 +57,8 @@ class StrategyEvaluationSummary:
     revision swaps.  Sub-step transitions are handled by the coordinator.
     """
 
-    # Mapping from endpoint ID to its evaluated sub_step — used to bulk-update the DB.
-    assignments: dict[UUID, DeploymentLifecycleSubStep] = field(default_factory=dict)
+    # Mapping from deployment ID to its evaluated sub_step — used to bulk-update the DB.
+    assignments: dict[DeploymentID, DeploymentLifecycleSubStep] = field(default_factory=dict)
 
     # Aggregated route mutations from all per-deployment evaluations.
     route_changes: RouteChanges = field(default_factory=RouteChanges)

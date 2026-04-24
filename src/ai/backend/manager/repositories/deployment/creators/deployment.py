@@ -10,13 +10,17 @@ from typing import Any, override
 
 import yarl
 
+from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.types import (
     ClusterMode,
+    MountInfoEntry,
     ResourceSlot,
     RuntimeVariant,
-    VFolderMount,
 )
-from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
+from ai.backend.manager.data.deployment.types import (
+    DeploymentLifecycleSubStep,
+    DeploymentOptions,
+)
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
@@ -87,7 +91,7 @@ class DeploymentMountFields:
     model_vfolder_id: uuid.UUID | None
     model_mount_destination: str = "/models"
     model_definition_path: str | None = None
-    extra_mounts: Sequence[VFolderMount] = ()
+    extra_mounts: Sequence[MountInfoEntry] = ()
 
 
 @dataclass
@@ -124,11 +128,17 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
 
     Corresponds to NewDeploymentCreator in data layer.
     All external references (like image) should be already resolved to UUIDs.
+
+    ``options`` defaults to an empty :class:`DeploymentOptions`; the
+    db_source overwrites it with a snapshot of the target scaling
+    group's ``default_deployment_options`` before the row is flushed
+    so every endpoint persists a fully-resolved copy.
     """
 
     metadata: DeploymentMetadataFields
     replica: DeploymentReplicaFields
     network: DeploymentNetworkFields
+    options: DeploymentOptions
     revision: ModelRevisionFields | None = None
 
     @override
@@ -152,6 +162,7 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             # Default state fields
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,
+            options=self.options,
         )
 
 
@@ -159,12 +170,17 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
 class EndpointLifecycleBatchUpdaterSpec(BatchUpdaterSpec[EndpointRow]):
     """BatchUpdaterSpec for batch updating endpoint lifecycle status.
 
-    Used for transitioning multiple endpoints between lifecycle states.
-    Automatically clears the ``sub_step`` column unless explicitly set.
+    Each axis is independently optional; ``None`` means "do not touch
+    this column". ``sub_step`` is coupled to ``lifecycle_stage`` — it
+    is written (possibly to ``None``, clearing any leftover sub-step)
+    only when the lifecycle advances. Pure scaling-only transitions
+    (``lifecycle_stage is None``) leave ``sub_step`` untouched so a
+    ``DEPLOYING`` endpoint's sub-step survives a scaling-state flip.
     """
 
-    lifecycle_stage: EndpointLifecycle
+    lifecycle_stage: EndpointLifecycle | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
+    scaling_state: ScalingState | None = None
 
     @property
     @override
@@ -173,4 +189,10 @@ class EndpointLifecycleBatchUpdaterSpec(BatchUpdaterSpec[EndpointRow]):
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"lifecycle_stage": self.lifecycle_stage, "sub_step": self.sub_step}
+        values: dict[str, Any] = {}
+        if self.lifecycle_stage is not None:
+            values["lifecycle_stage"] = self.lifecycle_stage
+            values["sub_step"] = self.sub_step
+        if self.scaling_state is not None:
+            values["scaling_state"] = self.scaling_state
+        return values

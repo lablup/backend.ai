@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, NonNegativeFloat, NonNegativeInt
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import RuntimeVariant
 
 __all__ = (
@@ -78,7 +79,10 @@ class ServeInfoModel(BaseResponseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
-    model_id: uuid.UUID = Field(description="ID of model VFolder.")
+    # ``model_id`` is null when the referenced model vfolder row has been
+    # deleted (``deployment_revisions.model`` SET NULL FK); the service is
+    # kept for history but cannot be redeployed in that state.
+    model_id: VFolderUUID | None = Field(description="ID of model VFolder.")
     extra_mounts: Sequence[uuid.UUID] = Field(
         description="List of extra VFolders which will be mounted to model service session."
     )

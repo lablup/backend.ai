@@ -10,6 +10,8 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    ReplaceResourceGroupDefaultDeploymentOptionsInput,
+    ReplaceResourceGroupDefaultSessionOptionsInput,
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
     UpdateAllowedResourceGroupsForDomainInput,
@@ -21,6 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AdminSearchResourceGroupsPayload,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import (
     DomainNamePathParam,
@@ -30,7 +33,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
+    from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -121,6 +124,36 @@ class V2ResourceGroupHandler:
             update={"resource_group_name": path.parsed.name},
         )
         result = await self._adapter.update_config(merged_input)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_replace_default_deployment_options(
+        self,
+        path: PathParam[ResourceGroupNamePathParam],
+        body: BodyParam[ReplaceResourceGroupDefaultDeploymentOptionsInput],
+    ) -> APIResponse:
+        """Fully replace a resource group's ``default_deployment_options``.
+
+        Admin-only; the registry enforces ``superadmin_required``.
+        """
+        result = await self._adapter.admin_replace_default_deployment_options(
+            name=ResourceGroupName(path.parsed.name),
+            input=body.parsed,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_replace_default_session_options(
+        self,
+        path: PathParam[ResourceGroupNamePathParam],
+        body: BodyParam[ReplaceResourceGroupDefaultSessionOptionsInput],
+    ) -> APIResponse:
+        """Fully replace a resource group's ``default_session_options``.
+
+        Admin-only; the registry enforces ``superadmin_required``.
+        """
+        result = await self._adapter.admin_replace_default_session_options(
+            name=ResourceGroupName(path.parsed.name),
+            input=body.parsed,
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # Allow / Disallow endpoints
