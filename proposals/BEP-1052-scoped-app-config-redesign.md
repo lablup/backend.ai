@@ -274,7 +274,7 @@ repositories/app_config_policy/
 
 | Repository                   | Methods                                                                                                              |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(scope, querier)` for a bound scope (via `AppConfigSourceSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, name)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`), and `admin_search_app_configs(querier)` for cross-user admin search. All three derive the chain in SQL via a policy join — see §5. |
+| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(scope, querier)` for a bound scope (via `AppConfigSourceSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, config_name)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`), and `admin_search_app_configs(querier)` for cross-user admin search. All three derive the chain in SQL via a policy join — see §5. |
 | `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(querier)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigSource` row still references the `config_name`. |
 
 `AppConfigSourceRepository` plays a **dual role** — raw CRUD (served
@@ -1328,9 +1328,10 @@ wider as the use case demands.
 ### Read (Merge)
 
 Single-document (`AppConfigSourceDBSource.get_user_app_config(user_id,
-name)`): one SQL resolves `domain_name` via a `users` subquery,
-joins `app_config_policies` to derive the chain (`scope_sources`),
-and pulls only the scope rows that are part of that chain. Rows are
+config_name)`): one SQL resolves `domain_name` via a `users`
+subquery, joins `app_config_policies` to derive the chain
+(`scope_sources`), and pulls only the scope rows that are part of
+that chain. Rows are
 ordered per the chain; absent scopes contribute `{}`; the deep-merge
 treats nested objects recursively, leaves as scalar replacement, and
 lists as wholesale replacement. Output: ordered `sources` + merged
@@ -1368,10 +1369,29 @@ class AppConfigSourceDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @staticmethod
+    def _merge_chain(
+        rows: Sequence[AppConfigSourceRow],
+        chain: Sequence[str],
+    ) -> tuple[list[AppConfigSourceRow], dict | None]:
+        # Order `rows` by `chain` (low → high) and deep-merge their
+        # `extra_config` in that order. Empty result projects to None
+        # per §3 null projection. Shared by get / search / admin_search.
+        by_scope = {row.scope_type: row for row in rows}
+        ordered_sources = [
+            by_scope[AppConfigScopeType(s)]
+            for s in chain
+            if AppConfigScopeType(s) in by_scope
+        ]
+        merged: dict = {}
+        for row in ordered_sources:
+            merged = deep_merge(merged, row.extra_config)
+        return ordered_sources, merged or None
+
     async def get_user_app_config(
         self,
-        user_id: str,
-        name: str,
+        user_id: uuid.UUID,
+        config_name: str,
     ) -> AppConfigData:
         # Single SQL: resolve `domain_name` via a `users` subquery,
         # join `app_config_policies` to derive the chain
@@ -1380,7 +1400,7 @@ class AppConfigSourceDBSource:
         # UniqueConstraint.
         user_domain_sq = (
             sa.select(UserRow.domain_name)
-            .where(UserRow.id == sa.cast(user_id, sa.UUID))
+            .where(UserRow.id == user_id)
             .scalar_subquery()
         )
         scope_id_match = sa.case(
@@ -1391,7 +1411,7 @@ class AppConfigSourceDBSource:
                 AppConfigScopeType.DOMAIN_USER_DEFAULTS,
             ]), user_domain_sq),
             (AppConfigSourceRow.scope_type == AppConfigScopeType.USER,
-             sa.literal(user_id)),
+             sa.literal(str(user_id))),
         )
         query = (
             sa.select(AppConfigSourceRow, AppConfigPolicyRow.scope_sources)
@@ -1400,7 +1420,7 @@ class AppConfigSourceDBSource:
                 AppConfigPolicyRow.config_name == AppConfigSourceRow.name,
             )
             .where(
-                AppConfigSourceRow.name == name,
+                AppConfigSourceRow.name == config_name,
                 AppConfigSourceRow.scope_id == scope_id_match,
                 sa.cast(AppConfigSourceRow.scope_type, sa.Text)
                     == sa.any_(AppConfigPolicyRow.scope_sources),
@@ -1411,29 +1431,20 @@ class AppConfigSourceDBSource:
 
         if not result:
             return AppConfigData(
-                user_id=user_id, name=name, sources=[], config=None,
+                user_id=user_id, name=config_name, sources=[], config=None,
             )
 
-        chain = result[0].scope_sources  # all rows share the same policy
-        by_scope = {
-            r.AppConfigSourceRow.scope_type: r.AppConfigSourceRow
-            for r in result
-        }
-        ordered_sources = [
-            by_scope[AppConfigScopeType(s)]
-            for s in chain
-            if AppConfigScopeType(s) in by_scope
-        ]
-        merged: dict = {}
-        for row in ordered_sources:
-            merged = deep_merge(merged, row.extra_config)
+        # `config_name` is UNIQUE and we filtered on a single value,
+        # so every result row carries the same `scope_sources`.
+        chain = result[0].scope_sources
+        rows = [r.AppConfigSourceRow for r in result]
+        ordered_sources, config = self._merge_chain(rows, chain)
 
         return AppConfigData(
             user_id=user_id,
-            name=name,
+            name=config_name,
             sources=ordered_sources,
-            # Empty → None per §3 null projection.
-            config=merged or None,
+            config=config,
         )
 
     async def search_user_app_configs(
@@ -1452,7 +1463,8 @@ class AppConfigSourceDBSource:
         #     array_position(p.scope_sources, s.scope_type::text)
         #
         # `execute_batch_querier` paginates at the distinct-`name`
-        # level; each group is deep-merged into one `AppConfigData`.
+        # level; each group's (rows, scope_sources) is fed to
+        # `_merge_chain` to produce one `AppConfigData`.
         ...
 
     async def admin_search_app_configs(
@@ -1464,8 +1476,9 @@ class AppConfigSourceDBSource:
         # produced. Authorization is enforced at the service layer
         # before this is reached. `querier.conditions` filters on
         # user_id / name as needed; `execute_batch_querier` paginates
-        # at the distinct-`(user_id, name)` level, each group
-        # deep-merged into one `AppConfigData`.
+        # at the distinct-`(user_id, name)` level, each group's
+        # (rows, scope_sources) fed to `_merge_chain` to produce one
+        # `AppConfigData`.
         ...
 
 
@@ -1520,10 +1533,10 @@ class AppConfigSourceRepository:
 
     async def get_app_config(
         self,
-        user_id: str,
-        name: str,
+        user_id: uuid.UUID,
+        config_name: str,
     ) -> AppConfigData:
-        return await self._db_source.get_user_app_config(user_id, name)
+        return await self._db_source.get_user_app_config(user_id, config_name)
 
     async def search_app_configs(
         self,
