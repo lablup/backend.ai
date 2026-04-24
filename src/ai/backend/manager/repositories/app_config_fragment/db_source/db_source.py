@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -25,6 +26,20 @@ from ai.backend.manager.repositories.app_config_fragment.types import (
     UserAppConfigSearchScope,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+
+
+@dataclass(frozen=True, slots=True)
+class _MergedChain:
+    """Internal return type of `_merge_chain` — the ordered fragments
+    that contributed to the merge plus the deep-merged config (or
+    `None` when every contributing fragment is empty).
+
+    Re-shaped into `AppConfigData` by callers that also know the
+    `(user_id, name)` they were resolving for.
+    """
+
+    fragments: list[AppConfigFragmentData]
+    config: Mapping[str, Any] | None
 
 
 class AppConfigFragmentDBSource:
@@ -154,7 +169,7 @@ class AppConfigFragmentDBSource:
     def _merge_chain(
         rows: Sequence[AppConfigFragmentRow],
         chain: Sequence[str],
-    ) -> tuple[list[AppConfigFragmentData], Mapping[str, Any] | None]:
+    ) -> _MergedChain:
         """Order `rows` by `chain` (low → high) and deep-merge their
         `extra_config` in that order. Empty result projects to `None`
         per BEP-1052 §3 null projection.
@@ -169,7 +184,10 @@ class AppConfigFragmentDBSource:
         merged: Mapping[str, Any] = {}
         for row in ordered:
             merged = deep_merge(merged, row.extra_config)
-        return [row.to_data() for row in ordered], (merged or None)
+        return _MergedChain(
+            fragments=[row.to_data() for row in ordered],
+            config=(merged or None),
+        )
 
     async def get_user_app_config(
         self,
@@ -231,12 +249,12 @@ class AppConfigFragmentDBSource:
         # every result row carries the same `scope_sources`.
         chain = result[0].scope_sources
         rows = [r.AppConfigFragmentRow for r in result]
-        ordered_fragments, config = self._merge_chain(rows, chain)
+        merged = self._merge_chain(rows, chain)
         return AppConfigData(
             user_id=user_id,
             name=config_name,
-            fragments=ordered_fragments,
-            config=config,
+            fragments=merged.fragments,
+            config=merged.config,
         )
 
     async def search_user_app_configs(
