@@ -82,3 +82,12 @@ def resource_policy() -> None:
 )
 def storage_host() -> None:
     """My storage host commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.effective_permissions:effective_permissions",
+    name="effective-permissions",
+)
+def effective_permissions() -> None:
+    """My effective permissions commands."""

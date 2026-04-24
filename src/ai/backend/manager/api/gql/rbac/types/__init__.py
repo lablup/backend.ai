@@ -13,7 +13,9 @@ from .permission import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
+    EffectivePermissionsPayloadGQL,
     EntityActionInfoGQL,
+    EntityEffectivePermissionsGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
     OperationTypeGQL,
@@ -24,6 +26,8 @@ from .permission import (
     PermissionNestedFilterGQL,
     PermissionOrderBy,
     PermissionOrderField,
+    ResolveEffectivePermissionsInputGQL,
+    ResolveUserEffectivePermissionsInputGQL,
     ScopeEntityCombinationGQL,
     ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
@@ -169,4 +173,9 @@ __all__ = [
     # Scope-entity-operation combination (permission matrix)
     "EntityActionInfoGQL",
     "ScopeEntityOperationCombinationGQL",
+    # Effective permissions
+    "ResolveEffectivePermissionsInputGQL",
+    "ResolveUserEffectivePermissionsInputGQL",
+    "EntityEffectivePermissionsGQL",
+    "EffectivePermissionsPayloadGQL",
 ]

@@ -9,6 +9,7 @@ from __future__ import annotations
 import click
 
 from .assignment import assignment
+from .effective_permissions import effective_permissions
 from .entity import entity
 from .invitation import invitation
 from .permission import permission
@@ -26,3 +27,4 @@ rbac.add_command(permission)
 rbac.add_command(assignment)
 rbac.add_command(entity)
 rbac.add_command(invitation)
+rbac.add_command(effective_permissions)

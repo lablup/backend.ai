@@ -29,10 +29,19 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    ResolveEffectivePermissionsInput as ResolveEffectivePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    ResolveUserEffectivePermissionsInput as ResolveUserEffectivePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    EffectivePermissionsPayload as EffectivePermissionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     EntityActionInfo,
@@ -42,11 +51,15 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     ScopeEntityOperationCombinationInfo,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    EntityEffectivePermissionsNode as EntityEffectivePermissionsNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
     PermissionNode as PermissionNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
@@ -365,3 +378,62 @@ class PermissionConnection(Connection[PermissionGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+# ==================== Effective Permissions Types ====================
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for resolving effective permissions for the current user.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ResolveEffectivePermissionsInput",
+)
+class ResolveEffectivePermissionsInputGQL(
+    PydanticInputMixin[ResolveEffectivePermissionsInputDTO],
+):
+    target_element_type: RBACElementTypeGQL
+    target_entity_ids: list[str]
+    permission_entity_type: RBACElementTypeGQL | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for resolving effective permissions for a specific user (admin).",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ResolveUserEffectivePermissionsInput",
+)
+class ResolveUserEffectivePermissionsInputGQL(
+    PydanticInputMixin[ResolveUserEffectivePermissionsInputDTO],
+):
+    user_id: UUID
+    target_element_type: RBACElementTypeGQL
+    target_entity_ids: list[str]
+    permission_entity_type: RBACElementTypeGQL | None = None
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Effective permissions for a single entity.",
+    ),
+    model=EntityEffectivePermissionsNodeDTO,
+    name="EntityEffectivePermissions",
+)
+class EntityEffectivePermissionsGQL(PydanticOutputMixin[EntityEffectivePermissionsNodeDTO]):
+    entity_id: str
+    operations: list[OperationTypeGQL]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload containing resolved effective permissions per entity.",
+    ),
+    model=EffectivePermissionsPayloadDTO,
+    name="EffectivePermissionsPayload",
+)
+class EffectivePermissionsPayloadGQL(PydanticOutputMixin[EffectivePermissionsPayloadDTO]):
+    items: list[EntityEffectivePermissionsGQL]

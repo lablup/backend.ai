@@ -19,6 +19,8 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     DeletePermissionInput,
     DeleteRoleInput,
     PurgeRoleInput,
+    ResolveEffectivePermissionsInput,
+    ResolveUserEffectivePermissionsInput,
     RevokeRoleInput,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -257,3 +259,21 @@ class V2RBACHandler:
             has_previous_page=result.has_previous_page,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    # ------------------------------------------------------------------ Effective Permissions
+
+    async def resolve_effective_permissions(
+        self,
+        body: BodyParam[ResolveUserEffectivePermissionsInput],
+    ) -> APIResponse:
+        """Resolve effective permissions for a user on target entities (admin)."""
+        result = await self._adapter.resolve_effective_permissions(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_resolve_effective_permissions(
+        self,
+        body: BodyParam[ResolveEffectivePermissionsInput],
+    ) -> APIResponse:
+        """Resolve effective permissions for the current authenticated user."""
+        result = await self._adapter.my_resolve_effective_permissions(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

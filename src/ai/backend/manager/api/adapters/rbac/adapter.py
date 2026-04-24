@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
@@ -12,6 +12,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.permission.types import EntityType as InternalEntityType
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.rbac import (
@@ -35,7 +36,9 @@ from ai.backend.common.dto.manager.v2.rbac import (
     CreateRoleInput,
     CreateRolePayload,
     DeleteRolePayload,
+    EffectivePermissionsPayload,
     EntityActionInfo,
+    EntityEffectivePermissionsNode,
     EntityNode,
     OperationInfo,
     PermissionNode,
@@ -81,6 +84,12 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    ResolveEffectivePermissionsInput as ResolveEffectivePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    ResolveUserEffectivePermissionsInput as ResolveUserEffectivePermissionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     RevokeRoleInput as RevokeRoleInputDTO,
@@ -238,6 +247,9 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
+from ai.backend.manager.services.permission_contoller.actions.resolve_effective_permissions import (
+    ResolveEffectivePermissionsAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
@@ -603,6 +615,66 @@ class RBACAdapter(BaseAdapter):
             )
             for scope, entity_map in sorted(matrix.items(), key=lambda e: e[0].value)
         ]
+
+    # ------------------------------------------------------------------ effective permissions
+
+    async def resolve_effective_permissions(
+        self,
+        input: ResolveUserEffectivePermissionsInputDTO,
+    ) -> EffectivePermissionsPayload:
+        """Resolve effective permissions for a specified user on target entities."""
+        action_result = await self._processors.permission_controller.resolve_effective_permissions.wait_for_complete(
+            ResolveEffectivePermissionsAction(
+                user_id=input.user_id,
+                target_element_type=RBACElementType(input.target_element_type),
+                target_entity_ids=input.target_entity_ids,
+                permission_entity_type=(
+                    InternalEntityType(input.permission_entity_type)
+                    if input.permission_entity_type is not None
+                    else None
+                ),
+            )
+        )
+        return self._build_effective_permissions_payload(action_result.permissions)
+
+    async def my_resolve_effective_permissions(
+        self,
+        input: ResolveEffectivePermissionsInputDTO,
+    ) -> EffectivePermissionsPayload:
+        """Resolve effective permissions for the current authenticated user."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action_result = await self._processors.permission_controller.resolve_effective_permissions.wait_for_complete(
+            ResolveEffectivePermissionsAction(
+                user_id=me.user_id,
+                target_element_type=RBACElementType(input.target_element_type),
+                target_entity_ids=input.target_entity_ids,
+                permission_entity_type=(
+                    InternalEntityType(input.permission_entity_type)
+                    if input.permission_entity_type is not None
+                    else None
+                ),
+            )
+        )
+        return self._build_effective_permissions_payload(action_result.permissions)
+
+    @staticmethod
+    def _build_effective_permissions_payload(
+        permissions: Mapping[str, set[InternalOperationType]],
+    ) -> EffectivePermissionsPayload:
+        return EffectivePermissionsPayload(
+            items=[
+                EntityEffectivePermissionsNode(
+                    entity_id=entity_id,
+                    operations=sorted(
+                        [OperationTypeDTO(op.value) for op in ops],
+                        key=lambda o: o.value,
+                    ),
+                )
+                for entity_id, ops in sorted(permissions.items())
+            ],
+        )
 
     # ------------------------------------------------------------------ create
 

@@ -5,7 +5,9 @@ from .permission import (
     admin_create_permission,
     admin_delete_permission,
     admin_permissions,
+    admin_resolve_effective_permissions,
     admin_update_permission,
+    my_effective_permissions,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
@@ -38,6 +40,8 @@ from .role_invitation import (
 __all__ = [
     # Permission queries
     "admin_permissions",
+    "admin_resolve_effective_permissions",
+    "my_effective_permissions",
     "rbac_entity_operation_combinations",
     "rbac_permission_matrix",
     "rbac_scope_entity_combinations",

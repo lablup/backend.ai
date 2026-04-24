@@ -23,6 +23,8 @@ from .types import (
 __all__ = (
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
+    "ResolveEffectivePermissionsInput",
+    "ResolveUserEffectivePermissionsInput",
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
     "AssignRoleInput",
@@ -327,3 +329,36 @@ class AdminSearchEntitiesGQLInput(BaseRequestModel):
     before: str | None = None
     limit: int | None = None
     offset: int | None = None
+
+
+class ResolveEffectivePermissionsInput(BaseRequestModel):
+    """Input for resolving effective permissions for the current user (self-service)."""
+
+    target_element_type: str = Field(
+        description="Element type to check (e.g. 'session', 'vfolder').",
+    )
+    target_entity_ids: list[str] = Field(
+        description="List of entity IDs to resolve permissions for.",
+    )
+    permission_entity_type: str | None = Field(
+        default=None,
+        description="Optional permission entity type override. Defaults to target_element_type.",
+    )
+
+
+class ResolveUserEffectivePermissionsInput(BaseRequestModel):
+    """Input for resolving effective permissions for a specific user (admin)."""
+
+    user_id: UUID = Field(
+        description="User ID to resolve permissions for.",
+    )
+    target_element_type: str = Field(
+        description="Element type to check (e.g. 'session', 'vfolder').",
+    )
+    target_entity_ids: list[str] = Field(
+        description="List of entity IDs to resolve permissions for.",
+    )
+    permission_entity_type: str | None = Field(
+        default=None,
+        description="Optional permission entity type override. Defaults to target_element_type.",
+    )

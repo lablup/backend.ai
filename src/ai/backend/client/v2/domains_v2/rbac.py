@@ -16,6 +16,8 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     DeletePermissionInput,
     DeleteRoleInput,
     PurgeRoleInput,
+    ResolveEffectivePermissionsInput,
+    ResolveUserEffectivePermissionsInput,
     RevokeRoleInput,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -31,6 +33,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRolePayload,
     DeletePermissionPayload,
     DeleteRolePayload,
+    EffectivePermissionsPayload,
     PermissionNode,
     PurgeRolePayload,
     RoleAssignmentNode,
@@ -222,4 +225,28 @@ class V2RBACClient(BaseDomainClient):
             f"{_PATH}/entities/search",
             request=request,
             response_model=AdminSearchAssociationsPayload,
+        )
+
+    # ------------------------------------------------------------------ Effective Permissions
+
+    async def resolve_effective_permissions(
+        self, request: ResolveUserEffectivePermissionsInput
+    ) -> EffectivePermissionsPayload:
+        """Resolve effective permissions for a user on target entities (admin)."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/effective-permissions",
+            request=request,
+            response_model=EffectivePermissionsPayload,
+        )
+
+    async def my_resolve_effective_permissions(
+        self, request: ResolveEffectivePermissionsInput
+    ) -> EffectivePermissionsPayload:
+        """Resolve effective permissions for the current authenticated user."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/effective-permissions/my",
+            request=request,
+            response_model=EffectivePermissionsPayload,
         )

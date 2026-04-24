@@ -144,4 +144,18 @@ def register_v2_rbac_routes(
         middlewares=[superadmin_required],
     )
 
+    # Effective Permissions
+    registry.add(
+        "POST",
+        "/effective-permissions",
+        handler.resolve_effective_permissions,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/effective-permissions/my",
+        handler.my_resolve_effective_permissions,
+        middlewares=[auth_required],
+    )
+
     return registry

@@ -21,6 +21,8 @@ from .actions import (
     GetRoleDetailAction,
     GetRoleDetailActionResult,
     PurgeRoleAction,
+    ResolveEffectivePermissionsAction,
+    ResolveEffectivePermissionsActionResult,
     RevokeRoleAction,
     RevokeRoleActionResult,
     SearchRolesAction,
@@ -130,6 +132,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
     update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
     delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
+    resolve_effective_permissions: ActionProcessor[
+        ResolveEffectivePermissionsAction, ResolveEffectivePermissionsActionResult
+    ]
     create_role_invitation: ScopeActionProcessor[
         CreateRoleInvitationAction, CreateRoleInvitationActionResult
     ]
@@ -190,6 +195,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
         self.update_permission = ActionProcessor(service.update_permission, action_monitors)
         self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
+        self.resolve_effective_permissions = ActionProcessor(
+            service.resolve_effective_permissions, action_monitors
+        )
         invitation_scope_validators = [validators.rbac.scope]
         invitation_entity_validators = [validators.rbac.single_entity]
         self.create_role_invitation = ScopeActionProcessor(
@@ -244,6 +252,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             CreatePermissionAction.spec(),
             UpdatePermissionAction.spec(),
             DeletePermissionAction.spec(),
+            ResolveEffectivePermissionsAction.spec(),
             CreateRoleInvitationAction.spec(),
             AcceptInvitationAction.spec(),
             RejectInvitationAction.spec(),

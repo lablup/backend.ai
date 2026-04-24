@@ -21,6 +21,8 @@ from .types import (
 __all__ = (
     "AdminSearchAssociationsPayload",
     "AdminSearchPermissionsPayload",
+    "EffectivePermissionsPayload",
+    "EntityEffectivePermissionsNode",
     "SearchRoleAssignmentsPayload",
     "AdminSearchRolesPayload",
     "AssociationScopesEntitiesNode",
@@ -240,4 +242,21 @@ class ScopeEntityOperationCombinationInfo(BaseResponseModel):
     scope_type: RBACElementTypeDTO = Field(description="Scope element type")
     entities: list[EntityActionInfo] = Field(
         description="Entities and their valid operations within this scope"
+    )
+
+
+class EntityEffectivePermissionsNode(BaseResponseModel):
+    """Effective permissions for a single entity."""
+
+    entity_id: str = Field(description="Entity identifier")
+    operations: list[OperationTypeDTO] = Field(
+        description="List of operations the user is authorized to perform"
+    )
+
+
+class EffectivePermissionsPayload(BaseResponseModel):
+    """Payload containing resolved effective permissions per entity."""
+
+    items: list[EntityEffectivePermissionsNode] = Field(
+        description="Effective permissions per entity"
     )

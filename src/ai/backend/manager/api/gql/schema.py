@@ -269,6 +269,7 @@ from .rbac import (
     admin_entities,
     admin_permissions,
     admin_purge_role,
+    admin_resolve_effective_permissions,
     admin_revoke_role,
     admin_role,
     admin_role_assignments,
@@ -277,6 +278,7 @@ from .rbac import (
     admin_update_permission,
     admin_update_role,
     create_role_invitation,
+    my_effective_permissions,
     my_role_invitations,
     my_roles,
     project_roles,
@@ -532,6 +534,7 @@ class Query:
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
     admin_entities = admin_entities
+    admin_resolve_effective_permissions = admin_resolve_effective_permissions
     # Keypair self-service queries
     my_keypairs = my_keypairs
     # Keypair admin queries
@@ -544,6 +547,7 @@ class Query:
     # RBAC User APIs
     my_roles = my_roles
     my_role_invitations = my_role_invitations
+    my_effective_permissions = my_effective_permissions
     # RBAC Admin Invitation APIs
     admin_role_invitations = admin_role_invitations
     # RBAC Scoped APIs

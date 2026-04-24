@@ -10,6 +10,7 @@ from ai.backend.common.data.permission.scope_entity_combinations import (
 )
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -21,6 +22,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
+    EffectivePermissionsPayloadGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
     OperationTypeGQL,
@@ -29,6 +31,8 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionGQL,
     PermissionOrderBy,
     RBACElementTypeGQL,
+    ResolveEffectivePermissionsInputGQL,
+    ResolveUserEffectivePermissionsInputGQL,
     ScopeEntityCombinationGQL,
     ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
@@ -189,3 +193,35 @@ async def admin_delete_permission(
     check_admin_only()
     result = await info.context.adapters.rbac.delete_permission(input.id)
     return DeletePermissionPayload.from_pydantic(result)
+
+
+# ==================== Effective Permissions Resolvers ====================
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Resolve effective permissions for a specific user on target entities (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_resolve_effective_permissions(
+    info: Info[StrawberryGQLContext],
+    input: ResolveUserEffectivePermissionsInputGQL,
+) -> EffectivePermissionsPayloadGQL:
+    check_admin_only()
+    result = await info.context.adapters.rbac.resolve_effective_permissions(input.to_pydantic())
+    return EffectivePermissionsPayloadGQL.from_pydantic(result)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Resolve effective permissions for the current user on target entities.",
+    )
+)  # type: ignore[misc]
+async def my_effective_permissions(
+    info: Info[StrawberryGQLContext],
+    input: ResolveEffectivePermissionsInputGQL,
+) -> EffectivePermissionsPayloadGQL:
+    result = await info.context.adapters.rbac.my_resolve_effective_permissions(input.to_pydantic())
+    return EffectivePermissionsPayloadGQL.from_pydantic(result)
