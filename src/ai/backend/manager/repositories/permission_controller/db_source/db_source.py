@@ -1182,6 +1182,10 @@ class PermissionDBSource:
             result = await execute_bulk_creator_partial(db_session, bulk_creator)
             all_user_ids = [row.user_id for row in result.successes]
             await self._sync_user_scopes_on_assign(db_session, all_user_ids)
+            # Idempotent with the service-layer bind_user_to_project path; keeps
+            # bulk assignment consistent with the single-entity flow when the
+            # caller does not supply project_id for a project-scoped role.
+            await self._sync_association_groups_users_on_assign(db_session, all_user_ids)
             return result
 
     async def bulk_revoke_role(

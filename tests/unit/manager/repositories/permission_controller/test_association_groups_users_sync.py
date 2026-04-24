@@ -4,7 +4,10 @@ Covers the 3-table invariant (user_roles, association_scopes_entities,
 association_groups_users) for:
 - bulk_revoke_role (BA-5810: regression)
 - accept_invitation for project-scoped roles (BA-5810: regression)
-- single assign/revoke paths (already correct, locked in here)
+- single assign and bulk_assign_role (repository-level sync).
+
+Single-user revoke_role is exercised at the service layer via
+unbind_user_from_project and is not covered here.
 """
 
 from __future__ import annotations
@@ -53,6 +56,8 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
@@ -365,6 +370,35 @@ class TestAssociationGroupsUsersSync:
                 )
             )
         assert count == 1
+
+    # --- bulk_assign_role membership sync ---
+
+    async def test_bulk_assign_project_role_creates_membership_rows(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        perm_db_source: PermissionDBSource,
+        role_in_project_a: uuid.UUID,
+        user_1: uuid.UUID,
+        user_2: uuid.UUID,
+        project_a: uuid.UUID,
+    ) -> None:
+        """bulk_assign_role populates association_groups_users from role scope.
+
+        Covers the case where the caller does not pass ``project_id`` through
+        the service layer for a project-scoped role — the repository-level
+        sync must still keep the business-membership table consistent.
+        """
+        bulk_creator = BulkCreator(
+            specs=[
+                UserRoleCreatorSpec(user_id=user_1, role_id=role_in_project_a),
+                UserRoleCreatorSpec(user_id=user_2, role_id=role_in_project_a),
+            ]
+        )
+
+        await perm_db_source.bulk_assign_role(bulk_creator)
+
+        assert project_a in await self._project_membership_ids(db_with_cleanup, user_1)
+        assert project_a in await self._project_membership_ids(db_with_cleanup, user_2)
 
     # --- accept_invitation (BA-5810 primary regression) ---
 
