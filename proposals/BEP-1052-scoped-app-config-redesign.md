@@ -274,7 +274,7 @@ repositories/app_config_policy/
 
 | Repository                   | Methods                                                                                                              |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(scope, querier)` for a bound scope (via `AppConfigSourceSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, name, chain)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`; chain derived in SQL via policy join), and `admin_search_app_configs(querier)` for cross-user admin search — see §5. |
+| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(scope, querier)` for a bound scope (via `AppConfigSourceSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, name)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`), and `admin_search_app_configs(querier)` for cross-user admin search. All three derive the chain in SQL via a policy join — see §5. |
 | `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(querier)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigSource` row still references the `config_name`. |
 
 `AppConfigSourceRepository` plays a **dual role** — raw CRUD (served
@@ -463,7 +463,7 @@ type AppConfig implements Node {
   contributing row has an empty stored `config` (clients fall back
   to built-in defaults).
   """
-  mergedConfig: JSON
+  config: JSON
 }
 ```
 
@@ -711,7 +711,7 @@ enum AppConfigOrderField {
 
 input AppConfigPolicyFilter {
   configName: StringFilter = null
-  userWritable: BooleanFilter = null
+  userWritable: Boolean = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
   AND: [AppConfigPolicyFilter!] = null
@@ -839,7 +839,7 @@ input AdminBulkPurgeAppConfigSourceInput {
 }
 
 # ── My Inputs — scope=USER, scopeId=current_user.user_id implicit ──
-# `AppConfig.mergedConfig` is read-only; writes go through these inputs.
+# `AppConfig.config` is read-only; writes go through these inputs.
 
 input MyAppConfigSourceItemInput {
   name: String!
@@ -1230,13 +1230,13 @@ of the GQL `AppConfig`:
       "scope_id": "<user_uuid>", "name": "preferences",
       "config": { ... }, "created_at": "...", "updated_at": "..." }
   ],
-  "merged_config": { ... }
+  "config": { ... }
 }
 ```
 
 `sources` is ordered low → high (policy's `scope_sources`).
 Elements appear only where a row exists for `(user, name)`. Each
-`config` and the top-level `merged_config` mirror GQL nullability
+`config` and the top-level `config` mirror GQL nullability
 (§3) — empty → `null`, never bare `{}`.
 
 #### Admin writes (bulk-only)
@@ -1328,12 +1328,14 @@ wider as the use case demands.
 ### Read (Merge)
 
 Single-document (`AppConfigSourceDBSource.get_user_app_config(user_id,
-name, chain)`): one SQL resolves `domain_name` via a `users`
-subquery and pulls one row per chain scope where present. Rows are
+name)`): one SQL resolves `domain_name` via a `users` subquery,
+joins `app_config_policies` to derive the chain (`scope_sources`),
+and pulls only the scope rows that are part of that chain. Rows are
 ordered per the chain; absent scopes contribute `{}`; the deep-merge
 treats nested objects recursively, leaves as scalar replacement, and
-lists as wholesale replacement. Output: ordered `sources` +
-merged `mergedConfig`.
+lists as wholesale replacement. Output: ordered `sources` + merged
+`config`. Callers don't pre-resolve the chain — the same pattern
+applies to search (below).
 
 Connection (`myAppConfigs` → `search_user_app_configs`): same
 single-SQL approach, generalized — joins `app_config_sources` with
@@ -1370,41 +1372,57 @@ class AppConfigSourceDBSource:
         self,
         user_id: str,
         name: str,
-        chain: list[AppConfigScopeType],
     ) -> AppConfigData:
-        # Service passes the policy's `scope_sources` as `chain`.
-        # Single SQL: resolve `domain_name` via a `users` subquery
-        # and pull one row per chain scope. Bounded by the natural-key
+        # Single SQL: resolve `domain_name` via a `users` subquery,
+        # join `app_config_policies` to derive the chain
+        # (`scope_sources`), and fetch only the scope rows that are
+        # part of that chain. Bounded by the natural-key
         # UniqueConstraint.
         user_domain_sq = (
             sa.select(UserRow.domain_name)
             .where(UserRow.id == sa.cast(user_id, sa.UUID))
             .scalar_subquery()
         )
-        scope_id_for = {
-            AppConfigScopeType.PUBLIC: sa.literal("public"),
-            AppConfigScopeType.DOMAIN: user_domain_sq,
-            AppConfigScopeType.DOMAIN_USER_DEFAULTS: user_domain_sq,
-            AppConfigScopeType.USER: sa.literal(user_id),
-        }
-        scope_predicates = [
-            sa.and_(
-                AppConfigSourceRow.scope_type == scope_type,
-                AppConfigSourceRow.scope_id == scope_id_for[scope_type],
+        scope_id_match = sa.case(
+            (AppConfigSourceRow.scope_type == AppConfigScopeType.PUBLIC,
+             sa.literal("public")),
+            (AppConfigSourceRow.scope_type.in_([
+                AppConfigScopeType.DOMAIN,
+                AppConfigScopeType.DOMAIN_USER_DEFAULTS,
+            ]), user_domain_sq),
+            (AppConfigSourceRow.scope_type == AppConfigScopeType.USER,
+             sa.literal(user_id)),
+        )
+        query = (
+            sa.select(AppConfigSourceRow, AppConfigPolicyRow.scope_sources)
+            .join(
+                AppConfigPolicyRow,
+                AppConfigPolicyRow.config_name == AppConfigSourceRow.name,
             )
-            for scope_type in chain
-        ]
+            .where(
+                AppConfigSourceRow.name == name,
+                AppConfigSourceRow.scope_id == scope_id_match,
+                sa.cast(AppConfigSourceRow.scope_type, sa.Text)
+                    == sa.any_(AppConfigPolicyRow.scope_sources),
+            )
+        )
         async with self._db.begin_readonly_session() as db_sess:
-            rows = (await db_sess.execute(
-                sa.select(AppConfigSourceRow).where(
-                    AppConfigSourceRow.name == name,
-                    sa.or_(*scope_predicates),
-                )
-            )).scalars().all()
+            result = (await db_sess.execute(query)).all()
 
-        by_scope = {row.scope_type: row for row in rows}
+        if not result:
+            return AppConfigData(
+                user_id=user_id, name=name, sources=[], config=None,
+            )
+
+        chain = result[0].scope_sources  # all rows share the same policy
+        by_scope = {
+            r.AppConfigSourceRow.scope_type: r.AppConfigSourceRow
+            for r in result
+        }
         ordered_sources = [
-            by_scope[scope_type] for scope_type in chain if scope_type in by_scope
+            by_scope[AppConfigScopeType(s)]
+            for s in chain
+            if AppConfigScopeType(s) in by_scope
         ]
         merged: dict = {}
         for row in ordered_sources:
@@ -1415,7 +1433,7 @@ class AppConfigSourceDBSource:
             name=name,
             sources=ordered_sources,
             # Empty → None per §3 null projection.
-            merged_config=merged or None,
+            config=merged or None,
         )
 
     async def search_user_app_configs(
@@ -1504,11 +1522,8 @@ class AppConfigSourceRepository:
         self,
         user_id: str,
         name: str,
-        chain: list[AppConfigScopeType],
     ) -> AppConfigData:
-        return await self._db_source.get_user_app_config(
-            user_id, name, chain
-        )
+        return await self._db_source.get_user_app_config(user_id, name)
 
     async def search_app_configs(
         self,
@@ -1537,7 +1552,7 @@ result:
   when no chain scope has a row, in which case the `name` itself
   doesn't appear in `myAppConfigs`. An individual source's `config`
   is `null` when the stored value is empty.
-- `mergedConfig` — deep-merge in order; `null` when every
+- `config` — deep-merge in order; `null` when every
   contributing row is empty (clients fall back to defaults).
 
 Callers distinguish admin defaults (`scopeType = DOMAIN_USER_DEFAULTS`)
@@ -1561,7 +1576,7 @@ publishes no bootstrap list.
 
 2. **Post-login** — one `myAppConfigs` query fetches all of the
    caller's merged documents in one round trip (each entry carries
-   `sources` + `mergedConfig`, §5). Admins use the same query for
+   `sources` + `config`, §5). Admins use the same query for
    their personal settings. `DOMAIN`-scope admin UIs issue
    `DomainV2.appConfigSources` / `adminAppConfigSources` separately.
    See S2 in §7.
@@ -1608,7 +1623,7 @@ query BootstrapMe {
       node {
         name
         sources { scopeType scopeId name config updatedAt }
-        mergedConfig
+        config
       }
     }
   }
@@ -1623,8 +1638,8 @@ query BootstrapMe {
   is backed by a policy (§1 required-policy invariant), so the chain
   always comes from `AppConfigPolicy.scope_sources` — there is no
   implicit fallback chain. `sources` carries the raw rows in chain
-  order; `mergedConfig` is their deep merge. See §5.
-- The WebUI initializes UI state from `mergedConfig` per document
+  order; `config` is their deep merge. See §5.
+- The WebUI initializes UI state from `config` per document
   and keeps the `sources` list around so the Settings page can
   distinguish user-changed (`scopeType = USER`) from admin-provided
   defaults (`scopeType = DOMAIN_USER_DEFAULTS`, etc.).
@@ -1646,7 +1661,7 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigSourceInput!) {
     updated {
       name
       sources { scopeType scopeId name config updatedAt }
-      mergedConfig
+      config
     }
     failed { index name message }
   }
@@ -1674,7 +1689,7 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigSourceInput!) {
   row (admins operating on other users use
   `adminBulkUpdateAppConfigSources`).
 - The input `config` replaces the USER row's stored JSON wholesale.
-  `AppConfig.mergedConfig` is read-only computed and cannot
+  `AppConfig.config` is read-only computed and cannot
   be written.
 - **Replace** semantics: anything the caller wants to keep must be
   sent in the same payload — there is no partial-merge or per-key
@@ -1737,7 +1752,7 @@ mutation PublishThemePolicy(
     `user_writable = false`.
   - `myAppConfigs` entries for `theme` are resolved through the
     chain `[DOMAIN]` (single-scope — `sources` has at most one
-    element, and `mergedConfig` equals that element's `config`
+    element, and `config` equals that element's `config`
     or is `null` when the element's `config` is `null`, §3).
 - Subsequent edits use `adminBulkUpdateAppConfigPolicies` with the
   same `configName`.
@@ -1815,7 +1830,7 @@ mutation PromoteThemePolicy(
     `theme` and write their own `USER` row.
   - The next `myAppConfigs` call returns `theme` entries whose
     `sources` is `[<DOMAIN row>, <USER row if present>]` and whose
-    `mergedConfig` is `domain ⊕ user`.
+    `config` is `domain ⊕ user`.
 - Reversibility: flipping the policy back to
   `scopeSources=["domain"]` + `userWritable=false` blocks new user
   writes and excludes `USER` rows from the resolved view, but leaves
