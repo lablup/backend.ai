@@ -9,6 +9,7 @@ from ai.backend.manager.actions.validator.bulk import (
     BulkValidationResult,
     DeniedEntity,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.role import BulkPermissionCheckInput
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -21,10 +22,10 @@ class BulkActionRBACValidator(BulkActionValidator):
     def __init__(
         self,
         repository: PermissionControllerRepository,
-        enabled: bool,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._repository = repository
-        self._enabled = enabled
+        self._config_provider = config_provider
 
     @classmethod
     @override
@@ -36,7 +37,7 @@ class BulkActionRBACValidator(BulkActionValidator):
         self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
         entity_ids = list(action.entity_ids)
-        if not self._enabled:
+        if not self._config_provider.config.manager.rbac.enforcement_enabled:
             return BulkValidationResult(
                 allowed_entity_ids=entity_ids,
                 denied_entities=[],

@@ -5,6 +5,7 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.role import ScopeChainPermissionCheckInput
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -16,14 +17,14 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
     def __init__(
         self,
         repository: PermissionControllerRepository,
-        enabled: bool,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._repository = repository
-        self._enabled = enabled
+        self._config_provider = config_provider
 
     @override
     async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
-        if not self._enabled:
+        if not self._config_provider.config.manager.rbac.enforcement_enabled:
             return
 
         user = current_user()
