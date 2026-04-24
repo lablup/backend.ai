@@ -16,7 +16,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.prometheus.fixed_query_builder import FixedContainerQueryBuilder
+from ai.backend.manager.clients.prometheus.fixed_query_builder import FixedQueryBuilder
 from ai.backend.manager.data.metric.types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
@@ -47,13 +47,13 @@ metric_repository_resilience = Resilience(
 class MetricRepository:
     _db: ExtendedAsyncSAEngine
     _prometheus_client: PrometheusClient
-    _fixed_query_builder: FixedContainerQueryBuilder
+    _fixed_query_builder: FixedQueryBuilder
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         prometheus_client: PrometheusClient,
-        fixed_query_builder: FixedContainerQueryBuilder,
+        fixed_query_builder: FixedQueryBuilder,
     ) -> None:
         self._db = db
         self._prometheus_client = prometheus_client

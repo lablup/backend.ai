@@ -23,7 +23,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     PrometheusConnectionError,
 )
-from ai.backend.manager.clients.prometheus.fixed_query_builder import FixedContainerQueryBuilder
+from ai.backend.manager.clients.prometheus.fixed_query_builder import FixedQueryBuilder
 from ai.backend.manager.data.metric.types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
@@ -63,7 +63,7 @@ def _make_metric_repository(
     return MetricRepository(
         MagicMock(),
         prometheus_client=mock_prometheus_client,
-        fixed_query_builder=FixedContainerQueryBuilder(timewindow),
+        fixed_query_builder=FixedQueryBuilder(timewindow),
     )
 
 
@@ -472,19 +472,17 @@ class TestMetricTypeDetection:
     """Test metric type detection logic."""
 
     @pytest.fixture
-    def fixed_query_builder(self) -> FixedContainerQueryBuilder:
-        return FixedContainerQueryBuilder("1m")
+    def fixed_query_builder(self) -> FixedQueryBuilder:
+        return FixedQueryBuilder("1m")
 
-    def test_cpu_util_detected_as_diff_type(
-        self, fixed_query_builder: FixedContainerQueryBuilder
-    ) -> None:
+    def test_cpu_util_detected_as_diff_type(self, fixed_query_builder: FixedQueryBuilder) -> None:
         metric_type = fixed_query_builder.get_container_metric_type(
             "cpu_util", ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
         )
         assert metric_type == MetricType.DIFF
 
     def test_network_metrics_detected_as_rate_type(
-        self, fixed_query_builder: FixedContainerQueryBuilder
+        self, fixed_query_builder: FixedQueryBuilder
     ) -> None:
         for metric_name in ["net_rx", "net_tx"]:
             metric_type = fixed_query_builder.get_container_metric_type(
@@ -493,7 +491,7 @@ class TestMetricTypeDetection:
             assert metric_type == MetricType.RATE
 
     def test_memory_metrics_detected_as_gauge_type(
-        self, fixed_query_builder: FixedContainerQueryBuilder
+        self, fixed_query_builder: FixedQueryBuilder
     ) -> None:
         for metric_name in ["container_memory_used_bytes", "container_gpu_percent"]:
             metric_type = fixed_query_builder.get_container_metric_type(
@@ -561,7 +559,7 @@ class TestTimewindowInitialization:
 
     @pytest.mark.parametrize("timewindow", ["30s", "1m", "5m", "15m", "1h"])
     async def test_timewindow_stored_correctly(self, timewindow: str) -> None:
-        fixed_query_builder = FixedContainerQueryBuilder(timewindow)
+        fixed_query_builder = FixedQueryBuilder(timewindow)
         assert fixed_query_builder._timewindow == timewindow
 
     @pytest.mark.parametrize(
@@ -575,7 +573,7 @@ class TestTimewindowInitialization:
     async def test_timewindow_applied_to_query(
         self, metric_name: str, value_type: ValueType
     ) -> None:
-        fixed_query_builder = FixedContainerQueryBuilder("3m")
+        fixed_query_builder = FixedQueryBuilder("3m")
         label = ContainerMetricOptionalLabel(value_type=value_type)
 
         query = fixed_query_builder.get_container_metric_query(metric_name, label)
@@ -734,7 +732,7 @@ class TestBuiltinQueryProvider:
         ids=lambda c: c.id,
     )
     async def test_build_query_renders_expected_promql(self, case: BuiltinQueryTestCase) -> None:
-        fixed_query_builder = FixedContainerQueryBuilder(case.timewindow)
+        fixed_query_builder = FixedQueryBuilder(case.timewindow)
 
         query = fixed_query_builder.get_container_metric_query(case.metric_name, case.labels)
         rendered_query = query.render()

@@ -51,7 +51,7 @@ def _regex_union(values: Sequence[str]) -> str:
     return "|".join(re.escape(value) for value in values)
 
 
-class FixedContainerQueryBuilder:
+class FixedQueryBuilder:
     _timewindow: str
 
     def __init__(self, timewindow: str) -> None:

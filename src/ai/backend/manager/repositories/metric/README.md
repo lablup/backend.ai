@@ -9,10 +9,10 @@ The Metric Repository provides the data access layer for metric-related operatio
 ### MetricRepository
 
 - Queries Prometheus for kernel live stats (gauge/diff/rate metrics)
-- Delegates platform fixed PromQL query construction to `FixedContainerQueryBuilder`
+- Delegates platform fixed PromQL query construction to `FixedQueryBuilder`
 - Instantiated through the repository factory with `PrometheusClient` and a fixed query provider
 
-### FixedContainerQueryBuilder
+### FixedQueryBuilder
 
 - Builds platform fixed container metric PromQL queries
 
