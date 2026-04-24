@@ -10,7 +10,6 @@ from typing import Annotated
 
 import strawberry
 
-from ai.backend.manager.api.gql.app_config import AppConfig
 from ai.backend.manager.api.gql.artifact.types import Artifact, ArtifactRevision
 from ai.backend.manager.api.gql.artifact_registry import ArtifactRegistry
 from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
@@ -43,7 +42,6 @@ EntityNode = Annotated[
     | SessionV2GQL
     | Artifact
     | ArtifactRegistry
-    | AppConfig
     | NotificationChannel
     | NotificationRule
     | ModelDeployment

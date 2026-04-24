@@ -15,18 +15,6 @@ from .agent import (
     agent_stats,
     agents_v2,
 )
-from .app_config import (
-    admin_delete_domain_app_config,
-    admin_domain_app_config,
-    admin_upsert_domain_app_config,
-    delete_domain_app_config,
-    delete_user_app_config,
-    domain_app_config,
-    merged_app_config,
-    upsert_domain_app_config,
-    upsert_user_app_config,
-    user_app_config,
-)
 from .artifact import (
     approve_artifact_revision,
     artifact,
@@ -476,8 +464,6 @@ class Query:
     artifacts = artifacts
     artifact_revision = artifact_revision
     artifact_revisions = artifact_revisions
-    user_app_config = user_app_config
-    merged_app_config = merged_app_config
     deployment = deployment
     revisions = revisions
     revision = revision
@@ -513,7 +499,6 @@ class Query:
     admin_notification_channels = admin_notification_channels
     admin_notification_rule = admin_notification_rule
     admin_notification_rules = admin_notification_rules
-    admin_domain_app_config = admin_domain_app_config
     admin_domain_fair_share = admin_domain_fair_share
     admin_domain_fair_shares = admin_domain_fair_shares
     admin_project_fair_share = admin_project_fair_share
@@ -595,7 +580,6 @@ class Query:
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
-    domain_app_config = domain_app_config
     domain_fair_share = domain_fair_share
     domain_fair_shares = domain_fair_shares
     project_fair_share = project_fair_share
@@ -683,8 +667,6 @@ class Mutation:
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
-    upsert_user_app_config = upsert_user_app_config
-    delete_user_app_config = delete_user_app_config
     delegate_scan_artifacts = delegate_scan_artifacts
     delegate_import_artifacts = delegate_import_artifacts
     update_artifact = update_artifact
@@ -712,9 +694,6 @@ class Mutation:
     admin_update_notification_rule = admin_update_notification_rule
     admin_delete_notification_rule = admin_delete_notification_rule
     admin_validate_notification_rule = admin_validate_notification_rule
-    # App Config - Admin APIs
-    admin_upsert_domain_app_config = admin_upsert_domain_app_config
-    admin_delete_domain_app_config = admin_delete_domain_app_config
     # Notification - Legacy (deprecated)
     create_notification_channel = create_notification_channel
     update_notification_channel = update_notification_channel
@@ -724,9 +703,6 @@ class Mutation:
     update_notification_rule = update_notification_rule
     delete_notification_rule = delete_notification_rule
     validate_notification_rule = validate_notification_rule
-    # App Config - Legacy (deprecated)
-    upsert_domain_app_config = upsert_domain_app_config
-    delete_domain_app_config = delete_domain_app_config
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     create_auto_scaling_rule = create_auto_scaling_rule
