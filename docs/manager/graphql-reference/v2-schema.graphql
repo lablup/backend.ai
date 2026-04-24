@@ -3988,6 +3988,14 @@ type EffectiveBreakdownV2 {
 }
 
 """
+Added in UNRELEASED. Payload containing resolved effective permissions per entity.
+"""
+type EffectivePermissionsPayload {
+  """Effective permissions per entity"""
+  items: [EntityEffectivePermissions!]!
+}
+
+"""
 Added in 26.4.2. Effective assignable resources considering all scope constraints.
 """
 type EffectiveResourceAllocationV2 {
@@ -4110,6 +4118,15 @@ type EntityConnection {
   """Contains the nodes in this connection"""
   edges: [EntityRefEdge!]!
   count: Int!
+}
+
+"""Added in UNRELEASED. Effective permissions for a single entity."""
+type EntityEffectivePermissions {
+  """Entity identifier"""
+  entityId: String!
+
+  """List of operations the user is authorized to perform"""
+  operations: [OperationType!]!
 }
 
 """Added in 26.3.0. Filter for entity associations"""
@@ -8685,6 +8702,11 @@ type Query {
   adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
 
   """
+  Added in UNRELEASED. Resolve effective permissions for a specific user on target entities (admin only).
+  """
+  adminResolveEffectivePermissions(input: ResolveUserEffectivePermissionsInput!): EffectivePermissionsPayload!
+
+  """
   Added in 26.4.2. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
   """
   myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection!
@@ -8721,6 +8743,11 @@ type Query {
 
   """Added in UNRELEASED. List the current user's role invitations."""
   myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
+
+  """
+  Added in UNRELEASED. Resolve effective permissions for the current user on target entities.
+  """
+  myEffectivePermissions(input: ResolveEffectivePermissionsInput!): EffectivePermissionsPayload!
 
   """
   Added in UNRELEASED. List all role invitations across the system (superadmin only).
@@ -9521,6 +9548,25 @@ type ReservoirRegistryEdge {
 
   """The item at the end of the edge"""
   node: ReservoirRegistry!
+}
+
+"""
+Added in UNRELEASED. Input for resolving effective permissions for the current user.
+"""
+input ResolveEffectivePermissionsInput {
+  targetElementType: RBACElementType!
+  targetEntityIds: [String!]!
+  permissionEntityType: RBACElementType = null
+}
+
+"""
+Added in UNRELEASED. Input for resolving effective permissions for a specific user (admin).
+"""
+input ResolveUserEffectivePermissionsInput {
+  userId: UUID!
+  targetElementType: RBACElementType!
+  targetEntityIds: [String!]!
+  permissionEntityType: RBACElementType = null
 }
 
 """Added in 26.2.0. Resource allocation with requested and used slots."""
