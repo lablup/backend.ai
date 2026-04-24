@@ -9,12 +9,11 @@ from uuid import UUID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
-
-from .base import RevisionOperationBaseAction
+from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
 @dataclass
-class PromoteDeploymentAction(RevisionOperationBaseAction):
+class PromoteDeploymentAction(DeploymentBaseAction):
     """Action to manually promote a blue-green deployment.
 
     Triggers immediate traffic switch from blue (old) to green (new) routes
