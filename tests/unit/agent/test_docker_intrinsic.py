@@ -926,8 +926,7 @@ class TestSharedStatsStreamerWiring:
         This test monkeypatches :meth:`AbstractAgent.scan_running_kernels`
         (the exact point where the blocker bites) and asserts the streamer
         is already set when it runs. It also confirms the intrinsic plugins
-        (discovered via ``hasattr(..., "attach_stats_streamer")``) received
-        the same streamer instance before the super init is reached.
+        received the same streamer instance before the super init is reached.
         """
         observed_streamer: list[DockerStatsStreamer | None] = []
         observed_cpu_streamer: list[DockerStatsStreamer | None] = []
@@ -941,16 +940,11 @@ class TestSharedStatsStreamerWiring:
 
         cpu_plugin = CPUPlugin.__new__(CPUPlugin)
         mem_plugin = MemoryPlugin.__new__(MemoryPlugin)
-        # A non-intrinsic plugin with no attach_stats_streamer attribute
-        # must be skipped silently by the hasattr-based attach loop.
-        unrelated_plugin = object()
 
         computer_ctx_cpu = MagicMock()
         computer_ctx_cpu.instance = cpu_plugin
         computer_ctx_mem = MagicMock()
         computer_ctx_mem.instance = mem_plugin
-        computer_ctx_other = MagicMock()
-        computer_ctx_other.instance = unrelated_plugin
 
         async def fake_scan_running_kernels(self: Any) -> None:
             # Record the streamer state at the exact moment the race would
@@ -1031,7 +1025,6 @@ class TestSharedStatsStreamerWiring:
         fake_computers: Any = {
             "cpu": computer_ctx_cpu,
             "mem": computer_ctx_mem,
-            "other": computer_ctx_other,
         }
         agent.computers = fake_computers
 
@@ -1046,8 +1039,6 @@ class TestSharedStatsStreamerWiring:
         # Both intrinsic plugins must already hold the same streamer instance.
         assert observed_cpu_streamer[0] is observed_streamer[0]
         assert observed_mem_streamer[0] is observed_streamer[0]
-        # Non-intrinsic plugins are silently skipped by the hasattr loop.
-        assert not hasattr(unrelated_plugin, "_stats_streamer")
 
         await agent._stats_streamer.close()
 
