@@ -5,7 +5,6 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
-from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.role import ScopeChainPermissionCheckInput
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -17,14 +16,14 @@ class ScopeActionRBACValidator(ScopeActionValidator):
     def __init__(
         self,
         repository: PermissionControllerRepository,
-        config_provider: ManagerConfigProvider,
+        enabled: bool,
     ) -> None:
         self._repository = repository
-        self._config_provider = config_provider
+        self._enabled = enabled
 
     @override
     async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
-        if not self._config_provider.config.manager.rbac.enforcement_enabled:
+        if not self._enabled:
             return
 
         user = current_user()

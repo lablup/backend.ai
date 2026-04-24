@@ -111,9 +111,7 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    real_single_entity_validator = SingleEntityActionRBACValidator(
-        rbac_permission_repo, MagicMock()
-    )
+    real_single_entity_validator = SingleEntityActionRBACValidator(rbac_permission_repo, True)
     return SessionProcessors(
         service=service,
         action_monitors=[],

@@ -259,11 +259,15 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
 
         permission_controller_repository = setup_input.repositories.permission_controller.repository
-        config_provider = setup_input.config_provider
+        rbac_enforcement_enabled = (
+            setup_input.config_provider.config.manager.rbac.enforcement_enabled
+        )
         rbac_validators = RBACValidators(
-            scope=ScopeActionRBACValidator(permission_controller_repository, config_provider),
+            scope=ScopeActionRBACValidator(
+                permission_controller_repository, rbac_enforcement_enabled
+            ),
             single_entity=SingleEntityActionRBACValidator(
-                permission_controller_repository, config_provider
+                permission_controller_repository, rbac_enforcement_enabled
             ),
         )
         legacy_rbac_validators = LegacyRBACValidators(
