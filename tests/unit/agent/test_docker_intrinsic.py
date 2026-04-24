@@ -683,6 +683,15 @@ _NUMA_SCENARIOS: dict[str, _NumaScenario] = {
         cores=[0, 1],
         expected_cpuset_mems=None,
     ),
+    # Empty allocation → no cores to pin; must not produce CpusetMems="" or
+    # a spurious node id. Locks in the defensive behavior so a future
+    # refactor of _resolve_node_local_mem cannot regress it.
+    "empty_allocation": _NumaScenario(
+        num_nodes=2,
+        core_to_node={0: 0, 1: 0},
+        cores=[],
+        expected_cpuset_mems=None,
+    ),
 }
 
 
