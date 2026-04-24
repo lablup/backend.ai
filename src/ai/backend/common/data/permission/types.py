@@ -340,6 +340,7 @@ class ScopeType(enum.StrEnum):
     ARTIFACT_REVISION = "artifact_revision"
     AGENT = "agent"
     ROLE = "role"
+    ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
     KEYPAIR = "keypair"
 

@@ -195,3 +195,11 @@ def model_card() -> None:
 )
 def scheduling_handler() -> None:
     """Admin scheduling handler commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.invitation:invitation",
+)
+def invitation() -> None:
+    """Admin role invitation commands."""

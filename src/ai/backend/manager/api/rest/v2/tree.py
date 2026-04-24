@@ -90,6 +90,8 @@ def build_v2_routes(
     from .resource_slot.registry import register_v2_resource_slot_routes
     from .resource_usage.handler import V2ResourceUsageHandler
     from .resource_usage.registry import register_v2_resource_usage_routes
+    from .role_invitation.handler import V2RoleInvitationHandler
+    from .role_invitation.registry import register_v2_role_invitation_routes
     from .runtime_variant.handler import V2RuntimeVariantHandler
     from .runtime_variant.registry import register_v2_runtime_variant_routes
     from .runtime_variant_preset.handler import V2RuntimeVariantPresetHandler
@@ -134,6 +136,7 @@ def build_v2_routes(
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
     object_storage_handler = V2ObjectStorageHandler(adapter=adapters.object_storage)
     project_handler = V2ProjectHandler(adapter=adapters.project)
+    role_invitation_handler = V2RoleInvitationHandler(adapter=adapters.rbac)
     prometheus_query_preset_handler = V2PrometheusQueryPresetHandler(
         adapter=adapters.prometheus_query_preset
     )
@@ -201,6 +204,7 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))
     v2_reg.add_subregistry(register_v2_object_storage_routes(object_storage_handler, route_deps))
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_role_invitation_routes(role_invitation_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_prometheus_query_preset_routes(prometheus_query_preset_handler, route_deps)
     )

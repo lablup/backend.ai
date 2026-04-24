@@ -8,8 +8,8 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.data.role_invitation.types import RoleInvitationState
-from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.role_invitation import DuplicateRoleInvitationError
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.repositories.base import CreatorSpec, IntegrityErrorCheck
 
@@ -29,7 +29,7 @@ class RoleInvitationCreatorSpec(CreatorSpec[RoleInvitationRow]):
             IntegrityErrorCheck(
                 violation_type=UniqueConstraintViolationError,
                 constraint_name="uq_role_invitations_active",
-                error=GenericBadRequest(
+                error=DuplicateRoleInvitationError(
                     "An active invitation already exists for this user and role"
                 ),
             ),

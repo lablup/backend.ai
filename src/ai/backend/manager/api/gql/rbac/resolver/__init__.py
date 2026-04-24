@@ -25,6 +25,15 @@ from .role import (
     my_roles,
     project_roles,
 )
+from .role_invitation import (
+    accept_role_invitation,
+    admin_cancel_role_invitation,
+    admin_role_invitations,
+    create_role_invitation,
+    my_role_invitations,
+    reject_role_invitation,
+    role_scoped_role_invitations,
+)
 
 __all__ = [
     # Permission queries
@@ -53,4 +62,13 @@ __all__ = [
     "admin_revoke_role",
     "admin_bulk_assign_role",
     "admin_bulk_revoke_role",
+    # Role invitation queries
+    "my_role_invitations",
+    "role_scoped_role_invitations",
+    "admin_role_invitations",
+    # Role invitation mutations
+    "create_role_invitation",
+    "accept_role_invitation",
+    "reject_role_invitation",
+    "admin_cancel_role_invitation",
 ]

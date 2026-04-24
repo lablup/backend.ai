@@ -16,11 +16,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac_role_invitation import (
-    AcceptRoleInvitationAction,
-    CancelRoleInvitationAction,
-    CreateRoleInvitationByEmailAction,
     CreateRoleInvitationResult,
-    RejectRoleInvitationAction,
 )
 from ai.backend.manager.data.permission.entity import (
     ElementAssociationListResult,
@@ -71,6 +67,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleNotAssigned, RoleNotFound
 from ai.backend.manager.errors.role_invitation import (
+    DuplicateRoleInvitationError,
     RoleInvitationInvalidState,
     RoleInvitationNotFound,
 )
@@ -1229,7 +1226,10 @@ class PermissionDBSource:
 
     async def create_invitation_by_email(
         self,
-        action: CreateRoleInvitationByEmailAction,
+        *,
+        invitee_emails: list[str],
+        inviter_user_id: uuid.UUID,
+        role_id: uuid.UUID,
     ) -> CreateRoleInvitationResult:
         """Resolve emails and create invitations in a single transaction.
 
@@ -1238,21 +1238,42 @@ class PermissionDBSource:
         are also silently skipped.
         """
         async with self._db.begin_session_read_committed() as session:
-            email_to_user_id = await self._resolve_invitation_emails(session, action.invitee_emails)
-            specs = [
-                RoleInvitationCreatorSpec(
-                    inviter_user_id=action.inviter_user_id,
-                    invitee_user_id=user_id,
-                    role_id=action.role_id,
+            email_to_user_id = await self._resolve_invitation_emails(session, invitee_emails)
+            creators = [
+                RBACEntityCreator(
+                    spec=RoleInvitationCreatorSpec(
+                        inviter_user_id=inviter_user_id,
+                        invitee_user_id=invitee_user_id,
+                        role_id=role_id,
+                    ),
+                    element_type=RBACElementType.ROLE_ASSIGNMENT,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.USER,
+                        element_id=str(invitee_user_id),
+                    ),
+                    additional_scope_refs=[
+                        RBACElementRef(
+                            element_type=RBACElementType.ROLE,
+                            element_id=str(role_id),
+                        ),
+                    ],
                 )
-                for email in action.invitee_emails
-                if (user_id := email_to_user_id.get(email)) is not None
+                for email in invitee_emails
+                if (invitee_user_id := email_to_user_id.get(email)) is not None
             ]
-            if not specs:
+            if not creators:
                 return CreateRoleInvitationResult()
-            result = await execute_bulk_creator_partial(session, BulkCreator(specs=specs))
+
+            created_rows: list[RoleInvitationRow] = []
+            for creator in creators:
+                async with session.begin_nested():
+                    try:
+                        row = (await execute_rbac_entity_creator(session, creator)).row
+                    except DuplicateRoleInvitationError:
+                        continue
+                    created_rows.append(row)
             return CreateRoleInvitationResult(
-                created=[row.to_data() for row in result.successes],
+                created=[row.to_data() for row in created_rows],
             )
 
     async def search_invitations_by_invitee(
@@ -1287,17 +1308,32 @@ class PermissionDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def admin_search_invitations(
+        self,
+        querier: BatchQuerier,
+    ) -> RoleInvitationSearchResult:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(RoleInvitationRow)
+            result = await execute_batch_querier(session, query, querier)
+            items = [row.RoleInvitationRow.to_data() for row in result.rows]
+            return RoleInvitationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
     async def accept_invitation(
         self,
-        action: AcceptRoleInvitationAction,
+        invitation_id: uuid.UUID,
     ) -> RoleInvitationData:
         """Transition PENDING→ACCEPTED and assign the role in one session."""
         async with self._db.begin_session_read_committed() as session:
             row = await self._update_invitation_state(
-                session, action.invitation_id, RoleInvitationState.ACCEPTED
+                session, invitation_id, RoleInvitationState.ACCEPTED
             )
             if row is None:
-                existing = await self._get_failed_invitation(session, action.invitation_id)
+                existing = await self._get_failed_invitation(session, invitation_id)
                 raise RoleInvitationInvalidState(
                     f"Cannot accept: invitation is {existing.state.value}, expected pending"
                 )
@@ -1309,15 +1345,15 @@ class PermissionDBSource:
 
     async def reject_invitation(
         self,
-        action: RejectRoleInvitationAction,
+        invitation_id: uuid.UUID,
     ) -> RoleInvitationData:
         async with self._db.begin_session_read_committed() as session:
             row = await self._update_invitation_state(
-                session, action.invitation_id, RoleInvitationState.REJECTED
+                session, invitation_id, RoleInvitationState.REJECTED
             )
             if row is not None:
                 return row.to_data()
-            existing = await self._get_failed_invitation(session, action.invitation_id)
+            existing = await self._get_failed_invitation(session, invitation_id)
             if existing.state == RoleInvitationState.REJECTED:
                 return existing.to_data()
             raise RoleInvitationInvalidState(
@@ -1326,15 +1362,15 @@ class PermissionDBSource:
 
     async def cancel_invitation(
         self,
-        action: CancelRoleInvitationAction,
+        invitation_id: uuid.UUID,
     ) -> RoleInvitationData:
         async with self._db.begin_session_read_committed() as session:
             row = await self._update_invitation_state(
-                session, action.invitation_id, RoleInvitationState.CANCELED
+                session, invitation_id, RoleInvitationState.CANCELED
             )
             if row is not None:
                 return row.to_data()
-            existing = await self._get_failed_invitation(session, action.invitation_id)
+            existing = await self._get_failed_invitation(session, invitation_id)
             if existing.state == RoleInvitationState.CANCELED:
                 return existing.to_data()
             raise RoleInvitationInvalidState(

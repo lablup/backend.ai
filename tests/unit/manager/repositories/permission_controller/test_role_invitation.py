@@ -9,10 +9,7 @@ import pytest
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.action.rbac_role_invitation import (
-    AcceptRoleInvitationAction,
-    CancelRoleInvitationAction,
     CreateRoleInvitationByEmailAction,
-    RejectRoleInvitationAction,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.role_invitation.types import RoleInvitationState
@@ -248,7 +245,11 @@ class TestCreateRoleInvitation:
         invitee: uuid.UUID,
         create_action: CreateRoleInvitationByEmailAction,
     ) -> None:
-        result = await perm_db.create_invitation_by_email(create_action)
+        result = await perm_db.create_invitation_by_email(
+            invitee_emails=create_action.invitee_emails,
+            inviter_user_id=create_action.inviter_user_id,
+            role_id=create_action.role_id,
+        )
 
         assert len(result.created) == 1
         assert result.created[0].invitee_user_id == invitee
@@ -265,7 +266,11 @@ class TestCreateRoleInvitation:
             inviter_user_id=inviter,
             role_id=role_id,
         )
-        result = await perm_db.create_invitation_by_email(action)
+        result = await perm_db.create_invitation_by_email(
+            invitee_emails=action.invitee_emails,
+            inviter_user_id=action.inviter_user_id,
+            role_id=action.role_id,
+        )
 
         assert len(result.created) == 0
 
@@ -280,7 +285,11 @@ class TestCreateRoleInvitation:
     ) -> None:
         await _insert_invitation(db, inviter, invitee, role_id)
 
-        result = await perm_db.create_invitation_by_email(create_action)
+        result = await perm_db.create_invitation_by_email(
+            invitee_emails=create_action.invitee_emails,
+            inviter_user_id=create_action.inviter_user_id,
+            role_id=create_action.role_id,
+        )
 
         assert len(result.created) == 0
 
@@ -328,33 +337,29 @@ class TestAcceptRoleInvitation:
         perm_db: PermissionDBSource,
         pending_id: uuid.UUID,
     ) -> None:
-        action = AcceptRoleInvitationAction(invitation_id=pending_id)
-        result = await perm_db.accept_invitation(action)
+        result = await perm_db.accept_invitation(pending_id)
 
         assert result.state == RoleInvitationState.ACCEPTED
 
     async def test_not_found(self, perm_db: PermissionDBSource) -> None:
-        action = AcceptRoleInvitationAction(invitation_id=uuid.uuid4())
         with pytest.raises(RoleInvitationNotFound):
-            await perm_db.accept_invitation(action)
+            await perm_db.accept_invitation(uuid.uuid4())
 
     async def test_already_rejected_fails(
         self,
         perm_db: PermissionDBSource,
         rejected_id: uuid.UUID,
     ) -> None:
-        action = AcceptRoleInvitationAction(invitation_id=rejected_id)
         with pytest.raises(RoleInvitationInvalidState):
-            await perm_db.accept_invitation(action)
+            await perm_db.accept_invitation(rejected_id)
 
     async def test_already_canceled_fails(
         self,
         perm_db: PermissionDBSource,
         canceled_id: uuid.UUID,
     ) -> None:
-        action = AcceptRoleInvitationAction(invitation_id=canceled_id)
         with pytest.raises(RoleInvitationInvalidState):
-            await perm_db.accept_invitation(action)
+            await perm_db.accept_invitation(canceled_id)
 
 
 # ── reject ───────────────────────────────────────────────────────
@@ -400,23 +405,20 @@ class TestRejectRoleInvitation:
         perm_db: PermissionDBSource,
         pending_id: uuid.UUID,
     ) -> None:
-        action = RejectRoleInvitationAction(invitation_id=pending_id)
-        result = await perm_db.reject_invitation(action)
+        result = await perm_db.reject_invitation(pending_id)
 
         assert result.state == RoleInvitationState.REJECTED
 
     async def test_not_found(self, perm_db: PermissionDBSource) -> None:
-        action = RejectRoleInvitationAction(invitation_id=uuid.uuid4())
         with pytest.raises(RoleInvitationNotFound):
-            await perm_db.reject_invitation(action)
+            await perm_db.reject_invitation(uuid.uuid4())
 
     async def test_already_rejected_is_idempotent(
         self,
         perm_db: PermissionDBSource,
         rejected_id: uuid.UUID,
     ) -> None:
-        action = RejectRoleInvitationAction(invitation_id=rejected_id)
-        result = await perm_db.reject_invitation(action)
+        result = await perm_db.reject_invitation(rejected_id)
 
         assert result.state == RoleInvitationState.REJECTED
 
@@ -425,9 +427,8 @@ class TestRejectRoleInvitation:
         perm_db: PermissionDBSource,
         accepted_id: uuid.UUID,
     ) -> None:
-        action = RejectRoleInvitationAction(invitation_id=accepted_id)
         with pytest.raises(RoleInvitationInvalidState):
-            await perm_db.reject_invitation(action)
+            await perm_db.reject_invitation(accepted_id)
 
 
 # ── cancel ───────────────────────────────────────────────────────
@@ -473,23 +474,20 @@ class TestCancelRoleInvitation:
         perm_db: PermissionDBSource,
         pending_id: uuid.UUID,
     ) -> None:
-        action = CancelRoleInvitationAction(invitation_id=pending_id)
-        result = await perm_db.cancel_invitation(action)
+        result = await perm_db.cancel_invitation(pending_id)
 
         assert result.state == RoleInvitationState.CANCELED
 
     async def test_not_found(self, perm_db: PermissionDBSource) -> None:
-        action = CancelRoleInvitationAction(invitation_id=uuid.uuid4())
         with pytest.raises(RoleInvitationNotFound):
-            await perm_db.cancel_invitation(action)
+            await perm_db.cancel_invitation(uuid.uuid4())
 
     async def test_already_canceled_is_idempotent(
         self,
         perm_db: PermissionDBSource,
         canceled_id: uuid.UUID,
     ) -> None:
-        action = CancelRoleInvitationAction(invitation_id=canceled_id)
-        result = await perm_db.cancel_invitation(action)
+        result = await perm_db.cancel_invitation(canceled_id)
 
         assert result.state == RoleInvitationState.CANCELED
 
@@ -498,6 +496,5 @@ class TestCancelRoleInvitation:
         perm_db: PermissionDBSource,
         accepted_id: uuid.UUID,
     ) -> None:
-        action = CancelRoleInvitationAction(invitation_id=accepted_id)
         with pytest.raises(RoleInvitationInvalidState):
-            await perm_db.cancel_invitation(action)
+            await perm_db.cancel_invitation(accepted_id)

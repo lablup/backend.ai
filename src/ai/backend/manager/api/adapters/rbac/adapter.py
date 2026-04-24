@@ -112,6 +112,33 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    CreateRoleInvitationInput as CreateRoleInvitationInputDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleInvitationFilter as RoleInvitationFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleInvitationOrderBy as RoleInvitationOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleInvitationStateFilter as RoleInvitationStateFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    RoleNestedFilter as InvitationRoleNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    SearchRoleInvitationsInput as SearchRoleInvitationsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.request import (
+    UserNestedFilter as InvitationUserNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.response import (
+    CreateRoleInvitationPayload,
+    RoleInvitationNode,
+    SearchRoleInvitationsPayload,
+)
+from ai.backend.common.dto.manager.v2.role_invitation.types import RoleInvitationStateDTO
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -138,6 +165,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
+from ai.backend.manager.data.role_invitation.types import RoleInvitationData, RoleInvitationState
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -158,6 +186,11 @@ from ai.backend.manager.models.rbac_models.orders import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.role_invitation.conditions import (
+    RoleInvitationConditions,
+    RoleInvitationOrders,
+)
+from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
@@ -180,6 +213,10 @@ from ai.backend.manager.repositories.permission_controller.types import ScopedRo
 from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
     RoleUpdaterSpec,
+)
+from ai.backend.manager.repositories.role_invitation.types import (
+    InviteeSearchScope,
+    RoleInvitationSearchScope,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
@@ -213,6 +250,23 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
     SearchPermissionsActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    AcceptRoleInvitationAction as AcceptInvitationServiceAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    AdminSearchRoleInvitationsAction,
+    SearchMyRoleInvitationsAction,
+    SearchRoleInvitationsByRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    CancelRoleInvitationAction as CancelInvitationServiceAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    CreateRoleInvitationAction as CreateInvitationServiceAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    RejectRoleInvitationAction as RejectInvitationServiceAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
@@ -276,6 +330,17 @@ def _entity_pagination_spec() -> PaginationSpec:
         forward_condition_factory=EntityScopeConditions.by_cursor_forward,
         backward_condition_factory=EntityScopeConditions.by_cursor_backward,
         tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _invitation_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=RoleInvitationOrders.created_at(ascending=False),
+        backward_order=RoleInvitationOrders.created_at(ascending=True),
+        forward_condition_factory=RoleInvitationConditions.by_cursor_forward,
+        backward_condition_factory=RoleInvitationConditions.by_cursor_backward,
+        tiebreaker_order=RoleInvitationRow.id.asc(),
     )
 
 
@@ -1468,4 +1533,288 @@ class RBACAdapter(BaseAdapter):
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
             description=data.description,
+        )
+
+    # ------------------------------------------------------------------ role invitations
+
+    @staticmethod
+    def _invitation_data_to_node(
+        data: RoleInvitationData,
+    ) -> RoleInvitationNode:
+        return RoleInvitationNode(
+            id=data.id,
+            inviter_user_id=data.inviter_user_id,
+            invitee_user_id=data.invitee_user_id,
+            role_id=data.role_id,
+            state=RoleInvitationStateDTO(data.state.value),
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+        )
+
+    async def create_role_invitation(
+        self,
+        input: CreateRoleInvitationInputDTO,
+    ) -> CreateRoleInvitationPayload:
+        """Create role invitations by email."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        result = (
+            await self._processors.permission_controller.create_role_invitation.wait_for_complete(
+                CreateInvitationServiceAction(
+                    role_id=input.role_id,
+                    invitee_emails=input.emails,
+                    inviter_user_id=me.user_id,
+                )
+            )
+        )
+        return CreateRoleInvitationPayload(
+            items=[self._invitation_data_to_node(d) for d in result.created],
+        )
+
+    async def accept_role_invitation(
+        self,
+        invitation_id: UUID,
+    ) -> RoleInvitationNode:
+        """Accept a PENDING invitation."""
+        result = (
+            await self._processors.permission_controller.accept_role_invitation.wait_for_complete(
+                AcceptInvitationServiceAction(invitation_id=invitation_id)
+            )
+        )
+        return self._invitation_data_to_node(result.data)
+
+    async def reject_role_invitation(
+        self,
+        invitation_id: UUID,
+    ) -> RoleInvitationNode:
+        """Reject a PENDING invitation."""
+        result = (
+            await self._processors.permission_controller.reject_role_invitation.wait_for_complete(
+                RejectInvitationServiceAction(invitation_id=invitation_id)
+            )
+        )
+        return self._invitation_data_to_node(result.data)
+
+    async def cancel_role_invitation(
+        self,
+        invitation_id: UUID,
+    ) -> RoleInvitationNode:
+        """Cancel a PENDING invitation."""
+        result = (
+            await self._processors.permission_controller.cancel_role_invitation.wait_for_complete(
+                CancelInvitationServiceAction(invitation_id=invitation_id)
+            )
+        )
+        return self._invitation_data_to_node(result.data)
+
+    @staticmethod
+    def _convert_invitation_orders(orders: list[RoleInvitationOrderByDTO]) -> list[QueryOrder]:
+        result: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirectionV2.ASC
+            if o.field == "created_at":
+                result.append(RoleInvitationOrders.created_at(ascending))
+            elif o.field == "updated_at":
+                result.append(RoleInvitationOrders.updated_at(ascending))
+            elif o.field == "state":
+                result.append(RoleInvitationOrders.state(ascending))
+        return result
+
+    def _convert_invitation_filter(self, f: RoleInvitationFilterDTO) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if f.state is not None:
+            cond = self._convert_invitation_state_filter(f.state)
+            if cond is not None:
+                conditions.append(cond)
+        if f.role_id is not None:
+            cond = self.convert_uuid_filter(
+                f.role_id,
+                equals_factory=RoleInvitationConditions.by_role_id_filter_equals,
+                in_factory=RoleInvitationConditions.by_role_id_filter_in,
+            )
+            if cond is not None:
+                conditions.append(cond)
+        if f.role is not None:
+            conditions.extend(self._convert_invitation_role_nested_filter(f.role))
+        if f.inviter is not None:
+            conditions.extend(self._convert_invitation_user_nested_filter(f.inviter, "inviter"))
+        if f.invitee is not None:
+            conditions.extend(self._convert_invitation_user_nested_filter(f.invitee, "invitee"))
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_invitation_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_invitation_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_invitation_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
+    @staticmethod
+    def _convert_invitation_state_filter(
+        f: RoleInvitationStateFilterDTO,
+    ) -> QueryCondition | None:
+        if f.equals is not None:
+            return RoleInvitationConditions.by_state_equals(RoleInvitationState(f.equals.value))
+        if f.in_ is not None:
+            return RoleInvitationConditions.by_state_in([
+                RoleInvitationState(s.value) for s in f.in_
+            ])
+        if f.not_equals is not None:
+            return RoleInvitationConditions.by_state_not_equals(
+                RoleInvitationState(f.not_equals.value)
+            )
+        if f.not_in is not None:
+            return RoleInvitationConditions.by_state_not_in([
+                RoleInvitationState(s.value) for s in f.not_in
+            ])
+        return None
+
+    def _convert_invitation_role_nested_filter(
+        self, f: InvitationRoleNestedFilterDTO
+    ) -> list[QueryCondition]:
+        role_conditions: list[QueryCondition] = []
+        if f.name is not None:
+            cond = self.convert_string_filter(
+                f.name,
+                contains_factory=RoleInvitationConditions.role_name_contains,
+                equals_factory=RoleInvitationConditions.role_name_equals,
+                starts_with_factory=RoleInvitationConditions.role_name_starts_with,
+                ends_with_factory=RoleInvitationConditions.role_name_ends_with,
+                in_factory=RoleInvitationConditions.role_name_in,
+            )
+            if cond is not None:
+                role_conditions.append(cond)
+        if role_conditions:
+            return [RoleInvitationConditions.exists_role_with_conditions(role_conditions)]
+        return []
+
+    def _convert_invitation_user_nested_filter(
+        self, f: InvitationUserNestedFilterDTO, relation: str
+    ) -> list[QueryCondition]:
+        user_conditions: list[QueryCondition] = []
+        if f.email is not None:
+            cond = self.convert_string_filter(
+                f.email,
+                contains_factory=RoleInvitationConditions._user_email_contains,
+                equals_factory=RoleInvitationConditions._user_email_equals,
+                starts_with_factory=RoleInvitationConditions._user_email_starts_with,
+                ends_with_factory=RoleInvitationConditions._user_email_ends_with,
+                in_factory=RoleInvitationConditions._user_email_in,
+            )
+            if cond is not None:
+                user_conditions.append(cond)
+        if not user_conditions:
+            return []
+        if relation == "inviter":
+            return [RoleInvitationConditions.exists_inviter_with_conditions(user_conditions)]
+        return [RoleInvitationConditions.exists_invitee_with_conditions(user_conditions)]
+
+    async def my_search_role_invitations(
+        self,
+        input: SearchRoleInvitationsInputDTO,
+    ) -> SearchRoleInvitationsPayload:
+        """Search invitations for the current authenticated user."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        conditions = self._convert_invitation_filter(input.filter) if input.filter else []
+        orders = self._convert_invitation_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_invitation_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[RoleInvitationConditions.by_invitee(me.user_id)],
+        )
+        action_result = await self._processors.permission_controller.search_my_role_invitations.wait_for_complete(
+            SearchMyRoleInvitationsAction(
+                user_id=me.user_id,
+                querier=querier,
+                scope=InviteeSearchScope(invitee_user_id=me.user_id),
+            )
+        )
+        raw = action_result.result
+        return SearchRoleInvitationsPayload(
+            items=[self._invitation_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
+
+    async def role_search_invitations(
+        self,
+        role_id: UUID,
+        input: SearchRoleInvitationsInputDTO,
+    ) -> SearchRoleInvitationsPayload:
+        """Search invitations for a specific role (admin/project-admin view)."""
+        conditions = self._convert_invitation_filter(input.filter) if input.filter else []
+        orders = self._convert_invitation_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_invitation_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[RoleInvitationConditions.by_role(role_id)],
+        )
+        action_result = await self._processors.permission_controller.search_role_invitations_by_role.wait_for_complete(
+            SearchRoleInvitationsByRoleAction(
+                role_id=role_id,
+                querier=querier,
+                scope=RoleInvitationSearchScope(role_id=role_id),
+            )
+        )
+        raw = action_result.result
+        return SearchRoleInvitationsPayload(
+            items=[self._invitation_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
+
+    async def admin_search_role_invitations(
+        self,
+        input: SearchRoleInvitationsInputDTO,
+    ) -> SearchRoleInvitationsPayload:
+        """Search all invitations across the system (superadmin only)."""
+        conditions = self._convert_invitation_filter(input.filter) if input.filter else []
+        orders = self._convert_invitation_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_invitation_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.permission_controller.admin_search_role_invitations.wait_for_complete(
+            AdminSearchRoleInvitationsAction(querier=querier)
+        )
+        raw = action_result.result
+        return SearchRoleInvitationsPayload(
+            items=[self._invitation_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
         )
