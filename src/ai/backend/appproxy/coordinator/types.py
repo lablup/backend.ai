@@ -211,27 +211,24 @@ class CircuitManager:
         worker_authority = circuit.worker_row.authority
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
-        # Circuit.traefik_services now emits a single bai_service_{circuit.id}
-        # loadBalancer (see models/circuit.py) instead of one weighted entry
-        # per session, so cleanup only needs to drop that single prefix before
-        # re-publishing the new config. The old_routes argument is kept for
-        # signature compatibility but is no longer consulted.
+        # Circuit.traefik_services emits a single bai_service_{circuit.id}
+        # loadBalancer (see models/circuit.py). We must atomically replace
+        # the subtree: a non-atomic delete+put leaves an empty service
+        # visible to Traefik between the two RPCs if the put fails, and
+        # requests to this circuit's router then receive 503s.
         del old_routes  # legacy signature; no per-session cleanup needed
         new_services = circuit.traefik_services
+        service_prefix = f"{etcd_prefix}/services/bai_service_{circuit.id}"
+        service_body = new_services.get(f"bai_service_{circuit.id}", {})
 
         log.debug(
-            "traefik_etcd.delete_prefix {}", f"{etcd_prefix}/services/bai_service_{circuit.id}"
+            "traefik_etcd.replace_prefix {} {}",
+            service_prefix,
+            convert_to_etcd_dict(service_body),
         )
-        await self.traefik_etcd.delete_prefix(f"{etcd_prefix}/services/bai_service_{circuit.id}")
-
-        log.debug(
-            "traefik_etcd.put_prefix {} {}",
-            f"{etcd_prefix}/services",
-            convert_to_etcd_dict(new_services),
-        )
-        await self.traefik_etcd.put_prefix(
-            f"{etcd_prefix}/services",
-            convert_to_etcd_dict(new_services),
+        await self.traefik_etcd.replace_prefix(
+            service_prefix,
+            convert_to_etcd_dict(service_body),
         )
         log.debug("update_traefik_circuit_routes(): end")
 
@@ -252,14 +249,46 @@ class CircuitManager:
 
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
         for circuit in circuits:
+            async with self.circuit_lock(circuit):
+                await self._unload_one_with_retry(circuit)
+
+    async def _unload_one_with_retry(self, circuit: Circuit, max_attempts: int = 3) -> None:
+        """Unload a single circuit with bounded retry on transient errors.
+
+        A transient etcd hiccup used to leave the circuit's Traefik metadata
+        partially deleted because (a) the four delete_prefix calls in
+        ``unload_traefik_circuit`` were not atomic and (b) the surrounding
+        code silently swallowed the raised exception. The atomic
+        ``delete_prefixes`` makes each attempt all-or-nothing; this retry
+        loop absorbs short-lived failures so a single blip does not force
+        the caller's DB transaction to roll back. After the bounded budget
+        is exhausted we re-raise so the DB transaction rolls back —
+        preserving the invariant that DB and etcd agree on which circuits
+        exist.
+        """
+        for attempt in range(max_attempts):
             try:
-                async with self.circuit_lock(circuit):
-                    if self.local_config.proxy_coordinator.enable_traefik:
-                        await self.unload_traefik_circuit(circuit)
-                    else:
-                        await self.unload_legacy_circuit(circuit)
-            except Exception:
-                log.exception("Failed to unload circuit {}", circuit.id)
+                if self.local_config.proxy_coordinator.enable_traefik:
+                    await self.unload_traefik_circuit(circuit)
+                else:
+                    await self.unload_legacy_circuit(circuit)
+                return
+            except Exception as e:
+                if attempt == max_attempts - 1:
+                    log.exception(
+                        "unload failed after {} attempts for circuit {}",
+                        max_attempts,
+                        circuit.id,
+                    )
+                    raise
+                log.warning(
+                    "unload attempt {}/{} failed for circuit {}: {}",
+                    attempt + 1,
+                    max_attempts,
+                    circuit.id,
+                    e,
+                )
+                await asyncio.sleep(0.1 * (2**attempt))
 
     async def unload_traefik_circuit(self, circuit: Circuit) -> None:
         log.debug("unload_traefik_circuit(): start")
@@ -269,9 +298,13 @@ class CircuitManager:
         worker_authority = circuit.worker_row.authority
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
-        # Circuit.traefik_services now emits a single bai_service_{circuit.id}
-        # prefix per circuit (no per-session sub-keys), so cleanup only needs
-        # to drop router / service / middleware prefixes scoped to the circuit id.
+        # Circuit.traefik_services emits a single bai_service_{circuit.id}
+        # prefix per circuit (no per-session sub-keys). The full keyset that
+        # must disappear atomically is the router, the service, and — for
+        # HTTP — the two middleware prefixes; otherwise a transient failure
+        # between individual deletes leaves Traefik with a stale router
+        # that can route to a kernel host:port reassigned to a different
+        # endpoint.
         prefixes_to_remove = [
             f"{etcd_prefix}/routers/bai_router_{circuit.id}",
             f"{etcd_prefix}/services/bai_service_{circuit.id}",
@@ -284,9 +317,8 @@ class CircuitManager:
                 f"{etcd_prefix}/middlewares/appproxy/plugin/bai_appproxy_plugin_{circuit.id}",
             )
 
-        for prefix in prefixes_to_remove:
-            log.debug("traefik_etcd.delete_prefix {}", prefix)
-            await self.traefik_etcd.delete_prefix(prefix)
+        log.debug("traefik_etcd.delete_prefixes {}", prefixes_to_remove)
+        await self.traefik_etcd.delete_prefixes(prefixes_to_remove)
         log.debug("unload_traefik_circuit(): end")
 
     async def reconcile_traefik_etcd_state(

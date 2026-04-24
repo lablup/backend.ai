@@ -90,6 +90,10 @@ class _EtcdCallRecorder:
     async def delete_prefix(self, prefix: str) -> None:
         self.calls.append(("delete", prefix))
 
+    async def delete_prefixes(self, prefixes: list[str]) -> None:
+        for prefix in prefixes:
+            self.calls.append(("delete", prefix))
+
     async def get_prefix(self, _prefix: str) -> dict[str, Any]:
         return {}
 
@@ -179,6 +183,7 @@ class TestTraefikCreateAndUnloadDoNotSerialize:
         etcd = MagicMock()
         etcd.put_prefix = AsyncMock(side_effect=recorder.put_prefix)
         etcd.delete_prefix = AsyncMock(side_effect=recorder.delete_prefix)
+        etcd.delete_prefixes = AsyncMock(side_effect=recorder.delete_prefixes)
         etcd.get_prefix = AsyncMock(side_effect=recorder.get_prefix)
         return CircuitManager(
             event_dispatcher=cast(Any, MagicMock()),
