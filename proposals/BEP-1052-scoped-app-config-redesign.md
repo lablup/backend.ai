@@ -88,10 +88,10 @@ Summary matrix:
 - **All writes are bulk-only.** There are no single-item mutations —
   callers pass a list (even a 1-element list for a single write) and
   get a partial-success payload back. The admin path exposes three
-  verbs (`create` / `update` / `purge`) — `adminBulkCreateAppConfigSources`
-  and siblings cover every scope, admin-only, return raw `AppConfigSource`
+  verbs (`create` / `update` / `purge`) — `adminBulkCreateAppConfigFragments`
+  and siblings cover every scope, admin-only, return raw `AppConfigFragment`
   lists. The self-service (my) path exposes two verbs
-  (`create` / `update`) — `bulkCreateMyAppConfigSources` and siblings, with
+  (`create` / `update`) — `bulkCreateMyAppConfigFragments` and siblings, with
   `USER` + `current_user` implicit and merged `AppConfig` in
   the response. `create` strictly inserts (per-item failure if any
   row exists for the key); `update` replaces the existing row's
@@ -102,17 +102,17 @@ Summary matrix:
   failure does not abort the rest. Identification uses the
   `(scope, scopeId, name)` natural key, never Relay `id` — my-path
   mutations have scope/scopeId injected by the server.
-- **Single source-of-truth table**: a single `app_config_sources` table holds
+- **Single source-of-truth table**: a single `app_config_fragments` table holds
   every scope; only the exposure layer is split.
 - **Relay style**: Input/Payload conventions and the Node interface.
 
 ---
 
-## 1. DB Layer — `app_config_sources` table
+## 1. DB Layer — `app_config_fragments` table
 
 ### Schema changes
 
-Add a `name` column to `app_config_sources`. The natural-key uniqueness
+Add a `name` column to `app_config_fragments`. The natural-key uniqueness
 constraint becomes `(scope_type, scope_id, name)`.
 
 ```python
@@ -124,15 +124,15 @@ class AppConfigScopeType(enum.StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class AppConfigSourceKey:
-    """Natural key for an app_config_sources row."""
+class AppConfigFragmentKey:
+    """Natural key for an app_config_fragments row."""
     scope_type: AppConfigScopeType
     scope_id: str
     name: str
 
 
-class AppConfigSourceRow(Base):
-    __tablename__ = "app_config_sources"
+class AppConfigFragmentRow(Base):
+    __tablename__ = "app_config_fragments"
 
     id: Mapped[uuid.UUID]
 
@@ -155,7 +155,7 @@ class AppConfigSourceRow(Base):
 
     __table_args__ = (
         sa.UniqueConstraint(
-            "scope_type", "scope_id", "name", name="uq_app_config_sources_scope_name"
+            "scope_type", "scope_id", "name", name="uq_app_config_fragments_scope_name"
         ),
     )
 ```
@@ -196,10 +196,10 @@ chain (§5) always resolves — no "policy-less fallback" path.
 ### App Config Policy table
 
 A separate `app_config_policies` table holds the rules per document
-— which app-config rows get merged as sources into the resolved
+— which app-config rows get merged as fragments into the resolved
 view, and which scopes may be written. Configs and policies are
 joined by `config_name` value, backed by a **FK** on
-`app_config_sources.name → app_config_policies.config_name` with no
+`app_config_fragments.name → app_config_policies.config_name` with no
 `ON DELETE` / `ON UPDATE` action (Postgres default `NO ACTION`).
 The **service layer also enforces the required-policy invariant**
 explicitly with friendly per-item errors; the FK is defense-in-depth
@@ -210,14 +210,14 @@ class AppConfigPolicyRow(Base):
     __tablename__ = "app_config_policies"
 
     id: Mapped[uuid.UUID]
-    config_name: Mapped[str]     # UNIQUE; FK target of `app_config_sources.name`.
+    config_name: Mapped[str]     # UNIQUE; FK target of `app_config_fragments.name`.
                                  # IMMUTABLE — rename rejected at service layer
                                  # (fix via purge + recreate).
     scope_sources: Mapped[list[str]]  # Ordered scope chain (low → high priority):
                                  # drives both the merge order (§5) and the
                                  # write allow-list. String-typed so that
                                  # adding a scope does not require migration.
-    user_writable: Mapped[bool]  # Gate for the `bulk*MyAppConfigSources` path.
+    user_writable: Mapped[bool]  # Gate for the `bulk*MyAppConfigFragments` path.
                                  # Admin-path writes are not gated.
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime]
@@ -235,10 +235,10 @@ class AppConfigPolicyRow(Base):
   (updates touch `scope_sources` / `user_writable` only). Removes
   the "rename orphans configs" failure mode.
 - **Policy purge**: only via `adminBulkPurgeAppConfigPolicies` (§3);
-  the service rejects if any AppConfigSource row still references
+  the service rejects if any AppConfigFragment row still references
   the policy. Admin purges referencing rows first, then the policy.
   FK `ON DELETE NO ACTION` is the backstop.
-- **AppConfigSource purge**: `adminBulkPurgeAppConfigSources` is the
+- **AppConfigFragment purge**: `adminBulkPurgeAppConfigFragments` is the
   cleanup-only escape hatch, not a general delete.
 
 The FK has no cascade — the schema forbids orphans and refuses to
@@ -247,20 +247,20 @@ orchestration stays the primary enforcement point.
 
 ---
 
-## 2. Repository Layer — single AppConfigSourceRepository
+## 2. Repository Layer — single AppConfigFragmentRepository
 
-Keep `models/app_config_source/row.py`'s `AppConfigSourceRow` as a
-single class, and use **a single `AppConfigSourceRepository`** for
+Keep `models/app_config_fragment/row.py`'s `AppConfigFragmentRow` as a
+single class, and use **a single `AppConfigFragmentRepository`** for
 all scopes. Prior drafts split the repository four ways (one per
 scope); the split added surface without real benefit because each
 scope variant was a thin `scope_type` / `scope_id` binding on the
 same table. One scope-parameterized repository is simpler.
 
 ```
-repositories/app_config_source/
+repositories/app_config_fragment/
 ├── db_source/
 │   └── db_source.py                  # single db_source
-├── app_config_source_repository.py   # all scopes; AppConfigSourceKey-addressed
+├── app_config_fragment_repository.py   # all scopes; AppConfigFragmentKey-addressed
 └── repositories.py
 
 repositories/app_config_policy/
@@ -274,11 +274,11 @@ repositories/app_config_policy/
 
 | Repository                   | Methods                                                                                                              |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(scope, querier)` for a bound scope (via `AppConfigSourceSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, config_name)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`), and `admin_search_app_configs(querier)` for cross-user admin search. All three derive the chain in SQL via a policy join — see §5. |
-| `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(querier)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigSource` row still references the `config_name`. |
+| `AppConfigFragmentRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigFragmentKey`. `search(scope, querier)` for a bound scope (via `AppConfigFragmentSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, config_name)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`), and `admin_search_app_configs(querier)` for cross-user admin search. All three derive the chain in SQL via a policy join — see §5. |
+| `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(querier)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigFragment` row still references the `config_name`. |
 
-`AppConfigSourceRepository` plays a **dual role** — raw CRUD (served
-as `AppConfigSource`) + merged-view reads (served as `AppConfig`,
+`AppConfigFragmentRepository` plays a **dual role** — raw CRUD (served
+as `AppConfigFragment`) + merged-view reads (served as `AppConfig`,
 §5). `domain_name` resolution for the merge lives inside the SQL
 (`users` subquery), so no `UserDBSource` is injected. No separate
 `AppConfigRepository`.
@@ -286,17 +286,17 @@ as `AppConfigSource`) + merged-view reads (served as `AppConfig`,
 ### `db_source` is a single module
 
 ```python
-class AppConfigSourceDBSource:
+class AppConfigFragmentDBSource:
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get(self, key: AppConfigSourceKey) -> AppConfigSourceRow | None:
+    async def get(self, key: AppConfigFragmentKey) -> AppConfigFragmentRow | None:
         async with self._db.begin_readonly_session() as db_sess:
             ...
 
-    async def get_by_id(self, id: uuid.UUID) -> AppConfigSourceRow | None:
+    async def get_by_id(self, id: uuid.UUID) -> AppConfigFragmentRow | None:
         # ID-based lookup for Actions that have already resolved the
         # natural key to a row id (see §3 "Name → ID resolution").
         async with self._db.begin_readonly_session() as db_sess:
@@ -304,9 +304,9 @@ class AppConfigSourceDBSource:
 
     async def create(
         self,
-        key: AppConfigSourceKey,
+        key: AppConfigFragmentKey,
         extra_config: Mapping[str, Any],
-    ) -> AppConfigSourceRow:
+    ) -> AppConfigFragmentRow:
         # Strict insert. Errors if any row already exists for the
         # natural key.
         async with self._db.begin_session() as db_sess:
@@ -314,9 +314,9 @@ class AppConfigSourceDBSource:
 
     async def update(
         self,
-        key: AppConfigSourceKey,
+        key: AppConfigFragmentKey,
         extra_config: Mapping[str, Any],
-    ) -> AppConfigSourceRow:
+    ) -> AppConfigFragmentRow:
         # Replace the existing row's value with `extra_config`.
         # Errors if no row exists for the natural key.
         async with self._db.begin_session() as db_sess:
@@ -324,17 +324,17 @@ class AppConfigSourceDBSource:
 
     async def search(
         self,
-        scope: AppConfigSourceSearchScope,
+        scope: AppConfigFragmentSearchScope,
         querier: BatchQuerier,
-    ) -> AppConfigSourceSearchResult:
+    ) -> AppConfigFragmentSearchResult:
         # Scope-bound; cross-scope uses `admin_search`. Merge search: §5.
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AppConfigSourceRow)
+            query = sa.select(AppConfigFragmentRow)
             result = await execute_batch_querier(
                 db_sess, query, querier, scope=scope,
             )
-            items = [row.AppConfigSourceRow.to_data() for row in result.rows]
-            return AppConfigSourceSearchResult(
+            items = [row.AppConfigFragmentRow.to_data() for row in result.rows]
+            return AppConfigFragmentSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -344,14 +344,14 @@ class AppConfigSourceDBSource:
     async def admin_search(
         self,
         querier: BatchQuerier,
-    ) -> AppConfigSourceSearchResult:
+    ) -> AppConfigFragmentSearchResult:
         # Cross-scope admin search — no scope binding. Authorization
         # is enforced at the service layer before this is reached.
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AppConfigSourceRow)
+            query = sa.select(AppConfigFragmentRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.AppConfigSourceRow.to_data() for row in result.rows]
-            return AppConfigSourceSearchResult(
+            items = [row.AppConfigFragmentRow.to_data() for row in result.rows]
+            return AppConfigFragmentSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -360,13 +360,13 @@ class AppConfigSourceDBSource:
 ```
 
 Listing is expressed via the `search` primitive — callers build a
-`AppConfigSourceSearchScope(scope_type, scope_id)` plus a
+`AppConfigFragmentSearchScope(scope_type, scope_id)` plus a
 `BatchQuerier` and pass both in. Permission checks and scope
 validation are performed in the service layer; the db_source only
 runs the resulting SQL.
 
-**Bulk mutation orchestration**: every bulk mutation (sources and
-policies) runs each item in its own DB transaction, collects
+**Bulk mutation orchestration**: every bulk mutation (fragments
+and policies) runs each item in its own DB transaction, collects
 successes/failures into `BulkActionResult(success_list,
 failed_list)`, and preserves input positions for the per-verb
 error `index` field (matching `BulkCreateUserV2Error` convention).
@@ -378,16 +378,16 @@ policy) don't compose cleanly in one statement.
 Search follows the shared **BatchQuerier** pattern
 (`repositories/base/querier.py`):
 
-- `AppConfigSourceSearchScope(SearchScope)` — frozen dataclass
+- `AppConfigFragmentSearchScope(SearchScope)` — frozen dataclass
   pinning `scope_type` + `scope_id` via `to_condition()`; no
   `existence_checks`.
 - `BatchQuerier` — `conditions` (from the GQL filter at the adapter
   boundary) + `orders` + `pagination`.
-- `AppConfigSourceSearchResult` — standard `items` / `total_count` /
+- `AppConfigFragmentSearchResult` — standard `items` / `total_count` /
   `has_next_page` / `has_previous_page` (cf. `GroupSearchResult`).
 
-The GQL `AppConfigSourceFilter` is the wire format; the adapter
-lowers it to `BatchQuerier.conditions` (+ `AppConfigSourceSearchScope`
+The GQL `AppConfigFragmentFilter` is the wire format; the adapter
+lowers it to `BatchQuerier.conditions` (+ `AppConfigFragmentSearchScope`
 for per-scope reads). Filter-to-condition translation is deferred
 to implementation.
 
@@ -395,21 +395,21 @@ to implementation.
 
 `AppConfigPolicyRepository` lives under
 `repositories/app_config_policy/` with its own `AppConfigPolicyDBSource`,
-kept separate from `AppConfigSourceDBSource` — the tables share no
+kept separate from `AppConfigFragmentDBSource` — the tables share no
 FK-driven join surface. Exposes the six-operation shape (§1 allows
 `get` / `get_by_id` / `create` / `update` / `search`; no
 `delete`).
 
-Write orchestration for `app_config_sources` consults policies in
+Write orchestration for `app_config_fragments` consults policies in
 the **service layer**: for each batch the service fetches the
 distinct `name`s' policies once (batch cache), then applies §1's
 three checks (policy-not-found / `scope_type ∉ scope_sources` /
-`user_writable = False` on the my-path) before calling the source
-repository. `AppConfigPolicyRepository.update` refuses to change
-`config_name`; `.purge` rejects when any `app_config_sources` row
+`user_writable = False` on the my-path) before calling the
+fragment repository. `AppConfigPolicyRepository.update` refuses to change
+`config_name`; `.purge` rejects when any `app_config_fragments` row
 still references the policy (required-policy invariant preserved).
 
-Reads don't consult the policy repository from the source
+Reads don't consult the policy repository from the fragment
 repository. The merge path (§5) resolves the chain inside SQL via
 a join with `app_config_policies`; per-scope raw reads don't need
 a policy lookup at all.
@@ -422,7 +422,7 @@ a policy lookup at all.
 
 There are two GQL types for app-config data:
 
-- `AppConfigSource` — one raw row from `app_config_sources`, regardless of scope.
+- `AppConfigFragment` — one raw row from `app_config_fragments`, regardless of scope.
   Carries `scopeType` + `scopeId` + `name` + `config` + `policy` so
   callers can disambiguate across scopes at read time. Defined
   further below (after the inputs/payloads that also reference it).
@@ -431,16 +431,16 @@ There are two GQL types for app-config data:
 
 Per-scope wrapper types (historical `PublicAppConfig`,
 `DomainAppConfig`, `UserAppConfig`) are **not** defined — they offered
-no information a single `AppConfigSource` type doesn't and added three
+no information a single `AppConfigFragment` type doesn't and added three
 Connection / Edge / filter triples of boilerplate. Callers
-disambiguate scope by reading `AppConfigSource.scopeType` instead.
+disambiguate scope by reading `AppConfigFragment.scopeType` instead.
 
 ```graphql
 """
 Merged per-user view — non-admins use `myAppConfigs` (own view);
 admins also have `adminAppConfigs` to resolve any user. Deep-merges
-same-`name` source rows in the matching policy's `scope_sources`
-order; appears whenever at least one source row exists (§5).
+same-`name` fragments in the matching policy's `scope_sources`
+order; appears whenever at least one fragment exists (§5).
 
 Implements `Node` with server-side ID
 `base64("AppConfig:{user_id}:{name}")`. `node(id)` resolves when
@@ -452,14 +452,14 @@ type AppConfig implements Node {
   name: String!
 
   """
-  Source rows in merge order (low → high). Callers distinguish
+  Fragments in merge order (low → high). Callers distinguish
   admin-provided defaults from user overrides via each row's
   `scopeType`.
   """
-  sources: [AppConfigSource!]!
+  fragments: [AppConfigFragment!]!
 
   """
-  Deep-merge of `sources` in order (last wins). `null` when every
+  Deep-merge of `fragments` in order (last wins). `null` when every
   contributing row has an empty stored `config` (clients fall back
   to built-in defaults).
   """
@@ -471,74 +471,74 @@ type AppConfig implements Node {
 
 | Location      | Field                                                                                  |
 |---------------|----------------------------------------------------------------------------------------|
-| `DomainV2` | `appConfigSources(filter, orderBy, ...pagination): AppConfigSourceConnection!` (`scopeType = DOMAIN`, `scopeId = domain_name` pinned) |
-| `UserV2`   | `appConfigSources(filter, orderBy, ...pagination): AppConfigSourceConnection!` (`scopeType = USER`, `scopeId = user_id` pinned)       |
+| `DomainV2` | `appConfigFragments(filter, orderBy, ...pagination): AppConfigFragmentConnection!` (`scopeType = DOMAIN`, `scopeId = domain_name` pinned) |
+| `UserV2`   | `appConfigFragments(filter, orderBy, ...pagination): AppConfigFragmentConnection!` (`scopeType = USER`, `scopeId = user_id` pinned)       |
 
 ### Permissions
 
-Each `appConfigSources` child field enforces its own access rule (not
+Each `appConfigFragments` child field enforces its own access rule (not
 simply inherited from the parent node) — see the permission matrix
-below. In short: `DomainV2.appConfigSources` is same-domain users or
-admin; `UserV2.appConfigSources` is owner or admin. Writes (mutations) on
+below. In short: `DomainV2.appConfigFragments` is same-domain users or
+admin; `UserV2.appConfigFragments` is owner or admin. Writes (mutations) on
 both are admin-only.
 
 ```graphql
 extend type DomainV2 {
   """DOMAIN-scope rows. Same-domain users or admin; `filter.scopeType`/`scopeId` ignored."""
-  appConfigSources(
-    filter: AppConfigSourceFilter = null
-    orderBy: [AppConfigSourceOrderBy!] = null
+  appConfigFragments(
+    filter: AppConfigFragmentFilter = null
+    orderBy: [AppConfigFragmentOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): AppConfigSourceConnection!
+  ): AppConfigFragmentConnection!
 }
 
 extend type UserV2 {
   """USER-scope rows. Owner or admin; `filter.scopeType`/`scopeId` ignored."""
-  appConfigSources(
-    filter: AppConfigSourceFilter = null
-    orderBy: [AppConfigSourceOrderBy!] = null
+  appConfigFragments(
+    filter: AppConfigFragmentFilter = null
+    orderBy: [AppConfigFragmentOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): AppConfigSourceConnection!
+  ): AppConfigFragmentConnection!
 }
 ```
 
 Root field `myAppConfigs` returns the caller's merged view
 (`AppConfig`), the only query that performs the merge (§5). All
-other queries expose raw `AppConfigSource` rows.
+other queries expose raw `AppConfigFragment` rows.
 
 ### Queries
 
 ```graphql
 type Query {
   """Public config documents. No auth."""
-  publicAppConfigSources(
-    filter: AppConfigSourceFilter = null
-    orderBy: [AppConfigSourceOrderBy!] = null
+  publicAppConfigFragments(
+    filter: AppConfigFragmentFilter = null
+    orderBy: [AppConfigFragmentOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): AppConfigSourceConnection!
+  ): AppConfigFragmentConnection!
 
   """
   Caller's merged view (auth required). Chain per policy (§5);
   `filter.scopeType` / `filter.scopeId` are ignored.
   """
   myAppConfigs(
-    filter: AppConfigSourceFilter = null
-    orderBy: [AppConfigSourceOrderBy!] = null
+    filter: AppConfigFragmentFilter = null
+    orderBy: [AppConfigFragmentOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
@@ -548,16 +548,16 @@ type Query {
   ): AppConfigConnection!
 
   """Cross-scope admin search."""
-  adminAppConfigSources(
-    filter: AppConfigSourceFilter = null
-    orderBy: [AppConfigSourceOrderBy!] = null
+  adminAppConfigFragments(
+    filter: AppConfigFragmentFilter = null
+    orderBy: [AppConfigFragmentOrderBy!] = null
     before: String = null
     after: String = null
     first: Int = null
     last: Int = null
     limit: Int = null
     offset: Int = null
-  ): AppConfigSourceConnection!
+  ): AppConfigFragmentConnection!
 
   """
   Cross-user merged-view search (admin only). Resolves any user's
@@ -591,30 +591,30 @@ type Query {
   ): AppConfigPolicyConnection!
 
   # Reused existing root fields (not new):
-  #   admin_user_v2(user_id: UUID!) { appConfigSources { ... } }
-  #   domain_v2(name: String!)      { appConfigSources { ... } }
+  #   admin_user_v2(user_id: UUID!) { appConfigFragments { ... } }
+  #   domain_v2(name: String!)      { appConfigFragments { ... } }
   #   node(id: ID!): Node
 }
 ```
 
 #### Connection / Filter / OrderBy
 
-A single `AppConfigSourceFilter` + `AppConfigSourceOrderBy` is reused
+A single `AppConfigFragmentFilter` + `AppConfigFragmentOrderBy` is reused
 across every raw-row query — each call pins `scopeType` / `scopeId`
 internally.
 
 ```graphql
 # ── Connections ───────────────────────────────────────────────
 
-"""Relay Connection over raw `AppConfigSource` rows (any scope)."""
-type AppConfigSourceConnection {
-  edges: [AppConfigSourceEdge!]!
+"""Relay Connection over raw `AppConfigFragment` rows (any scope)."""
+type AppConfigFragmentConnection {
+  edges: [AppConfigFragmentEdge!]!
   pageInfo: PageInfo!
   count: Int!
 }
-type AppConfigSourceEdge {
+type AppConfigFragmentEdge {
   cursor: String!
-  node: AppConfigSource!
+  node: AppConfigFragment!
 }
 
 """Relay Connection over the caller's merged `AppConfig` — backs `myAppConfigs`."""
@@ -642,11 +642,11 @@ type AppConfigPolicyEdge {
 # ── Filter / OrderBy (shared by all Connections) ──────────────
 
 """
-AppConfigSource search filter. Scalar fields at the top level are
+AppConfigFragment search filter. Scalar fields at the top level are
 AND-combined. For arbitrary boolean shapes, nest predicates under
 `AND` / `OR` / `NOT`.
 """
-input AppConfigSourceFilter {
+input AppConfigFragmentFilter {
   """Scope filters are ignored on per-scope Connections (scope pinned by the field)."""
   scopeType: AppConfigScopeTypeEnumFilter = null
   scopeId: StringFilter = null
@@ -655,9 +655,9 @@ input AppConfigSourceFilter {
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
 
-  AND: [AppConfigSourceFilter!] = null
-  OR: [AppConfigSourceFilter!] = null
-  NOT: [AppConfigSourceFilter!] = null
+  AND: [AppConfigFragmentFilter!] = null
+  OR: [AppConfigFragmentFilter!] = null
+  NOT: [AppConfigFragmentFilter!] = null
 }
 
 input AppConfigScopeTypeEnumFilter {
@@ -667,8 +667,8 @@ input AppConfigScopeTypeEnumFilter {
   notIn: [AppConfigScopeType!]
 }
 
-input AppConfigSourceOrderBy {
-  field: AppConfigSourceOrderField!
+input AppConfigFragmentOrderBy {
+  field: AppConfigFragmentOrderField!
   direction: OrderDirection! = ASC
 }
 
@@ -677,7 +677,7 @@ input AppConfigSourceOrderBy {
 Connections. `UPDATED_AT` / `CREATED_AT` fall back to `NAME` on
 `myAppConfigs` (derived `AppConfig` has no timestamps).
 """
-enum AppConfigSourceOrderField {
+enum AppConfigFragmentOrderField {
   SCOPE_TYPE
   SCOPE_ID
   NAME
@@ -736,11 +736,11 @@ enum AppConfigPolicyOrderField {
 All writes are **bulk-only** (pass a 1-element array for a single
 write). Eight mutations total across three paths:
 
-- `adminBulk{Create,Update,Purge}AppConfigSources` — admin-only.
-  Items carry `AppConfigSourceKey { scopeType, scopeId, name }`, so
+- `adminBulk{Create,Update,Purge}AppConfigFragments` — admin-only.
+  Items carry `AppConfigFragmentKey { scopeType, scopeId, name }`, so
   scopes may be mixed in one call. Create/Update return raw
-  `AppConfigSource` lists; Purge returns the purged keys.
-- `bulk{Create,Update}MyAppConfigSources` — any authenticated
+  `AppConfigFragment` lists; Purge returns the purged keys.
+- `bulk{Create,Update}MyAppConfigFragments` — any authenticated
   user, `USER` + `current_user.user_id` injected server-side.
   Returns recomputed `AppConfig`s. No Purge (admin-only cleanup).
 - `adminBulk{Create,Update,Purge}AppConfigPolicies` — admin-only.
@@ -756,21 +756,21 @@ type Mutation {
   # ── Admin path — every scope, admin-only ─────────────────────
 
   """Strict insert across any scope; admin USER-row seeding also goes here."""
-  adminBulkCreateAppConfigSources(input: AdminBulkCreateAppConfigSourceInput!): AdminBulkCreateAppConfigSourcesPayload!
+  adminBulkCreateAppConfigFragments(input: AdminBulkCreateAppConfigFragmentInput!): AdminBulkCreateAppConfigFragmentsPayload!
 
   """Wholesale JSON replacement; items with no existing row fail."""
-  adminBulkUpdateAppConfigSources(input: AdminBulkUpdateAppConfigSourceInput!): AdminBulkUpdateAppConfigSourcesPayload!
+  adminBulkUpdateAppConfigFragments(input: AdminBulkUpdateAppConfigFragmentInput!): AdminBulkUpdateAppConfigFragmentsPayload!
 
   """Cleanup-only deletion (see §1); absent keys are no-oped."""
-  adminBulkPurgeAppConfigSources(input: AdminBulkPurgeAppConfigSourceInput!): AdminBulkPurgeAppConfigSourcesPayload!
+  adminBulkPurgeAppConfigFragments(input: AdminBulkPurgeAppConfigFragmentInput!): AdminBulkPurgeAppConfigFragmentsPayload!
 
   # ── Self-service (my) path — USER + current_user implicit ────
 
   """Strict insert on the caller's USER row; duplicates fail."""
-  bulkCreateMyAppConfigSources(input: BulkCreateMyAppConfigSourceInput!): BulkCreateMyAppConfigSourcesPayload!
+  bulkCreateMyAppConfigFragments(input: BulkCreateMyAppConfigFragmentInput!): BulkCreateMyAppConfigFragmentsPayload!
 
   """Wholesale replacement; items with no existing USER row fail."""
-  bulkUpdateMyAppConfigSources(input: BulkUpdateMyAppConfigSourceInput!): BulkUpdateMyAppConfigSourcesPayload!
+  bulkUpdateMyAppConfigFragments(input: BulkUpdateMyAppConfigFragmentInput!): BulkUpdateMyAppConfigFragmentsPayload!
 
   # ── Admin policy path — admin-only ─────────────────────────
 
@@ -801,7 +801,7 @@ enum AppConfigScopeType {
 
 """
 Natural composite key identifying a single app config row.
-Mirrors the Python `AppConfigSourceKey` dataclass used by the repository /
+Mirrors the Python `AppConfigFragmentKey` dataclass used by the repository /
 db_source layer.
 - `PUBLIC`:               `scopeId` is the literal string `"public"`.
 - `DOMAIN`:               `scopeId` is `domain_name`.
@@ -809,7 +809,7 @@ db_source layer.
 - `USER`:                 `scopeId` is `user_id` (UUID string).
 - `name` is the document name (unique within the scope).
 """
-input AppConfigSourceKey {
+input AppConfigFragmentKey {
   scopeType: AppConfigScopeType!
   scopeId: String!
   name: String!
@@ -820,45 +820,45 @@ input AppConfigSourceKey {
 # replacement on update. Pass `{}` to clear (reads back as `null`).
 # Service applies a reasonable item cap.
 
-input AdminAppConfigSourceItemInput {
-  key: AppConfigSourceKey!
+input AdminAppConfigFragmentItemInput {
+  key: AppConfigFragmentKey!
   config: JSON!
 }
 
-input AdminBulkCreateAppConfigSourceInput {
-  items: [AdminAppConfigSourceItemInput!]!
+input AdminBulkCreateAppConfigFragmentInput {
+  items: [AdminAppConfigFragmentItemInput!]!
 }
 
-input AdminBulkUpdateAppConfigSourceInput {
-  items: [AdminAppConfigSourceItemInput!]!
+input AdminBulkUpdateAppConfigFragmentInput {
+  items: [AdminAppConfigFragmentItemInput!]!
 }
 
-"""Purge is keyed by `AppConfigSourceKey` alone."""
-input AdminBulkPurgeAppConfigSourceInput {
-  keys: [AppConfigSourceKey!]!
+"""Purge is keyed by `AppConfigFragmentKey` alone."""
+input AdminBulkPurgeAppConfigFragmentInput {
+  keys: [AppConfigFragmentKey!]!
 }
 
 # ── My Inputs — scope=USER, scopeId=current_user.user_id implicit ──
 # `AppConfig.config` is read-only; writes go through these inputs.
 
-input MyAppConfigSourceItemInput {
+input MyAppConfigFragmentItemInput {
   name: String!
   config: JSON!
 }
 
-input BulkCreateMyAppConfigSourceInput {
-  items: [MyAppConfigSourceItemInput!]!
+input BulkCreateMyAppConfigFragmentInput {
+  items: [MyAppConfigFragmentItemInput!]!
 }
 
-input BulkUpdateMyAppConfigSourceInput {
-  items: [MyAppConfigSourceItemInput!]!
+input BulkUpdateMyAppConfigFragmentInput {
+  items: [MyAppConfigFragmentItemInput!]!
 }
 
-# ── Admin Payloads — raw AppConfigSource ───────────────────────
+# ── Admin Payloads — raw AppConfigFragment ───────────────────────
 # Error types are per-verb (matching BulkCreateUserV2Error convention).
 # `index` = original position in the input list.
 
-type AdminBulkCreateAppConfigSourceError {
+type AdminBulkCreateAppConfigFragmentError {
   index: Int!
   scopeType: AppConfigScopeType!
   scopeId: String!
@@ -866,7 +866,7 @@ type AdminBulkCreateAppConfigSourceError {
   message: String!
 }
 
-type AdminBulkUpdateAppConfigSourceError {
+type AdminBulkUpdateAppConfigFragmentError {
   index: Int!
   scopeType: AppConfigScopeType!
   scopeId: String!
@@ -874,7 +874,7 @@ type AdminBulkUpdateAppConfigSourceError {
   message: String!
 }
 
-type AdminBulkPurgeAppConfigSourceError {
+type AdminBulkPurgeAppConfigFragmentError {
   index: Int!
   scopeType: AppConfigScopeType!
   scopeId: String!
@@ -882,45 +882,45 @@ type AdminBulkPurgeAppConfigSourceError {
   message: String!
 }
 
-type AdminBulkCreateAppConfigSourcesPayload {
-  created: [AppConfigSource!]!
-  failed: [AdminBulkCreateAppConfigSourceError!]!
+type AdminBulkCreateAppConfigFragmentsPayload {
+  created: [AppConfigFragment!]!
+  failed: [AdminBulkCreateAppConfigFragmentError!]!
 }
 
-type AdminBulkUpdateAppConfigSourcesPayload {
-  updated: [AppConfigSource!]!
-  failed: [AdminBulkUpdateAppConfigSourceError!]!
+type AdminBulkUpdateAppConfigFragmentsPayload {
+  updated: [AppConfigFragment!]!
+  failed: [AdminBulkUpdateAppConfigFragmentError!]!
 }
 
-type AdminBulkPurgeAppConfigSourcesPayload {
+type AdminBulkPurgeAppConfigFragmentsPayload {
   """Keys of rows actually removed (absent keys are no-oped)."""
-  purged: [AppConfigSourceKey!]!
-  failed: [AdminBulkPurgeAppConfigSourceError!]!
+  purged: [AppConfigFragmentKey!]!
+  failed: [AdminBulkPurgeAppConfigFragmentError!]!
 }
 
 # ── My Payloads — recomputed AppConfig ─────────────────────────
 # scope / scopeId are server-injected, so `name` is the only identifier.
 
-type BulkCreateMyAppConfigSourceError {
+type BulkCreateMyAppConfigFragmentError {
   index: Int!
   name: String!
   message: String!
 }
 
-type BulkUpdateMyAppConfigSourceError {
+type BulkUpdateMyAppConfigFragmentError {
   index: Int!
   name: String!
   message: String!
 }
 
-type BulkCreateMyAppConfigSourcesPayload {
+type BulkCreateMyAppConfigFragmentsPayload {
   created: [AppConfig!]!
-  failed: [BulkCreateMyAppConfigSourceError!]!
+  failed: [BulkCreateMyAppConfigFragmentError!]!
 }
 
-type BulkUpdateMyAppConfigSourcesPayload {
+type BulkUpdateMyAppConfigFragmentsPayload {
   updated: [AppConfig!]!
-  failed: [BulkUpdateMyAppConfigSourceError!]!
+  failed: [BulkUpdateMyAppConfigFragmentError!]!
 }
 
 # ── Admin Policy Inputs / Payloads ──────────────────────────
@@ -986,11 +986,11 @@ type AdminBulkPurgeAppConfigPoliciesPayload {
 }
 
 """
-Raw `app_config_sources` row — any scope. No back-refs to parent
+Raw `app_config_fragments` row — any scope. No back-refs to parent
 `DomainV2` / `UserV2`; callers re-query as needed.
 """
-type AppConfigSource implements Node {
-  """Relay ID — `base64("AppConfigSource:<row_uuid>")`."""
+type AppConfigFragment implements Node {
+  """Relay ID — `base64("AppConfigFragment:<row_uuid>")`."""
   id: ID!
 
   scopeType: AppConfigScopeType!
@@ -1040,7 +1040,7 @@ type AppConfigPolicy implements Node {
   """
   scopeSources: [String!]!
 
-  """Gate for the `bulk*MyAppConfigSources` path. Admin-path is ungated."""
+  """Gate for the `bulk*MyAppConfigFragments` path. Admin-path is ungated."""
   userWritable: Boolean!
 
   createdAt: DateTime!
@@ -1054,38 +1054,38 @@ Queries:
 
 | Operation                          | Anonymous | User                             | Admin |
 |------------------------------------|-----------|----------------------------------|-------|
-| `publicAppConfigSources`                 | ✅        | ✅                               | ✅    |
+| `publicAppConfigFragments`                 | ✅        | ✅                               | ✅    |
 | `myAppConfigs`                     | ❌        | ✅ (self)                        | ✅    |
-| `DomainV2.appConfigSources`              | ❌        | ✅ (same domain only)            | ✅    |
-| `UserV2.appConfigSources`                | ❌        | ✅ (self)                        | ✅    |
-| `adminAppConfigSources`                  | ❌        | ❌                               | ✅    |
+| `DomainV2.appConfigFragments`              | ❌        | ✅ (same domain only)            | ✅    |
+| `UserV2.appConfigFragments`                | ❌        | ✅ (self)                        | ✅    |
+| `adminAppConfigFragments`                  | ❌        | ❌                               | ✅    |
 | `adminAppConfigs`                        | ❌        | ❌                               | ✅    |
 | `appConfigPolicy` / `appConfigPolicies` | ❌   | ✅                               | ✅    |
-| `node(id)` → `AppConfigSource`           | ✅ iff row `scopeType = PUBLIC` | ✅ (PUBLIC always; DOMAIN / DOMAIN_USER_DEFAULTS same-domain only; USER self only) | ✅ |
+| `node(id)` → `AppConfigFragment`           | ✅ iff row `scopeType = PUBLIC` | ✅ (PUBLIC always; DOMAIN / DOMAIN_USER_DEFAULTS same-domain only; USER self only) | ✅ |
 | `node(id)` → `AppConfig`   | ❌        | ✅ (id's `user_id` is self)      | ✅ (any `user_id`)         |
 | `node(id)` → `AppConfigPolicy`     | ❌        | ✅                               | ✅    |
 
 Write mutations split into two paths with distinct rules. All
 bulk-only.
 
-**Admin path** — `adminBulkCreateAppConfigSources`,
-`adminBulkUpdateAppConfigSources`. Admin regardless of each item's
+**Admin path** — `adminBulkCreateAppConfigFragments`,
+`adminBulkUpdateAppConfigFragments`. Admin regardless of each item's
 `key.scopeType`:
 
 | Operation                                  | Anonymous | User | Admin |
 |--------------------------------------------|-----------|------|-------|
-| `adminBulk{Create,Update,Purge}AppConfigSources` | ❌        | ❌   | ✅    |
+| `adminBulk{Create,Update,Purge}AppConfigFragments` | ❌        | ❌   | ✅    |
 
-**Self-service (my) path** — `bulkCreateMyAppConfigSources`,
-`bulkUpdateMyAppConfigSources`. Imply `scope = USER` +
+**Self-service (my) path** — `bulkCreateMyAppConfigFragments`,
+`bulkUpdateMyAppConfigFragments`. Imply `scope = USER` +
 `scopeId = current_user.user_id`:
 
 | Operation              | Anonymous | User (self) | Admin (self) |
 |------------------------|-----------|-------------|--------------|
-| `bulk*MyAppConfigSources`    | ❌        | ✅          | ✅           |
+| `bulk*MyAppConfigFragments`    | ❌        | ✅          | ✅           |
 
 > Admins operating on another user's `USER` row must use the admin
-> path with an explicit `AppConfigSourceKey { scopeType: USER, scopeId:
+> path with an explicit `AppConfigFragmentKey { scopeType: USER, scopeId:
 > target_user_id, name }` on each item — the my path cannot target
 > another user.
 
@@ -1101,9 +1101,9 @@ Where the checks live:
 - Admin paths: `check_admin_only()` at entry, then per-item dispatch
   on `item.key.scopeType`.
 - My paths: authenticated-only; `scopeId` is server-injected.
-- `DomainV2.appConfigSources`: same-domain users or admin (helper in
+- `DomainV2.appConfigFragments`: same-domain users or admin (helper in
   `src/ai/backend/manager/api/gql/utils.py`).
-- `UserV2.appConfigSources`: owner or admin.
+- `UserV2.appConfigFragments`: owner or admin.
 
 #### Name → ID resolution and ID-based Actions
 
@@ -1125,14 +1125,14 @@ pattern via `AppConfigPolicyRepository.get(name)`.
 
 REST exposes three prefix trees that mirror the GQL surface:
 
-- `/v2/app-config-sources/...` — raw source row operations (admin
+- `/v2/app-config-fragments/...` — raw fragment operations (admin
   CRUD, cross-scope search, per-scope search, single reads, my-path
   writes).
 - `/v2/app-configs/my/...` — **merged `AppConfig` view** per user
-  (read-only; writes go through the source prefix).
+  (read-only; writes go through the fragment prefix).
 - `/v2/app-config-policies/...` — policy CRUD + reads.
 
-Mounted via `RouteRegistry.create("app-config-sources", ...)`,
+Mounted via `RouteRegistry.create("app-config-fragments", ...)`,
 `RouteRegistry.create("app-configs", ...)`, and
 `RouteRegistry.create("app-config-policies", ...)` respectively,
 matching the project-wide v2 conventions in
@@ -1157,19 +1157,19 @@ Search bodies share a common pagination shape:
 Single-resource reads (`GET .../{name}`) remain `GET` — one row,
 no pagination.
 
-### App Config Source endpoints
+### App Config Fragment endpoints
 
 REST mirrors the GQL admin / my split — the scope-parameterized
 path handles **admin writes + per-scope reads / search** (maps to
-GQL `adminBulk*AppConfigSources` mutations and the scoped queries),
+GQL `adminBulk*AppConfigFragments` mutations and the scoped queries),
 and the `/my` path is **self-only** (maps to GQL
-`bulk*MyAppConfigSources` mutations).
+`bulk*MyAppConfigFragments` mutations).
 
 #### Scope-parameterized path — admin writes / per-scope reads
 
 ```
-/v2/app-config-sources/{scope_type}/{scope_id}/{name}     # single GET
-/v2/app-config-sources/{scope_type}/{scope_id}/search     # POST search
+/v2/app-config-fragments/{scope_type}/{scope_id}/{name}     # single GET
+/v2/app-config-fragments/{scope_type}/{scope_id}/search     # POST search
 ```
 
 - `{scope_type}` ∈ `public | domain | domain_user_defaults | user`.
@@ -1182,8 +1182,8 @@ the bulk endpoints (below).
 
 | Method | Path                                                           | Description                           |
 |--------|----------------------------------------------------------------|---------------------------------------|
-| GET    | `/v2/app-config-sources/{scope_type}/{scope_id}/{name}`        | Read one source row                    |
-| POST   | `/v2/app-config-sources/{scope_type}/{scope_id}/search`        | Paginated list within this scope       |
+| GET    | `/v2/app-config-fragments/{scope_type}/{scope_id}/{name}`        | Read one fragment                    |
+| POST   | `/v2/app-config-fragments/{scope_type}/{scope_id}/search`        | Paginated list within this scope       |
 
 `POST .../search` accepts the shared search body (filter + order +
 `limit/offset`); `filter.scopeType` / `filter.scopeId` are ignored
@@ -1199,7 +1199,7 @@ Read-only per-user `AppConfig` at its own prefix to make the
 "merged view, not raw row" framing explicit in the URL. The
 adapter pins `(USER, current_user.user_id)`; no way to target
 another user, no writes (those go through
-`/v2/app-config-sources/my/bulk-*`).
+`/v2/app-config-fragments/my/bulk-*`).
 
 | Method | Path                                | Description                              |
 |--------|-------------------------------------|------------------------------------------|
@@ -1222,7 +1222,7 @@ of the GQL `AppConfig`:
 ```json
 {
   "name": "preferences",
-  "sources": [
+  "fragments": [
     { "scope_type": "domain_user_defaults",
       "scope_id": "default", "name": "preferences",
       "config": { ... }, "created_at": "...", "updated_at": "..." },
@@ -1234,7 +1234,7 @@ of the GQL `AppConfig`:
 }
 ```
 
-`sources` is ordered low → high (policy's `scope_sources`).
+`fragments` is ordered low → high (policy's `scope_sources`).
 Elements appear only where a row exists for `(user, name)`. Each
 `config` and the top-level `config` mirror GQL nullability
 (§3) — empty → `null`, never bare `{}`.
@@ -1243,9 +1243,9 @@ Elements appear only where a row exists for `(user, name)`. Each
 
 | Method | Path                                       | Access | Maps to                             |
 |--------|--------------------------------------------|--------|-------------------------------------|
-| POST   | `/v2/app-config-sources/bulk-create`       | Admin  | `adminBulkCreateAppConfigSources`   |
-| POST   | `/v2/app-config-sources/bulk-update`       | Admin  | `adminBulkUpdateAppConfigSources`   |
-| POST   | `/v2/app-config-sources/bulk-purge`        | Admin  | `adminBulkPurgeAppConfigSources`    |
+| POST   | `/v2/app-config-fragments/bulk-create`       | Admin  | `adminBulkCreateAppConfigFragments`   |
+| POST   | `/v2/app-config-fragments/bulk-update`       | Admin  | `adminBulkUpdateAppConfigFragments`   |
+| POST   | `/v2/app-config-fragments/bulk-purge`        | Admin  | `adminBulkPurgeAppConfigFragments`    |
 
 Request / response bodies are the snake_case projection of the
 corresponding GQL input / payload. Example (`bulk-create`):
@@ -1261,7 +1261,7 @@ corresponding GQL input / payload. Example (`bulk-create`):
 
 // Response
 {
-  "created": [ /* AppConfigSource objects */ ],
+  "created": [ /* AppConfigFragment objects */ ],
   "failed": [
     { "scope_type": "USER", "scope_id": "...",
       "name": "...", "message": "..." }
@@ -1273,17 +1273,17 @@ corresponding GQL input / payload. Example (`bulk-create`):
 
 | Method | Path                                          | Access | Maps to                          |
 |--------|-----------------------------------------------|--------|----------------------------------|
-| POST   | `/v2/app-config-sources/my/bulk-create`       | User   | `bulkCreateMyAppConfigSources`   |
-| POST   | `/v2/app-config-sources/my/bulk-update`       | User   | `bulkUpdateMyAppConfigSources`   |
+| POST   | `/v2/app-config-fragments/my/bulk-create`       | User   | `bulkCreateMyAppConfigFragments`   |
+| POST   | `/v2/app-config-fragments/my/bulk-update`       | User   | `bulkUpdateMyAppConfigFragments`   |
 
 Response bodies are the snake_case projection of the corresponding
-GQL `Bulk*MyAppConfigSourcesPayload` (a success list plus `failed`).
+GQL `Bulk*MyAppConfigFragmentsPayload` (a success list plus `failed`).
 
 #### Admin cross-scope search
 
 | Method | Path                                | Access | Description                                                                                  |
 |--------|-------------------------------------|--------|----------------------------------------------------------------------------------------------|
-| POST   | `/v2/app-config-sources/search`     | Admin  | Cross-scope paginated search — same body schema as `adminAppConfigSources` (offset + cursor) |
+| POST   | `/v2/app-config-fragments/search`     | Admin  | Cross-scope paginated search — same body schema as `adminAppConfigFragments` (offset + cursor) |
 
 ### App Config Policy endpoints
 
@@ -1327,19 +1327,19 @@ wider as the use case demands.
 
 ### Read (Merge)
 
-Single-document (`AppConfigSourceDBSource.get_user_app_config(user_id,
+Single-document (`AppConfigFragmentDBSource.get_user_app_config(user_id,
 config_name)`): one SQL resolves `domain_name` via a `users`
 subquery, joins `app_config_policies` to derive the chain
 (`scope_sources`), and pulls only the scope rows that are part of
 that chain. Rows are
 ordered per the chain; absent scopes contribute `{}`; the deep-merge
 treats nested objects recursively, leaves as scalar replacement, and
-lists as wholesale replacement. Output: ordered `sources` + merged
+lists as wholesale replacement. Output: ordered `fragments` + merged
 `config`. Callers don't pre-resolve the chain — the same pattern
 applies to search (below).
 
 Connection (`myAppConfigs` → `search_user_app_configs`): same
-single-SQL approach, generalized — joins `app_config_sources` with
+single-SQL approach, generalized — joins `app_config_fragments` with
 `app_config_policies ON name = config_name`, filters
 `scope_type = ANY(policy.scope_sources)`, orders by
 `array_position(policy.scope_sources, scope_type)`. Each `name`'s
@@ -1363,7 +1363,7 @@ DOMAIN_USER_DEFAULTS, and USER rows). No Python callable is
 threaded through — chain derivation lives entirely in SQL.
 
 ```python
-class AppConfigSourceDBSource:
+class AppConfigFragmentDBSource:
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
@@ -1371,22 +1371,22 @@ class AppConfigSourceDBSource:
 
     @staticmethod
     def _merge_chain(
-        rows: Sequence[AppConfigSourceRow],
+        rows: Sequence[AppConfigFragmentRow],
         chain: Sequence[str],
-    ) -> tuple[list[AppConfigSourceRow], dict | None]:
+    ) -> tuple[list[AppConfigFragmentRow], dict | None]:
         # Order `rows` by `chain` (low → high) and deep-merge their
         # `extra_config` in that order. Empty result projects to None
         # per §3 null projection. Shared by get / search / admin_search.
         by_scope = {row.scope_type: row for row in rows}
-        ordered_sources = [
+        ordered_fragments = [
             by_scope[AppConfigScopeType(s)]
             for s in chain
             if AppConfigScopeType(s) in by_scope
         ]
         merged: dict = {}
-        for row in ordered_sources:
+        for row in ordered_fragments:
             merged = deep_merge(merged, row.extra_config)
-        return ordered_sources, merged or None
+        return ordered_fragments, merged or None
 
     async def get_user_app_config(
         self,
@@ -1404,25 +1404,25 @@ class AppConfigSourceDBSource:
             .scalar_subquery()
         )
         scope_id_match = sa.case(
-            (AppConfigSourceRow.scope_type == AppConfigScopeType.PUBLIC,
+            (AppConfigFragmentRow.scope_type == AppConfigScopeType.PUBLIC,
              sa.literal("public")),
-            (AppConfigSourceRow.scope_type.in_([
+            (AppConfigFragmentRow.scope_type.in_([
                 AppConfigScopeType.DOMAIN,
                 AppConfigScopeType.DOMAIN_USER_DEFAULTS,
             ]), user_domain_sq),
-            (AppConfigSourceRow.scope_type == AppConfigScopeType.USER,
+            (AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
              sa.literal(str(user_id))),
         )
         query = (
-            sa.select(AppConfigSourceRow, AppConfigPolicyRow.scope_sources)
+            sa.select(AppConfigFragmentRow, AppConfigPolicyRow.scope_sources)
             .join(
                 AppConfigPolicyRow,
-                AppConfigPolicyRow.config_name == AppConfigSourceRow.name,
+                AppConfigPolicyRow.config_name == AppConfigFragmentRow.name,
             )
             .where(
-                AppConfigSourceRow.name == config_name,
-                AppConfigSourceRow.scope_id == scope_id_match,
-                sa.cast(AppConfigSourceRow.scope_type, sa.Text)
+                AppConfigFragmentRow.name == config_name,
+                AppConfigFragmentRow.scope_id == scope_id_match,
+                sa.cast(AppConfigFragmentRow.scope_type, sa.Text)
                     == sa.any_(AppConfigPolicyRow.scope_sources),
             )
         )
@@ -1431,19 +1431,19 @@ class AppConfigSourceDBSource:
 
         if not result:
             return AppConfigData(
-                user_id=user_id, name=config_name, sources=[], config=None,
+                user_id=user_id, name=config_name, fragments=[], config=None,
             )
 
         # `config_name` is UNIQUE and we filtered on a single value,
         # so every result row carries the same `scope_sources`.
         chain = result[0].scope_sources
-        rows = [r.AppConfigSourceRow for r in result]
-        ordered_sources, config = self._merge_chain(rows, chain)
+        rows = [r.AppConfigFragmentRow for r in result]
+        ordered_fragments, config = self._merge_chain(rows, chain)
 
         return AppConfigData(
             user_id=user_id,
             name=config_name,
-            sources=ordered_sources,
+            fragments=ordered_fragments,
             config=config,
         )
 
@@ -1455,7 +1455,7 @@ class AppConfigSourceDBSource:
         # Connection counterpart. Single SQL joins policies:
         #
         #   SELECT s.*, p.scope_sources
-        #   FROM app_config_sources AS s
+        #   FROM app_config_fragments AS s
         #   JOIN app_config_policies AS p ON s.name = p.config_name
         #   WHERE <scope.to_condition()>
         #     AND s.scope_type::text = ANY(p.scope_sources)
@@ -1482,51 +1482,51 @@ class AppConfigSourceDBSource:
         ...
 
 
-class AppConfigSourceRepository:
+class AppConfigFragmentRepository:
     """
-    CRUD for raw `app_config_sources` rows (any scope, addressed by
-    `AppConfigSourceKey`) + merge-specific reads for `AppConfig` (§5).
+    CRUD for raw `app_config_fragments` rows (any scope, addressed by
+    `AppConfigFragmentKey`) + merge-specific reads for `AppConfig` (§5).
     No separate `AppConfigRepository`.
     """
 
-    _db_source: AppConfigSourceDBSource
+    _db_source: AppConfigFragmentDBSource
 
-    def __init__(self, db_source: AppConfigSourceDBSource) -> None:
+    def __init__(self, db_source: AppConfigFragmentDBSource) -> None:
         self._db_source = db_source
 
-    # ── Raw source CRUD (AppConfigSource) ──────────────────────────
+    # ── Raw fragment CRUD (AppConfigFragment) ──────────────────────────
 
-    async def get(self, key: AppConfigSourceKey) -> AppConfigSourceRow | None:
+    async def get(self, key: AppConfigFragmentKey) -> AppConfigFragmentRow | None:
         return await self._db_source.get(key)
 
-    async def get_by_id(self, id: uuid.UUID) -> AppConfigSourceRow | None:
+    async def get_by_id(self, id: uuid.UUID) -> AppConfigFragmentRow | None:
         return await self._db_source.get_by_id(id)
 
     async def create(
-        self, key: AppConfigSourceKey, extra_config: Mapping[str, Any]
-    ) -> AppConfigSourceRow:
+        self, key: AppConfigFragmentKey, extra_config: Mapping[str, Any]
+    ) -> AppConfigFragmentRow:
         return await self._db_source.create(key, extra_config)
 
     async def update(
-        self, key: AppConfigSourceKey, extra_config: Mapping[str, Any]
-    ) -> AppConfigSourceRow:
+        self, key: AppConfigFragmentKey, extra_config: Mapping[str, Any]
+    ) -> AppConfigFragmentRow:
         return await self._db_source.update(key, extra_config)
 
-    async def purge(self, key: AppConfigSourceKey) -> AppConfigSourceRow | None:
+    async def purge(self, key: AppConfigFragmentKey) -> AppConfigFragmentRow | None:
         return await self._db_source.purge(key)
 
     async def search(
         self,
-        scope: AppConfigSourceSearchScope,
+        scope: AppConfigFragmentSearchScope,
         querier: BatchQuerier,
-    ) -> AppConfigSourceSearchResult:
+    ) -> AppConfigFragmentSearchResult:
         # Scope-bound search. Cross-scope (admin) uses `admin_search`.
         return await self._db_source.search(scope=scope, querier=querier)
 
     async def admin_search(
         self,
         querier: BatchQuerier,
-    ) -> AppConfigSourceSearchResult:
+    ) -> AppConfigFragmentSearchResult:
         return await self._db_source.admin_search(querier)
 
     # ── Merged view (AppConfig) — thin delegates to db_source ────
@@ -1558,18 +1558,18 @@ class AppConfigSourceRepository:
 
 ### Exposure
 
-`AppConfig` exposes the contributing source rows + the deep-merge
+`AppConfig` exposes the contributing fragments + the deep-merge
 result:
 
-- `sources` — ordered low → high (matches the chain). Empty only
+- `fragments` — ordered low → high (matches the chain). Empty only
   when no chain scope has a row, in which case the `name` itself
-  doesn't appear in `myAppConfigs`. An individual source's `config`
+  doesn't appear in `myAppConfigs`. An individual fragment's `config`
   is `null` when the stored value is empty.
 - `config` — deep-merge in order; `null` when every
   contributing row is empty (clients fall back to defaults).
 
 Callers distinguish admin defaults (`scopeType = DOMAIN_USER_DEFAULTS`)
-from user overrides (`scopeType = USER`) by inspecting each source's
+from user overrides (`scopeType = USER`) by inspecting each fragment's
 `scopeType`. The REST `/v2/app-configs/my/{name}` response is the
 snake_case projection of the same shape (§4).
 
@@ -1583,15 +1583,15 @@ publishes no bootstrap list.
 
 ### Bootstrap flow
 
-1. **Pre-login (anonymous)** — per document, `publicAppConfigSources`
+1. **Pre-login (anonymous)** — per document, `publicAppConfigFragments`
    with a `name` filter. On no-edge / network error, fall back to
    built-in defaults. See S1 in §7.
 
 2. **Post-login** — one `myAppConfigs` query fetches all of the
    caller's merged documents in one round trip (each entry carries
-   `sources` + `config`, §5). Admins use the same query for
+   `fragments` + `config`, §5). Admins use the same query for
    their personal settings. `DOMAIN`-scope admin UIs issue
-   `DomainV2.appConfigSources` / `adminAppConfigSources` separately.
+   `DomainV2.appConfigFragments` / `adminAppConfigFragments` separately.
    See S2 in §7.
 
 ---
@@ -1610,7 +1610,7 @@ frontend; backend stores it opaquely.)
 
 ```graphql
 query LoadPublicTheme {
-  publicAppConfigSources(filter: { name: { equals: "theme" } }) {
+  publicAppConfigFragments(filter: { name: { equals: "theme" } }) {
     edges { node { name config updatedAt } }
   }
 }
@@ -1635,25 +1635,25 @@ query BootstrapMe {
     edges {
       node {
         name
-        sources { scopeType scopeId name config updatedAt }
+        fragments { scopeType scopeId name config updatedAt }
         config
       }
     }
   }
-  publicAppConfigSources {
+  publicAppConfigFragments {
     edges { node { name config } }
   }
 }
 ```
 
 - Server: `myAppConfigs` returns one entry per `name` for which at
-  least one source row in the merge chain exists. Every such `name`
+  least one fragment in the merge chain exists. Every such `name`
   is backed by a policy (§1 required-policy invariant), so the chain
   always comes from `AppConfigPolicy.scope_sources` — there is no
-  implicit fallback chain. `sources` carries the raw rows in chain
+  implicit fallback chain. `fragments` carries the raw rows in chain
   order; `config` is their deep merge. See §5.
 - The WebUI initializes UI state from `config` per document
-  and keeps the `sources` list around so the Settings page can
+  and keeps the `fragments` list around so the Settings page can
   distinguish user-changed (`scopeType = USER`) from admin-provided
   defaults (`scopeType = DOMAIN_USER_DEFAULTS`, etc.).
 
@@ -1661,7 +1661,7 @@ query BootstrapMe {
 
 The user replaces their `preferences` document — e.g. language,
 experimental-feature toggles, visible-column choices per table. They
-call the self-service `bulkUpdateMyAppConfigSources` — each item carries
+call the self-service `bulkUpdateMyAppConfigFragments` — each item carries
 only `name` + `config`, with `scopeType` / `scopeId` injected server-side
 as `USER` + `current_user.user_id`. Even a single-item write goes
 through the bulk path (1-element `items` array); the recomputed
@@ -1669,11 +1669,11 @@ through the bulk path (1-element `items` array); the recomputed
 `myAppConfigs` re-query is needed.
 
 ```graphql
-mutation SaveMyConfig($input: BulkUpdateMyAppConfigSourceInput!) {
-  bulkUpdateMyAppConfigSources(input: $input) {
+mutation SaveMyConfig($input: BulkUpdateMyAppConfigFragmentInput!) {
+  bulkUpdateMyAppConfigFragments(input: $input) {
     updated {
       name
-      sources { scopeType scopeId name config updatedAt }
+      fragments { scopeType scopeId name config updatedAt }
       config
     }
     failed { index name message }
@@ -1700,7 +1700,7 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigSourceInput!) {
 - Authorization: authenticated user. The server injects `scopeId =
   current_user.user_id`, so the mutation cannot touch another user's
   row (admins operating on other users use
-  `adminBulkUpdateAppConfigSources`).
+  `adminBulkUpdateAppConfigFragments`).
 - The input `config` replaces the USER row's stored JSON wholesale.
   `AppConfig.config` is read-only computed and cannot
   be written.
@@ -1712,19 +1712,19 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigSourceInput!) {
   appended to `failed` with a policy-violation message. Clients can
   discover this ahead of time by reading the policy via
   `appConfigPolicy(configName:)`.
-- **First write vs. subsequent writes**: `bulkUpdateMyAppConfigSources`
+- **First write vs. subsequent writes**: `bulkUpdateMyAppConfigFragments`
   places items with no USER row into `failed`. For the very first
-  save of a given `name`, the client calls `bulkCreateMyAppConfigSources`
+  save of a given `name`, the client calls `bulkCreateMyAppConfigFragments`
   with the same shape. Clients can disambiguate by checking whether
   the `myAppConfigs` entry for that `name` already has a `USER` row
-  in its `sources` list.
+  in its `fragments` list.
 
 ### S3.5. Admin publishes an app-config policy
 
 Before the `theme` document can be published (S4 below), an admin
 establishes a policy for `theme` that restricts writes to an
 admin-only scope and forbids per-user customization. The policy is
-**required** (§1 required-policy invariant) — no AppConfigSource row for
+**required** (§1 required-policy invariant) — no AppConfigFragment row for
 `theme` can be created until this step runs.
 
 The choice of scope for the admin-owned value — `domain` vs
@@ -1761,10 +1761,10 @@ mutation PublishThemePolicy(
 - Effect:
   - Writes to `theme` at any scope other than `DOMAIN` are rejected
     at the service layer.
-  - `bulk*MyAppConfigSources` calls targeting `theme` are rejected because
+  - `bulk*MyAppConfigFragments` calls targeting `theme` are rejected because
     `user_writable = false`.
   - `myAppConfigs` entries for `theme` are resolved through the
-    chain `[DOMAIN]` (single-scope — `sources` has at most one
+    chain `[DOMAIN]` (single-scope — `fragments` has at most one
     element, and `config` equals that element's `config`
     or is `null` when the element's `config` is `null`, §3).
 - Subsequent edits use `adminBulkUpdateAppConfigPolicies` with the
@@ -1800,7 +1800,7 @@ Any of the above may be switched live: an admin editing
 `adminBulkUpdateAppConfigPolicies` for `theme` from `[domain]` +
 `userWritable=false` to `[domain, user]` + `userWritable=true`
 immediately loosens the document — existing admin rows remain, and
-from the next `bulkUpdateMyAppConfigSources` onward users can layer their
+from the next `bulkUpdateMyAppConfigFragments` onward users can layer their
 own customization on top (§7 S3.7).
 
 ### S3.7. Promoting a document from admin-only to user-customizable
@@ -1839,17 +1839,17 @@ mutation PromoteThemePolicy(
 - Effect:
   - No data migration — the existing `DOMAIN` row for `theme` stays
     as-is.
-  - Users can now call `bulkCreate/UpdateMyAppConfigSources` targeting
+  - Users can now call `bulkCreate/UpdateMyAppConfigFragments` targeting
     `theme` and write their own `USER` row.
   - The next `myAppConfigs` call returns `theme` entries whose
-    `sources` is `[<DOMAIN row>, <USER row if present>]` and whose
+    `fragments` is `[<DOMAIN row>, <USER row if present>]` and whose
     `config` is `domain ⊕ user`.
 - Reversibility: flipping the policy back to
   `scopeSources=["domain"]` + `userWritable=false` blocks new user
   writes and excludes `USER` rows from the resolved view, but leaves
   any pre-existing `USER` rows untouched at the DB level (they
   simply stop being read). Admins who want those rows gone target
-  them with `adminBulkPurgeAppConfigSources` (see S3.8).
+  them with `adminBulkPurgeAppConfigFragments` (see S3.8).
 
 ### S3.8. Admin fixes a misconfigured policy or config
 
@@ -1858,17 +1858,17 @@ cannot be fixed by renaming. The admin's recovery path is a **purge
 and rebuild** workflow. The mutations run in a specific order because
 of the required-policy invariant:
 
-1. If any AppConfigSource rows already exist under the wrong `config_name`,
+1. If any AppConfigFragment rows already exist under the wrong `config_name`,
    purge them first — the policy cannot be purged while references
    exist.
 2. Purge the wrong policy.
 3. Create the correct policy.
-4. Re-create any AppConfigSource rows under the correct `config_name`.
+4. Re-create any AppConfigFragment rows under the correct `config_name`.
 
 ```graphql
-# Step 1 — purge the bad AppConfigSource rows (keys identify them).
-mutation PurgeBadConfigs($input: AdminBulkPurgeAppConfigSourceInput!) {
-  adminBulkPurgeAppConfigSources(input: $input) {
+# Step 1 — purge the bad AppConfigFragment rows (keys identify them).
+mutation PurgeBadConfigs($input: AdminBulkPurgeAppConfigFragmentInput!) {
+  adminBulkPurgeAppConfigFragments(input: $input) {
     purged { scopeType scopeId name }
     failed { index scopeType scopeId name message }
   }
@@ -1899,7 +1899,7 @@ mutation PurgeBadPolicy($input: AdminBulkPurgeAppConfigPolicyInput!) {
 
 - Authorization: admin required on both mutations.
 - Step 2 rejects the item if step 1 was skipped (or missed a row) —
-  the service checks for remaining AppConfigSource references under that
+  the service checks for remaining AppConfigFragment references under that
   `config_name` before purging.
 - Purge is the only deletion verb in the BEP; day-to-day writes
   still flow through create / update and never remove rows on their
@@ -1913,14 +1913,14 @@ base for their own `USER` row. The policy for `preferences` (S3.6's
 "`[domain_user_defaults, user]` + `userWritable=true`" shape) admits
 both admin-written `DOMAIN_USER_DEFAULTS` entries and user overrides;
 this scenario exercises the admin side. The first publish uses
-`adminBulkCreateAppConfigSources` with `key.scopeType =
+`adminBulkCreateAppConfigFragments` with `key.scopeType =
 DOMAIN_USER_DEFAULTS`; later edits use
-`adminBulkUpdateAppConfigSources` with the identical input shape.
+`adminBulkUpdateAppConfigFragments` with the identical input shape.
 Multiple domains can be seeded in one call by passing multiple items.
 
 ```graphql
-mutation AdminCreateAppConfigSources($input: AdminBulkCreateAppConfigSourceInput!) {
-  adminBulkCreateAppConfigSources(input: $input) {
+mutation AdminCreateAppConfigFragments($input: AdminBulkCreateAppConfigFragmentInput!) {
+  adminBulkCreateAppConfigFragments(input: $input) {
     created { id scopeType scopeId name config updatedAt }
     failed { index scopeType scopeId name message }
   }
@@ -1947,9 +1947,9 @@ mutation AdminCreateAppConfigSources($input: AdminBulkCreateAppConfigSourceInput
 - Authorization: admin required — the service rejects non-admin
   calls on any admin-path mutation.
 - Internally, the service forwards each item to
-  `AppConfigSourceRepository.create` (§2). Items whose key already
+  `AppConfigFragmentRepository.create` (§2). Items whose key already
   has a row land in `failed` — the admin falls back to
-  `adminBulkUpdateAppConfigSources`.
+  `adminBulkUpdateAppConfigFragments`.
 - Policy: the write's `scope_type` must be in the policy's
   `scope_sources`. The `preferences`-style policy lists
   `DOMAIN_USER_DEFAULTS`, so this write passes. A stricter policy
@@ -1964,15 +1964,15 @@ mutation AdminCreateAppConfigSources($input: AdminBulkCreateAppConfigSourceInput
 
 For a support request, an admin seeds user A's `preferences` USER row
 for the first time. Since the target is another user's row, this
-must use the admin path — `adminBulkCreateAppConfigSources` with
+must use the admin path — `adminBulkCreateAppConfigFragments` with
 `key.scopeType = USER` and `key.scopeId = user A's user_id`, not the
 self-service bulk path.
 Items whose key already has a row land in `failed`, in which case
-the admin falls back to `adminBulkUpdateAppConfigSources`.
+the admin falls back to `adminBulkUpdateAppConfigFragments`.
 
 ```graphql
-mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigSourceInput!) {
-  adminBulkCreateAppConfigSources(input: $input) {
+mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigFragmentInput!) {
+  adminBulkCreateAppConfigFragments(input: $input) {
     created { id scopeType scopeId name config updatedAt }
     failed { index scopeType scopeId name message }
   }
@@ -1998,32 +1998,32 @@ mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigSourceInpu
 
 - For `USER` scope the `config` input is stored as the user's
   customization for that `name`.
-- `adminBulkCreateAppConfigSources` fails the item if a row already exists
-  for the key; use `adminBulkUpdateAppConfigSources` instead to overwrite.
+- `adminBulkCreateAppConfigFragments` fails the item if a row already exists
+  for the key; use `adminBulkUpdateAppConfigFragments` instead to overwrite.
 - Policy: if an `AppConfigPolicy` for `preferences` has `USER ∉
   scope_sources`, the admin path still rejects the item
   (`scope_sources` applies to both paths — admins just bypass
   `user_writable`, not the scope list). With the usual
   `preferences`-style policy (`scope_sources` includes `USER`) this
   write passes.
-- The response is a list of raw `AppConfigSource`; the target user's
+- The response is a list of raw `AppConfigFragment`; the target user's
   resolved view reflects the new USER row (merged with the matching
   domain defaults) on the next `myAppConfigs` read from that user's
   session.
 
-### S6. Admin audits all AppConfigSources (cross-scope search)
+### S6. Admin audits all AppConfigFragments (cross-scope search)
 
 Cases such as "list every domain that touched `theme` in the last
 week" or "every domain that customized the `menu` document":
 
 ```graphql
 query AuditConfigs(
-  $filter: AppConfigSourceFilter!
-  $orderBy: [AppConfigSourceOrderBy!]
+  $filter: AppConfigFragmentFilter!
+  $orderBy: [AppConfigFragmentOrderBy!]
   $first: Int
   $after: String
 ) {
-  adminAppConfigSources(filter: $filter, orderBy: $orderBy, first: $first, after: $after) {
+  adminAppConfigFragments(filter: $filter, orderBy: $orderBy, first: $first, after: $after) {
     edges {
       cursor
       node {
