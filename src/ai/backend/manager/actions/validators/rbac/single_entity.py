@@ -16,11 +16,16 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
     def __init__(
         self,
         repository: PermissionControllerRepository,
+        enabled: bool,
     ) -> None:
         self._repository = repository
+        self._enabled = enabled
 
     @override
     async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+        if not self._enabled:
+            return
+
         user = current_user()
         if user is None:
             raise UnreachableError("User context is not available")

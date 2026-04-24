@@ -21,8 +21,10 @@ class BulkActionRBACValidator(BulkActionValidator):
     def __init__(
         self,
         repository: PermissionControllerRepository,
+        enabled: bool,
     ) -> None:
         self._repository = repository
+        self._enabled = enabled
 
     @classmethod
     @override
@@ -33,10 +35,16 @@ class BulkActionRBACValidator(BulkActionValidator):
     async def validate(
         self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
+        entity_ids = list(action.entity_ids)
+        if not self._enabled:
+            return BulkValidationResult(
+                allowed_entity_ids=entity_ids,
+                denied_entities=[],
+            )
+
         user = current_user()
         if user is None:
             raise UnreachableError("User context is not available")
-        entity_ids = list(action.entity_ids)
         if user.is_superadmin:
             return BulkValidationResult(
                 allowed_entity_ids=entity_ids,

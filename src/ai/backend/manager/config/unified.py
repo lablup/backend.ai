@@ -527,6 +527,29 @@ class AuthConfig(BaseConfigSchema):
     ]
 
 
+class RBACConfig(BaseConfigSchema):
+    enforcement_enabled: Annotated[
+        bool,
+        Field(
+            default=True,
+            validation_alias=AliasChoices("enforcement-enabled", "enforcement_enabled", "enabled"),
+            serialization_alias="enforcement-enabled",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to enable RBAC enforcement on the manager's read/validation path. "
+                "When true (default), all RBAC validators run normally. "
+                "When false, RBAC validators short-circuit so that only the legacy "
+                "permission path (user.role / is_admin / domain and project membership) applies. "
+                "RBAC write paths continue to populate association and role-mapping rows "
+                "regardless of this flag, so re-enabling does not require data backfill."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+
+
 class ManagerConfig(BaseConfigSchema):
     ipc_base_path: Annotated[
         AutoDirectoryPath,
@@ -1229,6 +1252,19 @@ class ManagerConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             example=ConfigExample(local="", prod="9090"),
+        ),
+    ]
+    rbac: Annotated[
+        RBACConfig,
+        Field(default_factory=RBACConfig),
+        BackendAIConfigMeta(
+            description=(
+                "RBAC (Role-Based Access Control) configuration. "
+                "Controls runtime RBAC enforcement behavior including "
+                "the ability to toggle enforcement on or off without a restart."
+            ),
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
         ),
     ]
 

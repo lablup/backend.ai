@@ -79,8 +79,8 @@ def deployment_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo),
-                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+                scope=ScopeActionRBACValidator(permission_controller_repo, True),
+                single_entity=SingleEntityActionRBACValidator(permission_controller_repo, True),
             ),
         ),
     )
