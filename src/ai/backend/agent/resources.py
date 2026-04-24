@@ -77,6 +77,8 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
+    from ai.backend.agent.docker.intrinsic import DockerStatsStreamer
+
 
 type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
@@ -515,6 +517,16 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
         """
         return []
+
+    def attach_stats_streamer(self, streamer: DockerStatsStreamer) -> None:
+        """
+        Hook point for Docker-backed plugins that need the agent-owned
+        :class:`DockerStatsStreamer` to read per-container stats from a
+        single shared stream. The base implementation is a no-op so
+        plugins that do not consume the streamer (e.g. K8s, Dummy,
+        third-party accelerators) can inherit the default safely.
+        """
+        pass
 
 
 type ComputersMap = Mapping[DeviceName, ComputerContext]

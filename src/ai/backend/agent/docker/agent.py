@@ -1539,9 +1539,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # before any code AFTER ``super().__ainit__()`` gets to run.
         self._stats_streamer = DockerStatsStreamer(self.docker)
         for computer_ctx in self.computers.values():
-            instance = computer_ctx.instance
-            if hasattr(instance, "attach_stats_streamer"):
-                instance.attach_stats_streamer(self._stats_streamer)
+            computer_ctx.instance.attach_stats_streamer(self._stats_streamer)
 
         await super().__ainit__()
         try:
