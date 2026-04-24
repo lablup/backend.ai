@@ -2,15 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ai.backend.common.metrics.metric import DomainType, LayerType
-from ai.backend.common.resilience import (
-    MetricArgs,
-    MetricPolicy,
-    Resilience,
-    RetryArgs,
-    RetryPolicy,
-)
-from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -29,24 +20,6 @@ from ai.backend.manager.repositories.app_config_policy.updaters import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 
-_admin_resilience = Resilience(
-    policies=[
-        MetricPolicy(
-            MetricArgs(
-                domain=DomainType.REPOSITORY,
-                layer=LayerType.APP_CONFIG_POLICY_ADMIN_REPOSITORY,
-            )
-        ),
-        RetryPolicy(
-            RetryArgs(
-                max_retries=10,
-                retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.FIXED,
-            )
-        ),
-    ]
-)
-
 
 class AppConfigPolicyAdminRepository:
     """Admin-only operations on AppConfigPolicy.
@@ -62,7 +35,8 @@ class AppConfigPolicyAdminRepository:
 
     Mutations are routed through shared Creator / Updater / Purger
     helpers so DB constraint violations surface as typed domain errors
-    (e.g., :class:`AppConfigPolicyConflict`).
+    (e.g., :class:`AppConfigPolicyConflict`). Retry + metric policies
+    are applied at the DB-source layer.
     """
 
     _db_source: AppConfigPolicyDBSource
@@ -70,7 +44,6 @@ class AppConfigPolicyAdminRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = AppConfigPolicyDBSource(db)
 
-    @_admin_resilience.apply()
     async def create(
         self,
         config_name: str,
@@ -84,7 +57,6 @@ class AppConfigPolicyAdminRepository:
         )
         return await self._db_source.create(creator)
 
-    @_admin_resilience.apply()
     async def update(
         self,
         config_name: str,
@@ -93,10 +65,8 @@ class AppConfigPolicyAdminRepository:
         spec = AppConfigPolicyUpdaterSpec(scope_sources=scope_sources)
         return await self._db_source.update(config_name, spec)
 
-    @_admin_resilience.apply()
     async def purge(self, config_name: str) -> bool:
         return await self._db_source.purge(config_name)
 
-    @_admin_resilience.apply()
     async def search(self, querier: BatchQuerier) -> AppConfigPolicySearchResult:
         return await self._db_source.search(querier)
