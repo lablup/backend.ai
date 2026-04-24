@@ -887,14 +887,6 @@ type AllowedResourceGroupsPayload
   items: [String!]!
 }
 
-"""Added in 25.16.0. App configuration data."""
-type AppConfig
-  @join__type(graph: STRAWBERRY)
-{
-  """Additional configuration data."""
-  extraConfig: JSON!
-}
-
 """
 Added in 24.09.0. Input for approving an artifact revision.
 
@@ -4909,23 +4901,6 @@ type DeleteDomain
   msg: String
 }
 
-"""Added in 25.16.0. Input for deleting domain-level app configuration"""
-input DeleteDomainConfigInput
-  @join__type(graph: STRAWBERRY)
-{
-  domainName: String!
-}
-
-"""
-Added in 25.16.0. Payload returned after deleting domain-level app configuration. Indicates whether the deletion was successful.
-"""
-type DeleteDomainConfigPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """Whether the deletion was successful."""
-  deleted: Boolean!
-}
-
 """Added in 26.4.2. Payload for domain deletion mutation."""
 type DeleteDomainPayload
   @join__type(graph: STRAWBERRY)
@@ -5235,26 +5210,6 @@ type DeleteUser
 {
   ok: Boolean
   msg: String
-}
-
-"""
-Added in 24.09.0. Input for deleting user-level app configuration.
-If user_id is not provided, the current user's configuration will be deleted.
-"""
-input DeleteUserConfigInput
-  @join__type(graph: STRAWBERRY)
-{
-  userId: ID = null
-}
-
-"""
-Added in 25.16.0. Payload returned after deleting user-level app configuration. Indicates whether the deletion was successful.
-"""
-type DeleteUserConfigPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """Whether the deletion was successful."""
-  deleted: Boolean!
 }
 
 type DeleteUserResourcePolicy
@@ -6845,7 +6800,6 @@ union EntityNode
   @join__unionMember(graph: STRAWBERRY, member: "SessionV2")
   @join__unionMember(graph: STRAWBERRY, member: "Artifact")
   @join__unionMember(graph: STRAWBERRY, member: "ArtifactRegistry")
-  @join__unionMember(graph: STRAWBERRY, member: "AppConfig")
   @join__unionMember(graph: STRAWBERRY, member: "NotificationChannel")
   @join__unionMember(graph: STRAWBERRY, member: "NotificationRule")
   @join__unionMember(graph: STRAWBERRY, member: "ModelDeployment")
@@ -6853,7 +6807,7 @@ union EntityNode
   @join__unionMember(graph: STRAWBERRY, member: "ContainerRegistryV2")
   @join__unionMember(graph: STRAWBERRY, member: "ArtifactRevision")
   @join__unionMember(graph: STRAWBERRY, member: "Role")
- = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
+ = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
 
 """Added in 26.4.2. Valid entity-operation combination for RBAC actions."""
 type EntityOperationCombination
@@ -11120,16 +11074,6 @@ type Mutation
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 25.16.0. Create or update user-level app configuration. The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. These settings will override domain-level settings when configurations are merged for this user. If user_id is not provided, the current user's configuration will be updated. Users can only modify their own configuration, but admins can modify any user's configuration
-  """
-  upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 25.16.0. Delete user-level app configuration. After deletion, the user will still receive domain-level configuration values when configurations are merged, as domain settings remain unaffected. If user_id is not provided, the current user's configuration will be deleted. Users can only delete their own configuration, but admins can delete any user's configuration
-  """
-  deleteUserAppConfig(input: DeleteUserConfigInput!): DeleteUserConfigPayload @join__field(graph: STRAWBERRY)
-
-  """
   Added in 25.15.0. Triggers artifact scanning on a remote reservoir registry. This mutation instructs a reservoir-type registry to initiate a scan of artifacts from its associated remote reservoir registry source. The scan process will discover and catalog artifacts available in the remote reservoir, making them accessible through the local reservoir registry. Requirements: - The delegator registry must be of type 'reservoir' - The delegator reservoir registry must have a valid remote registry configuration
   """
   delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateScanArtifactsPayload @join__field(graph: STRAWBERRY)
@@ -11224,16 +11168,6 @@ type Mutation
   """Added in 26.4.2. Validate a notification rule (admin only)"""
   adminValidateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload @join__field(graph: STRAWBERRY)
 
-  """
-  Added in 26.2.0. Create or update domain-level app configuration (admin only). The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. All users in this domain will be affected by these settings when their configurations are merged, unless they have user-level configurations that override specific keys
-  """
-  adminUpsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0. Delete domain-level app configuration (admin only). All users in this domain may be affected by this deletion. After deletion, users will only receive their user-level configurations when configurations are merged, with no domain-level defaults
-  """
-  adminDeleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload @join__field(graph: STRAWBERRY)
-
   """Added in 26.4.2. Create a new notification channel"""
   createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
@@ -11257,16 +11191,6 @@ type Mutation
 
   """Added in 26.4.2. Validate a notification rule"""
   validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 25.16.0. Create or update domain-level app configuration. The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. All users in this domain will be affected by these settings when their configurations are merged, unless they have user-level configurations that override specific keys. Requires admin privileges
-  """
-  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 25.16.0. Delete domain-level app configuration. All users in this domain may be affected by this deletion. After deletion, users will only receive their user-level configurations when configurations are merged, with no domain-level defaults. Requires admin privileges
-  """
-  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 25.14.0. Create an object storage."""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload @join__field(graph: STRAWBERRY)
@@ -14002,16 +13926,6 @@ type Query
   """
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection @join__field(graph: STRAWBERRY)
 
-  """
-  Added in 25.16.0. Retrieve user-level app configuration. Returns only the configuration set specifically for the user, without merging with domain config. This query is useful for checking what values are configured at the user level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead. If user_id is not provided, returns the current user's configuration. Users can only access their own configuration, but admins can access any user's configuration.
-  """
-  userAppConfig(userId: ID = null): AppConfig @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 25.16.0. Retrieve merged app configuration for the current user. The result combines domain-level and user-level configurations, where user settings override domain settings for the same keys. This query should be used when working with user app configurations to get the actual configuration values that will be applied.
-  """
-  mergedAppConfig: AppConfig @join__field(graph: STRAWBERRY)
-
   """Added in 25.16.0. Get a specific deployment by ID."""
   deployment(id: ID!): ModelDeployment @join__field(graph: STRAWBERRY)
 
@@ -14133,11 +14047,6 @@ type Query
 
   """Added in 26.4.2. List notification rules (admin only)"""
   adminNotificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0. Retrieve domain-level app configuration (admin only). Returns only the configuration set specifically for the domain, without merging. This query is useful for checking what values are configured at the domain level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead.
-  """
-  adminDomainAppConfig(domainName: String!): AppConfig @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get domain fair share data (admin only)."""
   adminDomainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
@@ -14407,11 +14316,6 @@ type Query
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 25.16.0. Retrieve domain-level app configuration. Returns only the configuration set specifically for the domain, without merging. This query is useful for checking what values are configured at the domain level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead. Requires admin privileges.
-  """
-  domainAppConfig(domainName: String!): AppConfig @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get domain fair share data (superadmin only)."""
   domainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -19620,29 +19524,6 @@ type UpdateVFSStoragePayload
 }
 
 """
-Added in 24.09.0. Input for creating or updating domain-level app configuration.
-The provided extra_config object will completely replace the existing configuration;
-existing keys not present in the new extra_config will be removed.
-All users in this domain will be affected by these settings when their configurations are merged.
-"""
-input UpsertDomainConfigInput
-  @join__type(graph: STRAWBERRY)
-{
-  domainName: String!
-  extraConfig: JSON!
-}
-
-"""
-Added in 25.16.0. Payload returned after upserting domain-level app configuration. Contains the resulting configuration that was stored.
-"""
-type UpsertDomainConfigPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """The resulting app configuration"""
-  appConfig: AppConfig!
-}
-
-"""
 Added in 26.1.0. Input for upserting domain fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
 """
 input UpsertDomainFairShareWeightInput
@@ -19697,30 +19578,6 @@ type UpsertProjectFairShareWeightPayload
 {
   """Updated project fair share data"""
   projectFairShare: ProjectFairShare!
-}
-
-"""
-Added in 24.09.0. Input for creating or updating user-level app configuration.
-The provided extra_config object will completely replace the existing configuration;
-existing keys not present in the new extra_config will be removed.
-These settings will override domain-level settings when configurations are merged for this user.
-If user_id is not provided, the current user's configuration will be updated.
-"""
-input UpsertUserConfigInput
-  @join__type(graph: STRAWBERRY)
-{
-  extraConfig: JSON!
-  userId: ID = null
-}
-
-"""
-Added in 25.16.0. Payload returned after upserting user-level app configuration. Contains the resulting configuration that was stored.
-"""
-type UpsertUserConfigPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """The resulting app configuration"""
-  appConfig: AppConfig!
 }
 
 """
