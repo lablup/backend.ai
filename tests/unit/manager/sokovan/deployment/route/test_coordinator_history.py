@@ -10,6 +10,8 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
     RouteHealthStatus,
@@ -42,13 +44,13 @@ def sample_route_data() -> RouteData:
     """Sample RouteData for testing."""
     return RouteData(
         route_id=uuid4(),
-        endpoint_id=uuid4(),
+        deployment_id=DeploymentID(uuid4()),
         session_id=None,
         status=RouteStatus.PROVISIONING,
         health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
-        revision_id=uuid4(),
+        revision_id=DeploymentRevisionID(uuid4()),
     )
 
 
@@ -382,13 +384,13 @@ class TestProcessRouteLifecycle:
             return_value=[
                 RouteData(
                     route_id=uuid4(),
-                    endpoint_id=uuid4(),
+                    deployment_id=DeploymentID(uuid4()),
                     session_id=None,
                     status=RouteStatus.RUNNING,
                     health_status=RouteHealthStatus.HEALTHY,
                     traffic_ratio=1.0,
                     created_at=datetime.now(tzutc()),
-                    revision_id=uuid4(),
+                    revision_id=DeploymentRevisionID(uuid4()),
                 )
             ]
         )

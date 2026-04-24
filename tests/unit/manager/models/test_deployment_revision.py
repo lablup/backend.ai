@@ -10,8 +10,9 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import BinarySize, ClusterMode, QuotaScopeID, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.data.image.types import ImageType
@@ -38,6 +39,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -87,6 +89,7 @@ class TestDeploymentRevisionRow:
                 ImageRow,
                 ResourcePresetRow,
                 ResourceSlotTypeRow,
+                RuntimeVariantRow,
                 EndpointRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
@@ -272,6 +275,22 @@ class TestDeploymentRevisionRow:
         yield sgroup
 
     @pytest.fixture
+    async def test_runtime_variant(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[RuntimeVariantRow, None]:
+        """Create a test runtime variant row."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            variant = RuntimeVariantRow(
+                name=f"test-variant-{uuid.uuid4().hex[:8]}",
+                description="Test runtime variant",
+                default_model_definition=ModelDefinitionDraft(),
+            )
+            db_sess.add(variant)
+            await db_sess.flush()
+        yield variant
+
+    @pytest.fixture
     async def test_endpoint(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -304,6 +323,7 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint: EndpointRow,
         test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
     ) -> None:
         """Test creating a deployment revision."""
         async with db_with_cleanup.begin_session() as db_sess:
@@ -317,7 +337,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant.id,
                 environ={},
                 extra_mounts=[],
             )
@@ -337,10 +357,22 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint: EndpointRow,
         test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
     ) -> None:
         """Test converting revision to ModelRevisionData."""
         model_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            # Satisfy the FK `fk_deployment_revisions_model_vfolders`.
+            vfolder = VFolderRow(
+                id=model_id,
+                host="local:volume1",
+                domain_name=test_endpoint.domain,
+                quota_scope_id=QuotaScopeID.parse("user:00000000-0000-0000-0000-000000000001"),
+                name=f"model-vfolder-{uuid.uuid4().hex[:8]}",
+                creator="test@example.com",
+            )
+            db_sess.add(vfolder)
+            await db_sess.flush()
             revision = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
                 revision_number=1,
@@ -354,7 +386,7 @@ class TestDeploymentRevisionRow:
                 cluster_size=1,
                 startup_command="python serve.py",
                 bootstrap_script="#!/bin/bash\necho hello",
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant.id,
                 environ={"DEBUG": "true"},
                 extra_mounts=[],
             )
@@ -378,7 +410,7 @@ class TestDeploymentRevisionRow:
             assert data.model_mount_config.vfolder_id == model_id
             assert data.model_mount_config.mount_destination == "/models"
             assert data.model_mount_config.definition_path == "model.yaml"
-            assert data.model_runtime_config.runtime_variant == RuntimeVariant("custom")
+            assert data.model_runtime_config.runtime_variant_id is not None
             assert data.model_runtime_config.environ == {"DEBUG": "true"}
             assert data.image_id == test_image.id
 
@@ -387,6 +419,7 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint: EndpointRow,
         test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
     ) -> None:
         """Test that endpoint + revision_number must be unique."""
         async with db_with_cleanup.begin_session() as db_sess:
@@ -400,7 +433,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant.id,
                 environ={},
                 extra_mounts=[],
             )
@@ -422,7 +455,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant.id,
                 environ={},
                 extra_mounts=[],
             )

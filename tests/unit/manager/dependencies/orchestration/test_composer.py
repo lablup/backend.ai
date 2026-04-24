@@ -55,6 +55,7 @@ class TestOrchestrationComposer:
             service_discovery=MagicMock(),
             prometheus_client=MagicMock(),
             prometheus_query_preset_repository=MagicMock(),
+            runtime_variant_repository=MagicMock(),
         )
 
         async with DependencyBuilderStack() as stack:
@@ -130,6 +131,7 @@ class TestOrchestrationComposer:
             service_discovery=MagicMock(),
             prometheus_client=MagicMock(),
             prometheus_query_preset_repository=MagicMock(),
+            runtime_variant_repository=MagicMock(),
         )
 
         async with DependencyBuilderStack() as stack:

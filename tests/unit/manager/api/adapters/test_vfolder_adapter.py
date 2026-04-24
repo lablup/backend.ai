@@ -101,7 +101,7 @@ class TestVFolderAdapterMySearch:
         input_dto = SearchVFoldersInput(limit=10, offset=0)
 
         with patch(
-            "ai.backend.manager.api.adapters.vfolder.current_user",
+            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
             return_value=user_data,
         ):
             await adapter.my_search(input_dto)
@@ -120,7 +120,7 @@ class TestVFolderAdapterMySearch:
         input_dto = SearchVFoldersInput(limit=10, offset=0)
 
         with patch(
-            "ai.backend.manager.api.adapters.vfolder.current_user",
+            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
             return_value=user_data,
         ):
             result = await adapter.my_search(input_dto)

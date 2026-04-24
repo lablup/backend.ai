@@ -12,7 +12,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
-from ai.backend.client.v2.exceptions import NotFoundError
+from ai.backend.client.v2.exceptions import NotFoundError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.session.request import (
     RestartSessionRequest,
@@ -247,56 +247,49 @@ async def full_lifecycle_session_seed(
 
 
 class TestSessionRestart:
-    """Test session restart lifecycle."""
+    """Test session restart lifecycle.
 
-    async def test_restart_running_session(
+    Session restart is no longer supported by the sokovan-driven session lifecycle;
+    the endpoint remains as a stub that returns HTTP 501. See commit 882f961ed6.
+    """
+
+    async def test_restart_returns_not_implemented(
         self,
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """Scenario: Admin restarts a currently RUNNING session.
+        """Any restart attempt now returns 501 Not Implemented regardless of state."""
+        with pytest.raises(ServerError) as exc_info:
+            await admin_registry.session.restart(
+                session_seed.session_name,
+                RestartSessionRequest(),
+            )
+        assert exc_info.value.args[0] == 501
 
-        Verifies that the restart API call succeeds and the session
-        remains in RUNNING status afterward (i.e., restart is a no-op
-        on the status when the agent mock simply acknowledges the request).
-        """
-        await admin_registry.session.restart(
-            session_seed.session_name,
-            RestartSessionRequest(),
-        )
-        result = await admin_registry.session.get_info(session_seed.session_name)
-        assert result.root["status"] == SessionStatus.RUNNING.name
-
-    async def test_restart_terminated_session_fails(
+    async def test_restart_terminated_session_returns_not_implemented(
         self,
         admin_registry: BackendAIClientRegistry,
         terminated_session_seed: SessionSeedData,
     ) -> None:
-        """Scenario: Admin attempts to restart a TERMINATED session.
-
-        Verifies that the server rejects the request because the session
-        is stale (allow_stale=False) and cannot be resolved for restart.
-        """
-        with pytest.raises((NotFoundError, BackendAPIError)):
+        """Restart against a TERMINATED session still returns 501."""
+        with pytest.raises(ServerError) as exc_info:
             await admin_registry.session.restart(
                 terminated_session_seed.session_name,
                 RestartSessionRequest(),
             )
+        assert exc_info.value.args[0] == 501
 
-    async def test_restart_nonexistent_session_returns_not_found(
+    async def test_restart_nonexistent_session_returns_not_implemented(
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """Scenario: Admin attempts to restart a session that does not exist.
-
-        Verifies that a completely unknown session name results in a
-        NotFoundError rather than an unexpected server error.
-        """
-        with pytest.raises(NotFoundError):
+        """Restart against a missing session returns 501 (endpoint is a stub)."""
+        with pytest.raises(ServerError) as exc_info:
             await admin_registry.session.restart(
                 "nonexistent-session-xyz-99999",
                 RestartSessionRequest(),
             )
+        assert exc_info.value.args[0] == 501
 
 
 class TestSessionStatusHistory:

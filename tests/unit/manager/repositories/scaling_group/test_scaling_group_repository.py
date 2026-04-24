@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -33,6 +34,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
@@ -110,6 +112,7 @@ class TestScalingGroupRepositoryDB:
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -424,7 +427,7 @@ class TestScalingGroupRepositoryDB:
                 db_sess.add(session)
 
                 # Create minimal endpoint for routing
-                endpoint_id = uuid.uuid4()
+                endpoint_id = DeploymentID(uuid.uuid4())
                 endpoint = EndpointRow(
                     id=endpoint_id,
                     name=f"test-endpoint-{i}",
@@ -1323,10 +1326,10 @@ class TestScalingGroupRepositoryDB:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_scaling_group_for_hierarchy: str,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> AsyncGenerator[DeploymentID, None]:
         """Create an endpoint referencing the scaling group."""
         test_user_uuid, test_domain, test_group_id = test_user_domain_group
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 EndpointRow(
@@ -1349,7 +1352,7 @@ class TestScalingGroupRepositoryDB:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_session: SessionId,
-        sample_endpoint: uuid.UUID,
+        sample_endpoint: DeploymentID,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create a route connecting the session to the endpoint."""
@@ -1377,7 +1380,7 @@ class TestScalingGroupRepositoryDB:
         sample_scaling_group_for_hierarchy: str,
         sample_session: SessionId,
         sample_kernel: uuid.UUID,
-        sample_endpoint: uuid.UUID,
+        sample_endpoint: DeploymentID,
         sample_route: uuid.UUID,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:

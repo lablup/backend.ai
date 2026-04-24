@@ -64,6 +64,7 @@ class TestSokovanOrchestratorDependency:
             service_discovery=MagicMock(),
             prometheus_client=MagicMock(),
             prometheus_query_preset_repository=MagicMock(),
+            runtime_variant_repository=MagicMock(),
         )
 
         async with dependency.provide(sokovan_input) as orchestrator:
@@ -125,6 +126,7 @@ class TestSokovanOrchestratorDependency:
             service_discovery=MagicMock(),
             prometheus_client=MagicMock(),
             prometheus_query_preset_repository=MagicMock(),
+            runtime_variant_repository=MagicMock(),
         )
 
         async with dependency.provide(sokovan_input):

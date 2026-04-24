@@ -17,7 +17,7 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit, InferenceAppInfo, PortFrontendInfo
-from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
+from ai.backend.common.types import RuntimeVariant
 
 
 def create_circuit(port: int) -> Circuit:
@@ -52,9 +52,6 @@ def create_circuit(port: int) -> Circuit:
                 kernel_port=30729,
                 protocol=ProxyProtocol.HTTP,
                 traffic_ratio=1.0,
-                health_status=ModelServiceStatus.HEALTHY,
-                last_health_check=datetime(2024, 7, 16, 5, 45, 45, 982450, tzinfo=UTC).timestamp(),
-                consecutive_failures=0,
             )
         ],
         session_ids=[UUID("f5cd34ba-ae53-4537-a813-09f38496443d")],

@@ -4,7 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
@@ -51,7 +52,6 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -147,12 +147,47 @@ def deployment_processors(
 
 
 @pytest.fixture()
+async def runtime_variant_fixture(
+    db_engine: SAEngine,
+) -> AsyncIterator[uuid.UUID]:
+    """Seed a runtime_variant row so deployment creates can resolve its FK."""
+    variant_id = uuid.uuid4()
+    default_definition = (
+        '{"models": [{"name": "test-model", "model_path": "/models/test",'
+        ' "service": {"start_command": ["python", "serve.py"], "port": 8000}}]}'
+    )
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO runtime_variants (id, name, description, default_model_definition)"
+                " VALUES (:id, :name, :desc, CAST(:default_model_definition AS jsonb))"
+            ).bindparams(
+                id=variant_id,
+                name=f"test-variant-{variant_id.hex[:8]}",
+                desc="Test runtime variant for deployment tests",
+                default_model_definition=default_definition,
+            )
+        )
+    yield variant_id
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text("DELETE FROM runtime_variants WHERE id = :id").bindparams(id=variant_id)
+        )
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     deployment_processors: DeploymentProcessors,
+    runtime_variant_fixture: uuid.UUID,
 ) -> list[RouteRegistry]:
     """Load only the modules required for deployment-domain tests."""
-    runtime_variant_adapter = RuntimeVariantAdapter(MagicMock(spec=Processors))
+    resolved_variant_id = RuntimeVariantID(runtime_variant_fixture)
+    runtime_variant_adapter = MagicMock(spec=RuntimeVariantAdapter)
+    runtime_variant_adapter.resolve_by_name = AsyncMock(return_value=resolved_variant_id)
+    _variant_node_mock = MagicMock()
+    _variant_node_mock.name = "custom"
+    runtime_variant_adapter.get = AsyncMock(return_value=_variant_node_mock)
     return [
         register_deployment_routes(
             DeploymentAPIHandler(

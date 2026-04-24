@@ -40,6 +40,7 @@ class TestRuntimeVariantPresetFixture:
                 {
                     "name": "vllm",
                     "description": "vLLM",
+                    "default_model_definition": {},
                 }
             ],
             "runtime_variant_presets": [
@@ -102,6 +103,7 @@ class TestRuntimeVariantPresetFixture:
                     "id": variant_id,
                     "name": "vllm",
                     "description": "vLLM",
+                    "default_model_definition": {},
                 }
             ],
             "runtime_variant_presets": [

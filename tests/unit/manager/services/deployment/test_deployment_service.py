@@ -186,7 +186,7 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         mock_deployment_repository.upsert_deployment_policy.assert_called_once()
         upserter_arg = mock_deployment_repository.upsert_deployment_policy.call_args[0][0]
         spec = upserter_arg.spec
-        assert spec.endpoint_id == endpoint_id
+        assert spec.deployment_id == endpoint_id
         assert spec.strategy == DeploymentStrategy.ROLLING
 
     async def test_upsert_deployment_policy_update(
@@ -309,13 +309,6 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
 
 class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     """Fixtures for model revision tests."""
-
-    @pytest.fixture(autouse=True)
-    def _setup_revision_generator(self, mock_revision_generator_registry: MagicMock) -> None:
-        """Set up mock revision generator to return no deployment config by default."""
-        mock_generator = MagicMock()
-        mock_generator.load_deployment_config = AsyncMock(return_value=None)
-        mock_revision_generator_registry.get.return_value = mock_generator
 
     @pytest.fixture(autouse=True)
     def _setup_default_repository_mocks(

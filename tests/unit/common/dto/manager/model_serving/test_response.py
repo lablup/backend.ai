@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.model_serving.response import (
     TokenResponseModel,
     TryStartResponseModel,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import RuntimeVariant
 
 
@@ -85,7 +86,7 @@ class TestRouteInfoModel:
 class TestServeInfoModel:
     def test_field_completeness(self) -> None:
         eid = uuid.uuid4()
-        mid = uuid.uuid4()
+        mid = VFolderUUID(uuid.uuid4())
         rid = uuid.uuid4()
         model = ServeInfoModel(
             endpoint_id=eid,
@@ -114,7 +115,7 @@ class TestServeInfoModel:
     def test_nullable_fields(self) -> None:
         model = ServeInfoModel(
             endpoint_id=uuid.uuid4(),
-            model_id=uuid.uuid4(),
+            model_id=VFolderUUID(uuid.uuid4()),
             extra_mounts=[],
             name="svc",
             replicas=0,
@@ -130,7 +131,7 @@ class TestServeInfoModel:
     def test_serialization_roundtrip(self) -> None:
         model = ServeInfoModel(
             endpoint_id=uuid.uuid4(),
-            model_id=uuid.uuid4(),
+            model_id=VFolderUUID(uuid.uuid4()),
             extra_mounts=[],
             name="svc",
             replicas=1,

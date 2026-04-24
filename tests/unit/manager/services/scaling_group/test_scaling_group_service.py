@@ -13,6 +13,7 @@ import pytest
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
+from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
@@ -25,6 +26,7 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupStatus,
     SchedulerType,
 )
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import (
     ScalingGroupNotFound,
@@ -163,6 +165,8 @@ class TestScalingGroupService:
                 default_weight=Decimal("1.0"),
                 resource_weights=ResourceSlot(),
             ),
+            default_deployment_options=DeploymentOptions(),
+            default_session_options=DefaultSessionOptions(),
         )
 
     @pytest.fixture
@@ -295,6 +299,8 @@ class TestScalingGroupService:
                     default_weight=Decimal("1.0"),
                     resource_weights=ResourceSlot(),
                 ),
+                default_deployment_options=DeploymentOptions(),
+                default_session_options=DefaultSessionOptions(),
             )
             for i in range(3)
         ]
@@ -720,6 +726,8 @@ class TestGetWsproxyVersion:
                 default_weight=Decimal("1.0"),
                 resource_weights=ResourceSlot(),
             ),
+            default_deployment_options=DeploymentOptions(),
+            default_session_options=DefaultSessionOptions(),
         )
 
     async def test_accessible_scaling_group_returns_version(
@@ -788,6 +796,8 @@ class TestGetWsproxyVersion:
             driver=sample_sgroup_with_wsproxy.driver,
             scheduler=sample_sgroup_with_wsproxy.scheduler,
             fair_share_spec=sample_sgroup_with_wsproxy.fair_share_spec,
+            default_deployment_options=DeploymentOptions(),
+            default_session_options=DefaultSessionOptions(),
         )
         mock_repository.list_allowed_sgroups = AsyncMock(return_value=[no_wsproxy])
 
@@ -862,6 +872,8 @@ class TestListAllowedScalingGroups:
                 default_weight=Decimal("1.0"),
                 resource_weights=ResourceSlot(),
             ),
+            default_deployment_options=DeploymentOptions(),
+            default_session_options=DefaultSessionOptions(),
         )
 
     async def test_admin_returns_all_groups(

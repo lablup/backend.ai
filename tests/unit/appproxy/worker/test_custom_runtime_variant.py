@@ -31,7 +31,7 @@ from ai.backend.appproxy.worker.types import (
     Measurement,
     PortFrontendInfo,
 )
-from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
+from ai.backend.common.types import RuntimeVariant
 
 # Sample Prometheus output that intentionally mixes multiple prefixes
 # to verify that CUSTOM variant returns ALL metrics without any filtering.
@@ -51,7 +51,6 @@ app_requests_total 100
 def _make_route(
     kernel_host: str = "10.0.0.1",
     kernel_port: int = 8080,
-    health_status: ModelServiceStatus | None = ModelServiceStatus.HEALTHY,
 ) -> RouteInfo:
     return RouteInfo(
         route_id=uuid4(),
@@ -61,9 +60,6 @@ def _make_route(
         kernel_port=kernel_port,
         protocol=ProxyProtocol.HTTP,
         traffic_ratio=1.0,
-        health_status=health_status,
-        last_health_check=None,
-        consecutive_failures=0,
     )
 
 

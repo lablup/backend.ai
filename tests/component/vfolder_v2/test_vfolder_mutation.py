@@ -36,7 +36,7 @@ from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACVali
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
-from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
