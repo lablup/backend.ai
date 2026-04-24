@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
@@ -3443,6 +3444,24 @@ class TestRouteOperations:
         assert result is False
 
 
+@dataclass(frozen=True)
+class _RouteState:
+    """Status/traffic triple for a route at a point in time."""
+
+    status: RouteStatus
+    traffic_status: RouteTrafficStatus
+    traffic_ratio: float
+
+
+@dataclass(frozen=True)
+class _PromoteDeploymentCase:
+    """Parametrized scenario for the promote-deployment happy path."""
+
+    description: str
+    initial_blue: _RouteState | None
+    expected_blue: _RouteState | None
+
+
 class TestPromoteDeployment:
     """Test cases for DeploymentRepository.promote_deployment (blue-green)."""
 
@@ -3719,7 +3738,31 @@ class TestPromoteDeployment:
             await db_sess.commit()
         return route_id
 
-    async def test_promote_activates_green_drains_blue_and_swaps_revision(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _PromoteDeploymentCase(
+                description="with_blue_route_drains_blue_and_swaps_revision",
+                initial_blue=_RouteState(
+                    status=RouteStatus.RUNNING,
+                    traffic_status=RouteTrafficStatus.ACTIVE,
+                    traffic_ratio=1.0,
+                ),
+                expected_blue=_RouteState(
+                    status=RouteStatus.TERMINATING,
+                    traffic_status=RouteTrafficStatus.INACTIVE,
+                    traffic_ratio=0.0,
+                ),
+            ),
+            _PromoteDeploymentCase(
+                description="only_green_route_swaps_revision",
+                initial_blue=None,
+                expected_blue=None,
+            ),
+        ],
+        ids=lambda c: c.description,
+    )
+    async def test_promote_activates_green_and_swaps_revision(
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -3729,9 +3772,10 @@ class TestPromoteDeployment:
         test_group_id: uuid.UUID,
         test_current_revision_id: uuid.UUID,
         test_deploying_revision_id: uuid.UUID,
+        case: _PromoteDeploymentCase,
     ) -> None:
-        """Promoting routes must flip green INACTIVE→ACTIVE, mark blue routes
-        TERMINATING+INACTIVE, and swap deploying_revision into current_revision."""
+        """Promote must flip green INACTIVE→ACTIVE and swap deploying_revision into
+        current_revision; when a blue route is present it must also be drained."""
         green_route_id = await self._create_route(
             db_with_cleanup,
             endpoint_id=promote_test_endpoint_id,
@@ -3743,22 +3787,26 @@ class TestPromoteDeployment:
             traffic_status=RouteTrafficStatus.INACTIVE,
             traffic_ratio=0.0,
         )
-        blue_route_id = await self._create_route(
-            db_with_cleanup,
-            endpoint_id=promote_test_endpoint_id,
-            revision_id=test_current_revision_id,
-            user_uuid=test_user_uuid,
-            domain_name=test_domain_name,
-            group_id=test_group_id,
-            status=RouteStatus.RUNNING,
-            traffic_status=RouteTrafficStatus.ACTIVE,
-            traffic_ratio=1.0,
-        )
+        drain_route_ids: list[uuid.UUID] = []
+        blue_route_id: uuid.UUID | None = None
+        if case.initial_blue is not None:
+            blue_route_id = await self._create_route(
+                db_with_cleanup,
+                endpoint_id=promote_test_endpoint_id,
+                revision_id=test_current_revision_id,
+                user_uuid=test_user_uuid,
+                domain_name=test_domain_name,
+                group_id=test_group_id,
+                status=case.initial_blue.status,
+                traffic_status=case.initial_blue.traffic_status,
+                traffic_ratio=case.initial_blue.traffic_ratio,
+            )
+            drain_route_ids.append(blue_route_id)
 
         swapped = await deployment_repository.promote_deployment(
             deployment_id=promote_test_endpoint_id,
             promote_route_ids=[green_route_id],
-            drain_route_ids=[blue_route_id],
+            drain_route_ids=drain_route_ids,
         )
 
         assert swapped == 1
@@ -3771,12 +3819,16 @@ class TestPromoteDeployment:
             assert green_row.traffic_ratio == 1.0
             assert green_row.status == RouteStatus.RUNNING
 
-            blue_row = (
-                await db_sess.execute(sa.select(RoutingRow).where(RoutingRow.id == blue_route_id))
-            ).scalar_one()
-            assert blue_row.status == RouteStatus.TERMINATING
-            assert blue_row.traffic_status == RouteTrafficStatus.INACTIVE
-            assert blue_row.traffic_ratio == 0.0
+            if case.expected_blue is not None:
+                assert blue_route_id is not None
+                blue_row = (
+                    await db_sess.execute(
+                        sa.select(RoutingRow).where(RoutingRow.id == blue_route_id)
+                    )
+                ).scalar_one()
+                assert blue_row.status == case.expected_blue.status
+                assert blue_row.traffic_status == case.expected_blue.traffic_status
+                assert blue_row.traffic_ratio == case.expected_blue.traffic_ratio
 
             endpoint_row = (
                 await db_sess.execute(
@@ -3786,53 +3838,6 @@ class TestPromoteDeployment:
             assert endpoint_row.current_revision == test_deploying_revision_id
             assert endpoint_row.deploying_revision is None
             assert endpoint_row.sub_step is None
-
-    async def test_promote_with_only_green_routes_swaps_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        promote_test_endpoint_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_domain_name: str,
-        test_group_id: uuid.UUID,
-        test_deploying_revision_id: uuid.UUID,
-    ) -> None:
-        """Promoting with no drain routes (initial deployment) must still swap the
-        revision and activate the green route."""
-        green_route_id = await self._create_route(
-            db_with_cleanup,
-            endpoint_id=promote_test_endpoint_id,
-            revision_id=test_deploying_revision_id,
-            user_uuid=test_user_uuid,
-            domain_name=test_domain_name,
-            group_id=test_group_id,
-            status=RouteStatus.RUNNING,
-            traffic_status=RouteTrafficStatus.INACTIVE,
-            traffic_ratio=0.0,
-        )
-
-        swapped = await deployment_repository.promote_deployment(
-            deployment_id=promote_test_endpoint_id,
-            promote_route_ids=[green_route_id],
-            drain_route_ids=[],
-        )
-
-        assert swapped == 1
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            green_row = (
-                await db_sess.execute(sa.select(RoutingRow).where(RoutingRow.id == green_route_id))
-            ).scalar_one()
-            assert green_row.traffic_status == RouteTrafficStatus.ACTIVE
-            assert green_row.traffic_ratio == 1.0
-
-            endpoint_row = (
-                await db_sess.execute(
-                    sa.select(EndpointRow).where(EndpointRow.id == promote_test_endpoint_id)
-                )
-            ).scalar_one()
-            assert endpoint_row.current_revision == test_deploying_revision_id
-            assert endpoint_row.deploying_revision is None
 
     async def test_promote_without_deploying_revision_does_not_swap(
         self,
