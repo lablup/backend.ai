@@ -158,6 +158,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
     SearchRevisionsAction,
     SearchRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.promote_deployment import (
+    PromoteDeploymentAction,
+    PromoteDeploymentActionResult,
+)
 from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
     RefreshDeploymentRevisionsAction,
     RefreshDeploymentRevisionsActionResult,
@@ -165,8 +169,6 @@ from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
-    PromoteDeploymentAction,
-    PromoteDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.route import (
     SearchRoutesAction,

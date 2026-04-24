@@ -287,12 +287,14 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
 )
+from ai.backend.manager.services.deployment.actions.promote_deployment import (
+    PromoteDeploymentAction,
+)
 from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
     RefreshDeploymentRevisionsAction,
 )
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
-    PromoteDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.route.search_routes import SearchRoutesAction
 from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
