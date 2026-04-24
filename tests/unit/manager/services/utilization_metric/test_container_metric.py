@@ -23,6 +23,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     PrometheusConnectionError,
 )
+from ai.backend.manager.clients.prometheus.fixed_query_builder import FixedContainerQueryBuilder
 from ai.backend.manager.data.metric.types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
@@ -54,6 +55,18 @@ def _make_query_range_response(
     )
 
 
+def _make_metric_repository(
+    mock_prometheus_client: Mock,
+    *,
+    timewindow: str = "1m",
+) -> MetricRepository:
+    return MetricRepository(
+        MagicMock(),
+        prometheus_client=mock_prometheus_client,
+        fixed_query_builder=FixedContainerQueryBuilder(timewindow),
+    )
+
+
 class TestContainerMetricRepositoryQueries:
     """Characterization tests: verify public interface behavior with PrometheusClient."""
 
@@ -63,9 +76,7 @@ class TestContainerMetricRepositoryQueries:
 
     @pytest.fixture
     def metric_repository(self, mock_prometheus_client: Mock) -> MetricRepository:
-        return MetricRepository(
-            MagicMock(), prometheus_client=mock_prometheus_client, timewindow="1m"
-        )
+        return _make_metric_repository(mock_prometheus_client)
 
     # -- query_container_metric_metadata --
 
@@ -461,30 +472,31 @@ class TestMetricTypeDetection:
     """Test metric type detection logic."""
 
     @pytest.fixture
-    def metric_repository(self) -> MetricRepository:
-        mock_client = Mock(spec=PrometheusClient)
-        return MetricRepository(MagicMock(), prometheus_client=mock_client, timewindow="1m")
+    def fixed_query_builder(self) -> FixedContainerQueryBuilder:
+        return FixedContainerQueryBuilder("1m")
 
-    def test_cpu_util_detected_as_diff_type(self, metric_repository: MetricRepository) -> None:
-        metric_type = metric_repository._get_metric_type(
+    def test_cpu_util_detected_as_diff_type(
+        self, fixed_query_builder: FixedContainerQueryBuilder
+    ) -> None:
+        metric_type = fixed_query_builder.get_container_metric_type(
             "cpu_util", ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
         )
         assert metric_type == MetricType.DIFF
 
     def test_network_metrics_detected_as_rate_type(
-        self, metric_repository: MetricRepository
+        self, fixed_query_builder: FixedContainerQueryBuilder
     ) -> None:
         for metric_name in ["net_rx", "net_tx"]:
-            metric_type = metric_repository._get_metric_type(
+            metric_type = fixed_query_builder.get_container_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
             assert metric_type == MetricType.RATE
 
     def test_memory_metrics_detected_as_gauge_type(
-        self, metric_repository: MetricRepository
+        self, fixed_query_builder: FixedContainerQueryBuilder
     ) -> None:
         for metric_name in ["container_memory_used_bytes", "container_gpu_percent"]:
-            metric_type = metric_repository._get_metric_type(
+            metric_type = fixed_query_builder.get_container_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
             assert metric_type == MetricType.GAUGE
@@ -547,18 +559,10 @@ class TestContainerMetricDataTypes:
 class TestTimewindowInitialization:
     """Tests for timewindow initialization."""
 
-    @pytest.fixture
-    async def mock_prometheus_client(self) -> MagicMock:
-        return MagicMock(spec=PrometheusClient)
-
     @pytest.mark.parametrize("timewindow", ["30s", "1m", "5m", "15m", "1h"])
-    async def test_timewindow_stored_correctly(
-        self, mock_prometheus_client: MagicMock, timewindow: str
-    ) -> None:
-        repository = MetricRepository(
-            MagicMock(), prometheus_client=mock_prometheus_client, timewindow=timewindow
-        )
-        assert repository._timewindow == timewindow
+    async def test_timewindow_stored_correctly(self, timewindow: str) -> None:
+        fixed_query_builder = FixedContainerQueryBuilder(timewindow)
+        assert fixed_query_builder._timewindow == timewindow
 
     @pytest.mark.parametrize(
         "metric_name,value_type",
@@ -568,21 +572,19 @@ class TestTimewindowInitialization:
             ("cpu_util", ValueType.CURRENT),  # DIFF
         ],
     )
-    async def test_timewindow_applied_to_preset(
-        self, mock_prometheus_client: MagicMock, metric_name: str, value_type: ValueType
+    async def test_timewindow_applied_to_query(
+        self, metric_name: str, value_type: ValueType
     ) -> None:
-        repository = MetricRepository(
-            MagicMock(), prometheus_client=mock_prometheus_client, timewindow="3m"
-        )
+        fixed_query_builder = FixedContainerQueryBuilder("3m")
         label = ContainerMetricOptionalLabel(value_type=value_type)
 
-        preset = repository._build_container_metric_preset(metric_name, label)
+        query = fixed_query_builder.get_container_metric_query(metric_name, label)
 
-        assert preset.window == "3m"
+        assert query.window == "3m"
 
 
 @dataclass
-class BuildPresetTestCase:
+class BuiltinQueryTestCase:
     id: str
     metric_name: str
     labels: ContainerMetricOptionalLabel
@@ -590,18 +592,14 @@ class BuildPresetTestCase:
     expected_query: str
 
 
-class TestBuildPreset:
-    """Characterization tests: verify _build_container_metric_preset produces expected PromQL."""
-
-    @pytest.fixture
-    async def mock_prometheus_client(self) -> MagicMock:
-        return MagicMock(spec=PrometheusClient)
+class TestBuiltinQueryProvider:
+    """Characterization tests: verify container metric built-in queries produce expected PromQL."""
 
     @pytest.mark.parametrize(
         "case",
         [
             # GAUGE - no window in template
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="gauge_mem_current",
                 metric_name="mem",
                 labels=ContainerMetricOptionalLabel(value_type=ValueType.CURRENT),
@@ -611,7 +609,7 @@ class TestBuildPreset:
                     '{container_metric_name="mem",value_type="current"})'
                 ),
             ),
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="gauge_mem_capacity_with_user_id",
                 metric_name="mem",
                 labels=ContainerMetricOptionalLabel(
@@ -625,7 +623,7 @@ class TestBuildPreset:
                     'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
                 ),
             ),
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="gauge_cuda_util_with_user_id",
                 metric_name="cuda_util",
                 labels=ContainerMetricOptionalLabel(
@@ -639,7 +637,7 @@ class TestBuildPreset:
                     'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
                 ),
             ),
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="gauge_io_read_with_user_id",
                 metric_name="io_read",
                 labels=ContainerMetricOptionalLabel(
@@ -654,7 +652,7 @@ class TestBuildPreset:
                 ),
             ),
             # RATE - uses window and interval divisor
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="rate_net_rx_current",
                 metric_name="net_rx",
                 labels=ContainerMetricOptionalLabel(value_type=ValueType.CURRENT),
@@ -664,7 +662,7 @@ class TestBuildPreset:
                     '{container_metric_name="net_rx",value_type="current"}[5m])) / 5.0'
                 ),
             ),
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="rate_net_tx_with_user_id",
                 metric_name="net_tx",
                 labels=ContainerMetricOptionalLabel(
@@ -678,7 +676,7 @@ class TestBuildPreset:
                     'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m])) / 5.0'
                 ),
             ),
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="rate_net_rx_capacity_with_user_id",
                 metric_name="net_rx",
                 labels=ContainerMetricOptionalLabel(
@@ -693,7 +691,7 @@ class TestBuildPreset:
                 ),
             ),
             # DIFF - uses window but no interval divisor
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="diff_cpu_util_current",
                 metric_name="cpu_util",
                 labels=ContainerMetricOptionalLabel(value_type=ValueType.CURRENT),
@@ -703,7 +701,7 @@ class TestBuildPreset:
                     '{container_metric_name="cpu_util",value_type="current"}[5m]))'
                 ),
             ),
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="diff_cpu_util_with_user_id",
                 metric_name="cpu_util",
                 labels=ContainerMetricOptionalLabel(
@@ -718,7 +716,7 @@ class TestBuildPreset:
                 ),
             ),
             # GAUGE for cpu_util with capacity (not DIFF since value_type != current)
-            BuildPresetTestCase(
+            BuiltinQueryTestCase(
                 id="gauge_cpu_util_capacity_with_user_id",
                 metric_name="cpu_util",
                 labels=ContainerMetricOptionalLabel(
@@ -735,15 +733,11 @@ class TestBuildPreset:
         ],
         ids=lambda c: c.id,
     )
-    async def test_build_preset_renders_expected_query(
-        self, mock_prometheus_client: MagicMock, case: BuildPresetTestCase
-    ) -> None:
-        repository = MetricRepository(
-            MagicMock(), prometheus_client=mock_prometheus_client, timewindow=case.timewindow
-        )
+    async def test_build_query_renders_expected_promql(self, case: BuiltinQueryTestCase) -> None:
+        fixed_query_builder = FixedContainerQueryBuilder(case.timewindow)
 
-        preset = repository._build_container_metric_preset(case.metric_name, case.labels)
-        rendered_query = preset.render()
+        query = fixed_query_builder.get_container_metric_query(case.metric_name, case.labels)
+        rendered_query = query.render()
 
         assert rendered_query == case.expected_query
 

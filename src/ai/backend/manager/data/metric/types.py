@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import Final, Self, cast
 from uuid import UUID
 
+from ai.backend.common.clients.prometheus.preset import MetricPreset
 from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
 from ai.backend.common.dto.clients.prometheus.response import (
     MetricResponseInfo,
@@ -15,6 +16,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import KernelId
 
 __all__ = [
+    "ContainerLiveStatQueries",
     "ContainerMetricOptionalLabel",
     "ContainerMetricResponseInfo",
     "ContainerMetricResult",
@@ -55,6 +57,20 @@ class MetricType(StrEnum):
 # Metric-name -> MetricType classification rules.
 # TODO: Refactor to query metric metadata from the repository layer once
 #       the metadata persistence is available.
+
+
+@dataclass(frozen=True)
+class ContainerLiveStatQueries:
+    """Gauge / diff / rate query preset bundle for container live stats."""
+
+    gauge: MetricPreset
+    diff: MetricPreset
+    rate: MetricPreset
+
+    def to_list(self) -> list[MetricPreset]:
+        return [self.gauge, self.diff, self.rate]
+
+
 DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
 RATE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
 
