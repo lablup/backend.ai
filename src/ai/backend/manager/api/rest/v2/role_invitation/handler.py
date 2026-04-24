@@ -74,3 +74,11 @@ class V2RoleInvitationHandler:
         """Search invitations for a specific role (admin view)."""
         result = await self._adapter.role_search_invitations(path.parsed.role_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_search(
+        self,
+        body: BodyParam[SearchRoleInvitationsInput],
+    ) -> APIResponse:
+        """Search all invitations across the system (superadmin only)."""
+        result = await self._adapter.admin_search_role_invitations(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

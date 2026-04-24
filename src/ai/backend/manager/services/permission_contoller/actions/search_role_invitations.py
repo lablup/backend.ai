@@ -10,6 +10,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
@@ -230,6 +231,35 @@ class SearchRoleInvitationsByRoleAction(_RoleScopedInvitationAction):
 
 @dataclass
 class SearchRoleInvitationsByRoleActionResult(_InvitationScopeActionResult):
+    result: SearchResult[RoleInvitationData]
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+# ------------------------------------------------------------------ admin_search (no scope, superadmin only)
+
+
+@dataclass
+class AdminSearchRoleInvitationsAction(BaseAction):
+    """Search all invitations across the system (superadmin only)."""
+
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.ROLE_ASSIGNMENT
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
+class AdminSearchRoleInvitationsActionResult(BaseActionResult):
     result: SearchResult[RoleInvitationData]
 
     @override

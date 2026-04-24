@@ -32,6 +32,7 @@ from .role_invitation import (
     create_role_invitation,
     my_role_invitations,
     reject_role_invitation,
+    role_scoped_role_invitations,
 )
 
 __all__ = [
@@ -63,6 +64,7 @@ __all__ = [
     "admin_bulk_revoke_role",
     # Role invitation queries
     "my_role_invitations",
+    "role_scoped_role_invitations",
     "admin_role_invitations",
     # Role invitation mutations
     "create_role_invitation",

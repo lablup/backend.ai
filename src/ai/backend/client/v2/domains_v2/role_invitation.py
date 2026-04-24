@@ -81,3 +81,15 @@ class V2RoleInvitationClient(BaseDomainClient):
             request=request,
             response_model=SearchRoleInvitationsPayload,
         )
+
+    async def admin_search(
+        self,
+        request: SearchRoleInvitationsInput,
+    ) -> SearchRoleInvitationsPayload:
+        """Search all invitations across the system (superadmin only)."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/search",
+            request=request,
+            response_model=SearchRoleInvitationsPayload,
+        )

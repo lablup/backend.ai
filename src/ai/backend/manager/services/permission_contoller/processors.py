@@ -68,9 +68,8 @@ from .actions.search_role_invitations import (
     AcceptRoleInvitationAction as AcceptInvitationAction,
 )
 from .actions.search_role_invitations import (
-    CancelRoleInvitationAction as CancelInvitationAction,
-)
-from .actions.search_role_invitations import (
+    AdminSearchRoleInvitationsAction,
+    AdminSearchRoleInvitationsActionResult,
     CreateRoleInvitationAction,
     CreateRoleInvitationActionResult,
     RoleInvitationActionResult,
@@ -78,6 +77,9 @@ from .actions.search_role_invitations import (
     SearchMyRoleInvitationsActionResult,
     SearchRoleInvitationsByRoleAction,
     SearchRoleInvitationsByRoleActionResult,
+)
+from .actions.search_role_invitations import (
+    CancelRoleInvitationAction as CancelInvitationAction,
 )
 from .actions.search_role_invitations import (
     RejectRoleInvitationAction as RejectInvitationAction,
@@ -146,6 +148,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     search_role_invitations_by_role: ScopeActionProcessor[
         SearchRoleInvitationsByRoleAction, SearchRoleInvitationsByRoleActionResult
     ]
+    admin_search_role_invitations: ActionProcessor[
+        AdminSearchRoleInvitationsAction, AdminSearchRoleInvitationsActionResult
+    ]
 
     def __init__(
         self,
@@ -209,6 +214,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=invitation_scope_validators,
         )
+        self.admin_search_role_invitations = ActionProcessor(
+            service.admin_search_role_invitations, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -242,4 +250,5 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             CancelInvitationAction.spec(),
             SearchMyRoleInvitationsAction.spec(),
             SearchRoleInvitationsByRoleAction.spec(),
+            AdminSearchRoleInvitationsAction.spec(),
         ]

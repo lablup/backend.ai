@@ -1308,6 +1308,21 @@ class PermissionDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def admin_search_invitations(
+        self,
+        querier: BatchQuerier,
+    ) -> RoleInvitationSearchResult:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(RoleInvitationRow)
+            result = await execute_batch_querier(session, query, querier)
+            items = [row.RoleInvitationRow.to_data() for row in result.rows]
+            return RoleInvitationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
     async def accept_invitation(
         self,
         invitation_id: uuid.UUID,

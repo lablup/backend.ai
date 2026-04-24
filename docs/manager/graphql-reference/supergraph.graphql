@@ -13548,9 +13548,14 @@ type Query
   myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. List invitations for a specific role (admin only).
+  Added in UNRELEASED. List invitations for a specific role (RBAC scope-validated).
   """
-  adminRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
+  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. List all role invitations across the system (superadmin only).
+  """
+  adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection! @join__field(graph: STRAWBERRY)
@@ -15432,6 +15437,7 @@ input RoleInvitationFilter
   @join__type(graph: STRAWBERRY)
 {
   state: RoleInvitationStateFilter = null
+  roleId: UUIDFilter = null
   role: RoleInvitationRoleNestedFilter = null
   inviter: RoleInvitationUserNestedFilter = null
   invitee: RoleInvitationUserNestedFilter = null

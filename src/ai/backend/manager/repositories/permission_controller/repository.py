@@ -406,6 +406,13 @@ class PermissionControllerRepository:
         return await self._db_source.search_invitations_by_role(querier, scope)
 
     @permission_controller_repository_resilience.apply()
+    async def admin_search_invitations(
+        self,
+        querier: BatchQuerier,
+    ) -> RoleInvitationSearchResult:
+        return await self._db_source.admin_search_invitations(querier)
+
+    @permission_controller_repository_resilience.apply()
     async def accept_invitation(
         self,
         invitation_id: uuid.UUID,

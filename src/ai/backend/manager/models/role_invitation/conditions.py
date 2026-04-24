@@ -8,7 +8,11 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.manager.data.role_invitation.types import RoleInvitationState
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -75,6 +79,26 @@ class RoleInvitationConditions:
     def by_role(role_id: UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleInvitationRow.role_id == role_id
+
+        return inner
+
+    @staticmethod
+    def by_role_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = RoleInvitationRow.role_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_role_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = RoleInvitationRow.role_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 

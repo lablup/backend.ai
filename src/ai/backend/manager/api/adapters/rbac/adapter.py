@@ -255,6 +255,11 @@ from ai.backend.manager.services.permission_contoller.actions.search_role_invita
     AcceptRoleInvitationAction as AcceptInvitationServiceAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    AdminSearchRoleInvitationsAction,
+    SearchMyRoleInvitationsAction,
+    SearchRoleInvitationsByRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
     CancelRoleInvitationAction as CancelInvitationServiceAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
@@ -262,10 +267,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_role_invita
 )
 from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
     RejectRoleInvitationAction as RejectInvitationServiceAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
-    SearchMyRoleInvitationsAction,
-    SearchRoleInvitationsByRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
@@ -1626,6 +1627,14 @@ class RBACAdapter(BaseAdapter):
             cond = self._convert_invitation_state_filter(f.state)
             if cond is not None:
                 conditions.append(cond)
+        if f.role_id is not None:
+            cond = self.convert_uuid_filter(
+                f.role_id,
+                equals_factory=RoleInvitationConditions.by_role_id_filter_equals,
+                in_factory=RoleInvitationConditions.by_role_id_filter_in,
+            )
+            if cond is not None:
+                conditions.append(cond)
         if f.role is not None:
             conditions.extend(self._convert_invitation_role_nested_filter(f.role))
         if f.inviter is not None:
@@ -1772,6 +1781,35 @@ class RBACAdapter(BaseAdapter):
                 querier=querier,
                 scope=RoleInvitationSearchScope(role_id=role_id),
             )
+        )
+        raw = action_result.result
+        return SearchRoleInvitationsPayload(
+            items=[self._invitation_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
+
+    async def admin_search_role_invitations(
+        self,
+        input: SearchRoleInvitationsInputDTO,
+    ) -> SearchRoleInvitationsPayload:
+        """Search all invitations across the system (superadmin only)."""
+        conditions = self._convert_invitation_filter(input.filter) if input.filter else []
+        orders = self._convert_invitation_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_invitation_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.permission_controller.admin_search_role_invitations.wait_for_complete(
+            AdminSearchRoleInvitationsAction(querier=querier)
         )
         raw = action_result.result
         return SearchRoleInvitationsPayload(

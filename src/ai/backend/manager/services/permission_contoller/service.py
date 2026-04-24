@@ -92,18 +92,20 @@ from ai.backend.manager.services.permission_contoller.actions.search_role_invita
     AcceptRoleInvitationAction as AcceptRoleInvitationServiceAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
-    CancelRoleInvitationAction as CancelRoleInvitationServiceAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
-    CreateRoleInvitationAction as CreateRoleInvitationServiceAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    AdminSearchRoleInvitationsAction,
+    AdminSearchRoleInvitationsActionResult,
     CreateRoleInvitationActionResult,
     RoleInvitationActionResult,
     SearchMyRoleInvitationsAction,
     SearchMyRoleInvitationsActionResult,
     SearchRoleInvitationsByRoleAction,
     SearchRoleInvitationsByRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    CancelRoleInvitationAction as CancelRoleInvitationServiceAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
+    CreateRoleInvitationAction as CreateRoleInvitationServiceAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
     RejectRoleInvitationAction as RejectRoleInvitationServiceAction,
@@ -448,6 +450,20 @@ class PermissionControllerService:
         """Search invitations for a specific role (admin/project-admin view)."""
         result = await self._repository.search_invitations_by_role(action.querier, action.scope)
         return SearchRoleInvitationsByRoleActionResult(
+            result=SearchResult(
+                items=result.items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+        )
+
+    async def admin_search_role_invitations(
+        self, action: AdminSearchRoleInvitationsAction
+    ) -> AdminSearchRoleInvitationsActionResult:
+        """Search all invitations across the system (superadmin only)."""
+        result = await self._repository.admin_search_invitations(action.querier)
+        return AdminSearchRoleInvitationsActionResult(
             result=SearchResult(
                 items=result.items,
                 total_count=result.total_count,

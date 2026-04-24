@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.role_invitation.types import RoleInvitationStateDTO
 
@@ -99,6 +99,7 @@ class RoleInvitationFilter(BaseRequestModel):
     """Filter for role invitations."""
 
     state: RoleInvitationStateFilter | None = None
+    role_id: UUIDFilter | None = None
     role: RoleNestedFilter | None = None
     inviter: UserNestedFilter | None = None
     invitee: UserNestedFilter | None = None

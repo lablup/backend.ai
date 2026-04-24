@@ -28,6 +28,7 @@ from .resolver import (
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
     reject_role_invitation,
+    role_scoped_role_invitations,
 )
 from .types import (
     AssignRoleInput,
@@ -142,6 +143,7 @@ __all__ = (
     "admin_bulk_revoke_role",
     # Role invitation resolvers
     "my_role_invitations",
+    "role_scoped_role_invitations",
     "admin_role_invitations",
     "create_role_invitation",
     "accept_role_invitation",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import auth_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2RoleInvitationHandler
@@ -55,12 +55,19 @@ def register_v2_role_invitation_routes(
         handler.my_search,
         middlewares=[auth_required],
     )
-    # Search invitations by role (admin/project-admin)
+    # Search invitations by role (scoped — non-admin with role permission also allowed)
     registry.add(
         "POST",
         "/roles/{role_id}/search",
         handler.role_search,
         middlewares=[auth_required],
+    )
+    # Search all invitations across the system (superadmin only)
+    registry.add(
+        "POST",
+        "/search",
+        handler.admin_search,
+        middlewares=[superadmin_required],
     )
 
     return registry

@@ -284,6 +284,7 @@ from .rbac import (
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
     reject_role_invitation,
+    role_scoped_role_invitations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -547,6 +548,7 @@ class Query:
     admin_role_invitations = admin_role_invitations
     # RBAC Scoped APIs
     project_roles = project_roles
+    role_scoped_role_invitations = role_scoped_role_invitations
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix

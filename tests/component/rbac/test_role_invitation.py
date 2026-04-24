@@ -12,7 +12,7 @@ import yarl
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
-from ai.backend.client.v2.exceptions import InvalidRequestError
+from ai.backend.client.v2.exceptions import InvalidRequestError, PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -798,3 +798,107 @@ class TestSearchInvitationsPagination:
         assert len(second_page.items) == 1
         assert first_page.items[0].id != second_page.items[0].id
         assert first_page.items[0].created_at <= second_page.items[0].created_at
+
+
+class TestAdminSearchInvitations:
+    """admin_search — scope-less, superadmin only."""
+
+    async def test_admin_search_returns_all_invitations_across_roles(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        admin_user_fixture: UserFixtureData,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Superadmin sees invitations spanning multiple roles without scope arg."""
+        role_a = await role_factory()
+        role_b = await role_factory()
+        for role, user in (
+            (role_a, regular_user_fixture),
+            (role_b, admin_user_fixture),
+        ):
+            await admin_v2_registry.role_invitation.create(
+                CreateRoleInvitationInput(
+                    role_id=role.role.id,
+                    emails=[user.email],
+                )
+            )
+        result = await admin_v2_registry.role_invitation.admin_search(SearchRoleInvitationsInput())
+        assert isinstance(result, SearchRoleInvitationsPayload)
+        role_ids = {inv.role_id for inv in result.items}
+        assert role_a.role.id in role_ids
+        assert role_b.role.id in role_ids
+
+    async def test_admin_search_respects_filter(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """admin_search honors RoleInvitationFilter (state equals)."""
+        role = await role_factory()
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        scoped = await admin_v2_registry.role_invitation.search_by_role(
+            role.role.id, SearchRoleInvitationsInput()
+        )
+        assert scoped.total_count == 1
+        await admin_v2_registry.role_invitation.cancel(scoped.items[0].id)
+
+        result = await admin_v2_registry.role_invitation.admin_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    state=RoleInvitationStateFilter(equals=RoleInvitationStateDTO.CANCELED),
+                    role=RoleNestedFilter(name=StringFilter(equals=role.role.name)),
+                )
+            )
+        )
+        assert result.total_count == 1
+        assert result.items[0].state == RoleInvitationStateDTO.CANCELED
+        assert result.items[0].role_id == role.role.id
+
+    async def test_admin_search_denies_regular_user(
+        self,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Regular user hitting POST /v2/role-invitations/search is rejected by superadmin_required."""
+        with pytest.raises(PermissionDeniedError):
+            await user_v2_registry.role_invitation.admin_search(SearchRoleInvitationsInput())
+
+
+class TestRoleScopedSearchNonAdmin:
+    """role_search — now RBAC scope-validated, non-admin callers allowed by auth_required."""
+
+    async def test_regular_user_can_call_role_search(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Regular user (not superadmin) may invoke role_search; RBAC scope validator gates access.
+
+        In component tests the rbac.scope validator is mocked (see
+        ``permission_controller_processors`` fixture), so the call succeeds without
+        admin privileges — verifying that the endpoint itself is no longer gated by
+        ``superadmin_required``.
+        """
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        result = await user_v2_registry.role_invitation.search_by_role(
+            target_role.role.id, SearchRoleInvitationsInput()
+        )
+        assert isinstance(result, SearchRoleInvitationsPayload)
+        assert all(inv.role_id == target_role.role.id for inv in result.items)

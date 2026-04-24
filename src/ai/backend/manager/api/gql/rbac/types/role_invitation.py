@@ -43,7 +43,7 @@ from ai.backend.common.dto.manager.v2.role_invitation.response import (
     RoleInvitationNode as RoleInvitationNodeDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -204,6 +204,7 @@ class RoleInvitationUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO])
 )
 class RoleInvitationFilterGQL(PydanticInputMixin[RoleInvitationFilterDTO]):
     state: RoleInvitationStateFilterGQL | None = None
+    role_id: UUIDFilter | None = None
     role: RoleInvitationRoleNestedFilterGQL | None = None
     inviter: RoleInvitationUserNestedFilterGQL | None = None
     invitee: RoleInvitationUserNestedFilterGQL | None = None
