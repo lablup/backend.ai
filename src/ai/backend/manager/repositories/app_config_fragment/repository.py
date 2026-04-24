@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
-from typing import Any
 
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
@@ -23,13 +21,11 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 
 class AppConfigFragmentRepository:
-    """Repository for AppConfigFragment.
+    """Read-side repository for AppConfigFragment.
 
-    Dual role (BEP-1052 §2):
-    1. Raw CRUD on `(scope_type, scope_id, name)` rows.
-    2. Merged-view reads (`AppConfig`) that resolve a user's chain by
-       joining `app_config_policies` in SQL — see `app_config(...)`,
-       `search_app_configs(...)`, and `admin_search_app_configs(...)`.
+    Scope-bound reads on raw fragments plus the per-user merged
+    `AppConfig` view (BEP-1052 §5). Mutations and admin cross-scope
+    reads live on `AppConfigFragmentAdminRepository`.
     """
 
     _db_source: AppConfigFragmentDBSource
@@ -37,30 +33,13 @@ class AppConfigFragmentRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = AppConfigFragmentDBSource(db)
 
-    # ── Raw fragment CRUD ──────────────────────────────────────────
+    # ── Raw fragment reads ────────────────────────────────────────
 
-    async def fragment(self, key: AppConfigFragmentKey) -> AppConfigFragmentData | None:
+    async def get(self, key: AppConfigFragmentKey) -> AppConfigFragmentData | None:
         return await self._db_source.get(key)
 
-    async def fragment_by_id(self, id: uuid.UUID) -> AppConfigFragmentData | None:
+    async def get_by_id(self, id: uuid.UUID) -> AppConfigFragmentData | None:
         return await self._db_source.get_by_id(id)
-
-    async def create(
-        self,
-        key: AppConfigFragmentKey,
-        extra_config: Mapping[str, Any],
-    ) -> AppConfigFragmentData:
-        return await self._db_source.create(key, extra_config)
-
-    async def update(
-        self,
-        key: AppConfigFragmentKey,
-        extra_config: Mapping[str, Any],
-    ) -> AppConfigFragmentData | None:
-        return await self._db_source.update(key, extra_config)
-
-    async def purge(self, key: AppConfigFragmentKey) -> bool:
-        return await self._db_source.purge(key)
 
     async def search(
         self,
@@ -69,13 +48,7 @@ class AppConfigFragmentRepository:
     ) -> AppConfigFragmentSearchResult:
         return await self._db_source.search(scope, querier)
 
-    async def admin_search(
-        self,
-        querier: BatchQuerier,
-    ) -> AppConfigFragmentSearchResult:
-        return await self._db_source.admin_search(querier)
-
-    # ── Merged view (AppConfig) — thin delegates to db_source ─────
+    # ── Merged view (AppConfig) ───────────────────────────────────
 
     async def app_config(
         self,
@@ -90,9 +63,3 @@ class AppConfigFragmentRepository:
         querier: BatchQuerier,
     ) -> AppConfigSearchResult:
         return await self._db_source.search_user_app_configs(scope, querier)
-
-    async def admin_search_app_configs(
-        self,
-        querier: BatchQuerier,
-    ) -> AppConfigSearchResult:
-        return await self._db_source.admin_search_app_configs(querier)
