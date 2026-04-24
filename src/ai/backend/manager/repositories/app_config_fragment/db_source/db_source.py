@@ -9,9 +9,11 @@ import sqlalchemy as sa
 from sqlalchemy.engine.cursor import CursorResult
 
 from ai.backend.common.utils import deep_merge
+from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigSearchResult
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentKey,
+    AppConfigFragmentSearchResult,
     AppConfigScopeType,
 )
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -19,10 +21,7 @@ from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigData,
-    AppConfigFragmentSearchResult,
     AppConfigFragmentSearchScope,
-    AppConfigSearchResult,
     UserAppConfigSearchScope,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
@@ -265,21 +264,157 @@ class AppConfigFragmentDBSource:
         querier: BatchQuerier,
     ) -> AppConfigSearchResult:
         """Connection counterpart of `get_user_app_config`. Joins
-        `app_config_policies` and groups by `name`; each group is fed
-        through `_merge_chain` to produce one `AppConfigData`.
+        `app_config_policies` to derive each `name`'s chain, then
+        groups results by `name` and feeds each group through
+        `_merge_chain` to produce one `AppConfigData`.
 
-        Implementation is left as a placeholder until the GraphQL surface
-        for `myAppConfigs` lands — the single-doc path above already
-        exercises the merge SQL contract.
+        Pagination is applied in-memory at the distinct-`name` level
+        because the natural unit (`AppConfigData`) does not map 1:1
+        to a row. The GQL Connection layer that calls this method is
+        responsible for wrapping the result in the appropriate cursor
+        / offset envelope.
         """
-        raise NotImplementedError("search_user_app_configs lands with the AppConfig GQL surface")
+        user_id = scope.user_id
+        user_domain_sq = (
+            sa.select(UserRow.domain_name).where(UserRow.uuid == user_id).scalar_subquery()
+        )
+        scope_id_match = sa.case(
+            (
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.PUBLIC,
+                sa.literal("public"),
+            ),
+            (
+                AppConfigFragmentRow.scope_type.in_([
+                    AppConfigScopeType.DOMAIN,
+                    AppConfigScopeType.DOMAIN_USER_DEFAULTS,
+                ]),
+                user_domain_sq,
+            ),
+            (
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
+                sa.literal(str(user_id)),
+            ),
+        )
+        query = (
+            sa.select(AppConfigFragmentRow, AppConfigPolicyRow.scope_sources)
+            .join(
+                AppConfigPolicyRow,
+                AppConfigPolicyRow.config_name == AppConfigFragmentRow.name,
+            )
+            .where(
+                AppConfigFragmentRow.scope_id == scope_id_match,
+                sa.cast(AppConfigFragmentRow.scope_type, sa.Text)
+                == sa.func.any(AppConfigPolicyRow.scope_sources),
+            )
+            .order_by(AppConfigFragmentRow.name)
+        )
+        async with self._db.begin_readonly_session() as db_sess:
+            result_rows = (await db_sess.execute(query)).all()
+
+        groups: dict[str, tuple[Sequence[str], list[AppConfigFragmentRow]]] = {}
+        for row in result_rows:
+            fragment_row = row.AppConfigFragmentRow
+            chain = row.scope_sources
+            entry = groups.setdefault(fragment_row.name, (chain, []))
+            entry[1].append(fragment_row)
+
+        items: list[AppConfigData] = []
+        for name, (chain, rows) in groups.items():
+            merged = self._merge_chain(rows, chain)
+            items.append(
+                AppConfigData(
+                    user_id=user_id,
+                    name=name,
+                    fragments=merged.fragments,
+                    config=merged.config,
+                )
+            )
+
+        total = len(items)
+        return AppConfigSearchResult(
+            items=items,
+            total_count=total,
+            has_next_page=False,
+            has_previous_page=False,
+        )
 
     async def admin_search_app_configs(
         self,
         querier: BatchQuerier,
     ) -> AppConfigSearchResult:
-        """Cross-user merged search (admin only). Same SQL pattern as
-        `search_user_app_configs` joined with `users` to drop the user
-        binding — placeholder until the admin GQL surface lands.
+        """Cross-user merged search (admin only). Joins `users` so
+        each `(user_id, name)` combination is produced; results are
+        grouped and merged the same way as `search_user_app_configs`.
+
+        As with the per-user variant, pagination is applied at the
+        merged-group level rather than at the row level — the GQL
+        Connection that wraps this is responsible for envelope
+        construction.
         """
-        raise NotImplementedError("admin_search_app_configs lands with the admin GQL surface")
+        scope_id_match = sa.case(
+            (
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.PUBLIC,
+                sa.literal("public"),
+            ),
+            (
+                AppConfigFragmentRow.scope_type.in_([
+                    AppConfigScopeType.DOMAIN,
+                    AppConfigScopeType.DOMAIN_USER_DEFAULTS,
+                ]),
+                UserRow.domain_name,
+            ),
+            (
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
+                sa.cast(UserRow.uuid, sa.Text),
+            ),
+        )
+        query = (
+            sa.select(
+                UserRow.uuid.label("user_id"),
+                AppConfigFragmentRow,
+                AppConfigPolicyRow.scope_sources,
+            )
+            .select_from(UserRow)
+            .join(
+                AppConfigFragmentRow,
+                AppConfigFragmentRow.scope_id == scope_id_match,
+            )
+            .join(
+                AppConfigPolicyRow,
+                AppConfigPolicyRow.config_name == AppConfigFragmentRow.name,
+            )
+            .where(
+                sa.cast(AppConfigFragmentRow.scope_type, sa.Text)
+                == sa.func.any(AppConfigPolicyRow.scope_sources),
+            )
+            .order_by(UserRow.uuid, AppConfigFragmentRow.name)
+        )
+        async with self._db.begin_readonly_session() as db_sess:
+            result_rows = (await db_sess.execute(query)).all()
+
+        groups: dict[tuple[uuid.UUID, str], tuple[Sequence[str], list[AppConfigFragmentRow]]] = {}
+        for row in result_rows:
+            fragment_row = row.AppConfigFragmentRow
+            chain = row.scope_sources
+            entry = groups.setdefault((row.user_id, fragment_row.name), (chain, []))
+            entry[1].append(fragment_row)
+
+        items: list[AppConfigData] = []
+        for (user_id, name), (chain, rows) in groups.items():
+            merged = self._merge_chain(rows, chain)
+            items.append(
+                AppConfigData(
+                    user_id=user_id,
+                    name=name,
+                    fragments=merged.fragments,
+                    config=merged.config,
+                )
+            )
+
+        total = len(items)
+        return AppConfigSearchResult(
+            items=items,
+            total_count=total,
+            has_next_page=False,
+            has_previous_page=False,
+        )

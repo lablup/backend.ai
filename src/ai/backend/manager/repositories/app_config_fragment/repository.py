@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import uuid
 
+from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigSearchResult
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentKey,
+    AppConfigFragmentSearchResult,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigData,
-    AppConfigFragmentSearchResult,
     AppConfigFragmentSearchScope,
-    AppConfigSearchResult,
     UserAppConfigSearchScope,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier

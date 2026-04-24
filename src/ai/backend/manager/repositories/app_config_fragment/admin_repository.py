@@ -3,17 +3,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from ai.backend.manager.data.app_config.types import AppConfigSearchResult
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentKey,
+    AppConfigFragmentSearchResult,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchResult,
-    AppConfigSearchResult,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 

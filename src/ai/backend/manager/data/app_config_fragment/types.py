@@ -41,3 +41,13 @@ class AppConfigFragmentData:
             scope_id=self.scope_id,
             name=self.name,
         )
+
+
+@dataclass(frozen=True)
+class AppConfigFragmentSearchResult:
+    """Result from searching raw `app_config_fragments` rows."""
+
+    items: list[AppConfigFragmentData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
