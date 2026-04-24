@@ -216,6 +216,7 @@ from ai.backend.manager.repositories.permission_controller.updaters import (
 )
 from ai.backend.manager.repositories.role_invitation.types import (
     InviteeSearchScope,
+    InviterSearchScope,
     RoleInvitationSearchScope,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
@@ -257,6 +258,7 @@ from ai.backend.manager.services.permission_contoller.actions.search_role_invita
 from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
     AdminSearchRoleInvitationsAction,
     SearchMyRoleInvitationsAction,
+    SearchMySentRoleInvitationsAction,
     SearchRoleInvitationsByRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
@@ -1745,6 +1747,43 @@ class RBACAdapter(BaseAdapter):
                 user_id=me.user_id,
                 querier=querier,
                 scope=InviteeSearchScope(invitee_user_id=me.user_id),
+            )
+        )
+        raw = action_result.result
+        return SearchRoleInvitationsPayload(
+            items=[self._invitation_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
+
+    async def my_sent_search_role_invitations(
+        self,
+        input: SearchRoleInvitationsInputDTO,
+    ) -> SearchRoleInvitationsPayload:
+        """Search invitations sent by the current authenticated user."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        conditions = self._convert_invitation_filter(input.filter) if input.filter else []
+        orders = self._convert_invitation_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_invitation_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[RoleInvitationConditions.by_inviter(me.user_id)],
+        )
+        action_result = await self._processors.permission_controller.search_my_sent_role_invitations.wait_for_complete(
+            SearchMySentRoleInvitationsAction(
+                user_id=me.user_id,
+                querier=querier,
+                scope=InviterSearchScope(inviter_user_id=me.user_id),
             )
         )
         raw = action_result.result

@@ -44,6 +44,26 @@ class InviteeSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
+class InviterSearchScope(SearchScope):
+    """Scope for searching invitations sent by a specific user."""
+
+    inviter_user_id: UUID
+
+    def to_condition(self) -> QueryCondition:
+        inviter_user_id = self.inviter_user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleInvitationRow.inviter_user_id == inviter_user_id
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        # Inviter existence is guaranteed by RBAC authentication before reaching here.
+        return []
+
+
+@dataclass(frozen=True)
 class RoleInvitationSearchScope(SearchScope):
     """Scope for searching invitations for a specific role."""
 

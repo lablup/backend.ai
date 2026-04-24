@@ -279,6 +279,7 @@ from .rbac import (
     create_role_invitation,
     my_role_invitations,
     my_roles,
+    my_sent_role_invitations,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
@@ -544,6 +545,7 @@ class Query:
     # RBAC User APIs
     my_roles = my_roles
     my_role_invitations = my_role_invitations
+    my_sent_role_invitations = my_sent_role_invitations
     # RBAC Admin Invitation APIs
     admin_role_invitations = admin_role_invitations
     # RBAC Scoped APIs

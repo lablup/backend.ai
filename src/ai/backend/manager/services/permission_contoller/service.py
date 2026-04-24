@@ -98,6 +98,8 @@ from ai.backend.manager.services.permission_contoller.actions.search_role_invita
     RoleInvitationActionResult,
     SearchMyRoleInvitationsAction,
     SearchMyRoleInvitationsActionResult,
+    SearchMySentRoleInvitationsAction,
+    SearchMySentRoleInvitationsActionResult,
     SearchRoleInvitationsByRoleAction,
     SearchRoleInvitationsByRoleActionResult,
 )
@@ -436,6 +438,20 @@ class PermissionControllerService:
         """Search invitations addressed to a specific user."""
         result = await self._repository.search_invitations_by_invitee(action.querier, action.scope)
         return SearchMyRoleInvitationsActionResult(
+            result=SearchResult(
+                items=result.items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+        )
+
+    async def search_my_sent_role_invitations(
+        self, action: SearchMySentRoleInvitationsAction
+    ) -> SearchMySentRoleInvitationsActionResult:
+        """Search invitations sent by a specific user."""
+        result = await self._repository.search_invitations_by_inviter(action.querier, action.scope)
+        return SearchMySentRoleInvitationsActionResult(
             result=SearchResult(
                 items=result.items,
                 total_count=result.total_count,

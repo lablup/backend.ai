@@ -133,6 +133,42 @@ def my_search(limit: int | None, offset: int | None, order_by: tuple[str, ...]) 
     asyncio.run(_run())
 
 
+@invitation.command(name="my-sent-search")
+@click.option("--limit", type=int, default=None, help="Maximum items to return.")
+@click.option("--offset", type=int, default=None, help="Number of items to skip.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., created_at:desc, state:asc).",
+)
+def my_sent_search(limit: int | None, offset: int | None, order_by: tuple[str, ...]) -> None:
+    """Search invitations you have sent."""
+    from ai.backend.client.cli.v2.helpers import parse_order_options
+    from ai.backend.common.dto.manager.v2.role_invitation.request import (
+        RoleInvitationOrderBy,
+        RoleInvitationOrderField,
+        SearchRoleInvitationsInput,
+    )
+
+    orders = (
+        parse_order_options(order_by, RoleInvitationOrderField, RoleInvitationOrderBy)
+        if order_by
+        else None
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.role_invitation.my_sent_search(
+                SearchRoleInvitationsInput(order=orders, limit=limit, offset=offset),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @invitation.command(name="role-search")
 @click.argument("role_id", type=click.UUID)
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")

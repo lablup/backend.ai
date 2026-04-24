@@ -55,6 +55,13 @@ def register_v2_role_invitation_routes(
         handler.my_search,
         middlewares=[auth_required],
     )
+    # Search invitations sent by the current user (inviter)
+    registry.add(
+        "POST",
+        "/my/sent-search",
+        handler.my_sent_search,
+        middlewares=[auth_required],
+    )
     # Search invitations by role (scoped — non-admin with role permission also allowed)
     registry.add(
         "POST",

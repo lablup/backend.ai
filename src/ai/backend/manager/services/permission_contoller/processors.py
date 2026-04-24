@@ -75,6 +75,8 @@ from .actions.search_role_invitations import (
     RoleInvitationActionResult,
     SearchMyRoleInvitationsAction,
     SearchMyRoleInvitationsActionResult,
+    SearchMySentRoleInvitationsAction,
+    SearchMySentRoleInvitationsActionResult,
     SearchRoleInvitationsByRoleAction,
     SearchRoleInvitationsByRoleActionResult,
 )
@@ -145,6 +147,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     search_my_role_invitations: ScopeActionProcessor[
         SearchMyRoleInvitationsAction, SearchMyRoleInvitationsActionResult
     ]
+    search_my_sent_role_invitations: ScopeActionProcessor[
+        SearchMySentRoleInvitationsAction, SearchMySentRoleInvitationsActionResult
+    ]
     search_role_invitations_by_role: ScopeActionProcessor[
         SearchRoleInvitationsByRoleAction, SearchRoleInvitationsByRoleActionResult
     ]
@@ -209,6 +214,11 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=invitation_scope_validators,
         )
+        self.search_my_sent_role_invitations = ScopeActionProcessor(
+            service.search_my_sent_role_invitations,
+            action_monitors,
+            validators=invitation_scope_validators,
+        )
         self.search_role_invitations_by_role = ScopeActionProcessor(
             service.search_role_invitations_by_role,
             action_monitors,
@@ -249,6 +259,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             RejectInvitationAction.spec(),
             CancelInvitationAction.spec(),
             SearchMyRoleInvitationsAction.spec(),
+            SearchMySentRoleInvitationsAction.spec(),
             SearchRoleInvitationsByRoleAction.spec(),
             AdminSearchRoleInvitationsAction.spec(),
         ]

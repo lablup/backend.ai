@@ -13561,6 +13561,9 @@ type Query
   """Added in UNRELEASED. List the current user's role invitations."""
   myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. List role invitations sent by the current user."""
+  mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection! @join__field(graph: STRAWBERRY)
+
   """
   Added in UNRELEASED. List all role invitations across the system (superadmin only).
   """
