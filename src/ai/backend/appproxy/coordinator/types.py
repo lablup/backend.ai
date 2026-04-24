@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import itertools
 import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Sequence
@@ -90,19 +89,28 @@ class CircuitManager:
     event_producer: EventProducer
     traefik_etcd: TraefikEtcd | None
     local_config: ServerConfig
-    _circuit_locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
+    # Keyed by ``{worker_authority}:{port or subdomain}`` so that two distinct
+    # circuits occupying the same worker slot serialize against each other.
+    # Keying by circuit.id would let create(B) and unload(A) on the same port
+    # race — their etcd writes could then interleave and produce a window
+    # where Traefik sees two routers matching the same traffic but pointing
+    # at different services.
+    _slot_locks: dict[str, asyncio.Lock] = field(default_factory=dict)
 
-    def _get_lock(self, circuit_id: UUID) -> asyncio.Lock:
-        if circuit_id not in self._circuit_locks:
-            self._circuit_locks[circuit_id] = asyncio.Lock()
-        return self._circuit_locks[circuit_id]
+    @staticmethod
+    def _slot_key(circuit: Circuit) -> str:
+        worker_authority = circuit.worker_row.authority
+        slot = circuit.port if circuit.port is not None else circuit.subdomain
+        return f"{worker_authority}:{slot}"
 
-    def _release_circuit_lock(self, circuit_id: UUID) -> None:
-        self._circuit_locks.pop(circuit_id, None)
+    def _get_slot_lock(self, slot_key: str) -> asyncio.Lock:
+        if slot_key not in self._slot_locks:
+            self._slot_locks[slot_key] = asyncio.Lock()
+        return self._slot_locks[slot_key]
 
     @actxmgr
-    async def circuit_lock(self, circuit_id: UUID) -> AsyncIterator[None]:
-        async with self._get_lock(circuit_id):
+    async def circuit_lock(self, circuit: Circuit) -> AsyncIterator[None]:
+        async with self._get_slot_lock(self._slot_key(circuit)):
             yield
 
     async def initialize_circuits(self, circuits: Sequence[Circuit]) -> None:
@@ -117,31 +125,37 @@ class CircuitManager:
         if not self.traefik_etcd:
             raise ServerMisconfiguredError("proxy-coordinator.traefik")
 
-        for circuit_chunk in itertools.batched(circuits, 5):
-            total_map: defaultdict[str, Any] = defaultdict(
-                lambda: defaultdict(lambda: {"services": {}, "routers": {}, "middlewares": {}})
-            )
-            for circuit in circuit_chunk:
-                worker_authority = circuit.worker_row.authority
+        # Each circuit is published under its own slot lock so a concurrent
+        # unload on the same slot cannot interleave its delete_prefix calls
+        # with our put_prefix. Batching across circuits is dropped here — a
+        # single worker's startup has one circuit per slot, and per-request
+        # create is always a single-element list, so the extra put_prefix
+        # calls are negligible in practice.
+        for circuit in circuits:
+            async with self.circuit_lock(circuit):
+                await self._publish_traefik_circuit(circuit)
+        log.debug("initialize_traefik_circuits(): end")
 
-                routers = circuit.traefik_routers
-                middlewares = circuit.get_traefik_middlewares(self.local_config)
-                services = circuit.traefik_services
+    async def _publish_traefik_circuit(self, circuit: Circuit) -> None:
+        if not self.traefik_etcd:
+            raise ServerMisconfiguredError("proxy-coordinator.traefik")
+        worker_authority = circuit.worker_row.authority
+        protocol = circuit.protocol.value.lower()
 
-                total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                    "services"
-                ].update(services)
-                total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                    "routers"
-                ].update(routers)
-                if middlewares:
-                    total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                        "middlewares"
-                    ].update(middlewares)
+        routers = circuit.traefik_routers
+        middlewares = circuit.get_traefik_middlewares(self.local_config)
+        services = circuit.traefik_services
 
-            log.debug("traefik_etcd put_prefix {}", convert_to_etcd_dict(total_map))
-            await self.traefik_etcd.put_prefix("", convert_to_etcd_dict(total_map))
-            log.debug("initialize_traefik_circuits(): end")
+        scope: dict[str, dict[str, Any]] = {
+            "services": dict(services),
+            "routers": dict(routers),
+        }
+        if middlewares:
+            scope["middlewares"] = dict(middlewares)
+        total_map: dict[str, Any] = {f"worker_{worker_authority}": {protocol: scope}}
+
+        log.debug("traefik_etcd put_prefix {}", convert_to_etcd_dict(total_map))
+        await self.traefik_etcd.put_prefix("", convert_to_etcd_dict(total_map))
 
     async def initialize_legacy_circuit(self, circuit: Circuit) -> None:
         worker_ready_evt = asyncio.Event()
@@ -176,7 +190,7 @@ class CircuitManager:
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
-        async with self.circuit_lock(circuit.id):
+        async with self.circuit_lock(circuit):
             await self._update_circuit_routes_unlocked(circuit, old_routes)
 
     async def _update_circuit_routes_unlocked(
@@ -239,15 +253,13 @@ class CircuitManager:
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
         for circuit in circuits:
             try:
-                async with self.circuit_lock(circuit.id):
+                async with self.circuit_lock(circuit):
                     if self.local_config.proxy_coordinator.enable_traefik:
                         await self.unload_traefik_circuit(circuit)
                     else:
                         await self.unload_legacy_circuit(circuit)
             except Exception:
                 log.exception("Failed to unload circuit {}", circuit.id)
-            finally:
-                self._release_circuit_lock(circuit.id)
 
     async def unload_traefik_circuit(self, circuit: Circuit) -> None:
         log.debug("unload_traefik_circuit(): start")

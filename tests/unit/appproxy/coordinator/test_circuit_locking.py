@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -45,15 +45,12 @@ class _FakeCircuitManager:
         self._order = order
 
     @asynccontextmanager
-    async def circuit_lock(self, _circuit_id: UUID) -> AsyncIterator[None]:
+    async def circuit_lock(self, _circuit: object) -> AsyncIterator[None]:
         self._order.append("lock_enter")
         try:
             yield
         finally:
             self._order.append("lock_exit")
-
-    def release_circuit_lock(self, _circuit_id: UUID) -> None:
-        self._order.append("release_lock")
 
     async def _update_circuit_routes_unlocked(
         self,
@@ -101,7 +98,15 @@ class TestCircuitManagerLocking:
 
     @pytest.fixture
     def circuit(self) -> Circuit:
-        return cast(Circuit, SimpleNamespace(id=uuid4()))
+        return cast(
+            Circuit,
+            SimpleNamespace(
+                id=uuid4(),
+                port=10200,
+                subdomain=None,
+                worker_row=SimpleNamespace(authority="worker-1"),
+            ),
+        )
 
     @pytest.fixture
     def update_control(self) -> UpdateControl:
@@ -157,7 +162,7 @@ class TestCircuitManagerLocking:
         monkeypatch.setattr(circuit_manager, "unload_traefik_circuit", AsyncMock(return_value=None))
 
         # Act - hold the lock externally, then queue update + unload behind it
-        async with circuit_manager.circuit_lock(circuit.id):
+        async with circuit_manager.circuit_lock(circuit):
             first_update_task = asyncio.create_task(
                 circuit_manager.update_circuit_routes(circuit, [])
             )
@@ -181,8 +186,6 @@ class TestCircuitManagerLocking:
             "second_start",
             "second_end",
         ]
-        # Lock entry is cleaned up after unload
-        assert circuit.id not in circuit_manager._circuit_locks
 
     @pytest.fixture
     def patch_unload(
@@ -192,19 +195,26 @@ class TestCircuitManagerLocking:
     ) -> None:
         monkeypatch.setattr(circuit_manager, "unload_traefik_circuit", AsyncMock(return_value=None))
 
-    async def test_unload_removes_circuit_lock(
+    async def test_same_slot_reuses_lock_entry(
         self,
         circuit_manager: CircuitManager,
         circuit: Circuit,
         patch_unload: None,
     ) -> None:
-        # Populate the lock entry
-        async with circuit_manager.circuit_lock(circuit.id):
+        """
+        Slot locks are intentionally persistent: a follow-up circuit on the
+        same slot must hit the same ``asyncio.Lock`` instance so that a
+        lingering unload and a fresh create cannot race each other.
+        """
+        slot_key = circuit_manager._slot_key(circuit)
+
+        async with circuit_manager.circuit_lock(circuit):
             pass
-        assert circuit.id in circuit_manager._circuit_locks
+        lock_after_first = circuit_manager._slot_locks[slot_key]
 
-        # Act
         await circuit_manager.unload_circuits([circuit])
-
-        # Assert - lock entry should be cleaned up
-        assert circuit.id not in circuit_manager._circuit_locks
+        # Unload path must not silently drop the slot lock, otherwise a
+        # subsequent create on the same slot would acquire a brand-new lock
+        # and interleave with any in-flight tail of the unload.
+        assert slot_key in circuit_manager._slot_locks
+        assert circuit_manager._slot_locks[slot_key] is lock_after_first
