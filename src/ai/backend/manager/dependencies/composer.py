@@ -26,6 +26,7 @@ from .plugins.base import PluginsInput
 from .plugins.monitoring import ErrorMonitorDependency, MonitoringInput, StatsMonitorDependency
 from .processing import ProcessingComposer, ProcessingInput, ProcessingResources
 from .system import SystemComposer, SystemInput, SystemResources
+from .system.prometheus_client import PrometheusClientDependency
 
 
 @dataclass
@@ -164,6 +165,9 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             MessagingInput(config=config),
         )
 
+        # Stage 5.5: Prometheus client (depends only on config, needed by Domain and System)
+        prometheus_client = await stack.enter_dependency(PrometheusClientDependency(), config)
+
         # Stage 6: Domain (notification center, distributed lock, repositories, services)
         domain = await stack.enter_composer(
             DomainComposer(),
@@ -176,6 +180,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_live=infrastructure.valkey.live,
                 valkey_schedule=infrastructure.valkey.schedule,
                 valkey_image=infrastructure.valkey.image,
+                prometheus_client=prometheus_client,
             ),
         )
 
@@ -222,6 +227,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 db=infrastructure.db,
                 event_producer=messaging.event_producer,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
+                prometheus_client=prometheus_client,
             ),
         )
 

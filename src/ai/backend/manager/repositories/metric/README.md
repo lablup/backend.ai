@@ -9,11 +9,16 @@ The Metric Repository provides the data access layer for metric-related operatio
 ### MetricRepository
 
 - Queries Prometheus for kernel live stats (gauge/diff/rate metrics)
-- Builds PromQL presets and parses responses into `MetricValue` types
-- Instantiated directly in the service factory with `PrometheusClient` and `timewindow`
+- Delegates platform fixed PromQL query construction to `FixedQueryBuilder`
+- Instantiated through the repository factory with `PrometheusClient` and a fixed query provider
 
-### Types (`types.py`)
+### FixedQueryBuilder
 
+- Builds platform fixed container metric PromQL queries
+
+### Metric data types
+
+- Metric DTOs live in `ai.backend.manager.data.metric.types`
 - `KernelMetricValuesByKernel`: Groups Prometheus response samples by kernel ID
 
 ## Usage
@@ -21,13 +26,13 @@ The Metric Repository provides the data access layer for metric-related operatio
 ```python
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 
-# Created in the service factory with required dependencies
+# Created in the repository factory with required dependencies
 metric_repo = MetricRepository(
     db=db_engine,
     prometheus_client=prometheus_client,
-    timewindow="1m",
+    fixed_query_builder=fixed_query_builder,
 )
 
 # Query live stats for kernels
-values_by_kernel = await metric_repo.query_kernel_live_stats(kernel_ids)
+values_by_kernel = await metric_repo.query_container_live_stats(kernel_ids)
 ```

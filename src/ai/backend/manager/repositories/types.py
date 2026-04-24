@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
@@ -18,3 +19,4 @@ class RepositoryArgs:
     valkey_schedule_client: "ValkeyScheduleClient"
     valkey_image_client: "ValkeyImageClient"
     valkey_live_client: "ValkeyLiveClient"
+    prometheus_client: "PrometheusClient"

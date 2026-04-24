@@ -11,33 +11,33 @@ from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricMetadataActionResult,
 )
 from ai.backend.manager.services.metric.actions.live_stat import (
-    QueryKernelLiveStatAction,
-    QueryKernelLiveStatActionResult,
+    ContainerLiveStatAction,
+    ContainerLiveStatActionResult,
 )
-from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.services.metric.service import MetricService
 
 
-class UtilizationMetricProcessors(AbstractProcessorPackage):
+class MetricProcessors(AbstractProcessorPackage):
     query_container: ActionProcessor[ContainerMetricAction, ContainerMetricActionResult]
     query_container_metadata: ActionProcessor[
         ContainerMetricMetadataAction, ContainerMetricMetadataActionResult
     ]
-    query_kernel_live_stat: ActionProcessor[
-        QueryKernelLiveStatAction, QueryKernelLiveStatActionResult
+    query_container_live_stat: ActionProcessor[
+        ContainerLiveStatAction, ContainerLiveStatActionResult
     ]
 
     def __init__(
         self,
-        service: UtilizationMetricService,
+        service: MetricService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.query_container = ActionProcessor(service.container.query_metric, action_monitors)
+        self.query_container = ActionProcessor(service.query_container_metric, action_monitors)
         self.query_container_metadata = ActionProcessor(
-            service.container.query_metadata, action_monitors
+            service.query_container_metric_metadata, action_monitors
         )
-        self.query_kernel_live_stat = ActionProcessor(
-            service.query_kernel_live_stat_batch, action_monitors
+        self.query_container_live_stat = ActionProcessor(
+            service.query_container_live_stats, action_monitors
         )
 
     @override
@@ -45,5 +45,5 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
         return [
             ContainerMetricAction.spec(),
             ContainerMetricMetadataAction.spec(),
-            QueryKernelLiveStatAction.spec(),
+            ContainerLiveStatAction.spec(),
         ]

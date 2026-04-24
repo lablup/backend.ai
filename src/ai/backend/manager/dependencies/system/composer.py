@@ -29,7 +29,6 @@ from .gql_adapter import GQLAdapterDependency
 from .health_probe import HealthProbeDependency, HealthProbeInput
 from .jwt_validator import JWTValidatorDependency
 from .metrics import MetricsDependency
-from .prometheus_client import PrometheusClientDependency
 from .service_discovery import ServiceDiscoveryDependency, ServiceDiscoveryInput
 
 
@@ -46,6 +45,7 @@ class SystemInput:
     db: ExtendedAsyncSAEngine
     event_producer: EventProducer
     valkey_profile_target: ValkeyProfileTarget
+    prometheus_client: PrometheusClient
 
 
 @dataclass
@@ -90,9 +90,7 @@ class SystemComposer(DependencyComposer[SystemInput, SystemResources]):
 
         # Layer 1: Config-dependent services
         jwt_validator = await stack.enter_dependency(JWTValidatorDependency(), setup_input.config)
-        prometheus_client = await stack.enter_dependency(
-            PrometheusClientDependency(), setup_input.config
-        )
+        prometheus_client = setup_input.prometheus_client
         sd_resources = await stack.enter_dependency(
             ServiceDiscoveryDependency(),
             ServiceDiscoveryInput(
