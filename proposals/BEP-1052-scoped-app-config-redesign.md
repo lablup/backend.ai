@@ -1084,9 +1084,10 @@ pattern via `AppConfigPolicyRepository.get(name)`.
 REST exposes three prefix trees that mirror the GQL surface:
 
 - `/v2/app-config-sources/...` — raw source row operations (admin
-  CRUD, cross-scope search, per-scope reads, my-path writes).
-- `/v2/app-configs/my[/{name}]` — **merged `AppConfig` view** per
-  user (read-only; writes go through the source prefix).
+  CRUD, cross-scope search, per-scope search, single reads, my-path
+  writes).
+- `/v2/app-configs/my/...` — **merged `AppConfig` view** per user
+  (read-only; writes go through the source prefix).
 - `/v2/app-config-policies/...` — policy CRUD + reads.
 
 Mounted via `RouteRegistry.create("app-config-sources", ...)`,
@@ -1095,18 +1096,38 @@ Mounted via `RouteRegistry.create("app-config-sources", ...)`,
 matching the project-wide v2 conventions in
 `src/ai/backend/manager/api/rest/v2/CLAUDE.md`.
 
+### Listing convention
+
+All list operations are exposed as `POST .../search` with a typed
+request body — **no `GET` list endpoints, no query-string
+pagination**. Listing is always paginated, and pagination
+parameters live in the request body.
+
+Search bodies share a common pagination shape:
+
+- `limit` — maximum items per page. A request-validation error
+  is raised for out-of-range values, so there is no way to request
+  an unbounded page.
+- `offset` — for offset pagination (non-negative).
+- Admin cross-scope variants additionally accept cursor pagination
+  (`first` / `after` / `last` / `before`).
+
+Single-resource reads (`GET .../{name}`) remain `GET` — one row,
+no pagination.
+
 ### App Config Source endpoints
 
 REST mirrors the GQL admin / my split — the scope-parameterized
-path handles **admin writes + per-scope reads** (maps to GQL
-`adminBulk*AppConfigSources` mutations and the scoped queries), and
-the `/my` path is **self-only** (maps to GQL
+path handles **admin writes + per-scope reads / search** (maps to
+GQL `adminBulk*AppConfigSources` mutations and the scoped queries),
+and the `/my` path is **self-only** (maps to GQL
 `bulk*MyAppConfigSources` mutations).
 
 #### Scope-parameterized path — admin writes / per-scope reads
 
 ```
-/v2/app-config-sources/{scope_type}/{scope_id}[/{name}]
+/v2/app-config-sources/{scope_type}/{scope_id}/{name}     # single GET
+/v2/app-config-sources/{scope_type}/{scope_id}/search     # POST search
 ```
 
 - `{scope_type}` ∈ `public | domain | domain_user_defaults | user`.
@@ -1114,12 +1135,17 @@ the `/my` path is **self-only** (maps to GQL
   `user_id`).
 - `{name}` is the document name.
 
-Writes go through the bulk endpoints (below); GET is read-only.
+Reads use single `GET` + `POST search` (above); writes go through
+the bulk endpoints (below).
 
-| Method | Path                                                    | Description                |
-|--------|---------------------------------------------------------|----------------------------|
-| GET    | `/v2/app-config-sources/{scope_type}/{scope_id}`        | List source rows in a scope |
-| GET    | `/v2/app-config-sources/{scope_type}/{scope_id}/{name}` | Read one source row         |
+| Method | Path                                                           | Description                           |
+|--------|----------------------------------------------------------------|---------------------------------------|
+| GET    | `/v2/app-config-sources/{scope_type}/{scope_id}/{name}`        | Read one source row                    |
+| POST   | `/v2/app-config-sources/{scope_type}/{scope_id}/search`        | Paginated list within this scope       |
+
+`POST .../search` accepts the shared search body (filter + order +
+`limit/offset`); `filter.scopeType` / `filter.scopeId` are ignored
+because the scope is already pinned by the path.
 
 Per-scope read permissions mirror the GQL matrix: `public` anonymous;
 `domain` / `domain_user_defaults` require same-domain or admin;
@@ -1133,12 +1159,13 @@ adapter pins `(USER, current_user.user_id)`; no way to target
 another user, no writes (those go through
 `/v2/app-config-sources/my/bulk-*`).
 
-| Method | Path                                | Description                             |
-|--------|-------------------------------------|-----------------------------------------|
-| GET    | `/v2/app-configs/my[/{name}]`       | List / read own documents (merged view) |
+| Method | Path                                | Description                                        |
+|--------|-------------------------------------|----------------------------------------------------|
+| GET    | `/v2/app-configs/my/{name}`         | Read one resolved document (merged view)           |
+| POST   | `/v2/app-configs/my/search`         | Paginated list of own resolved documents           |
 
-Response body is the **resolved AppConfig** (snake_case
-projection of the GQL `AppConfig`):
+Response body for the single `GET` is the **resolved AppConfig**
+(snake_case projection of the GQL `AppConfig`):
 
 ```json
 {
@@ -1202,9 +1229,9 @@ GQL `Bulk*MyAppConfigSourcesPayload` (a success list plus `failed`).
 
 #### Admin cross-scope search
 
-| Method | Path                        | Access | Description                                                |
-|--------|-----------------------------|--------|------------------------------------------------------------|
-| POST   | `/v2/app-config-sources/search`    | Admin  | Cross-scope search — same body schema as `adminAppConfigSources` |
+| Method | Path                                | Access | Description                                                                                  |
+|--------|-------------------------------------|--------|----------------------------------------------------------------------------------------------|
+| POST   | `/v2/app-config-sources/search`     | Admin  | Cross-scope paginated search — same body schema as `adminAppConfigSources` (offset + cursor) |
 
 ### App Config Policy endpoints
 
@@ -1213,25 +1240,22 @@ are available to any authenticated user; writes are admin-only.
 
 | Method | Path                                         | Access | Maps to                               |
 |--------|----------------------------------------------|--------|---------------------------------------|
-| GET    | `/v2/app-config-policies`                    | User   | `appConfigPolicies` (Connection)      |
 | GET    | `/v2/app-config-policies/{config_name}`      | User   | `appConfigPolicy(configName)`         |
+| POST   | `/v2/app-config-policies/search`             | User   | `appConfigPolicies` (Connection)      |
 | POST   | `/v2/app-config-policies/bulk-create`        | Admin  | `adminBulkCreateAppConfigPolicies`    |
 | POST   | `/v2/app-config-policies/bulk-update`        | Admin  | `adminBulkUpdateAppConfigPolicies`    |
 | POST   | `/v2/app-config-policies/bulk-purge`         | Admin  | `adminBulkPurgeAppConfigPolicies`     |
 
 Request / response bodies are the snake_case projection of the
-corresponding GQL input / payload — `items[]` for writes, a
-`{ data: [...], page_info: {...}, count: N }` envelope for list
-reads, and a single policy object for the `{config_name}` GET.
+corresponding GQL input / payload — `items[]` for writes, the
+shared search body (`filter` + `order` + `limit/offset`) for
+`search`, a `{ data: [...], page_info: {...}, count: N }` envelope
+for search results, and a single policy object for the
+`{config_name}` `GET`.
 
 ---
 
 ## 5. `AppConfig` — Merge policy
-
-> The merge semantics here apply **only to `AppConfig`**. The
-> raw `AppConfigSource` type (returned from `publicAppConfigSources`,
-> `adminAppConfigSources`, `DomainV2.appConfigSources`, `UserV2.appConfigSources`)
-> exposes `extra_config` as a single `config` field — no merge.
 
 ### Storage
 
