@@ -191,10 +191,11 @@ class CPUPlugin(AbstractComputePlugin):
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
         # This function might be needed later to apply fine-grained tuning for
-        # K8s resource allocation. NUMA memory pinning is intentionally not
-        # mirrored from the Docker backend here: on Kubernetes, node-local
-        # memory placement is driven by the kubelet Topology Manager
-        # (via pod-level resource hints), not via per-container HostConfig.
+        # K8s resource allocation. NUMA memory pinning is not mirrored from the
+        # Docker backend because this backend currently does not emit
+        # per-container CPU/memory requests/limits; node-local placement on
+        # Kubernetes would require Guaranteed-QoS pod specs plus cluster-level
+        # Topology Manager configuration, which is out of scope here.
         return {}
 
     async def restore_from_container(
