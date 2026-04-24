@@ -17,6 +17,7 @@ from ai.backend.manager.actions.action.rbac_role_invitation import (
     RejectRoleInvitationAction,
 )
 from ai.backend.manager.data.permission.role import (
+    EffectivePermissionsInput,
     UserRoleRevocationData,
 )
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
@@ -73,6 +74,10 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.actions.purge_role import (
     PurgeRoleAction,
     PurgeRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.resolve_effective_permissions import (
+    ResolveEffectivePermissionsAction,
+    ResolveEffectivePermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
     RevokeRoleAction,
@@ -359,6 +364,24 @@ class PermissionControllerService:
             actions = entity_map.setdefault(perm.element_type, {})
             actions[action_cls.action_name()] = perm
         return GetPermissionMatrixActionResult(matrix=result)
+
+    async def resolve_effective_permissions(
+        self, action: ResolveEffectivePermissionsAction
+    ) -> ResolveEffectivePermissionsActionResult:
+        """Resolve the set of permitted operations per entity for a given user.
+
+        Traverses the scope chain and evaluates all role/permission assignments
+        to return all operations the user is authorized to perform on each entity.
+        """
+        result = await self._repository.resolve_effective_permissions(
+            EffectivePermissionsInput(
+                user_id=action.user_id,
+                target_element_type=action.target_element_type,
+                target_entity_ids=action.target_entity_ids,
+                permission_entity_type=action.permission_entity_type,
+            )
+        )
+        return ResolveEffectivePermissionsActionResult(permissions=result.permissions)
 
     async def create_role_invitation_by_email(
         self, action: CreateRoleInvitationByEmailAction

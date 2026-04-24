@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections import defaultdict
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -40,6 +41,8 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
+    EffectivePermissionsInput,
+    EffectivePermissionsResult,
     ProjectRoleCount,
     RoleListResult,
     RolePermissionsUpdateInput,
@@ -1087,6 +1090,88 @@ class PermissionDBSource:
             )
         )
         return {eid: eid in granted for eid in data.target_entity_ids}
+
+    async def resolve_effective_permissions(
+        self,
+        data: EffectivePermissionsInput,
+    ) -> EffectivePermissionsResult:
+        """Resolve the effective permissions for a user across multiple entities.
+
+        Uses a single batched query that traverses the scope chain (AUTO edges)
+        and self-scope permissions to collect all operations the user can perform
+        on each entity.
+
+        Returns a mapping from entity ID to the set of permitted operations.
+        """
+        if not data.target_entity_ids:
+            return EffectivePermissionsResult(permissions={})
+
+        association_entity_type = data.target_element_type.to_entity_type()
+        permission_entity_type = data.permission_entity_type or association_entity_type
+        target_scope_type = data.target_element_type.to_scope_type()
+
+        perm = PermissionRow.__table__
+        user_roles = UserRoleRow.__table__
+        roles = RoleRow.__table__
+
+        scope_chain_cte = self._build_scope_chain_cte(
+            association_entity_type, data.target_entity_ids
+        )
+        scope_chain_query = (
+            sa.select(
+                scope_chain_cte.c.entity_id,
+                perm.c.operation,
+            )
+            .select_from(
+                scope_chain_cte.join(
+                    perm,
+                    sa.and_(
+                        perm.c.scope_type == scope_chain_cte.c.scope_type,
+                        perm.c.scope_id == scope_chain_cte.c.scope_id,
+                    ),
+                )
+                .join(roles, roles.c.id == perm.c.role_id)
+                .join(user_roles, user_roles.c.role_id == roles.c.id)
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == data.user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    perm.c.entity_type == permission_entity_type,
+                )
+            )
+        )
+
+        self_scope_query = (
+            sa.select(
+                perm.c.scope_id.label("entity_id"),
+                perm.c.operation,
+            )
+            .select_from(
+                perm.join(roles, roles.c.id == perm.c.role_id).join(
+                    user_roles, user_roles.c.role_id == roles.c.id
+                )
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == data.user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    perm.c.scope_type == target_scope_type,
+                    perm.c.scope_id.in_(data.target_entity_ids),
+                    perm.c.entity_type == permission_entity_type,
+                )
+            )
+        )
+
+        combined_query = sa.union_all(scope_chain_query, self_scope_query)
+
+        permissions: defaultdict[str, set[OperationType]] = defaultdict(set)
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            result = await db_session.execute(combined_query)
+            for row in result:
+                permissions[row.entity_id].add(OperationType(row.operation))
+
+        return EffectivePermissionsResult(permissions=permissions)
 
     async def bulk_assign_role(
         self, bulk_creator: BulkCreator[UserRoleRow]
