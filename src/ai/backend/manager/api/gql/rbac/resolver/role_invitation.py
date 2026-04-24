@@ -190,7 +190,7 @@ async def admin_role_invitations(
         added_version=NEXT_RELEASE_VERSION,
         description="Create role invitations by email.",
     )
-)  # type: ignore[misc]
+)
 async def create_role_invitation(
     info: Info[StrawberryGQLContext],
     input: CreateRoleInvitationInputGQL,
@@ -204,7 +204,7 @@ async def create_role_invitation(
         added_version=NEXT_RELEASE_VERSION,
         description="Accept a pending role invitation.",
     )
-)  # type: ignore[misc]
+)
 async def accept_role_invitation(
     info: Info[StrawberryGQLContext],
     input: AcceptRoleInvitationInputGQL,
@@ -219,7 +219,7 @@ async def accept_role_invitation(
         added_version=NEXT_RELEASE_VERSION,
         description="Reject a pending role invitation.",
     )
-)  # type: ignore[misc]
+)
 async def reject_role_invitation(
     info: Info[StrawberryGQLContext],
     input: RejectRoleInvitationInputGQL,
@@ -234,7 +234,7 @@ async def reject_role_invitation(
         added_version=NEXT_RELEASE_VERSION,
         description="Cancel a pending role invitation (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_cancel_role_invitation(
     info: Info[StrawberryGQLContext],
     input: CancelRoleInvitationInputGQL,

@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
     AcceptRoleInvitationInput as AcceptRoleInvitationInputDTO,
@@ -114,6 +120,58 @@ class RoleInvitationGQL(PydanticNodeMixin[RoleInvitationNodeDTO]):
     state: RoleInvitationStateGQL = gql_field(description="Invitation state.")
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime | None = gql_field(description="Last update timestamp.")
+
+    @gql_field(description="The user who sent this invitation. Null for system-issued invitations.")  # type: ignore[misc]
+    async def inviter(
+        self,
+        info: Info,
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.inviter_user_id is None:
+            return None
+        inviter: UserV2GQL | None = await info.context.data_loaders.user_loader.load(
+            self.inviter_user_id
+        )
+        return inviter
+
+    @gql_field(
+        description="The user who received this invitation. Null if the user no longer exists."
+    )  # type: ignore[misc]
+    async def invitee(
+        self,
+        info: Info,
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        invitee: UserV2GQL | None = await info.context.data_loaders.user_loader.load(
+            self.invitee_user_id
+        )
+        return invitee
+
+    @gql_field(
+        description="The role this invitation grants on acceptance. Null if the role no longer exists."
+    )  # type: ignore[misc]
+    async def role(
+        self,
+        info: Info,
+    ) -> (
+        Annotated[
+            RoleGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.role"),
+        ]
+        | None
+    ):
+        role: RoleGQL | None = await info.context.data_loaders.role_loader.load(self.role_id)
+        return role
 
 
 # -- Connection --

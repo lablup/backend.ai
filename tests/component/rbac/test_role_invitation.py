@@ -32,7 +32,7 @@ from ai.backend.common.dto.manager.v2.role_invitation.response import (
     SearchRoleInvitationsPayload,
 )
 from ai.backend.common.dto.manager.v2.role_invitation.types import RoleInvitationStateDTO
-from ai.backend.manager.api.adapters.rbac import RBACAdapter
+from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.rbac.handler import RBACHandler

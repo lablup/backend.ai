@@ -15,7 +15,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import InvitationIdPathParam, RoleIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.rbac import RBACAdapter
+    from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
