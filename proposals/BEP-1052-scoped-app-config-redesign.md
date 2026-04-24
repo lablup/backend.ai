@@ -274,7 +274,7 @@ repositories/app_config_policy/
 
 | Repository                   | Methods                                                                                                              |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(scope, querier)` for a bound scope (via `AppConfigSourceSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, name, chain)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`; chain derived in SQL via policy join) — see §5. |
+| `AppConfigSourceRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigSourceKey`. `search(scope, querier)` for a bound scope (via `AppConfigSourceSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, name, chain)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`; chain derived in SQL via policy join), and `admin_search_app_configs(querier)` for cross-user admin search — see §5. |
 | `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(querier)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigSource` row still references the `config_name`. |
 
 `AppConfigSourceRepository` plays a **dual role** — raw CRUD (served
@@ -437,14 +437,15 @@ disambiguate scope by reading `AppConfigSource.scopeType` instead.
 
 ```graphql
 """
-Merged per-user view — `myAppConfigs` or `node(id)`. Deep-merges
+Merged per-user view — non-admins use `myAppConfigs` (own view);
+admins also have `adminAppConfigs` to resolve any user. Deep-merges
 same-`name` source rows in the matching policy's `scope_sources`
 order; appears whenever at least one source row exists (§5).
 
 Implements `Node` with server-side ID
-`base64("AppConfig:{user_id}:{name}")`. `node(id)` resolves only
-when `decoded.user_id == current_user.id` — strictly the caller's
-own view, no admin override.
+`base64("AppConfig:{user_id}:{name}")`. `node(id)` resolves when
+`decoded.user_id == current_user.id`, or for any `user_id` when the
+caller is admin.
 """
 type AppConfig implements Node {
   id: ID!
@@ -558,6 +559,22 @@ type Query {
     offset: Int = null
   ): AppConfigSourceConnection!
 
+  """
+  Cross-user merged-view search (admin only). Resolves any user's
+  `AppConfig` for audit / support. Pin to a single user with
+  `filter.userId`; otherwise paginates across all users.
+  """
+  adminAppConfigs(
+    filter: AppConfigFilter = null
+    orderBy: [AppConfigOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): AppConfigConnection!
+
   """Policy lookup by `configName`. Any authenticated user."""
   appConfigPolicy(configName: String!): AppConfigPolicy
 
@@ -666,6 +683,30 @@ enum AppConfigSourceOrderField {
   NAME
   UPDATED_AT
   CREATED_AT
+}
+
+"""
+Filter for the merged `AppConfig` view. On `myAppConfigs` `userId`
+is pinned to the caller and ignored; on `adminAppConfigs` admins
+use it to scope to a target user.
+"""
+input AppConfigFilter {
+  userId: StringFilter = null
+  name: StringFilter = null
+
+  AND: [AppConfigFilter!] = null
+  OR: [AppConfigFilter!] = null
+  NOT: [AppConfigFilter!] = null
+}
+
+input AppConfigOrderBy {
+  field: AppConfigOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum AppConfigOrderField {
+  USER_ID
+  NAME
 }
 
 input AppConfigPolicyFilter {
@@ -1018,9 +1059,10 @@ Queries:
 | `DomainV2.appConfigSources`              | ❌        | ✅ (same domain only)            | ✅    |
 | `UserV2.appConfigSources`                | ❌        | ✅ (self)                        | ✅    |
 | `adminAppConfigSources`                  | ❌        | ❌                               | ✅    |
+| `adminAppConfigs`                        | ❌        | ❌                               | ✅    |
 | `appConfigPolicy` / `appConfigPolicies` | ❌   | ✅                               | ✅    |
 | `node(id)` → `AppConfigSource`           | ✅ iff row `scopeType = PUBLIC` | ✅ (PUBLIC always; DOMAIN / DOMAIN_USER_DEFAULTS same-domain only; USER self only) | ✅ |
-| `node(id)` → `AppConfig`   | ❌        | ✅ (id's `user_id` is self)      | ✅ (id's `user_id` is self) |
+| `node(id)` → `AppConfig`   | ❌        | ✅ (id's `user_id` is self)      | ✅ (any `user_id`)         |
 | `node(id)` → `AppConfigPolicy`     | ❌        | ✅                               | ✅    |
 
 Write mutations split into two paths with distinct rules. All
@@ -1151,7 +1193,7 @@ Per-scope read permissions mirror the GQL matrix: `public` anonymous;
 `domain` / `domain_user_defaults` require same-domain or admin;
 `user` requires self or admin.
 
-### Resolved view endpoint — `/v2/app-configs/my`
+### AppConfig endpoint — `/v2/app-configs/my`
 
 Read-only per-user `AppConfig` at its own prefix to make the
 "merged view, not raw row" framing explicit in the URL. The
@@ -1159,13 +1201,23 @@ adapter pins `(USER, current_user.user_id)`; no way to target
 another user, no writes (those go through
 `/v2/app-config-sources/my/bulk-*`).
 
-| Method | Path                                | Description                                        |
-|--------|-------------------------------------|----------------------------------------------------|
-| GET    | `/v2/app-configs/my/{name}`         | Read one resolved document (merged view)           |
-| POST   | `/v2/app-configs/my/search`         | Paginated list of own resolved documents           |
+| Method | Path                                | Description                              |
+|--------|-------------------------------------|------------------------------------------|
+| GET    | `/v2/app-configs/my/{name}`         | Read one `AppConfig`                     |
+| POST   | `/v2/app-configs/my/search`         | Paginated list of own `AppConfig`s       |
 
-Response body for the single `GET` is the **resolved AppConfig**
-(snake_case projection of the GQL `AppConfig`):
+#### Admin cross-user search
+
+Admins can resolve any user's merged view (audit / support; maps
+to GQL `adminAppConfigs`).
+
+| Method | Path                                       | Access | Description                                                            |
+|--------|--------------------------------------------|--------|------------------------------------------------------------------------|
+| POST   | `/v2/app-configs/search`                   | Admin  | Cross-user paginated search — pin to a single user via `userId` filter |
+| GET    | `/v2/app-configs/{user_id}/{name}`         | Admin  | Read one user's `AppConfig`                                            |
+
+Response body for the single `GET` is the snake_case projection
+of the GQL `AppConfig`:
 
 ```json
 {
@@ -1291,6 +1343,12 @@ single-SQL approach, generalized — joins `app_config_sources` with
 chain is evaluated independently in SQL; no per-name chain map is
 precomputed in service code.
 
+Cross-user (`adminAppConfigs` → `admin_search_app_configs`): same
+SQL joined with `users` to drop the user_id binding — paginates at
+the `(user_id, name)` level. Authorization is admin-only, enforced
+at the service layer; `querier.conditions` filters on user_id /
+name as needed.
+
 `AppConfigData` is the service return for a single document;
 `AppConfigSearchResult` is its search counterpart (standard `items`
 / `total_count` / `has_next_page` / `has_previous_page`). Search
@@ -1379,6 +1437,19 @@ class AppConfigSourceDBSource:
         # level; each group is deep-merged into one `AppConfigData`.
         ...
 
+    async def admin_search_app_configs(
+        self,
+        querier: BatchQuerier,
+    ) -> AppConfigSearchResult:
+        # Cross-user merged search — no user_id binding. Joins
+        # `users` so each user × applicable `name` combination is
+        # produced. Authorization is enforced at the service layer
+        # before this is reached. `querier.conditions` filters on
+        # user_id / name as needed; `execute_batch_querier` paginates
+        # at the distinct-`(user_id, name)` level, each group
+        # deep-merged into one `AppConfigData`.
+        ...
+
 
 class AppConfigSourceRepository:
     """
@@ -1447,6 +1518,14 @@ class AppConfigSourceRepository:
         return await self._db_source.search_user_app_configs(
             scope, querier,
         )
+
+    async def admin_search_app_configs(
+        self,
+        querier: BatchQuerier,
+    ) -> AppConfigSearchResult:
+        # Cross-user merged search (admin only). Thin delegate —
+        # authorization is already enforced at the service layer.
+        return await self._db_source.admin_search_app_configs(querier)
 ```
 
 ### Exposure
