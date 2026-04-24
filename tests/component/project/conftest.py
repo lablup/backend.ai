@@ -127,8 +127,8 @@ def group_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_repo, True),
-                single_entity=SingleEntityActionRBACValidator(permission_repo, True),
+                scope=ScopeActionRBACValidator(permission_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(permission_repo, MagicMock()),
             ),
         ),
     )
