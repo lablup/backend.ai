@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from ai.backend.common.clients.prometheus.types import ValueType
-from ai.backend.manager.repositories.metric.types import (
+from ai.backend.manager.data.metric.types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
     ContainerMetricResult,

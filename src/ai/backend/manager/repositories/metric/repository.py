@@ -29,17 +29,15 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.metric.types import (
     DIFF_METRICS,
     RATE_METRICS,
-    KernelLiveStatBatchResult,
-    MetricType,
-)
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.metric.types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
     ContainerMetricResult,
+    KernelLiveStatBatchResult,
     KernelMetricValuesByKernel,
     MetricResultValue,
+    MetricType,
 )
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

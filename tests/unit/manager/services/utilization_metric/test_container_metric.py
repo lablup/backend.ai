@@ -23,14 +23,15 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     PrometheusConnectionError,
 )
-from ai.backend.manager.data.metric.types import MetricType, ValueType
+from ai.backend.manager.data.metric.types import (
+    ContainerMetricOptionalLabel,
+    ContainerMetricResponseInfo,
+    MetricType,
+    ValueType,
+)
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
-)
-from ai.backend.manager.services.metric.types import (
-    ContainerMetricOptionalLabel,
-    ContainerMetricResponseInfo,
 )
 
 
