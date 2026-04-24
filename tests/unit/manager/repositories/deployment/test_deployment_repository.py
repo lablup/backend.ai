@@ -3443,7 +3443,7 @@ class TestRouteOperations:
         assert result is False
 
 
-class TestPromoteDeployment(TestRouteOperations):
+class TestPromoteDeployment:
     """Test cases for DeploymentRepository.promote_deployment (blue-green)."""
 
     @pytest.fixture
@@ -3451,7 +3451,7 @@ class TestPromoteDeployment(TestRouteOperations):
         self,
         database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Override parent fixture to include KeyPairRow (UserRow FK dependency)."""
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
             [
@@ -3491,6 +3491,161 @@ class TestPromoteDeployment(TestRouteOperations):
                         {"slot_name": slot_name, "slot_type": slot_type},
                     )
             yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test domain and return domain name."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.commit()
+
+        return domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test scaling group and return name."""
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.commit()
+
+        return sgroup_name
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test resource policy and return policy name."""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test project resource policy and return policy name."""
+        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_network_count=5,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> uuid.UUID:
+        """Create test user and return user UUID."""
+        user_uuid = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=create_test_password_info("test_password"),
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.commit()
+
+        return user_uuid
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        """Create test group and return group ID."""
+        group_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain_name,
+                resource_policy=test_project_resource_policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.commit()
+
+        return group_id
+
+    @pytest.fixture
+    def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DeploymentRepository:
+        """Create DeploymentRepository instance."""
+        storage_manager = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_live = MagicMock()
+        valkey_schedule = MagicMock()
+
+        return DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=storage_manager,
+            valkey_stat=valkey_stat,
+            valkey_live=valkey_live,
+            valkey_schedule=valkey_schedule,
+        )
 
     @pytest.fixture
     async def test_current_revision_id(self) -> uuid.UUID:
