@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.manager.errors.app_config import AppConfigPolicyNotFound
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_policy.admin_repository import (
@@ -111,17 +112,15 @@ class TestAppConfigPolicyAdminRepository:
         assert updated is not None
         assert list(updated.scope_sources) == ["domain", "user"]
 
-    async def test_update_returns_none_for_missing_config_name(
+    async def test_update_raises_for_missing_config_name(
         self,
         admin_repository: AppConfigPolicyAdminRepository,
     ) -> None:
-        assert (
+        with pytest.raises(AppConfigPolicyNotFound):
             await admin_repository.update(
                 config_name="nonexistent",
                 scope_sources=["user"],
             )
-            is None
-        )
 
     async def test_purge_existing_policy_returns_true(
         self,
