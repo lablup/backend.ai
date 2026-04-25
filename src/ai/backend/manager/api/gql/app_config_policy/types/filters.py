@@ -45,6 +45,7 @@ class AppConfigPolicyFilterGQL(PydanticInputMixin[AppConfigPolicyFilterDTO]):
 class AppConfigPolicyOrderFieldGQL(StrEnum):
     CONFIG_NAME = "config_name"
     CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
 
 
 @gql_pydantic_input(

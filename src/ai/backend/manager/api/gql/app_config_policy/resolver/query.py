@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.app_config_policy.request import (
@@ -9,10 +10,13 @@ from ai.backend.common.dto.manager.v2.app_config_policy.request import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.app_config_policy.types import (
+    AppConfigPolicyConnectionGQL,
+    AppConfigPolicyEdgeGQL,
     AppConfigPolicyFilterGQL,
     AppConfigPolicyGQL,
     AppConfigPolicyOrderByGQL,
 )
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -57,7 +61,7 @@ async def app_config_policies(
     before: str | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> list[AppConfigPolicyGQL]:
+) -> AppConfigPolicyConnectionGQL:
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
 
@@ -73,4 +77,17 @@ async def app_config_policies(
             offset=offset,
         )
     )
-    return [AppConfigPolicyGQL.from_pydantic(node) for node in payload.items]
+    nodes = [AppConfigPolicyGQL.from_pydantic(node) for node in payload.items]
+    edges = [
+        AppConfigPolicyEdgeGQL(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+    ]
+    return AppConfigPolicyConnectionGQL(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )

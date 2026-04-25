@@ -15,7 +15,11 @@ from .filters import (
     AppConfigPolicyOrderByGQL,
     AppConfigPolicyOrderFieldGQL,
 )
-from .node import AppConfigPolicyGQL
+from .node import (
+    AppConfigPolicyConnectionGQL,
+    AppConfigPolicyEdgeGQL,
+    AppConfigPolicyGQL,
+)
 
 __all__ = [
     "AdminAppConfigPolicyItemInputGQL",
@@ -26,6 +30,8 @@ __all__ = [
     "AdminBulkUpdateAppConfigPoliciesPayloadGQL",
     "AdminBulkUpdateAppConfigPolicyInputGQL",
     "AppConfigPolicyBulkErrorGQL",
+    "AppConfigPolicyConnectionGQL",
+    "AppConfigPolicyEdgeGQL",
     "AppConfigPolicyFilterGQL",
     "AppConfigPolicyGQL",
     "AppConfigPolicyOrderByGQL",
