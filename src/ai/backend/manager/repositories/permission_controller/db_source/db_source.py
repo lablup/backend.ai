@@ -111,6 +111,7 @@ from ai.backend.manager.repositories.role_invitation.creators import (
 )
 from ai.backend.manager.repositories.role_invitation.types import (
     InviteeSearchScope,
+    InviterSearchScope,
     RoleInvitationSearchResult,
     RoleInvitationSearchScope,
 )
@@ -1280,6 +1281,22 @@ class PermissionDBSource:
         self,
         querier: BatchQuerier,
         scope: InviteeSearchScope,
+    ) -> RoleInvitationSearchResult:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(RoleInvitationRow)
+            result = await execute_batch_querier(session, query, querier, scope=scope)
+            items = [row.RoleInvitationRow.to_data() for row in result.rows]
+            return RoleInvitationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_invitations_by_inviter(
+        self,
+        querier: BatchQuerier,
+        scope: InviterSearchScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)

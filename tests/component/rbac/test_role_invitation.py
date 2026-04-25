@@ -902,3 +902,91 @@ class TestRoleScopedSearchNonAdmin:
         )
         assert isinstance(result, SearchRoleInvitationsPayload)
         assert all(inv.role_id == target_role.role.id for inv in result.items)
+
+
+class TestMySentSearchInvitations:
+    """my_sent_search — invitations sent by the current authenticated user."""
+
+    async def test_my_sent_search_returns_invitations_sent_by_caller(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: UserFixtureData,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Inviter sees only invitations they created."""
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        result = await admin_v2_registry.role_invitation.my_sent_search(
+            SearchRoleInvitationsInput()
+        )
+        assert isinstance(result, SearchRoleInvitationsPayload)
+        assert result.total_count == 1
+        assert all(inv.inviter_user_id == admin_user_fixture.user_uuid for inv in result.items)
+
+    async def test_my_sent_search_excludes_received_invitations(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        user_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """Invitee (not inviter) sees nothing in my_sent_search for an invitation they received."""
+        await admin_v2_registry.role_invitation.create(
+            CreateRoleInvitationInput(
+                role_id=target_role.role.id,
+                emails=[regular_user_fixture.email],
+            )
+        )
+        sent = await user_v2_registry.role_invitation.my_sent_search(SearchRoleInvitationsInput())
+        # Regular user has not sent any invitation — my_sent must be strictly empty.
+        assert sent.total_count == 0
+        assert sent.items == []
+
+    async def test_my_sent_search_respects_filter_and_order(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+        admin_user_fixture: UserFixtureData,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        """my_sent_search honors RoleInvitationFilter and RoleInvitationOrderBy."""
+        role_a = await role_factory()
+        role_b = await role_factory()
+        for role in (role_a, role_b):
+            await admin_v2_registry.role_invitation.create(
+                CreateRoleInvitationInput(
+                    role_id=role.role.id,
+                    emails=[regular_user_fixture.email],
+                )
+            )
+        filtered = await admin_v2_registry.role_invitation.my_sent_search(
+            SearchRoleInvitationsInput(
+                filter=RoleInvitationFilter(
+                    role=RoleNestedFilter(name=StringFilter(equals=role_a.role.name)),
+                )
+            )
+        )
+        assert filtered.total_count == 1
+        assert filtered.items[0].role_id == role_a.role.id
+        assert filtered.items[0].inviter_user_id == admin_user_fixture.user_uuid
+
+        ordered = await admin_v2_registry.role_invitation.my_sent_search(
+            SearchRoleInvitationsInput(
+                order=[
+                    RoleInvitationOrderBy(
+                        field=RoleInvitationOrderField.CREATED_AT,
+                        direction=OrderDirection.ASC,
+                    )
+                ],
+            )
+        )
+        ts = [inv.created_at for inv in ordered.items]
+        assert ts == sorted(ts)

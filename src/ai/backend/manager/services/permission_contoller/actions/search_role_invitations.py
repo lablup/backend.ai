@@ -24,6 +24,7 @@ from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.role_invitation.types import (
     InviteeSearchScope,
+    InviterSearchScope,
     RoleInvitationSearchScope,
 )
 
@@ -206,6 +207,31 @@ class SearchMyRoleInvitationsAction(_UserScopedInvitationAction):
 
 @dataclass
 class SearchMyRoleInvitationsActionResult(_InvitationScopeActionResult):
+    result: SearchResult[RoleInvitationData]
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+# ------------------------------------------------------------------ my_sent_search
+
+
+@dataclass
+class SearchMySentRoleInvitationsAction(_UserScopedInvitationAction):
+    """Search invitations sent by the current user."""
+
+    querier: BatchQuerier
+    scope: InviterSearchScope
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
+class SearchMySentRoleInvitationsActionResult(_InvitationScopeActionResult):
     result: SearchResult[RoleInvitationData]
 
     @override

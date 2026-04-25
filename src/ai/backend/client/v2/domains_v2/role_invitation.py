@@ -69,6 +69,18 @@ class V2RoleInvitationClient(BaseDomainClient):
             response_model=SearchRoleInvitationsPayload,
         )
 
+    async def my_sent_search(
+        self,
+        request: SearchRoleInvitationsInput,
+    ) -> SearchRoleInvitationsPayload:
+        """Search invitations sent by the current user."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/sent-search",
+            request=request,
+            response_model=SearchRoleInvitationsPayload,
+        )
+
     async def search_by_role(
         self,
         role_id: UUID,

@@ -86,6 +86,54 @@ async def my_role_invitations(
 @gql_root_field(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description="List role invitations sent by the current user.",
+    )
+)  # type: ignore[misc]
+async def my_sent_role_invitations(
+    info: Info[StrawberryGQLContext],
+    filter: RoleInvitationFilterGQL | None = None,
+    order_by: list[RoleInvitationOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> RoleInvitationConnection:
+    result = await info.context.adapters.rbac.my_sent_search_role_invitations(
+        SearchRoleInvitationsInput(
+            filter=filter.to_pydantic() if filter is not None else None,
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    edges = [
+        RoleInvitationEdge(
+            node=RoleInvitationGQL.from_pydantic(item),
+            cursor=encode_cursor(str(item.id)),
+        )
+        for item in result.items
+    ]
+    return RoleInvitationConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="List invitations for a specific role.",
     )
 )  # type: ignore[misc]

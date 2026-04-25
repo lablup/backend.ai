@@ -60,6 +60,7 @@ from ai.backend.manager.repositories.permission_controller.types import (
 )
 from ai.backend.manager.repositories.role_invitation.types import (
     InviteeSearchScope,
+    InviterSearchScope,
     RoleInvitationSearchResult,
     RoleInvitationSearchScope,
 )
@@ -396,6 +397,14 @@ class PermissionControllerRepository:
         scope: InviteeSearchScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_invitee(querier, scope)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_invitations_by_inviter(
+        self,
+        querier: BatchQuerier,
+        scope: InviterSearchScope,
+    ) -> RoleInvitationSearchResult:
+        return await self._db_source.search_invitations_by_inviter(querier, scope)
 
     @permission_controller_repository_resilience.apply()
     async def search_invitations_by_role(

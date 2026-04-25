@@ -66,6 +66,14 @@ class V2RoleInvitationHandler:
         result = await self._adapter.my_search_role_invitations(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def my_sent_search(
+        self,
+        body: BodyParam[SearchRoleInvitationsInput],
+    ) -> APIResponse:
+        """Search invitations sent by the current user."""
+        result = await self._adapter.my_sent_search_role_invitations(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def role_search(
         self,
         path: PathParam[RoleIdPathParam],

@@ -23,6 +23,7 @@ from .resolver import (
     create_role_invitation,
     my_role_invitations,
     my_roles,
+    my_sent_role_invitations,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
@@ -143,6 +144,7 @@ __all__ = (
     "admin_bulk_revoke_role",
     # Role invitation resolvers
     "my_role_invitations",
+    "my_sent_role_invitations",
     "role_scoped_role_invitations",
     "admin_role_invitations",
     "create_role_invitation",

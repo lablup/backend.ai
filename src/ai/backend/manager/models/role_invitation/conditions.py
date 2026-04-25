@@ -76,6 +76,13 @@ class RoleInvitationConditions:
         return inner
 
     @staticmethod
+    def by_inviter(inviter_user_id: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleInvitationRow.inviter_user_id == inviter_user_id
+
+        return inner
+
+    @staticmethod
     def by_role(role_id: UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleInvitationRow.role_id == role_id
