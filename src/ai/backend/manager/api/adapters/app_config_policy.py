@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.app_config_policy.response import (
     UpdateAppConfigPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_policy.types import OrderDirection
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.app_config_policy.conditions import AppConfigPolicyConditions
@@ -40,7 +41,6 @@ from ai.backend.manager.services.app_config_policy.actions.update import (
 )
 
 from .base import BaseAdapter
-from .pagination import PaginationSpec
 
 
 class AppConfigPolicyAdapter(BaseAdapter):
