@@ -3,12 +3,6 @@
 All mutations (assign, unassign, create model card) go through the SDK;
 only DB-level fixtures are used for entities that require a storage proxy
 (vfolders) or that have no v2 SDK yet (MODEL_STORE project type).
-
-Scenarios:
-1. Assign user → create model card → user searches → finds the card.
-2. Non-member user → search → 403.
-3. Assign → unassign → search → 403.
-4. Cross-project isolation: member of A, not B → A succeeds, B fails.
 """
 
 from __future__ import annotations

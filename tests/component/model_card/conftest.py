@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
@@ -41,6 +42,9 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
@@ -277,6 +281,38 @@ async def role_fixture(
     yield role_id
     async with db_engine.begin() as conn:
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+
+
+@pytest.fixture(autouse=True)
+async def _register_role_in_project(
+    db_engine: SAEngine,
+    role_fixture: uuid.UUID,
+    model_store_project_fixture: uuid.UUID,
+) -> AsyncIterator[None]:
+    """Register the test role in the primary project scope via ASE.
+
+    This ensures revoke_role() can detect the role as project-scoped
+    and properly calls unbind_user_from_project() to clean up agus entries.
+    """
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(model_store_project_fixture),
+                entity_type=EntityType.ROLE,
+                entity_id=str(role_fixture),
+            )
+        )
+    yield
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                sa.and_(
+                    AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE,
+                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_fixture),
+                )
+            )
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -4,12 +4,6 @@ Tests the same membership gating scenarios as test_model_card_project_assign,
 but membership is acquired/revoked through the RBAC role assignment SDK
 (rbac.assign_role / rbac.revoke_role with project_id) instead of
 project.assign_users / project.unassign_users.
-
-Scenarios:
-1. Assign role with project → create model card → user searches → finds it.
-2. Non-member user → search → 403.
-3. Assign role → revoke role → search → 403.
-4. Cross-project isolation: role assigned in project A only → A succeeds, B fails.
 """
 
 from __future__ import annotations
