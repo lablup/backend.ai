@@ -20,3 +20,9 @@ class AppConfigPolicyOrders:
         if ascending:
             return AppConfigPolicyRow.created_at.asc()
         return AppConfigPolicyRow.created_at.desc()
+
+    @staticmethod
+    def updated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AppConfigPolicyRow.updated_at.asc()
+        return AppConfigPolicyRow.updated_at.desc()

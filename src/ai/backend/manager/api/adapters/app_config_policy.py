@@ -165,6 +165,8 @@ class AppConfigPolicyAdapter(BaseAdapter):
                     result.append(AppConfigPolicyOrders.config_name(ascending))
                 case "created_at":
                     result.append(AppConfigPolicyOrders.created_at(ascending))
+                case "updated_at":
+                    result.append(AppConfigPolicyOrders.updated_at(ascending))
         return result
 
     @staticmethod

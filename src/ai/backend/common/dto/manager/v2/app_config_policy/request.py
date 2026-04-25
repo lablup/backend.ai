@@ -43,12 +43,13 @@ class CreateAppConfigPolicyInput(BaseRequestModel):
         ),
     )
 
-    @field_validator("config_name")
+    @field_validator("config_name", mode="before")
     @classmethod
-    def config_name_must_not_be_blank(cls, v: str) -> str:
+    def strip_and_validate_name(cls, v: str) -> str:
+        """Strip whitespace and ensure config_name is non-blank."""
         stripped = v.strip()
         if not stripped:
-            raise ValueError("config_name must not be blank or whitespace-only")
+            raise ValueError("config_name must not be blank after stripping whitespace")
         return stripped
 
 
@@ -66,6 +67,15 @@ class UpdateAppConfigPolicyInput(BaseRequestModel):
     scope_sources: list[str] = Field(
         description="Replacement ordered scope chain.",
     )
+
+    @field_validator("config_name", mode="before")
+    @classmethod
+    def strip_and_validate_name(cls, v: str) -> str:
+        """Strip whitespace and ensure config_name is non-blank."""
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("config_name must not be blank after stripping whitespace")
+        return stripped
 
 
 class PurgeAppConfigPolicyInput(BaseRequestModel):
@@ -105,6 +115,15 @@ class AdminAppConfigPolicyItemInput(BaseRequestModel):
     scope_sources: list[str] = Field(
         description="Ordered scope chain (low → high merge priority).",
     )
+
+    @field_validator("config_name", mode="before")
+    @classmethod
+    def strip_and_validate_name(cls, v: str) -> str:
+        """Strip whitespace and ensure config_name is non-blank."""
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("config_name must not be blank after stripping whitespace")
+        return stripped
 
 
 class AdminBulkCreateAppConfigPoliciesInput(BaseRequestModel):
