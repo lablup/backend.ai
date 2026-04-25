@@ -12,6 +12,10 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
+    "AdminBulkCreateAppConfigPoliciesPayload",
+    "AdminBulkPurgeAppConfigPoliciesPayload",
+    "AdminBulkUpdateAppConfigPoliciesPayload",
+    "AppConfigPolicyBulkError",
     "AppConfigPolicyNode",
     "CreateAppConfigPolicyPayload",
     "GetAppConfigPolicyPayload",
@@ -65,3 +69,37 @@ class SearchAppConfigPoliciesPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of policies matching the filter.")
     has_next_page: bool = Field(default=False, description="Whether there is a next page.")
     has_previous_page: bool = Field(default=False, description="Whether there is a previous page.")
+
+
+# ── Bulk mutation payloads (BEP-1052 §3) ─────────────────────────
+
+
+class AppConfigPolicyBulkError(BaseResponseModel):
+    """Per-item failure info for bulk Policy mutations."""
+
+    index: int = Field(description="Original position in the input list.")
+    config_name: str = Field(description="`config_name` of the failed row.")
+    message: str = Field(description="Reason for the failure.")
+
+
+class AdminBulkCreateAppConfigPoliciesPayload(BaseResponseModel):
+    """Payload for `adminBulkCreateAppConfigPolicies`."""
+
+    created: list[AppConfigPolicyNode] = Field(description="Created policies.")
+    failed: list[AppConfigPolicyBulkError] = Field(description="Per-item failures.")
+
+
+class AdminBulkUpdateAppConfigPoliciesPayload(BaseResponseModel):
+    """Payload for `adminBulkUpdateAppConfigPolicies`."""
+
+    updated: list[AppConfigPolicyNode] = Field(description="Updated policies.")
+    failed: list[AppConfigPolicyBulkError] = Field(description="Per-item failures.")
+
+
+class AdminBulkPurgeAppConfigPoliciesPayload(BaseResponseModel):
+    """Payload for `adminBulkPurgeAppConfigPolicies`."""
+
+    purged_config_names: list[str] = Field(
+        description="`config_name`s of policies actually removed (absent names no-oped).",
+    )
+    failed: list[AppConfigPolicyBulkError] = Field(description="Per-item failures.")

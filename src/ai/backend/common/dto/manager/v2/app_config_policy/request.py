@@ -12,6 +12,10 @@ from ai.backend.common.dto.manager.query import StringFilter
 from .types import AppConfigPolicyOrderField, OrderDirection
 
 __all__ = (
+    "AdminAppConfigPolicyItemInput",
+    "AdminBulkCreateAppConfigPoliciesInput",
+    "AdminBulkPurgeAppConfigPoliciesInput",
+    "AdminBulkUpdateAppConfigPoliciesInput",
     "AppConfigPolicyFilter",
     "AppConfigPolicyOrder",
     "CreateAppConfigPolicyInput",
@@ -81,6 +85,38 @@ class AppConfigPolicyOrder(BaseRequestModel):
 
     field: AppConfigPolicyOrderField = Field(description="Field to order by")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
+
+
+# ── Bulk mutation inputs (BEP-1052 §3) ───────────────────────────
+
+
+class AdminAppConfigPolicyItemInput(BaseRequestModel):
+    """Per-item input for `adminBulkCreate/UpdateAppConfigPolicies`.
+
+    `user_writable` is intentionally omitted — user writes are blocked
+    in this iteration; re-add when user writes are enabled (BEP-1052 §1).
+    """
+
+    config_name: str = Field(
+        min_length=1,
+        max_length=128,
+        description="Unique, immutable policy name.",
+    )
+    scope_sources: list[str] = Field(
+        description="Ordered scope chain (low → high merge priority).",
+    )
+
+
+class AdminBulkCreateAppConfigPoliciesInput(BaseRequestModel):
+    items: list[AdminAppConfigPolicyItemInput] = Field(description="Policies to create.")
+
+
+class AdminBulkUpdateAppConfigPoliciesInput(BaseRequestModel):
+    items: list[AdminAppConfigPolicyItemInput] = Field(description="Policies to update.")
+
+
+class AdminBulkPurgeAppConfigPoliciesInput(BaseRequestModel):
+    config_names: list[str] = Field(description="`config_name`s to purge.")
 
 
 class SearchAppConfigPoliciesInput(BaseRequestModel):

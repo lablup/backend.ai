@@ -1,9 +1,27 @@
+import logging
+
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.app_config_policy.bulk_types import (
+    AppConfigPolicyBulkItemError,
+)
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.app_config_policy.admin_repository import (
     AppConfigPolicyAdminRepository,
 )
 from ai.backend.manager.repositories.app_config_policy.repository import (
     AppConfigPolicyRepository,
+)
+from ai.backend.manager.services.app_config_policy.actions.admin_bulk_create import (
+    AdminBulkCreateAppConfigPoliciesAction,
+    AdminBulkCreateAppConfigPoliciesActionResult,
+)
+from ai.backend.manager.services.app_config_policy.actions.admin_bulk_purge import (
+    AdminBulkPurgeAppConfigPoliciesAction,
+    AdminBulkPurgeAppConfigPoliciesActionResult,
+)
+from ai.backend.manager.services.app_config_policy.actions.admin_bulk_update import (
+    AdminBulkUpdateAppConfigPoliciesAction,
+    AdminBulkUpdateAppConfigPoliciesActionResult,
 )
 from ai.backend.manager.services.app_config_policy.actions.create import (
     CreateAppConfigPolicyAction,
@@ -25,6 +43,8 @@ from ai.backend.manager.services.app_config_policy.actions.update import (
     UpdateAppConfigPolicyAction,
     UpdateAppConfigPolicyActionResult,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AppConfigPolicyService:
@@ -73,4 +93,87 @@ class AppConfigPolicyService:
         return PurgeAppConfigPolicyActionResult(
             config_name=action.config_name,
             purged=purged,
+        )
+
+    # ── Bulk mutations (BEP-1052 §3) ─────────────────────────────
+
+    async def admin_bulk_create(
+        self, action: AdminBulkCreateAppConfigPoliciesAction
+    ) -> AdminBulkCreateAppConfigPoliciesActionResult:
+        """Strict insert per-item; failures collected per-item."""
+        created = []
+        failed: list[AppConfigPolicyBulkItemError] = []
+        for index, item in enumerate(action.items):
+            try:
+                policy = await self._admin_repository.create(item.config_name, item.scope_sources)
+                created.append(policy)
+            except Exception as e:
+                log.debug("policy admin_bulk_create item {} failed: {}", index, e)
+                failed.append(
+                    AppConfigPolicyBulkItemError(
+                        index=index,
+                        config_name=item.config_name,
+                        message=str(e),
+                    )
+                )
+        return AdminBulkCreateAppConfigPoliciesActionResult(created=created, failed=failed)
+
+    async def admin_bulk_update(
+        self, action: AdminBulkUpdateAppConfigPoliciesAction
+    ) -> AdminBulkUpdateAppConfigPoliciesActionResult:
+        """Replace `scope_sources`; `config_name` itself is immutable
+        (BEP-1052 §1). Items referencing a non-existent `config_name`
+        are collected as failures (not auto-inserted)."""
+        updated = []
+        failed: list[AppConfigPolicyBulkItemError] = []
+        for index, item in enumerate(action.items):
+            try:
+                policy = await self._admin_repository.update(item.config_name, item.scope_sources)
+                if policy is None:
+                    failed.append(
+                        AppConfigPolicyBulkItemError(
+                            index=index,
+                            config_name=item.config_name,
+                            message="policy does not exist",
+                        )
+                    )
+                else:
+                    updated.append(policy)
+            except Exception as e:
+                log.debug("policy admin_bulk_update item {} failed: {}", index, e)
+                failed.append(
+                    AppConfigPolicyBulkItemError(
+                        index=index,
+                        config_name=item.config_name,
+                        message=str(e),
+                    )
+                )
+        return AdminBulkUpdateAppConfigPoliciesActionResult(updated=updated, failed=failed)
+
+    async def admin_bulk_purge(
+        self, action: AdminBulkPurgeAppConfigPoliciesAction
+    ) -> AdminBulkPurgeAppConfigPoliciesActionResult:
+        """Hard-delete per-item; items whose `config_name` still has
+        referencing fragments surface as per-item failures (BEP-1052 §1
+        required-policy invariant)."""
+        purged_names: list[str] = []
+        failed: list[AppConfigPolicyBulkItemError] = []
+        for index, config_name in enumerate(action.config_names):
+            try:
+                ok = await self._admin_repository.purge(config_name)
+                if ok:
+                    purged_names.append(config_name)
+                # Absent names are no-oped intentionally.
+            except Exception as e:
+                log.debug("policy admin_bulk_purge item {} failed: {}", index, e)
+                failed.append(
+                    AppConfigPolicyBulkItemError(
+                        index=index,
+                        config_name=config_name,
+                        message=str(e),
+                    )
+                )
+        return AdminBulkPurgeAppConfigPoliciesActionResult(
+            purged_config_names=purged_names,
+            failed=failed,
         )
