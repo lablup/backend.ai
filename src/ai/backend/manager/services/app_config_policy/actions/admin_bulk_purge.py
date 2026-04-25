@@ -3,21 +3,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import EntityType
+from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_policy.bulk_types import (
     AppConfigPolicyBulkItemError,
 )
-from ai.backend.manager.services.app_config_policy.actions.base import AppConfigPolicyAction
 
 
 @dataclass
-class AdminBulkPurgeAppConfigPoliciesAction(AppConfigPolicyAction):
-    config_names: list[str]
+class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[str]):
+    """`entity_ids` carries the `config_name`s to purge — the natural
+    Policy identifier."""
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def typed_entity_ids(self) -> list[str]:
+        return list(self.entity_ids)
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG
 
     @override
     @classmethod
@@ -26,10 +32,10 @@ class AdminBulkPurgeAppConfigPoliciesAction(AppConfigPolicyAction):
 
 
 @dataclass
-class AdminBulkPurgeAppConfigPoliciesActionResult(BaseActionResult):
+class AdminBulkPurgeAppConfigPoliciesActionResult(BaseBulkActionResult):
     purged_config_names: list[str]
     failed: list[AppConfigPolicyBulkItemError]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def entity_ids(self) -> list[str]:
+        return list(self.purged_config_names)
