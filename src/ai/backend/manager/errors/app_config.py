@@ -7,6 +7,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.errors.common import ObjectNotFound
 
 
 class AppConfigPolicyConflict(BackendAIError, web.HTTPConflict):
@@ -18,4 +19,15 @@ class AppConfigPolicyConflict(BackendAIError, web.HTTPConflict):
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class AppConfigPolicyNotFound(ObjectNotFound):
+    object_name = "app-config policy"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

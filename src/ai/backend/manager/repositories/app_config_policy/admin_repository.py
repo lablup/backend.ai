@@ -61,7 +61,8 @@ class AppConfigPolicyAdminRepository:
         self,
         config_name: str,
         scope_sources: Sequence[str],
-    ) -> AppConfigPolicyData | None:
+    ) -> AppConfigPolicyData:
+        """Update a policy. Raises ``AppConfigPolicyNotFound`` when missing."""
         spec = AppConfigPolicyUpdaterSpec(scope_sources=scope_sources)
         return await self._db_source.update(config_name, spec)
 

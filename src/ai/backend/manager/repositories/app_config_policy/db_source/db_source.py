@@ -10,6 +10,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
+from ai.backend.manager.errors.app_config import AppConfigPolicyNotFound
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_policy.creators import (
@@ -101,7 +102,7 @@ class AppConfigPolicyDBSource:
         self,
         config_name: str,
         spec: AppConfigPolicyUpdaterSpec,
-    ) -> AppConfigPolicyData | None:
+    ) -> AppConfigPolicyData:
         """Update the policy identified by `config_name`.
 
         `config_name` is UNIQUE but not the PK, so we first resolve it
@@ -109,8 +110,9 @@ class AppConfigPolicyDBSource:
         helper (which requires a single-column PK).
 
         `config_name` itself is never mutated — `AppConfigPolicyUpdaterSpec`
-        exposes only `scope_sources` (BEP-1052 §1). Returns `None` when no
-        row exists for `config_name`.
+        exposes only `scope_sources` (BEP-1052 §1). Raises
+        :class:`AppConfigPolicyNotFound` when no row exists for
+        `config_name`; reads use the nullable `get(...)` instead.
         """
         async with self._db.begin_session() as db_sess:
             pk_value = await db_sess.scalar(
@@ -119,10 +121,18 @@ class AppConfigPolicyDBSource:
                 )
             )
             if pk_value is None:
-                return None
+                raise AppConfigPolicyNotFound(
+                    extra_msg=f"config_name={config_name!r}",
+                )
             updater: Updater[AppConfigPolicyRow] = Updater(spec=spec, pk_value=pk_value)
             result = await execute_updater(db_sess, updater)
-            return result.row.to_data() if result is not None else None
+            if result is None:
+                # The row vanished between PK resolution and UPDATE
+                # (concurrent purge); treat as NotFound for the caller.
+                raise AppConfigPolicyNotFound(
+                    extra_msg=f"config_name={config_name!r}",
+                )
+            return result.row.to_data()
 
     @app_config_policy_db_source_resilience.apply()
     async def purge(self, config_name: str) -> bool:

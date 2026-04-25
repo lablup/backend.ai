@@ -95,16 +95,7 @@ class AppConfigPolicyService:
         for index, item in enumerate(action.items):
             try:
                 policy = await self._admin_repository.update(item.config_name, item.scope_sources)
-                if policy is None:
-                    failed.append(
-                        AppConfigPolicyBulkItemError(
-                            index=index,
-                            config_name=item.config_name,
-                            message="policy does not exist",
-                        )
-                    )
-                else:
-                    updated.append(policy)
+                updated.append(policy)
             except Exception as e:
                 log.debug("policy admin_bulk_update item {} failed: {}", index, e)
                 failed.append(
