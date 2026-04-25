@@ -15,6 +15,13 @@ from .agent import (
     agent_stats,
     agents_v2,
 )
+from .app_config_policy import (
+    admin_bulk_create_app_config_policies,
+    admin_bulk_purge_app_config_policies,
+    admin_bulk_update_app_config_policies,
+    app_config_policies,
+    app_config_policy,
+)
 from .artifact import (
     approve_artifact_revision,
     artifact,
@@ -523,6 +530,9 @@ class Query:
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
+    # App Config Policy APIs (read available to any authenticated user)
+    app_config_policy = app_config_policy
+    app_config_policies = app_config_policies
     # Prometheus Query Preset APIs (read available to any authenticated user)
     prometheus_query_preset = prometheus_query_preset
     prometheus_query_presets = prometheus_query_presets
@@ -804,6 +814,10 @@ class Mutation:
     admin_unblock_user = admin_unblock_user
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
+    # App Config Policy - Bulk admin mutations (BEP-1052 §3 — bulk-only)
+    admin_bulk_create_app_config_policies = admin_bulk_create_app_config_policies
+    admin_bulk_update_app_config_policies = admin_bulk_update_app_config_policies
+    admin_bulk_purge_app_config_policies = admin_bulk_purge_app_config_policies
     # Prometheus Query Preset - Admin APIs
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
