@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -173,6 +174,22 @@ class GroupRepository:
             ProjectNotFound: If project does not exist.
         """
         return await self._db_source.get_project(project_id)
+
+    @group_repository_resilience.apply()
+    async def project_id_by_name_in_domain(
+        self, domain_name: str, project_name: str
+    ) -> ProjectID | None:
+        """Resolve an active project's UUID by its domain-scoped name.
+
+        LEGACY: Exists solely to support existing API handlers that only accept a
+        group name as input (e.g. the REST v1 session/cluster template endpoints).
+        New API handlers and any other new code MUST NOT use this — they should
+        accept a project UUID directly.
+
+        Returns:
+            The project UUID if found, or ``None`` if no matching active project exists.
+        """
+        return await self._db_source.project_id_by_name_in_domain(domain_name, project_name)
 
     @group_repository_resilience.apply()
     async def search_projects(

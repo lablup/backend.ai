@@ -26,6 +26,10 @@ from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
+from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
+    ResolveProjectIdByNameAction,
+    ResolveProjectIdByNameActionResult,
+)
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
     GetProjectActionResult,
@@ -71,6 +75,9 @@ class GroupProcessors(AbstractProcessorPackage):
     unassign_users_from_project: SingleEntityActionProcessor[
         UnassignUsersFromProjectAction, UnassignUsersFromProjectActionResult
     ]
+    resolve_project_id_by_name: ActionProcessor[
+        ResolveProjectIdByNameAction, ResolveProjectIdByNameActionResult
+    ]
 
     def __init__(
         self,
@@ -114,6 +121,9 @@ class GroupProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=rbac_single_entity_validators,
         )
+        self.resolve_project_id_by_name = ActionProcessor(
+            group_service.resolve_project_id_by_name, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -130,4 +140,5 @@ class GroupProcessors(AbstractProcessorPackage):
             GetProjectAction.spec(),
             AssignUsersToProjectAction.spec(),
             UnassignUsersFromProjectAction.spec(),
+            ResolveProjectIdByNameAction.spec(),
         ]

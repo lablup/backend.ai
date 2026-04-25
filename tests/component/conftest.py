@@ -43,6 +43,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -113,6 +114,9 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -781,6 +785,14 @@ async def admin_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_fixture),
+                entity_type=EntityType.USER,
+                entity_id=str(data.user_uuid),
+            )
+        )
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
@@ -794,6 +806,11 @@ async def admin_user_fixture(
         await conn.execute(
             association_groups_users.delete().where(
                 association_groups_users.c.user_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
             )
         )
         await conn.execute(
@@ -869,6 +886,14 @@ async def regular_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_fixture),
+                entity_type=EntityType.USER,
+                entity_id=str(data.user_uuid),
+            )
+        )
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
@@ -879,6 +904,11 @@ async def regular_user_fixture(
         await conn.execute(
             association_groups_users.delete().where(
                 association_groups_users.c.user_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
             )
         )
         await conn.execute(
