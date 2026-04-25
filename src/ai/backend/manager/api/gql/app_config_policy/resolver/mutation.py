@@ -26,7 +26,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Strict insert keyed on `configName` (admin only, per-item transaction).",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_create_app_config_policies(
     info: Info[StrawberryGQLContext],
     input: AdminBulkCreateAppConfigPolicyInputGQL,
@@ -44,7 +44,7 @@ async def admin_bulk_create_app_config_policies(
             "Admin only, per-item transaction."
         ),
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_update_app_config_policies(
     info: Info[StrawberryGQLContext],
     input: AdminBulkUpdateAppConfigPolicyInputGQL,
@@ -62,7 +62,7 @@ async def admin_bulk_update_app_config_policies(
             "(BEP-1052 §1). Admin only."
         ),
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_purge_app_config_policies(
     info: Info[StrawberryGQLContext],
     input: AdminBulkPurgeAppConfigPolicyInputGQL,

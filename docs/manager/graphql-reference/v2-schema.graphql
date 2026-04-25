@@ -604,6 +604,47 @@ type AllowedResourceGroupsPayload {
   items: [String!]!
 }
 
+"""Added in UNRELEASED. Scoped app-config policy (BEP-1052 §1)."""
+type AppConfigPolicy {
+  """Policy row ID"""
+  id: UUID!
+
+  """Unique, immutable policy name."""
+  configName: String!
+
+  """Ordered scope chain (low → high merge priority)."""
+  scopeSources: [String!]!
+
+  """Creation timestamp"""
+  createdAt: DateTime!
+
+  """Last update timestamp"""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Filter input for querying app-config policies."""
+input AppConfigPolicyFilter {
+  """Filter by config_name."""
+  configName: StringFilter = null
+}
+
+"""Added in UNRELEASED. Specifies ordering for app-config policy results."""
+input AppConfigPolicyOrderBy {
+  """The field to order by."""
+  field: AppConfigPolicyOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering app-config policies.
+"""
+enum AppConfigPolicyOrderField {
+  CONFIG_NAME
+  CREATED_AT
+}
+
 """
 Added in 24.09.0. Input for approving an artifact revision.
 
@@ -2047,6 +2088,25 @@ input CreateAccessTokenInput {
 type CreateAccessTokenPayload {
   """Created access token"""
   accessToken: AccessToken!
+}
+
+"""
+Added in UNRELEASED. Input for creating a new app-config policy (admin only).
+"""
+input CreateAppConfigPolicyInput {
+  """Unique, immutable policy name."""
+  configName: String!
+
+  """Ordered scope chain (low → high merge priority)."""
+  scopeSources: [String!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating an app-config policy.
+"""
+type CreateAppConfigPolicyPayload {
+  """Created policy."""
+  policy: AppConfigPolicy!
 }
 
 """Added in 25.19.0. Input for creating an auto-scaling rule."""
@@ -7406,6 +7466,19 @@ type Mutation {
   """
   updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload
 
+  """Added in UNRELEASED. Create a new app-config policy (admin only)."""
+  adminCreateAppConfigPolicy(input: CreateAppConfigPolicyInput!): CreateAppConfigPolicyPayload!
+
+  """
+  Added in UNRELEASED. Update an app-config policy (admin only). `config_name` is immutable.
+  """
+  adminUpdateAppConfigPolicy(input: UpdateAppConfigPolicyInput!): UpdateAppConfigPolicyPayload!
+
+  """
+  Added in UNRELEASED. Purge (hard-delete) an app-config policy (admin only).
+  """
+  adminPurgeAppConfigPolicy(input: PurgeAppConfigPolicyInput!): PurgeAppConfigPolicyPayload!
+
   """Added in 26.3.0. Create a new query definition (admin only)"""
   adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload
 
@@ -9023,6 +9096,25 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""
+Added in UNRELEASED. Input for purging an app-config policy (admin only).
+"""
+input PurgeAppConfigPolicyInput {
+  """`config_name` of the policy to purge."""
+  configName: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after purging an app-config policy.
+"""
+type PurgeAppConfigPolicyPayload {
+  """`config_name` of the purged policy."""
+  configName: String!
+
+  """Whether a row was actually removed."""
+  purged: Boolean!
+}
+
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
 type PurgeDomainPayload {
   """Whether the purge was successful."""
@@ -9339,6 +9431,16 @@ type Query {
   Added in 26.2.0. Query image aliases with optional filtering, ordering, and pagination. Returns image aliases that provide alternative names for container images. Use filters to search by alias string. Supports both cursor-based and offset-based pagination.
   """
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
+
+  """
+  Added in UNRELEASED. Get a single app-config policy by `config_name`. Available to any authenticated user.
+  """
+  appConfigPolicy(configName: String!): AppConfigPolicy
+
+  """
+  Added in UNRELEASED. List app-config policies with filtering and pagination. Available to any authenticated user.
+  """
+  appConfigPolicies(filter: AppConfigPolicyFilter = null, orderBy: [AppConfigPolicyOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [AppConfigPolicy!]!
 
   """
   Added in 26.4.2. Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.
@@ -12913,6 +13015,25 @@ input UpdateAllowedResourceGroupsForProjectInput {
 
   """Resource group names to disallow."""
   remove: [String!] = null
+}
+
+"""
+Added in UNRELEASED. Input for updating an app-config policy (admin only).
+"""
+input UpdateAppConfigPolicyInput {
+  """Target policy's `config_name` (immutable)."""
+  configName: String!
+
+  """Replacement scope chain."""
+  scopeSources: [String!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after updating an app-config policy.
+"""
+type UpdateAppConfigPolicyPayload {
+  """Updated policy."""
+  policy: AppConfigPolicy!
 }
 
 """
