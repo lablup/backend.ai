@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -920,6 +921,32 @@ class GroupDBSource:
             if row is None:
                 raise ProjectNotFound(f"Project {project_id} not found")
             return row.to_data()
+
+    async def project_id_by_name_in_domain(
+        self, domain_name: str, project_name: str
+    ) -> ProjectID | None:
+        """Resolve an active project's UUID by its domain-scoped name.
+
+        LEGACY: Exists solely to support existing API handlers that only accept a
+        group name as input (e.g. the REST v1 session/cluster template endpoints).
+        New API handlers and any other new code MUST NOT use this — they should
+        accept a project UUID directly.
+
+        Returns:
+            The project UUID if found, or ``None`` if no matching active project exists.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(GroupRow.id).where(
+                    GroupRow.domain_name == domain_name,
+                    GroupRow.name == project_name,
+                    GroupRow.is_active.is_(True),
+                )
+            )
+            project_id = result.scalar_one_or_none()
+            if project_id is None:
+                return None
+            return ProjectID(project_id)
 
     async def search_projects(
         self,

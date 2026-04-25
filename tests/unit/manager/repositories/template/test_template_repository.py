@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -778,18 +779,18 @@ class TestTemplateRepository:
         test_user_in_group: None,
     ) -> None:
         """When no owner_access_key override, resolves to the requester."""
-        _, group_name = test_group
-        owner_uuid, group_id = await template_repository.resolve_owner(
+        group_uuid, _ = test_group
+        owner_uuid, project_id = await template_repository.resolve_owner(
             requester_uuid=test_user,
             requester_access_key=test_keypair,
             requester_role=UserRole.USER,
             requester_domain=test_domain,
             requesting_domain=test_domain,
-            requesting_group=group_name,
+            requesting_project_id=ProjectID(group_uuid),
         )
 
         assert owner_uuid == test_user
-        assert isinstance(group_id, uuid.UUID)
+        assert project_id == ProjectID(group_uuid)
 
     async def test_resolve_owner_invalid_domain(
         self,
@@ -801,7 +802,7 @@ class TestTemplateRepository:
         test_user_in_group: None,
     ) -> None:
         """Regular user cannot set domain different from their own."""
-        _, group_name = test_group
+        group_uuid, _ = test_group
         with pytest.raises(InvalidAPIParameters, match="domain"):
             await template_repository.resolve_owner(
                 requester_uuid=test_user,
@@ -809,7 +810,7 @@ class TestTemplateRepository:
                 requester_role=UserRole.USER,
                 requester_domain=test_domain,
                 requesting_domain="other-domain",
-                requesting_group=group_name,
+                requesting_project_id=ProjectID(group_uuid),
             )
 
     async def test_resolve_owner_invalid_group(
@@ -819,7 +820,7 @@ class TestTemplateRepository:
         test_user: uuid.UUID,
         test_keypair: str,
     ) -> None:
-        """Non-existent group raises InvalidAPIParameters."""
+        """Project the user has no membership in raises InvalidAPIParameters."""
         with pytest.raises(InvalidAPIParameters, match="group"):
             await template_repository.resolve_owner(
                 requester_uuid=test_user,
@@ -827,5 +828,5 @@ class TestTemplateRepository:
                 requester_role=UserRole.USER,
                 requester_domain=test_domain,
                 requesting_domain=test_domain,
-                requesting_group="nonexistent-group",
+                requesting_project_id=ProjectID(uuid.uuid4()),
             )

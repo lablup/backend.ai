@@ -261,8 +261,12 @@ def build_api_routes(
     )
 
     # Template sub-registries
-    cluster_template_handler = ClusterTemplateHandler(template=processors.template)
-    session_template_handler = SessionTemplateHandler(template=processors.template)
+    cluster_template_handler = ClusterTemplateHandler(
+        template=processors.template, group=processors.group
+    )
+    session_template_handler = SessionTemplateHandler(
+        template=processors.template, group=processors.group
+    )
     cluster_template_reg = register_cluster_template_routes(cluster_template_handler, route_deps)
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
 
