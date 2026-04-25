@@ -789,6 +789,35 @@ class TestGroupRepository:
 
         return group_id
 
+    @pytest.fixture
+    async def inactive_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: str,
+        default_project_resource_policy: str,
+    ) -> tuple[uuid.UUID, str]:
+        """Create a soft-deleted (is_active=False) group for negative-path tests."""
+        group_id = uuid.uuid4()
+        group_name = f"inactive-group-{group_id.hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as session:
+            group = GroupRow(
+                id=group_id,
+                name=group_name,
+                description="Inactive group",
+                is_active=False,
+                domain_name=test_domain,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                integration_id=None,
+                resource_policy=default_project_resource_policy,
+                type=ProjectType.GENERAL,
+            )
+            session.add(group)
+            await session.commit()
+
+        return group_id, group_name
+
     # ===========================================
     # Tests for create method
     # ===========================================
@@ -1257,9 +1286,7 @@ class TestGroupRepository:
         """Resolves an active project's UUID from its (domain, name) pair."""
         group_name = f"test-group-{test_group.hex[:8]}"
 
-        project_id = await group_repository.project_id_by_name_in_domain(
-            test_domain, group_name
-        )
+        project_id = await group_repository.project_id_by_name_in_domain(test_domain, group_name)
 
         assert project_id == ProjectID(test_group)
 
@@ -1292,24 +1319,14 @@ class TestGroupRepository:
 
     async def test_project_id_by_name_in_domain_returns_none_for_inactive_project(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         group_repository: GroupRepository,
         test_domain: str,
-        test_group: uuid.UUID,
+        inactive_group: tuple[uuid.UUID, str],
     ) -> None:
         """Returns None when the matching project is soft-deleted (is_active=False)."""
-        group_name = f"test-group-{test_group.hex[:8]}"
-        async with db_with_cleanup.begin_session() as session:
-            await session.execute(
-                sa.update(GroupRow)
-                .where(GroupRow.id == test_group)
-                .values(is_active=False)
-            )
-            await session.commit()
+        _, group_name = inactive_group
 
-        project_id = await group_repository.project_id_by_name_in_domain(
-            test_domain, group_name
-        )
+        project_id = await group_repository.project_id_by_name_in_domain(test_domain, group_name)
 
         assert project_id is None
 

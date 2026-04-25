@@ -278,6 +278,11 @@ class GroupService:
     ) -> ResolveProjectIdByNameActionResult:
         """Resolve an active project's UUID by its `(domain_name, project_name)` pair.
 
+        LEGACY: Exists solely to keep legacy API handlers working that accept a
+        project name as input. Performs no authorization or validation beyond the
+        existence/active-state check in the underlying query. New API handlers
+        MUST NOT use this — they should accept a project UUID directly.
+
         Returns a result whose ``project_id`` is ``None`` when no matching
         active project exists — the caller decides how to handle the miss.
         """
