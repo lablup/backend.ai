@@ -16,25 +16,13 @@ from ai.backend.manager.services.app_config_policy.actions.admin_bulk_update imp
     AdminBulkUpdateAppConfigPoliciesAction,
     AdminBulkUpdateAppConfigPoliciesActionResult,
 )
-from ai.backend.manager.services.app_config_policy.actions.create import (
-    CreateAppConfigPolicyAction,
-    CreateAppConfigPolicyActionResult,
-)
 from ai.backend.manager.services.app_config_policy.actions.get import (
     GetAppConfigPolicyAction,
     GetAppConfigPolicyActionResult,
 )
-from ai.backend.manager.services.app_config_policy.actions.purge import (
-    PurgeAppConfigPolicyAction,
-    PurgeAppConfigPolicyActionResult,
-)
 from ai.backend.manager.services.app_config_policy.actions.search import (
     SearchAppConfigPoliciesAction,
     SearchAppConfigPoliciesActionResult,
-)
-from ai.backend.manager.services.app_config_policy.actions.update import (
-    UpdateAppConfigPolicyAction,
-    UpdateAppConfigPolicyActionResult,
 )
 from ai.backend.manager.services.app_config_policy.service import AppConfigPolicyService
 
@@ -42,9 +30,6 @@ from ai.backend.manager.services.app_config_policy.service import AppConfigPolic
 class AppConfigPolicyProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetAppConfigPolicyAction, GetAppConfigPolicyActionResult]
     search: ActionProcessor[SearchAppConfigPoliciesAction, SearchAppConfigPoliciesActionResult]
-    create: ActionProcessor[CreateAppConfigPolicyAction, CreateAppConfigPolicyActionResult]
-    update: ActionProcessor[UpdateAppConfigPolicyAction, UpdateAppConfigPolicyActionResult]
-    purge: ActionProcessor[PurgeAppConfigPolicyAction, PurgeAppConfigPolicyActionResult]
     # Bulk mutations (BEP-1052 §3)
     admin_bulk_create: ActionProcessor[
         AdminBulkCreateAppConfigPoliciesAction, AdminBulkCreateAppConfigPoliciesActionResult
@@ -64,9 +49,6 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.purge = ActionProcessor(service.purge, action_monitors)
         self.admin_bulk_create = ActionProcessor(service.admin_bulk_create, action_monitors)
         self.admin_bulk_update = ActionProcessor(service.admin_bulk_update, action_monitors)
         self.admin_bulk_purge = ActionProcessor(service.admin_bulk_purge, action_monitors)
@@ -76,9 +58,6 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
         return [
             GetAppConfigPolicyAction.spec(),
             SearchAppConfigPoliciesAction.spec(),
-            CreateAppConfigPolicyAction.spec(),
-            UpdateAppConfigPolicyAction.spec(),
-            PurgeAppConfigPolicyAction.spec(),
             AdminBulkCreateAppConfigPoliciesAction.spec(),
             AdminBulkUpdateAppConfigPoliciesAction.spec(),
             AdminBulkPurgeAppConfigPoliciesAction.spec(),

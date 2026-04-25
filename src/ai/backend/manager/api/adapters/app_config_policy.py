@@ -8,10 +8,7 @@ from ai.backend.common.dto.manager.v2.app_config_policy.request import (
     AdminBulkUpdateAppConfigPoliciesInput,
     AppConfigPolicyFilter,
     AppConfigPolicyOrder,
-    CreateAppConfigPolicyInput,
-    PurgeAppConfigPolicyInput,
     SearchAppConfigPoliciesInput,
-    UpdateAppConfigPolicyInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_policy.response import (
     AdminBulkCreateAppConfigPoliciesPayload,
@@ -19,11 +16,8 @@ from ai.backend.common.dto.manager.v2.app_config_policy.response import (
     AdminBulkUpdateAppConfigPoliciesPayload,
     AppConfigPolicyBulkError,
     AppConfigPolicyNode,
-    CreateAppConfigPolicyPayload,
     GetAppConfigPolicyPayload,
-    PurgeAppConfigPolicyPayload,
     SearchAppConfigPoliciesPayload,
-    UpdateAppConfigPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_policy.types import OrderDirection
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -32,7 +26,6 @@ from ai.backend.manager.data.app_config_policy.bulk_types import (
     AppConfigPolicyBulkItemError,
 )
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.app_config_policy.conditions import AppConfigPolicyConditions
 from ai.backend.manager.models.app_config_policy.orders import AppConfigPolicyOrders
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
@@ -46,34 +39,20 @@ from ai.backend.manager.services.app_config_policy.actions.admin_bulk_purge impo
 from ai.backend.manager.services.app_config_policy.actions.admin_bulk_update import (
     AdminBulkUpdateAppConfigPoliciesAction,
 )
-from ai.backend.manager.services.app_config_policy.actions.create import (
-    CreateAppConfigPolicyAction,
-)
 from ai.backend.manager.services.app_config_policy.actions.get import GetAppConfigPolicyAction
-from ai.backend.manager.services.app_config_policy.actions.purge import (
-    PurgeAppConfigPolicyAction,
-)
 from ai.backend.manager.services.app_config_policy.actions.search import (
     SearchAppConfigPoliciesAction,
-)
-from ai.backend.manager.services.app_config_policy.actions.update import (
-    UpdateAppConfigPolicyAction,
 )
 
 from .base import BaseAdapter
 
 
 class AppConfigPolicyAdapter(BaseAdapter):
-    """Adapter for AppConfigPolicy domain operations (BEP-1052 §1)."""
+    """Adapter for AppConfigPolicy domain operations (BEP-1052 §1).
 
-    async def create(self, input: CreateAppConfigPolicyInput) -> CreateAppConfigPolicyPayload:
-        result = await self._processors.app_config_policy.create.wait_for_complete(
-            CreateAppConfigPolicyAction(
-                config_name=input.config_name,
-                scope_sources=list(input.scope_sources),
-            )
-        )
-        return CreateAppConfigPolicyPayload(item=self._data_to_dto(result.policy))
+    Writes are bulk-only (BEP-1052 §3); single-item create / update /
+    purge entry points are intentionally absent.
+    """
 
     async def get(self, config_name: str) -> GetAppConfigPolicyPayload:
         result = await self._processors.app_config_policy.get.wait_for_complete(
@@ -93,28 +72,6 @@ class AppConfigPolicyAdapter(BaseAdapter):
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-        )
-
-    async def update(self, input: UpdateAppConfigPolicyInput) -> UpdateAppConfigPolicyPayload:
-        result = await self._processors.app_config_policy.update.wait_for_complete(
-            UpdateAppConfigPolicyAction(
-                config_name=input.config_name,
-                scope_sources=list(input.scope_sources),
-            )
-        )
-        # Service raises ObjectNotFound when the config_name does not exist,
-        # so `result.policy` is guaranteed to be non-None here.
-        if result.policy is None:
-            raise ObjectNotFound(object_name=f"AppConfigPolicy({input.config_name})")
-        return UpdateAppConfigPolicyPayload(item=self._data_to_dto(result.policy))
-
-    async def purge(self, input: PurgeAppConfigPolicyInput) -> PurgeAppConfigPolicyPayload:
-        result = await self._processors.app_config_policy.purge.wait_for_complete(
-            PurgeAppConfigPolicyAction(config_name=input.config_name)
-        )
-        return PurgeAppConfigPolicyPayload(
-            config_name=result.config_name,
-            purged=result.purged,
         )
 
     _PAGINATION_SPEC = PaginationSpec(

@@ -18,70 +18,8 @@ __all__ = (
     "AdminBulkUpdateAppConfigPoliciesInput",
     "AppConfigPolicyFilter",
     "AppConfigPolicyOrder",
-    "CreateAppConfigPolicyInput",
-    "PurgeAppConfigPolicyInput",
     "SearchAppConfigPoliciesInput",
-    "UpdateAppConfigPolicyInput",
 )
-
-
-class CreateAppConfigPolicyInput(BaseRequestModel):
-    """Input for creating an app-config policy.
-
-    `config_name` is immutable once created (BEP-1052 §1) and is the
-    FK target referenced by `app_config_fragments.name`.
-    """
-
-    config_name: str = Field(
-        min_length=1,
-        max_length=128,
-        description="Unique, immutable policy name (doubles as the merge document key).",
-    )
-    scope_sources: list[str] = Field(
-        description=(
-            "Ordered scope chain (low → high merge priority) matching `AppConfigScopeType` values."
-        ),
-    )
-
-    @field_validator("config_name", mode="before")
-    @classmethod
-    def strip_and_validate_name(cls, v: str) -> str:
-        """Strip whitespace and ensure config_name is non-blank."""
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("config_name must not be blank after stripping whitespace")
-        return stripped
-
-
-class UpdateAppConfigPolicyInput(BaseRequestModel):
-    """Input for updating an app-config policy.
-
-    Only `scope_sources` is mutable — `config_name` is fixed per
-    BEP-1052 §1 and therefore identifies the target instead of
-    appearing as a settable field.
-    """
-
-    config_name: str = Field(
-        description="Target policy's `config_name` (immutable identifier).",
-    )
-    scope_sources: list[str] = Field(
-        description="Replacement ordered scope chain.",
-    )
-
-    @field_validator("config_name", mode="before")
-    @classmethod
-    def strip_and_validate_name(cls, v: str) -> str:
-        """Strip whitespace and ensure config_name is non-blank."""
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("config_name must not be blank after stripping whitespace")
-        return stripped
-
-
-class PurgeAppConfigPolicyInput(BaseRequestModel):
-    """Input for purging (hard-delete) an app-config policy."""
-
-    config_name: str = Field(description="`config_name` of the policy to purge.")
 
 
 class AppConfigPolicyFilter(BaseRequestModel):
@@ -97,7 +35,7 @@ class AppConfigPolicyOrder(BaseRequestModel):
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
 
 
-# ── Bulk mutation inputs (BEP-1052 §3) ───────────────────────────
+# ── Bulk mutation inputs (BEP-1052 §3, bulk-only writes) ─────────
 
 
 class AdminAppConfigPolicyItemInput(BaseRequestModel):

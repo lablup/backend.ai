@@ -17,11 +17,8 @@ __all__ = (
     "AdminBulkUpdateAppConfigPoliciesPayload",
     "AppConfigPolicyBulkError",
     "AppConfigPolicyNode",
-    "CreateAppConfigPolicyPayload",
     "GetAppConfigPolicyPayload",
-    "PurgeAppConfigPolicyPayload",
     "SearchAppConfigPoliciesPayload",
-    "UpdateAppConfigPolicyPayload",
 )
 
 
@@ -35,25 +32,6 @@ class AppConfigPolicyNode(BaseResponseModel):
     )
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp")
-
-
-class CreateAppConfigPolicyPayload(BaseResponseModel):
-    """Payload returned after creating an app-config policy."""
-
-    item: AppConfigPolicyNode = Field(description="Created policy.")
-
-
-class UpdateAppConfigPolicyPayload(BaseResponseModel):
-    """Payload returned after updating an app-config policy."""
-
-    item: AppConfigPolicyNode = Field(description="Updated policy.")
-
-
-class PurgeAppConfigPolicyPayload(BaseResponseModel):
-    """Payload returned after purging an app-config policy."""
-
-    config_name: str = Field(description="`config_name` of the purged policy.")
-    purged: bool = Field(description="Whether a row was actually removed.")
 
 
 class GetAppConfigPolicyPayload(BaseResponseModel):
@@ -71,7 +49,7 @@ class SearchAppConfigPoliciesPayload(BaseResponseModel):
     has_previous_page: bool = Field(default=False, description="Whether there is a previous page.")
 
 
-# ── Bulk mutation payloads (BEP-1052 §3) ─────────────────────────
+# ── Bulk mutation payloads (BEP-1052 §3, bulk-only writes) ───────
 
 
 class AppConfigPolicyBulkError(BaseResponseModel):
