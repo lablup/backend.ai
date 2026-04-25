@@ -6,10 +6,6 @@ from ai.backend.manager.actions.processor.single_entity import SingleEntityActio
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusAction,
-    CheckAndTransitStatusActionResult,
-)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -106,10 +102,6 @@ from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
-from ai.backend.manager.services.session.actions.restart_session import (
-    RestartSessionAction,
-    RestartSessionActionResult,
-)
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
@@ -178,7 +170,6 @@ class SessionProcessors(AbstractProcessorPackage):
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
-    restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
     search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
     search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
     search_sessions_in_project: ActionProcessor[
@@ -193,9 +184,6 @@ class SessionProcessors(AbstractProcessorPackage):
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     modify_session: SingleEntityActionProcessor[ModifySessionAction, ModifySessionActionResult]
-    check_and_transit_status: ActionProcessor[
-        CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
-    ]
 
     def __init__(
         self,
@@ -225,14 +213,10 @@ class SessionProcessors(AbstractProcessorPackage):
         self.interrupt = ActionProcessor(service.interrupt, action_monitors)
         self.list_files = ActionProcessor(service.list_files, action_monitors)
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
-        self.restart_session = ActionProcessor(service.restart_session, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
         self.terminate_sessions = ActionProcessor(service.terminate_sessions, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
-        self.check_and_transit_status = ActionProcessor(
-            service.check_and_transit_status, action_monitors
-        )
 
         # Scope actions with RBAC validation
         self.create_cluster = ActionProcessor(
@@ -322,7 +306,6 @@ class SessionProcessors(AbstractProcessorPackage):
             ListFilesAction.spec(),
             MatchSessionsAction.spec(),
             RenameSessionAction.spec(),
-            RestartSessionAction.spec(),
             SearchKernelsAction.spec(),
             SearchSessionsAction.spec(),
             SearchSessionsInProjectAction.spec(),
@@ -333,5 +316,4 @@ class SessionProcessors(AbstractProcessorPackage):
             UploadFilesAction.spec(),
             GetSessionAction.spec(),
             ModifySessionAction.spec(),
-            CheckAndTransitStatusAction.spec(),
         ]

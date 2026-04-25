@@ -19,6 +19,8 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import RouteHealthRecord
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -34,13 +36,13 @@ def _make_route(
 ) -> RouteData:
     return RouteData(
         route_id=uuid4(),
-        endpoint_id=uuid4(),
+        deployment_id=DeploymentID(uuid4()),
         session_id=session_id or SessionId(uuid4()),
         status=RouteStatus.RUNNING,
         health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
         created_at=datetime.fromtimestamp(created_at_ts, tz=tzutc()),
-        revision_id=uuid4(),
+        revision_id=DeploymentRevisionID(uuid4()),
         replica_host="10.0.0.1",
         replica_port=8000,
     )

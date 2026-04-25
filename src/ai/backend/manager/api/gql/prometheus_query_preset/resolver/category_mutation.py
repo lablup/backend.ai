@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.3.0",
         description="Create a new query preset category (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_prometheus_query_preset_category(
     info: Info[StrawberryGQLContext],
     input: CreateCategoryInputGQL,
@@ -47,7 +47,7 @@ async def admin_create_prometheus_query_preset_category(
         added_version="26.3.0",
         description="Delete a query preset category (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_prometheus_query_preset_category(
     info: Info[StrawberryGQLContext],
     id: ID,

@@ -212,7 +212,19 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        devices = await graph_ctx.registry.gather_agent_hwinfo(AgentId(self.id))
+        # Adapt v3 ``list[DeviceHardwareInfo]`` back into the legacy
+        # ``{device_name: HardwareMetadata}`` JSON shape that existing
+        # GraphQL clients query. The registry-layer call now uses v3
+        # types natively; this layer owns the legacy schema contract.
+        return {
+            device.device_name: {
+                "status": device.status.value,
+                "status_info": device.status_info,
+                "metadata": device.metadata,
+            }
+            for device in devices
+        }
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         return {
@@ -437,7 +449,19 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        devices = await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        # Adapt v3 ``list[DeviceHardwareInfo]`` back into the legacy
+        # ``{device_name: HardwareMetadata}`` JSON shape that existing
+        # GraphQL clients query. The registry-layer call now uses v3
+        # types natively; this layer owns the legacy schema contract.
+        return {
+            device.device_name: {
+                "status": device.status.value,
+                "status_info": device.status_info,
+                "metadata": dict(device.metadata),
+            }
+            for device in devices
+        }
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         return {

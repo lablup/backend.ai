@@ -109,7 +109,7 @@ async def runtime_variant(
         added_version="26.4.2",
         description="Create a new runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: CreateRuntimeVariantInputGQL,
@@ -125,7 +125,7 @@ async def admin_create_runtime_variant(
         added_version="26.4.2",
         description="Update a runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: UpdateRuntimeVariantInputGQL,
@@ -141,7 +141,7 @@ async def admin_update_runtime_variant(
         added_version="26.4.2",
         description="Delete a runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_runtime_variant(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -156,7 +156,7 @@ async def admin_delete_runtime_variant(
         added_version="26.4.2",
         description="Delete multiple runtime variants (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_runtime_variants(
     info: Info[StrawberryGQLContext],
     input: DeleteRuntimeVariantsInputGQL,

@@ -12,12 +12,17 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import DeploymentNameAlreadyExists
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -25,14 +30,15 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     BinarySize,
     ClusterMode,
+    QuotaScopeID,
     ResourceSlot,
-    RuntimeVariant,
     ServicePort,
     ServicePortProtocols,
     SessionId,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    DeploymentOptions,
     DeploymentPolicyData,
     ModelRevisionData,
     RouteStatus,
@@ -77,6 +83,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
     SessionResult,
@@ -159,6 +166,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 SessionRow,
                 KernelRow,
                 EndpointRow,
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
                 RoutingRow,
@@ -571,12 +579,13 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint with revision and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
         revision_id = uuid.uuid4()
         registry_id = uuid.uuid4()
         image_id = uuid.uuid4()
+        runtime_variant_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Create container registry for image FK
@@ -610,6 +619,15 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             )
             image.id = image_id
             db_sess.add(image)
+            # Create runtime_variant for revision FK
+            db_sess.add(
+                RuntimeVariantRow(
+                    id=runtime_variant_id,
+                    name=f"vllm-{runtime_variant_id.hex[:8]}",
+                    description="test variant",
+                    default_model_definition=ModelDefinitionDraft(),
+                )
+            )
             await db_sess.flush()
 
             # Create endpoint
@@ -642,7 +660,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=runtime_variant_id,
                 environ={},
                 extra_mounts=[],
             )
@@ -659,7 +677,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     async def test_route_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_session_id: SessionId,
         test_domain_name: str,
         test_user_uuid: uuid.UUID,
@@ -708,7 +726,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         self,
         deployment_repository: DeploymentRepository,
         test_route_id: uuid.UUID,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_kernel_with_inference_port: tuple[uuid.UUID, str, int],
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
@@ -721,10 +739,10 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         assert len(result) == 1
         info = result[0]
         assert info.route_id == test_route_id
-        assert info.endpoint_id == test_endpoint_id
+        assert info.deployment_id == test_endpoint_id
         assert info.kernel_host == kernel_host
         assert info.kernel_port == inference_port
-        assert info.runtime_variant == "vllm"
+        assert info.runtime_variant.startswith("vllm")
         assert "test-endpoint" in info.endpoint_name
         assert info.session_owner == test_user_uuid
         assert info.project == test_group_id
@@ -733,7 +751,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_session_id: SessionId,
         test_domain_name: str,
         test_user_uuid: uuid.UUID,
@@ -830,11 +848,20 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             )
             image.id = image_id
             db_sess.add(image)
+            runtime_variant_id = uuid.uuid4()
+            db_sess.add(
+                RuntimeVariantRow(
+                    id=runtime_variant_id,
+                    name=f"vllm-{runtime_variant_id.hex[:8]}",
+                    description="test variant",
+                    default_model_definition=ModelDefinitionDraft(),
+                )
+            )
             await db_sess.flush()
 
             for i in range(3):
                 # Create endpoint + revision
-                endpoint_id = uuid.uuid4()
+                endpoint_id = DeploymentID(uuid.uuid4())
                 revision_id = uuid.uuid4()
                 endpoint = EndpointRow(
                     id=endpoint_id,
@@ -862,7 +889,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     resource_opts={},
                     cluster_mode=ClusterMode.SINGLE_NODE.name,
                     cluster_size=1,
-                    runtime_variant=RuntimeVariant("vllm"),
+                    runtime_variant_id=runtime_variant_id,
                     environ={},
                     extra_mounts=[],
                 )
@@ -964,10 +991,10 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         # Verify each result has correct structure
         for info in result:
             assert info.route_id in route_ids
-            assert info.endpoint_id in endpoint_ids
+            assert info.deployment_id in endpoint_ids
             assert info.kernel_host.startswith("10.0.1.")
             assert 8080 <= info.kernel_port <= 8082
-            assert info.runtime_variant == RuntimeVariant("vllm")
+            assert info.runtime_variant.startswith("vllm")
             assert info.endpoint_name.startswith("endpoint-")
 
 
@@ -1336,6 +1363,7 @@ class TestDeploymentRevisionOperations:
                 EndpointRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
                 DeploymentPolicyRow,
@@ -1522,9 +1550,9 @@ class TestDeploymentRevisionOperations:
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
         test_image_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -1545,6 +1573,48 @@ class TestDeploymentRevisionOperations:
             await db_sess.commit()
 
         return endpoint_id
+
+    @pytest.fixture
+    async def test_vfolder_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_uuid: uuid.UUID,
+    ) -> VFolderUUID:
+        """Create a vfolder that satisfies the deployment_revisions model FK."""
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    host="local:volume1",
+                    domain_name=test_domain_name,
+                    quota_scope_id=QuotaScopeID.parse(f"user:{test_user_uuid}"),
+                    name=f"model-vfolder-{uuid.uuid4().hex[:8]}",
+                    creator="test@example.com",
+                )
+            )
+            await db_sess.commit()
+        return vfolder_id
+
+    @pytest.fixture
+    async def test_runtime_variant_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> RuntimeVariantID:
+        """Create a runtime_variant row and return its ID."""
+        variant_id = RuntimeVariantID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                RuntimeVariantRow(
+                    id=variant_id,
+                    name=f"test-variant-{variant_id.hex[:8]}",
+                    description="test",
+                    default_model_definition=ModelDefinitionDraft(),
+                )
+            )
+            await db_sess.commit()
+        return variant_id
 
     @pytest.fixture
     def deployment_repository(
@@ -1569,22 +1639,24 @@ class TestDeploymentRevisionOperations:
     async def test_revision_data(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_image_id: uuid.UUID,
+        test_vfolder_id: VFolderUUID,
+        test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> ModelRevisionData:
         """Create a single test revision."""
 
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             revision_number=1,
-            image_id=test_image_id,
+            image_id=ImageID(test_image_id),
             resource_group=test_scaling_group_name,
             resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             resource_opts={},
             cluster_mode=ClusterMode.SINGLE_NODE.name,
             cluster_size=1,
-            model_id=None,
+            model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
             model_definition_path=None,
             model_definition=None,
@@ -1592,7 +1664,7 @@ class TestDeploymentRevisionOperations:
             bootstrap_script=None,
             environ={},
             callback_url=None,
-            runtime_variant=RuntimeVariant("custom"),
+            runtime_variant_id=test_runtime_variant_id,
             extra_mounts=[],
         )
         return await deployment_repository.create_revision(
@@ -1610,23 +1682,25 @@ class TestDeploymentRevisionOperations:
     async def test_multiple_revisions(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_image_id: uuid.UUID,
+        test_vfolder_id: VFolderUUID,
+        test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> list[ModelRevisionData]:
         """Create multiple test revisions (revision 1, 2, 3)."""
         revisions: list[ModelRevisionData] = []
         for rev_num in [1, 2, 3]:
             spec = DeploymentRevisionCreatorSpec(
-                endpoint_id=test_endpoint_id,
+                deployment_id=test_endpoint_id,
                 revision_number=rev_num,
-                image_id=test_image_id,
+                image_id=ImageID(test_image_id),
                 resource_group=test_scaling_group_name,
                 resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                model_id=None,
+                model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
                 model_definition_path=None,
                 model_definition=None,
@@ -1634,7 +1708,7 @@ class TestDeploymentRevisionOperations:
                 bootstrap_script=None,
                 environ={},
                 callback_url=None,
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant_id,
                 extra_mounts=[],
             )
             revision = await deployment_repository.create_revision(
@@ -1654,23 +1728,25 @@ class TestDeploymentRevisionOperations:
     async def test_five_revisions(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_image_id: uuid.UUID,
+        test_vfolder_id: VFolderUUID,
+        test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> list[ModelRevisionData]:
         """Create 5 test revisions for pagination tests."""
         revisions: list[ModelRevisionData] = []
         for rev_num in range(1, 6):
             spec = DeploymentRevisionCreatorSpec(
-                endpoint_id=test_endpoint_id,
+                deployment_id=test_endpoint_id,
                 revision_number=rev_num,
-                image_id=test_image_id,
+                image_id=ImageID(test_image_id),
                 resource_group=test_scaling_group_name,
                 resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                model_id=None,
+                model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
                 model_definition_path=None,
                 model_definition=None,
@@ -1678,7 +1754,7 @@ class TestDeploymentRevisionOperations:
                 bootstrap_script=None,
                 environ={},
                 callback_url=None,
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant_id,
                 extra_mounts=[],
             )
             revision = await deployment_repository.create_revision(
@@ -1697,21 +1773,23 @@ class TestDeploymentRevisionOperations:
     async def test_create_revision(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_image_id: uuid.UUID,
+        test_vfolder_id: VFolderUUID,
+        test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> None:
         """Test creating a deployment revision using RBACEntityCreator."""
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             revision_number=1,
-            image_id=test_image_id,
+            image_id=ImageID(test_image_id),
             resource_group=test_scaling_group_name,
             resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             resource_opts={},
             cluster_mode=ClusterMode.SINGLE_NODE.name,
             cluster_size=1,
-            model_id=None,
+            model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
             model_definition_path=None,
             model_definition=None,
@@ -1719,7 +1797,7 @@ class TestDeploymentRevisionOperations:
             bootstrap_script=None,
             environ={},
             callback_url=None,
-            runtime_variant=RuntimeVariant("custom"),
+            runtime_variant_id=test_runtime_variant_id,
             extra_mounts=[],
         )
         creator = RBACEntityCreator(
@@ -1737,7 +1815,7 @@ class TestDeploymentRevisionOperations:
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
         assert result.cluster_config.size == 1
         assert result.resource_config.resource_group_name == test_scaling_group_name
-        assert result.model_runtime_config.runtime_variant == RuntimeVariant("custom")
+        assert result.model_runtime_config.runtime_variant_id is not None
         assert result.name == "revision-1"
 
     async def test_get_revision(
@@ -1765,7 +1843,7 @@ class TestDeploymentRevisionOperations:
     async def test_get_latest_revision_number_no_revisions(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test that get_latest_revision_number returns None when no revisions exist."""
         result = await deployment_repository.get_latest_revision_number(test_endpoint_id)
@@ -1775,7 +1853,7 @@ class TestDeploymentRevisionOperations:
     async def test_get_latest_revision_number_with_revisions(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_multiple_revisions: list[ModelRevisionData],
     ) -> None:
         """Test that get_latest_revision_number returns correct value."""
@@ -1786,7 +1864,7 @@ class TestDeploymentRevisionOperations:
     async def test_search_revisions_empty(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test search_revisions returns empty result when no revisions exist."""
         querier = BatchQuerier(
@@ -1804,7 +1882,7 @@ class TestDeploymentRevisionOperations:
     async def test_search_revisions_with_results(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_multiple_revisions: list[ModelRevisionData],
     ) -> None:
         """Test search_revisions returns correct results."""
@@ -1823,7 +1901,7 @@ class TestDeploymentRevisionOperations:
     async def test_search_revisions_with_pagination(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_five_revisions: list[ModelRevisionData],
     ) -> None:
         """Test search_revisions respects pagination."""
@@ -1855,7 +1933,7 @@ class TestDeploymentRevisionOperations:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_revision_data: ModelRevisionData,
     ) -> None:
         """Test updating endpoint deploying_revision using Updater."""
@@ -1881,7 +1959,7 @@ class TestDeploymentRevisionOperations:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_revision_data: ModelRevisionData,
     ) -> None:
         """Test updating endpoint current_revision using Updater."""
@@ -1908,7 +1986,7 @@ class TestDeploymentRevisionOperations:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_revision_data: ModelRevisionData,
     ) -> None:
         """Test nullifying endpoint deploying_revision using TriState.nullify()."""
@@ -1943,7 +2021,7 @@ class TestDeploymentRevisionOperations:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_revision_data: ModelRevisionData,
     ) -> None:
         """Test that update_endpoint returns DeploymentInfo with updated values."""
@@ -2154,9 +2232,9 @@ class TestDeploymentAutoScalingPolicyOperations:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -2201,11 +2279,11 @@ class TestDeploymentAutoScalingPolicyOperations:
     async def test_auto_scaling_policy_data(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> DeploymentAutoScalingPolicyData:
         """Create a single test auto-scaling policy."""
         spec = DeploymentAutoScalingPolicyCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             min_replicas=1,
             max_replicas=10,
             metric_source=AutoScalingMetricSource.KERNEL,
@@ -2222,11 +2300,11 @@ class TestDeploymentAutoScalingPolicyOperations:
     async def test_create_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test creating an auto-scaling policy using Creator."""
         spec = DeploymentAutoScalingPolicyCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             min_replicas=2,
             max_replicas=20,
             metric_source=AutoScalingMetricSource.KERNEL,
@@ -2258,7 +2336,7 @@ class TestDeploymentAutoScalingPolicyOperations:
     async def test_get_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_auto_scaling_policy_data: DeploymentAutoScalingPolicyData,
     ) -> None:
         """Test getting an auto-scaling policy by endpoint ID."""
@@ -2274,7 +2352,7 @@ class TestDeploymentAutoScalingPolicyOperations:
     async def test_get_auto_scaling_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test that get_auto_scaling_policy raises AutoScalingPolicyNotFound."""
         with pytest.raises(AutoScalingPolicyNotFound):
@@ -2324,7 +2402,7 @@ class TestDeploymentAutoScalingPolicyOperations:
     async def test_delete_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_auto_scaling_policy_data: DeploymentAutoScalingPolicyData,
     ) -> None:
         """Test deleting an auto-scaling policy using Purger."""
@@ -2530,9 +2608,9 @@ class TestDeploymentPolicyOperations:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -2577,11 +2655,11 @@ class TestDeploymentPolicyOperations:
     async def test_deployment_policy_data(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> DeploymentPolicyData:
         """Create a single test deployment policy via upsert."""
         spec = DeploymentPolicyUpserterSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(
                 max_surge=IntOrPercent(count=1),
@@ -2594,11 +2672,11 @@ class TestDeploymentPolicyOperations:
     async def test_upsert_deployment_policy_insert(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test upserting a deployment policy (insert path)."""
         spec = DeploymentPolicyUpserterSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
         )
@@ -2616,12 +2694,12 @@ class TestDeploymentPolicyOperations:
     async def test_upsert_deployment_policy_update(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
         """Test upserting a deployment policy (update path)."""
         spec = DeploymentPolicyUpserterSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
         )
@@ -2635,7 +2713,7 @@ class TestDeploymentPolicyOperations:
     async def test_get_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
         """Test getting a deployment policy by endpoint ID."""
@@ -2652,7 +2730,7 @@ class TestDeploymentPolicyOperations:
     async def test_get_deployment_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test that get_deployment_policy raises DeploymentPolicyNotFound."""
         with pytest.raises(DeploymentPolicyNotFound):
@@ -2661,7 +2739,7 @@ class TestDeploymentPolicyOperations:
     async def test_delete_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
         """Test deleting a deployment policy using Purger."""
@@ -2849,12 +2927,12 @@ class TestSearchDeploymentPolicies:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> list[uuid.UUID]:
+    ) -> list[DeploymentID]:
         """Create 4 endpoints and return their IDs."""
-        endpoint_ids: list[uuid.UUID] = []
+        endpoint_ids: list[DeploymentID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(4):
-                eid = uuid.uuid4()
+                eid = DeploymentID(uuid.uuid4())
                 endpoint = EndpointRow(
                     id=eid,
                     name=f"test-endpoint-{i}-{uuid.uuid4().hex[:8]}",
@@ -2878,7 +2956,7 @@ class TestSearchDeploymentPolicies:
     async def sample_policies(
         self,
         deployment_repository: DeploymentRepository,
-        sample_endpoint_ids: list[uuid.UUID],
+        sample_endpoint_ids: list[DeploymentID],
     ) -> list[DeploymentPolicyData]:
         """Create deployment policies for all sample endpoints."""
         policies: list[DeploymentPolicyData] = []
@@ -2910,7 +2988,7 @@ class TestSearchDeploymentPolicies:
             result = await deployment_repository.upsert_deployment_policy(
                 Upserter(
                     spec=DeploymentPolicyUpserterSpec(
-                        endpoint_id=eid,
+                        deployment_id=eid,
                         strategy=strategy,
                         strategy_spec=spec,
                     )
@@ -3002,7 +3080,7 @@ class TestSearchDeploymentPolicies:
         self,
         deployment_repository: DeploymentRepository,
         sample_policies: list[DeploymentPolicyData],
-        sample_endpoint_ids: list[uuid.UUID],
+        sample_endpoint_ids: list[DeploymentID],
     ) -> None:
         """Test filtering deployment policies by endpoint ID."""
         target_endpoint_id = sample_endpoint_ids[0]
@@ -3251,9 +3329,9 @@ class TestRouteOperations:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -3297,14 +3375,14 @@ class TestRouteOperations:
     async def test_create_route(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
     ) -> None:
         """Test creating a route using Creator with RouteCreatorSpec."""
         spec = RouteCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
@@ -3330,7 +3408,7 @@ class TestRouteOperations:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
@@ -3338,7 +3416,7 @@ class TestRouteOperations:
         """Test updating route status using RouteStatusUpdaterSpec."""
         # Create a route first
         spec = RouteCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
@@ -3378,7 +3456,7 @@ class TestRouteOperations:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
@@ -3386,7 +3464,7 @@ class TestRouteOperations:
         """Test updating route using unified RouteUpdaterSpec."""
         # Create a route first
         spec = RouteCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
@@ -3470,6 +3548,7 @@ class TestDeploymentRepositoryDuplicateName:
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
                 AssociationScopesEntitiesRow,
@@ -3653,6 +3732,7 @@ class TestDeploymentRepositoryDuplicateName:
             ),
             replica=DeploymentReplicaFields(replica_count=1, desired_replica_count=1),
             network=DeploymentNetworkFields(open_to_public=False, url=None),
+            options=DeploymentOptions(),
             revision=None,
         )
         return RBACEntityCreator(

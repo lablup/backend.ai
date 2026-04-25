@@ -3,14 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 @dataclass(frozen=True)
 class PresetValueData:
-    preset_id: UUID
+    preset_id: DeploymentPresetID
     value: str
 
 
@@ -34,12 +36,12 @@ class EnvironEntryData:
 
 @dataclass(frozen=True)
 class DeploymentRevisionPresetData:
-    id: UUID
-    runtime_variant_id: UUID
+    id: DeploymentPresetID
+    runtime_variant_id: RuntimeVariantID
     name: str
     description: str | None
     rank: int
-    image_id: UUID
+    image_id: ImageID
     model_definition: dict[str, Any] | None
     resource_opts: list[ResourceOptsEntryData]
     cluster_mode: str

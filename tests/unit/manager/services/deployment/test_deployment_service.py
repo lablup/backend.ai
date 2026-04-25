@@ -13,10 +13,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.config import ModelDefinitionDraft
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
@@ -32,6 +36,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
@@ -61,9 +66,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 
 
 class DeploymentServiceBaseFixtures:
@@ -80,31 +82,15 @@ class DeploymentServiceBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        """Mock RevisionGeneratorRegistry for testing."""
-        return MagicMock(spec=RevisionGeneratorRegistry)
-
-    @pytest.fixture
-    def mock_model_definition_generator_registry(self) -> AsyncMock:
-        """Mock ModelDefinitionGeneratorRegistry."""
-        registry = AsyncMock()
-        registry.generate_model_definition.return_value = ModelDefinitionDraft()
-        return registry
-
-    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
-        mock_model_definition_generator_registry: AsyncMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
-            revision_generator_registry=mock_revision_generator_registry,
-            model_definition_generator_registry=mock_model_definition_generator_registry,
         )
 
     @pytest.fixture
@@ -200,7 +186,7 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         mock_deployment_repository.upsert_deployment_policy.assert_called_once()
         upserter_arg = mock_deployment_repository.upsert_deployment_policy.call_args[0][0]
         spec = upserter_arg.spec
-        assert spec.endpoint_id == endpoint_id
+        assert spec.deployment_id == endpoint_id
         assert spec.strategy == DeploymentStrategy.ROLLING
 
     async def test_upsert_deployment_policy_update(
@@ -325,13 +311,6 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     """Fixtures for model revision tests."""
 
     @pytest.fixture(autouse=True)
-    def _setup_revision_generator(self, mock_revision_generator_registry: MagicMock) -> None:
-        """Set up mock revision generator to return no deployment config by default."""
-        mock_generator = MagicMock()
-        mock_generator.load_deployment_config = AsyncMock(return_value=None)
-        mock_revision_generator_registry.get.return_value = mock_generator
-
-    @pytest.fixture(autouse=True)
     def _setup_default_repository_mocks(
         self,
         mock_deployment_repository: MagicMock,
@@ -359,7 +338,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     @pytest.fixture
     def endpoint_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
-            id=deployment_id,
+            id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",
                 domain="default",
@@ -372,11 +351,13 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
             ),
             state=DeploymentState(
                 lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
             replica_spec=ReplicaSpec(replica_count=1),
             network=DeploymentNetworkSpec(open_to_public=False),
             model_revisions=[],
+            options=DeploymentOptions(),
         )
 
     @pytest.fixture
@@ -384,7 +365,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
         self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID
     ) -> ModelRevisionCreator:
         return ModelRevisionCreator(
-            image_id=image_id,
+            image_id=ImageID(image_id),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -392,15 +373,16 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_opts={"shmem": "1g"},
             ),
             mounts=VFolderMountsCreator(
-                model_vfolder_id=model_vfolder_id,
+                model_vfolder_id=VFolderUUID(model_vfolder_id),
                 model_definition_path="model-definition.yaml",
                 model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
                 startup_command="python serve.py",
                 bootstrap_script="pip install -r requirements.txt",
                 environ={"CUDA_VISIBLE_DEVICES": "0"},
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 callback_url=None,
             ),
             model_definition=ModelDefinitionDraft(),
@@ -420,14 +402,14 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             ),
             model_mount_config=ModelMountConfigData(
-                vfolder_id=model_vfolder_id,
+                vfolder_id=VFolderUUID(model_vfolder_id),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
             ),
-            image_id=image_id,
+            image_id=ImageID(image_id),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
@@ -437,7 +419,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     ) -> ModelRevisionCreator:
         """Creator with None environ and resource_opts for edge case testing."""
         return ModelRevisionCreator(
-            image_id=image_id,
+            image_id=ImageID(image_id),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -445,10 +427,13 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_opts=None,
             ),
             mounts=VFolderMountsCreator(
-                model_vfolder_id=model_vfolder_id,
+                model_vfolder_id=VFolderUUID(model_vfolder_id),
+                model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 environ=None,
             ),
             model_definition=ModelDefinitionDraft(),

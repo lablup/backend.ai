@@ -60,10 +60,8 @@ from ai.backend.manager.services.login_client_type.processors import (
 from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
-from ai.backend.manager.services.metric.processors.utilization_metric import (
-    UtilizationMetricProcessors,
-)
-from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.services.metric.processors import MetricProcessors
+from ai.backend.manager.services.metric.service import MetricService
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
@@ -197,6 +195,7 @@ def create_services(args: ServiceArgs) -> Services:
             args.valkey_stat_client,
             args.agent_registry,
             repositories.user.repository,
+            args.scheduling_controller,
         ),
         image=ImageService(
             args.agent_registry, repositories.image.repository, args.config_provider
@@ -296,10 +295,8 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.scaling_group.repository,
             appproxy_client_pool=args.appproxy_client_pool,
         ),
-        utilization_metric=UtilizationMetricService(
-            args.prometheus_client,
-            args.config_provider.config.metric.timewindow,
-            repositories.metric.repository,
+        metric=MetricService(
+            metric_repository=repositories.metric.repository,
         ),
         model_serving=ModelServingService(
             agent_registry=args.agent_registry,
@@ -311,9 +308,9 @@ def create_services(args: ServiceArgs) -> Services:
             valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
             deployment_repository=repositories.deployment.repository,
+            runtime_variant_repository=repositories.runtime_variant.repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
-            revision_generator_registry=args.revision_generator_registry,
         ),
         model_serving_auto_scaling=AutoScalingService(
             repository=repositories.model_serving.repository,
@@ -383,8 +380,6 @@ def create_services(args: ServiceArgs) -> Services:
         deployment=DeploymentService(
             args.deployment_controller,
             repositories.deployment.repository,
-            args.revision_generator_registry,
-            args.model_definition_generator_registry,
             deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
         ),
@@ -481,9 +476,7 @@ def create_processors(
             services.resource_usage, action_monitors, validators
         ),
         scaling_group=ScalingGroupProcessors(services.scaling_group, action_monitors, validators),
-        utilization_metric=UtilizationMetricProcessors(
-            services.utilization_metric, action_monitors, validators
-        ),
+        metric=MetricProcessors(services.metric, action_monitors, validators),
         model_serving=ModelServingProcessors(services.model_serving, action_monitors, validators),
         model_serving_auto_scaling=ModelServingAutoScalingProcessors(
             services.model_serving_auto_scaling, action_monitors, validators

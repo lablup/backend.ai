@@ -8,9 +8,9 @@ from .base import (
     TAction,
     TActionResult,
 )
-from .batch import (
-    BaseBatchAction,
-    BaseBatchActionResult,
+from .bulk import (
+    BaseBulkAction,
+    BaseBulkActionResult,
 )
 from .rbac import (
     BaseRBACAction,
@@ -32,6 +32,13 @@ from .rbac_project import (
     ProjectSearchRBACAction,
     ProjectSoftDeleteRBACAction,
     ProjectUpdateRBACAction,
+)
+from .rbac_role_invitation import (
+    AcceptRoleInvitationAction,
+    CancelRoleInvitationAction,
+    CreateRoleInvitationByEmailAction,
+    RejectRoleInvitationAction,
+    RoleInvitationReadRBACAction,
 )
 from .rbac_session import (
     SessionCreateRBACAction,
@@ -104,6 +111,11 @@ RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     VFolderGrantUpdateRBACAction,
     VFolderGrantSoftDeleteRBACAction,
     VFolderGrantHardDeleteRBACAction,
+    CreateRoleInvitationByEmailAction,
+    RoleInvitationReadRBACAction,
+    AcceptRoleInvitationAction,
+    RejectRoleInvitationAction,
+    CancelRoleInvitationAction,
 )
 
 __all__ = (
@@ -111,8 +123,8 @@ __all__ = (
     "BaseActionResult",
     "BaseActionResultMeta",
     "BaseActionTriggerMeta",
-    "BaseBatchAction",
-    "BaseBatchActionResult",
+    "BaseBulkAction",
+    "BaseBulkActionResult",
     "BaseRBACAction",
     "RBACActionName",
     "RBACRequiredPermission",

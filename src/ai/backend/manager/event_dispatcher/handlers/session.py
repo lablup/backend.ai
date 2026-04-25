@@ -44,6 +44,7 @@ from ai.backend.manager.models.utils import (
     execute_with_retry,
 )
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -53,6 +54,7 @@ class SessionEventHandler:
     _db: ExtendedAsyncSAEngine
     _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     _idle_checker_host: IdleCheckerHost
+    _scheduling_controller: SchedulingController
 
     def __init__(
         self,
@@ -60,11 +62,13 @@ class SessionEventHandler:
         db: ExtendedAsyncSAEngine,
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
         idle_checker_host: IdleCheckerHost,
+        scheduling_controller: SchedulingController,
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
         self._idle_checker_host = idle_checker_host
+        self._scheduling_controller = scheduling_controller
 
     async def _handle_started_or_cancelled(
         self,
@@ -138,14 +142,11 @@ class SessionEventHandler:
         _source: AgentId,
         event: DoTerminateSessionEvent,
     ) -> None:
-        async with self._registry.db.begin_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
-            )
-        await self._registry.destroy_session(
-            session,
+        reason = event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT
+        await self._scheduling_controller.mark_sessions_for_termination(
+            [event.session_id],
+            reason=reason.value,
             forced=False,
-            reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
         )
 
     async def handle_batch_result(
@@ -165,18 +166,10 @@ class SessionEventHandler:
             case SessionFailureAnycastEvent(session_id=session_id, reason=_reason, exit_code=_):
                 await SessionRow.set_session_result(self._db, session_id, success=False)
                 reason = _reason
-        async with self._db.begin_session() as db_sess:
-            try:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    event.session_id,
-                    kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                )
-            except SessionNotFound:
-                return
-        await self._registry.destroy_session(
-            session,
-            reason=reason,
+        await self._scheduling_controller.mark_sessions_for_termination(
+            [event.session_id],
+            reason=reason.value,
+            forced=False,
         )
 
         await self.invoke_session_callback(None, source, event)

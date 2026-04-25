@@ -3,14 +3,13 @@
 from dataclasses import dataclass
 from typing import Any, Self
 
-from ai.backend.common.types import ResourceSlot, SessionTypes
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.types import MountInfoEntry, MountPermission, ResourceSlot, SessionTypes
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ModelRevisionSpec,
-    MountSpec,
     ResourceSpec,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
 
 
 @dataclass
@@ -31,18 +30,27 @@ class CalculatedResources:
 
 @dataclass
 class SessionValidationSpec:
-    mount_spec: MountSpec
+    # Typed carrier replacing the legacy ``MountSpec`` 3-dict split.
+    # The model vfolder is always first (read-only), extra mounts follow.
+    mount_entries: list[MountInfoEntry]
     resource_spec: ResourceSpec
-    image_identifier: ImageIdentifier
+    image_id: ImageID
     execution_spec: ExecutionSpec
     session_type: SessionTypes
 
     @classmethod
     def from_revision(cls, model_revision: ModelRevisionSpec) -> Self:
         return cls(
-            mount_spec=model_revision.mounts.to_mount_spec(),
+            mount_entries=[
+                MountInfoEntry(
+                    vfolder_id=model_revision.mounts.model_vfolder_id,
+                    mount_destination=model_revision.mounts.model_mount_destination,
+                    mount_perm=MountPermission.READ_ONLY,
+                ),
+                *model_revision.mounts.extra_mounts,
+            ],
             resource_spec=model_revision.resource_spec,
-            image_identifier=model_revision.image_identifier,
+            image_id=model_revision.image_id,
             execution_spec=model_revision.execution,
             session_type=SessionTypes.INFERENCE,
         )

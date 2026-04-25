@@ -38,8 +38,18 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RevisionOrderField,
     RouteOrderField,
 )
+from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
-from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, RuntimeVariant
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import (
+    AutoScalingMetricSource,
+    ClusterMode,
+    MountPermission,
+)
 from ai.backend.common.utils import dedent_strip
 
 __all__ = (
@@ -85,6 +95,8 @@ __all__ = (
     "RevisionFilter",
     "RevisionInput",
     "RevisionOrder",
+    "ReplaceDeploymentOptionsGQLInput",
+    "ReplaceDeploymentOptionsInput",
     "RollingUpdateConfigInput",
     "RouteFilter",
     "RouteOrder",
@@ -136,7 +148,7 @@ class ResourceConfigInput(BaseRequestModel):
 class ImageInput(BaseRequestModel):
     """Container image input for a revision."""
 
-    id: UUID = Field(description="Container image ID")
+    id: ImageID = Field(description="Container image ID")
 
 
 class EnvironmentVariableEntryInput(BaseRequestModel):
@@ -157,7 +169,13 @@ class EnvironmentVariablesInput(BaseRequestModel):
 class ModelRuntimeConfigInput(BaseRequestModel):
     """Runtime configuration input for a revision."""
 
-    runtime_variant: str = Field(description="Runtime variant identifier")
+    runtime_variant_id: RuntimeVariantID = Field(
+        description=(
+            "Runtime variant ID (UUID). Internal v2 adapters consume the id"
+            " directly; legacy REST handlers resolve name→id via the"
+            " RuntimeVariant resolver service before invoking internal flows."
+        ),
+    )
     inference_runtime_config: dict[str, Any] | None = Field(
         default=None, description="Framework-specific inference runtime configuration"
     )
@@ -169,7 +187,7 @@ class ModelRuntimeConfigInput(BaseRequestModel):
 class ModelMountConfigInput(BaseRequestModel):
     """Model mount configuration input for a revision."""
 
-    vfolder_id: UUID = Field(description="VFolder ID for the model")
+    vfolder_id: VFolderUUID = Field(description="VFolder ID for the model")
     mount_destination: str = Field(description="Mount destination path inside container")
     definition_path: str = Field(description="Path to model definition file")
 
@@ -177,15 +195,23 @@ class ModelMountConfigInput(BaseRequestModel):
 class ExtraVFolderMountInput(BaseRequestModel):
     """Input for an extra vfolder mount."""
 
-    vfolder_id: UUID = Field(description="VFolder ID to mount")
+    vfolder_id: VFolderUUID = Field(description="VFolder ID to mount")
     mount_destination: str | None = Field(default=None, description="Mount destination path")
+    mount_perm: MountPermission | None = Field(
+        default=None,
+        description=(
+            "Optional permission override. ``null`` (default) uses the vfolder's own "
+            "stored permission; a concrete value (e.g. ``ro``) forces that permission "
+            "regardless of what the vfolder grants."
+        ),
+    )
 
 
 class CreateRevisionInputDTO(BaseRequestModel):
     """Input for a deployment revision (nested structure matching GQL CreateRevisionInput)."""
 
     name: str | None = Field(default=None, description="Revision name")
-    revision_preset_id: UUID | None = Field(
+    revision_preset_id: DeploymentPresetID | None = Field(
         default=None,
         description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
     )
@@ -220,7 +246,7 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     """Input for adding a revision. Used by both GQL and REST v2 APIs."""
 
     name: str | None = Field(default=None, description="Revision name")
-    revision_preset_id: UUID | None = Field(
+    revision_preset_id: DeploymentPresetID | None = Field(
         default=None,
         description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
     )
@@ -336,7 +362,7 @@ class RevisionInput(BaseRequestModel):
     """Input for a deployment revision."""
 
     name: str | None = Field(default=None, description="Revision name")
-    revision_preset_id: UUID | None = Field(
+    revision_preset_id: DeploymentPresetID | None = Field(
         default=None,
         description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
     )
@@ -348,13 +374,11 @@ class RevisionInput(BaseRequestModel):
     resource_opts: Mapping[str, Any] | None = Field(
         default=None, description="Optional resource options"
     )
-    runtime_variant: RuntimeVariant = Field(
-        default=RuntimeVariant("custom"), description="Runtime variant"
-    )
+    runtime_variant_id: RuntimeVariantID = Field(description="Runtime variant ID (UUID)")
     inference_runtime_config: dict[str, Any] | None = Field(
         default=None, description="Framework-specific inference runtime configuration"
     )
-    model_vfolder_id: UUID = Field(description="Model VFolder ID")
+    model_vfolder_id: VFolderUUID = Field(description="Model VFolder ID")
     model_mount_destination: str = Field(
         default="/models", description="Mount destination for model vfolder"
     )
@@ -882,3 +906,29 @@ class UpdateRouteTrafficStatusInput(BaseRequestModel):
 
     route_id: UUID = Field(description="Route ID to update")
     traffic_status: RouteTrafficStatus = Field(description="New traffic status (ACTIVE/INACTIVE)")
+
+
+class ReplaceDeploymentOptionsInput(BaseRequestModel):
+    """REST body for fully replacing a deployment's ``options`` surface.
+
+    Replace semantics — the supplied payload is the complete new value
+    (partial updates are not supported here).
+    """
+
+    options: DeploymentOptionsInput = Field(
+        description="New deployment options payload. Replaces the existing options atomically.",
+    )
+
+
+class ReplaceDeploymentOptionsGQLInput(BaseRequestModel):
+    """GraphQL mutation input for fully replacing a deployment's ``options`` surface.
+
+    Mirrors :class:`ReplaceDeploymentOptionsInput` with an additional
+    ``deployment_id`` argument so the GQL mutation can take a single
+    input object (REST carries the id in the path instead).
+    """
+
+    deployment_id: DeploymentID = Field(description="Target deployment ID.")
+    options: DeploymentOptionsInput = Field(
+        description="New deployment options payload. Replaces the existing options atomically.",
+    )

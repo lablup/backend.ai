@@ -32,6 +32,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -54,6 +55,7 @@ _MAPPER_ROWS = [
     EndpointRow,
     DeploymentPolicyRow,
     DeploymentAutoScalingPolicyRow,
+    RuntimeVariantRow,
     DeploymentRevisionRow,
     SessionRow,
     AgentRow,

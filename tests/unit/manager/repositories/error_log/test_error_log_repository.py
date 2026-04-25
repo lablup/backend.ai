@@ -32,6 +32,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
@@ -81,6 +82,7 @@ class TestErrorLogRepository:
                 ImageRow,
                 ResourcePresetRow,
                 EndpointRow,
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 DeploymentAutoScalingPolicyRow,
                 DeploymentPolicyRow,

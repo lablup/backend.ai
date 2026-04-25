@@ -12,6 +12,8 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -40,7 +42,7 @@ class EndpointCreationArgs:
 class EndpointData:
     """Data structure for model service endpoint."""
 
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     name: str
     model_id: uuid.UUID
     owner_id: uuid.UUID
@@ -61,13 +63,13 @@ class RouteData:
     """Data structure for model service route."""
 
     route_id: uuid.UUID
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     session_id: SessionId | None
     status: RouteStatus
     health_status: RouteHealthStatus
     traffic_ratio: float
     created_at: datetime
-    revision_id: uuid.UUID
+    revision_id: DeploymentRevisionID
     replica_host: str | None = None
     replica_port: int | None = None
     updated_at: datetime | None = None
@@ -79,7 +81,7 @@ class RouteServiceDiscoveryInfo:
     """Service discovery information for a model service route."""
 
     route_id: uuid.UUID
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     endpoint_name: str
     runtime_variant: str
     kernel_host: str

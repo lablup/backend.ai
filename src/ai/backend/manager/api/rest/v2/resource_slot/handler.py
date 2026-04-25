@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
+    from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

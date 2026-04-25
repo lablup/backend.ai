@@ -75,6 +75,14 @@ class GroupData:
 
 
 @dataclass(frozen=True)
+class ProjectResourceInfo:
+    project_id: uuid.UUID
+    max_vfolder_count: int
+    max_quota_scope_size: int
+    project_type: ProjectType
+
+
+@dataclass(frozen=True)
 class ProjectMemberRoleSpec:
     """ScopeSystemRoleData implementation for the project-scoped member role."""
 

@@ -10,6 +10,9 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.actions.action.rbac_role_invitation import (
+    CreateRoleInvitationResult,
+)
 from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import (
@@ -19,10 +22,13 @@ from ai.backend.manager.data.permission.permission import (
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
     BatchEntityPermissionCheckInput,
+    BulkPermissionCheckInput,
     BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
+    EffectivePermissionsInput,
+    EffectivePermissionsResult,
     RoleData,
     RoleDetailData,
     RoleListResult,
@@ -38,6 +44,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.types import (
     ScopeListResult,
 )
+from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -50,6 +57,12 @@ from ai.backend.manager.repositories.permission_controller.creators import UserR
 from ai.backend.manager.repositories.permission_controller.types import (
     PermissionSearchScope,
     ScopedRoleSearchScope,
+)
+from ai.backend.manager.repositories.role_invitation.types import (
+    InviteeSearchScope,
+    InviterSearchScope,
+    RoleInvitationSearchResult,
+    RoleInvitationSearchScope,
 )
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
@@ -336,3 +349,95 @@ class PermissionControllerRepository:
         scope. REF edges are not traversed.
         """
         return await self._db_source.check_permission_with_scope_chain(data)
+
+    @permission_controller_repository_resilience.apply()
+    async def check_bulk_permission_with_scope_chain(
+        self,
+        data: BulkPermissionCheckInput,
+    ) -> dict[str, bool]:
+        """Batch permission check that traverses the scope chain via AUTO edges.
+
+        Same semantics as check_permission_with_scope_chain but for multiple
+        entities of the same RBACElementType in a single query.
+        """
+        return await self._db_source.check_bulk_permission_with_scope_chain(data)
+
+    @permission_controller_repository_resilience.apply()
+    async def resolve_effective_permissions(
+        self,
+        data: EffectivePermissionsInput,
+    ) -> EffectivePermissionsResult:
+        """Resolve the set of permitted operations per entity for a given user.
+
+        For each target entity, traverses the scope chain (AUTO edges) and
+        self-scope permissions to collect all operations the user can perform.
+        """
+        return await self._db_source.resolve_effective_permissions(data)
+
+    # -- role invitation --
+
+    @permission_controller_repository_resilience.apply()
+    async def create_invitation_by_email(
+        self,
+        *,
+        invitee_emails: list[str],
+        inviter_user_id: uuid.UUID,
+        role_id: uuid.UUID,
+    ) -> CreateRoleInvitationResult:
+        return await self._db_source.create_invitation_by_email(
+            invitee_emails=invitee_emails,
+            inviter_user_id=inviter_user_id,
+            role_id=role_id,
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def search_invitations_by_invitee(
+        self,
+        querier: BatchQuerier,
+        scope: InviteeSearchScope,
+    ) -> RoleInvitationSearchResult:
+        return await self._db_source.search_invitations_by_invitee(querier, scope)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_invitations_by_inviter(
+        self,
+        querier: BatchQuerier,
+        scope: InviterSearchScope,
+    ) -> RoleInvitationSearchResult:
+        return await self._db_source.search_invitations_by_inviter(querier, scope)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_invitations_by_role(
+        self,
+        querier: BatchQuerier,
+        scope: RoleInvitationSearchScope,
+    ) -> RoleInvitationSearchResult:
+        return await self._db_source.search_invitations_by_role(querier, scope)
+
+    @permission_controller_repository_resilience.apply()
+    async def admin_search_invitations(
+        self,
+        querier: BatchQuerier,
+    ) -> RoleInvitationSearchResult:
+        return await self._db_source.admin_search_invitations(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def accept_invitation(
+        self,
+        invitation_id: uuid.UUID,
+    ) -> RoleInvitationData:
+        return await self._db_source.accept_invitation(invitation_id)
+
+    @permission_controller_repository_resilience.apply()
+    async def reject_invitation(
+        self,
+        invitation_id: uuid.UUID,
+    ) -> RoleInvitationData:
+        return await self._db_source.reject_invitation(invitation_id)
+
+    @permission_controller_repository_resilience.apply()
+    async def cancel_invitation(
+        self,
+        invitation_id: uuid.UUID,
+    ) -> RoleInvitationData:
+        return await self._db_source.cancel_invitation(invitation_id)

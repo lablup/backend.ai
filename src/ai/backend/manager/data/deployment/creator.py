@@ -5,9 +5,13 @@ from uuid import UUID
 
 from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     ExecutionSpec,
     ImageIdentifierDraft,
     ModelRevisionSpec,
@@ -15,18 +19,22 @@ from ai.backend.manager.data.deployment.types import (
     MountInfo,
     ReplicaSpec,
     ResourceSpec,
+    RevisionDraft,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 
 @dataclass
 class VFolderMountsCreator:
-    model_vfolder_id: UUID
-    model_definition_path: str | None = None
-    model_mount_destination: str = "/models"
-    extra_mounts: list[MountInfo] = field(default_factory=list)
+    # Creators describe an intent to persist a revision, so the model
+    # vfolder must always be supplied here; a post-hoc SET NULL on the
+    # persisted row is the only way ``model`` should become NULL (see
+    # ``MountMetadata.model_vfolder_id`` for the read-side counterpart).
+    model_vfolder_id: VFolderUUID
+    model_definition_path: str | None
+    model_mount_destination: str
+    extra_mounts: list[MountInfo]
 
 
 @dataclass
@@ -42,13 +50,42 @@ class ModelRevisionCreator:
     would otherwise silently override the preset.
     """
 
-    image_id: UUID | None
+    # ``image_id`` is None when no image has been resolved yet at creation
+    # time (e.g. revision preset supplies it later). A persisted revision
+    # may also surface ``image_id is None`` if the referenced image row
+    # was deleted (see ``deployment_revisions.image`` SET NULL FK).
+    image_id: ImageID | None
     mounts: VFolderMountsCreator
     resource_spec: ResourceSpec | None = None
     execution: ExecutionSpec | None = None
     model_definition: ModelDefinitionDraft | None = None
-    revision_preset_id: UUID | None = None
+    revision_preset_id: DeploymentPresetID | None = None
     preset_values: list[PresetValueData] = field(default_factory=list)
+
+    def to_draft(self) -> RevisionDraft:
+        """Project this v2 creator onto a ``RevisionDraft`` layer.
+
+        ``image_id`` is already resolved upstream. Optional ``resource_spec`` /
+        ``execution`` are projected only when set; leaving them ``None`` lets
+        preset (or other lower-priority sources) supply the missing fields
+        without being overridden.
+        """
+        rs = self.resource_spec
+        ex = self.execution
+        return RevisionDraft(
+            image_id=self.image_id,
+            resource_slots=rs.resource_slots if rs is not None else None,
+            resource_opts=rs.resource_opts if rs is not None else None,
+            cluster_mode=rs.cluster_mode if rs is not None else None,
+            cluster_size=rs.cluster_size if rs is not None else None,
+            startup_command=ex.startup_command if ex is not None else None,
+            bootstrap_script=ex.bootstrap_script if ex is not None else None,
+            environ=ex.environ if ex is not None else None,
+            runtime_variant_id=ex.runtime_variant_id if ex is not None else None,
+            callback_url=ex.callback_url if ex is not None else None,
+            inference_runtime_config=ex.inference_runtime_config if ex is not None else None,
+            model_definition=self.model_definition,
+        )
 
 
 @dataclass
@@ -58,12 +95,6 @@ class DeploymentCreator:
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionSpec
     policy: DeploymentPolicyConfig | None = None
-
-    # Accessor properties for backward compatibility
-    @property
-    def image_identifier(self) -> ImageIdentifier:
-        """Get the image identifier from model revision spec."""
-        return self.model_revision.image_identifier
 
     @property
     def domain(self) -> str:
@@ -148,3 +179,6 @@ class NewDeploymentCreator:
     network: DeploymentNetworkSpec | None = None
     model_revision: ModelRevisionCreator | None = None
     policy: DeploymentPolicyConfig | None = None
+    # ``None`` defers to the resource group's ``default_deployment_options``
+    # (snapshot-copied at create time). An explicit value overrides.
+    options: DeploymentOptions | None = None

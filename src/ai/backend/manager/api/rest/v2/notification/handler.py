@@ -24,7 +24,7 @@ from ai.backend.manager.api.rest.v2.path_params import ChannelIdPathParam, RuleI
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.notification import NotificationAdapter
+    from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

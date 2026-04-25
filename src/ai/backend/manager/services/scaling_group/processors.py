@@ -72,6 +72,14 @@ from ai.backend.manager.services.scaling_group.actions.purge_scaling_group impor
     PurgeScalingGroupAction,
     PurgeScalingGroupActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.replace_default_deployment_options import (
+    ReplaceDefaultDeploymentOptionsAction,
+    ReplaceDefaultDeploymentOptionsActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.replace_default_session_options import (
+    ReplaceDefaultSessionOptionsAction,
+    ReplaceDefaultSessionOptionsActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -109,6 +117,14 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     get_resource_info: ActionProcessor[GetResourceInfoAction, GetResourceInfoActionResult]
     update_fair_share_spec: ActionProcessor[
         UpdateFairShareSpecAction, UpdateFairShareSpecActionResult
+    ]
+    replace_default_deployment_options: ActionProcessor[
+        ReplaceDefaultDeploymentOptionsAction,
+        ReplaceDefaultDeploymentOptionsActionResult,
+    ]
+    replace_default_session_options: ActionProcessor[
+        ReplaceDefaultSessionOptionsAction,
+        ReplaceDefaultSessionOptionsActionResult,
     ]
     associate_scaling_group_with_domains: ActionProcessor[
         AssociateScalingGroupWithDomainsAction, AssociateScalingGroupWithDomainsActionResult
@@ -178,6 +194,12 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.update_fair_share_spec = ActionProcessor(
             service.update_fair_share_spec, action_monitors
         )
+        self.replace_default_deployment_options = ActionProcessor(
+            service.replace_default_deployment_options, action_monitors
+        )
+        self.replace_default_session_options = ActionProcessor(
+            service.replace_default_session_options, action_monitors
+        )
         self.associate_scaling_group_with_domains = ActionProcessor(
             service.associate_scaling_group_with_domains, action_monitors
         )
@@ -232,6 +254,8 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             GetWsproxyVersionAction.spec(),
             GetResourceInfoAction.spec(),
             UpdateFairShareSpecAction.spec(),
+            ReplaceDefaultDeploymentOptionsAction.spec(),
+            ReplaceDefaultSessionOptionsAction.spec(),
             AssociateScalingGroupWithDomainsAction.spec(),
             DisassociateScalingGroupWithDomainsAction.spec(),
             AssociateScalingGroupWithKeypairsAction.spec(),

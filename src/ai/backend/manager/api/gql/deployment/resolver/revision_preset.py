@@ -109,7 +109,7 @@ async def deployment_revision_preset(
         added_version="26.4.2",
         description="Create a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     input: CreateDeploymentRevisionPresetInputGQL,
@@ -125,7 +125,7 @@ async def admin_create_deployment_revision_preset(
         added_version="26.4.2",
         description="Update a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     input: UpdateDeploymentRevisionPresetInputGQL,
@@ -141,7 +141,7 @@ async def admin_update_deployment_revision_preset(
         added_version="26.4.2",
         description="Delete a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,

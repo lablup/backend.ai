@@ -11,6 +11,7 @@ from ai.backend.manager.repositories.types import RepositoryArgs
 from .base import DomainDependency
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.prometheus.client import PrometheusClient
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
@@ -33,6 +34,7 @@ class RepositoriesInput:
     valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
     valkey_image: ValkeyImageClient
+    prometheus_client: PrometheusClient
 
 
 class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
@@ -67,6 +69,7 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
                 valkey_live_client=setup_input.valkey_live,
                 valkey_schedule_client=setup_input.valkey_schedule,
                 valkey_image_client=setup_input.valkey_image,
+                prometheus_client=setup_input.prometheus_client,
             )
         )
         yield repositories

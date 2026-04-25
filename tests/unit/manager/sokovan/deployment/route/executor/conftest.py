@@ -9,12 +9,15 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOptions,
     DeploymentState,
     ReplicaSpec,
     RouteHealthStatus,
@@ -32,7 +35,7 @@ from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 def mock_deployment_repo() -> AsyncMock:
     """Mock DeploymentRepository."""
     repo = AsyncMock()
-    repo.get_endpoints_by_ids = AsyncMock(return_value=[])
+    repo.get_deployments_by_ids = AsyncMock(return_value=[])
     repo.update_route_sessions = AsyncMock(return_value=None)
     repo.fetch_session_statuses_by_route_ids = AsyncMock(return_value={})
     repo.fetch_route_service_discovery_info = AsyncMock(return_value=[])
@@ -45,7 +48,7 @@ def mock_deployment_repo() -> AsyncMock:
 def mock_scheduling_controller() -> AsyncMock:
     """Mock SchedulingController."""
     controller = AsyncMock()
-    controller.enqueue_session = AsyncMock(return_value=SessionId(uuid4()))
+    controller.enqueue_session_from_draft = AsyncMock(return_value=SessionId(uuid4()))
     controller.mark_sessions_for_termination = AsyncMock(return_value=None)
     return controller
 
@@ -113,7 +116,7 @@ def _create_deployment_info(
     dep_id = deployment_id or uuid4()
 
     return DeploymentInfo(
-        id=dep_id,
+        id=DeploymentID(dep_id),
         metadata=DeploymentMetadata(
             name="test-deployment",
             domain="default",
@@ -126,6 +129,7 @@ def _create_deployment_info(
         ),
         state=DeploymentState(
             lifecycle=lifecycle,
+            scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
         replica_spec=ReplicaSpec(
@@ -137,7 +141,8 @@ def _create_deployment_info(
             url="http://test.endpoint",
         ),
         model_revisions=[],
-        current_revision_id=uuid4(),
+        options=DeploymentOptions(),
+        current_revision_id=DeploymentRevisionID(uuid4()),
     )
 
 
@@ -148,7 +153,7 @@ def _create_deployment_info(
 
 def _create_route_data(
     route_id: UUID | None = None,
-    endpoint_id: UUID | None = None,
+    deployment_id: DeploymentID | None = None,
     session_id: SessionId | None = None,
     status: RouteStatus = RouteStatus.PROVISIONING,
     health_status: RouteHealthStatus = RouteHealthStatus.NOT_CHECKED,
@@ -156,13 +161,13 @@ def _create_route_data(
     """Create RouteData for tests."""
     return RouteData(
         route_id=route_id or uuid4(),
-        endpoint_id=endpoint_id or uuid4(),
+        deployment_id=deployment_id or DeploymentID(uuid4()),
         session_id=session_id,
         status=status,
         health_status=health_status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
-        revision_id=uuid4(),
+        revision_id=DeploymentRevisionID(uuid4()),
     )
 
 
@@ -184,10 +189,10 @@ def provisioning_route_with_session() -> RouteData:
 @pytest.fixture
 def provisioning_routes_multiple() -> list[RouteData]:
     """Multiple PROVISIONING routes."""
-    endpoint_id = uuid4()
+    endpoint_id = DeploymentID(uuid4())
     return [
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.PROVISIONING),
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.PROVISIONING),
+        _create_route_data(deployment_id=endpoint_id, status=RouteStatus.PROVISIONING),
+        _create_route_data(deployment_id=endpoint_id, status=RouteStatus.PROVISIONING),
     ]
 
 
@@ -204,16 +209,16 @@ def running_route() -> RouteData:
 @pytest.fixture
 def running_routes_multiple() -> list[RouteData]:
     """Multiple RUNNING routes."""
-    endpoint_id = uuid4()
+    endpoint_id = DeploymentID(uuid4())
     return [
         _create_route_data(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
             session_id=SessionId(uuid4()),
         ),
         _create_route_data(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
             session_id=SessionId(uuid4()),
@@ -234,16 +239,16 @@ def healthy_route() -> RouteData:
 @pytest.fixture
 def healthy_routes_multiple() -> list[RouteData]:
     """Multiple HEALTHY routes."""
-    endpoint_id = uuid4()
+    endpoint_id = DeploymentID(uuid4())
     return [
         _create_route_data(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
             session_id=SessionId(uuid4()),
         ),
         _create_route_data(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
             session_id=SessionId(uuid4()),
@@ -273,15 +278,15 @@ def terminating_route() -> RouteData:
 @pytest.fixture
 def terminating_routes_multiple() -> list[RouteData]:
     """Multiple TERMINATING routes."""
-    endpoint_id = uuid4()
+    endpoint_id = DeploymentID(uuid4())
     return [
         _create_route_data(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             status=RouteStatus.TERMINATING,
             session_id=SessionId(uuid4()),
         ),
         _create_route_data(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             status=RouteStatus.TERMINATING,
             session_id=SessionId(uuid4()),
         ),

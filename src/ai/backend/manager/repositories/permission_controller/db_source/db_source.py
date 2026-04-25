@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections import defaultdict
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -14,6 +15,9 @@ from ai.backend.common.data.permission.types import (
     RelationType,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.action.rbac_role_invitation import (
+    CreateRoleInvitationResult,
+)
 from ai.backend.manager.data.permission.entity import (
     ElementAssociationListResult,
     EntityData,
@@ -29,9 +33,12 @@ from ai.backend.manager.data.permission.permission import (
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     AssignedUserListResult,
+    BulkPermissionCheckInput,
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
+    EffectivePermissionsInput,
+    EffectivePermissionsResult,
     ProjectRoleCount,
     RoleListResult,
     RolePermissionsUpdateInput,
@@ -52,8 +59,18 @@ from ai.backend.manager.data.permission.types import (
     ScopeListResult,
     ScopeType,
 )
+from ai.backend.manager.data.role_invitation.types import (
+    RoleInvitationData,
+    RoleInvitationState,
+)
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleNotAssigned, RoleNotFound
+from ai.backend.manager.errors.role_invitation import (
+    DuplicateRoleInvitationError,
+    RoleInvitationInvalidState,
+    RoleInvitationNotFound,
+)
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -63,6 +80,7 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import (
@@ -88,6 +106,15 @@ from ai.backend.manager.repositories.permission_controller.types import (
     PermissionSearchScope,
     ScopedRoleSearchScope,
 )
+from ai.backend.manager.repositories.role_invitation.creators import (
+    RoleInvitationCreatorSpec,
+)
+from ai.backend.manager.repositories.role_invitation.types import (
+    InviteeSearchScope,
+    InviterSearchScope,
+    RoleInvitationSearchResult,
+    RoleInvitationSearchScope,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -99,6 +126,15 @@ class CreateRoleInput:
     creator: Creator[RoleRow]
     object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation]
     scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class _ScopeChainQueryParams:
+    user_id: uuid.UUID
+    target_element_type: RBACElementType
+    entity_ids: list[str]
+    operation: OperationType
+    permission_entity_type: EntityType | None = None
 
 
 class PermissionDBSource:
@@ -346,16 +382,21 @@ class PermissionDBSource:
 
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:
-            creator = Creator(
-                spec=UserRoleCreatorSpec(
-                    user_id=data.user_id,
-                    role_id=data.role_id,
-                    granted_by=data.granted_by,
-                )
+            return await self._assign_role_in_session(db_session, data)
+
+    async def _assign_role_in_session(
+        self, db_session: SASession, data: UserRoleAssignmentInput
+    ) -> UserRoleRow:
+        creator = Creator(
+            spec=UserRoleCreatorSpec(
+                user_id=data.user_id,
+                role_id=data.role_id,
+                granted_by=data.granted_by,
             )
-            result = await execute_creator(db_session, creator)
-            await self._sync_user_scopes_on_assign(db_session, [data.user_id])
-            return result.row
+        )
+        result = await execute_creator(db_session, creator)
+        await self._sync_user_scopes_on_assign(db_session, [data.user_id])
+        return result.row
 
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
         """Revoke a role from a user.
@@ -515,17 +556,6 @@ class PermissionDBSource:
             result = await db_session.scalars(stmt)
             return list(result.all())
 
-    async def get_entity_mapped_scopes(
-        self, target_object_id: ObjectId
-    ) -> list[AssociationScopesEntitiesRow]:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            stmt = sa.select(AssociationScopesEntitiesRow).where(
-                AssociationScopesEntitiesRow.entity_id == target_object_id.entity_id,
-                AssociationScopesEntitiesRow.entity_type == target_object_id.entity_type.value,
-            )
-            result = await db_session.scalars(stmt)
-            return list(result.all())
-
     async def check_scope_permission_exist(
         self,
         user_id: uuid.UUID,
@@ -555,42 +585,6 @@ class PermissionDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalar(role_query)
             return result or False
-
-    def _make_query_statement_for_object_permission(
-        self,
-        user_id: uuid.UUID,
-        object_ids: Iterable[ObjectId],
-    ) -> sa.sql.Select[Any]:
-        object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
-        return (
-            sa.select(RoleRow)
-            .select_from(
-                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-                .join(PermissionRow, RoleRow.id == PermissionRow.role_id)
-                .join(
-                    AssociationScopesEntitiesRow,
-                    sa.and_(
-                        PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
-                        PermissionRow.scope_type == AssociationScopesEntitiesRow.scope_type,
-                    ),
-                )
-                .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
-            )
-            .where(
-                sa.and_(
-                    RoleRow.status == RoleStatus.ACTIVE,
-                    UserRoleRow.user_id == user_id,
-                    sa.or_(
-                        PermissionRow.scope_type == ScopeType.GLOBAL,
-                        AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
-                        ObjectPermissionRow.entity_id.in_(object_id_for_cond),
-                    ),
-                )
-            )
-            .options(
-                contains_eager(RoleRow.object_permission_rows),
-            )
-        )
 
     def _make_query_statement_for_object_permissions(
         self,
@@ -638,20 +632,6 @@ class PermissionDBSource:
                 contains_eager(RoleRow.object_permission_rows),
             )
         )
-
-    async def check_object_permission_exist(
-        self,
-        user_id: uuid.UUID,
-        object_id: ObjectId,
-        operation: OperationType,
-    ) -> bool:
-        role_query = self._make_query_statement_for_object_permissions(
-            user_id, [object_id], operation
-        )
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            result = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], result.unique().all())
-            return len(role_rows) > 0
 
     async def check_batch_object_permission_exist(
         self,
@@ -943,36 +923,35 @@ class PermissionDBSource:
 
     @staticmethod
     def _build_scope_chain_cte(
-        target_element_ref: RBACElementRef,
+        target_entity_type: EntityType,
+        entity_ids: list[str],
     ) -> sa.CTE:
-        """Build a recursive CTE that walks the scope chain upward via AUTO edges only.
+        """Build a recursive CTE that walks the scope chain upward via AUTO edges.
 
-        Starting from the target entity, traverses association_scopes_entities
-        following only AUTO edges to find all ancestor scopes. REF edges
-        terminate the chain — scopes beyond a REF edge are unreachable.
-
-        Uses UNION (not UNION ALL) to prevent infinite recursion on cycles.
+        Carries entity_id through the recursion so each result row can be
+        traced back to its originating entity.
         """
         ase = AssociationScopesEntitiesRow.__table__
-        target_entity_type = target_element_ref.element_type.to_entity_type()
 
-        # Base case: direct AUTO scope entries for the target entity.
+        # Base case: direct AUTO scope entries for target entities.
         scope_chain_base = sa.select(
+            ase.c.entity_id,
             ase.c.scope_type,
             ase.c.scope_id,
         ).where(
             sa.and_(
                 ase.c.entity_type == target_entity_type,
-                ase.c.entity_id == target_element_ref.element_id,
+                ase.c.entity_id.in_(entity_ids),
                 ase.c.relation_type == RelationType.AUTO,
             )
         )
         scope_chain_cte = scope_chain_base.cte("scope_chain", recursive=True)
 
-        # Recursive case: walk parent scopes upward, following AUTO edges only.
+        # Recursive case: walk parent scopes upward, carrying entity_id.
         parent = ase.alias("parent")
         scope_chain_recursive = (
             sa.select(
+                scope_chain_cte.c.entity_id,
                 parent.c.scope_type,
                 parent.c.scope_id,
             )
@@ -991,21 +970,30 @@ class PermissionDBSource:
         )
         return scope_chain_cte.union(scope_chain_recursive)
 
-    def _build_scope_chain_permission_query(
+    async def _check_permissions_via_scope_chain(
         self,
-        user_id: uuid.UUID,
-        target_element_ref: RBACElementRef,
-        target_entity_type: EntityType,
-        operation: OperationType,
-    ) -> sa.sql.Select[Any]:
-        """Build a query that checks permissions via CTE scope chain traversal."""
+        params: _ScopeChainQueryParams,
+    ) -> set[str]:
+        """Core scope chain permission check shared by single and batch methods.
+
+        Two-layer check:
+        1. Scope chain traversal — walks AUTO edges upward via recursive CTE.
+        2. Self-scope direct match — permission scoped to the target entity itself.
+
+        Returns the set of entity IDs that have the requested permission.
+        """
+        association_entity_type = params.target_element_type.to_entity_type()
+        permission_entity_type = params.permission_entity_type or association_entity_type
+        target_scope_type = params.target_element_type.to_scope_type()
+
         permissions = PermissionRow.__table__
         user_roles = UserRoleRow.__table__
         roles = RoleRow.__table__
 
-        scope_chain_cte = self._build_scope_chain_cte(target_element_ref)
-        return (
-            sa.select(sa.literal(1))
+        # Layer 1: scope chain traversal.
+        scope_chain_cte = self._build_scope_chain_cte(association_entity_type, params.entity_ids)
+        scope_chain_query = (
+            sa.select(scope_chain_cte.c.entity_id)
             .select_from(
                 scope_chain_cte.join(
                     permissions,
@@ -1025,30 +1013,17 @@ class PermissionDBSource:
             )
             .where(
                 sa.and_(
-                    user_roles.c.user_id == user_id,
+                    user_roles.c.user_id == params.user_id,
                     roles.c.status == RoleStatus.ACTIVE,
-                    permissions.c.entity_type == target_entity_type,
-                    permissions.c.operation == operation,
+                    permissions.c.entity_type == permission_entity_type,
+                    permissions.c.operation == params.operation,
                 )
             )
-            .limit(1)
         )
 
-    def _build_self_scope_permission_query(
-        self,
-        user_id: uuid.UUID,
-        target_element_ref: RBACElementRef,
-        target_entity_type: EntityType,
-        target_scope_type: ScopeType,
-        operation: OperationType,
-    ) -> sa.sql.Select[Any]:
-        """Build a query that checks permissions scoped to the target entity itself."""
-        permissions = PermissionRow.__table__
-        user_roles = UserRoleRow.__table__
-        roles = RoleRow.__table__
-
-        return (
-            sa.select(sa.literal(1))
+        # Layer 2: self-scope direct match.
+        self_scope_query = (
+            sa.select(permissions.c.scope_id.label("entity_id"))
             .select_from(
                 permissions.join(
                     roles,
@@ -1060,66 +1035,141 @@ class PermissionDBSource:
             )
             .where(
                 sa.and_(
-                    user_roles.c.user_id == user_id,
+                    user_roles.c.user_id == params.user_id,
                     roles.c.status == RoleStatus.ACTIVE,
                     permissions.c.scope_type == target_scope_type,
-                    permissions.c.scope_id == target_element_ref.element_id,
-                    permissions.c.entity_type == target_entity_type,
-                    permissions.c.operation == operation,
+                    permissions.c.scope_id.in_(params.entity_ids),
+                    permissions.c.entity_type == permission_entity_type,
+                    permissions.c.operation == params.operation,
                 )
             )
-            .limit(1)
         )
+
+        combined_query = sa.union(scope_chain_query, self_scope_query)
+
+        granted: set[str] = set()
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            rows = await db_session.execute(combined_query)
+            for row in rows:
+                granted.add(row.entity_id)
+
+        return granted
 
     async def check_permission_with_scope_chain(
         self,
         data: ScopeChainPermissionCheckInput,
     ) -> bool:
-        """CTE-based permission check that traverses the scope chain.
-
-        Two-layer check:
-        1. Self-scope direct match — permission scoped to the target entity itself.
-        2. Scope chain traversal — walks AUTO edges upward via CTE.
-
-        Args:
-            data: Permission check input containing user_id, target_element_ref,
-                operation, and optional permission_entity_type override.
-                When permission_entity_type is provided, it is used as the
-                entity_type filter for permission matching instead of deriving
-                it from target_element_ref. This enables cross-scope entity type
-                checks (e.g., checking MODEL_DEPLOYMENT:READ permission at
-                PROJECT scope).
-        """
-        target_entity_type = (
-            data.permission_entity_type or data.target_element_ref.element_type.to_entity_type()
+        """CTE-based permission check for a single entity."""
+        granted = await self._check_permissions_via_scope_chain(
+            _ScopeChainQueryParams(
+                user_id=data.user_id,
+                target_element_type=data.target_element_ref.element_type,
+                entity_ids=[data.target_element_ref.element_id],
+                operation=data.operation,
+                permission_entity_type=data.permission_entity_type,
+            )
         )
-        target_scope_type = data.target_element_ref.element_type.to_scope_type()
+        return data.target_element_ref.element_id in granted
 
-        combined_query = sa.select(
-            sa.or_(
-                sa.exists(
-                    self._build_scope_chain_permission_query(
-                        data.user_id,
-                        data.target_element_ref,
-                        target_entity_type,
-                        data.operation,
-                    )
-                ),
-                sa.exists(
-                    self._build_self_scope_permission_query(
-                        data.user_id,
-                        data.target_element_ref,
-                        target_entity_type,
-                        target_scope_type,
-                        data.operation,
-                    )
-                ),
+    async def check_bulk_permission_with_scope_chain(
+        self,
+        data: BulkPermissionCheckInput,
+    ) -> dict[str, bool]:
+        """Batch CTE-based permission check for multiple entities."""
+        if not data.target_entity_ids:
+            return {}
+
+        granted = await self._check_permissions_via_scope_chain(
+            _ScopeChainQueryParams(
+                user_id=data.user_id,
+                target_element_type=data.target_element_type,
+                entity_ids=data.target_entity_ids,
+                operation=data.operation,
+            )
+        )
+        return {eid: eid in granted for eid in data.target_entity_ids}
+
+    async def resolve_effective_permissions(
+        self,
+        data: EffectivePermissionsInput,
+    ) -> EffectivePermissionsResult:
+        """Resolve the effective permissions for a user across multiple entities.
+
+        Uses a single batched query that traverses the scope chain (AUTO edges)
+        and self-scope permissions to collect all operations the user can perform
+        on each entity.
+
+        Returns a mapping from entity ID to the set of permitted operations.
+        """
+        if not data.target_entity_ids:
+            return EffectivePermissionsResult(permissions={})
+
+        association_entity_type = data.target_element_type.to_entity_type()
+        permission_entity_type = data.permission_entity_type or association_entity_type
+        target_scope_type = data.target_element_type.to_scope_type()
+
+        perm = PermissionRow.__table__
+        user_roles = UserRoleRow.__table__
+        roles = RoleRow.__table__
+
+        scope_chain_cte = self._build_scope_chain_cte(
+            association_entity_type, data.target_entity_ids
+        )
+        scope_chain_query = (
+            sa.select(
+                scope_chain_cte.c.entity_id,
+                perm.c.operation,
+            )
+            .select_from(
+                scope_chain_cte.join(
+                    perm,
+                    sa.and_(
+                        perm.c.scope_type == scope_chain_cte.c.scope_type,
+                        perm.c.scope_id == scope_chain_cte.c.scope_id,
+                    ),
+                )
+                .join(roles, roles.c.id == perm.c.role_id)
+                .join(user_roles, user_roles.c.role_id == roles.c.id)
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == data.user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    perm.c.entity_type == permission_entity_type,
+                )
             )
         )
 
+        self_scope_query = (
+            sa.select(
+                perm.c.scope_id.label("entity_id"),
+                perm.c.operation,
+            )
+            .select_from(
+                perm.join(roles, roles.c.id == perm.c.role_id).join(
+                    user_roles, user_roles.c.role_id == roles.c.id
+                )
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == data.user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    perm.c.scope_type == target_scope_type,
+                    perm.c.scope_id.in_(data.target_entity_ids),
+                    perm.c.entity_type == permission_entity_type,
+                )
+            )
+        )
+
+        combined_query = sa.union_all(scope_chain_query, self_scope_query)
+
+        permissions: defaultdict[str, set[OperationType]] = defaultdict(set)
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            result = await db_session.scalar(combined_query)
-            return result or False
+            result = await db_session.execute(combined_query)
+            for row in result:
+                permissions[row.entity_id].add(OperationType(row.operation))
+
+        return EffectivePermissionsResult(permissions=permissions)
 
     async def bulk_assign_role(
         self, bulk_creator: BulkCreator[UserRoleRow]
@@ -1172,3 +1222,233 @@ class PermissionDBSource:
             await self._sync_user_scopes_on_revoke(db_session, revoked_user_ids)
 
         return BulkRoleRevocationResultData(successes=successes, failures=failures)
+
+    # -- role invitation --
+
+    async def create_invitation_by_email(
+        self,
+        *,
+        invitee_emails: list[str],
+        inviter_user_id: uuid.UUID,
+        role_id: uuid.UUID,
+    ) -> CreateRoleInvitationResult:
+        """Resolve emails and create invitations in a single transaction.
+
+        Emails that don't resolve to exactly one ACTIVE user are silently skipped.
+        Duplicate active invitations (caught by the partial unique index)
+        are also silently skipped.
+        """
+        async with self._db.begin_session_read_committed() as session:
+            email_to_user_id = await self._resolve_invitation_emails(session, invitee_emails)
+            creators = [
+                RBACEntityCreator(
+                    spec=RoleInvitationCreatorSpec(
+                        inviter_user_id=inviter_user_id,
+                        invitee_user_id=invitee_user_id,
+                        role_id=role_id,
+                    ),
+                    element_type=RBACElementType.ROLE_ASSIGNMENT,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.USER,
+                        element_id=str(invitee_user_id),
+                    ),
+                    additional_scope_refs=[
+                        RBACElementRef(
+                            element_type=RBACElementType.ROLE,
+                            element_id=str(role_id),
+                        ),
+                    ],
+                )
+                for email in invitee_emails
+                if (invitee_user_id := email_to_user_id.get(email)) is not None
+            ]
+            if not creators:
+                return CreateRoleInvitationResult()
+
+            created_rows: list[RoleInvitationRow] = []
+            for creator in creators:
+                async with session.begin_nested():
+                    try:
+                        row = (await execute_rbac_entity_creator(session, creator)).row
+                    except DuplicateRoleInvitationError:
+                        continue
+                    created_rows.append(row)
+            return CreateRoleInvitationResult(
+                created=[row.to_data() for row in created_rows],
+            )
+
+    async def search_invitations_by_invitee(
+        self,
+        querier: BatchQuerier,
+        scope: InviteeSearchScope,
+    ) -> RoleInvitationSearchResult:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(RoleInvitationRow)
+            result = await execute_batch_querier(session, query, querier, scope=scope)
+            items = [row.RoleInvitationRow.to_data() for row in result.rows]
+            return RoleInvitationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_invitations_by_inviter(
+        self,
+        querier: BatchQuerier,
+        scope: InviterSearchScope,
+    ) -> RoleInvitationSearchResult:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(RoleInvitationRow)
+            result = await execute_batch_querier(session, query, querier, scope=scope)
+            items = [row.RoleInvitationRow.to_data() for row in result.rows]
+            return RoleInvitationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_invitations_by_role(
+        self,
+        querier: BatchQuerier,
+        scope: RoleInvitationSearchScope,
+    ) -> RoleInvitationSearchResult:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(RoleInvitationRow)
+            result = await execute_batch_querier(session, query, querier, scope=scope)
+            items = [row.RoleInvitationRow.to_data() for row in result.rows]
+            return RoleInvitationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def admin_search_invitations(
+        self,
+        querier: BatchQuerier,
+    ) -> RoleInvitationSearchResult:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(RoleInvitationRow)
+            result = await execute_batch_querier(session, query, querier)
+            items = [row.RoleInvitationRow.to_data() for row in result.rows]
+            return RoleInvitationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def accept_invitation(
+        self,
+        invitation_id: uuid.UUID,
+    ) -> RoleInvitationData:
+        """Transition PENDING→ACCEPTED and assign the role in one session."""
+        async with self._db.begin_session_read_committed() as session:
+            row = await self._update_invitation_state(
+                session, invitation_id, RoleInvitationState.ACCEPTED
+            )
+            if row is None:
+                existing = await self._get_failed_invitation(session, invitation_id)
+                raise RoleInvitationInvalidState(
+                    f"Cannot accept: invitation is {existing.state.value}, expected pending"
+                )
+            await self._assign_role_in_session(
+                session,
+                UserRoleAssignmentInput(user_id=row.invitee_user_id, role_id=row.role_id),
+            )
+            return row.to_data()
+
+    async def reject_invitation(
+        self,
+        invitation_id: uuid.UUID,
+    ) -> RoleInvitationData:
+        async with self._db.begin_session_read_committed() as session:
+            row = await self._update_invitation_state(
+                session, invitation_id, RoleInvitationState.REJECTED
+            )
+            if row is not None:
+                return row.to_data()
+            existing = await self._get_failed_invitation(session, invitation_id)
+            if existing.state == RoleInvitationState.REJECTED:
+                return existing.to_data()
+            raise RoleInvitationInvalidState(
+                f"Cannot reject: invitation is {existing.state.value}, expected pending"
+            )
+
+    async def cancel_invitation(
+        self,
+        invitation_id: uuid.UUID,
+    ) -> RoleInvitationData:
+        async with self._db.begin_session_read_committed() as session:
+            row = await self._update_invitation_state(
+                session, invitation_id, RoleInvitationState.CANCELED
+            )
+            if row is not None:
+                return row.to_data()
+            existing = await self._get_failed_invitation(session, invitation_id)
+            if existing.state == RoleInvitationState.CANCELED:
+                return existing.to_data()
+            raise RoleInvitationInvalidState(
+                f"Cannot cancel: invitation is {existing.state.value}, expected pending"
+            )
+
+    @staticmethod
+    async def _update_invitation_state(
+        session: SASession,
+        invitation_id: uuid.UUID,
+        target_state: RoleInvitationState,
+    ) -> RoleInvitationRow | None:
+        """UPDATE PENDING→*target_state* with RETURNING; None if no row matched."""
+        update_stmt = (
+            sa.update(RoleInvitationRow)
+            .where(
+                RoleInvitationRow.id == invitation_id,
+                RoleInvitationRow.state == RoleInvitationState.PENDING,
+            )
+            .values(state=target_state)
+            .returning(*RoleInvitationRow.__table__.columns)
+        )
+        result = await session.execute(sa.select(RoleInvitationRow).from_statement(update_stmt))
+        return cast(RoleInvitationRow | None, result.scalar_one_or_none())
+
+    @staticmethod
+    async def _get_failed_invitation(
+        session: SASession,
+        invitation_id: uuid.UUID,
+    ) -> RoleInvitationRow:
+        """Fetch the row that caused an update to match no row.
+
+        Raises RoleInvitationNotFound if the row does not exist. The caller
+        inspects the returned row's state to decide idempotent vs. invalid.
+        """
+        existing = await session.scalar(
+            sa.select(RoleInvitationRow).where(RoleInvitationRow.id == invitation_id)
+        )
+        if existing is None:
+            raise RoleInvitationNotFound()
+        return existing
+
+    @staticmethod
+    async def _resolve_invitation_emails(
+        session: SASession,
+        emails: Collection[str],
+    ) -> dict[str, uuid.UUID]:
+        """Resolve emails to user UUIDs (ACTIVE users only).
+
+        Emails that don't match exactly one ACTIVE user are silently skipped.
+        """
+        if not emails:
+            return {}
+        stmt = sa.select(UserRow.email, UserRow.uuid).where(
+            UserRow.status == UserStatus.ACTIVE,
+            UserRow.email.in_(emails),
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        resolved: dict[str, uuid.UUID] = {}
+        for row in rows:
+            resolved[row.email] = row.uuid
+        return resolved

@@ -38,6 +38,14 @@ class RuntimeVariantDBSource:
                 raise RuntimeVariantNotFound()
             return row.to_data()
 
+    async def get_by_name(self, name: str) -> RuntimeVariantData:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(RuntimeVariantRow).where(RuntimeVariantRow.name == name)
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            if row is None:
+                raise RuntimeVariantNotFound()
+            return row.to_data()
+
     async def update(self, updater: Updater[RuntimeVariantRow]) -> RuntimeVariantData:
         async with self._db.begin_session() as session:
             result = await execute_updater(session, updater)

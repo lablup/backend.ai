@@ -36,7 +36,9 @@ from ai.backend.common.types import (
     PreemptionOrder,
     SessionTypes,
 )
+from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -300,6 +302,23 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         nullable=True,
         default=None,
     )
+    # Default operational options snapshot-copied onto each new
+    # deployment in this scaling group. See :class:`DeploymentOptions`.
+    default_deployment_options: Mapped[DeploymentOptions] = mapped_column(
+        "default_deployment_options",
+        PydanticColumn(DeploymentOptions),
+        nullable=False,
+        default=DeploymentOptions,
+    )
+    # Default session-side operational options used by the resolver
+    # when a create-session request omits fields. See
+    # :class:`DefaultSessionOptions`.
+    default_session_options: Mapped[DefaultSessionOptions] = mapped_column(
+        "default_session_options",
+        PydanticColumn(DefaultSessionOptions),
+        nullable=False,
+        default=DefaultSessionOptions,
+    )
 
     sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="scaling_group")
     agents: Mapped[list[AgentRow]] = relationship("AgentRow", back_populates="scaling_group_row")
@@ -375,6 +394,8 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                 ),
             ),
             fair_share_spec=self.fair_share_spec or FairShareScalingGroupSpec(),
+            default_deployment_options=self.default_deployment_options,
+            default_session_options=self.default_session_options,
         )
 
     @classmethod

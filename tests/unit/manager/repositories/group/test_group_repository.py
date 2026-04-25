@@ -13,6 +13,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -59,6 +60,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -260,6 +262,7 @@ class TestGroupRepository:
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -786,6 +789,35 @@ class TestGroupRepository:
 
         return group_id
 
+    @pytest.fixture
+    async def inactive_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: str,
+        default_project_resource_policy: str,
+    ) -> tuple[uuid.UUID, str]:
+        """Create a soft-deleted (is_active=False) group for negative-path tests."""
+        group_id = uuid.uuid4()
+        group_name = f"inactive-group-{group_id.hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as session:
+            group = GroupRow(
+                id=group_id,
+                name=group_name,
+                description="Inactive group",
+                is_active=False,
+                domain_name=test_domain,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                integration_id=None,
+                resource_policy=default_project_resource_policy,
+                type=ProjectType.GENERAL,
+            )
+            session.add(group)
+            await session.commit()
+
+        return group_id, group_name
+
     # ===========================================
     # Tests for create method
     # ===========================================
@@ -1240,6 +1272,63 @@ class TestGroupRepository:
                 sa.select(GroupRow).where(GroupRow.id == group_with_mounted_vfolders)
             )
             assert group_row is not None
+
+    # ===========================================
+    # Tests for project_id_by_name_in_domain method
+    # ===========================================
+
+    async def test_project_id_by_name_in_domain_returns_id(
+        self,
+        group_repository: GroupRepository,
+        test_domain: str,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Resolves an active project's UUID from its (domain, name) pair."""
+        group_name = f"test-group-{test_group.hex[:8]}"
+
+        project_id = await group_repository.project_id_by_name_in_domain(test_domain, group_name)
+
+        assert project_id == ProjectID(test_group)
+
+    async def test_project_id_by_name_in_domain_returns_none_for_unknown_name(
+        self,
+        group_repository: GroupRepository,
+        test_domain: str,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Returns None when no project with that name exists in the domain."""
+        project_id = await group_repository.project_id_by_name_in_domain(
+            test_domain, "no-such-group"
+        )
+
+        assert project_id is None
+
+    async def test_project_id_by_name_in_domain_returns_none_for_other_domain(
+        self,
+        group_repository: GroupRepository,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Returns None when the project exists but in a different domain."""
+        group_name = f"test-group-{test_group.hex[:8]}"
+
+        project_id = await group_repository.project_id_by_name_in_domain(
+            "no-such-domain", group_name
+        )
+
+        assert project_id is None
+
+    async def test_project_id_by_name_in_domain_returns_none_for_inactive_project(
+        self,
+        group_repository: GroupRepository,
+        test_domain: str,
+        inactive_group: tuple[uuid.UUID, str],
+    ) -> None:
+        """Returns None when the matching project is soft-deleted (is_active=False)."""
+        _, group_name = inactive_group
+
+        project_id = await group_repository.project_id_by_name_in_domain(test_domain, group_name)
+
+        assert project_id is None
 
 
 class TestGroupRowVFolderHostPermissionMap:

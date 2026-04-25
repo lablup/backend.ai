@@ -36,6 +36,75 @@ def get(project_id: UUID) -> None:
     asyncio.run(_run())
 
 
+@project.command(name="assign-users")
+@click.argument("project_id", type=click.UUID)
+@click.option(
+    "--user-id",
+    "user_ids",
+    type=click.UUID,
+    multiple=True,
+    required=True,
+    help="User UUID to assign (repeatable).",
+)
+@click.option(
+    "--role-id",
+    type=click.UUID,
+    required=True,
+    help="Project role UUID granted to each assigned user.",
+)
+def assign_users(
+    project_id: UUID,
+    user_ids: tuple[UUID, ...],
+    role_id: UUID,
+) -> None:
+    """Assign users to a project with a specific project role."""
+    from ai.backend.common.dto.manager.v2.group.request import AssignUsersToProjectInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.project.assign_users(
+                project_id,
+                AssignUsersToProjectInput(user_ids=list(user_ids), role_id=role_id),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@project.command(name="unassign-users")
+@click.argument("project_id", type=click.UUID)
+@click.option(
+    "--user-id",
+    "user_ids",
+    type=click.UUID,
+    multiple=True,
+    required=True,
+    help="User UUID to unassign (repeatable).",
+)
+def unassign_users(
+    project_id: UUID,
+    user_ids: tuple[UUID, ...],
+) -> None:
+    """Unassign users from a project."""
+    from ai.backend.common.dto.manager.v2.group.request import UnassignUsersFromProjectInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.project.unassign_users(
+                project_id,
+                UnassignUsersFromProjectInput(user_ids=list(user_ids)),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 # -- Sub-group: role --
 
 

@@ -14,6 +14,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     DeploymentHistoryData,
     DeploymentHistoryListResult,
     RouteHistoryData,
@@ -92,6 +93,7 @@ def _make_deployment_history() -> DeploymentHistoryData:
     return DeploymentHistoryData(
         id=uuid4(),
         deployment_id=uuid4(),
+        handler_category=DeploymentHandlerCategory.LIFECYCLE,
         phase="CREATING",
         from_status=None,
         to_status=None,

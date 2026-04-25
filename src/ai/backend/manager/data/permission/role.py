@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -13,7 +14,7 @@ from .object_permission import (
 )
 from .permission import ScopedPermissionCreateInput
 from .status import RoleStatus
-from .types import EntityType, OperationType, RBACElementRef, RoleSource
+from .types import EntityType, OperationType, RBACElementRef, RBACElementType, RoleSource
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,36 @@ class ScopeChainPermissionCheckInput:
     target_element_ref: RBACElementRef
     operation: OperationType
     permission_entity_type: EntityType | None
+
+
+@dataclass(frozen=True)
+class EffectivePermissionsInput:
+    """Input for resolving effective permissions per entity for a given user.
+
+    Given a user, an element type, and a list of entity IDs, returns the
+    set of permitted operations per entity by traversing the scope chain
+    and evaluating all role/permission assignments.
+    """
+
+    user_id: uuid.UUID
+    target_element_type: RBACElementType
+    target_entity_ids: list[str]
+    permission_entity_type: EntityType | None = None
+
+
+@dataclass(frozen=True)
+class EffectivePermissionsResult:
+    """Mapping from entity ID to the set of operations the user is authorized to perform."""
+
+    permissions: Mapping[str, set[OperationType]]
+
+
+@dataclass(frozen=True)
+class BulkPermissionCheckInput:
+    user_id: uuid.UUID
+    target_element_type: RBACElementType
+    target_entity_ids: list[str]
+    operation: OperationType
 
 
 @dataclass(frozen=True)

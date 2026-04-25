@@ -12,6 +12,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import RouteHandlerCategory, RouteStatus
@@ -373,9 +374,9 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         test_user_uuid: uuid.UUID,
         test_keypair: AccessKey,
         test_image_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint in PENDING state and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -419,7 +420,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     async def test_updates_status_and_creates_history_atomically(
         self,
         deployment_repository: DeploymentRepository,
-        test_pending_endpoint_id: uuid.UUID,
+        test_pending_endpoint_id: DeploymentID,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Status update and history are created in the same transaction."""
@@ -446,7 +447,8 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
 
         updated_count = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            new_history_specs=history_specs,
+            merge_history_ids=[],
         )
 
         assert updated_count == 1
@@ -472,7 +474,9 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     ) -> None:
         """Empty batch_updaters returns 0."""
         result = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
-            [], BulkCreator(specs=[])
+            [],
+            new_history_specs=[],
+            merge_history_ids=[],
         )
         assert result == 0
 
@@ -785,9 +789,9 @@ class TestUpdateRouteStatusBulkWithHistory:
         test_user_uuid: uuid.UUID,
         test_keypair: AccessKey,
         test_image_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -813,7 +817,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_provisioning_route_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -861,7 +865,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         self,
         deployment_repository: DeploymentRepository,
         test_provisioning_route_id: uuid.UUID,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Status update and history are created in the same transaction."""
@@ -960,9 +964,9 @@ class TestDeploymentHistoryMergeLogic:
     async def test_endpoint_with_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> tuple[uuid.UUID, uuid.UUID]:
+    ) -> tuple[DeploymentID, uuid.UUID]:
         """Create test endpoint with existing history record."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
         history_id = uuid.uuid4()
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
@@ -1155,7 +1159,7 @@ class TestDeploymentHistoryMergeLogic:
     async def test_merge_same_phase_error_to_status(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_with_history: tuple[uuid.UUID, uuid.UUID],
+        test_endpoint_with_history: tuple[DeploymentID, uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Same phase, error_code, to_status should merge (increment attempts)."""
@@ -1168,21 +1172,11 @@ class TestDeploymentHistoryMergeLogic:
                 conditions=[DeploymentConditions.by_ids([endpoint_id])],
             )
         ]
-        history_specs = [
-            DeploymentHistoryCreatorSpec(
-                deployment_id=endpoint_id,
-                phase="validation",  # Same
-                result=SchedulingResult.FAILURE,
-                error_code="INSUFFICIENT_RESOURCE",  # Same
-                message="Still not enough resources",
-                from_status=EndpointLifecycle.PENDING,
-                to_status=EndpointLifecycle.PENDING,  # Same
-            )
-        ]
 
         await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            new_history_specs=[],
+            merge_history_ids=[history_id],
         )
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1199,7 +1193,7 @@ class TestDeploymentHistoryMergeLogic:
     async def test_no_merge_different_phase(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_with_history: tuple[uuid.UUID, uuid.UUID],
+        test_endpoint_with_history: tuple[DeploymentID, uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Different phase should create new record."""
@@ -1225,7 +1219,8 @@ class TestDeploymentHistoryMergeLogic:
 
         await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            new_history_specs=history_specs,
+            merge_history_ids=[],
         )
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1284,9 +1279,9 @@ class TestRouteHistoryMergeLogic:
     async def test_route_with_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
+    ) -> tuple[DeploymentID, uuid.UUID, uuid.UUID]:
         """Create test route with existing history record."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
         route_id = uuid.uuid4()
         history_id = uuid.uuid4()
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -1496,7 +1491,7 @@ class TestRouteHistoryMergeLogic:
     async def test_merge_same_phase_error_to_status(
         self,
         deployment_repository: DeploymentRepository,
-        test_route_with_history: tuple[uuid.UUID, uuid.UUID, uuid.UUID],
+        test_route_with_history: tuple[DeploymentID, uuid.UUID, uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Same phase, error_code, to_status should merge (increment attempts)."""
@@ -1539,7 +1534,7 @@ class TestRouteHistoryMergeLogic:
     async def test_no_merge_different_to_status(
         self,
         deployment_repository: DeploymentRepository,
-        test_route_with_history: tuple[uuid.UUID, uuid.UUID, uuid.UUID],
+        test_route_with_history: tuple[DeploymentID, uuid.UUID, uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Different to_status should create new record."""

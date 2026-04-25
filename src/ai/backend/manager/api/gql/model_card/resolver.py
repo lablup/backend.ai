@@ -116,7 +116,7 @@ async def model_card_v2(
         added_version="26.4.2",
         description="Create a model card (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: CreateModelCardInputGQL,
@@ -132,7 +132,7 @@ async def admin_create_model_card_v2(
         added_version="26.4.2",
         description="Update a model card (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateModelCardInputGQL,
@@ -148,7 +148,7 @@ async def admin_update_model_card_v2(
         added_version="26.4.2",
         description="Delete a model card (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -163,7 +163,7 @@ async def admin_delete_model_card_v2(
         added_version="26.4.2",
         description="Delete multiple model cards (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_model_cards_v2(
     info: Info[StrawberryGQLContext],
     input: DeleteModelCardsInputGQL,
@@ -189,7 +189,7 @@ async def admin_delete_model_cards_v2(
         added_version="26.4.2",
         description="Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.",
     )
-)  # type: ignore[misc]
+)
 async def scan_project_model_cards_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -203,7 +203,7 @@ async def scan_project_model_cards_v2(
         added_version="26.4.2",
         description="Deploy a model card by creating a deployment with a revision preset.",
     )
-)  # type: ignore[misc]
+)
 async def deploy_model_card_v2(
     info: Info[StrawberryGQLContext],
     card_id: UUID,

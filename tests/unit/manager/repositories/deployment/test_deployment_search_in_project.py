@@ -11,7 +11,8 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import EndpointId, ResourceSlot
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
 from ai.backend.manager.data.image.types import ImageType
@@ -37,6 +38,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -83,6 +85,7 @@ class TestEndpointSearchInProject:
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -218,7 +221,7 @@ class TestEndpointSearchInProject:
             # Endpoints: 2 in project A, 1 in project B (all CREATED lifecycle)
             endpoint_ids_in_a: list[uuid.UUID] = []
             for i in range(2):
-                eid = EndpointId(uuid.uuid4())
+                eid = DeploymentID(uuid.uuid4())
                 db_sess.add(
                     EndpointRow(
                         id=eid,
@@ -236,7 +239,7 @@ class TestEndpointSearchInProject:
                 endpoint_ids_in_a.append(eid)
 
             endpoint_ids_in_b: list[uuid.UUID] = []
-            eid = EndpointId(uuid.uuid4())
+            eid = DeploymentID(uuid.uuid4())
             db_sess.add(
                 EndpointRow(
                     id=eid,

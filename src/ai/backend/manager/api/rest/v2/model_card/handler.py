@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     SearchModelCardsInput,
     UpdateModelCardInput,
 )
-from ai.backend.manager.api.adapters.model_card import ModelCardAdapter
+from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
 
 

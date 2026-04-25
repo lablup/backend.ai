@@ -157,7 +157,7 @@ async def rbac_permission_matrix(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Create a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_create_permission(
     info: Info[StrawberryGQLContext],
     input: CreatePermissionInput,
@@ -169,7 +169,7 @@ async def admin_create_permission(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Update a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_update_permission(
     info: Info[StrawberryGQLContext],
     input: UpdatePermissionInput,
@@ -181,7 +181,7 @@ async def admin_update_permission(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Delete a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_delete_permission(
     info: Info[StrawberryGQLContext],
     input: DeletePermissionInput,

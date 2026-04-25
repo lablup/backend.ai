@@ -65,13 +65,9 @@ def deployment_processors(
         valkey_clients.schedule,
     )
     deployment_controller = AsyncMock()
-    revision_generator_registry = MagicMock()
-    model_definition_generator_registry = MagicMock()
     service = DeploymentService(
         deployment_controller,
         repo,
-        revision_generator_registry,
-        model_definition_generator_registry,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
@@ -79,8 +75,10 @@ def deployment_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo),
-                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(
+                    permission_controller_repo, MagicMock()
+                ),
             ),
         ),
     )

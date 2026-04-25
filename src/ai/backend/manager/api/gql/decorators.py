@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import enum
 from collections.abc import Callable, Sequence
-from typing import Any, TypeVar, dataclass_transform, overload
+from typing import Any, TypeVar, cast, dataclass_transform, overload
 
 import strawberry
 import strawberry.experimental.pydantic
@@ -318,17 +318,29 @@ def gql_enum(
     return strawberry.enum(description=description)
 
 
+_ResolverFn = TypeVar("_ResolverFn", bound=Callable[..., Any])
+
+
 def gql_mutation(
     meta: BackendAIGQLMeta,
     *,
     name: str | None = None,
     deprecation_reason: str | None = None,
-) -> Any:
-    """Mutation resolver with version metadata."""
-    return strawberry.mutation(
-        description=_build_description(meta),
-        name=name,
-        deprecation_reason=deprecation_reason,
+) -> Callable[[_ResolverFn], _ResolverFn]:
+    """Mutation resolver with version metadata.
+
+    Returned signature preserves the decorated function's type so mypy
+    does not flag the wrapped resolver as untyped. At runtime Strawberry
+    rewrites the attribute into a :class:`StrawberryField`, but the
+    type-checker only sees the pass-through contract.
+    """
+    return cast(
+        Callable[[_ResolverFn], _ResolverFn],
+        strawberry.mutation(
+            description=_build_description(meta),
+            name=name,
+            deprecation_reason=deprecation_reason,
+        ),
     )
 
 
@@ -337,12 +349,15 @@ def gql_subscription(
     *,
     name: str | None = None,
     deprecation_reason: str | None = None,
-) -> Any:
+) -> Callable[[_ResolverFn], _ResolverFn]:
     """Subscription resolver with version metadata."""
-    return strawberry.subscription(
-        description=_build_description(meta),
-        name=name,
-        deprecation_reason=deprecation_reason,
+    return cast(
+        Callable[[_ResolverFn], _ResolverFn],
+        strawberry.subscription(
+            description=_build_description(meta),
+            name=name,
+            deprecation_reason=deprecation_reason,
+        ),
     )
 
 

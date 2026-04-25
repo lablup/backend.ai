@@ -292,7 +292,7 @@ class GetPresignedUploadURLPayload:
     fields: strawberry.auto
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create an object storage."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create an object storage."))
 async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload:
@@ -304,7 +304,7 @@ async def create_object_storage(
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update an object storage."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update an object storage."))
 async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload:
@@ -316,7 +316,7 @@ async def update_object_storage(
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete an object storage."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete an object storage."))
 async def delete_object_storage(
     input: DeleteObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteObjectStoragePayload:
@@ -327,7 +327,7 @@ async def delete_object_storage(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.14.0", description="Get a presigned download URL.")
-)  # type: ignore[misc]
+)
 async def get_presigned_download_url(
     input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedDownloadURLPayload:
@@ -340,7 +340,7 @@ async def get_presigned_download_url(
     return GetPresignedDownloadURLPayload(presigned_url=result.presigned_url)
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Get a presigned upload URL."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Get a presigned upload URL."))
 async def get_presigned_upload_url(
     input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedUploadURLPayload:

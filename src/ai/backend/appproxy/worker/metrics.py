@@ -9,7 +9,7 @@ from prometheus_client.parser import text_string_to_metric_families
 
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
-from ai.backend.common.types import MetricKey, ModelServiceStatus
+from ai.backend.common.types import MetricKey
 from ai.backend.logging import BraceStyleAdapter
 
 from .errors import InvalidAppInfoTypeError, InvalidMatrixSizeError
@@ -71,11 +71,6 @@ async def gather_prometheus_inference_measures(
     # Use ClientPool to reuse sessions per kernel host:port
     for route in routes:
         if not route.route_id:
-            continue
-
-        # Skip unhealthy routes to avoid connection errors
-        if route.health_status and route.health_status != ModelServiceStatus.HEALTHY:
-            log.debug("Skipping metrics collection for unhealthy route {}", route.route_id)
             continue
 
         # Create a client key for each kernel endpoint

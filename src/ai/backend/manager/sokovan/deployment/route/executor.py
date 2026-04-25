@@ -11,6 +11,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ValkeyScheduleClient,
 )
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
@@ -24,7 +25,9 @@ from ai.backend.manager.errors.deployment import (
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
-from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
+from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
+    DeploymentSessionDraftBuilder,
+)
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionError,
@@ -81,9 +84,9 @@ class RouteExecutor:
         """
         # Phase 1: Load configuration
         with RouteRecorderContext.shared_phase("load_configuration"):
-            with RouteRecorderContext.shared_step("load_endpoint_config"):
-                endpoint_ids = {route.endpoint_id for route in routes}
-                deployments = await self._deployment_repo.get_endpoints_by_ids(endpoint_ids)
+            with RouteRecorderContext.shared_step("load_deployment_config"):
+                deployment_ids = {route.deployment_id for route in routes}
+                deployments = await self._deployment_repo.get_deployments_by_ids(deployment_ids)
                 deployment_map = {dep.id: dep for dep in deployments}
 
         route_session_ids: dict[UUID, SessionId] = {}
@@ -302,8 +305,11 @@ class RouteExecutor:
 
         Reads RouteHealthRecord and classifies based on computed healthy/stale:
         - HEALTHY: record.healthy is True
-        - UNHEALTHY: record.healthy is False and not stale
-        - DEGRADED: record is stale or missing
+        - UNHEALTHY: record.healthy is False and not stale (only past initial_delay)
+        - DEGRADED: record is stale or missing (only past initial_delay)
+        - (no transition): within initial_delay without a successful probe yet —
+          the route keeps whatever health_status it already has so a transient
+          warmup failure does not downgrade it prematurely.
 
         The handler only reads and syncs to DB — all health check logic
         is in the RouteHealthObserver.
@@ -335,8 +341,22 @@ class RouteExecutor:
                 stale.append(route)
                 continue
 
+            within_initial_delay = current_time < record.initial_delay_until
+
+            # Success path always wins — a healthy probe transitions the route
+            # to HEALTHY even if initial_delay has not elapsed, so the kernel
+            # can start receiving traffic as soon as it is ready.
+            if record.last_check > 0 and not record.is_stale(current_time) and record.healthy:
+                successes.append(route)
+                continue
+
+            # Within initial_delay and no successful probe yet — hold the
+            # existing health_status (NOT_CHECKED/HEALTHY/UNHEALTHY/DEGRADED)
+            # by skipping classification entirely.
+            if within_initial_delay:
+                continue
+
             if record.last_check == 0:
-                # Never checked yet — keep as NOT_CHECKED (stale)
                 stale.append(route)
                 continue
 
@@ -344,17 +364,14 @@ class RouteExecutor:
                 stale.append(route)
                 continue
 
-            if record.healthy:
-                successes.append(route)
-            else:
-                errors.append(
-                    RouteExecutionError(
-                        route_info=route,
-                        reason="Route health check failed",
-                        error_detail="RouteHealthRecord reports unhealthy",
-                        error_code=None,
-                    )
+            errors.append(
+                RouteExecutionError(
+                    route_info=route,
+                    reason="Route health check failed",
+                    error_detail="RouteHealthRecord reports unhealthy",
+                    error_code=None,
                 )
+            )
 
         return RouteExecutionResult(
             successes=successes,
@@ -405,8 +422,8 @@ class RouteExecutor:
                 metrics_path="/metrics",
                 labels={
                     "runtime_variant": data.runtime_variant,
-                    "endpoint_id": str(data.endpoint_id),
-                    "deployment_id": str(data.endpoint_id),
+                    "endpoint_id": str(data.deployment_id),
+                    "deployment_id": str(data.deployment_id),
                     "session_owner": str(data.session_owner),
                     "project": str(data.project),
                 },
@@ -445,32 +462,32 @@ class RouteExecutor:
 
         # Phase 1: Load cleanup configuration
         with RouteRecorderContext.shared_phase("load_cleanup_config"):
-            with RouteRecorderContext.shared_step("load_endpoint_info"):
-                endpoint_ids = {route.endpoint_id for route in routes}
-                endpoints = await self._deployment_repo.get_endpoints_by_ids(endpoint_ids)
+            with RouteRecorderContext.shared_step("load_deployment_info"):
+                deployment_ids = {route.deployment_id for route in routes}
+                deployments = await self._deployment_repo.get_deployments_by_ids(deployment_ids)
 
             with RouteRecorderContext.shared_step("load_cleanup_policy"):
                 scaling_group_names = list({
-                    endpoint.metadata.resource_group for endpoint in endpoints
+                    deployment.metadata.resource_group for deployment in deployments
                 })
                 cleanup_configs = await self._deployment_repo.get_scaling_group_cleanup_configs(
                     scaling_group_names
                 )
 
-        # Create mapping of endpoint_id -> cleanup config (no phase - transformation only)
-        endpoint_cleanup_config: dict[UUID, set[RouteHealthStatus]] = {}
-        for endpoint in endpoints:
-            config = cleanup_configs.get(endpoint.metadata.resource_group, None)
+        # Create mapping of deployment_id -> cleanup config (no phase - transformation only)
+        deployment_cleanup_config: dict[DeploymentID, set[RouteHealthStatus]] = {}
+        for deployment in deployments:
+            config = cleanup_configs.get(deployment.metadata.resource_group, None)
             if config:
-                endpoint_cleanup_config[endpoint.id] = set(config.cleanup_target_statuses)
+                deployment_cleanup_config[deployment.id] = set(config.cleanup_target_statuses)
             else:
-                endpoint_cleanup_config[endpoint.id] = set()
+                deployment_cleanup_config[deployment.id] = set()
 
         successes: list[RouteData] = []
 
         # Phase 2: Identify cleanup targets (per-route)
         for route in routes:
-            should_cleanup = self._check_route_cleanup_eligibility(route, endpoint_cleanup_config)
+            should_cleanup = self._check_route_cleanup_eligibility(route, deployment_cleanup_config)
             if should_cleanup:
                 successes.append(route)
                 log.info(
@@ -494,7 +511,7 @@ class RouteExecutor:
     async def _provision_route(
         self,
         route: RouteData,
-        deployment_map: Mapping[UUID, DeploymentInfo],
+        deployment_map: Mapping[DeploymentID, DeploymentInfo],
     ) -> SessionId | None:
         """Provision a single route by creating a session.
 
@@ -512,9 +529,11 @@ class RouteExecutor:
                 return None
 
             with recorder.step("enqueue_session"):
-                deployment = deployment_map.get(route.endpoint_id)
+                deployment = deployment_map.get(route.deployment_id)
                 if deployment is None:
-                    raise EndpointNotFound(f"Deployment not found for endpoint {route.endpoint_id}")
+                    raise EndpointNotFound(
+                        f"Deployment not found for deployment {route.deployment_id}"
+                    )
 
                 deployment_context = await self._deployment_repo.fetch_deployment_context(
                     deployment,
@@ -522,15 +541,13 @@ class RouteExecutor:
                 )
                 target_revision = deployment.resolve_revision_spec(route.revision_id)
 
-                # Create session with full context
-                return await self._scheduling_controller.enqueue_session(
-                    SessionCreationSpec.from_deployment_info(
-                        deployment_info=deployment,
-                        context=deployment_context,
-                        route_id=route.route_id,
-                        target_revision=target_revision,
-                    )
+                draft = DeploymentSessionDraftBuilder.build(
+                    deployment_info=deployment,
+                    context=deployment_context,
+                    route_id=route.route_id,
+                    target_revision=target_revision,
                 )
+                return await self._scheduling_controller.enqueue_session_from_draft(draft)
 
     def _verify_route_session_status(
         self,
@@ -554,7 +571,7 @@ class RouteExecutor:
     def _check_route_cleanup_eligibility(
         self,
         route: RouteData,
-        endpoint_cleanup_config: Mapping[UUID, set[RouteHealthStatus]],
+        deployment_cleanup_config: Mapping[DeploymentID, set[RouteHealthStatus]],
     ) -> bool:
         """Check if route should be cleaned up based on cleanup config."""
         pool = RouteRecorderContext.current_pool()
@@ -562,5 +579,5 @@ class RouteExecutor:
 
         with recorder.phase("identify_cleanup_target"):
             with recorder.step("check_cleanup_eligibility"):
-                cleanup_targets = endpoint_cleanup_config.get(route.endpoint_id, set())
+                cleanup_targets = deployment_cleanup_config.get(route.deployment_id, set())
                 return route.health_status in cleanup_targets

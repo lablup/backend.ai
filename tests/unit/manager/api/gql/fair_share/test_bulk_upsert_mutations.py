@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -100,7 +101,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
             ],
         )
 
-        resolver_fn = domain_resolver.bulk_upsert_domain_fair_share_weight.base_resolver
+        resolver_fn = cast(Any, domain_resolver.bulk_upsert_domain_fair_share_weight).base_resolver
         result = await resolver_fn(mock_info, input_data)
 
         mock_adapter.assert_called_once()
@@ -139,7 +140,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
             ],
         )
 
-        resolver_fn = domain_resolver.bulk_upsert_domain_fair_share_weight.base_resolver
+        resolver_fn = cast(Any, domain_resolver.bulk_upsert_domain_fair_share_weight).base_resolver
         result = await resolver_fn(mock_info, input_data)
 
         assert result.upserted_count == 5
@@ -164,7 +165,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
             inputs=[DomainWeightInputItem(domain_name="domain1", weight=Decimal("1.0"))],
         )
 
-        resolver_fn = domain_resolver.bulk_upsert_domain_fair_share_weight.base_resolver
+        resolver_fn = cast(Any, domain_resolver.bulk_upsert_domain_fair_share_weight).base_resolver
         with pytest.raises(web.HTTPForbidden):
             await resolver_fn(mock_info, input_data)
 
@@ -212,7 +213,9 @@ class TestBulkUpsertProjectFairShareWeightMutation:
             ],
         )
 
-        resolver_fn = project_resolver.bulk_upsert_project_fair_share_weight.base_resolver
+        resolver_fn = cast(
+            Any, project_resolver.bulk_upsert_project_fair_share_weight
+        ).base_resolver
         result = await resolver_fn(mock_info, input_data)
 
         mock_adapter.assert_called_once()
@@ -254,7 +257,9 @@ class TestBulkUpsertProjectFairShareWeightMutation:
             ],
         )
 
-        resolver_fn = project_resolver.bulk_upsert_project_fair_share_weight.base_resolver
+        resolver_fn = cast(
+            Any, project_resolver.bulk_upsert_project_fair_share_weight
+        ).base_resolver
         with pytest.raises(web.HTTPForbidden):
             await resolver_fn(mock_info, input_data)
 
@@ -306,7 +311,7 @@ class TestBulkUpsertUserFairShareWeightMutation:
             ],
         )
 
-        resolver_fn = user_resolver.bulk_upsert_user_fair_share_weight.base_resolver
+        resolver_fn = cast(Any, user_resolver.bulk_upsert_user_fair_share_weight).base_resolver
         result = await resolver_fn(mock_info, input_data)
 
         mock_adapter.assert_called_once()
@@ -351,7 +356,7 @@ class TestBulkUpsertUserFairShareWeightMutation:
             ],
         )
 
-        resolver_fn = user_resolver.bulk_upsert_user_fair_share_weight.base_resolver
+        resolver_fn = cast(Any, user_resolver.bulk_upsert_user_fair_share_weight).base_resolver
         with pytest.raises(web.HTTPForbidden):
             await resolver_fn(mock_info, input_data)
 

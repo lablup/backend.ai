@@ -22,7 +22,8 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.types import ClusterMode, MountPermission, RuntimeVariant
 
 __all__ = (
     "AccessTokenOrderField",
@@ -95,7 +96,7 @@ class RevisionOrderField(StrEnum):
     CREATED_AT = "created_at"
     RESOURCE_GROUP = "resource_group"
     CLUSTER_MODE = "cluster_mode"
-    RUNTIME_VARIANT = "runtime_variant"
+    RUNTIME_VARIANT_NAME = "runtime_variant_name"
 
 
 class RouteOrderField(StrEnum):
@@ -352,9 +353,14 @@ class ResourceConfigInfoDTO(BaseResponseModel):
 
 
 class ModelRuntimeConfigInfoDTO(BaseResponseModel):
-    """Runtime configuration backing DTO for ModelRuntimeConfig GQL type."""
+    """Runtime configuration backing DTO for ModelRuntimeConfig GQL type.
 
-    runtime_variant: str
+    Only the ``runtime_variant_id`` is exposed on v2 responses; clients
+    resolve the full variant node via a separate GraphQL field resolver
+    (or REST lookup) when the name/metadata is needed.
+    """
+
+    runtime_variant_id: RuntimeVariantID
     inference_runtime_config: dict[str, Any] | None = None
     environ: EnvironmentVariablesInfoDTO | None = None
 
@@ -381,6 +387,17 @@ class ExtraVFolderMountGQLDTO(BaseResponseModel):
 
     vfolder_id: str
     mount_destination: str | None = None
+    mount_perm: MountPermission | None = Field(
+        default=None,
+        description=(
+            "The concrete permission snapshot fixed at revision-write time. "
+            "``INHERIT`` policies are resolved against the vfolder's current "
+            "permission at that point, so this value is immutable and does "
+            "not change when the vfolder's permission later changes. ``None`` "
+            "when the caller left it unset to inherit the vfolder's stored "
+            "permission at session-creation time (task #83)."
+        ),
+    )
 
 
 class DeploymentMetadataInfoDTO(BaseResponseModel):

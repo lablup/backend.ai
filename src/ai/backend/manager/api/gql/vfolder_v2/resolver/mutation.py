@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
     CloneVFolderInputGQL,
     CloneVFolderPayloadGQL,
     CreateVFolderInputGQL,
+    CreateVFolderInScopeInputGQL,
     CreateVFolderPayloadGQL,
     DeleteFilesInputGQL,
     DeleteFilesPayloadGQL,
@@ -43,7 +44,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
         added_version="26.4.2",
         description="Create a new virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def create_vfolder_v2(
     info: Info[StrawberryGQLContext],
     input: CreateVFolderInputGQL,
@@ -57,7 +58,7 @@ async def create_vfolder_v2(
         added_version="26.4.2",
         description="Soft-delete a virtual folder (move to trash).",
     )
-)  # type: ignore[misc]
+)
 async def delete_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -71,7 +72,7 @@ async def delete_vfolder_v2(
         added_version="26.4.2",
         description="Permanently purge a virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def purge_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -86,7 +87,7 @@ async def purge_vfolder_v2(
         description="Restore a trashed virtual folder. RBAC enforced via scope chain.",
     ),
     name="restoreVFolder",
-)  # type: ignore[misc]
+)
 async def restore_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -101,7 +102,7 @@ async def restore_vfolder_v2(
         added_version="26.4.2",
         description="Deploy a deployment directly from a model VFolder.",
     )
-)  # type: ignore[misc]
+)
 async def deploy_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -116,7 +117,7 @@ async def deploy_vfolder_v2(
         added_version="26.4.2",
         description="Clone a virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def clone_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -131,7 +132,7 @@ async def clone_vfolder_v2(
         added_version="26.4.2",
         description="List files in a virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def vfolder_list_files_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -146,7 +147,7 @@ async def vfolder_list_files_v2(
         added_version="26.4.2",
         description="Create directories inside a virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def vfolder_mkdir_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -161,7 +162,7 @@ async def vfolder_mkdir_v2(
         added_version="26.4.2",
         description="Move a file within a virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def vfolder_move_file_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -176,7 +177,7 @@ async def vfolder_move_file_v2(
         added_version="26.4.2",
         description="Delete files inside a virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def vfolder_delete_files_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -191,7 +192,7 @@ async def vfolder_delete_files_v2(
         added_version="26.4.2",
         description="Create an upload session for a virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def vfolder_create_upload_session_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -208,7 +209,7 @@ async def vfolder_create_upload_session_v2(
         added_version="26.4.2",
         description="Create a download session for a virtual folder.",
     )
-)  # type: ignore[misc]
+)
 async def vfolder_create_download_session_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
@@ -225,7 +226,7 @@ async def vfolder_create_download_session_v2(
         added_version="26.4.2",
         description="Soft-delete multiple virtual folders.",
     )
-)  # type: ignore[misc]
+)
 async def bulk_delete_vfolders_v2(
     info: Info[StrawberryGQLContext],
     input: BulkDeleteVFoldersInputGQL,
@@ -247,10 +248,30 @@ async def bulk_delete_vfolders_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Create a virtual folder owned by the specified project. "
+            "Requires project-scoped CREATE permission."
+        ),
+    ),
+    name="createVFolderInProject",
+)
+async def create_vfolder_in_project(
+    info: Info[StrawberryGQLContext],
+    project_id: UUID,
+    input: CreateVFolderInScopeInputGQL,
+) -> CreateVFolderPayloadGQL:
+    """Create a new virtual folder scoped to a project."""
+    payload = await info.context.adapters.vfolder.create_in_project(project_id, input.to_pydantic())
+    return CreateVFolderPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Permanently purge multiple virtual folders.",
     )
-)  # type: ignore[misc]
+)
 async def bulk_purge_vfolders_v2(
     info: Info[StrawberryGQLContext],
     input: BulkPurgeVFoldersInputGQL,

@@ -5,6 +5,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentOptionsInfo,
+    DeploymentTimeoutsInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     CreateResourceGroupPayload,
     DeleteResourceGroupPayload,
@@ -21,6 +25,15 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     PreemptionOrderDTO,
     SchedulerTypeDTO,
+)
+from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.common.dto.manager.v2.session_options.response import (
+    DefaultSessionOptionsInfo,
+    SessionTimeoutsInfo,
+)
+from ai.backend.common.dto.manager.v2.session_options.types import (
+    AgentSelectionPolicyEnum,
+    FailurePolicyEnum,
 )
 
 
@@ -60,6 +73,18 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
                 order=PreemptionOrderDTO.OLDEST,
                 mode=PreemptionModeDTO.TERMINATE,
             ),
+        ),
+        default_deployment_options=DeploymentOptionsInfo(
+            timeouts=DeploymentTimeoutsInfo(default=None, by_handler=[]),
+        ),
+        default_session_options=DefaultSessionOptionsInfo(
+            priority=0,
+            is_preemptible=False,
+            cluster_mode=ClusterModeEnum.SINGLE_NODE,
+            default_failure_policy=FailurePolicyEnum.STRICT,
+            default_kernel_execution_spec=None,
+            timeouts=SessionTimeoutsInfo(default=None, by_handler=[]),
+            agent_selection_policy=AgentSelectionPolicyEnum.STRICT,
         ),
     )
 

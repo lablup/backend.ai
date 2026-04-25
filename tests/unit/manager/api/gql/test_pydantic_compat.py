@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any, cast
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import strawberry
@@ -22,7 +23,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     ContainerRegistryNode,
 )
-from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.registry import Adapters
 from ai.backend.manager.api.gql.container_registry.types import (
     ContainerRegistryGQL,
@@ -353,9 +354,19 @@ class TestAdaptersRegistry:
     """Verify Adapters registry can be created."""
 
     def test_create_registry(self) -> None:
-        adapters = Adapters.create(processors=None, auth_config=None)  # type: ignore[arg-type]
+        adapters = Adapters.create(
+            processors=MagicMock(),
+            auth_config=MagicMock(),
+            deployment_coordinator=MagicMock(),
+            schedule_coordinator=MagicMock(),
+        )
         assert isinstance(adapters, Adapters)
 
     def test_container_registry_adapter_available(self) -> None:
-        adapters = Adapters.create(processors=None, auth_config=None)  # type: ignore[arg-type]
+        adapters = Adapters.create(
+            processors=MagicMock(),
+            auth_config=MagicMock(),
+            deployment_coordinator=MagicMock(),
+            schedule_coordinator=MagicMock(),
+        )
         assert isinstance(adapters.container_registry, ContainerRegistryAdapter)

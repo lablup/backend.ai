@@ -41,7 +41,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="Create a new keypair resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     input: CreateKeypairResourcePolicyInputGQL,
@@ -58,7 +58,7 @@ async def admin_create_keypair_resource_policy_v2(
         added_version="26.4.2",
         description="Update a keypair resource policy (admin only). Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -76,7 +76,7 @@ async def admin_update_keypair_resource_policy_v2(
         added_version="26.4.2",
         description="Delete a keypair resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -96,7 +96,7 @@ async def admin_delete_keypair_resource_policy_v2(
         added_version="26.4.2",
         description="Create a new user resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     input: CreateUserResourcePolicyInputGQL,
@@ -113,7 +113,7 @@ async def admin_create_user_resource_policy_v2(
         added_version="26.4.2",
         description="Update a user resource policy (admin only). Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -131,7 +131,7 @@ async def admin_update_user_resource_policy_v2(
         added_version="26.4.2",
         description="Delete a user resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -151,7 +151,7 @@ async def admin_delete_user_resource_policy_v2(
         added_version="26.4.2",
         description="Create a new project resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_project_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     input: CreateProjectResourcePolicyInputGQL,
@@ -168,7 +168,7 @@ async def admin_create_project_resource_policy_v2(
         added_version="26.4.2",
         description="Update a project resource policy (admin only). Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_project_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -186,7 +186,7 @@ async def admin_update_project_resource_policy_v2(
         added_version="26.4.2",
         description="Delete a project resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_project_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,

@@ -117,7 +117,7 @@ class DeploymentStrategyEvaluator:
         )
         route_map: defaultdict[UUID, list[RouteInfo]] = defaultdict(list)
         for route in route_search.items:
-            route_map[route.endpoint_id].append(route)
+            route_map[route.deployment_id].append(route)
 
         # ── 2. Per-deployment evaluation ──
         for deployment in deployments:

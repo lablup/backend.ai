@@ -1,0 +1,56 @@
+"""Container user mapping rule.
+
+Ports the legacy per-kernel fallback (``SessionPreparer._prepare_kernels``
+lines 286-289) into the draft chain. For each kernel draft:
+
+  * ``uid`` falls back to ``context.container_user_info.uid`` when unset
+  * ``main_gid`` falls back to ``context.container_user_info.main_gid``
+  * ``supplementary_gids`` falls back to the context's list when empty
+
+Caller-specified values (e.g. a per-kernel override that the request
+adapter placed directly onto ``KernelSpecDraft.uid``) survive — the
+rule only fills in absent values.
+
+Runs after :class:`.expand_kernel_groups_rule.ExpandKernelGroupsRule`
+so the fallback targets each materialized per-replica draft.
+"""
+
+from __future__ import annotations
+
+from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
+    SessionSpecDraftRule,
+    SessionSpecPreparationContext,
+)
+
+
+class AssignContainerUserMappingRule(SessionSpecDraftRule):
+    """Fill kernel-draft ``uid`` / ``main_gid`` / ``supplementary_gids`` from the context."""
+
+    def name(self) -> str:
+        return "assign_container_user_mapping"
+
+    async def prepare(
+        self,
+        draft: SessionSpecDraft,
+        context: SessionSpecPreparationContext,
+    ) -> SessionSpecDraft:
+        info = context.container_user_info
+        if info is None:
+            return draft
+
+        new_kernels = tuple(
+            k.model_copy(
+                update={
+                    "uid": k.uid if k.uid is not None else info.uid,
+                    "main_gid": (k.main_gid if k.main_gid is not None else info.main_gid),
+                    "supplementary_gids": (
+                        k.supplementary_gids
+                        if k.supplementary_gids
+                        else tuple(info.supplementary_gids)
+                    ),
+                }
+            )
+            for k in draft.kernel_specs
+        )
+        return draft.model_copy(update={"kernel_specs": new_kernels})

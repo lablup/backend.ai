@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
     CreateVFolderInput,
+    CreateVFolderInScopeInput,
     DeleteFilesInput,
     DeployVFolderInput,
     ListFilesInput,
@@ -23,7 +24,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+    from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 
 
 class V2VFolderHandler:
@@ -105,6 +106,15 @@ class V2VFolderHandler:
         """Restore a trashed vfolder."""
         result = await self._adapter.restore(path.parsed.vfolder_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def project_create(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[CreateVFolderInScopeInput],
+    ) -> APIResponse:
+        """Create a vfolder owned by a project. Scope comes from the URL path."""
+        result = await self._adapter.create_in_project(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def deploy(
         self,

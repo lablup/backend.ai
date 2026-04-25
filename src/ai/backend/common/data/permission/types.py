@@ -97,6 +97,7 @@ class EntityType(enum.StrEnum):
     AUDIT_LOG = "audit_log"
     CONTAINER_METRIC = "container_metric"
     CONTAINER_METRIC_METADATA = "container_metric_metadata"
+    CONTAINER_LIVE_STAT = "container_live_stat"
     CONTAINER_REGISTRY = "container_registry"
     DEPLOYMENT = "deployment"
     ERROR_LOG = "error_log"
@@ -339,6 +340,7 @@ class ScopeType(enum.StrEnum):
     ARTIFACT_REVISION = "artifact_revision"
     AGENT = "agent"
     ROLE = "role"
+    ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
     KEYPAIR = "keypair"
 
@@ -411,6 +413,7 @@ class RBACElementType(enum.StrEnum):
     DEPLOYMENT_POLICY = "deployment:policy"
     DEPLOYMENT_REVISION = "deployment:revision"
     IMAGE_ALIAS = "image:alias"
+    ROLE_ASSIGNMENT = "role:assignment"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"

@@ -27,7 +27,7 @@ class UnsupportedOperation(BackendAIError):
         )
 
 
-class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
+class NotImplementedAPI(BackendAIError, web.HTTPNotImplemented):
     error_type = "https://api.backend.ai/probs/not-implemented"
     error_title = "This API is not implemented."
 

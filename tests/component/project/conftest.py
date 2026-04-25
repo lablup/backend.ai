@@ -25,7 +25,7 @@ from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
-from ai.backend.manager.api.adapters.project import ProjectAdapter
+from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.project.handler import V2ProjectHandler
@@ -127,8 +127,8 @@ def group_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_repo),
-                single_entity=SingleEntityActionRBACValidator(permission_repo),
+                scope=ScopeActionRBACValidator(permission_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(permission_repo, MagicMock()),
             ),
         ),
     )

@@ -27,7 +27,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="Create a new container registry (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_container_registry_v2(
     info: Info[StrawberryGQLContext],
     input: CreateContainerRegistryInputGQL,
@@ -42,7 +42,7 @@ async def admin_create_container_registry_v2(
         added_version="26.4.2",
         description="Update a container registry (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_container_registry_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateContainerRegistryInputGQL,
@@ -57,7 +57,7 @@ async def admin_update_container_registry_v2(
         added_version="26.4.2",
         description="Delete a container registry (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_container_registry_v2(
     info: Info[StrawberryGQLContext],
     id: str,

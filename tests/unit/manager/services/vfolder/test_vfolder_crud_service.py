@@ -12,11 +12,13 @@ import aiohttp
 import pytest
 
 from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderUsageMode,
 )
+from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
@@ -149,7 +151,7 @@ def _make_vfolder_data(
     unmanaged_path: str | None = None,
 ) -> VFolderData:
     return VFolderData(
-        id=vfolder_id,
+        id=VFolderUUID(vfolder_id),
         name=name,
         host=host,
         domain_name="default",
@@ -243,7 +245,12 @@ class TestCreateVFolderAction:
         group_uuid: uuid.UUID,
     ) -> None:
         mock_vfolder_repository.get_group_resource_info = AsyncMock(
-            return_value=(group_uuid, 10, 0, None)
+            return_value=ProjectResourceInfo(
+                project_id=group_uuid,
+                max_vfolder_count=10,
+                max_quota_scope_size=0,
+                project_type=ProjectType.GENERAL,
+            )
         )
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
         mock_vfolder_repository.count_vfolders_by_group = AsyncMock(return_value=0)
@@ -396,7 +403,12 @@ class TestCreateVFolderAction:
         group_uuid: uuid.UUID,
     ) -> None:
         mock_vfolder_repository.get_group_resource_info = AsyncMock(
-            return_value=(group_uuid, 10, 0, ProjectType.MODEL_STORE)
+            return_value=ProjectResourceInfo(
+                project_id=group_uuid,
+                max_vfolder_count=10,
+                max_quota_scope_size=0,
+                project_type=ProjectType.MODEL_STORE,
+            )
         )
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
         mock_vfolder_repository.count_vfolders_by_group = AsyncMock(return_value=0)

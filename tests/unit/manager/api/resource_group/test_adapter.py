@@ -18,8 +18,8 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
 )
-from ai.backend.manager.api.adapters.pagination import PaginationSpec
-from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
+from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
@@ -44,7 +44,11 @@ def _get_pagination_spec() -> PaginationSpec:
 
 def _make_adapter() -> ResourceGroupAdapter:
     """Create a ResourceGroupAdapter with a mock processors."""
-    return ResourceGroupAdapter(processors=MagicMock())
+    return ResourceGroupAdapter(
+        processors=MagicMock(),
+        deployment_coordinator=MagicMock(),
+        schedule_coordinator=MagicMock(),
+    )
 
 
 class TestResourceGroupAdapterConvertFilter:

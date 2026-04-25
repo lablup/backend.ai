@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
     SearchProjectFairSharesPayload,
 )
 from ai.backend.common.types import ResourceSlot, SlotQuantity
-from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
+from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import project as project_resolver
 from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareGQL,

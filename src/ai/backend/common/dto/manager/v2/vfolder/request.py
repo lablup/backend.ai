@@ -11,6 +11,7 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -30,6 +31,7 @@ __all__ = (
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
+    "CreateVFolderInScopeInput",
     "CreateVFolderInput",
     "DeleteFilesInput",
     "DeleteInvitationInput",
@@ -72,6 +74,38 @@ class CreateVFolderInput(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
     unmanaged_path: str | None = Field(default=None, description="Path for unmanaged vfolders")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_and_validate_name(cls, v: object) -> object:
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("name must not be blank or whitespace-only")
+            return stripped
+        return v
+
+
+class CreateVFolderInScopeInput(BaseRequestModel):
+    """Scope-agnostic body for vfolder creation under a specific scope.
+
+    The owning scope (project, user, domain, …) is supplied externally by
+    the transport layer (REST path segment, GraphQL mutation argument)
+    and is NOT part of this body. This keeps the body reusable across
+    scope-specific endpoints without forcing clients to duplicate the
+    scope identifier.
+    """
+
+    name: VFolderName = Field(description="VFolder name")
+    host: str | None = Field(default=None, description="Storage host for the vfolder")
+    usage_mode: VFolderUsageMode = Field(
+        default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
+    )
+    permission: VFolderPermissionField = Field(
+        default=VFolderPermissionField.READ_WRITE,
+        description="Default permission of the vfolder",
+    )
+    cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
 
     @field_validator("name", mode="before")
     @classmethod
@@ -330,7 +364,7 @@ class DeployVFolderInput(BaseRequestModel):
         description="Target project UUID where the deployment will be created. "
         "Must be a general project, not MODEL_STORE.",
     )
-    revision_preset_id: UUID = Field(
+    revision_preset_id: DeploymentPresetID = Field(
         description="Deployment revision preset UUID that provides image, "
         "runtime variant, resource slots, environ, and startup command.",
     )

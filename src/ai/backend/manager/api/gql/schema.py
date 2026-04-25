@@ -257,9 +257,11 @@ from .prometheus_query_preset import (
     prometheus_query_presets,
 )
 from .rbac import (
+    accept_role_invitation,
     admin_assign_role,
     admin_bulk_assign_role,
     admin_bulk_revoke_role,
+    admin_cancel_role_invitation,
     admin_create_permission,
     admin_create_role,
     admin_delete_permission,
@@ -270,14 +272,20 @@ from .rbac import (
     admin_revoke_role,
     admin_role,
     admin_role_assignments,
+    admin_role_invitations,
     admin_roles,
     admin_update_permission,
     admin_update_role,
+    create_role_invitation,
+    my_role_invitations,
     my_roles,
+    my_sent_role_invitations,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
+    reject_role_invitation,
+    role_scoped_role_invitations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -310,6 +318,8 @@ from .resource_group import (
     admin_update_allowed_resource_groups_for_project_v2,
     admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
+    replace_resource_group_default_deployment_options,
+    replace_resource_group_default_session_options,
     resource_groups,
     update_resource_group_fair_share_spec,
 )
@@ -366,6 +376,7 @@ from .runtime_variant_preset import (
 from .scheduler import (
     scheduling_events_by_session,
 )
+from .scheduling_handler import scheduling_handlers
 from .scheduling_history import (
     admin_deployment_histories,
     admin_route_histories,
@@ -415,6 +426,7 @@ from .vfolder_v2 import (
     bulk_delete_vfolders_v2,
     bulk_purge_vfolders_v2,
     clone_vfolder_v2,
+    create_vfolder_in_project,
     create_vfolder_v2,
     delete_vfolder_v2,
     deploy_vfolder_v2,
@@ -470,6 +482,7 @@ class Query:
     # Admin APIs
     admin_resource_groups = admin_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
+    scheduling_handlers = scheduling_handlers
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
     admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
@@ -531,8 +544,13 @@ class Query:
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
+    my_role_invitations = my_role_invitations
+    my_sent_role_invitations = my_sent_role_invitations
+    # RBAC Admin Invitation APIs
+    admin_role_invitations = admin_role_invitations
     # RBAC Scoped APIs
     project_roles = project_roles
+    role_scoped_role_invitations = role_scoped_role_invitations
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
@@ -742,6 +760,10 @@ class Mutation:
     admin_update_allowed_projects_for_resource_group_v2 = (
         admin_update_allowed_projects_for_resource_group_v2
     )
+    replace_resource_group_default_deployment_options = (
+        replace_resource_group_default_deployment_options
+    )
+    replace_resource_group_default_session_options = replace_resource_group_default_session_options
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # Domain V2 APIs
@@ -801,6 +823,11 @@ class Mutation:
     admin_revoke_role = admin_revoke_role
     admin_bulk_assign_role = admin_bulk_assign_role
     admin_bulk_revoke_role = admin_bulk_revoke_role
+    # RBAC Invitation Mutations
+    create_role_invitation = create_role_invitation
+    accept_role_invitation = accept_role_invitation
+    reject_role_invitation = reject_role_invitation
+    admin_cancel_role_invitation = admin_cancel_role_invitation
     # Resource Policy V2 APIs
     admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
     admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
@@ -841,6 +868,7 @@ class Mutation:
     deploy_model_card_v2 = deploy_model_card_v2
     # VFolder V2 mutations
     create_vfolder_v2 = create_vfolder_v2
+    create_vfolder_in_project = create_vfolder_in_project
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
     restore_vfolder_v2 = restore_vfolder_v2

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Self
 
+from ai.backend.manager.clients.prometheus.fixed_query_builder import FixedQueryBuilder
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.types import RepositoryArgs
 
@@ -11,8 +12,12 @@ class MetricRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = MetricRepository(args.db)
-
         return cls(
-            repository=repository,
+            repository=MetricRepository(
+                args.db,
+                prometheus_client=args.prometheus_client,
+                fixed_query_builder=FixedQueryBuilder(
+                    args.config_provider.config.metric.timewindow
+                ),
+            ),
         )

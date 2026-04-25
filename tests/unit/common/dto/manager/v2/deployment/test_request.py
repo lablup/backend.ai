@@ -37,17 +37,21 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateDeploymentInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode
 
 
 def _make_revision_input(**kwargs: object) -> RevisionInput:
     defaults: dict[str, Any] = {
-        "image_id": uuid.uuid4(),
+        "image_id": ImageID(uuid.uuid4()),
         "cluster_mode": ClusterMode.SINGLE_NODE,
         "cluster_size": 1,
         "resource_group": "default",
         "resource_slots": {"cpu": "2", "mem": "4g"},
-        "model_vfolder_id": uuid.uuid4(),
+        "runtime_variant_id": RuntimeVariantID(uuid.uuid4()),
+        "model_vfolder_id": VFolderUUID(uuid.uuid4()),
         "model_definition_path": "/models/model.yaml",
         "model_definition": ModelDefinitionDraft(),
     }
@@ -67,10 +71,12 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
                 ]
             ),
         ),
-        "image": ImageInput(id=uuid.uuid4()),
-        "model_runtime_config": ModelRuntimeConfigInput(runtime_variant="custom"),
+        "image": ImageInput(id=ImageID(uuid.uuid4())),
+        "model_runtime_config": ModelRuntimeConfigInput(
+            runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
+        ),
         "model_mount_config": ModelMountConfigInput(
-            vfolder_id=uuid.uuid4(),
+            vfolder_id=VFolderUUID(uuid.uuid4()),
             mount_destination="/models",
             definition_path="/models/model.yaml",
         ),
@@ -84,13 +90,15 @@ class TestRevisionInput:
     """Tests for RevisionInput model creation and validation."""
 
     def test_valid_creation_with_required_fields(self) -> None:
-        image_id = uuid.uuid4()
-        model_id = uuid.uuid4()
+        image_id = ImageID(uuid.uuid4())
+        model_id = VFolderUUID(uuid.uuid4())
+        runtime_variant_id = RuntimeVariantID(uuid.uuid4())
         rev = RevisionInput(
             image_id=image_id,
             cluster_mode=ClusterMode.SINGLE_NODE,
             resource_group="default",
             resource_slots={"cpu": "2"},
+            runtime_variant_id=runtime_variant_id,
             model_vfolder_id=model_id,
             model_definition_path="/models/def.yaml",
             model_definition=ModelDefinitionDraft(),
@@ -105,9 +113,10 @@ class TestRevisionInput:
         rev = _make_revision_input()
         assert rev.cluster_size == 1
 
-    def test_default_runtime_variant_is_custom(self) -> None:
-        rev = _make_revision_input()
-        assert rev.runtime_variant == RuntimeVariant("custom")
+    def test_runtime_variant_id_is_preserved(self) -> None:
+        runtime_variant_id = RuntimeVariantID(uuid.uuid4())
+        rev = _make_revision_input(runtime_variant_id=runtime_variant_id)
+        assert rev.runtime_variant_id == runtime_variant_id
 
     def test_default_model_mount_destination(self) -> None:
         rev = _make_revision_input()
@@ -130,28 +139,26 @@ class TestRevisionInput:
             _make_revision_input(cluster_size=0)
 
     def test_with_extra_mounts(self) -> None:
-        mount = ExtraVFolderMountInput(vfolder_id=uuid.uuid4(), mount_destination="/data")
+        mount = ExtraVFolderMountInput(
+            vfolder_id=VFolderUUID(uuid.uuid4()), mount_destination="/data"
+        )
         rev = _make_revision_input(extra_mounts=[mount])
         assert rev.extra_mounts is not None
         assert len(rev.extra_mounts) == 1
         assert rev.extra_mounts[0].mount_destination == "/data"
-
-    def test_with_vllm_runtime_variant(self) -> None:
-        rev = _make_revision_input(runtime_variant=RuntimeVariant("vllm"))
-        assert rev.runtime_variant == RuntimeVariant("vllm")
 
 
 class TestExtraVFolderMountInput:
     """Tests for ExtraVFolderMountInput model."""
 
     def test_valid_creation(self) -> None:
-        vfolder_id = uuid.uuid4()
+        vfolder_id = VFolderUUID(uuid.uuid4())
         mount = ExtraVFolderMountInput(vfolder_id=vfolder_id, mount_destination="/data")
         assert mount.vfolder_id == vfolder_id
         assert mount.mount_destination == "/data"
 
     def test_mount_destination_defaults_to_none(self) -> None:
-        mount = ExtraVFolderMountInput(vfolder_id=uuid.uuid4())
+        mount = ExtraVFolderMountInput(vfolder_id=VFolderUUID(uuid.uuid4()))
         assert mount.mount_destination is None
 
     def test_missing_vfolder_id_raises_validation_error(self) -> None:
@@ -387,7 +394,7 @@ class TestCreateDeploymentInput:
         assert inp.default_deployment_strategy.blue_green.auto_promote is True
 
     def test_nested_revision_input(self) -> None:
-        image_id = uuid.uuid4()
+        image_id = ImageID(uuid.uuid4())
         rev = _make_create_revision_input_dto(image=ImageInput(id=image_id))
         inp = self._make_input(initial_revision=rev)
         assert inp.initial_revision is not None

@@ -217,6 +217,24 @@ class ScheduleCoordinator:
             scheduling_controller,
         )
 
+    def registered_lifecycle_handlers(self) -> tuple[SessionLifecycleHandler, ...]:
+        """Return the unique set of lifecycle handlers attached to this
+        coordinator.
+
+        Used by the ResourceGroup admin-replace path to validate
+        ``SessionTimeouts.by_handler`` keys against the live registry.
+        Deduplicates on ``id()`` because a single handler instance may
+        be registered under multiple ``ScheduleType`` keys.
+        """
+        seen: set[int] = set()
+        unique: list[SessionLifecycleHandler] = []
+        for handler in self._handlers.lifecycle_handlers.values():
+            if id(handler) in seen:
+                continue
+            seen.add(id(handler))
+            unique.append(handler)
+        return tuple(unique)
+
     async def process_lifecycle_schedule(
         self,
         schedule_type: ScheduleType,

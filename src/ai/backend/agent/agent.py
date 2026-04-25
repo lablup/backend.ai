@@ -51,8 +51,7 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
+from pydantic import ValidationError
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -62,7 +61,6 @@ from tenacity import (
     stop_after_delay,
     wait_fixed,
 )
-from trafaret import DataError
 
 from ai.backend.agent.errors import (
     AsyncioTaskNotAvailableError,
@@ -86,7 +84,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.config import model_definition_iv
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
@@ -137,12 +135,6 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatedBroadcastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    ModelServiceStatusAnycastEvent,
-)
-from ai.backend.common.events.event_types.model_serving.broadcast import (
-    ModelServiceStatusBroadcastEvent,
-)
 from ai.backend.common.events.event_types.session.anycast import (
     ExecutionFinishedAnycastEvent,
     ExecutionStartedAnycastEvent,
@@ -186,7 +178,6 @@ from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
     AgentId,
     AutoPullBehavior,
@@ -205,12 +196,10 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelCreationResult,
     KernelId,
-    ModelServiceStatus,
     MountPermission,
     MountTypes,
     RedisTarget,
     ResourceSlot,
-    RuntimeVariant,
     Sentinel,
     ServicePort,
     ServicePortProtocols,
@@ -240,10 +229,8 @@ from .errors import (
     ContainerStartupFailedError,
     ContainerStartupTimeoutError,
     ImageArchitectureMismatchError,
-    ImageCommandRequiredError,
     ImagePullTimeoutError,
     ModelDefinitionEmptyError,
-    ModelDefinitionInvalidYAMLError,
     ModelDefinitionNotFoundError,
     ModelDefinitionValidationError,
     ModelFolderNotSpecifiedError,
@@ -2895,12 +2882,7 @@ class AbstractAgent[
                         service_ports,
                     )
                     if kernel_config["session_type"] == SessionTypes.INFERENCE:
-                        model_definition = await self.load_model_definition(
-                            RuntimeVariant(
-                                (kernel_config["internal_data"] or {}).get(
-                                    "runtime_variant", "custom"
-                                )
-                            ),
+                        model_definition = await self._load_model_definition(
                             model_folders,
                             environ,
                             service_ports,
@@ -3265,33 +3247,25 @@ class AbstractAgent[
         log.debug("starting model service of model {}", model["name"])
         result = await kernel_obj.start_model_service(model)
         if result["status"] == "failed":
-            # handle cases where krunner fails to spawn model service process
-            # if everything went well then krunner itself will report the status via zmq
-            await self.anycast_and_broadcast_event(
-                ModelServiceStatusAnycastEvent(
-                    kernel_obj.session_id,
-                    ModelServiceStatus.UNHEALTHY,
-                ),
-                ModelServiceStatusBroadcastEvent(
-                    kernel_obj.session_id,
-                    ModelServiceStatus.UNHEALTHY,
-                ),
+            log.error(
+                "Model service failed to start for kernel {} (session {}). Destroying kernel.",
+                kernel_obj.kernel_id,
+                kernel_obj.session_id,
+            )
+            await self.inject_container_lifecycle_event(
+                kernel_obj.kernel_id,
+                kernel_obj.session_id,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.FAILED_TO_START,
             )
 
-    async def load_model_definition(
+    async def _load_model_definition(
         self,
-        runtime_variant: RuntimeVariant,
         model_folders: list[VFolderMount],
         environ: MutableMapping[str, Any],
         service_ports: list[ServicePort],
         kernel_config: KernelCreationConfig,
     ) -> Any:
-        image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
-        if runtime_variant != "custom" and not image_command:
-            raise ImageCommandRequiredError(
-                "Image should have its own command when runtime variant is set to values other than CUSTOM"
-            )
-
         if len(model_folders) == 0:
             raise ModelFolderNotSpecifiedError(
                 "At least one model virtual folder must be specified"
@@ -3299,167 +3273,52 @@ class AbstractAgent[
 
         model_folder: VFolderMount = model_folders[0]
 
-        raw_definition: dict[str, Any]
-        match runtime_variant:
-            case "vllm":
-                _model = {
-                    "name": "vllm-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
+        # The manager resolves the final ModelDefinition at deployment-
+        # revision creation time (variant baseline → preset → yaml →
+        # overrides) and persists it on the revision row. The scheduler
+        # inlines that value into the kernel's ``internal_data`` via
+        # ``InternalDataRule``, so the agent must treat it as the sole
+        # source of truth — no per-variant construction, no on-disk read.
+        inlined = (kernel_config.get("internal_data") or {}).get("model_definition")
+        if not inlined:
+            raise ModelDefinitionNotFoundError(
+                "Model definition not inlined in kernel internal_data;"
+                f" vFolder {model_folder.name} (ID {model_folder.vfid})",
+            )
 
-            case "huggingface-tgi":
-                _model = {
-                    "name": "tgi-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "nim":
-                _model = {
-                    "name": "nim-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "sglang":
-                _model = {
-                    "name": "sglang-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "modular-max":
-                _model = {
-                    "name": "max-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "cmd":
-                _model = {
-                    "name": "image-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": 8000,
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "custom":
-                if _fname := (kernel_config.get("internal_data") or {}).get(
-                    "model_definition_path"
-                ):
-                    model_definition_candidates = [_fname]
-                else:
-                    model_definition_candidates = [
-                        "model-definition.yaml",
-                        "model-definition.yml",
-                    ]
-
-                model_definition_path = None
-                for filename in model_definition_candidates:
-                    if (Path(model_folder.host_path) / filename).is_file():
-                        model_definition_path = Path(model_folder.host_path) / filename
-                        break
-
-                if not model_definition_path:
-                    raise ModelDefinitionNotFoundError(
-                        f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
-                        f" {model_folder.name} (ID {model_folder.vfid})",
-                    )
-                try:
-                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                        None, model_definition_path.read_text
-                    )
-                except FileNotFoundError as e:
-                    raise ModelDefinitionNotFoundError(
-                        "Model definition file (model-definition.yml) does not exist under"
-                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-                    ) from e
-                try:
-                    yaml = YAML()
-                    raw_definition = yaml.load(model_definition_yaml)
-                except YAMLError as e:
-                    raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
         try:
-            model_definition = model_definition_iv.check(raw_definition)
-            if model_definition is None:
-                raise ModelDefinitionEmptyError
-            for model in model_definition["models"]:
-                if "BACKEND_MODEL_NAME" not in environ:
-                    environ["BACKEND_MODEL_NAME"] = model["name"]
-                environ["BACKEND_MODEL_PATH"] = model["model_path"]
-                if service := model.get("service"):
-                    if service["port"] in (2000, 2001):
-                        raise ReservedPortError("Port 2000 and 2001 are reserved for internal use")
-                    overlapping_services = [
-                        s for s in service_ports if service["port"] in s["container_ports"]
-                    ]
-                    if len(overlapping_services) > 0:
-                        raise PortConflictError(
-                            f"Port {service['port']} overlaps with built-in service"
-                            f" {overlapping_services[0]['name']}"
-                        )
-                    service_ports.append({
-                        "name": f"{model['name']}-{service['port']}",
-                        "protocol": ServicePortProtocols.PREOPEN,
-                        "container_ports": (service["port"],),
-                        "host_ports": (None,),
-                        "is_inference": True,
-                    })
-            return model_definition
-        except DataError as e:
+            parsed = ModelDefinition.model_validate(inlined)
+        except ValidationError as e:
             raise ModelDefinitionValidationError(
-                "Failed to validate model definition from vFolder"
+                "Failed to validate model definition for vFolder"
                 f" {model_folder.name} (ID {model_folder.vfid})",
             ) from e
+        if not parsed.models:
+            raise ModelDefinitionEmptyError
+        model_definition = parsed.model_dump(mode="json")
+        for model in model_definition["models"]:
+            if "BACKEND_MODEL_NAME" not in environ:
+                environ["BACKEND_MODEL_NAME"] = model["name"]
+            environ["BACKEND_MODEL_PATH"] = model["model_path"]
+            if service := model.get("service"):
+                if service["port"] in (2000, 2001):
+                    raise ReservedPortError("Port 2000 and 2001 are reserved for internal use")
+                overlapping_services = [
+                    s for s in service_ports if service["port"] in s["container_ports"]
+                ]
+                if len(overlapping_services) > 0:
+                    raise PortConflictError(
+                        f"Port {service['port']} overlaps with built-in service"
+                        f" {overlapping_services[0]['name']}"
+                    )
+                service_ports.append({
+                    "name": f"{model['name']}-{service['port']}",
+                    "protocol": ServicePortProtocols.PREOPEN,
+                    "container_ports": (service["port"],),
+                    "host_ports": (None,),
+                    "is_inference": True,
+                })
+        return model_definition
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]

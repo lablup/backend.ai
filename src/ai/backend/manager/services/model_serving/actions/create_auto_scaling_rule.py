@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.types import EndpointId
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
@@ -12,7 +12,7 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 
 @dataclass
 class CreateEndpointAutoScalingRuleAction(ModelServiceAction):
-    endpoint_id: EndpointId
+    deployment_id: DeploymentID
     creator: EndpointAutoScalingRuleCreator
 
     @override

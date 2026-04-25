@@ -9,11 +9,11 @@ import pytest
 import yarl
 from pytest_mock import MockerFixture
 
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
-    EndpointId,
     ResourceSlot,
-    RuntimeVariant,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -161,7 +161,7 @@ def sample_image() -> ImageRow:
 def sample_vfolder() -> VFolderRow:
     """Create a sample vfolder for testing."""
     vfolder = VFolderRow()
-    vfolder.id = uuid.uuid4()
+    vfolder.id = VFolderUUID(uuid.uuid4())
     vfolder.name = "model-vfolder"
     vfolder.user = uuid.uuid4()
     vfolder.group = None
@@ -191,7 +191,6 @@ def sample_endpoint_creator_spec(
         model=sample_vfolder.id,
         model_mount_destination="/models",
         model_definition_path="model.py",
-        runtime_variant=RuntimeVariant("custom"),
         session_owner=sample_user.uuid,
         tag="test",
         startup_command="python serve.py",
@@ -227,7 +226,7 @@ def sample_endpoint(
     """Create a sample endpoint for testing."""
     endpoint = sample_endpoint_creator_spec.build_row()
     # Set attributes that are normally set by the database
-    endpoint.id = EndpointId(uuid.uuid4())
+    endpoint.id = DeploymentID(uuid.uuid4())
     endpoint.created_at = datetime.now(UTC)
     endpoint.destroyed_at = None
     endpoint.lifecycle_stage = EndpointLifecycle.CREATED
@@ -439,7 +438,6 @@ def create_full_featured_endpoint(
         model=sample_vfolder.id,
         model_mount_destination="/models/custom",
         model_definition_path="model_definition.py",
-        runtime_variant=RuntimeVariant("custom"),
         session_owner=sample_user.uuid,
         tag="v1.0.0",
         startup_command="python -m model_server",
@@ -458,7 +456,7 @@ def create_full_featured_endpoint(
     )
 
     # Set attributes normally set by database
-    endpoint_row.id = EndpointId(uuid.uuid4())
+    endpoint_row.id = DeploymentID(uuid.uuid4())
     endpoint_row.created_at = datetime.now(tz=UTC)
     endpoint_row.destroyed_at = None
     endpoint_row.lifecycle_stage = EndpointLifecycle.CREATED

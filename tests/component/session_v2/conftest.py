@@ -33,7 +33,7 @@ from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
-from ai.backend.manager.api.adapters.session import SessionAdapter
+from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.session.handler import V2SessionHandler
@@ -111,7 +111,9 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    real_single_entity_validator = SingleEntityActionRBACValidator(rbac_permission_repo)
+    real_single_entity_validator = SingleEntityActionRBACValidator(
+        rbac_permission_repo, MagicMock()
+    )
     return SessionProcessors(
         service=service,
         action_monitors=[],

@@ -164,7 +164,10 @@ def build_api_routes(
     container_registry_handler = ContainerRegistryHandler(
         container_registry=processors.container_registry
     )
-    deployment_handler = DeploymentAPIHandler(deployment=processors.deployment)
+    deployment_handler = DeploymentAPIHandler(
+        deployment=processors.deployment,
+        runtime_variant_adapter=adapters.runtime_variant,
+    )
     domainconfig_handler = DomainConfigHandler(dotfile=processors.dotfile)
     error_log_handler = ErrorLogHandler(error_log=processors.error_log)
     etcd_handler = EtcdHandler(
@@ -204,6 +207,7 @@ def build_api_routes(
         deployment=processors.deployment,
         model_serving=processors.model_serving,
         model_serving_auto_scaling=processors.model_serving_auto_scaling,
+        runtime_variant=processors.runtime_variant,
     )
     session_handler = SessionHandler(
         auth=processors.auth,
@@ -257,8 +261,12 @@ def build_api_routes(
     )
 
     # Template sub-registries
-    cluster_template_handler = ClusterTemplateHandler(template=processors.template)
-    session_template_handler = SessionTemplateHandler(template=processors.template)
+    cluster_template_handler = ClusterTemplateHandler(
+        template=processors.template, group=processors.group
+    )
+    session_template_handler = SessionTemplateHandler(
+        template=processors.template, group=processors.group
+    )
     cluster_template_reg = register_cluster_template_routes(cluster_template_handler, route_deps)
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
 

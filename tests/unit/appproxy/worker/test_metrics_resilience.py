@@ -50,9 +50,6 @@ def _make_route(
         kernel_port=kernel_port,
         protocol=ProxyProtocol.HTTP,
         traffic_ratio=1.0,
-        health_status=health_status,
-        last_health_check=None,
-        consecutive_failures=0,
     )
 
 
@@ -174,27 +171,6 @@ class TestGatherPrometheusInferenceMeasures:
                     expected_collected_replica_count=2,
                 ),
                 id="two-healthy-routes",
-            ),
-            pytest.param(
-                _create_metrics_scenario(
-                    [
-                        RouteInput(
-                            kernel_host="10.0.0.1",
-                            kernel_port=8080,
-                            health_status=ModelServiceStatus.HEALTHY,
-                            mock_response=SAMPLE_PROMETHEUS_OUTPUT,
-                        ),
-                        RouteInput(
-                            kernel_host="10.0.0.2",
-                            kernel_port=8081,
-                            health_status=ModelServiceStatus.UNHEALTHY,
-                            mock_response=SAMPLE_PROMETHEUS_OUTPUT,
-                        ),
-                    ],
-                    expected_num_requests_running=Decimal(3),
-                    expected_collected_replica_count=1,
-                ),
-                id="unhealthy-route-skipped",
             ),
             pytest.param(
                 _create_metrics_scenario(

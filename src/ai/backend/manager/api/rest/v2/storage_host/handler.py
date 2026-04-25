@@ -10,7 +10,7 @@ from ai.backend.common.api_handlers import APIResponse
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.storage_host import StorageHostAdapter
+    from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

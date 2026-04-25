@@ -60,12 +60,6 @@ from ai.backend.manager.service.container_registry.harbor import (
 from ai.backend.manager.services.processors import Processors, ServiceArgs
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-)
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -122,8 +116,6 @@ class ProcessingInput:
     error_monitor: ErrorPluginContext
     hook_plugin_ctx: HookPluginContext
     deployment_controller: DeploymentController
-    revision_generator_registry: RevisionGeneratorRegistry
-    model_definition_generator_registry: ModelDefinitionGeneratorRegistry
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
@@ -248,8 +240,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             hook_plugin_ctx=setup_input.hook_plugin_ctx,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
-            revision_generator_registry=setup_input.revision_generator_registry,
-            model_definition_generator_registry=setup_input.model_definition_generator_registry,
             event_producer=setup_input.event_producer,
             agent_cache=setup_input.agent_cache,
             notification_center=setup_input.notification_center,
@@ -259,9 +249,12 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
 
         permission_controller_repository = setup_input.repositories.permission_controller.repository
+        config_provider = setup_input.config_provider
         rbac_validators = RBACValidators(
-            scope=ScopeActionRBACValidator(permission_controller_repository),
-            single_entity=SingleEntityActionRBACValidator(permission_controller_repository),
+            scope=ScopeActionRBACValidator(permission_controller_repository, config_provider),
+            single_entity=SingleEntityActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
         )
         legacy_rbac_validators = LegacyRBACValidators(
             scope=LegacyScopeActionRBACValidator(permission_controller_repository),

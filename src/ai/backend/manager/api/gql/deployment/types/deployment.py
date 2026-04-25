@@ -11,6 +11,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
 )
@@ -45,6 +46,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelDeploymentNetworkAccessInput as ModelDeploymentNetworkAccessInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplaceDeploymentOptionsGQLInput as ReplaceDeploymentOptionsGQLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -66,6 +70,9 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    ReplaceDeploymentOptionsPayload as ReplaceDeploymentOptionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     RevisionRefreshResultInfo as RevisionRefreshResultInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
@@ -84,6 +91,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -118,6 +126,10 @@ from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
     AutoScalingRuleFilter,
     AutoScalingRuleOrderBy,
 )
+from ai.backend.manager.api.gql.deployment.types.deployment_options import (
+    DeploymentOptionsInfoGQL,
+    DeploymentOptionsInputGQL,
+)
 from ai.backend.manager.api.gql.deployment.types.policy import (
     BlueGreenConfigInputGQL,
     DeploymentPolicyGQL,
@@ -141,7 +153,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
 )
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
@@ -164,6 +176,21 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
     ),
     ModelDeploymentStatus,
     name="DeploymentStatus",
+)
+
+
+ScalingStateGQL: type[ScalingState] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Replica scaling axis for a deployment, orthogonal to the"
+            " lifecycle status. ``SCALING`` while the replica reconciler"
+            " is adjusting replica count against desired_replica_count;"
+            " ``STABLE`` once holding at the desired count."
+        ),
+    ),
+    ScalingState,
+    name="ScalingState",
 )
 
 
@@ -289,6 +316,17 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     default_deployment_strategy: DeploymentStrategyGQL
     replica_state: ReplicaState
     created_user_id: ID
+    options: DeploymentOptionsInfoGQL
+    scaling_state: ScalingStateGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle)."
+                " ``SCALING`` while the replica reconciler is adjusting replica count;"
+                " ``STABLE`` once holding at the desired count."
+            ),
+        )
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -786,3 +824,36 @@ class AdminRefreshDeploymentRevisionsPayload:
     """Payload for admin bulk revision refresh mutation result."""
 
     results: strawberry.auto
+
+
+# Replace deployment options types
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for the replaceDeploymentOptions mutation. Full-replace"
+            " semantics — the supplied payload is the complete new value."
+        ),
+    ),
+    name="ReplaceDeploymentOptionsInput",
+)
+class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptionsGQLInputDTO]):
+    deployment_id: UUID
+    options: DeploymentOptionsInputGQL
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Payload returned after replacing a deployment's options. Only"
+            " the refreshed options surface is returned; the server path uses"
+            " ``UPDATE ... RETURNING`` and does not re-read the surrounding"
+            " deployment node."
+        ),
+    ),
+    model=ReplaceDeploymentOptionsPayloadDTO,
+)
+class ReplaceDeploymentOptionsPayload(PydanticOutputMixin[ReplaceDeploymentOptionsPayloadDTO]):
+    deployment_id: ID
+    options: DeploymentOptionsInfoGQL

@@ -23,6 +23,9 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    CreateVFolderInScopeInput as CreateInScopeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
     DeleteFilesInput as DeleteFilesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -94,6 +97,10 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     PresetDeploymentStrategyInputGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
+from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
+    VFolderMountPermissionGQL,
+    VFolderUsageModeGQL,
+)
 from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
 
 # ============================================================
@@ -119,6 +126,29 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     )
     permission: str = gql_field(
         default="rw", description="Default permission of the vfolder (ro, rw, wd)."
+    )
+    cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Scope-agnostic body for vfolder creation. The owning scope is "
+            "supplied as a separate mutation argument."
+        ),
+    ),
+    name="CreateVFolderInScopeInput",
+)
+class CreateVFolderInScopeInputGQL(PydanticInputMixin[CreateInScopeInputDTO]):
+    name: str = gql_field(description="VFolder name.")
+    host: str | None = gql_field(default=None, description="Storage host for the vfolder.")
+    usage_mode: VFolderUsageModeGQL = gql_field(
+        default=VFolderUsageModeGQL.GENERAL, description="Usage mode of the vfolder."
+    )
+    permission: VFolderMountPermissionGQL = gql_field(
+        default=VFolderMountPermissionGQL.READ_WRITE,
+        description="Default mount permission of the vfolder.",
     )
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
 

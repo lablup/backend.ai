@@ -17,6 +17,7 @@ from .repositories import RepositoriesDependency, RepositoriesInput
 from .services import ServicesContextDependency, ServicesInput
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.prometheus.client import PrometheusClient
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
@@ -44,6 +45,7 @@ class DomainInput:
     valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
     valkey_image: ValkeyImageClient
+    prometheus_client: PrometheusClient
 
 
 @dataclass
@@ -110,6 +112,7 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
             valkey_live=setup_input.valkey_live,
             valkey_schedule=setup_input.valkey_schedule,
             valkey_image=setup_input.valkey_image,
+            prometheus_client=setup_input.prometheus_client,
         )
         repositories = await stack.enter_dependency(repositories_dep, repositories_input)
 

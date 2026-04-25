@@ -15,6 +15,8 @@ from .resolver import (
     admin_update_allowed_resource_groups_for_project_v2,
     admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
+    replace_resource_group_default_deployment_options,
+    replace_resource_group_default_session_options,
     resource_groups,
     update_resource_group_fair_share_spec,
 )
@@ -59,6 +61,8 @@ __all__ = (
     "admin_update_allowed_resource_groups_for_project_v2",
     "admin_update_allowed_domains_for_resource_group_v2",
     "admin_update_allowed_projects_for_resource_group_v2",
+    "replace_resource_group_default_deployment_options",
+    "replace_resource_group_default_session_options",
     # Mutation Resolvers - Legacy (deprecated)
     "update_resource_group_fair_share_spec",
 )
