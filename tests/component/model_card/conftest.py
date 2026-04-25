@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, OperationType, ScopeType
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
@@ -45,6 +45,7 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
@@ -70,7 +71,7 @@ if TYPE_CHECKING:
 
 def _build_validators(
     database_engine: ExtendedAsyncSAEngine,
-    config_provider: ManagerConfigProvider | MagicMock,
+    config_provider: ManagerConfigProvider,
 ) -> ActionValidators:
     permission_repo = PermissionControllerRepository(database_engine)
     return ActionValidators(
@@ -85,10 +86,9 @@ def _build_validators(
 def model_card_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: AsyncMock,
-    config_provider: MagicMock,
+    config_provider: ManagerConfigProvider,
 ) -> ModelCardProcessors:
-    """Real ModelCardProcessors with RBAC enforcement disabled."""
-    config_provider.config.manager.rbac.enforcement_enabled = False
+    """Real ModelCardProcessors with real RBAC enforcement."""
     repo = ModelCardRepository(database_engine)
     service = ModelCardService(repo, storage_manager)
     return ModelCardProcessors(
@@ -102,11 +102,10 @@ def model_card_processors(
 def group_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: AsyncMock,
-    config_provider: MagicMock,
+    config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
 ) -> GroupProcessors:
-    """Real GroupProcessors with RBAC enforcement disabled."""
-    config_provider.config.manager.rbac.enforcement_enabled = False
+    """Real GroupProcessors with real RBAC enforcement."""
     repo = GroupRepository(
         database_engine,
         config_provider,
@@ -131,7 +130,7 @@ def group_processors(
 def permission_controller_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: AsyncMock,
-    config_provider: MagicMock,
+    config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
 ) -> PermissionControllerProcessors:
     """Real PermissionControllerProcessors for role assign/revoke SDK calls."""
@@ -142,11 +141,10 @@ def permission_controller_processors(
     service = PermissionControllerService(
         perm_repo, group_repository=group_repo, rbac_action_registry=[]
     )
-    validators = MagicMock()
-    validators.rbac.scope.validate = AsyncMock()
-    validators.rbac.single_entity.validate = AsyncMock()
     return PermissionControllerProcessors(
-        service=service, action_monitors=[], validators=validators
+        service=service,
+        action_monitors=[],
+        validators=_build_validators(database_engine, config_provider),
     )
 
 
@@ -311,6 +309,36 @@ async def _register_role_in_project(
                     AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE,
                     AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_fixture),
                 )
+            )
+        )
+
+
+@pytest.fixture(autouse=True)
+async def _grant_model_card_read_permission(
+    db_engine: SAEngine,
+    role_fixture: uuid.UUID,
+    model_store_project_fixture: uuid.UUID,
+) -> AsyncIterator[None]:
+    """Grant model_card:read permission to the test role at the project scope.
+
+    Required for the regular user to pass RBAC enforcement on
+    search_in_project (ScopeActionRBACValidator checks this permission).
+    """
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(PermissionRow.__table__).values(
+                role_id=role_fixture,
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(model_store_project_fixture),
+                entity_type=EntityType.MODEL_CARD,
+                operation=OperationType.READ,
+            )
+        )
+    yield
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            PermissionRow.__table__.delete().where(
+                PermissionRow.__table__.c.role_id == role_fixture
             )
         )
 
