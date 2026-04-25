@@ -156,6 +156,62 @@ type AddRevisionPayload {
   revision: ModelRevision!
 }
 
+"""Added in UNRELEASED. Per-item input for admin bulk create / update."""
+input AdminAppConfigPolicyItemInput {
+  """Unique, immutable policy name."""
+  configName: String!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
+}
+
+"""Added in UNRELEASED. Payload for `adminBulkCreateAppConfigPolicies`."""
+type AdminBulkCreateAppConfigPoliciesPayload {
+  """Created policies."""
+  created: [AppConfigPolicy!]!
+
+  """Per-item failures."""
+  failed: [AppConfigPolicyBulkError!]!
+}
+
+"""Added in UNRELEASED. Admin bulk create input for app-config policies."""
+input AdminBulkCreateAppConfigPolicyInput {
+  """Policies to create."""
+  items: [AdminAppConfigPolicyItemInput!]!
+}
+
+"""Added in UNRELEASED. Payload for `adminBulkPurgeAppConfigPolicies`."""
+type AdminBulkPurgeAppConfigPoliciesPayload {
+  """`config_name`s of policies actually removed (absent names no-oped)."""
+  purgedConfigNames: [String!]!
+
+  """Per-item failures."""
+  failed: [AppConfigPolicyBulkError!]!
+}
+
+"""
+Added in UNRELEASED. Admin bulk purge input for app-config policies (keyed on `config_name`).
+"""
+input AdminBulkPurgeAppConfigPolicyInput {
+  """`config_name`s to purge."""
+  configNames: [String!]!
+}
+
+"""Added in UNRELEASED. Payload for `adminBulkUpdateAppConfigPolicies`."""
+type AdminBulkUpdateAppConfigPoliciesPayload {
+  """Updated policies."""
+  updated: [AppConfigPolicy!]!
+
+  """Per-item failures."""
+  failed: [AppConfigPolicyBulkError!]!
+}
+
+"""Added in UNRELEASED. Admin bulk update input for app-config policies."""
+input AdminBulkUpdateAppConfigPolicyInput {
+  """Policies to update."""
+  items: [AdminAppConfigPolicyItemInput!]!
+}
+
 """Added in 26.4.2. Admin input for creating a keypair for a user."""
 input AdminCreateKeypairInput {
   """UUID of the target user."""
@@ -605,9 +661,9 @@ type AllowedResourceGroupsPayload {
 }
 
 """Added in UNRELEASED. Scoped app-config policy (BEP-1052 §1)."""
-type AppConfigPolicy {
-  """Policy row ID"""
-  id: UUID!
+type AppConfigPolicy implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
 
   """Unique, immutable policy name."""
   configName: String!
@@ -615,11 +671,46 @@ type AppConfigPolicy {
   """Ordered scope chain (low → high merge priority)."""
   scopeSources: [String!]!
 
-  """Creation timestamp"""
+  """Creation timestamp."""
   createdAt: DateTime!
 
-  """Last update timestamp"""
+  """Last update timestamp."""
   updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Per-item failure info for bulk Policy mutations."""
+type AppConfigPolicyBulkError {
+  """Original position in the input list."""
+  index: Int!
+
+  """`config_name` of the failed row."""
+  configName: String!
+
+  """Reason for the failure."""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Connection type for paginated app-config policy results.
+"""
+type AppConfigPolicyConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigPolicyEdge!]!
+
+  """Total number of policies matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigPolicyEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigPolicy!
 }
 
 """Added in UNRELEASED. Filter input for querying app-config policies."""
@@ -643,6 +734,7 @@ Added in UNRELEASED. Fields available for ordering app-config policies.
 enum AppConfigPolicyOrderField {
   CONFIG_NAME
   CREATED_AT
+  UPDATED_AT
 }
 
 """
@@ -2088,25 +2180,6 @@ input CreateAccessTokenInput {
 type CreateAccessTokenPayload {
   """Created access token"""
   accessToken: AccessToken!
-}
-
-"""
-Added in UNRELEASED. Input for creating a new app-config policy (admin only).
-"""
-input CreateAppConfigPolicyInput {
-  """Unique, immutable policy name."""
-  configName: String!
-
-  """Ordered scope chain (low → high merge priority)."""
-  scopeSources: [String!]!
-}
-
-"""
-Added in UNRELEASED. Payload returned after creating an app-config policy.
-"""
-type CreateAppConfigPolicyPayload {
-  """Created policy."""
-  policy: AppConfigPolicy!
 }
 
 """Added in 25.19.0. Input for creating an auto-scaling rule."""
@@ -7466,18 +7539,20 @@ type Mutation {
   """
   updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload
 
-  """Added in UNRELEASED. Create a new app-config policy (admin only)."""
-  adminCreateAppConfigPolicy(input: CreateAppConfigPolicyInput!): CreateAppConfigPolicyPayload!
+  """
+  Added in UNRELEASED. Strict insert keyed on `configName` (admin only, per-item transaction).
+  """
+  adminBulkCreateAppConfigPolicies(input: AdminBulkCreateAppConfigPolicyInput!): AdminBulkCreateAppConfigPoliciesPayload!
 
   """
-  Added in UNRELEASED. Update an app-config policy (admin only). `config_name` is immutable.
+  Added in UNRELEASED. Replace `scope_sources`; `config_name` is immutable (BEP-1052 §1). Admin only, per-item transaction.
   """
-  adminUpdateAppConfigPolicy(input: UpdateAppConfigPolicyInput!): UpdateAppConfigPolicyPayload!
+  adminBulkUpdateAppConfigPolicies(input: AdminBulkUpdateAppConfigPolicyInput!): AdminBulkUpdateAppConfigPoliciesPayload!
 
   """
-  Added in UNRELEASED. Purge (hard-delete) an app-config policy (admin only).
+  Added in UNRELEASED. Rejects items whose `config_name` still has referencing fragment rows (BEP-1052 §1). Admin only.
   """
-  adminPurgeAppConfigPolicy(input: PurgeAppConfigPolicyInput!): PurgeAppConfigPolicyPayload!
+  adminBulkPurgeAppConfigPolicies(input: AdminBulkPurgeAppConfigPolicyInput!): AdminBulkPurgeAppConfigPoliciesPayload!
 
   """Added in 26.3.0. Create a new query definition (admin only)"""
   adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload
@@ -9096,25 +9171,6 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
-"""
-Added in UNRELEASED. Input for purging an app-config policy (admin only).
-"""
-input PurgeAppConfigPolicyInput {
-  """`config_name` of the policy to purge."""
-  configName: String!
-}
-
-"""
-Added in UNRELEASED. Payload returned after purging an app-config policy.
-"""
-type PurgeAppConfigPolicyPayload {
-  """`config_name` of the purged policy."""
-  configName: String!
-
-  """Whether a row was actually removed."""
-  purged: Boolean!
-}
-
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
 type PurgeDomainPayload {
   """Whether the purge was successful."""
@@ -9440,7 +9496,7 @@ type Query {
   """
   Added in UNRELEASED. List app-config policies with filtering and pagination. Available to any authenticated user.
   """
-  appConfigPolicies(filter: AppConfigPolicyFilter = null, orderBy: [AppConfigPolicyOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [AppConfigPolicy!]!
+  appConfigPolicies(filter: AppConfigPolicyFilter = null, orderBy: [AppConfigPolicyOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigPolicyConnection!
 
   """
   Added in 26.4.2. Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.
@@ -13015,25 +13071,6 @@ input UpdateAllowedResourceGroupsForProjectInput {
 
   """Resource group names to disallow."""
   remove: [String!] = null
-}
-
-"""
-Added in UNRELEASED. Input for updating an app-config policy (admin only).
-"""
-input UpdateAppConfigPolicyInput {
-  """Target policy's `config_name` (immutable)."""
-  configName: String!
-
-  """Replacement scope chain."""
-  scopeSources: [String!]!
-}
-
-"""
-Added in UNRELEASED. Payload returned after updating an app-config policy.
-"""
-type UpdateAppConfigPolicyPayload {
-  """Updated policy."""
-  policy: AppConfigPolicy!
 }
 
 """
