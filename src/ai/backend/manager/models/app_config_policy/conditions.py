@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection
+from datetime import datetime
 
 import sqlalchemy as sa
 
@@ -76,6 +77,48 @@ class AppConfigPolicyConditions:
         return inner
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigPolicyRow.config_name))
+
+    @staticmethod
+    def by_created_at_before(value: datetime) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            return AppConfigPolicyRow.created_at <= value
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(value: datetime) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            return AppConfigPolicyRow.created_at >= value
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(value: datetime) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            return AppConfigPolicyRow.created_at == value
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_before(value: datetime) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            return AppConfigPolicyRow.updated_at <= value
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_after(value: datetime) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            return AppConfigPolicyRow.updated_at >= value
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_equals(value: datetime) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            return AppConfigPolicyRow.updated_at == value
+
+        return inner
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:

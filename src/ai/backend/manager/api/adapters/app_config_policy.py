@@ -110,6 +110,22 @@ class AppConfigPolicyAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if filter.created_at is not None:
+            condition = filter.created_at.build_query_condition(
+                before_factory=AppConfigPolicyConditions.by_created_at_before,
+                after_factory=AppConfigPolicyConditions.by_created_at_after,
+                equals_factory=AppConfigPolicyConditions.by_created_at_equals,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if filter.updated_at is not None:
+            condition = filter.updated_at.build_query_condition(
+                before_factory=AppConfigPolicyConditions.by_updated_at_before,
+                after_factory=AppConfigPolicyConditions.by_updated_at_after,
+                equals_factory=AppConfigPolicyConditions.by_updated_at_equals,
+            )
+            if condition is not None:
+                conditions.append(condition)
         return conditions
 
     @staticmethod

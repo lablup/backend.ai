@@ -7,7 +7,7 @@ from __future__ import annotations
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 
 from .types import AppConfigPolicyOrderField, OrderDirection
 
@@ -26,6 +26,8 @@ class AppConfigPolicyFilter(BaseRequestModel):
     """Filter for app-config policy search."""
 
     config_name: StringFilter | None = Field(default=None, description="Filter by config_name")
+    created_at: DateTimeFilter | None = Field(default=None, description="Filter by created_at")
+    updated_at: DateTimeFilter | None = Field(default=None, description="Filter by updated_at")
 
 
 class AppConfigPolicyOrder(BaseRequestModel):

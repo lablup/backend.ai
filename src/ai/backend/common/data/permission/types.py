@@ -96,6 +96,7 @@ class EntityType(enum.StrEnum):
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact_registry"
     APP_CONFIG = "app_config"
+    APP_CONFIG_POLICY = "app_config_policy"
     NOTIFICATION_CHANNEL = "notification_channel"
     NOTIFICATION_RULE = "notification_rule"
     MODEL_DEPLOYMENT = "model_deployment"

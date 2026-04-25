@@ -27,7 +27,7 @@ class AdminBulkUpdateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyBulkI
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG
+        return EntityType.APP_CONFIG_POLICY
 
     @override
     @classmethod
