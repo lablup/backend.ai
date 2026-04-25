@@ -100,12 +100,15 @@ class MetricRepository:
         self,
         kernel_ids: Sequence[KernelId],
     ) -> dict[KernelId, list[MetricValue]]:
-        queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
-        gauge_response = await self._prometheus_client.query_instant(queries.gauge)
-        diff_response = await self._prometheus_client.query_instant(queries.diff)
-        rate_response = await self._prometheus_client.query_instant(queries.rate)
-        gauge = KernelMetricValuesByKernel.from_prometheus_response(gauge_response)
-        diff = KernelMetricValuesByKernel.from_prometheus_response(diff_response)
-        rate = KernelMetricValuesByKernel.from_prometheus_response(rate_response)
-        merged = gauge.merged_with(diff).merged_with(rate)
+        live_stat_queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
+        merged = KernelMetricValuesByKernel(values_by_kernel={})
+        for query in live_stat_queries.to_list():
+            try:
+                response = await self._prometheus_client.query_instant(query)
+            except (PrometheusConnectionError, FailedToGetMetric) as e:
+                log.warning("Failed to query Prometheus for live stat preset, skipping: {}", e)
+                continue
+            merged = merged.merged_with(
+                KernelMetricValuesByKernel.from_prometheus_response(response)
+            )
         return merged.values_by_kernel
