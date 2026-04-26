@@ -94,7 +94,7 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
     StrEnumType,
 )
-from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.routing import RouteHealthStatus, RouteStatus
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
@@ -120,6 +120,18 @@ __all__ = (
 
 
 type ModelServiceSerializableConnectionInfo = dict[str, list[dict[str, Any]]]
+
+# Route ``health_status`` values that qualify a route to receive
+# user traffic via AppProxy / Traefik. ``HEALTHY`` is the canonical
+# serving state; ``DEGRADED`` is included so a route that was previously
+# healthy but recently flapped continues to drain traffic instead of
+# 503-ing the whole endpoint while the periodic health probe recovers.
+# ``NOT_CHECKED`` (initial provisioning window) and ``UNHEALTHY`` are
+# excluded — those backends have not yet proven they can serve.
+_ROUTE_SERVING_HEALTH_STATUSES: frozenset[RouteHealthStatus] = frozenset({
+    RouteHealthStatus.HEALTHY,
+    RouteHealthStatus.DEGRADED,
+})
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -581,12 +593,23 @@ class EndpointRow(Base):  # type: ignore[misc]
         from ai.backend.manager.models.kernel import KernelRow
         from ai.backend.manager.models.routing import RoutingRow
 
-        # Only routes whose traffic_status is ACTIVE should be exposed to the
-        # app proxy. INACTIVE routes (e.g. a blue-green deploying revision that
-        # has not been promoted yet) are intentionally hidden from Traefik.
+        # Only routes that are both:
+        #   * traffic_status == ACTIVE — admin / blue-green policy says this
+        #     route should receive traffic (INACTIVE routes such as a
+        #     blue-green deploying revision that has not been promoted yet
+        #     are intentionally hidden from Traefik), AND
+        #   * health_status in {HEALTHY, DEGRADED} — the route's session has
+        #     passed health checks at least once (DEGRADED keeps fault-tolerant
+        #     traffic flowing through routes that recently dipped but were
+        #     previously healthy). Routes still in NOT_CHECKED / UNHEALTHY are
+        #     suppressed so the AppProxy / Traefik does not route user traffic
+        #     to a backend that has never proven ready.
         all_active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
         active_routes = [
-            r for r in all_active_routes if r.traffic_status == RouteTrafficStatus.ACTIVE
+            r
+            for r in all_active_routes
+            if r.traffic_status == RouteTrafficStatus.ACTIVE
+            and r.health_status in _ROUTE_SERVING_HEALTH_STATUSES
         ]
         running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
             db_sess,
