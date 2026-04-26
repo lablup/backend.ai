@@ -27,7 +27,6 @@ class RuntimeVariantPresetUpdaterSpec(UpdaterSpec[RuntimeVariantPresetRow]):
     default_value: TriState[str] = field(default_factory=TriState[str].nop)
     key: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     category: TriState[str] = field(default_factory=TriState[str].nop)
-    ui_type: TriState[str] = field(default_factory=TriState[str].nop)
     display_name: TriState[str] = field(default_factory=TriState[str].nop)
     ui_option: TriState[UIOption] = field(default_factory=TriState[UIOption].nop)
 
@@ -47,7 +46,6 @@ class RuntimeVariantPresetUpdaterSpec(UpdaterSpec[RuntimeVariantPresetRow]):
         self.default_value.update_dict(to_update, "default_value")
         self.key.update_dict(to_update, "key")
         self.category.update_dict(to_update, "category")
-        self.ui_type.update_dict(to_update, "ui_type")
         self.display_name.update_dict(to_update, "display_name")
         self.ui_option.update_dict(to_update, "ui_option")
         return to_update
