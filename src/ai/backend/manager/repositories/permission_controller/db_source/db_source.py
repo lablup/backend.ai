@@ -129,14 +129,16 @@ class CreateRoleInput:
 
 
 @dataclass(frozen=True)
-class _DirectScopeWalkQueryParams:
-    """Parameters for the shared fan-in dedup permission resolver.
+class _ScopeWalkQueryParams:
+    """Parameters for the shared permission resolver.
 
-    ``operation_filter=None`` returns every granted operation per entity
-    (used by the effective-permissions resolver). Setting it pushes
-    ``perm.operation = operation_filter`` into the perm-join WHERE clause
-    so each entity's set has at most one element — used by the bulk
-    permission check to preserve perm-join selectivity at K>1.
+    ``permission_entity_type`` overrides the entity type used to match
+    permission rows; when ``None``, it defaults to the entity type derived
+    from ``target_element_type``.
+
+    ``operation_filter=None`` returns every granted operation per entity.
+    Setting it restricts the result to that single operation, so each
+    entity's set has at most one element.
     """
 
     user_id: uuid.UUID
@@ -937,9 +939,8 @@ class PermissionDBSource:
     ) -> sa.CTE:
         """Build the ``direct_scopes`` CTE: each input entity → its direct AUTO parent scope(s).
 
-        Result columns: ``(entity_id, scope_type, scope_id)``. Used as the
-        seed of :meth:`_build_scope_walk_cte` and joined back at the end of
-        the resolver to link each walked scope to its originating entity.
+        Result columns: ``(entity_id, scope_type, scope_id)``. Seeds
+        :meth:`_build_scope_walk_cte`.
         """
         ase = AssociationScopesEntitiesRow.__table__
         return (
@@ -967,10 +968,6 @@ class PermissionDBSource:
         unique direct scopes keeps the working set at
         ``O(unique_direct_scopes * D)`` rather than ``O(K * D)`` when many
         input entities share the same direct parent scope.
-
-        The caller joins ``direct_scopes_cte`` against the returned CTE on
-        ``(scope_type, scope_id) == (start_scope_type, start_scope_id)``
-        to link each walked scope back to its originating entity.
         """
         ase = AssociationScopesEntitiesRow.__table__
 
@@ -1013,7 +1010,7 @@ class PermissionDBSource:
         """Return whether the user holds *operation* on the target element."""
         entity_id = data.target_element_ref.element_id
         granted_map = await self._resolve_permissions_via_direct_scope_walk(
-            _DirectScopeWalkQueryParams(
+            _ScopeWalkQueryParams(
                 user_id=data.user_id,
                 target_element_type=data.target_element_ref.element_type,
                 entity_ids=[entity_id],
@@ -1027,17 +1024,16 @@ class PermissionDBSource:
         self,
         data: BulkPermissionCheckInput,
     ) -> dict[str, bool]:
-        """Batch CTE-based permission check for multiple entities.
+        """Check whether the user holds *operation* on each target entity in one go.
 
-        Routed through the shared fan-in dedup path so that the recursive
-        scope walk runs once per unique direct parent scope rather than once
-        per input entity.
+        Returns a mapping from entity id to a boolean indicating whether
+        the operation is granted.
         """
         if not data.target_entity_ids:
             return {}
 
         granted_map = await self._resolve_permissions_via_direct_scope_walk(
-            _DirectScopeWalkQueryParams(
+            _ScopeWalkQueryParams(
                 user_id=data.user_id,
                 target_element_type=data.target_element_type,
                 entity_ids=data.target_entity_ids,
@@ -1050,28 +1046,21 @@ class PermissionDBSource:
 
     async def _resolve_permissions_via_direct_scope_walk(
         self,
-        params: _DirectScopeWalkQueryParams,
+        params: _ScopeWalkQueryParams,
     ) -> dict[str, set[OperationType]]:
-        """Shared fan-in dedup path for effective-permissions and bulk checks.
+        """Resolve granted operations for a user across the input entities.
 
-        Builds two CTEs:
-          1. ``direct_scopes`` — each input entity → its direct AUTO parent scope(s).
-          2. ``scope_walk`` — recursive walk starting from the unique
-             ``(scope_type, scope_id)`` pairs in ``direct_scopes``. Carries
-             only the originating ``start_scope`` so the recursive working
-             set is ``O(unique_direct_scopes * D)`` instead of ``O(K * D)``.
+        The query unions two branches:
+          * scope-chain: walks parent scopes upward from each entity's
+            direct AUTO scope and picks up permissions on the way up.
+          * self-scope: picks up permissions whose scope is the entity
+            itself.
 
-        Joins ``direct_scopes ⨝ scope_walk ⨝ permission ⨝ role(ACTIVE) ⨝
-        user_role`` plus the existing self-scope direct match. Returns a
-        per-entity granted operation set; entities with no granted operation
-        are absent from the returned mapping.
+        Returns a mapping from entity id to the set of granted operations.
+        Entities that received no grant are absent from the returned mapping.
 
-        When ``params.operation_filter`` is set, the perm-join WHERE clause
-        includes ``perm.operation = operation_filter``, so each returned set
-        has at most one element. This preserves the perm-join selectivity
-        that bulk checks rely on. When ``operation_filter`` is ``None``
-        every granted operation is returned, which the effective-permissions
-        resolver requires.
+        When ``params.operation_filter`` is set, only that operation is
+        considered; otherwise every granted operation is returned.
         """
         if not params.entity_ids:
             return {}
@@ -1162,15 +1151,13 @@ class PermissionDBSource:
         """Resolve the effective permissions for a user across multiple entities.
 
         Returns a mapping from entity id to the set of operations the user
-        is authorized to perform on that entity. The mapping behaves like
-        a ``defaultdict(set)``, so callers can index by any of the input
-        entity ids and receive an empty set when nothing was granted.
+        is authorized to perform on that entity.
         """
         if not data.target_entity_ids:
             return EffectivePermissionsResult(permissions={})
 
         granted_map = await self._resolve_permissions_via_direct_scope_walk(
-            _DirectScopeWalkQueryParams(
+            _ScopeWalkQueryParams(
                 user_id=data.user_id,
                 target_element_type=data.target_element_type,
                 entity_ids=data.target_entity_ids,
