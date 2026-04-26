@@ -18,7 +18,7 @@ rather than once per input entity. These tests verify:
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass, field
 
 import pytest
@@ -89,17 +89,17 @@ class SharedPathFixture:
 
 
 def _normalize_permissions(
-    perms: object,
+    perms: Mapping[str, set[OperationType]],
     entity_ids: list[str],
 ) -> dict[str, set[OperationType]]:
     """Snap a permissions mapping into a plain dict keyed by every input entity id.
 
-    The legacy resolver returns a defaultdict whose missing keys silently
-    materialize empty sets, while the shared path returns a plain dict
-    that omits ungranted entities. Compare them on common ground by
-    explicitly filling in empty sets for ids that are not present.
+    Both resolvers return a ``defaultdict(set)`` whose missing-key access
+    has the side effect of inserting an empty set on first read. Comparing
+    two such mappings as equality on the same key set is brittle — the
+    comparison itself can mutate the operands. Snap both into a plain
+    dict containing exactly the input ids first, then compare those.
     """
-    assert isinstance(perms, dict)
     return {eid: set(perms.get(eid, set())) for eid in entity_ids}
 
 
