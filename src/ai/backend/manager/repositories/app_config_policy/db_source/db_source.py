@@ -10,7 +10,6 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
-from ai.backend.manager.errors.app_config import AppConfigPolicyNotFound
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_policy.creators import (
@@ -98,65 +97,38 @@ class AppConfigPolicyDBSource:
             return result.row.to_data()
 
     @app_config_policy_db_source_resilience.apply()
-    async def update(
+    async def resolve_pk_by_config_name(
         self,
         config_name: str,
-        spec: AppConfigPolicyUpdaterSpec,
-    ) -> AppConfigPolicyData:
-        """Update the policy identified by `config_name`.
-
-        `config_name` is UNIQUE but not the PK, so we first resolve it
-        to the row's UUID `id` and then delegate to the shared Updater
-        helper (which requires a single-column PK).
-
-        `config_name` itself is never mutated — `AppConfigPolicyUpdaterSpec`
-        exposes only `scope_sources`. Raises
-        :class:`AppConfigPolicyNotFound` when no row exists for
-        `config_name`; reads use the nullable `get(...)` instead.
-        """
-        async with self._db.begin_session() as db_sess:
-            pk_value = await db_sess.scalar(
+    ) -> uuid.UUID | None:
+        """Resolve a policy's `config_name` (UNIQUE) to the row's UUID
+        ``id``. Returns ``None`` when no row matches — callers translate
+        to a domain-appropriate response."""
+        async with self._db.begin_readonly_session() as db_sess:
+            pk: uuid.UUID | None = await db_sess.scalar(
                 sa.select(AppConfigPolicyRow.id).where(
                     AppConfigPolicyRow.config_name == config_name
                 )
             )
-            if pk_value is None:
-                raise AppConfigPolicyNotFound(
-                    extra_msg=f"config_name={config_name!r}",
-                )
-            updater: Updater[AppConfigPolicyRow] = Updater(spec=spec, pk_value=pk_value)
-            result = await execute_updater(db_sess, updater)
-            if result is None:
-                # The row vanished between PK resolution and UPDATE
-                # (concurrent purge); treat as NotFound for the caller.
-                raise AppConfigPolicyNotFound(
-                    extra_msg=f"config_name={config_name!r}",
-                )
-            return result.row.to_data()
+            return pk
 
     @app_config_policy_db_source_resilience.apply()
-    async def purge(self, config_name: str) -> bool:
-        """Delete the policy identified by `config_name`.
+    async def update(self, updater: Updater[AppConfigPolicyRow]) -> AppConfigPolicyData | None:
+        """Apply a pre-built Updater. Returns ``None`` when the row
+        vanished between PK resolution and write; the caller maps this
+        to :class:`AppConfigPolicyNotFound`."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_updater(db_sess, updater)
+            return result.row.to_data() if result is not None else None
 
-        Resolves `config_name` to the row's UUID `id` and delegates to
-        the shared Purger helper. The DB-side FK from
+    @app_config_policy_db_source_resilience.apply()
+    async def purge(self, purger: Purger[AppConfigPolicyRow]) -> bool:
+        """Apply a pre-built Purger. The DB-side FK from
         `app_config_fragments.name` (NO ACTION) blocks the delete while
         fragments still reference this policy — the service layer is
-        expected to reject earlier with a friendlier error.
-
-        Returns `True` when a row was actually removed, `False` otherwise.
-        """
+        expected to reject earlier with a friendlier error. Returns
+        ``True`` only when a row was actually removed."""
         async with self._db.begin_session() as db_sess:
-            pk_value = await db_sess.scalar(
-                sa.select(AppConfigPolicyRow.id).where(
-                    AppConfigPolicyRow.config_name == config_name
-                )
-            )
-            if pk_value is None:
-                return False
-            purger: Purger[AppConfigPolicyRow] = Purger(
-                row_class=AppConfigPolicyRow, pk_value=pk_value
-            )
             result = await execute_purger(db_sess, purger)
             return result is not None
 
