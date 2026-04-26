@@ -814,7 +814,7 @@ class Mutation:
     admin_unblock_user = admin_unblock_user
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
-    # App Config Policy - Bulk admin mutations (BEP-1052 §3 — bulk-only)
+    # App Config Policy - Bulk admin mutations (bulk-only)
     admin_bulk_create_app_config_policies = admin_bulk_create_app_config_policies
     admin_bulk_update_app_config_policies = admin_bulk_update_app_config_policies
     admin_bulk_purge_app_config_policies = admin_bulk_purge_app_config_policies

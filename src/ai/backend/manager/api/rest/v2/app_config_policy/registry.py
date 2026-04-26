@@ -1,4 +1,4 @@
-"""Route registration for v2 app-config policy endpoints (BEP-1052 §4)."""
+"""Route registration for v2 app-config policy endpoints."""
 
 from __future__ import annotations
 
@@ -17,18 +17,18 @@ def register_v2_app_config_policy_routes(
     handler: V2AppConfigPolicyHandler,
     route_deps: RouteDeps,
 ) -> RouteRegistry:
-    """Register all v2 app-config policy routes (BEP-1052 §4).
+    """Register all v2 app-config policy routes.
 
     Reads (`GET /{config_name}`, `POST /search`) are available to any
-    authenticated user. Writes are bulk-only and admin-only per BEP
-    §3 — `/bulk-create`, `/bulk-update`, `/bulk-purge`.
+    authenticated user. Writes are bulk-only and admin-only —
+    `/bulk-create`, `/bulk-update`, `/bulk-purge`.
     """
     reg = RouteRegistry.create("app-config-policies", route_deps.cors_options)
 
     # Reads
     reg.add("POST", "/search", handler.search, middlewares=[auth_required])
     reg.add("GET", "/{config_name}", handler.get, middlewares=[auth_required])
-    # Admin bulk writes (BEP-1052 §3)
+    # Admin bulk writes
     reg.add("POST", "/bulk-create", handler.admin_bulk_create, middlewares=[superadmin_required])
     reg.add("POST", "/bulk-update", handler.admin_bulk_update, middlewares=[superadmin_required])
     reg.add("POST", "/bulk-purge", handler.admin_bulk_purge, middlewares=[superadmin_required])

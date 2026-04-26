@@ -18,7 +18,7 @@ __all__ = [
     # Queries
     "app_config_policy",
     "app_config_policies",
-    # Bulk mutations (BEP-1052 §3 — bulk-only)
+    # Bulk mutations (bulk-only)
     "admin_bulk_create_app_config_policies",
     "admin_bulk_update_app_config_policies",
     "admin_bulk_purge_app_config_policies",

@@ -21,7 +21,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Scoped app-config policy (BEP-1052 §1).",
+        description="Scoped app-config policy.",
     ),
     name="AppConfigPolicy",
 )

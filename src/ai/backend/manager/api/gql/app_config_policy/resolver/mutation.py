@@ -1,4 +1,4 @@
-"""AppConfigPolicy GQL mutation resolvers (bulk-only, BEP-1052 §3)."""
+"""AppConfigPolicy GQL mutation resolvers (bulk-only)."""
 
 from __future__ import annotations
 
@@ -40,8 +40,7 @@ async def admin_bulk_create_app_config_policies(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Replace `scope_sources`; `config_name` is immutable (BEP-1052 §1). "
-            "Admin only, per-item transaction."
+            "Replace `scope_sources`; `config_name` is immutable. Admin only, per-item transaction."
         ),
     )
 )
@@ -58,8 +57,7 @@ async def admin_bulk_update_app_config_policies(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Rejects items whose `config_name` still has referencing fragment rows "
-            "(BEP-1052 §1). Admin only."
+            "Rejects items whose `config_name` still has referencing fragment rows. Admin only."
         ),
     )
 )

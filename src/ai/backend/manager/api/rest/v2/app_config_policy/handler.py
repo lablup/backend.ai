@@ -1,8 +1,8 @@
-"""REST v2 handler for the app-config policy domain (BEP-1052 §4).
+"""REST v2 handler for the app-config policy domain.
 
-Writes are **bulk-only** per BEP §3 — the single-item create / update /
-purge endpoints were removed in favour of `/bulk-create`,
-`/bulk-update`, `/bulk-purge` (admin-only).
+Writes are **bulk-only** — the single-item create / update / purge
+endpoints were removed in favour of `/bulk-create`, `/bulk-update`,
+`/bulk-purge` (admin-only).
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ class V2AppConfigPolicyHandler:
         result = await self._adapter.search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    # ── Admin bulk writes (BEP-1052 §3) ──────────────────────────
+    # ── Admin bulk writes ────────────────────────────────────────
 
     async def admin_bulk_create(
         self,

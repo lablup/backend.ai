@@ -1,4 +1,4 @@
-"""AppConfigPolicy bulk-mutation GQL payload types (BEP-1052 §3)."""
+"""AppConfigPolicy bulk-mutation GQL payload types."""
 
 from __future__ import annotations
 
