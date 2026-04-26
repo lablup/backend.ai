@@ -169,7 +169,7 @@ async def proxy(
                 SessionConfig(
                     id=token.session_id,
                     user_uuid=token.user_uuid,
-                    group_id=token.group_id,
+                    project_id=token.group_id,
                     access_key=token.access_key,
                     domain_name=token.domain_name,
                 ),

@@ -49,7 +49,7 @@ async def conf_v2(
             params.kernel_port,
             params.session.id,
             params.session.user_uuid,
-            params.session.group_id,
+            params.session.project_id,
             params.session.access_key,
             params.session.domain_name,
         )
