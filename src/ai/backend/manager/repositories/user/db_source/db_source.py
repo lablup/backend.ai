@@ -1029,11 +1029,7 @@ class UserDBSource:
         user_uuid: UUID,
         project_id: ProjectID,
     ) -> None:
-        """Add a user to a project, owning its own transaction.
-
-        Inserts the business N:N association, creates the RBAC scope binding,
-        and maps the user to the project's member role.
-        """
+        """Add a user to a project, mapping the user to the project's member role."""
         async with self._db.begin_session_read_committed() as session:
             await self._add_user_to_project_in_session(session, user_uuid, project_id)
 

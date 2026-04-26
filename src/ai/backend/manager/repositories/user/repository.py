@@ -100,8 +100,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def assign_project_membership(self, user_uuid: UUID, project_id: ProjectID) -> None:
-        """Add a user to a project: insert the business N:N association, the
-        RBAC scope binding, and the project member role mapping."""
+        """Add a user to a project, mapping the user to the project's member role."""
         await self._db_source.assign_project_membership(user_uuid, project_id)
 
     @user_repository_resilience.apply()

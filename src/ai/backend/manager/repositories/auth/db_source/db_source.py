@@ -128,7 +128,7 @@ class AuthDBSource:
         user_data: dict[str, Any],
         keypair_data: dict[str, Any],
     ) -> UserData:
-        """Insert a new user with the default keypair and the user's RBAC system role mapping."""
+        """Insert a new user with the default keypair."""
         async with self._db.begin_session_read_committed() as db_session:
             conn = await db_session.connection()
 
