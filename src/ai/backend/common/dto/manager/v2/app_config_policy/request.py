@@ -37,14 +37,14 @@ class AppConfigPolicyOrder(BaseRequestModel):
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
 
 
-# ── Bulk mutation inputs (BEP-1052 §3, bulk-only writes) ─────────
+# ── Bulk mutation inputs (bulk-only writes) ──────────────────────
 
 
 class AdminAppConfigPolicyItemInput(BaseRequestModel):
     """Per-item input for `adminBulkCreate/UpdateAppConfigPolicies`.
 
     `user_writable` is intentionally omitted — user writes are blocked
-    in this iteration; re-add when user writes are enabled (BEP-1052 §1).
+    in this iteration; re-add when user writes are enabled.
     """
 
     config_name: str = Field(

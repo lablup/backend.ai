@@ -31,10 +31,10 @@ from ai.backend.manager.services.app_config_policy.service import AppConfigPolic
 class AppConfigPolicyProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetAppConfigPolicyAction, GetAppConfigPolicyActionResult]
     search: ActionProcessor[SearchAppConfigPoliciesAction, SearchAppConfigPoliciesActionResult]
-    # Bulk mutations (BEP-1052 §3) — wrapped by BulkActionProcessor so
-    # validators (RBAC, etc.) can filter entity_ids per-item before the
-    # service runs. No bulk validators are wired today; the processor
-    # simply forwards to the service.
+    # Bulk mutations — wrapped by BulkActionProcessor so validators
+    # (RBAC, etc.) can filter entity_ids per-item before the service
+    # runs. No bulk validators are wired today; the processor simply
+    # forwards to the service.
     admin_bulk_create: BulkActionProcessor[
         AdminBulkCreateAppConfigPoliciesAction, AdminBulkCreateAppConfigPoliciesActionResult
     ]

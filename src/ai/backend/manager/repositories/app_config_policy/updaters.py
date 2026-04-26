@@ -14,8 +14,8 @@ from ai.backend.manager.repositories.base.updater import UpdaterSpec
 class AppConfigPolicyUpdaterSpec(UpdaterSpec[AppConfigPolicyRow]):
     """UpdaterSpec for `app_config_policies`.
 
-    Only `scope_sources` is mutable — `config_name` is immutable per
-    BEP-1052 §1 and therefore never appears in ``build_values()``.
+    Only `scope_sources` is mutable — `config_name` is immutable and
+    therefore never appears in ``build_values()``.
     """
 
     scope_sources: Sequence[str]

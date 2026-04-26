@@ -110,7 +110,7 @@ class AppConfigPolicyDBSource:
         helper (which requires a single-column PK).
 
         `config_name` itself is never mutated — `AppConfigPolicyUpdaterSpec`
-        exposes only `scope_sources` (BEP-1052 §1). Raises
+        exposes only `scope_sources`. Raises
         :class:`AppConfigPolicyNotFound` when no row exists for
         `config_name`; reads use the nullable `get(...)` instead.
         """

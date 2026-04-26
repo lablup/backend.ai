@@ -23,7 +23,7 @@ __all__ = (
 
 
 class AppConfigPolicyNode(BaseResponseModel):
-    """Node representing a single app-config policy (BEP-1052 §1)."""
+    """Node representing a single app-config policy."""
 
     id: UUID = Field(description="Policy row ID")
     config_name: str = Field(description="Unique, immutable policy name.")
@@ -49,7 +49,7 @@ class SearchAppConfigPoliciesPayload(BaseResponseModel):
     has_previous_page: bool = Field(default=False, description="Whether there is a previous page.")
 
 
-# ── Bulk mutation payloads (BEP-1052 §3, bulk-only writes) ───────
+# ── Bulk mutation payloads (bulk-only writes) ────────────────────
 
 
 class AppConfigPolicyBulkError(BaseResponseModel):

@@ -19,7 +19,10 @@ from ai.backend.common.dto.manager.v2.app_config_policy.response import (
     GetAppConfigPolicyPayload,
     SearchAppConfigPoliciesPayload,
 )
-from ai.backend.common.dto.manager.v2.app_config_policy.types import OrderDirection
+from ai.backend.common.dto.manager.v2.app_config_policy.types import (
+    AppConfigPolicyOrderField,
+    OrderDirection,
+)
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config_policy.bulk_types import (
     AppConfigPolicyBulkItem,
@@ -48,10 +51,10 @@ from .base import BaseAdapter
 
 
 class AppConfigPolicyAdapter(BaseAdapter):
-    """Adapter for AppConfigPolicy domain operations (BEP-1052 §1).
+    """Adapter for AppConfigPolicy domain operations.
 
-    Writes are bulk-only (BEP-1052 §3); single-item create / update /
-    purge entry points are intentionally absent.
+    Writes are bulk-only; single-item create / update / purge entry
+    points are intentionally absent.
     """
 
     async def get(self, config_name: str) -> GetAppConfigPolicyPayload:
@@ -133,12 +136,12 @@ class AppConfigPolicyAdapter(BaseAdapter):
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
-            match order.field.value:
-                case "config_name":
+            match order.field:
+                case AppConfigPolicyOrderField.CONFIG_NAME:
                     result.append(AppConfigPolicyOrders.config_name(ascending))
-                case "created_at":
+                case AppConfigPolicyOrderField.CREATED_AT:
                     result.append(AppConfigPolicyOrders.created_at(ascending))
-                case "updated_at":
+                case AppConfigPolicyOrderField.UPDATED_AT:
                     result.append(AppConfigPolicyOrders.updated_at(ascending))
         return result
 
@@ -152,7 +155,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
             updated_at=data.updated_at,
         )
 
-    # ── Bulk mutations (BEP-1052 §3) ───────────────────────────────
+    # ── Bulk mutations ─────────────────────────────────────────────
     #
     # Each bulk processor returns a `BulkProcessResult[T]` whose `.result`
     # field is the underlying `*ActionResult` produced by the service. We

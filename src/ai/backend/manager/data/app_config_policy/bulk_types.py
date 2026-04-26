@@ -1,4 +1,4 @@
-"""Bulk-mutation service-layer dataclasses for app_config_policies (BEP-1052 §3)."""
+"""Bulk-mutation service-layer dataclasses for app_config_policies."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ class AppConfigPolicyBulkItem:
 
     `user_writable` was dropped pre-landing — user writes are blocked
     entirely in this iteration; re-introduce when user writes are
-    enabled (BEP-1052 §1).
+    enabled.
     """
 
     config_name: str

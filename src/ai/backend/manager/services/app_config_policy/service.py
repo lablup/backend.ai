@@ -61,7 +61,7 @@ class AppConfigPolicyService:
             has_previous_page=result.has_previous_page,
         )
 
-    # ── Bulk mutations (BEP-1052 §3) ─────────────────────────────
+    # ── Bulk mutations ──────────────────────────────────────────
 
     async def admin_bulk_create(
         self, action: AdminBulkCreateAppConfigPoliciesAction
@@ -74,7 +74,7 @@ class AppConfigPolicyService:
                 policy = await self._admin_repository.create(item.config_name, item.scope_sources)
                 created.append(policy)
             except Exception as e:
-                log.debug("policy admin_bulk_create item {} failed: {}", index, e)
+                log.warning("policy admin_bulk_create item {} failed: {}", index, e)
                 failed.append(
                     AppConfigPolicyBulkItemError(
                         index=index,
@@ -87,9 +87,9 @@ class AppConfigPolicyService:
     async def admin_bulk_update(
         self, action: AdminBulkUpdateAppConfigPoliciesAction
     ) -> AdminBulkUpdateAppConfigPoliciesActionResult:
-        """Replace `scope_sources`; `config_name` itself is immutable
-        (BEP-1052 §1). Items referencing a non-existent `config_name`
-        are collected as failures (not auto-inserted)."""
+        """Replace `scope_sources`; `config_name` itself is immutable.
+        Items referencing a non-existent `config_name` are collected as
+        failures (not auto-inserted)."""
         updated = []
         failed: list[AppConfigPolicyBulkItemError] = []
         for index, item in enumerate(action.items):
@@ -97,7 +97,7 @@ class AppConfigPolicyService:
                 policy = await self._admin_repository.update(item.config_name, item.scope_sources)
                 updated.append(policy)
             except Exception as e:
-                log.debug("policy admin_bulk_update item {} failed: {}", index, e)
+                log.warning("policy admin_bulk_update item {} failed: {}", index, e)
                 failed.append(
                     AppConfigPolicyBulkItemError(
                         index=index,
@@ -111,7 +111,7 @@ class AppConfigPolicyService:
         self, action: AdminBulkPurgeAppConfigPoliciesAction
     ) -> AdminBulkPurgeAppConfigPoliciesActionResult:
         """Hard-delete per-item; items whose `config_name` still has
-        referencing fragments surface as per-item failures (BEP-1052 §1
+        referencing fragments surface as per-item failures (the
         required-policy invariant)."""
         purged_names: list[str] = []
         failed: list[AppConfigPolicyBulkItemError] = []
@@ -122,7 +122,7 @@ class AppConfigPolicyService:
                     purged_names.append(config_name)
                 # Absent names are no-oped intentionally.
             except Exception as e:
-                log.debug("policy admin_bulk_purge item {} failed: {}", index, e)
+                log.warning("policy admin_bulk_purge item {} failed: {}", index, e)
                 failed.append(
                     AppConfigPolicyBulkItemError(
                         index=index,
