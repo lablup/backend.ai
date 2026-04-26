@@ -42,6 +42,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationState,
@@ -71,7 +77,7 @@ from ai.backend.manager.models.base import (
     StrEnumType,
     metadata,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -89,6 +95,9 @@ from ai.backend.manager.models.rbac.exceptions import NotEnoughPermission
 from ai.backend.manager.models.rbac.permission_defs import StorageHostPermission
 from ai.backend.manager.models.rbac.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
@@ -567,7 +576,6 @@ async def query_accessible_vfolders(
     extra_vf_group_conds: Any = None,
     allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models.group import association_groups_users as agus
     from ai.backend.manager.models.group import groups
     from ai.backend.manager.models.user import users
 
@@ -698,11 +706,15 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select(agus.c.group_id).select_from(j).where(agus.c.user_id == user_uuid)
+            ase = AssociationScopesEntitiesRow.__table__
+            query = sa.select(ase.c.scope_id).where(
+                ase.c.scope_type == PermissionScopeType.PROJECT,
+                ase.c.entity_type == PermissionEntityType.USER,
+                ase.c.entity_id == str(user_uuid),
+            )
             result = await conn.execute(query)
             grps = result.fetchall()
-            group_ids = [g.group_id for g in grps]
+            group_ids = [uuid.UUID(g.scope_id) for g in grps]
             # Include MODEL_STORE projects in the same domain for cross-project model access
             from ai.backend.manager.data.group.types import ProjectType
 
@@ -818,7 +830,7 @@ async def get_allowed_vfolder_hosts_by_user(
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
     from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.group import association_groups_users, groups
+    from ai.backend.manager.models.group import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -829,30 +841,20 @@ async def get_allowed_vfolder_hosts_by_user(
         result_hosts: VFolderHostPermissionMap = allowed_hosts | values
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
-    if group_id is not None:
-        j = groups.join(
-            association_groups_users,
-            (
-                (groups.c.id == association_groups_users.c.group_id)
-                & (groups.c.id == group_id)
-                & (association_groups_users.c.user_id == user_uuid)
-            ),
-        )
-    else:
-        j = groups.join(
-            association_groups_users,
-            (
-                (groups.c.id == association_groups_users.c.group_id)
-                & (association_groups_users.c.user_id == user_uuid)
-            ),
-        )
-    query = (
-        sa.select(groups.c.allowed_vfolder_hosts)
-        .select_from(j)
-        .where(
-            (groups.c.domain_name == domain_name) & (groups.c.is_active),
-        )
+    ase = AssociationScopesEntitiesRow.__table__
+    project_ids_subq = sa.select(ase.c.scope_id).where(
+        ase.c.scope_type == PermissionScopeType.PROJECT,
+        ase.c.entity_type == PermissionEntityType.USER,
+        ase.c.entity_id == str(user_uuid),
     )
+    where_conds = [
+        groups.c.domain_name == domain_name,
+        groups.c.is_active,
+        sa.cast(groups.c.id, sa.String).in_(project_ids_subq),
+    ]
+    if group_id is not None:
+        where_conds.append(groups.c.id == group_id)
+    query = sa.select(groups.c.allowed_vfolder_hosts).where(*where_conds)
     if rows := (await conn.execute(query)).fetchall():
         for row in rows:
             result_hosts = allowed_hosts | row.allowed_vfolder_hosts
@@ -1389,8 +1391,6 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models.group import association_groups_users as agus
-
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
     quota_scope_user: UserRow | None = await conn.scalar(query)
@@ -1417,12 +1417,12 @@ async def ensure_quota_scope_accessible_by_user(
                 if quota_scope_group.domain_name == user["domain_name"]:
                     return
             case _:
-                query = (
-                    sa.select(agus.c.group_id)
-                    .select_from(agus)
-                    .where(
-                        (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
-                    )
+                ase = AssociationScopesEntitiesRow.__table__
+                query = sa.select(ase.c.scope_id).where(
+                    ase.c.scope_type == PermissionScopeType.PROJECT,
+                    ase.c.entity_type == PermissionEntityType.USER,
+                    ase.c.scope_id == str(quota_scope.scope_id),
+                    ase.c.entity_id == str(user["uuid"]),
                 )
                 matched_group_id = await conn.scalar(query)
                 if matched_group_id:
@@ -1716,18 +1716,17 @@ class VFolderPermissionContextBuilder(
     ) -> VFolderPermissionContext:
         result = VFolderPermissionContext()
 
-        j = sa.join(
-            GroupRow,
-            AssocGroupUserRow,
-            GroupRow.id == AssocGroupUserRow.group_id,
+        ase = AssociationScopesEntitiesRow.__table__
+        project_ids_subq = sa.select(ase.c.scope_id).where(
+            ase.c.scope_type == PermissionScopeType.PROJECT,
+            ase.c.entity_type == PermissionEntityType.USER,
+            ase.c.entity_id == str(ctx.user_id),
         )
         _project_stmt = (
             sa.select(GroupRow)
-            .select_from(j)
             .where(
-                sa.and_(
-                    GroupRow.domain_name == domain_name, AssocGroupUserRow.user_id == ctx.user_id
-                )
+                GroupRow.domain_name == domain_name,
+                sa.cast(GroupRow.id, sa.String).in_(project_ids_subq),
             )
             .options(load_only(GroupRow.id))
         )
