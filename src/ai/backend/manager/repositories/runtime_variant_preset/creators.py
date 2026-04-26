@@ -28,7 +28,6 @@ class RuntimeVariantPresetCreatorSpec(CreatorSpec[RuntimeVariantPresetRow]):
     default_value: str | None
     key: str
     category: str | None
-    ui_type: str | None
     display_name: str | None
     ui_option: UIOption | None
 
@@ -56,7 +55,6 @@ class RuntimeVariantPresetCreatorSpec(CreatorSpec[RuntimeVariantPresetRow]):
         row.default_value = self.default_value
         row.key = self.key
         row.category = self.category
-        row.ui_type = self.ui_type
         row.display_name = self.display_name
         row.ui_option = self.ui_option
         return row

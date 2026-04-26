@@ -54,7 +54,6 @@ class TestRuntimeVariantPresetFixture:
                     "default_value": "auto",
                     "key": "--dtype",
                     "category": "model_loading",
-                    "ui_type": "select",
                     "display_name": "DType",
                     "ui_option": {
                         "ui_type": "select",
