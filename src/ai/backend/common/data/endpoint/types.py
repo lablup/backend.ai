@@ -1,5 +1,6 @@
 from enum import Enum, StrEnum
 from functools import lru_cache
+from typing import Any, Self
 
 
 class EndpointStatus(StrEnum):
@@ -58,6 +59,25 @@ class EndpointLifecycle(Enum):
     @lru_cache(maxsize=1)
     def inactive_states(cls) -> set["EndpointLifecycle"]:
         return {cls.DESTROYING, cls.DESTROYED}
+
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        # Accept v2 :class:`ModelDeploymentStatus` aliases on the wire so
+        # historical / future callers that hand us the new naming still
+        # resolve to a valid lifecycle value.
+        if isinstance(value, str):
+            alias = _DEPLOYMENT_STATUS_TO_LIFECYCLE_ALIASES.get(value.lower())
+            if alias is not None:
+                return cls(alias)
+        return None
+
+
+# Map v2 :class:`ModelDeploymentStatus` values back onto the lowercase
+# :class:`EndpointLifecycle` form. Used by ``EndpointLifecycle._missing_``.
+_DEPLOYMENT_STATUS_TO_LIFECYCLE_ALIASES: dict[str, str] = {
+    "stopping": "destroying",
+    "stopped": "destroyed",
+}
 
 
 class ScalingState(StrEnum):
