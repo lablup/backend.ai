@@ -989,21 +989,48 @@ class PermissionDBSource:
         return scope_chain_cte.union(scope_chain_recursive)
 
     @staticmethod
-    def _build_direct_scope_walk_cte(direct_scopes_cte: sa.CTE) -> sa.CTE:
-        """Walk parent scopes upward from the unique scopes in *direct_scopes_cte*.
+    def _build_direct_scope_walk_cte(
+        params: _DirectScopeWalkQueryParams,
+    ) -> tuple[sa.CTE, sa.CTE]:
+        """Build the ``direct_scopes`` and ``scope_walk`` CTEs for fan-in dedup.
 
-        Carries only ``(start_scope_type, start_scope_id)`` through the
-        recursion — entity_id is not carried. Compared to
-        ``_build_scope_chain_cte`` which carries entity_id, this CTE keys on
-        unique direct scopes, reducing the recursive working set from
-        ``O(K * D)`` to ``O(unique_direct_scopes * D)`` when many input
-        entities share the same direct parent scope.
+        Returns ``(direct_scopes_cte, scope_walk_cte)`` where:
+          * ``direct_scopes_cte`` maps each input entity to its direct AUTO
+            parent scope(s).
+          * ``scope_walk_cte`` recursively walks parent scopes upward from
+            the unique ``(scope_type, scope_id)`` pairs in
+            ``direct_scopes_cte``, carrying only
+            ``(start_scope_type, start_scope_id)`` — entity_id is not
+            carried.
 
-        The caller joins ``direct_scopes_cte`` against the returned CTE on
-        ``(scope_type, scope_id) == (start_scope_type, start_scope_id)`` to
-        link each walked scope back to its originating entity.
+        Compared to ``_build_scope_chain_cte`` which carries entity_id
+        through the walk, this pair keys the recursion on unique direct
+        scopes, reducing the recursive working set from ``O(K * D)`` to
+        ``O(unique_direct_scopes * D)`` when many input entities share
+        the same direct parent scope.
+
+        The caller joins ``direct_scopes_cte`` against ``scope_walk_cte``
+        on ``(scope_type, scope_id) == (start_scope_type, start_scope_id)``
+        to link each walked scope back to its originating entity.
         """
         ase = AssociationScopesEntitiesRow.__table__
+        association_entity_type = params.target_element_type.to_entity_type()
+
+        direct_scopes_cte = (
+            sa.select(
+                ase.c.entity_id,
+                ase.c.scope_type,
+                ase.c.scope_id,
+            )
+            .where(
+                sa.and_(
+                    ase.c.entity_type == association_entity_type,
+                    ase.c.entity_id.in_(params.entity_ids),
+                    ase.c.relation_type == RelationType.AUTO,
+                )
+            )
+            .cte("direct_scopes")
+        )
 
         # Base case: unique direct scopes; start_scope == current scope.
         walk_base = sa.select(
@@ -1035,7 +1062,7 @@ class PermissionDBSource:
                 parent.c.relation_type == RelationType.AUTO,
             )
         )
-        return walk_cte.union(walk_recursive)
+        return direct_scopes_cte, walk_cte.union(walk_recursive)
 
     async def _check_permissions_via_scope_chain(
         self,
@@ -1191,31 +1218,16 @@ class PermissionDBSource:
         if not params.entity_ids:
             return {}
 
-        association_entity_type = params.target_element_type.to_entity_type()
-        effective_perm_entity_type = params.permission_entity_type or association_entity_type
+        effective_perm_entity_type = (
+            params.permission_entity_type or params.target_element_type.to_entity_type()
+        )
         target_scope_type = params.target_element_type.to_scope_type()
 
-        ase = AssociationScopesEntitiesRow.__table__
         perm = PermissionRow.__table__
         user_roles = UserRoleRow.__table__
         roles = RoleRow.__table__
 
-        direct_scopes_cte = (
-            sa.select(
-                ase.c.entity_id,
-                ase.c.scope_type,
-                ase.c.scope_id,
-            )
-            .where(
-                sa.and_(
-                    ase.c.entity_type == association_entity_type,
-                    ase.c.entity_id.in_(params.entity_ids),
-                    ase.c.relation_type == RelationType.AUTO,
-                )
-            )
-            .cte("direct_scopes")
-        )
-        scope_walk_cte = self._build_direct_scope_walk_cte(direct_scopes_cte)
+        direct_scopes_cte, scope_walk_cte = self._build_direct_scope_walk_cte(params)
 
         chain_filters: list[sa.ColumnElement[bool]] = [
             user_roles.c.user_id == params.user_id,
