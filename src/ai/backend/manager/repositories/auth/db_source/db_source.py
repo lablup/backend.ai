@@ -26,7 +26,7 @@ from ai.backend.manager.errors.auth import (
     UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
-from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
@@ -127,10 +127,8 @@ class AuthDBSource:
         self,
         user_data: dict[str, Any],
         keypair_data: dict[str, Any],
-        group_name: str,
-        domain_name: str,
     ) -> UserData:
-        """Insert a new user with keypair and add to default group in database."""
+        """Insert a new user with the default keypair and the user's RBAC system role mapping."""
         async with self._db.begin_session_read_committed() as db_session:
             conn = await db_session.connection()
 
@@ -151,19 +149,6 @@ class AuthDBSource:
             keypair_data["user"] = user_row.uuid
             keypair_query = keypairs.insert().values(keypair_data)
             await conn.execute(keypair_query)
-
-            # Add to default group
-            group_query = (
-                sa.select(groups.c.id)
-                .select_from(groups)
-                .where((groups.c.domain_name == domain_name) & (groups.c.name == group_name))
-            )
-            result = await conn.execute(group_query)
-            grp = result.first()
-            if grp is not None:
-                values = [{"user_id": user_row.uuid, "group_id": grp.id}]
-                assoc_query = association_groups_users.insert().values(values)
-                await conn.execute(assoc_query)
 
             # Create RBAC system role and map user to role
             role_spec = UserSystemRoleSpec(user_id=user_row.uuid)
