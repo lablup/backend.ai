@@ -253,9 +253,14 @@ class SerializableToken(BaseModel):
 
 
 class SessionConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: Annotated[UUID | None, Field(default=None)]
     user_uuid: UUID
-    group_id: UUID
+    # Renamed from ``group_id`` to ``project_id`` to align with v2 naming.
+    # ``group_id`` is accepted as a validation alias so older Manager peers
+    # that still send the legacy key continue to work on the wire.
+    project_id: UUID = Field(validation_alias=AliasChoices("project_id", "group_id"))
     access_key: Annotated[str | None, Field(default=None)]
     domain_name: str
 
