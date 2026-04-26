@@ -955,7 +955,7 @@ type AllowedResourceGroupsPayload
   items: [String!]!
 }
 
-"""Added in UNRELEASED. Scoped app-config policy (BEP-1052 §1)."""
+"""Added in UNRELEASED. Scoped app-config policy."""
 type AppConfigPolicy implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -11690,12 +11690,12 @@ type Mutation
   adminBulkCreateAppConfigPolicies(input: AdminBulkCreateAppConfigPolicyInput!): AdminBulkCreateAppConfigPoliciesPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Replace `scope_sources`; `config_name` is immutable (BEP-1052 §1). Admin only, per-item transaction.
+  Added in UNRELEASED. Replace `scope_sources`; `config_name` is immutable. Admin only, per-item transaction.
   """
   adminBulkUpdateAppConfigPolicies(input: AdminBulkUpdateAppConfigPolicyInput!): AdminBulkUpdateAppConfigPoliciesPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Rejects items whose `config_name` still has referencing fragment rows (BEP-1052 §1). Admin only.
+  Added in UNRELEASED. Rejects items whose `config_name` still has referencing fragment rows. Admin only.
   """
   adminBulkPurgeAppConfigPolicies(input: AdminBulkPurgeAppConfigPolicyInput!): AdminBulkPurgeAppConfigPoliciesPayload! @join__field(graph: STRAWBERRY)
 

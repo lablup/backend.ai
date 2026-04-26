@@ -660,7 +660,7 @@ type AllowedResourceGroupsPayload {
   items: [String!]!
 }
 
-"""Added in UNRELEASED. Scoped app-config policy (BEP-1052 §1)."""
+"""Added in UNRELEASED. Scoped app-config policy."""
 type AppConfigPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -7545,12 +7545,12 @@ type Mutation {
   adminBulkCreateAppConfigPolicies(input: AdminBulkCreateAppConfigPolicyInput!): AdminBulkCreateAppConfigPoliciesPayload!
 
   """
-  Added in UNRELEASED. Replace `scope_sources`; `config_name` is immutable (BEP-1052 §1). Admin only, per-item transaction.
+  Added in UNRELEASED. Replace `scope_sources`; `config_name` is immutable. Admin only, per-item transaction.
   """
   adminBulkUpdateAppConfigPolicies(input: AdminBulkUpdateAppConfigPolicyInput!): AdminBulkUpdateAppConfigPoliciesPayload!
 
   """
-  Added in UNRELEASED. Rejects items whose `config_name` still has referencing fragment rows (BEP-1052 §1). Admin only.
+  Added in UNRELEASED. Rejects items whose `config_name` still has referencing fragment rows. Admin only.
   """
   adminBulkPurgeAppConfigPolicies(input: AdminBulkPurgeAppConfigPolicyInput!): AdminBulkPurgeAppConfigPoliciesPayload!
 
