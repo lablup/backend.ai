@@ -989,34 +989,18 @@ class PermissionDBSource:
         return scope_chain_cte.union(scope_chain_recursive)
 
     @staticmethod
-    def _build_direct_scope_walk_cte(
-        params: _DirectScopeWalkQueryParams,
-    ) -> tuple[sa.CTE, sa.CTE]:
-        """Build the ``direct_scopes`` and ``scope_walk`` CTEs for fan-in dedup.
+    def _build_direct_scopes_cte(
+        target_entity_type: EntityType,
+        entity_ids: list[str],
+    ) -> sa.CTE:
+        """Build the ``direct_scopes`` CTE: each input entity → its direct AUTO parent scope(s).
 
-        Returns ``(direct_scopes_cte, scope_walk_cte)`` where:
-          * ``direct_scopes_cte`` maps each input entity to its direct AUTO
-            parent scope(s).
-          * ``scope_walk_cte`` recursively walks parent scopes upward from
-            the unique ``(scope_type, scope_id)`` pairs in
-            ``direct_scopes_cte``, carrying only
-            ``(start_scope_type, start_scope_id)`` — entity_id is not
-            carried.
-
-        Compared to ``_build_scope_chain_cte`` which carries entity_id
-        through the walk, this pair keys the recursion on unique direct
-        scopes, reducing the recursive working set from ``O(K * D)`` to
-        ``O(unique_direct_scopes * D)`` when many input entities share
-        the same direct parent scope.
-
-        The caller joins ``direct_scopes_cte`` against ``scope_walk_cte``
-        on ``(scope_type, scope_id) == (start_scope_type, start_scope_id)``
-        to link each walked scope back to its originating entity.
+        Result columns: ``(entity_id, scope_type, scope_id)``. Used as the
+        seed of :meth:`_build_scope_walk_cte` and joined back at the end of
+        the resolver to link each walked scope to its originating entity.
         """
         ase = AssociationScopesEntitiesRow.__table__
-        association_entity_type = params.target_element_type.to_entity_type()
-
-        direct_scopes_cte = (
+        return (
             sa.select(
                 ase.c.entity_id,
                 ase.c.scope_type,
@@ -1024,13 +1008,30 @@ class PermissionDBSource:
             )
             .where(
                 sa.and_(
-                    ase.c.entity_type == association_entity_type,
-                    ase.c.entity_id.in_(params.entity_ids),
+                    ase.c.entity_type == target_entity_type,
+                    ase.c.entity_id.in_(entity_ids),
                     ase.c.relation_type == RelationType.AUTO,
                 )
             )
             .cte("direct_scopes")
         )
+
+    @staticmethod
+    def _build_scope_walk_cte(direct_scopes_cte: sa.CTE) -> sa.CTE:
+        """Walk parent scopes upward from the unique scopes in ``direct_scopes_cte``.
+
+        Carries only ``(start_scope_type, start_scope_id)`` through the
+        recursion — entity_id is not carried. Compared to
+        :meth:`_build_scope_chain_cte` which carries entity_id, this CTE
+        keys the recursion on unique direct scopes, reducing the working
+        set from ``O(K * D)`` to ``O(unique_direct_scopes * D)`` when many
+        input entities share the same direct parent scope.
+
+        The caller joins ``direct_scopes_cte`` against the returned CTE on
+        ``(scope_type, scope_id) == (start_scope_type, start_scope_id)``
+        to link each walked scope back to its originating entity.
+        """
+        ase = AssociationScopesEntitiesRow.__table__
 
         # Base case: unique direct scopes; start_scope == current scope.
         walk_base = sa.select(
@@ -1062,7 +1063,7 @@ class PermissionDBSource:
                 parent.c.relation_type == RelationType.AUTO,
             )
         )
-        return direct_scopes_cte, walk_cte.union(walk_recursive)
+        return walk_cte.union(walk_recursive)
 
     async def _check_permissions_via_scope_chain(
         self,
@@ -1218,16 +1219,18 @@ class PermissionDBSource:
         if not params.entity_ids:
             return {}
 
-        effective_perm_entity_type = (
-            params.permission_entity_type or params.target_element_type.to_entity_type()
-        )
+        association_entity_type = params.target_element_type.to_entity_type()
+        effective_perm_entity_type = params.permission_entity_type or association_entity_type
         target_scope_type = params.target_element_type.to_scope_type()
 
         perm = PermissionRow.__table__
         user_roles = UserRoleRow.__table__
         roles = RoleRow.__table__
 
-        direct_scopes_cte, scope_walk_cte = self._build_direct_scope_walk_cte(params)
+        direct_scopes_cte = self._build_direct_scopes_cte(
+            association_entity_type, params.entity_ids
+        )
+        scope_walk_cte = self._build_scope_walk_cte(direct_scopes_cte)
 
         chain_filters: list[sa.ColumnElement[bool]] = [
             user_roles.c.user_id == params.user_id,
@@ -1295,17 +1298,18 @@ class PermissionDBSource:
                 granted[row.entity_id].add(OperationType(row.operation))
         return dict(granted)
 
-    async def resolve_effective_permissions_via_direct_scope_walk(
+    async def resolve_effective_permissions(
         self,
         data: EffectivePermissionsInput,
     ) -> EffectivePermissionsResult:
-        """Effective permissions resolver routed through the fan-in dedup path.
+        """Resolve the effective permissions for a user across multiple entities.
 
-        Equivalent to :meth:`resolve_effective_permissions` for any input,
-        but the recursive scope walk runs once per unique direct parent
-        scope rather than once per input entity. The returned mapping is a
-        ``defaultdict(set)`` so callers can index by entity id even when no
-        operation was granted (matching the legacy resolver's behavior).
+        Routed through the shared fan-in dedup path: parent scopes are
+        walked once per unique direct parent rather than once per input
+        entity, so the recursive working set is
+        ``O(unique_direct_scopes * D)`` instead of ``O(K * D)``. Returns a
+        ``defaultdict(set)`` so callers can index by entity id even when
+        no operation was granted.
         """
         if not data.target_entity_ids:
             return EffectivePermissionsResult(permissions={})
@@ -1319,88 +1323,6 @@ class PermissionDBSource:
             )
         )
         permissions: defaultdict[str, set[OperationType]] = defaultdict(set, granted_map)
-        return EffectivePermissionsResult(permissions=permissions)
-
-    async def resolve_effective_permissions(
-        self,
-        data: EffectivePermissionsInput,
-    ) -> EffectivePermissionsResult:
-        """Resolve the effective permissions for a user across multiple entities.
-
-        Uses a single batched query that traverses the scope chain (AUTO edges)
-        and self-scope permissions to collect all operations the user can perform
-        on each entity.
-
-        Returns a mapping from entity ID to the set of permitted operations.
-        """
-        if not data.target_entity_ids:
-            return EffectivePermissionsResult(permissions={})
-
-        association_entity_type = data.target_element_type.to_entity_type()
-        permission_entity_type = data.permission_entity_type or association_entity_type
-        target_scope_type = data.target_element_type.to_scope_type()
-
-        perm = PermissionRow.__table__
-        user_roles = UserRoleRow.__table__
-        roles = RoleRow.__table__
-
-        scope_chain_cte = self._build_scope_chain_cte(
-            association_entity_type, data.target_entity_ids
-        )
-        scope_chain_query = (
-            sa.select(
-                scope_chain_cte.c.entity_id,
-                perm.c.operation,
-            )
-            .select_from(
-                scope_chain_cte.join(
-                    perm,
-                    sa.and_(
-                        perm.c.scope_type == scope_chain_cte.c.scope_type,
-                        perm.c.scope_id == scope_chain_cte.c.scope_id,
-                    ),
-                )
-                .join(roles, roles.c.id == perm.c.role_id)
-                .join(user_roles, user_roles.c.role_id == roles.c.id)
-            )
-            .where(
-                sa.and_(
-                    user_roles.c.user_id == data.user_id,
-                    roles.c.status == RoleStatus.ACTIVE,
-                    perm.c.entity_type == permission_entity_type,
-                )
-            )
-        )
-
-        self_scope_query = (
-            sa.select(
-                perm.c.scope_id.label("entity_id"),
-                perm.c.operation,
-            )
-            .select_from(
-                perm.join(roles, roles.c.id == perm.c.role_id).join(
-                    user_roles, user_roles.c.role_id == roles.c.id
-                )
-            )
-            .where(
-                sa.and_(
-                    user_roles.c.user_id == data.user_id,
-                    roles.c.status == RoleStatus.ACTIVE,
-                    perm.c.scope_type == target_scope_type,
-                    perm.c.scope_id.in_(data.target_entity_ids),
-                    perm.c.entity_type == permission_entity_type,
-                )
-            )
-        )
-
-        combined_query = sa.union_all(scope_chain_query, self_scope_query)
-
-        permissions: defaultdict[str, set[OperationType]] = defaultdict(set)
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            result = await db_session.execute(combined_query)
-            for row in result:
-                permissions[row.entity_id].add(OperationType(row.operation))
-
         return EffectivePermissionsResult(permissions=permissions)
 
     async def bulk_assign_role(
