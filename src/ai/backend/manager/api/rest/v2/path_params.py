@@ -10,10 +10,6 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.identifier.role_preset import RolePresetID
 
 
-class AppConfigPolicyConfigNamePathParam(BaseRequestModel):
-    config_name: str = Field(description="App-config policy `config_name`")
-
-
 class DomainNamePathParam(BaseRequestModel):
     domain_name: str = Field(description="Domain name")
 
