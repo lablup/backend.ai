@@ -1304,12 +1304,10 @@ class PermissionDBSource:
     ) -> EffectivePermissionsResult:
         """Resolve the effective permissions for a user across multiple entities.
 
-        Routed through the shared fan-in dedup path: parent scopes are
-        walked once per unique direct parent rather than once per input
-        entity, so the recursive working set is
-        ``O(unique_direct_scopes * D)`` instead of ``O(K * D)``. Returns a
-        ``defaultdict(set)`` so callers can index by entity id even when
-        no operation was granted.
+        Returns a mapping from entity id to the set of operations the user
+        is authorized to perform on that entity. The mapping behaves like
+        a ``defaultdict(set)``, so callers can index by any of the input
+        entity ids and receive an empty set when nothing was granted.
         """
         if not data.target_entity_ids:
             return EffectivePermissionsResult(permissions={})
