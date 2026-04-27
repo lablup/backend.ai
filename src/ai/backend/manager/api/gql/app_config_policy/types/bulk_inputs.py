@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ai.backend.common.dto.manager.v2.app_config_policy.request import (
-    AdminAppConfigPolicyItemInput as AdminItemInputDTO,
+    AdminAppConfigPolicyCreateItemInput as AdminCreateItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_policy.request import (
+    AdminAppConfigPolicyUpdateItemInput as AdminUpdateItemInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_policy.request import (
     AdminBulkCreateAppConfigPoliciesInput as AdminBulkCreateInputDTO,
@@ -26,12 +31,24 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Per-item input for admin bulk create / update.",
+        description="Per-item input for admin bulk create — `config_name` + initial `scope_sources`.",
     ),
-    name="AdminAppConfigPolicyItemInput",
+    name="AdminAppConfigPolicyCreateItemInput",
 )
-class AdminAppConfigPolicyItemInputGQL(PydanticInputMixin[AdminItemInputDTO]):
+class AdminAppConfigPolicyCreateItemInputGQL(PydanticInputMixin[AdminCreateItemInputDTO]):
     config_name: str = gql_field(description="Unique, immutable policy name.")
+    scope_sources: list[str] = gql_field(description="Ordered scope chain.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Per-item input for admin bulk update — target row id + new `scope_sources`.",
+    ),
+    name="AdminAppConfigPolicyUpdateItemInput",
+)
+class AdminAppConfigPolicyUpdateItemInputGQL(PydanticInputMixin[AdminUpdateItemInputDTO]):
+    id: UUID = gql_field(description="Policy row id.")
     scope_sources: list[str] = gql_field(description="Ordered scope chain.")
 
 
@@ -43,7 +60,9 @@ class AdminAppConfigPolicyItemInputGQL(PydanticInputMixin[AdminItemInputDTO]):
     name="AdminBulkCreateAppConfigPolicyInput",
 )
 class AdminBulkCreateAppConfigPolicyInputGQL(PydanticInputMixin[AdminBulkCreateInputDTO]):
-    items: list[AdminAppConfigPolicyItemInputGQL] = gql_field(description="Policies to create.")
+    items: list[AdminAppConfigPolicyCreateItemInputGQL] = gql_field(
+        description="Policies to create."
+    )
 
 
 @gql_pydantic_input(
@@ -54,15 +73,17 @@ class AdminBulkCreateAppConfigPolicyInputGQL(PydanticInputMixin[AdminBulkCreateI
     name="AdminBulkUpdateAppConfigPolicyInput",
 )
 class AdminBulkUpdateAppConfigPolicyInputGQL(PydanticInputMixin[AdminBulkUpdateInputDTO]):
-    items: list[AdminAppConfigPolicyItemInputGQL] = gql_field(description="Policies to update.")
+    items: list[AdminAppConfigPolicyUpdateItemInputGQL] = gql_field(
+        description="Policies to update."
+    )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Admin bulk purge input for app-config policies (keyed on `config_name`).",
+        description="Admin bulk purge input for app-config policies (keyed on row id).",
     ),
     name="AdminBulkPurgeAppConfigPolicyInput",
 )
 class AdminBulkPurgeAppConfigPolicyInputGQL(PydanticInputMixin[AdminBulkPurgeInputDTO]):
-    config_names: list[str] = gql_field(description="`config_name`s to purge.")
+    ids: list[UUID] = gql_field(description="Policy row ids to purge.")

@@ -31,6 +31,7 @@ async def admin_bulk_create_app_config_policies(
     info: Info[StrawberryGQLContext],
     input: AdminBulkCreateAppConfigPolicyInputGQL,
 ) -> AdminBulkCreateAppConfigPoliciesPayloadGQL:
+    """Bulk-create app-config policies; failures surface per-item via `failed`."""
     check_admin_only()
     result = await info.context.adapters.app_config_policy.admin_bulk_create(input.to_pydantic())
     return AdminBulkCreateAppConfigPoliciesPayloadGQL.from_pydantic(result)
@@ -48,6 +49,7 @@ async def admin_bulk_update_app_config_policies(
     info: Info[StrawberryGQLContext],
     input: AdminBulkUpdateAppConfigPolicyInputGQL,
 ) -> AdminBulkUpdateAppConfigPoliciesPayloadGQL:
+    """Bulk-replace `scope_sources` per row id; missing-id items surface in `failed`."""
     check_admin_only()
     result = await info.context.adapters.app_config_policy.admin_bulk_update(input.to_pydantic())
     return AdminBulkUpdateAppConfigPoliciesPayloadGQL.from_pydantic(result)
@@ -57,7 +59,7 @@ async def admin_bulk_update_app_config_policies(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Rejects items whose `config_name` still has referencing fragment rows. Admin only."
+            "Hard-delete policies by row id; rows still referenced by fragments surface in `failed`. Admin only."
         ),
     )
 )
@@ -65,6 +67,7 @@ async def admin_bulk_purge_app_config_policies(
     info: Info[StrawberryGQLContext],
     input: AdminBulkPurgeAppConfigPolicyInputGQL,
 ) -> AdminBulkPurgeAppConfigPoliciesPayloadGQL:
+    """Bulk-purge app-config policies by row id; absent ids no-op."""
     check_admin_only()
     result = await info.context.adapters.app_config_policy.admin_bulk_purge(input.to_pydantic())
     return AdminBulkPurgeAppConfigPoliciesPayloadGQL.from_pydantic(result)

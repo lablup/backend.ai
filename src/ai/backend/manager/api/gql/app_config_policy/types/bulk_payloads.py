@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ai.backend.common.dto.manager.v2.app_config_policy.response import (
     AdminBulkCreateAppConfigPoliciesPayload as AdminBulkCreatePayloadDTO,
 )
@@ -34,7 +36,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 )
 class AppConfigPolicyBulkErrorGQL(PydanticOutputMixin[AppConfigPolicyBulkErrorDTO]):
     index: int = gql_field(description="Original position in the input list.")
-    config_name: str = gql_field(description="`config_name` of the failed row.")
     message: str = gql_field(description="Reason for the failure.")
 
 
@@ -73,7 +74,7 @@ class AdminBulkUpdateAppConfigPoliciesPayloadGQL(PydanticOutputMixin[AdminBulkUp
     name="AdminBulkPurgeAppConfigPoliciesPayload",
 )
 class AdminBulkPurgeAppConfigPoliciesPayloadGQL(PydanticOutputMixin[AdminBulkPurgePayloadDTO]):
-    purged_config_names: list[str] = gql_field(
-        description="`config_name`s of policies actually removed (absent names no-oped).",
+    purged_ids: list[UUID] = gql_field(
+        description="Ids of policies actually removed (absent ids no-oped).",
     )
     failed: list[AppConfigPolicyBulkErrorGQL] = gql_field(description="Per-item failures.")

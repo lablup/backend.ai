@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import strawberry
 from strawberry import Info
 
@@ -28,15 +30,15 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Get a single app-config policy by `config_name`. Available to any authenticated user."
+            "Get a single app-config policy by row id. Available to any authenticated user."
         ),
     )
 )  # type: ignore[misc]
 async def app_config_policy(
     info: Info[StrawberryGQLContext],
-    config_name: str,
+    id: UUID,
 ) -> AppConfigPolicyGQL | None:
-    payload = await info.context.adapters.app_config_policy.get(config_name)
+    payload = await info.context.adapters.app_config_policy.get(id)
     if payload.item is None:
         return None
     return AppConfigPolicyGQL.from_pydantic(payload.item)

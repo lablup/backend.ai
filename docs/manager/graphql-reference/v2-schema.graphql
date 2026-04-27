@@ -156,10 +156,23 @@ type AddRevisionPayload {
   revision: ModelRevision!
 }
 
-"""Added in UNRELEASED. Per-item input for admin bulk create / update."""
-input AdminAppConfigPolicyItemInput {
+"""
+Added in UNRELEASED. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
+"""
+input AdminAppConfigPolicyCreateItemInput {
   """Unique, immutable policy name."""
   configName: String!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
+}
+
+"""
+Added in UNRELEASED. Per-item input for admin bulk update — target row id + new `scope_sources`.
+"""
+input AdminAppConfigPolicyUpdateItemInput {
+  """Policy row id."""
+  id: UUID!
 
   """Ordered scope chain."""
   scopeSources: [String!]!
@@ -177,24 +190,24 @@ type AdminBulkCreateAppConfigPoliciesPayload {
 """Added in UNRELEASED. Admin bulk create input for app-config policies."""
 input AdminBulkCreateAppConfigPolicyInput {
   """Policies to create."""
-  items: [AdminAppConfigPolicyItemInput!]!
+  items: [AdminAppConfigPolicyCreateItemInput!]!
 }
 
 """Added in UNRELEASED. Payload for `adminBulkPurgeAppConfigPolicies`."""
 type AdminBulkPurgeAppConfigPoliciesPayload {
-  """`config_name`s of policies actually removed (absent names no-oped)."""
-  purgedConfigNames: [String!]!
+  """Ids of policies actually removed (absent ids no-oped)."""
+  purgedIds: [UUID!]!
 
   """Per-item failures."""
   failed: [AppConfigPolicyBulkError!]!
 }
 
 """
-Added in UNRELEASED. Admin bulk purge input for app-config policies (keyed on `config_name`).
+Added in UNRELEASED. Admin bulk purge input for app-config policies (keyed on row id).
 """
 input AdminBulkPurgeAppConfigPolicyInput {
-  """`config_name`s to purge."""
-  configNames: [String!]!
+  """Policy row ids to purge."""
+  ids: [UUID!]!
 }
 
 """Added in UNRELEASED. Payload for `adminBulkUpdateAppConfigPolicies`."""
@@ -209,7 +222,7 @@ type AdminBulkUpdateAppConfigPoliciesPayload {
 """Added in UNRELEASED. Admin bulk update input for app-config policies."""
 input AdminBulkUpdateAppConfigPolicyInput {
   """Policies to update."""
-  items: [AdminAppConfigPolicyItemInput!]!
+  items: [AdminAppConfigPolicyUpdateItemInput!]!
 }
 
 """Added in 26.4.2. Admin input for creating a keypair for a user."""
@@ -682,9 +695,6 @@ type AppConfigPolicy implements Node {
 type AppConfigPolicyBulkError {
   """Original position in the input list."""
   index: Int!
-
-  """`config_name` of the failed row."""
-  configName: String!
 
   """Reason for the failure."""
   message: String!
@@ -7550,7 +7560,7 @@ type Mutation {
   adminBulkUpdateAppConfigPolicies(input: AdminBulkUpdateAppConfigPolicyInput!): AdminBulkUpdateAppConfigPoliciesPayload!
 
   """
-  Added in UNRELEASED. Rejects items whose `config_name` still has referencing fragment rows. Admin only.
+  Added in UNRELEASED. Hard-delete policies by row id; rows still referenced by fragments surface in `failed`. Admin only.
   """
   adminBulkPurgeAppConfigPolicies(input: AdminBulkPurgeAppConfigPolicyInput!): AdminBulkPurgeAppConfigPoliciesPayload!
 
@@ -9489,9 +9499,9 @@ type Query {
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """
-  Added in UNRELEASED. Get a single app-config policy by `config_name`. Available to any authenticated user.
+  Added in UNRELEASED. Get a single app-config policy by row id. Available to any authenticated user.
   """
-  appConfigPolicy(configName: String!): AppConfigPolicy
+  appConfigPolicy(id: UUID!): AppConfigPolicy
 
   """
   Added in UNRELEASED. List app-config policies with filtering and pagination. Available to any authenticated user.

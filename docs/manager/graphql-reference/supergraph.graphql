@@ -202,12 +202,27 @@ type AddRevisionPayload
   revision: ModelRevision!
 }
 
-"""Added in UNRELEASED. Per-item input for admin bulk create / update."""
-input AdminAppConfigPolicyItemInput
+"""
+Added in UNRELEASED. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
+"""
+input AdminAppConfigPolicyCreateItemInput
   @join__type(graph: STRAWBERRY)
 {
   """Unique, immutable policy name."""
   configName: String!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
+}
+
+"""
+Added in UNRELEASED. Per-item input for admin bulk update — target row id + new `scope_sources`.
+"""
+input AdminAppConfigPolicyUpdateItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Policy row id."""
+  id: UUID!
 
   """Ordered scope chain."""
   scopeSources: [String!]!
@@ -229,28 +244,28 @@ input AdminBulkCreateAppConfigPolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Policies to create."""
-  items: [AdminAppConfigPolicyItemInput!]!
+  items: [AdminAppConfigPolicyCreateItemInput!]!
 }
 
 """Added in UNRELEASED. Payload for `adminBulkPurgeAppConfigPolicies`."""
 type AdminBulkPurgeAppConfigPoliciesPayload
   @join__type(graph: STRAWBERRY)
 {
-  """`config_name`s of policies actually removed (absent names no-oped)."""
-  purgedConfigNames: [String!]!
+  """Ids of policies actually removed (absent ids no-oped)."""
+  purgedIds: [UUID!]!
 
   """Per-item failures."""
   failed: [AppConfigPolicyBulkError!]!
 }
 
 """
-Added in UNRELEASED. Admin bulk purge input for app-config policies (keyed on `config_name`).
+Added in UNRELEASED. Admin bulk purge input for app-config policies (keyed on row id).
 """
 input AdminBulkPurgeAppConfigPolicyInput
   @join__type(graph: STRAWBERRY)
 {
-  """`config_name`s to purge."""
-  configNames: [String!]!
+  """Policy row ids to purge."""
+  ids: [UUID!]!
 }
 
 """Added in UNRELEASED. Payload for `adminBulkUpdateAppConfigPolicies`."""
@@ -269,7 +284,7 @@ input AdminBulkUpdateAppConfigPolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Policies to update."""
-  items: [AdminAppConfigPolicyItemInput!]!
+  items: [AdminAppConfigPolicyUpdateItemInput!]!
 }
 
 """Added in 26.4.2. Admin input for creating a keypair for a user."""
@@ -982,9 +997,6 @@ type AppConfigPolicyBulkError
 {
   """Original position in the input list."""
   index: Int!
-
-  """`config_name` of the failed row."""
-  configName: String!
 
   """Reason for the failure."""
   message: String!
@@ -11695,7 +11707,7 @@ type Mutation
   adminBulkUpdateAppConfigPolicies(input: AdminBulkUpdateAppConfigPolicyInput!): AdminBulkUpdateAppConfigPoliciesPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Rejects items whose `config_name` still has referencing fragment rows. Admin only.
+  Added in UNRELEASED. Hard-delete policies by row id; rows still referenced by fragments surface in `failed`. Admin only.
   """
   adminBulkPurgeAppConfigPolicies(input: AdminBulkPurgeAppConfigPolicyInput!): AdminBulkPurgeAppConfigPoliciesPayload! @join__field(graph: STRAWBERRY)
 
@@ -14435,9 +14447,9 @@ type Query
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Get a single app-config policy by `config_name`. Available to any authenticated user.
+  Added in UNRELEASED. Get a single app-config policy by row id. Available to any authenticated user.
   """
-  appConfigPolicy(configName: String!): AppConfigPolicy @join__field(graph: STRAWBERRY)
+  appConfigPolicy(id: UUID!): AppConfigPolicy @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. List app-config policies with filtering and pagination. Available to any authenticated user.
