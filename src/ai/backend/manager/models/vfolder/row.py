@@ -1717,17 +1717,19 @@ class VFolderPermissionContextBuilder(
         result = VFolderPermissionContext()
 
         ase = AssociationScopesEntitiesRow.__table__
+        j = sa.join(
+            GroupRow,
+            ase,
+            sa.and_(
+                sa.cast(GroupRow.id, sa.String) == ase.c.scope_id,
+                ase.c.scope_type == PermissionScopeType.PROJECT,
+                ase.c.entity_type == PermissionEntityType.USER,
+                ase.c.entity_id == str(ctx.user_id),
+            ),
+        )
         _project_stmt = (
             sa.select(GroupRow)
-            .join(
-                ase,
-                sa.and_(
-                    sa.cast(GroupRow.id, sa.String) == ase.c.scope_id,
-                    ase.c.scope_type == PermissionScopeType.PROJECT,
-                    ase.c.entity_type == PermissionEntityType.USER,
-                    ase.c.entity_id == str(ctx.user_id),
-                ),
-            )
+            .select_from(j)
             .where(GroupRow.domain_name == domain_name)
             .options(load_only(GroupRow.id))
         )
