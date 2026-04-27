@@ -842,19 +842,19 @@ async def get_allowed_vfolder_hosts_by_user(
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
     ase = AssociationScopesEntitiesRow.__table__
-    project_ids_subq = sa.select(ase.c.scope_id).where(
+    join_cond = sa.and_(
+        sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
         ase.c.scope_type == PermissionScopeType.PROJECT,
         ase.c.entity_type == PermissionEntityType.USER,
         ase.c.entity_id == str(user_uuid),
     )
-    where_conds = [
-        groups.c.domain_name == domain_name,
-        groups.c.is_active,
-        sa.cast(groups.c.id, sa.String).in_(project_ids_subq),
-    ]
     if group_id is not None:
-        where_conds.append(groups.c.id == group_id)
-    query = sa.select(groups.c.allowed_vfolder_hosts).where(*where_conds)
+        join_cond = sa.and_(join_cond, groups.c.id == group_id)
+    query = (
+        sa.select(groups.c.allowed_vfolder_hosts)
+        .select_from(groups.join(ase, join_cond))
+        .where(groups.c.domain_name == domain_name, groups.c.is_active)
+    )
     if rows := (await conn.execute(query)).fetchall():
         for row in rows:
             result_hosts = allowed_hosts | row.allowed_vfolder_hosts
@@ -1717,17 +1717,18 @@ class VFolderPermissionContextBuilder(
         result = VFolderPermissionContext()
 
         ase = AssociationScopesEntitiesRow.__table__
-        project_ids_subq = sa.select(ase.c.scope_id).where(
-            ase.c.scope_type == PermissionScopeType.PROJECT,
-            ase.c.entity_type == PermissionEntityType.USER,
-            ase.c.entity_id == str(ctx.user_id),
-        )
         _project_stmt = (
             sa.select(GroupRow)
-            .where(
-                GroupRow.domain_name == domain_name,
-                sa.cast(GroupRow.id, sa.String).in_(project_ids_subq),
+            .join(
+                ase,
+                sa.and_(
+                    sa.cast(GroupRow.id, sa.String) == ase.c.scope_id,
+                    ase.c.scope_type == PermissionScopeType.PROJECT,
+                    ase.c.entity_type == PermissionEntityType.USER,
+                    ase.c.entity_id == str(ctx.user_id),
+                ),
             )
+            .where(GroupRow.domain_name == domain_name)
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
