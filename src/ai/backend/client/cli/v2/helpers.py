@@ -30,10 +30,10 @@ DEFAULTS = {
 }
 
 
-def _load_cwd_dotenv() -> None:
+def load_cwd_dotenv() -> None:
     """Load ``.env`` from the current working directory (walking upward).
 
-    Called from the ``v2()`` Click group callback so all v2 subcommands see
+    Called from the v2 CLI entry point so all v2 subcommands see
     ``BACKEND_*`` variables defined in a project-local ``.env``. Mirrors v1
     CLI behavior; ``override=True`` preserves v1 semantics where ``.env``
     wins over pre-existing shell env vars.
@@ -56,10 +56,6 @@ class V2ConnectionConfig:
 
 def load_v2_config() -> V2ConnectionConfig:
     """Load v2 connection config from ``~/.backend.ai/``.
-
-    ``.env`` auto-loading happens once in the ``v2`` Click group callback;
-    callers reaching this function outside that group must invoke
-    ``_load_cwd_dotenv()`` themselves if they want ``.env`` picked up.
 
     Precedence (highest to lowest):
     1. Environment variables (``BACKEND_ENDPOINT``, ``BACKEND_ACCESS_KEY``, etc.)

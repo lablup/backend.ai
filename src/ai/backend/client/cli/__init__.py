@@ -67,9 +67,9 @@ def v2() -> None:
     # subcommand reads os.environ. The v2/__init__.py callback is unreachable
     # because LazyGroup only wraps click.Group methods, not MultiCommand.invoke,
     # so this wrapper is the actual entry point for `./bai v2 ...`.
-    from ai.backend.client.cli.v2.helpers import _load_cwd_dotenv
+    from ai.backend.client.cli.v2.helpers import load_cwd_dotenv
 
-    _load_cwd_dotenv()
+    load_cwd_dotenv()
 
 
 # Groups with aliases in subcommands - still eager load
