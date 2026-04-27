@@ -14,8 +14,13 @@ from ai.backend.client.cli.v2.deployment_chat_cache import (
     DeploymentChatCacheEntry,
     IncompatibleChatCacheError,
     load_chat_cache,
-    mask_token,
     save_chat_cache,
+)
+from ai.backend.client.cli.v2.deployment_chat_config import (
+    IncompatibleChatConfigError,
+    load_chat_config,
+    mask_token,
+    save_chat_config,
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 
@@ -81,23 +86,27 @@ def set_(
     if api_key and no_token:
         raise click.ClickException("--token and --no-token are mutually exclusive.")
 
-    config = load_v2_config()
+    connection = load_v2_config()
     try:
         cache = load_chat_cache()
     except IncompatibleChatCacheError as e:
         raise click.ClickException(str(e)) from e
+    try:
+        chat_config_store = load_chat_config()
+    except IncompatibleChatConfigError as e:
+        raise click.ClickException(str(e)) from e
 
-    existing = cache.get(deployment_id)
+    existing_entry = cache.get(deployment_id)
     resolved_key: str | None
     if no_token:
         resolved_key = None
     elif api_key is not None:
         resolved_key = api_key
     else:
-        resolved_key = cache.get_token(deployment_id)
+        resolved_key = chat_config_store.get_token(deployment_id)
 
     async def _run() -> None:
-        registry = await create_v2_registry(config)
+        registry = await create_v2_registry(connection)
         try:
             deployment = await registry.deployment.get(deployment_id)
         finally:
@@ -115,8 +124,8 @@ def set_(
             served_model = await _discover_model(
                 endpoint_url,
                 resolved_key,
-                config.skip_ssl_verification,
-                existing.default_model if existing is not None else None,
+                connection.skip_ssl_verification,
+                existing_entry.default_model if existing_entry is not None else None,
             )
 
         cache.upsert(
@@ -127,11 +136,13 @@ def set_(
                 last_synced_at=datetime.now(UTC),
             ),
         )
-        if resolved_key is None:
-            cache.clear_token(deployment_id)
-        else:
-            cache.set_token(deployment_id, resolved_key)
         save_chat_cache(cache)
+        if resolved_key is None:
+            chat_config_store.clear_token(deployment_id)
+        else:
+            chat_config_store.set_token(deployment_id, resolved_key)
+        save_chat_config(chat_config_store)
+
         click.echo(f"Updated chat cache entry for deployment {deployment_id}.")
         if served_model:
             click.echo(f"  default_model: {served_model}")
@@ -180,21 +191,25 @@ def show(deployment_id: UUID | None) -> None:
         cache = load_chat_cache()
     except IncompatibleChatCacheError as e:
         raise click.ClickException(str(e)) from e
+    try:
+        chat_config_store = load_chat_config()
+    except IncompatibleChatConfigError as e:
+        raise click.ClickException(str(e)) from e
 
     if deployment_id is not None:
         entry = cache.get(deployment_id)
-        token = cache.get_token(deployment_id)
+        token = chat_config_store.get_token(deployment_id)
         if entry is None and token is None:
             raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
         _print_entry(deployment_id, entry, token)
         return
 
-    dep_ids = set(cache.entries) | set(cache.tokens)
+    dep_ids = set(cache.deployments) | set(chat_config_store.tokens)
     if not dep_ids:
         click.echo("No chat cache entries.")
         return
     for dep_id in dep_ids:
-        _print_entry(dep_id, cache.get(dep_id), cache.get_token(dep_id))
+        _print_entry(dep_id, cache.get(dep_id), chat_config_store.get_token(dep_id))
         click.echo("")
 
 
@@ -206,8 +221,18 @@ def clear(deployment_id: UUID) -> None:
         cache = load_chat_cache()
     except IncompatibleChatCacheError as e:
         raise click.ClickException(str(e)) from e
-    if cache.remove(deployment_id):
+    try:
+        chat_config_store = load_chat_config()
+    except IncompatibleChatConfigError as e:
+        raise click.ClickException(str(e)) from e
+
+    removed_entry = cache.remove(deployment_id)
+    removed_token = chat_config_store.clear_token(deployment_id)
+    if removed_entry:
         save_chat_cache(cache)
+    if removed_token:
+        save_chat_config(chat_config_store)
+    if removed_entry or removed_token:
         click.echo(f"Removed chat cache entry for deployment {deployment_id}.")
     else:
         click.echo(f"No chat cache entry for deployment {deployment_id}.")
