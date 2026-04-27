@@ -1503,18 +1503,17 @@ class VfolderRepository:
             )
 
             users_table = UserRow.__table__
-            ase_table = AssociationScopesEntitiesRow.__table__
             j = users_table.join(
-                ase_table,
-                sa.cast(users_table.c.uuid, sa.String) == ase_table.c.entity_id,
+                AssociationScopesEntitiesRow,
+                sa.cast(users_table.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
             )
             db_query = (
                 sa.select(users_table.c.uuid, users_table.c.email)
                 .select_from(j)
                 .where(
-                    ase_table.c.scope_type == ScopeType.PROJECT,
-                    ase_table.c.entity_type == EntityType.USER,
-                    ase_table.c.scope_id == str(vfolder_group),
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.scope_id == str(vfolder_group),
                     users_table.c.email.in_(emails),
                     users_table.c.email != requester_email,
                     users_table.c.status.in_(ACTIVE_USER_STATUSES),

@@ -706,11 +706,10 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            ase = AssociationScopesEntitiesRow.__table__
-            query = sa.select(ase.c.scope_id).where(
-                ase.c.scope_type == PermissionScopeType.PROJECT,
-                ase.c.entity_type == PermissionEntityType.USER,
-                ase.c.entity_id == str(user_uuid),
+            query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                AssociationScopesEntitiesRow.entity_id == str(user_uuid),
             )
             result = await conn.execute(query)
             grps = result.fetchall()
@@ -841,18 +840,17 @@ async def get_allowed_vfolder_hosts_by_user(
         result_hosts: VFolderHostPermissionMap = allowed_hosts | values
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
-    ase = AssociationScopesEntitiesRow.__table__
     join_cond = sa.and_(
-        sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
-        ase.c.scope_type == PermissionScopeType.PROJECT,
-        ase.c.entity_type == PermissionEntityType.USER,
-        ase.c.entity_id == str(user_uuid),
+        sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+        AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+        AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+        AssociationScopesEntitiesRow.entity_id == str(user_uuid),
     )
     if group_id is not None:
         join_cond = sa.and_(join_cond, groups.c.id == group_id)
     query = (
         sa.select(groups.c.allowed_vfolder_hosts)
-        .select_from(groups.join(ase, join_cond))
+        .select_from(groups.join(AssociationScopesEntitiesRow, join_cond))
         .where(groups.c.domain_name == domain_name, groups.c.is_active)
     )
     if rows := (await conn.execute(query)).fetchall():
@@ -1417,14 +1415,13 @@ async def ensure_quota_scope_accessible_by_user(
                 if quota_scope_group.domain_name == user["domain_name"]:
                     return
             case _:
-                ase = AssociationScopesEntitiesRow.__table__
-                query = sa.select(ase.c.scope_id).where(
-                    ase.c.scope_type == PermissionScopeType.PROJECT,
-                    ase.c.entity_type == PermissionEntityType.USER,
-                    ase.c.scope_id == str(quota_scope.scope_id),
-                    ase.c.entity_id == str(user["uuid"]),
+                membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                    AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                    AssociationScopesEntitiesRow.scope_id == str(quota_scope.scope_id),
+                    AssociationScopesEntitiesRow.entity_id == str(user["uuid"]),
                 )
-                matched_group_id = await conn.scalar(query)
+                matched_group_id = await conn.scalar(membership_query)
                 if matched_group_id:
                     return
 
@@ -1716,15 +1713,14 @@ class VFolderPermissionContextBuilder(
     ) -> VFolderPermissionContext:
         result = VFolderPermissionContext()
 
-        ase = AssociationScopesEntitiesRow.__table__
         j = sa.join(
             GroupRow,
-            ase,
+            AssociationScopesEntitiesRow,
             sa.and_(
-                sa.cast(GroupRow.id, sa.String) == ase.c.scope_id,
-                ase.c.scope_type == PermissionScopeType.PROJECT,
-                ase.c.entity_type == PermissionEntityType.USER,
-                ase.c.entity_id == str(ctx.user_id),
+                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                AssociationScopesEntitiesRow.entity_id == str(ctx.user_id),
             ),
         )
         _project_stmt = (
