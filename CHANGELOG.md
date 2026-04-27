@@ -16,6 +16,72 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.4rc1 (2026-04-27)
+
+### Features
+* Add `BACKENDAI_PERSISTENT_PATHS` environment variable in containers to display persistent vfolder mount paths on shell startup. ([#9738](https://github.com/lablup/backend.ai/issues/9738))
+* Migrate keypair auth plugin into the core repository under `src/ai/backend/manager/plugin/keypair/` ([#10771](https://github.com/lablup/backend.ai/issues/10771))
+* Auto-sync user-scope membership entries in `association_scopes_entities` when roles are assigned or revoked ([#10990](https://github.com/lablup/backend.ai/issues/10990))
+* Add Prometheus-based kernel live stat query pipeline for batch metric collection ([#10998](https://github.com/lablup/backend.ai/issues/10998))
+* Add project-scoped `createVFolderInProject` GraphQL mutation with RBAC enforcement via ScopeActionProcessor. ([#11139](https://github.com/lablup/backend.ai/issues/11139))
+* Add RBAC-enforced VFolder delete and restore v2 mutations with SingleEntityActionProcessor. ([#11164](https://github.com/lablup/backend.ai/issues/11164))
+* Add RBAC-enforced VFolder purge v2 mutation with SingleEntityActionProcessor. ([#11165](https://github.com/lablup/backend.ai/issues/11165))
+* Add my-role REST v2 SDK endpoint and CLI command for users to query their own role assignments ([#11179](https://github.com/lablup/backend.ai/issues/11179))
+* Add blind role invitation data layer: model, migration, RBAC actions, and service for inviting users to project roles by email ([#11181](https://github.com/lablup/backend.ai/issues/11181))
+* Add bulk scope-chain permission check query for validating multiple entities in a single DB round-trip. ([#11189](https://github.com/lablup/backend.ai/issues/11189))
+* Add bulk RBAC filtering infrastructure so `BulkActionProcessor` can narrow actions per-entity and report per-validator decisions. ([#11191](https://github.com/lablup/backend.ai/issues/11191))
+* Add an effective permissions resolver in the permission controller service and repository layers that returns all permitted operations a user can perform on given entities by traversing the RBAC scope chain. ([#11236](https://github.com/lablup/backend.ai/issues/11236))
+* Add role invitation REST API, GraphQL API, SDK client, CLI commands, and component tests with RBAC scope/single-entity validators ([#11239](https://github.com/lablup/backend.ai/issues/11239))
+* Wire BulkActionRBACValidator to the bulk permission check so bulk actions filter unauthorized entities and surface them via partial-success responses. ([#11240](https://github.com/lablup/backend.ai/issues/11240))
+* Add `manager.rbac.enforcement-enabled` runtime feature flag to toggle RBAC enforcement without a manager restart. ([#11248](https://github.com/lablup/backend.ai/issues/11248))
+* Add `my_sent_role_invitations` query so inviters can list the role invitations they have sent (REST, GraphQL, SDK, and CLI). ([#11288](https://github.com/lablup/backend.ai/issues/11288))
+* Add an idempotent Alembic migration that backfills `association_scopes_entities` with PROJECT/USER membership rows derived from `association_groups_users`, so RBAC read paths see consistent membership state on deployments that predate auto-sync. ([#11289](https://github.com/lablup/backend.ai/issues/11289))
+* Migrate model card project membership check from `association_groups_users` to `association_scopes_entities` (ASE). ([#11299](https://github.com/lablup/backend.ai/issues/11299))
+* Replace the agent's set-based host port pool with `PortPool`, a FIFO queue + per-port reuse cooldown (configurable via `container.port_reuse_cooldown_sec`, default 60s) so recently released ports are not immediately reallocated and TCP TIME_WAIT / stale firewall and monitoring state no longer collide with new containers. ([#11345](https://github.com/lablup/backend.ai/issues/11345))
+
+### Improvements
+* Unify VFolder delete_v2 action with RBAC enforcement via SingleEntityActionProcessor, removing the duplicated delete_v2_rbac path. ([#11208](https://github.com/lablup/backend.ai/issues/11208))
+* Consolidate metric service layer into standard single-service structure and move Prometheus data-fetching to repository layer ([#11238](https://github.com/lablup/backend.ai/issues/11238))
+* Unify session and kernel lifecycle under the sokovan scheduling controller: route all terminations through `mark_sessions_for_termination`, retire registry's `destroy_session` path, return 501 for `session restart` and `check_and_transit_status`, and reconcile terminal-session/non-terminal-kernel drift during `POST /resource/recalculate-usage`. ([#11250](https://github.com/lablup/backend.ai/issues/11250))
+* Migrate session and cluster template code paths off the legacy `association_groups_users` table; project membership is now validated against `association_scopes_entities` and the REST handlers resolve `(domain, group_name) → project_id` upstream via a new `GroupService` entry point. ([#11284](https://github.com/lablup/backend.ai/issues/11284))
+* Reduce the recursive working set when resolving effective permissions or running bulk permission checks for many entities sharing a direct parent scope by routing both through a shared fan-in dedup path. ([#11304](https://github.com/lablup/backend.ai/issues/11304))
+* Migrate `query_userinfo` and `query_userinfo_from_session` off `association_groups_users` to read project membership from `association_scopes_entities`. ([#11310](https://github.com/lablup/backend.ai/issues/11310))
+* Replace the Redis + event-based AppProxy routing push with a single bulk HTTP endpoint and a lifecycle-hint driven sync handler so Manager → AppProxy traffic flows through one contract and one call per proxy target. ([#11339](https://github.com/lablup/backend.ai/issues/11339))
+
+### Fixes
+* Fix session creation failure on macOS with Docker Desktop VirtioFS caused by nested bind mount of `DO_NOT_STORE_PERSISTENT_FILES_HERE.md` by copying the file into the scratch work directory instead. ([#10944](https://github.com/lablup/backend.ai/issues/10944))
+* Fix Prometheus not scraping model-service metrics by rewriting loopback addresses via relabel_configs ([#11170](https://github.com/lablup/backend.ai/issues/11170))
+* Split OpenID plugin config so the hook plugin no longer requires `openid` and `login_uri` keys that only the webapp plugin uses ([#11173](https://github.com/lablup/backend.ai/issues/11173))
+* Expose `--config`, `--debug`, and `--log-level` options on the `account-manager start-server` CLI wrapper for consistency with other component start-server commands ([#11176](https://github.com/lablup/backend.ai/issues/11176))
+* Fix invalid `glm4_moe` reasoning-parser value and expand parser/dtype/quantization choices in vLLM runtime variant preset fixtures. ([#11177](https://github.com/lablup/backend.ai/issues/11177))
+* Fix alembic downgrade failure by including missing health status values in routestatus enum recreation ([#11182](https://github.com/lablup/backend.ai/issues/11182))
+* Fix `KeyError: 'allowed_vfolder_hosts'` when the keypair resource policy is missing during vfolder ownership changes. ([#11185](https://github.com/lablup/backend.ai/issues/11185))
+* Fix TOTP login failure caused by OTP value leaking into sToken hook parameter, which made the keypair auth plugin reject valid logins ([#11204](https://github.com/lablup/backend.ai/issues/11204))
+* Fix single-node session creation failing with `DockerError 403 "endpoint already exists"` when the accelerator plugin `docker-networks` config includes `bridge`, by skipping networks already attached to the container before calling `network.connect()`. ([#11209](https://github.com/lablup/backend.ai/issues/11209))
+* Pass ManagerConfigProvider to RBAC validators for runtime hot-reload support ([#11254](https://github.com/lablup/backend.ai/issues/11254))
+* Accept `project_id` (v2 naming) on app-proxy coordinator's `SessionConfig` payload by renaming the field and aliasing the legacy `group_id` key, fixing HTTP 500 from `/v2/endpoints/bulk` when the manager sends the v2 form. ([#11308](https://github.com/lablup/backend.ai/issues/11308))
+* Drop the redundant `ui_type` column on `runtime_variant_presets` after backfilling it into the `ui_option` JSONB; the JSONB now is the single source of truth, fixing HTTP 500 on preset search/get when historical rows had only the column populated. ([#11315](https://github.com/lablup/backend.ai/issues/11315))
+* Cross-resolve `EndpointLifecycle` and `ModelDeploymentStatus` legacy aliases via `_missing_`, fixing HTTP 500 from `/v2/scheduling-history/deployments/search` when historical rows persist `EndpointLifecycle` values (`destroying`/`destroyed`). ([#11316](https://github.com/lablup/backend.ai/issues/11316))
+* Bind signup-created users to the default project via `association_scopes_entities` and assign the project member role, so newly registered users pass RBAC-aware membership checks immediately. ([#11317](https://github.com/lablup/backend.ai/issues/11317))
+* Fix `createAccessToken` mutation failure caused by `CreateAccessTokenInput.deployment_id` field name mismatch with the GQL/supergraph `modelDeploymentId` field. ([#11325](https://github.com/lablup/backend.ai/issues/11325))
+* Fix `ModelReplica.sessionId` returning the replica's own ID instead of `null` while the compute session is still being provisioned, which previously caused the deployment Replicas tab to open a session drawer with a permission error. ([#11326](https://github.com/lablup/backend.ai/issues/11326))
+* Fix `--limit` on CLI list commands so it caps the total number of returned items instead of being treated only as a per-request page size. ([#11332](https://github.com/lablup/backend.ai/issues/11332))
+* Drop stale top-level `ui_type` from runtime_variant_preset example fixture, aligned with the `ui_type` column drop in #11315 ([#11350](https://github.com/lablup/backend.ai/issues/11350))
+
+### Documentation Updates
+* Redesign RBAC role-scope binding to support multi-scope roles with per-scope permissions, and unify scope membership via role assignments ([#10977](https://github.com/lablup/backend.ai/issues/10977))
+* Sync README with current accelerator plugins (Habana, Tenstorrent, TPU Ironwood), unified `./backend.ai` CLI commands, Account Manager, and directory structure ([#11175](https://github.com/lablup/backend.ai/issues/11175))
+* Add BEP-1052 proposing a scoped redesign of the WebUI App Config API: per-scope `AppConfigFragment` rows (public/domain/domain_user_defaults/user) joined by a required `AppConfigPolicy` that drives the per-document merge chain into the merged `AppConfig` view (admins can resolve any user's view via `adminAppConfigs`); bulk-only writes split across admin / self-service / policy paths; REST list endpoints unified under `POST .../search` with paginated bodies. ([#11197](https://github.com/lablup/backend.ai/issues/11197))
+
+### Miscellaneous
+* Auto-correct news fragment filenames whose PR-number prefix does not match the current pull request in the `assign-pr-number` CI workflow. ([#11215](https://github.com/lablup/backend.ai/issues/11215))
+* Remove the unused PyInfra production-deployment scaffold under `src/ai/backend/install/pyinfra/` and clean up stale pants build configuration so `pants lint`, `check`, and `tailor --check` report no warnings. ([#11231](https://github.com/lablup/backend.ai/issues/11231))
+* Speed up PR CI by adding path filter, splitting lint/typecheck jobs, and narrowing test dependents scope to `direct`. ([#11306](https://github.com/lablup/backend.ai/issues/11306))
+
+### Test Updates
+* Catch up test fixtures to the runtime-variant decoupling refactor: newtype UUID wrapping (DeploymentID/VFolderUUID/ImageID/RuntimeVariantID), RuntimeVariantRow FK seeding, renamed creator spec fields (deployment_id, runtime_variant_id, model_vfolder_id), and new DeploymentOptions / ScalingState / default_{deployment,session}_options required fields. ([#11250](https://github.com/lablup/backend.ai/issues/11250))
+
+
 ## 26.4.3 (2026-04-17)
 
 ### Features
