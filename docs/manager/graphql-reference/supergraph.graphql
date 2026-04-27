@@ -9283,7 +9283,7 @@ type ModelReplica implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  sessionId: ID!
+  sessionId: ID
   revisionId: ID!
 
   """Whether the replica has been checked and its health state."""
@@ -9299,9 +9299,9 @@ type ModelReplica implements Node
   createdAt: DateTime!
 
   """
-  The session ID associated with the replica. This can be null right after replica creation.
+  The session associated with the replica. Can be null if the replica is still provisioning.
   """
-  session: ComputeSessionNode! @deprecated(reason: "Use session_v2 instead.")
+  session: ComputeSessionNode @deprecated(reason: "Use session_v2 instead.")
 
   """
   Added in 26.4.3. The compute session running this replica, resolved via DataLoader.
