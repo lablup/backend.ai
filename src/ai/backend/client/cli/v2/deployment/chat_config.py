@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import NoReturn
+from typing import Any, NoReturn
 from uuid import UUID
 
 import click
@@ -23,6 +24,21 @@ from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 def _abort(message: str) -> NoReturn:
     click.echo(message, err=True)
     sys.exit(1)
+
+
+def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
+    from ai.backend.client.exceptions import BackendAPIError
+
+    try:
+        asyncio.run(coro_fn())
+    except BackendAPIError as e:
+        data: Any = e.args[2] if len(e.args) > 2 else {}
+        title = data.get("title", "") if isinstance(data, dict) else ""
+        msg = data.get("msg", "") if isinstance(data, dict) else ""
+        status = e.args[0] if e.args else "?"
+        detail = title or msg or str(e)
+        click.echo(f"Error ({status}): {detail}", err=True)
+        sys.exit(1)
 
 
 @click.group(name="chat-config")
@@ -66,41 +82,42 @@ def set_(
 
     existing = cache.get(deployment_id)
 
-    async def _resolve() -> str:
+    async def _run() -> None:
         if endpoint_url:
-            return endpoint_url
-        if existing is not None and existing.endpoint_url:
-            return existing.endpoint_url
-        registry = await create_v2_registry(config)
-        try:
-            deployment = await registry.deployment.get(deployment_id)
-        finally:
-            await registry.close()
-        resolved = deployment.network_access.endpoint_url
-        if not resolved:
-            raise click.ClickException(
-                f"Deployment {deployment_id} has no endpoint_url yet "
-                "(it may still be provisioning). Provide --endpoint-url explicitly."
-            )
-        return resolved
+            final_endpoint = endpoint_url
+        elif existing is not None and existing.endpoint_url:
+            final_endpoint = existing.endpoint_url
+        else:
+            registry = await create_v2_registry(config)
+            try:
+                deployment = await registry.deployment.get(deployment_id)
+            finally:
+                await registry.close()
+            resolved = deployment.network_access.endpoint_url
+            if not resolved:
+                raise click.ClickException(
+                    f"Deployment {deployment_id} has no endpoint_url yet "
+                    "(it may still be provisioning). Provide --endpoint-url explicitly."
+                )
+            final_endpoint = resolved
 
-    final_endpoint = asyncio.run(_resolve())
-
-    cache.upsert(
-        deployment_id,
-        DeploymentChatCacheEntry(
-            endpoint_url=final_endpoint,
-            vllm_api_key=vllm_api_key,
-            default_model=(
-                default_model
-                if default_model is not None
-                else (existing.default_model if existing is not None else None)
+        cache.upsert(
+            deployment_id,
+            DeploymentChatCacheEntry(
+                endpoint_url=final_endpoint,
+                vllm_api_key=vllm_api_key,
+                default_model=(
+                    default_model
+                    if default_model is not None
+                    else (existing.default_model if existing is not None else None)
+                ),
+                last_synced_at=datetime.now(UTC),
             ),
-            last_synced_at=datetime.now(UTC),
-        ),
-    )
-    save_chat_cache(cache)
-    click.echo(f"Updated chat cache entry for deployment {deployment_id}.")
+        )
+        save_chat_cache(cache)
+        click.echo(f"Updated chat cache entry for deployment {deployment_id}.")
+
+    _run_async(_run)
 
 
 @chat_config.command(name="show")

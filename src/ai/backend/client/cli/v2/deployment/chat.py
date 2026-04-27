@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 from uuid import UUID
 
 import click
@@ -26,6 +27,21 @@ if TYPE_CHECKING:
 def _abort(message: str) -> NoReturn:
     click.echo(message, err=True)
     sys.exit(1)
+
+
+def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
+    from ai.backend.client.exceptions import BackendAPIError
+
+    try:
+        asyncio.run(coro_fn())
+    except BackendAPIError as e:
+        data: Any = e.args[2] if len(e.args) > 2 else {}
+        title = data.get("title", "") if isinstance(data, dict) else ""
+        msg = data.get("msg", "") if isinstance(data, dict) else ""
+        status = e.args[0] if e.args else "?"
+        detail = title or msg or str(e)
+        click.echo(f"Error ({status}): {detail}", err=True)
+        sys.exit(1)
 
 
 async def _resolve_endpoint_url(registry: V2ClientRegistry, deployment_id: UUID) -> str:
@@ -147,7 +163,7 @@ def chat(
                 _abort(f"Inference endpoint error ({e.status} {e.reason}): {e.data}")
         print_result(response)
 
-    asyncio.run(_run())
+    _run_async(_run)
 
 
 __all__ = ("chat", "CHAT_CACHE_FILE")
