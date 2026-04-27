@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from tests.component.conftest import UserFixtureData
 
 
-class TestUserProjectSearchRBAC:
+class TestUserSearchViaProjectAssign:
     """ASE-based project membership gating for user.search_by_project."""
 
     async def test_member_finds_self_in_project_search(
@@ -32,20 +32,21 @@ class TestUserProjectSearchRBAC:
         admin_v2_registry: V2ClientRegistry,
         user_v2_registry: V2ClientRegistry,
         regular_user_fixture: UserFixtureData,
-        project_fixture: uuid.UUID,
-        role_fixture: uuid.UUID,
+        target_project_fixture: uuid.UUID,
+        member_role_fixture: uuid.UUID,
+        admin_target_project_permission: uuid.UUID,
     ) -> None:
         """Assigned user can search project members and finds self."""
         await admin_v2_registry.project.assign_users(
-            project_fixture,
+            target_project_fixture,
             AssignUsersToProjectInput(
                 user_ids=[regular_user_fixture.user_uuid],
-                role_id=role_fixture,
+                role_id=member_role_fixture,
             ),
         )
 
         result = await user_v2_registry.user.search_by_project(
-            project_fixture, SearchUsersRequest()
+            target_project_fixture, SearchUsersRequest()
         )
 
         assert result.pagination.total >= 1
@@ -55,60 +56,67 @@ class TestUserProjectSearchRBAC:
     async def test_non_member_is_rejected(
         self,
         user_v2_registry: V2ClientRegistry,
-        project_fixture: uuid.UUID,
+        target_project_fixture: uuid.UUID,
+        member_role_fixture: uuid.UUID,
     ) -> None:
         """A user who is not a project member cannot search the project."""
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.user.search_by_project(project_fixture, SearchUsersRequest())
+            await user_v2_registry.user.search_by_project(
+                target_project_fixture, SearchUsersRequest()
+            )
 
     async def test_unassigned_user_loses_access(
         self,
         admin_v2_registry: V2ClientRegistry,
         user_v2_registry: V2ClientRegistry,
         regular_user_fixture: UserFixtureData,
-        project_fixture: uuid.UUID,
-        role_fixture: uuid.UUID,
+        target_project_fixture: uuid.UUID,
+        member_role_fixture: uuid.UUID,
+        admin_target_project_permission: uuid.UUID,
     ) -> None:
         """After SDK unassign, project search becomes forbidden."""
         user_id = regular_user_fixture.user_uuid
 
         await admin_v2_registry.project.assign_users(
-            project_fixture,
-            AssignUsersToProjectInput(user_ids=[user_id], role_id=role_fixture),
+            target_project_fixture,
+            AssignUsersToProjectInput(user_ids=[user_id], role_id=member_role_fixture),
         )
         # Sanity: search succeeds while assigned.
-        await user_v2_registry.user.search_by_project(project_fixture, SearchUsersRequest())
+        await user_v2_registry.user.search_by_project(target_project_fixture, SearchUsersRequest())
 
         await admin_v2_registry.project.unassign_users(
-            project_fixture,
+            target_project_fixture,
             UnassignUsersFromProjectInput(user_ids=[user_id]),
         )
 
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.user.search_by_project(project_fixture, SearchUsersRequest())
+            await user_v2_registry.user.search_by_project(
+                target_project_fixture, SearchUsersRequest()
+            )
 
     async def test_cross_project_isolation(
         self,
         admin_v2_registry: V2ClientRegistry,
         user_v2_registry: V2ClientRegistry,
         regular_user_fixture: UserFixtureData,
-        project_fixture: uuid.UUID,
-        second_project_fixture: uuid.UUID,
-        role_fixture: uuid.UUID,
+        target_project_fixture: uuid.UUID,
+        other_project_fixture: uuid.UUID,
+        member_role_fixture: uuid.UUID,
+        admin_target_project_permission: uuid.UUID,
     ) -> None:
         """Membership in project A does not grant access to project B."""
         user_id = regular_user_fixture.user_uuid
 
         await admin_v2_registry.project.assign_users(
-            project_fixture,
-            AssignUsersToProjectInput(user_ids=[user_id], role_id=role_fixture),
+            target_project_fixture,
+            AssignUsersToProjectInput(user_ids=[user_id], role_id=member_role_fixture),
         )
 
         # Project A — succeeds
-        await user_v2_registry.user.search_by_project(project_fixture, SearchUsersRequest())
+        await user_v2_registry.user.search_by_project(target_project_fixture, SearchUsersRequest())
 
         # Project B — rejected
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.user.search_by_project(
-                second_project_fixture, SearchUsersRequest()
+                other_project_fixture, SearchUsersRequest()
             )

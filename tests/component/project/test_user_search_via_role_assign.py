@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from tests.component.conftest import UserFixtureData
 
 
-class TestUserRoleAssign:
+class TestUserSearchViaRoleAssign:
     """ASE-based project membership gating via role assignment SDK."""
 
     async def test_role_member_finds_self_in_project_search(
@@ -32,20 +32,20 @@ class TestUserRoleAssign:
         admin_v2_registry: V2ClientRegistry,
         user_v2_registry: V2ClientRegistry,
         regular_user_fixture: UserFixtureData,
-        project_fixture: uuid.UUID,
-        role_fixture: uuid.UUID,
+        target_project_fixture: uuid.UUID,
+        member_role_fixture: uuid.UUID,
     ) -> None:
         """User with role assigned in the project can search and finds self."""
         await admin_v2_registry.rbac.assign_role(
             AssignRoleInput(
                 user_id=regular_user_fixture.user_uuid,
-                role_id=role_fixture,
-                project_id=project_fixture,
+                role_id=member_role_fixture,
+                project_id=target_project_fixture,
             ),
         )
 
         result = await user_v2_registry.user.search_by_project(
-            project_fixture, SearchUsersRequest()
+            target_project_fixture, SearchUsersRequest()
         )
 
         assert result.pagination.total >= 1
@@ -55,57 +55,70 @@ class TestUserRoleAssign:
     async def test_non_member_is_rejected(
         self,
         user_v2_registry: V2ClientRegistry,
-        project_fixture: uuid.UUID,
+        target_project_fixture: uuid.UUID,
+        member_role_fixture: uuid.UUID,
     ) -> None:
         """A user without role assignment cannot search the project."""
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.user.search_by_project(project_fixture, SearchUsersRequest())
+            await user_v2_registry.user.search_by_project(
+                target_project_fixture, SearchUsersRequest()
+            )
 
     async def test_revoked_role_loses_access(
         self,
         admin_v2_registry: V2ClientRegistry,
         user_v2_registry: V2ClientRegistry,
         regular_user_fixture: UserFixtureData,
-        project_fixture: uuid.UUID,
-        role_fixture: uuid.UUID,
+        target_project_fixture: uuid.UUID,
+        member_role_fixture: uuid.UUID,
     ) -> None:
         """After role revocation, project search becomes forbidden."""
         user_id = regular_user_fixture.user_uuid
 
         await admin_v2_registry.rbac.assign_role(
-            AssignRoleInput(user_id=user_id, role_id=role_fixture, project_id=project_fixture),
+            AssignRoleInput(
+                user_id=user_id,
+                role_id=member_role_fixture,
+                project_id=target_project_fixture,
+            ),
         )
         # Sanity: search succeeds while role is assigned.
-        await user_v2_registry.user.search_by_project(project_fixture, SearchUsersRequest())
+        await user_v2_registry.user.search_by_project(target_project_fixture, SearchUsersRequest())
 
         await admin_v2_registry.rbac.revoke_role(
-            RevokeRoleInput(user_id=user_id, role_id=role_fixture),
+            RevokeRoleInput(user_id=user_id, role_id=member_role_fixture),
         )
 
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.user.search_by_project(project_fixture, SearchUsersRequest())
+            await user_v2_registry.user.search_by_project(
+                target_project_fixture, SearchUsersRequest()
+            )
 
     async def test_cross_project_isolation(
         self,
         admin_v2_registry: V2ClientRegistry,
         user_v2_registry: V2ClientRegistry,
         regular_user_fixture: UserFixtureData,
-        project_fixture: uuid.UUID,
-        second_project_fixture: uuid.UUID,
-        role_fixture: uuid.UUID,
+        target_project_fixture: uuid.UUID,
+        other_project_fixture: uuid.UUID,
+        member_role_fixture: uuid.UUID,
     ) -> None:
         """Role assigned in project A does not grant access to project B."""
         user_id = regular_user_fixture.user_uuid
 
         await admin_v2_registry.rbac.assign_role(
-            AssignRoleInput(user_id=user_id, role_id=role_fixture, project_id=project_fixture),
+            AssignRoleInput(
+                user_id=user_id,
+                role_id=member_role_fixture,
+                project_id=target_project_fixture,
+            ),
         )
 
         # Project A — succeeds
-        await user_v2_registry.user.search_by_project(project_fixture, SearchUsersRequest())
+        await user_v2_registry.user.search_by_project(target_project_fixture, SearchUsersRequest())
 
         # Project B — rejected
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.user.search_by_project(
-                second_project_fixture, SearchUsersRequest()
+                other_project_fixture, SearchUsersRequest()
             )
