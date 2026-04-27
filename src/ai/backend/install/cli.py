@@ -106,6 +106,22 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     default="0.0.0.0/0",
     help="CIDR for metric access allowed hosts (default: 0.0.0.0/0).",
 )
+@click.option(
+    "--enable-observability",
+    is_flag=True,
+    default=False,
+    help=(
+        "Bring up the halfstack 'observability' Compose profile (Prometheus,"
+        " Grafana, OTel collector, Loki, Tempo, Pyroscope, exporters) and enable"
+        " Pyroscope / OTel in component configs."
+    ),
+)
+@click.option(
+    "--enable-storage",
+    is_flag=True,
+    default=False,
+    help="Bring up the halfstack 'storage' Compose profile (MinIO).",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -124,6 +140,8 @@ def main(
     use_wildcard_binding: bool,
     otel_endpoint: str | None,
     metric_access_cidr: str,
+    enable_observability: bool,
+    enable_storage: bool,
     accelerator: str,
 ) -> None:
     """The installer"""
@@ -155,6 +173,8 @@ def main(
         use_wildcard_binding=use_wildcard_binding,
         otel_endpoint=otel_endpoint,
         metric_access_cidr=metric_access_cidr,
+        enable_observability=enable_observability,
+        enable_storage=enable_storage,
     )
     app = InstallerApp(args)
     app.run(headless=headless)

@@ -47,6 +47,33 @@ trim() {
   echo "$1" | sed -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g'
 }
 
+enable_observability_in_toml() {
+  # Flip "enabled = false" to "enabled = true" inside the [pyroscope] and
+  # [otel] sections of a component config. No-op when --enable-observability
+  # was not passed.
+  local file="$1"
+  if [ $ENABLE_OBSERVABILITY -ne 1 ]; then
+    return
+  fi
+  if [ ! -f "$file" ]; then
+    return
+  fi
+  python3 - "$file" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path) as f:
+    text = f.read()
+for section in ("pyroscope", "otel"):
+    pat = re.compile(
+        r"(\[" + section + r"\][^\[]*?)^enabled\s*=\s*false",
+        re.MULTILINE | re.DOTALL,
+    )
+    text = pat.sub(r"\1enabled = true", text, count=1)
+with open(path, "w") as f:
+    f.write(text)
+PY
+}
+
 usage() {
   echo "${GREEN}Backend.AI Development Setup${NC}: ${CYAN}Auto-installer Tool${NC}"
   echo ""
@@ -90,6 +117,16 @@ usage() {
   echo "  ${LWHITE}--enable-rocm-mock${NC}"
   echo "    Install ROCm accelerator mock plugin and pull a"
   echo "    TensorFlow ROCm kernel for testing/demo."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-observability${NC}"
+  echo "    Bring up the halfstack 'observability' Compose profile"
+  echo "    (Prometheus, Grafana, OTel collector, Loki, Tempo, Pyroscope,"
+  echo "    exporters) and enable Pyroscope / OTel in component configs."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-storage${NC}"
+  echo "    Bring up the halfstack 'storage' Compose profile (MinIO)."
   echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
@@ -325,6 +362,8 @@ ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
 ENABLE_CUDA_MIG_MOCK=0
 ENABLE_ROCM_MOCK=0
+ENABLE_OBSERVABILITY=0
+ENABLE_STORAGE=0
 CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
@@ -370,6 +409,8 @@ while [ $# -gt 0 ]; do
     --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
     --enable-cuda-mig-mock) ENABLE_CUDA_MIG_MOCK=1 ;;
     --enable-rocm-mock)    ENABLE_ROCM_MOCK=1 ;;
+    --enable-observability) ENABLE_OBSERVABILITY=1 ;;
+    --enable-storage)      ENABLE_STORAGE=1 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -977,7 +1018,15 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
 
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
+  HALFSTACK_PROFILE_ARGS=""
+  if [ $ENABLE_OBSERVABILITY -eq 1 ]; then
+    HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile observability"
+  fi
+  if [ $ENABLE_STORAGE -eq 1 ]; then
+    HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile storage"
+  fi
+
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS pull
 
   show_info "Pre-pulling frequently used kernel images..."
   echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
@@ -991,8 +1040,8 @@ setup_environment() {
 configure_backendai() {
   wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS up -d --wait
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS ps   # You should see containers here.
 
   # Install rover cli for Supergraph generation
   install_rover_cli
@@ -1152,9 +1201,18 @@ configure_backendai() {
 
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" down
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS down
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS up -d --wait
   fi
+
+  # Enable Pyroscope / OTel in component configs when --enable-observability was passed.
+  enable_observability_in_toml ./manager.toml
+  enable_observability_in_toml ./account-manager.toml
+  enable_observability_in_toml ./agent.toml
+  enable_observability_in_toml ./storage-proxy.toml
+  enable_observability_in_toml ./app-proxy-coordinator.toml
+  enable_observability_in_toml ./app-proxy-worker.toml
+  enable_observability_in_toml ./webserver.conf
 
   # initialize the DB schema
   POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')

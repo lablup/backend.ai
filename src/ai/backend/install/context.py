@@ -219,6 +219,21 @@ class Context(metaclass=ABCMeta):
                     content = pattern.sub(replacement, content)
         path.write_text(content)
 
+    def enable_observability_in_toml(self, path: Path) -> None:
+        """Flip ``enabled = false`` to ``enabled = true`` for the ``[pyroscope]``
+        and ``[otel]`` sections of a component config. No-op when the
+        ``--enable-observability`` flag is not set."""
+        if not self.install_variable.enable_observability:
+            return
+        content = path.read_text()
+        for section in ("pyroscope", "otel"):
+            section_pat = re.compile(
+                rf"(\[{section}\][^\[]*?)^enabled\s*=\s*false",
+                re.MULTILINE | re.DOTALL,
+            )
+            content = section_pat.sub(r"\1enabled = true", content, count=1)
+        path.write_text(content)
+
     async def run_manager_cli(self, cmdargs: Sequence[str]) -> None:
         if self.install_info.type == InstallType.SOURCE:
             # Develop mode: use ./backend.ai from current directory
@@ -424,12 +439,18 @@ class Context(metaclass=ABCMeta):
             ],
         )
         sudo = " ".join(self.docker_sudo)
+        profile_args_list: list[str] = []
+        if self.install_variable.enable_observability:
+            profile_args_list.append("--profile observability")
+        if self.install_variable.enable_storage:
+            profile_args_list.append("--profile storage")
+        profile_args = " ".join(profile_args_list)
         await self.run_shell(
             f"""
-        {sudo} docker compose pull && \\
-        {sudo} docker compose up -d --wait backendai-half-db && \\
-        {sudo} docker compose up -d --wait && \\
-        {sudo} docker compose ps
+        {sudo} docker compose {profile_args} pull && \\
+        {sudo} docker compose {profile_args} up -d --wait backendai-half-db && \\
+        {sudo} docker compose {profile_args} up -d --wait && \\
+        {sudo} docker compose {profile_args} ps
         """,
             cwd=self.install_info.base_path,
         )
@@ -619,6 +640,7 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+        self.enable_observability_in_toml(toml_path)
 
     async def configure_agent(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -684,6 +706,7 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+        self.enable_observability_in_toml(toml_path)
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -762,6 +785,7 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+        self.enable_observability_in_toml(toml_path)
 
     async def configure_webserver(self) -> None:
         conf_path = self.copy_config("webserver.conf")
@@ -831,6 +855,7 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+        self.enable_observability_in_toml(conf_path)
 
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
@@ -1115,6 +1140,8 @@ class Context(metaclass=ABCMeta):
                     'endpoint = "http://127.0.0.1:4317"',
                     f'endpoint = "{self.install_variable.otel_endpoint}"',
                 )
+        for conf in (coord_conf, worker_conf):
+            self.enable_observability_in_toml(conf)
 
     async def configure_appproxy_fixture(self) -> None:
         self.log_header("Updating manager scaling_groups to point to appproxy coordinator...")

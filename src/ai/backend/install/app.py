@@ -497,6 +497,8 @@ class ModeMenu(Static):
             use_wildcard_binding=args.use_wildcard_binding,
             otel_endpoint=args.otel_endpoint,
             metric_access_cidr=args.metric_access_cidr,
+            enable_observability=args.enable_observability,
+            enable_storage=args.enable_storage,
         )
 
     def compose(self) -> ComposeResult:
