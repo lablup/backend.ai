@@ -1,11 +1,13 @@
 """Local cache for ``./bai deployment chat`` per-deployment settings.
 
-Stores ``endpoint_url`` (resolved from the manager) and the inference API
-key the user registered for each deployment so that follow-up ``chat``
-invocations do not need to re-query the manager nor re-prompt for the key.
+Persists the manager-resolved ``endpoint_url`` and the served model name
+discovered from the inference endpoint, plus a separate map of API keys
+the user registered through ``./bai deployment chat-config set``. The
+endpoint entry is auto-managed (refetched when missing); the token is
+user-supplied and never auto-discovered.
 
-Persisted as a single JSON file at ``~/.backend.ai/deployment_chat.json``
-with ``0600`` file permissions because the API key is stored in plaintext.
+Stored as a single JSON file at ``~/.backend.ai/deployment_chat.json``
+with ``0600`` permissions because the API keys are kept in plaintext.
 """
 
 from __future__ import annotations
@@ -15,10 +17,12 @@ import os
 import stat
 import tempfile
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ai.backend.client.cli.v2.helpers import CONFIG_DIR
 
@@ -26,45 +30,27 @@ CHAT_CACHE_FILE = CONFIG_DIR / "deployment_chat.json"
 CHAT_CACHE_SCHEMA_VERSION = 1
 
 
-@dataclass(frozen=True)
-class DeploymentChatCacheEntry:
-    """One deployment's chat configuration."""
+class DeploymentChatCacheEntry(BaseModel):
+    """One deployment's auto-managed endpoint metadata."""
+
+    model_config = ConfigDict(frozen=True)
 
     endpoint_url: str
-    api_key: str | None
-    default_model: str | None
+    default_model: str | None = None
     last_synced_at: datetime
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "endpoint_url": self.endpoint_url,
-            "api_key": self.api_key,
-            "default_model": self.default_model,
-            "last_synced_at": self.last_synced_at.isoformat(),
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DeploymentChatCacheEntry:
-        synced_raw = data.get("last_synced_at")
-        if isinstance(synced_raw, str):
-            synced = datetime.fromisoformat(synced_raw)
-        else:
-            synced = datetime.now(UTC)
-        return cls(
-            endpoint_url=str(data["endpoint_url"]),
-            api_key=(str(data["api_key"]) if data.get("api_key") is not None else None),
-            default_model=(
-                str(data["default_model"]) if data.get("default_model") is not None else None
-            ),
-            last_synced_at=synced,
-        )
 
 
 @dataclass
 class DeploymentChatCache:
-    """In-memory representation of the chat cache file."""
+    """In-memory representation of the chat cache file.
+
+    ``entries`` is the auto-managed endpoint cache; ``tokens`` is the
+    user-managed API-key store. They are kept in the same file under
+    distinct top-level keys.
+    """
 
     entries: dict[UUID, DeploymentChatCacheEntry] = field(default_factory=dict)
+    tokens: dict[UUID, str] = field(default_factory=dict)
 
     def get(self, deployment_id: UUID) -> DeploymentChatCacheEntry | None:
         return self.entries.get(deployment_id)
@@ -73,12 +59,26 @@ class DeploymentChatCache:
         self.entries[deployment_id] = entry
 
     def remove(self, deployment_id: UUID) -> bool:
-        return self.entries.pop(deployment_id, None) is not None
+        had_entry = self.entries.pop(deployment_id, None) is not None
+        had_token = self.tokens.pop(deployment_id, None) is not None
+        return had_entry or had_token
+
+    def get_token(self, deployment_id: UUID) -> str | None:
+        return self.tokens.get(deployment_id)
+
+    def set_token(self, deployment_id: UUID, token: str) -> None:
+        self.tokens[deployment_id] = token
+
+    def clear_token(self, deployment_id: UUID) -> bool:
+        return self.tokens.pop(deployment_id, None) is not None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": CHAT_CACHE_SCHEMA_VERSION,
-            "deployments": {str(dep_id): entry.to_dict() for dep_id, entry in self.entries.items()},
+            "deployments": {
+                str(dep_id): entry.model_dump(mode="json") for dep_id, entry in self.entries.items()
+            },
+            "tokens": {str(dep_id): token for dep_id, token in self.tokens.items()},
         }
 
 
@@ -109,8 +109,8 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
             f"deployment_chat.json schema version {schema} is newer than supported "
             f"{CHAT_CACHE_SCHEMA_VERSION}; please upgrade the client."
         )
-    deployments_raw = raw.get("deployments") or {}
     entries: dict[UUID, DeploymentChatCacheEntry] = {}
+    deployments_raw = raw.get("deployments") or {}
     if isinstance(deployments_raw, dict):
         for key, value in deployments_raw.items():
             try:
@@ -120,10 +120,20 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
             if not isinstance(value, dict):
                 continue
             try:
-                entries[dep_id] = DeploymentChatCacheEntry.from_dict(value)
-            except (KeyError, ValueError, TypeError):
+                entries[dep_id] = DeploymentChatCacheEntry.model_validate(value)
+            except ValidationError:
                 continue
-    return DeploymentChatCache(entries=entries)
+    tokens: dict[UUID, str] = {}
+    tokens_raw = raw.get("tokens") or {}
+    if isinstance(tokens_raw, dict):
+        for key, value in tokens_raw.items():
+            try:
+                dep_id = UUID(str(key))
+            except ValueError:
+                continue
+            if isinstance(value, str):
+                tokens[dep_id] = value
+    return DeploymentChatCache(entries=entries, tokens=tokens)
 
 
 def save_chat_cache(cache: DeploymentChatCache, path: Path = CHAT_CACHE_FILE) -> None:

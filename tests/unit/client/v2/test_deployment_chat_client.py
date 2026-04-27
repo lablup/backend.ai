@@ -8,9 +8,9 @@ import pytest
 from aiohttp import web
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-from ai.backend.client.v2.domains_v2.inference_chat import (
-    InferenceChatAuthError,
-    InferenceChatClient,
+from ai.backend.client.v2.deployment_chat import (
+    DeploymentChatAuthError,
+    DeploymentChatClient,
 )
 
 HandlerFn = Callable[[web.Request], Awaitable[web.StreamResponse]]
@@ -60,8 +60,8 @@ async def _start_server(
 
 
 @pytest.fixture
-async def chat_client() -> AsyncIterator[InferenceChatClient]:
-    client = InferenceChatClient()
+async def chat_client() -> AsyncIterator[DeploymentChatClient]:
+    client = DeploymentChatClient()
     try:
         yield client
     finally:
@@ -77,7 +77,7 @@ def _request_body() -> dict[str, Any]:
 
 class TestChatCompletionSuccess:
     async def test_posts_to_v1_chat_completions_with_bearer_header(
-        self, chat_client: InferenceChatClient
+        self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.json_response({
@@ -109,7 +109,7 @@ class TestChatCompletionSuccess:
         assert resp["choices"][0]["message"]["content"] == "hi"
 
     async def test_endpoint_url_already_ending_in_chat_completions(
-        self, chat_client: InferenceChatClient
+        self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.json_response({"choices": []})
@@ -123,7 +123,7 @@ class TestChatCompletionSuccess:
         assert server.recorded["path"] == "/v1/chat/completions"
 
     async def test_endpoint_url_with_trailing_slash_is_normalized(
-        self, chat_client: InferenceChatClient
+        self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.json_response({"choices": []})
@@ -137,7 +137,7 @@ class TestChatCompletionSuccess:
         assert server.recorded["path"] == "/v1/chat/completions"
 
     async def test_omits_authorization_when_api_key_is_none(
-        self, chat_client: InferenceChatClient
+        self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.json_response({"choices": []})
@@ -151,7 +151,7 @@ class TestChatCompletionSuccess:
 
 
 class TestListModels:
-    async def test_returns_models_payload(self, chat_client: InferenceChatClient) -> None:
+    async def test_returns_models_payload(self, chat_client: DeploymentChatClient) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.json_response({
                 "object": "list",
@@ -168,29 +168,29 @@ class TestListModels:
 
 
 class TestAuthErrors:
-    async def test_401_raises_InferenceChatAuthError(
-        self, chat_client: InferenceChatClient
+    async def test_401_raises_DeploymentChatAuthError(
+        self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.json_response({"error": "invalid api key"}, status=401)
 
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
-            with pytest.raises(InferenceChatAuthError) as exc_info:
+            with pytest.raises(DeploymentChatAuthError) as exc_info:
                 await chat_client.chat_completion(server.base_url, "bad", _request_body())
         finally:
             await server.stop()
         assert exc_info.value.status == 401
 
-    async def test_403_raises_InferenceChatAuthError(
-        self, chat_client: InferenceChatClient
+    async def test_403_raises_DeploymentChatAuthError(
+        self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.json_response({"error": "forbidden"}, status=403)
 
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
-            with pytest.raises(InferenceChatAuthError):
+            with pytest.raises(DeploymentChatAuthError):
                 await chat_client.chat_completion(server.base_url, "bad", _request_body())
         finally:
             await server.stop()
@@ -198,7 +198,7 @@ class TestAuthErrors:
 
 class TestServerErrors:
     async def test_500_raises_BackendAPIError_not_auth(
-        self, chat_client: InferenceChatClient
+        self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.json_response({"error": "boom"}, status=500)
@@ -209,13 +209,13 @@ class TestServerErrors:
                 await chat_client.chat_completion(server.base_url, "sk", _request_body())
         finally:
             await server.stop()
-        assert not isinstance(exc_info.value, InferenceChatAuthError)
+        assert not isinstance(exc_info.value, DeploymentChatAuthError)
         assert exc_info.value.status == 500
 
 
 class TestNonJsonResponse:
     async def test_non_json_response_raises_client_error(
-        self, chat_client: InferenceChatClient
+        self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:
             return web.Response(text="not-json", content_type="text/plain")
@@ -231,6 +231,6 @@ class TestNonJsonResponse:
 class TestExternalSession:
     async def test_does_not_close_externally_owned_session(self) -> None:
         async with aiohttp.ClientSession() as external:
-            client = InferenceChatClient(session=external)
+            client = DeploymentChatClient(session=external)
             await client.close()
             assert external.closed is False

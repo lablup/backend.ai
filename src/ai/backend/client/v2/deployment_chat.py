@@ -24,11 +24,11 @@ DEFAULT_CHAT_PATH = "/v1/chat/completions"
 DEFAULT_MODELS_PATH = "/v1/models"
 
 
-class InferenceChatAuthError(BackendAPIError):
+class DeploymentChatAuthError(BackendAPIError):
     """Raised when the inference endpoint rejects the configured API key."""
 
 
-class InferenceChatClient:
+class DeploymentChatClient:
     """Direct HTTP client for OpenAI-compatible inference endpoints."""
 
     _session: aiohttp.ClientSession
@@ -145,7 +145,7 @@ class InferenceChatClient:
             return
         data = payload if isinstance(payload, dict) else {"detail": payload}
         if resp.status in (401, 403):
-            raise InferenceChatAuthError(resp.status, resp.reason or "Unauthorized", data)
+            raise DeploymentChatAuthError(resp.status, resp.reason or "Unauthorized", data)
         raise BackendAPIError(resp.status, resp.reason or "HTTP error", data)
 
     @staticmethod
