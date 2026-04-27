@@ -268,29 +268,50 @@ class VfolderRepository:
         every active keypair so that the host-permission check reflects the
         full set of hosts available to the user (rather than only the main
         keypair).
+
+        Implementation note: a single LEFT OUTER JOIN is used (instead of an
+        ORM ``selectinload`` on ``UserRow.keypairs``) so that only the columns
+        needed for the host-permission check are loaded. This avoids loading
+        sensitive keypair columns such as ``secret_key`` and
+        ``ssh_private_key``.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user_row: UserRow | None = await db_session.scalar(
-                sa.select(UserRow)
-                .where(UserRow.uuid == user_uuid)
-                .options(
-                    selectinload(UserRow.keypairs).selectinload(KeyPairRow.resource_policy_row)
+            stmt = (
+                sa.select(
+                    UserRow.email,
+                    UserRow.role,
+                    UserRow.domain_name,
+                    keypair_resource_policies.c.allowed_vfolder_hosts,
                 )
+                .select_from(UserRow)
+                .outerjoin(
+                    KeyPairRow,
+                    sa.and_(
+                        KeyPairRow.user == UserRow.uuid,
+                        KeyPairRow.is_active.is_(True),
+                    ),
+                )
+                .outerjoin(
+                    keypair_resource_policies,
+                    keypair_resource_policies.c.name == KeyPairRow.resource_policy,
+                )
+                .where(UserRow.uuid == user_uuid)
             )
-            if user_row is None:
+            rows = (await db_session.execute(stmt)).all()
+            if not rows:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
-            if user_row.role is None or user_row.domain_name is None:
+            email, role, domain_name, _ = rows[0]
+            if role is None or domain_name is None:
                 raise UserNotFound(f"User with UUID {user_uuid} has invalid role or domain data.")
             merged_hosts = VFolderHostPermissionMap()
-            for keypair in user_row.keypairs:
-                if not keypair.is_active:
+            for row in rows:
+                policy_hosts = row.allowed_vfolder_hosts
+                if policy_hosts is None:
                     continue
-                merged_hosts = VFolderHostPermissionMap(
-                    merged_hosts | keypair.resource_policy_row.allowed_vfolder_hosts
-                )
+                merged_hosts = VFolderHostPermissionMap(merged_hosts | policy_hosts)
             return UserWithVFolderHostPermissions(
-                email=user_row.email,
-                role=user_row.role,
+                email=email,
+                role=role,
                 allowed_vfolder_hosts=merged_hosts,
             )
 
