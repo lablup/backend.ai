@@ -46,38 +46,40 @@ def load_v2_config() -> V2ConnectionConfig:
     """Load v2 connection config from ``~/.backend.ai/``.
 
     Precedence (highest to lowest):
-    1. Environment variables (``BACKEND_ENDPOINT``, ``BACKEND_ACCESS_KEY``, etc.)
-    2. ``~/.backend.ai/credentials.toml``
-    3. ``~/.backend.ai/config.toml``
-    4. Built-in defaults
+    1. ``~/.backend.ai/credentials.toml`` (access/secret), ``~/.backend.ai/config.toml`` (endpoint/type)
+    2. Environment variables (``BACKEND_ENDPOINT``, ``BACKEND_ACCESS_KEY``, etc.) — also fed by a cwd ``.env``
+    3. Built-in defaults
+
+    Explicitly-saved files win over ambient env vars so a stray ``.env`` in
+    the cwd hierarchy cannot silently swap a logged-in user's saved
+    credentials. Use env vars / ``.env`` only when the corresponding file
+    leaves a slot empty.
     """
     import tomllib
 
     cfg: dict[str, Any] = dict(DEFAULTS)
+
+    # Env first — used only as a fallback when the file does not provide a value.
+    if env_endpoint := os.environ.get("BACKEND_ENDPOINT"):
+        cfg["endpoint"] = env_endpoint
+    if env_type := os.environ.get("BACKEND_ENDPOINT_TYPE"):
+        cfg["endpoint_type"] = env_type
 
     if CONFIG_FILE.exists():
         with CONFIG_FILE.open("rb") as f:
             file_cfg = tomllib.load(f).get("backend-ai", {})
         cfg.update({k: v for k, v in file_cfg.items() if v is not None})
 
-    access_key: str | None = None
-    secret_key: str | None = None
+    access_key: str | None = os.environ.get("BACKEND_ACCESS_KEY") or None
+    secret_key: str | None = os.environ.get("BACKEND_SECRET_KEY") or None
 
     if CREDENTIALS_FILE.exists():
         with CREDENTIALS_FILE.open("rb") as f:
             creds = tomllib.load(f).get("backend-ai", {})
-        access_key = creds.get("access_key")
-        secret_key = creds.get("secret_key")
-
-    # Environment variables override file settings
-    if env_endpoint := os.environ.get("BACKEND_ENDPOINT"):
-        cfg["endpoint"] = env_endpoint
-    if env_type := os.environ.get("BACKEND_ENDPOINT_TYPE"):
-        cfg["endpoint_type"] = env_type
-    if env_ak := os.environ.get("BACKEND_ACCESS_KEY"):
-        access_key = env_ak
-    if env_sk := os.environ.get("BACKEND_SECRET_KEY"):
-        secret_key = env_sk
+        if creds.get("access_key"):
+            access_key = creds["access_key"]
+        if creds.get("secret_key"):
+            secret_key = creds["secret_key"]
 
     # Defer cookie jar creation to async context (aiohttp >=3.13 requires event loop)
     cookie_file = None
