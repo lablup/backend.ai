@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -17,6 +18,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionInput,
     BlueGreenConfigInput,
     ClusterConfigInput,
+    CreateAccessTokenInput,
     CreateDeploymentInput,
     CreateRevisionInputDTO,
     DeleteDeploymentInput,
@@ -560,3 +562,65 @@ class TestAddRevisionInput:
         restored = AddRevisionInput.model_validate_json(json_str)
         assert restored.deployment_id == deployment_id
         assert restored.revision.cluster_mode == ClusterMode.SINGLE_NODE
+
+
+class TestCreateAccessTokenInput:
+    """Regression tests for CreateAccessTokenInput (BA-5854).
+
+    Verifies that the DTO uses model_deployment_id (matching the GQL/supergraph
+    schema) rather than the old deployment_id field name.
+    """
+
+    def test_valid_creation_with_model_deployment_id(self) -> None:
+        deployment_id = uuid.uuid4()
+        inp = CreateAccessTokenInput(model_deployment_id=deployment_id)
+        assert inp.model_deployment_id == deployment_id
+
+    def test_expires_at_defaults_to_none(self) -> None:
+        inp = CreateAccessTokenInput(model_deployment_id=uuid.uuid4())
+        assert inp.expires_at is None
+
+    def test_valid_creation_with_expires_at(self) -> None:
+        deployment_id = uuid.uuid4()
+        expires = datetime(2026, 12, 31, 23, 59, 59, tzinfo=UTC)
+        inp = CreateAccessTokenInput(model_deployment_id=deployment_id, expires_at=expires)
+        assert inp.model_deployment_id == deployment_id
+        assert inp.expires_at == expires
+
+    def test_model_validate_with_model_deployment_id_succeeds(self) -> None:
+        deployment_id = uuid.uuid4()
+        expires = datetime(2027, 1, 1, tzinfo=UTC)
+        inp = CreateAccessTokenInput.model_validate({
+            "model_deployment_id": str(deployment_id),
+            "expires_at": expires.isoformat(),
+        })
+        assert inp.model_deployment_id == deployment_id
+        assert inp.expires_at == expires
+
+    def test_model_validate_with_expires_at_none(self) -> None:
+        deployment_id = uuid.uuid4()
+        inp = CreateAccessTokenInput.model_validate({
+            "model_deployment_id": str(deployment_id),
+            "expires_at": None,
+        })
+        assert inp.model_deployment_id == deployment_id
+        assert inp.expires_at is None
+
+    def test_old_field_name_deployment_id_raises_validation_error(self) -> None:
+        # Regression: the old field name must no longer be accepted.
+        with pytest.raises(ValidationError):
+            CreateAccessTokenInput.model_validate({
+                "deployment_id": str(uuid.uuid4()),
+            })
+
+    def test_missing_model_deployment_id_raises_validation_error(self) -> None:
+        with pytest.raises(ValidationError):
+            CreateAccessTokenInput.model_validate({"expires_at": None})
+
+    def test_uuid_string_is_coerced_to_uuid(self) -> None:
+        deployment_id = uuid.uuid4()
+        inp = CreateAccessTokenInput.model_validate({
+            "model_deployment_id": str(deployment_id),
+        })
+        assert isinstance(inp.model_deployment_id, uuid.UUID)
+        assert inp.model_deployment_id == deployment_id
