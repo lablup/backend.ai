@@ -46,7 +46,7 @@ def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
 )
 @click.option(
     "--params",
-    default=None,
+    default="{}",
     type=JSONParamType(),
     help=(
         "Extra request-body fields as a JSON object. "
@@ -82,9 +82,9 @@ def chat(
     except IncompatibleChatCacheError as e:
         raise click.ClickException(str(e)) from e
 
-    if params is not None and not isinstance(params, dict):
+    if not isinstance(params, dict):
         raise click.ClickException("--params must be a JSON object.")
-    extra_body: dict[str, Any] = params or {}
+    extra_body: dict[str, Any] = params
     entry = cache.get(deployment_id)
 
     async def _resolve_endpoint() -> DeploymentChatCacheEntry:
