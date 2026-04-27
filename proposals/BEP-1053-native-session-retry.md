@@ -183,7 +183,7 @@ The decision flow is the same regardless:
 
 1. Load session. If `retry_count >= max_retries` → emit `session.retry_exhausted` and return.
 2. Classify failure via `classify_failure(session, status_data)`. If the cause is hardcoded never-retriable, or not in `policy.eligible_causes`, return.
-3. Acquire a row lock with `select_for_update()`. If a child whose deterministic `creation_id = parent.creation_id + ":retry:" + (retry_count + 1)` already exists, return (idempotency).
+3. Lock the parent row with `sa.select(SessionRow).where(SessionRow.id == parent.id).with_for_update()` inside the session repository's `begin_session()` transaction. If a child whose deterministic `creation_id = parent.creation_id + ":retry:" + (retry_count + 1)` already exists, return (idempotency).
 4. Compute `delay` per the formula above.
 5. Schedule retry creation through the existing background task / event mechanism with the computed delay. Do not block the handler on a sleep.
 
