@@ -1904,6 +1904,57 @@ input CreateDeploymentRevisionPresetInput {
 
   """Default deployment strategy for deployments created from this preset."""
   deploymentStrategy: PresetDeploymentStrategyInput = null
+
+  """Added in UNRELEASED. Container image to run the inference server."""
+  imageId: UUID!
+
+  """
+  Added in UNRELEASED. Detailed explanation of when and why to use this preset configuration.
+  """
+  description: String = null
+
+  """
+  Added in UNRELEASED. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.
+  """
+  modelDefinition: ModelDefinitionInput = null
+
+  """
+  Added in UNRELEASED. Resource slot allocations (e.g. cpu, mem, cuda.device).
+  """
+  resourceSlots: [ResourceSlotEntryInput!] = null
+
+  """
+  Added in UNRELEASED. Additional resource options such as shared memory (shmem) size.
+  """
+  resourceOpts: [DeploymentRevisionPresetResourceOptsEntryInput!] = null
+
+  """
+  Added in UNRELEASED. Deployment topology mode (single-node or multi-node).
+  """
+  clusterMode: ClusterMode = null
+
+  """Added in UNRELEASED. Number of worker nodes in the cluster."""
+  clusterSize: Int = null
+
+  """
+  Added in UNRELEASED. Command to start the inference server process inside the container.
+  """
+  startupCommand: String = null
+
+  """
+  Added in UNRELEASED. Script executed before the main process starts (e.g. to download model weights).
+  """
+  bootstrapScript: String = null
+
+  """
+  Added in UNRELEASED. Environment variables injected into the inference container.
+  """
+  environ: [DeploymentRevisionPresetEnvironEntryInput!] = null
+
+  """
+  Added in UNRELEASED. Runtime variant preset values applied when using this deployment preset.
+  """
+  presetValues: [DeploymentRevisionPresetValueEntryInput!] = null
 }
 
 """Added in 26.4.2. Create deployment revision preset payload."""
@@ -3394,6 +3445,17 @@ type DeploymentRevisionPresetEdge {
   node: DeploymentRevisionPreset!
 }
 
+"""
+Added in UNRELEASED. A single environment variable key-value pair to inject into the inference container when a deployment revision preset is applied.
+"""
+input DeploymentRevisionPresetEnvironEntryInput {
+  """The environment variable name."""
+  key: String!
+
+  """The value assigned to the environment variable."""
+  value: String!
+}
+
 """Added in 26.4.2. Filter for deployment revision presets."""
 input DeploymentRevisionPresetFilter {
   """Name filter."""
@@ -3420,6 +3482,17 @@ enum DeploymentRevisionPresetOrderField {
 }
 
 """
+Added in UNRELEASED. A single additional resource option (e.g. shared memory size) for a deployment revision preset.
+"""
+input DeploymentRevisionPresetResourceOptsEntryInput {
+  """Resource option name (e.g. 'shmem')."""
+  name: String!
+
+  """Resource option value (e.g. '1g')."""
+  value: String!
+}
+
+"""
 Added in 26.4.2. A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.
 """
 type DeploymentRevisionPresetValueEntry {
@@ -3427,6 +3500,17 @@ type DeploymentRevisionPresetValueEntry {
   presetId: UUID!
 
   """Value for this preset."""
+  value: String!
+}
+
+"""
+Added in UNRELEASED. A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.
+"""
+input DeploymentRevisionPresetValueEntryInput {
+  """The runtime variant preset that this value applies to."""
+  presetId: UUID!
+
+  """The concrete value to set for the referenced preset parameter."""
   value: String!
 }
 
@@ -12040,6 +12124,50 @@ input UpdateDeploymentRevisionPresetInput {
   Default deployment strategy for deployments created from this preset. Set to null to clear.
   """
   deploymentStrategy: PresetDeploymentStrategyInput
+
+  """
+  Added in UNRELEASED. Container image for the inference server. Set to null to clear.
+  """
+  imageId: UUID
+
+  """Added in UNRELEASED. Parsed model definition. Set to null to clear."""
+  modelDefinition: ModelDefinitionInput
+
+  """Added in UNRELEASED. Container startup command. Set to null to clear."""
+  startupCommand: String
+
+  """
+  Added in UNRELEASED. Bootstrap script run before the main process. Set to null to clear.
+  """
+  bootstrapScript: String
+
+  """
+  Added in UNRELEASED. Replace resource slot allocations. Omit to leave unchanged.
+  """
+  resourceSlots: [ResourceSlotEntryInput!] = null
+
+  """
+  Added in UNRELEASED. Replace additional resource options. Omit to leave unchanged.
+  """
+  resourceOpts: [DeploymentRevisionPresetResourceOptsEntryInput!] = null
+
+  """
+  Added in UNRELEASED. New cluster topology mode. Omit to leave unchanged.
+  """
+  clusterMode: ClusterMode = null
+
+  """Added in UNRELEASED. New cluster size. Omit to leave unchanged."""
+  clusterSize: Int = null
+
+  """
+  Added in UNRELEASED. Replace environment variables. Omit to leave unchanged.
+  """
+  environ: [DeploymentRevisionPresetEnvironEntryInput!] = null
+
+  """
+  Added in UNRELEASED. Replace runtime variant preset values. Omit to leave unchanged.
+  """
+  presetValues: [DeploymentRevisionPresetValueEntryInput!] = null
 }
 
 """Added in 26.4.2. Update deployment revision preset payload."""
