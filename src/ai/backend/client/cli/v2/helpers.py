@@ -56,6 +56,10 @@ class V2ConnectionConfig:
 def load_v2_config() -> V2ConnectionConfig:
     """Load v2 connection config from ``~/.backend.ai/``.
 
+    ``.env`` auto-loading happens once in the ``v2`` Click group callback;
+    callers reaching this function outside that group must invoke
+    ``_load_cwd_dotenv()`` themselves if they want ``.env`` picked up.
+
     Precedence (highest to lowest):
     1. Environment variables (``BACKEND_ENDPOINT``, ``BACKEND_ACCESS_KEY``, etc.)
     2. ``~/.backend.ai/credentials.toml``
@@ -63,8 +67,6 @@ def load_v2_config() -> V2ConnectionConfig:
     4. Built-in defaults
     """
     import tomllib
-
-    _load_cwd_dotenv()
 
     cfg: dict[str, Any] = dict(DEFAULTS)
 
