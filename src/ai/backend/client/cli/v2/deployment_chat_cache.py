@@ -1,8 +1,8 @@
 """Local cache for ``./bai deployment chat`` per-deployment settings.
 
-Stores ``endpoint_url`` and the vLLM API key the user registered for each
-deployment so that follow-up ``chat`` invocations do not need to re-query
-the manager nor re-prompt for the API key.
+Stores ``endpoint_url`` (resolved from the manager) and the inference API
+key the user registered for each deployment so that follow-up ``chat``
+invocations do not need to re-query the manager nor re-prompt for the key.
 
 Persisted as a single JSON file at ``~/.backend.ai/deployment_chat.json``
 with ``0600`` file permissions because the API key is stored in plaintext.
@@ -31,14 +31,14 @@ class DeploymentChatCacheEntry:
     """One deployment's chat configuration."""
 
     endpoint_url: str
-    vllm_api_key: str | None
+    api_key: str | None
     default_model: str | None
     last_synced_at: datetime
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "endpoint_url": self.endpoint_url,
-            "vllm_api_key": self.vllm_api_key,
+            "api_key": self.api_key,
             "default_model": self.default_model,
             "last_synced_at": self.last_synced_at.isoformat(),
         }
@@ -52,9 +52,7 @@ class DeploymentChatCacheEntry:
             synced = datetime.now(UTC)
         return cls(
             endpoint_url=str(data["endpoint_url"]),
-            vllm_api_key=(
-                str(data["vllm_api_key"]) if data.get("vllm_api_key") is not None else None
-            ),
+            api_key=(str(data["api_key"]) if data.get("api_key") is not None else None),
             default_model=(
                 str(data["default_model"]) if data.get("default_model") is not None else None
             ),
@@ -89,11 +87,20 @@ class IncompatibleChatCacheError(Exception):
 
 
 def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
-    """Load the chat cache; return an empty cache when the file is absent."""
+    """Load the chat cache; return an empty cache when the file is absent or unreadable.
+
+    A corrupted JSON file or unreadable file is treated as an empty cache —
+    individual malformed entries are skipped rather than aborting the whole
+    load. A schema version newer than this build raises
+    :class:`IncompatibleChatCacheError` so the caller can warn the user.
+    """
     if not path.exists():
         return DeploymentChatCache()
-    with path.open("r", encoding="utf-8") as f:
-        raw = json.load(f)
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return DeploymentChatCache()
     if not isinstance(raw, dict):
         return DeploymentChatCache()
     schema = raw.get("schema_version")
@@ -110,8 +117,12 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
                 dep_id = UUID(str(key))
             except ValueError:
                 continue
-            if isinstance(value, dict):
+            if not isinstance(value, dict):
+                continue
+            try:
                 entries[dep_id] = DeploymentChatCacheEntry.from_dict(value)
+            except (KeyError, ValueError, TypeError):
+                continue
     return DeploymentChatCache(entries=entries)
 
 

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Any, NoReturn
+from typing import Any
 from uuid import UUID
 
 import click
@@ -21,11 +20,6 @@ from ai.backend.client.cli.v2.deployment_chat_cache import (
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 
 
-def _abort(message: str) -> NoReturn:
-    click.echo(message, err=True)
-    sys.exit(1)
-
-
 def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
     from ai.backend.client.exceptions import BackendAPIError
 
@@ -37,16 +31,16 @@ def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
         msg = data.get("msg", "") if isinstance(data, dict) else ""
         status = e.args[0] if e.args else "?"
         detail = title or msg or str(e)
-        click.echo(f"Error ({status}): {detail}", err=True)
-        sys.exit(1)
+        raise click.ClickException(f"{status}: {detail}") from e
 
 
 @click.group(name="chat-config")
 def chat_config() -> None:
-    """Manage stored vLLM API keys for deployment chat.
+    """Manage stored API keys and discovered model names for deployment chat.
 
-    The deployment's ``endpoint_url`` is always resolved from the manager
-    automatically; only the API key is registered through this command.
+    The deployment's ``endpoint_url`` and the served model name are
+    resolved automatically (from the manager and the inference endpoint
+    respectively); only the API key is registered through this command.
     """
 
 
@@ -54,35 +48,53 @@ def chat_config() -> None:
 @click.argument("deployment_id", type=click.UUID)
 @click.option(
     "--token",
-    "vllm_api_key",
-    required=True,
+    "api_key",
+    default=None,
     type=str,
-    help="The vLLM API key the deployment was started with (--api-key).",
+    help=(
+        "API key the inference runtime accepts as a Bearer token. "
+        "Omit when the runtime was started without an API key."
+    ),
+)
+@click.option(
+    "--no-token",
+    is_flag=True,
+    default=False,
+    help="Explicitly clear the cached API key (deployment exposes no auth).",
 )
 @click.option(
     "--default-model",
     default=None,
     type=str,
-    help="Default model name sent with chat requests when --model is omitted.",
+    help=(
+        "Override the auto-discovered served model name. "
+        "If omitted, the model is fetched from the inference endpoint's /v1/models."
+    ),
 )
 def set_(
     deployment_id: UUID,
-    vllm_api_key: str,
+    api_key: str | None,
+    no_token: bool,
     default_model: str | None,
 ) -> None:
-    """Register or update the vLLM API key for a deployment.
+    """Register or update the chat cache entry for a deployment."""
+    if api_key and no_token:
+        raise click.ClickException("--token and --no-token are mutually exclusive.")
 
-    The deployment's endpoint URL is resolved from the manager and stored
-    alongside the key so the next ``chat`` invocation does not need to
-    re-query.
-    """
     config = load_v2_config()
     try:
         cache = load_chat_cache()
     except IncompatibleChatCacheError as e:
-        _abort(str(e))
+        raise click.ClickException(str(e)) from e
 
     existing = cache.get(deployment_id)
+    resolved_key: str | None
+    if no_token:
+        resolved_key = None
+    elif api_key is not None:
+        resolved_key = api_key
+    else:
+        resolved_key = existing.api_key if existing is not None else None
 
     async def _run() -> None:
         registry = await create_v2_registry(config)
@@ -90,30 +102,71 @@ def set_(
             deployment = await registry.deployment.get(deployment_id)
         finally:
             await registry.close()
-        resolved = deployment.network_access.endpoint_url
-        if not resolved:
+        endpoint_url = deployment.network_access.endpoint_url
+        if not endpoint_url:
             raise click.ClickException(
                 f"Deployment {deployment_id} has no endpoint_url yet "
                 "(it may still be provisioning). Wait until the deployment is READY."
             )
 
+        if default_model is not None:
+            served_model: str | None = default_model
+        else:
+            served_model = await _discover_model(
+                endpoint_url,
+                resolved_key,
+                config.skip_ssl_verification,
+                existing.default_model if existing is not None else None,
+            )
+
         cache.upsert(
             deployment_id,
             DeploymentChatCacheEntry(
-                endpoint_url=resolved,
-                vllm_api_key=vllm_api_key,
-                default_model=(
-                    default_model
-                    if default_model is not None
-                    else (existing.default_model if existing is not None else None)
-                ),
+                endpoint_url=endpoint_url,
+                api_key=resolved_key,
+                default_model=served_model,
                 last_synced_at=datetime.now(UTC),
             ),
         )
         save_chat_cache(cache)
         click.echo(f"Updated chat cache entry for deployment {deployment_id}.")
+        if served_model:
+            click.echo(f"  default_model: {served_model}")
+        click.echo(f"  api_key:       {mask_token(resolved_key)}")
 
     _run_async(_run)
+
+
+async def _discover_model(
+    endpoint_url: str,
+    api_key: str | None,
+    skip_ssl_verification: bool,
+    fallback: str | None,
+) -> str | None:
+    """Call ``GET {endpoint}/v1/models`` to learn the served model name.
+
+    Returns the first model id reported by the inference endpoint. Falls
+    back to *fallback* when the endpoint is unreachable or the response
+    does not contain any model entries.
+    """
+    from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+    from ai.backend.client.v2.domains_v2.inference_chat import (
+        InferenceChatAuthError,
+        InferenceChatClient,
+    )
+
+    async with InferenceChatClient(skip_ssl_verification=skip_ssl_verification) as client:
+        try:
+            payload = await client.list_models(endpoint_url, api_key)
+        except (InferenceChatAuthError, BackendAPIError, BackendClientError):
+            return fallback
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        return fallback
+    for entry in data:
+        if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+            return str(entry["id"])
+    return fallback
 
 
 @chat_config.command(name="show")
@@ -123,14 +176,13 @@ def show(deployment_id: UUID | None) -> None:
     try:
         cache = load_chat_cache()
     except IncompatibleChatCacheError as e:
-        _abort(str(e))
+        raise click.ClickException(str(e)) from e
 
     if deployment_id is not None:
         entry = cache.get(deployment_id)
         if entry is None:
-            _abort(f"No chat cache entry for deployment {deployment_id}.")
-        else:
-            _print_entry(deployment_id, entry)
+            raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
+        _print_entry(deployment_id, entry)
         return
 
     if not cache.entries:
@@ -148,7 +200,7 @@ def clear(deployment_id: UUID) -> None:
     try:
         cache = load_chat_cache()
     except IncompatibleChatCacheError as e:
-        _abort(str(e))
+        raise click.ClickException(str(e)) from e
     if cache.remove(deployment_id):
         save_chat_cache(cache)
         click.echo(f"Removed chat cache entry for deployment {deployment_id}.")
@@ -159,7 +211,7 @@ def clear(deployment_id: UUID) -> None:
 def _print_entry(deployment_id: UUID, entry: DeploymentChatCacheEntry) -> None:
     click.echo(f"deployment_id : {deployment_id}")
     click.echo(f"endpoint_url  : {entry.endpoint_url}")
-    click.echo(f"vllm_api_key  : {mask_token(entry.vllm_api_key)}")
+    click.echo(f"api_key       : {mask_token(entry.api_key)}")
     click.echo(f"default_model : {entry.default_model or '-'}")
     click.echo(f"last_synced_at: {entry.last_synced_at.isoformat()}")
 

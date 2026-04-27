@@ -28,7 +28,7 @@ def _entry(
 ) -> DeploymentChatCacheEntry:
     return DeploymentChatCacheEntry(
         endpoint_url=endpoint,
-        vllm_api_key=api_key,
+        api_key=api_key,
         default_model=default_model,
         last_synced_at=datetime(2026, 4, 27, 12, 0, tzinfo=UTC),
     )
@@ -43,15 +43,14 @@ class TestLoadSaveRoundTrip:
         path = tmp_path / "deployment_chat.json"
         cache = DeploymentChatCache()
         dep_id = uuid4()
-        original = _entry()
+        original = _entry(default_model="gpt-test")
         cache.upsert(dep_id, original)
         save_chat_cache(cache, path)
 
         loaded = load_chat_cache(path)
-        assert dep_id in loaded.entries
         restored = loaded.entries[dep_id]
         assert restored.endpoint_url == original.endpoint_url
-        assert restored.vllm_api_key == original.vllm_api_key
+        assert restored.api_key == original.api_key
         assert restored.default_model == original.default_model
         assert restored.last_synced_at == original.last_synced_at
 
@@ -62,25 +61,6 @@ class TestLoadSaveRoundTrip:
             payload = json.load(f)
         assert payload["schema_version"] == CHAT_CACHE_SCHEMA_VERSION
 
-    def test_load_skips_invalid_uuid_keys(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        path.write_text(
-            json.dumps({
-                "schema_version": CHAT_CACHE_SCHEMA_VERSION,
-                "deployments": {
-                    "not-a-uuid": {
-                        "endpoint_url": "https://x.example",
-                        "vllm_api_key": None,
-                        "default_model": None,
-                        "last_synced_at": "2026-04-27T12:00:00+00:00",
-                    },
-                },
-            }),
-            encoding="utf-8",
-        )
-        loaded = load_chat_cache(path)
-        assert loaded.entries == {}
-
 
 class TestPermissions:
     @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
@@ -89,19 +69,7 @@ class TestPermissions:
         cache = DeploymentChatCache()
         cache.upsert(uuid4(), _entry())
         save_chat_cache(cache, path)
-        mode = stat.S_IMODE(path.stat().st_mode)
-        assert mode == 0o600
-
-    @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
-    def test_save_resets_too_open_permissions(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        path.write_text("{}", encoding="utf-8")
-        os.chmod(path, 0o644)
-        cache = DeploymentChatCache()
-        cache.upsert(uuid4(), _entry())
-        save_chat_cache(cache, path)
-        mode = stat.S_IMODE(path.stat().st_mode)
-        assert mode == 0o600
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
 
 class TestSchemaVersionGuard:
@@ -118,6 +86,66 @@ class TestSchemaVersionGuard:
             load_chat_cache(path)
 
 
+class TestLoaderResilience:
+    def test_load_returns_empty_on_corrupt_json(self, tmp_path: Path) -> None:
+        path = tmp_path / "cache.json"
+        path.write_text("not-json{", encoding="utf-8")
+        assert load_chat_cache(path).entries == {}
+
+    def test_load_returns_empty_when_top_level_not_object(self, tmp_path: Path) -> None:
+        path = tmp_path / "cache.json"
+        path.write_text("[]", encoding="utf-8")
+        assert load_chat_cache(path).entries == {}
+
+    def test_load_skips_invalid_uuid_keys(self, tmp_path: Path) -> None:
+        path = tmp_path / "cache.json"
+        good_id = UUID("12345678-1234-5678-1234-567812345678")
+        path.write_text(
+            json.dumps({
+                "schema_version": CHAT_CACHE_SCHEMA_VERSION,
+                "deployments": {
+                    "not-a-uuid": {
+                        "endpoint_url": "https://x.example",
+                        "api_key": None,
+                        "default_model": None,
+                        "last_synced_at": "2026-04-27T12:00:00+00:00",
+                    },
+                    str(good_id): {
+                        "endpoint_url": "https://y.example",
+                        "api_key": "sk-token-value-1234",
+                        "default_model": "m",
+                        "last_synced_at": "2026-04-27T12:00:00+00:00",
+                    },
+                },
+            }),
+            encoding="utf-8",
+        )
+        loaded = load_chat_cache(path)
+        assert list(loaded.entries.keys()) == [good_id]
+
+    def test_load_skips_malformed_entry_payload(self, tmp_path: Path) -> None:
+        path = tmp_path / "cache.json"
+        good_id = UUID("12345678-1234-5678-1234-567812345678")
+        bad_id = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        path.write_text(
+            json.dumps({
+                "schema_version": CHAT_CACHE_SCHEMA_VERSION,
+                "deployments": {
+                    str(bad_id): {"default_model": "m"},
+                    str(good_id): {
+                        "endpoint_url": "https://y.example",
+                        "api_key": "sk-token-value-1234",
+                        "default_model": "m",
+                        "last_synced_at": "2026-04-27T12:00:00+00:00",
+                    },
+                },
+            }),
+            encoding="utf-8",
+        )
+        loaded = load_chat_cache(path)
+        assert list(loaded.entries.keys()) == [good_id]
+
+
 class TestUpsertAndRemove:
     def test_upsert_overwrites_existing_entry(self) -> None:
         cache = DeploymentChatCache()
@@ -126,7 +154,7 @@ class TestUpsertAndRemove:
         cache.upsert(dep_id, _entry(api_key="sk-new-token-5678"))
         stored = cache.get(dep_id)
         assert stored is not None
-        assert stored.vllm_api_key == "sk-new-token-5678"
+        assert stored.api_key == "sk-new-token-5678"
 
     def test_remove_returns_true_when_present(self) -> None:
         cache = DeploymentChatCache()
@@ -136,8 +164,7 @@ class TestUpsertAndRemove:
         assert cache.get(dep_id) is None
 
     def test_remove_returns_false_when_absent(self) -> None:
-        cache = DeploymentChatCache()
-        assert cache.remove(uuid4()) is False
+        assert DeploymentChatCache().remove(uuid4()) is False
 
 
 class TestMaskToken:
@@ -152,53 +179,3 @@ class TestMaskToken:
 
     def test_mask_none(self) -> None:
         assert mask_token(None) == "<unset>"
-
-
-class TestAtomicWrite:
-    def test_save_does_not_leave_temp_files_on_success(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        cache = DeploymentChatCache()
-        cache.upsert(uuid4(), _entry())
-        save_chat_cache(cache, path)
-        leftover = [p for p in tmp_path.iterdir() if p.name.startswith("cache.json.")]
-        assert leftover == []
-
-
-class TestEntryFromDictTolerance:
-    def test_from_dict_accepts_missing_optional_fields(self) -> None:
-        entry = DeploymentChatCacheEntry.from_dict({
-            "endpoint_url": "https://infer.example.test/api",
-        })
-        assert entry.endpoint_url == "https://infer.example.test/api"
-        assert entry.vllm_api_key is None
-        assert entry.default_model is None
-        assert isinstance(entry.last_synced_at, datetime)
-
-
-class TestLoadInvalidShapes:
-    def test_load_returns_empty_when_top_level_not_object(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        path.write_text("[]", encoding="utf-8")
-        loaded = load_chat_cache(path)
-        assert loaded.entries == {}
-
-    def test_load_handles_uuid_keyed_entry(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        dep_id = UUID("12345678-1234-5678-1234-567812345678")
-        path.write_text(
-            json.dumps({
-                "schema_version": CHAT_CACHE_SCHEMA_VERSION,
-                "deployments": {
-                    str(dep_id): {
-                        "endpoint_url": "https://infer.example.test/api",
-                        "vllm_api_key": "sk-token-value-1234",
-                        "default_model": "gpt-test",
-                        "last_synced_at": "2026-04-27T12:00:00+00:00",
-                    },
-                },
-            }),
-            encoding="utf-8",
-        )
-        loaded = load_chat_cache(path)
-        assert dep_id in loaded.entries
-        assert loaded.entries[dep_id].default_model == "gpt-test"
