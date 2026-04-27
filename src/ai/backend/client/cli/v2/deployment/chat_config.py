@@ -43,7 +43,11 @@ def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
 
 @click.group(name="chat-config")
 def chat_config() -> None:
-    """Manage local chat cache for deployment chat (vLLM API keys, endpoints)."""
+    """Manage stored vLLM API keys for deployment chat.
+
+    The deployment's ``endpoint_url`` is always resolved from the manager
+    automatically; only the API key is registered through this command.
+    """
 
 
 @chat_config.command(name="set")
@@ -56,12 +60,6 @@ def chat_config() -> None:
     help="The vLLM API key the deployment was started with (--api-key).",
 )
 @click.option(
-    "--endpoint-url",
-    default=None,
-    type=str,
-    help="Override the deployment's endpoint_url (otherwise auto-resolved).",
-)
-@click.option(
     "--default-model",
     default=None,
     type=str,
@@ -70,10 +68,14 @@ def chat_config() -> None:
 def set_(
     deployment_id: UUID,
     vllm_api_key: str,
-    endpoint_url: str | None,
     default_model: str | None,
 ) -> None:
-    """Register or update the chat cache entry for a deployment."""
+    """Register or update the vLLM API key for a deployment.
+
+    The deployment's endpoint URL is resolved from the manager and stored
+    alongside the key so the next ``chat`` invocation does not need to
+    re-query.
+    """
     config = load_v2_config()
     try:
         cache = load_chat_cache()
@@ -83,28 +85,22 @@ def set_(
     existing = cache.get(deployment_id)
 
     async def _run() -> None:
-        if endpoint_url:
-            final_endpoint = endpoint_url
-        elif existing is not None and existing.endpoint_url:
-            final_endpoint = existing.endpoint_url
-        else:
-            registry = await create_v2_registry(config)
-            try:
-                deployment = await registry.deployment.get(deployment_id)
-            finally:
-                await registry.close()
-            resolved = deployment.network_access.endpoint_url
-            if not resolved:
-                raise click.ClickException(
-                    f"Deployment {deployment_id} has no endpoint_url yet "
-                    "(it may still be provisioning). Provide --endpoint-url explicitly."
-                )
-            final_endpoint = resolved
+        registry = await create_v2_registry(config)
+        try:
+            deployment = await registry.deployment.get(deployment_id)
+        finally:
+            await registry.close()
+        resolved = deployment.network_access.endpoint_url
+        if not resolved:
+            raise click.ClickException(
+                f"Deployment {deployment_id} has no endpoint_url yet "
+                "(it may still be provisioning). Wait until the deployment is READY."
+            )
 
         cache.upsert(
             deployment_id,
             DeploymentChatCacheEntry(
-                endpoint_url=final_endpoint,
+                endpoint_url=resolved,
                 vllm_api_key=vllm_api_key,
                 default_model=(
                     default_model
