@@ -1341,14 +1341,19 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        from ai.backend.manager.models.group import AssocGroupUserRow
+        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+            AssociationScopesEntitiesRow,
+        )
 
-        get_assoc_group_ids_stmt = sa.select(AssocGroupUserRow.group_id).where(
-            AssocGroupUserRow.user_id == scope.user_id
+        get_assoc_group_ids_stmt = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+            AssociationScopesEntitiesRow.entity_id == str(scope.user_id),
         )
         group_ids = await self.db_session.scalars(get_assoc_group_ids_stmt)
 
-        return [ProjectScope(project_id=group_id) for group_id in group_ids]
+        return [ProjectScope(project_id=UUID(group_id)) for group_id in group_ids]
 
     async def _get_domain_accessible_project_scopes(
         self,
