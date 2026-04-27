@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections import defaultdict
 from collections.abc import (
     Iterable,
     Sequence,
@@ -74,7 +73,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
     ReplicaSpec,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -83,7 +81,6 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData,
     ScalingState,
 )
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound, ServiceUnavailable
 from ai.backend.manager.errors.resource import DataTransformationFailed
@@ -118,8 +115,6 @@ __all__ = (
     "ModelServiceHelper",
 )
 
-
-type ModelServiceSerializableConnectionInfo = dict[str, list[dict[str, Any]]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -574,66 +569,6 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
-
-    async def generate_route_info(
-        self, db_sess: AsyncSession
-    ) -> ModelServiceSerializableConnectionInfo:
-        from ai.backend.manager.models.kernel import KernelRow
-        from ai.backend.manager.models.routing import RoutingRow
-
-        # Only routes whose traffic_status is ACTIVE should be exposed to the
-        # app proxy. INACTIVE routes (e.g. a blue-green deploying revision that
-        # has not been promoted yet) are intentionally hidden from Traefik.
-        all_active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
-        active_routes = [
-            r for r in all_active_routes if r.traffic_status == RouteTrafficStatus.ACTIVE
-        ]
-        running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
-            db_sess,
-            [
-                r.session
-                for r in active_routes
-                if r.status in RouteStatus.active_route_statuses()
-                and r.session
-                and r.session_row is not None
-                and r.session_row.status in [SessionStatus.RUNNING, SessionStatus.CREATING]
-            ],
-        )
-        if (num_routes_without_session := len(active_routes) - len(running_main_kernels)) > 0:
-            log.info(
-                "generate_route_info(): There are {} active routes without corresponding RUNNING sessions, "
-                "which may be still provisioning or being terminated. (Endpoint: {})",
-                num_routes_without_session,
-                self.id,
-            )
-        session_id_to_route_map = {r.session: r for r in active_routes}
-        connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-        for kernel in running_main_kernels:
-            if kernel.service_ports is None:
-                log.debug(
-                    "generate_route_info(): Kernel {} has no service ports defined. Skipping.",
-                    kernel.id,
-                )
-                continue
-            service_ports_list = kernel.service_ports
-            num_inference_ports = len([*filter(lambda x: x["is_inference"], service_ports_list)])
-            if num_inference_ports > 1:
-                log.warning(
-                    "generate_route_info(): Multiple ({}) inference ports found. "
-                    "Currently only the first-seen inference port is used. (Endpoint: {})",
-                    num_inference_ports,
-                    self.id,
-                )
-            for port_info in service_ports_list:
-                if port_info["is_inference"]:
-                    connection_info[port_info["name"]].append({
-                        "session_id": str(kernel.session_id),
-                        "route_id": str(session_id_to_route_map[kernel.session_id].id),
-                        "kernel_host": kernel.kernel_host,
-                        "kernel_port": port_info["host_ports"][0],
-                    })
-                    break
-        return connection_info
 
     def _find_current_revision(self) -> DeploymentRevisionRow | None:
         """Find the current revision row from eagerly loaded revisions.

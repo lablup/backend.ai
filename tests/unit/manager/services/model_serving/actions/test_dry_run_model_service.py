@@ -173,6 +173,12 @@ class TestDryRunModelService:
         return mock
 
     @pytest.fixture
+    def mock_route_controller(self) -> MagicMock:
+        mock = MagicMock()
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
     def mock_runtime_variant_repository(self) -> MagicMock:
         return MagicMock(spec=RuntimeVariantRepository)
 
@@ -191,6 +197,7 @@ class TestDryRunModelService:
         mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
+        mock_route_controller: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -205,6 +212,7 @@ class TestDryRunModelService:
             runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            route_controller=mock_route_controller,
         )
 
     @pytest.fixture
@@ -670,6 +678,12 @@ class TestDryRunWithDeploymentConfigOverrides:
         return mock
 
     @pytest.fixture
+    def mock_route_controller(self) -> MagicMock:
+        mock = MagicMock()
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
     def mock_runtime_variant_repository(self) -> MagicMock:
         return MagicMock(spec=RuntimeVariantRepository)
 
@@ -688,6 +702,7 @@ class TestDryRunWithDeploymentConfigOverrides:
         mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
+        mock_route_controller: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -702,6 +717,7 @@ class TestDryRunWithDeploymentConfigOverrides:
             runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            route_controller=mock_route_controller,
         )
 
     @pytest.fixture
@@ -966,6 +982,12 @@ class TestDryRunExtraMountsHandling:
         return mock
 
     @pytest.fixture
+    def mock_route_controller(self) -> MagicMock:
+        mock = MagicMock()
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
     def mock_runtime_variant_repository(self) -> MagicMock:
         return MagicMock(spec=RuntimeVariantRepository)
 
@@ -984,6 +1006,7 @@ class TestDryRunExtraMountsHandling:
         mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
+        mock_route_controller: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -998,6 +1021,7 @@ class TestDryRunExtraMountsHandling:
             runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            route_controller=mock_route_controller,
         )
 
     @pytest.fixture

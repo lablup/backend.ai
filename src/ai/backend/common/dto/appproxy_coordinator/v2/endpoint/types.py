@@ -9,6 +9,8 @@ name so the wire format converges over time.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import AliasChoices, AnyUrl, Field
 
 from ai.backend.common.api_handlers import BaseFieldModel
@@ -181,6 +183,82 @@ class DeleteEndpointItem(BaseFieldModel):
         ),
         validation_alias=AliasChoices("deployment_id", "endpoint_id"),
         serialization_alias="deployment_id",
+    )
+
+
+class RouteEntry(BaseFieldModel):
+    """A single (session, kernel host:port) tuple for an endpoint's routing table.
+
+    The coordinator stores these on each circuit's ``route_info`` and the
+    worker fans request traffic across them. Manager fills these in after
+    a session reaches RUNNING + HEALTHY and pushes them via the bulk
+    routes-sync API.
+    """
+
+    session_id: UUID = Field(
+        ...,
+        description="Session UUID hosting the model service replica for this route.",
+    )
+    route_id: UUID = Field(
+        ...,
+        description="Route UUID — the manager-side identity of this routing entry.",
+    )
+    kernel_host: str = Field(
+        ...,
+        description="Host / IP that the proxy uses to reach the kernel of the session.",
+    )
+    kernel_port: int = Field(
+        ...,
+        description="Port on ``kernel_host`` exposing the model service inference port.",
+    )
+
+
+class UpdateRoutesItem(BaseFieldModel):
+    """One endpoint's routing table to be installed on the coordinator.
+
+    The coordinator replaces ``circuit.route_info`` for the endpoint with
+    ``routes`` (no merge), so the caller is expected to send the
+    authoritative current set of HEALTHY routes. An empty list is valid
+    and means "no traffic should land on this endpoint right now"; the
+    circuit row stays.
+    """
+
+    deployment_id: DeploymentID = Field(
+        ...,
+        description=(
+            "Target deployment UUID. ``endpoint_id`` is accepted as a "
+            "validation alias for backward compatibility."
+        ),
+        validation_alias=AliasChoices("deployment_id", "endpoint_id"),
+        serialization_alias="deployment_id",
+    )
+    routes: list[RouteEntry] = Field(
+        ...,
+        description="Authoritative routing entries (replaces the circuit's current set).",
+    )
+
+
+class UpdatedRoutesItem(BaseFieldModel):
+    """Per-endpoint result of a bulk routes-sync call.
+
+    Bulk routes-sync continues past per-entry failures (e.g. circuit not
+    yet registered, race against deletion) and reports success / failure
+    individually so the caller can decide how to handle partial failures.
+    """
+
+    deployment_id: DeploymentID = Field(
+        ...,
+        description="Deployment UUID that the coordinator attempted to update.",
+        validation_alias=AliasChoices("deployment_id", "endpoint_id"),
+        serialization_alias="deployment_id",
+    )
+    success: bool = Field(
+        ...,
+        description="``True`` when the route table was applied; ``False`` otherwise.",
+    )
+    error: str | None = Field(
+        default=None,
+        description="Human-readable error when ``success`` is ``False``; ``None`` on success.",
     )
 
 

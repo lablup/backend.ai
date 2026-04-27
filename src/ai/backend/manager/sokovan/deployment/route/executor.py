@@ -10,19 +10,35 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     RouteHealthRecord,
     ValkeyScheduleClient,
 )
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
+    BulkUpdateRoutesRequest,
+)
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
+    RouteEntry,
+    UpdateRoutesItem,
+)
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteHealthStatus
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.errors.deployment import (
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
 )
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
@@ -65,6 +81,8 @@ class RouteExecutor:
         client_pool: ClientPool,
         valkey_schedule: ValkeyScheduleClient,
         service_discovery: ServiceDiscovery,
+        event_producer: EventProducer,
+        appproxy_client_pool: AppProxyClientPool,
     ) -> None:
         self._deployment_repo = deployment_repo
         self._scheduling_controller = scheduling_controller
@@ -72,6 +90,8 @@ class RouteExecutor:
         self._client_pool = client_pool
         self._valkey_schedule = valkey_schedule
         self._service_discovery = service_discovery
+        self._event_producer = event_producer
+        self._appproxy_client_pool = appproxy_client_pool
 
     async def provision_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Provision routes by creating sessions.
@@ -442,6 +462,139 @@ class RouteExecutor:
             log.debug("No valid routes to sync to service discovery")
 
         return RouteExecutionResult(successes=[], errors=[])
+
+    async def sync_appproxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Push the current HEALTHY routing tables for affected endpoints to AppProxy.
+
+        Steps:
+        1. Group the input routes by endpoint (the AppProxy contract is
+           endpoint-scoped: one ``circuit.route_info`` per deployment).
+        2. Resolve each endpoint's proxy target (wsproxy_addr / token)
+           via the deployment repository in two batched calls.
+        3. Re-read the authoritative RUNNING + HEALTHY route set per
+           endpoint with a caller-composed ``BatchQuerier`` so the same
+           plumbing works for sync, debug, and reporting paths — no
+           ``only_healthy`` flag and no Row-side query method.
+        4. Group endpoints by proxy target and issue one
+           ``bulk_update_routes`` HTTP call per target instead of one
+           event per endpoint, which previously meant one DB connection
+           per endpoint on the AppProxy side.
+        5. Map per-entry response status back to the lifecycle handler's
+           per-route success / error result so failed pushes are picked
+           up by the next short cycle.
+        """
+        if not routes:
+            return RouteExecutionResult(successes=[], errors=[])
+
+        routes_by_endpoint: dict[DeploymentID, list[RouteData]] = {}
+        for route in routes:
+            routes_by_endpoint.setdefault(route.deployment_id, []).append(route)
+        endpoint_ids = list(routes_by_endpoint.keys())
+
+        successes: list[RouteData] = []
+        errors: list[RouteExecutionError] = []
+
+        deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
+        deployment_by_id = {dep.id: dep for dep in deployments}
+        scaling_groups = {dep.metadata.resource_group for dep in deployments}
+        proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
+            scaling_groups
+        )
+
+        # Caller composes the filter so the conditions stay explicit at
+        # the call site instead of hiding behind a flag-laden helper.
+        route_querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                RouteConditions.by_endpoint_ids(endpoint_ids),
+                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
+                RouteConditions.by_health_statuses([RouteHealthStatus.HEALTHY]),
+                RouteConditions.by_traffic_status_equals(RouteTrafficStatus.ACTIVE),
+            ],
+        )
+        connection_infos = await self._deployment_repo.fetch_route_connection_infos(
+            route_querier=route_querier,
+        )
+
+        items_by_target: dict[tuple[str, str], list[UpdateRoutesItem]] = {}
+        for endpoint_id in endpoint_ids:
+            deployment = deployment_by_id.get(endpoint_id)
+            if deployment is None:
+                for route in routes_by_endpoint[endpoint_id]:
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="Deployment row not found for AppProxy sync",
+                            error_detail=f"deployment {endpoint_id} disappeared between fetch and sync",
+                            error_code=None,
+                        )
+                    )
+                continue
+            target = proxy_targets.get(deployment.metadata.resource_group)
+            if target is None:
+                for route in routes_by_endpoint[endpoint_id]:
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="No proxy target configured for scaling group",
+                            error_detail=f"scaling group {deployment.metadata.resource_group}",
+                            error_code=None,
+                        )
+                    )
+                continue
+            entries = connection_infos.get(endpoint_id, [])
+            items_by_target.setdefault((target.addr, target.api_token), []).append(
+                UpdateRoutesItem(
+                    deployment_id=endpoint_id,
+                    routes=[
+                        RouteEntry(
+                            session_id=entry.session_id,
+                            route_id=entry.route_id,
+                            kernel_host=entry.kernel_host,
+                            kernel_port=entry.kernel_port,
+                        )
+                        for entry in entries
+                    ],
+                )
+            )
+
+        for (addr, token), items in items_by_target.items():
+            client = self._appproxy_client_pool.load_client(addr, token)
+            try:
+                response = await client.bulk_update_routes(BulkUpdateRoutesRequest(endpoints=items))
+            except Exception as exc:
+                log.exception("AppProxy bulk routes-sync request failed for target {}", addr)
+                error_code = _extract_error_code(exc)
+                for item in items:
+                    ep_id = DeploymentID(item.deployment_id)
+                    for route in routes_by_endpoint.get(ep_id, []):
+                        errors.append(
+                            RouteExecutionError(
+                                route_info=route,
+                                reason="AppProxy bulk routes-sync request failed",
+                                error_detail=str(exc),
+                                error_code=error_code,
+                            )
+                        )
+                continue
+
+            for resp_item in response.endpoints:
+                ep_id = DeploymentID(resp_item.deployment_id)
+                ep_routes = routes_by_endpoint.get(ep_id, [])
+                if resp_item.success:
+                    successes.extend(ep_routes)
+                else:
+                    for route in ep_routes:
+                        errors.append(
+                            RouteExecutionError(
+                                route_info=route,
+                                reason="AppProxy bulk routes-sync entry failed",
+                                error_detail=resp_item.error or "unknown",
+                                error_code=None,
+                            )
+                        )
+
+        return RouteExecutionResult(successes=successes, errors=errors)
 
     async def cleanup_routes_by_config(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """

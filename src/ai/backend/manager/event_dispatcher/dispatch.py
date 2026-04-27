@@ -62,9 +62,6 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    DoSyncRouteInfoToAppProxyEvent,
-)
 from ai.backend.common.events.event_types.notification.anycast import (
     NotificationTriggeredEvent,
 )
@@ -462,13 +459,6 @@ class Dispatchers:
             None,
             self._schedule_event_handler.handle_do_route_lifecycle,
             name="route.lifecycle",
-        )
-        # Periodic route info sync trigger (leader-only via sokovan LeaderCron)
-        event_dispatcher.consume(
-            DoSyncRouteInfoToAppProxyEvent,
-            None,
-            self._schedule_event_handler.handle_do_sync_route_info_to_appproxy,
-            name="deployment.sync_route_info_to_appproxy",
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:

@@ -5,7 +5,6 @@ from collections.abc import Iterator
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
-import aiohttp
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -118,6 +117,12 @@ class TestUpdateRoute:
         return mock
 
     @pytest.fixture
+    def mock_route_controller(self) -> MagicMock:
+        mock = MagicMock()
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
     def mock_runtime_variant_repository(self) -> MagicMock:
         return MagicMock(spec=RuntimeVariantRepository)
 
@@ -136,6 +141,7 @@ class TestUpdateRoute:
         mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
+        mock_route_controller: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -150,6 +156,7 @@ class TestUpdateRoute:
             runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            route_controller=mock_route_controller,
         )
 
     @pytest.fixture
@@ -218,19 +225,11 @@ class TestUpdateRoute:
         )
 
     @pytest.fixture
-    def mock_notify_endpoint_route_update_to_appproxy(
-        self, mocker: Any, mock_agent_registry: Any
-    ) -> AsyncMock:
-        mock = cast(
-            AsyncMock,
-            mocker.patch.object(
-                mock_agent_registry,
-                "notify_endpoint_route_update_to_appproxy",
-                new_callable=AsyncMock,
-            ),
-        )
-        mock.return_value = None
-        return mock
+    def mock_mark_appproxy_resync_needed(self, mock_route_controller: MagicMock) -> AsyncMock:
+        # The service no longer touches AppProxy from the API path; the
+        # route controller's lifecycle hint is the only side effect
+        # observable from the action.
+        return cast(AsyncMock, mock_route_controller.mark_lifecycle_needed)
 
     @pytest.mark.parametrize(
         "scenario",
@@ -255,7 +254,7 @@ class TestUpdateRoute:
         mock_get_endpoint_access_validation_data_update_route: AsyncMock,
         mock_update_route_traffic: AsyncMock,
         mock_get_endpoint_for_appproxy_update: AsyncMock,
-        mock_notify_endpoint_route_update_to_appproxy: AsyncMock,
+        mock_mark_appproxy_resync_needed: AsyncMock,
     ) -> None:
         action = scenario.input
 
@@ -335,7 +334,7 @@ class TestUpdateRoute:
 
         await scenario.test(update_route)
 
-    async def test_update_route_appproxy_failure(
+    async def test_update_route_marks_appproxy_resync(
         self,
         user_data: UserData,
         model_serving_processors: ModelServingProcessors,
@@ -343,31 +342,27 @@ class TestUpdateRoute:
         mock_get_endpoint_access_validation_data_update_route: AsyncMock,
         mock_update_route_traffic: AsyncMock,
         mock_get_endpoint_for_appproxy_update: AsyncMock,
-        mock_notify_endpoint_route_update_to_appproxy: AsyncMock,
+        mock_mark_appproxy_resync_needed: AsyncMock,
     ) -> None:
+        # The previous "AppProxy communication failure propagates" check
+        # no longer applies: the service hands off via the route
+        # controller's lifecycle hint, and the actual AppProxy push is
+        # owned by the route coordinator's sync cycle. We verify that
+        # the hint is requested instead.
         action = UpdateRouteAction(
             service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
             route_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
             traffic_ratio=0.7,
         )
-
-        # Mock validation data for access validation
         mock_validation_data = MagicMock(
             session_owner_id=user_data.user_id,
             session_owner_role=UserRole(user_data.role),
             domain=user_data.domain_name,
         )
         mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
-
-        # Mock successful route update
         mock_update_route_traffic.return_value = MagicMock(id=action.service_id)
         mock_get_endpoint_for_appproxy_update.return_value = MagicMock(id=action.service_id)
 
-        # Mock AppProxy communication failure
-        mock_notify_endpoint_route_update_to_appproxy.side_effect = aiohttp.ClientError(
-            "Connection failed"
-        )
+        await model_serving_processors.update_route.wait_for_complete(action)
 
-        # AppProxy failure should propagate as exception
-        with pytest.raises(aiohttp.ClientError, match="Connection failed"):
-            await model_serving_processors.update_route.wait_for_complete(action)
+        mock_mark_appproxy_resync_needed.assert_awaited_once()

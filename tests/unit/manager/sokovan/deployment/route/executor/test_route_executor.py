@@ -9,19 +9,30 @@ Test Scenarios:
 - RE-001 ~ RE-003: Route Eviction
 - RT-001 ~ RT-003: Route Termination
 - SD-001 ~ SD-004: Service Discovery Sync
+- AP-001 ~ AP-004: AppProxy Sync
 """
 
 from __future__ import annotations
 
 import dataclasses
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
+from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import RouteHealthRecord
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
+    BulkUpdateRoutesResponse,
+)
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import UpdatedRoutesItem
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
+from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
@@ -758,3 +769,160 @@ class TestSyncServiceDiscovery:
         mock_service_discovery.sync_model_service_routes.assert_awaited_once()
         call_args = mock_service_discovery.sync_model_service_routes.call_args
         assert len(call_args[0][0]) == 2
+
+
+# =============================================================================
+# TestSyncAppproxy (AP-001 ~ AP-004)
+# =============================================================================
+
+
+def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
+    return RouteData(
+        route_id=uuid4(),
+        deployment_id=endpoint_id,
+        session_id=SessionId(uuid4()),
+        status=RouteStatus.RUNNING,
+        health_status=RouteHealthStatus.HEALTHY,
+        traffic_ratio=1.0,
+        revision_id=DeploymentRevisionID(uuid4()),
+        created_at=datetime.now(tzutc()),
+    )
+
+
+def _make_deployment_mock(deployment_id: UUID, resource_group: str) -> MagicMock:
+    """Tiny stand-in for DeploymentInfo so sync_appproxy can read ``id`` and ``metadata.resource_group`` without dragging the full constructor."""
+    deployment = MagicMock()
+    deployment.id = deployment_id
+    deployment.metadata.resource_group = resource_group
+    return deployment
+
+
+def _wire_proxy_target(
+    mock_deployment_repo: AsyncMock,
+    endpoint_ids: list[DeploymentID],
+    *,
+    resource_group: str = "default",
+    addr: str = "http://appproxy:5000",
+    token: str = "test-token",
+) -> None:
+    """Wire deployment / proxy lookups so sync_appproxy can resolve every endpoint.
+
+    Pulled out so each test only declares the input that matters and not
+    the chain of mock returns the executor walks before the HTTP call.
+    """
+    deployments = [_make_deployment_mock(UUID(str(eid)), resource_group) for eid in endpoint_ids]
+    mock_deployment_repo.get_deployments_by_ids.return_value = deployments
+    mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
+        resource_group: ScalingGroupProxyTarget(addr=addr, api_token=token),
+    }
+    mock_deployment_repo.fetch_route_connection_infos.return_value = {
+        UUID(str(eid)): [
+            AppProxyRouteEntry(
+                session_id=uuid4(),
+                route_id=uuid4(),
+                kernel_host="10.0.0.1",
+                kernel_port=8000,
+            )
+        ]
+        for eid in endpoint_ids
+    }
+
+
+def _bulk_response(items: list[UpdatedRoutesItem]) -> BulkUpdateRoutesResponse:
+    return BulkUpdateRoutesResponse(endpoints=items)
+
+
+class TestSyncAppproxy:
+    """Tests for sync_appproxy functionality.
+
+    Verifies the executor groups routes by endpoint, resolves the proxy
+    target, and issues exactly one bulk routes-sync HTTP call per
+    AppProxy target instead of one event per endpoint.
+    """
+
+    async def test_empty_routes_is_noop(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> None:
+        """AP-001: Empty route list is a no-op."""
+        result = await route_executor.sync_appproxy([])
+
+        assert result.successes == []
+        assert result.errors == []
+        mock_deployment_repo.get_deployments_by_ids.assert_not_awaited()
+        mock_appproxy_client_pool.load_client.assert_not_called()
+
+    async def test_single_endpoint_pushes_once(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> None:
+        """AP-002: Multiple HEALTHY routes for one endpoint trigger one bulk call.
+
+        Two routes for the same endpoint must collapse into a single
+        bulk routes-sync HTTP request — that's the whole point of moving
+        from per-endpoint events to a bulk endpoint.
+        """
+        endpoint_id = DeploymentID(uuid4())
+        routes = [_route_for_endpoint(endpoint_id), _route_for_endpoint(endpoint_id)]
+        _wire_proxy_target(mock_deployment_repo, [endpoint_id])
+        client = mock_appproxy_client_pool.load_client.return_value
+        client.bulk_update_routes.return_value = _bulk_response([
+            UpdatedRoutesItem(deployment_id=endpoint_id, success=True)
+        ])
+
+        result = await route_executor.sync_appproxy(routes)
+
+        assert len(result.successes) == 2
+        assert result.errors == []
+        client.bulk_update_routes.assert_awaited_once()
+        request = client.bulk_update_routes.await_args.args[0]
+        assert [item.deployment_id for item in request.endpoints] == [endpoint_id]
+
+    async def test_multiple_endpoints_share_one_call(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> None:
+        """AP-003: Routes for distinct endpoints sharing one proxy target use one call."""
+        endpoint_ids = [DeploymentID(uuid4()) for _ in range(3)]
+        routes = [_route_for_endpoint(eid) for eid in endpoint_ids]
+        _wire_proxy_target(mock_deployment_repo, endpoint_ids)
+        client = mock_appproxy_client_pool.load_client.return_value
+        client.bulk_update_routes.return_value = _bulk_response([
+            UpdatedRoutesItem(deployment_id=eid, success=True) for eid in endpoint_ids
+        ])
+
+        result = await route_executor.sync_appproxy(routes)
+
+        assert len(result.successes) == 3
+        client.bulk_update_routes.assert_awaited_once()
+        request = client.bulk_update_routes.await_args.args[0]
+        assert {item.deployment_id for item in request.endpoints} == set(endpoint_ids)
+
+    async def test_per_endpoint_failure_isolated(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> None:
+        """AP-004: One endpoint marked failed by AppProxy doesn't drop other successes."""
+        endpoint_ids = [DeploymentID(uuid4()) for _ in range(3)]
+        routes = [_route_for_endpoint(eid) for eid in endpoint_ids]
+        _wire_proxy_target(mock_deployment_repo, endpoint_ids)
+        client = mock_appproxy_client_pool.load_client.return_value
+        client.bulk_update_routes.return_value = _bulk_response([
+            UpdatedRoutesItem(deployment_id=endpoint_ids[0], success=False, error="circuit gone"),
+            UpdatedRoutesItem(deployment_id=endpoint_ids[1], success=True),
+            UpdatedRoutesItem(deployment_id=endpoint_ids[2], success=True),
+        ])
+
+        result = await route_executor.sync_appproxy(routes)
+
+        assert len(result.successes) == 2
+        assert len(result.errors) == 1
+        assert result.errors[0].route_info.deployment_id == endpoint_ids[0]

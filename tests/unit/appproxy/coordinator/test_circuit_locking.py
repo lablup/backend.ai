@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.appproxy.coordinator.models import Circuit
-from ai.backend.appproxy.coordinator.types import CircuitManager
+from ai.backend.appproxy.coordinator.types import CircuitManager, CircuitRouteUpdateItem
 
 
 class _ReadonlySessionContext:
@@ -72,7 +72,10 @@ class UpdateControl:
     call_order: list[str] = field(default_factory=list)
     _invocation_count: int = field(default=0, init=False)
 
-    async def side_effect(self, _circuit: object, _old_routes: list[object]) -> None:
+    async def side_effect(self, _items: list[CircuitRouteUpdateItem]) -> None:
+        # The bulk path replaces the per-circuit traefik update; this
+        # side-effect models the same one-call-per-update semantics
+        # that the original tests asserted on.
         self._invocation_count += 1
         if self._invocation_count == 1:
             self.call_order.append("first_start")
@@ -116,7 +119,7 @@ class TestCircuitManagerLocking:
     ) -> UpdateControl:
         monkeypatch.setattr(
             circuit_manager,
-            "update_traefik_circuit_routes",
+            "_update_traefik_circuit_routes_bulk",
             AsyncMock(side_effect=update_control.side_effect),
         )
         return update_control

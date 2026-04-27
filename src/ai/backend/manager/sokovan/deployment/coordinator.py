@@ -20,10 +20,6 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    DoSyncRouteInfoToAppProxyEvent,
-    EndpointRouteListUpdatedEvent,
-)
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
@@ -913,52 +909,8 @@ class DeploymentCoordinator:
             )
             specs.append(long_spec)
 
-        # Periodic reconcile of every active endpoint's route info into Redis,
-        # acting as a safety net for missed RUNNING/TERMINATED hook invocations
-        # so the app proxy coordinator eventually converges on the manager's
-        # DB state. Runs leader-only via the sokovan LeaderCron.
-        specs.append(
-            EventTaskSpec(
-                name="sync_route_info_to_appproxy",
-                event_factory=lambda: DoSyncRouteInfoToAppProxyEvent(),
-                interval=30.0,
-                initial_delay=15.0,
-            )
-        )
-
+        # The periodic AppProxy reconcile previously implemented here lives
+        # on RouteCoordinator now (RouteLifecycleType.APPPROXY_SYNC short +
+        # long cycle), so the deployment coordinator no longer schedules a
+        # standalone sync task.
         return specs
-
-    async def sync_route_info_to_appproxy(self) -> None:
-        """Re-publish route_connection_info for every active endpoint into
-        Redis and fire EndpointRouteListUpdatedEvent per endpoint.
-
-        The per-endpoint call chain is identical to the RUNNING/TERMINATED
-        transition hook so downstream receivers (coordinator on_route_update_event)
-        behave the same regardless of which path triggered the update.
-        """
-        active_querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                DeploymentConditions.by_lifecycle_stages(EndpointLifecycle.active_states()),
-            ],
-        )
-        deployment_ids = await self._deployment_repository.search_deployment_ids(
-            querier=active_querier,
-        )
-        if not deployment_ids:
-            return
-        log.debug(
-            "sync_route_info_to_appproxy: syncing {} active deployments",
-            len(deployment_ids),
-        )
-        for deployment_id in deployment_ids:
-            try:
-                await self._deployment_repository.update_endpoint_route_info(deployment_id)
-                await self._event_producer.anycast_event(
-                    EndpointRouteListUpdatedEvent(deployment_id)
-                )
-            except Exception:
-                log.exception(
-                    "sync_route_info_to_appproxy: failed for deployment {}",
-                    deployment_id,
-                )
