@@ -73,6 +73,7 @@ from ai.backend.agent.metrics.metric import (
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks, current_loop
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -819,7 +820,7 @@ class AbstractAgent[
     slots: Mapping[SlotName, Decimal]
     computers: Mapping[DeviceName, ComputerContext]
     images: Mapping[ImageCanonical, InstalledImageInfo]
-    port_pool: set[int]
+    port_pool: PortPool
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
     timer_tasks: MutableSequence[asyncio.Task[Any]]
@@ -913,11 +914,9 @@ class AbstractAgent[
             else None,
         )
         self.timer_tasks = []
-        self.port_pool = set(
-            range(
-                local_config.container.port_range[0],
-                local_config.container.port_range[1] + 1,
-            )
+        self.port_pool = PortPool(
+            local_config.container.port_range,
+            cooldown_sec=local_config.container.port_reuse_cooldown_sec,
         )
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
@@ -1541,59 +1540,10 @@ class AbstractAgent[
         )
 
     def _restore_ports(self, host_ports: Iterable[int]) -> None:
-        # Restore used ports to the port pool.
-        port_range = self.local_config.container.port_range
-        # Exclude out-of-range ports, because when the agent restarts
-        # with a different port range, existing containers' host ports
-        # may not belong to the new port range.
-        restored_ports = [
-            *filter(
-                lambda p: port_range[0] <= p <= port_range[1],
-                host_ports,
-            )
-        ]
-        self.port_pool.update(restored_ports)
-
-    def current_used_port_set(self) -> set[int]:
-        """
-        Get the current port pool.
-        """
-        total_port_set = set(
-            range(
-                self.local_config.container.port_range[0],
-                self.local_config.container.port_range[1] + 1,
-            )
-        )
-        return total_port_set - self.port_pool
-
-    def release_unused_ports(self, unused_ports: set[int]) -> None:
-        """
-        Release the given unused ports back to the port pool.
-        """
-        if not unused_ports:
-            return
-        log.info(
-            "releasing unused ports back to port pool. current port-pool length: {}, releasing length: {}",
-            len(self.port_pool),
-            len(unused_ports),
-        )
-        self.port_pool.update(unused_ports)
-
-    def reset_port_pool(self, used_ports: Iterable[int]) -> None:
-        """
-        Reset the port pool by excluding the given used ports.
-        """
-        used_port_set = set(used_ports)
-        port_range = self.local_config.container.port_range
-        log.info(
-            "reset port pool with used ports. current port-pool length: {}, used ports length: {}",
-            len(self.port_pool),
-            len(used_port_set),
-        )
-        original_port_pool: set[int] = {
-            p for p in range(port_range[0], port_range[1] + 1) if p not in used_port_set
-        }
-        self.port_pool = original_port_pool
+        # PortPool.release ignores out-of-range ports, which handles the
+        # case where the agent restarts with a different port_range and
+        # existing containers still hold ports from the old range.
+        self.port_pool.release_many(host_ports)
 
     def update_scaling_group(self, scaling_group: str) -> None:
         self.local_config.update(agent_update={"scaling_group": scaling_group})

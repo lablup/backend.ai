@@ -1251,14 +1251,17 @@ class AgentRPCServer(aobject):
     async def assign_port(self, agent_id: AgentId | None = None) -> int:
         log.debug("rpc::assign_port()")
         agent = self.runtime.get_agent(agent_id)
-        return agent.port_pool.pop()
+        # RPC path bypasses cooldown: callers (e.g. manager scheduler)
+        # use this for ad-hoc/emergency allocation outside the normal
+        # container creation flow.
+        return agent.port_pool.acquire(respect_cooldown=False)
 
     @rpc_function
     @collect_error
     async def release_port(self, port_no: int, agent_id: AgentId | None = None) -> None:
         log.debug("rpc::release_port(port_no:{})", port_no)
         agent = self.runtime.get_agent(agent_id)
-        agent.port_pool.add(port_no)
+        agent.port_pool.release(port_no)
 
     @rpc_function
     @collect_error
