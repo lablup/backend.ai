@@ -255,7 +255,13 @@ async def web_handler(
                     continue
                 if (value := frontend_rqst.headers.get(key)) is not None:
                     backend_rqst.headers[key] = value
-            async with backend_rqst.fetch() as backend_resp:
+            # Preserve the client's original Date header so that signature-based
+            # auth schemes that bind the signature to Date keep working through
+            # the proxy. fetch() otherwise refreshes Date unconditionally.
+            fetch_header_overrides: dict[str, str] = {}
+            if (client_date := frontend_rqst.headers.get("Date")) is not None:
+                fetch_header_overrides["Date"] = client_date
+            async with backend_rqst.fetch(headers=fetch_header_overrides) as backend_resp:
                 frontend_resp_hdrs = {
                     key: value
                     for key, value in backend_resp.headers.items()
@@ -427,8 +433,14 @@ async def web_handler_with_jwt(
                 if (value := frontend_rqst.headers.get(key)) is not None:
                     backend_rqst.headers[key] = value
 
+            # Preserve the client's original Date header so that signature-based
+            # auth schemes that bind the signature to Date keep working through
+            # the proxy. fetch() otherwise refreshes Date unconditionally.
+            fetch_header_overrides: dict[str, str] = {}
+            if (client_date := frontend_rqst.headers.get("Date")) is not None:
+                fetch_header_overrides["Date"] = client_date
             # Fetch from backend and stream response
-            async with backend_rqst.fetch() as backend_resp:
+            async with backend_rqst.fetch(headers=fetch_header_overrides) as backend_resp:
                 frontend_resp_hdrs = {
                     key: value
                     for key, value in backend_resp.headers.items()
@@ -530,7 +542,13 @@ async def web_plugin_handler(
             for key in HTTP_HEADERS_TO_FORWARD:
                 if (value := frontend_rqst.headers.get(key)) is not None:
                     backend_rqst.headers[key] = value
-            async with backend_rqst.fetch() as backend_resp:
+            # Preserve the client's original Date header so that signature-based
+            # auth schemes that bind the signature to Date keep working through
+            # the proxy. fetch() otherwise refreshes Date unconditionally.
+            fetch_header_overrides: dict[str, str] = {}
+            if (client_date := frontend_rqst.headers.get("Date")) is not None:
+                fetch_header_overrides["Date"] = client_date
+            async with backend_rqst.fetch(headers=fetch_header_overrides) as backend_resp:
                 frontend_resp_hdrs = {
                     key: value
                     for key, value in backend_resp.headers.items()

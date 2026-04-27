@@ -267,3 +267,49 @@ async def test_response_async(defconfig: APIConfig, dummy_endpoint: str) -> None
             async with rqst.fetch() as resp:
                 assert await resp.text() == '{"test": 5678}'
                 assert await resp.json() == {"test": 5678}
+
+
+async def test_fetch_preserves_date_header_override(dummy_endpoint: str) -> None:
+    fixed_date = "Tue, 02 Sep 2025 08:00:00 GMT"
+    with aioresponses() as m:
+        m.post(dummy_endpoint + "function", status=HTTPStatus.OK, body=b"")
+        async with AsyncSession():
+            rqst = Request("POST", "function")
+            async with rqst.fetch(headers={"Date": fixed_date}):
+                pass
+
+        sent_kwargs = next(iter(m.requests.values()))[0].kwargs
+        assert sent_kwargs["headers"]["Date"] == fixed_date
+
+    # The internal datetime must also reflect the override so that signing
+    # done with `self.date` matches the Date header sent on the wire.
+    assert rqst.date is not None
+    assert rqst.date.year == 2025
+    assert rqst.date.month == 9
+    assert rqst.date.day == 2
+
+
+async def test_fetch_default_date_header_when_no_override(dummy_endpoint: str) -> None:
+    with aioresponses() as m:
+        m.post(dummy_endpoint + "function", status=HTTPStatus.OK, body=b"")
+        async with AsyncSession():
+            rqst = Request("POST", "function")
+            async with rqst.fetch():
+                pass
+
+        sent_kwargs = next(iter(m.requests.values()))[0].kwargs
+        # Without override, fetch() auto-populates Date with self.date.isoformat().
+        assert rqst.date is not None
+        assert sent_kwargs["headers"]["Date"] == rqst.date.isoformat()
+
+
+async def test_fetch_passes_through_arbitrary_header_overrides(dummy_endpoint: str) -> None:
+    with aioresponses() as m:
+        m.post(dummy_endpoint + "function", status=HTTPStatus.OK, body=b"")
+        async with AsyncSession():
+            rqst = Request("POST", "function")
+            async with rqst.fetch(headers={"X-Custom-Header": "custom-value"}):
+                pass
+
+        sent_kwargs = next(iter(m.requests.values()))[0].kwargs
+        assert sent_kwargs["headers"]["X-Custom-Header"] == "custom-value"
