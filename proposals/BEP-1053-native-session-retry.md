@@ -181,8 +181,8 @@ The retry decision lives in `SessionEventHandler` (`event_dispatcher/handlers/se
 
 The decision flow:
 
-1. Load the parent session. If `retry_count >= max_retries`, emit `session.retry_exhausted` and return.
-2. Classify failure via `classify_failure(session, status_data)`. If the cause is hardcoded never-retriable, or not in `policy.eligible_causes`, return.
+1. Load the parent session. **Short-circuit unless `session.session_type == SessionTypes.BATCH`** — interactive and inference sessions share `SessionEventHandler` (see line 210's INFERENCE-specific routing in `handle_session_terminated`) and are explicitly out of scope for v1. Then, if `retry_count >= max_retries`, emit `session.retry_exhausted` and return.
+2. Classify failure via `classify_failure(session, status_data)`. The shape of `status_data["error"]` is defined by `manager/exceptions.py:convert_to_status_data` (returns `ErrorStatusInfo` / `ErrorDetail` TypedDicts at line 97); classification reads `error.name` and `error.src` to map to a `RetryEligibleCause`. If the cause is hardcoded never-retriable, or not in `policy.eligible_causes`, return.
 3. Inside the session repository's `begin_session()` transaction, lock the parent row with `sa.select(SessionRow).where(SessionRow.id == parent.id).with_for_update()` and re-read `retry_count` to handle racing handlers on the same parent.
 4. Compute `delay` per the formula above.
 5. Hand off to `BackgroundTaskManager.start_retriable()` (already injected into `SessionService` at `services/session/service.py:245,408`) with the computed delay and a `CreateFromParamsAction` derived from the parent. The background task framework is already the canonical primitive for durable, replayable, delayed work in the manager — using it avoids inventing a new scheduling path.
