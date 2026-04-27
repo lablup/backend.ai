@@ -49,7 +49,7 @@ POST /v2/sessions
   → repository → SessionRow (models/session/row.py:384)
 ```
 
-`SessionRow.creation_id` (lines 389–390) is a 32-character idempotency key reused across kernel placements; we can extend it to also key retry attempts.
+`SessionRow.creation_id` (lines 389–390) is a 32-character idempotency key reused across kernel placements; today it is generated as `secrets.token_urlsafe(16)` (`services/session/service.py:1593`). It is **not** extended to encode retry chains — those use a separate first-class column (see Data Model).
 
 There are no fields for `parent_session_id`, `retry_count`, `max_retries`, or a retry policy on `SessionRow`.
 
@@ -148,14 +148,12 @@ delay = min(delay, max_retry_delay or MAX_RETRY_DELAY)
 
 `MAX_RETRY_DELAY` is a hard 24 h ceiling, matching Airflow. Deterministic jitter is `SHA1(session_id || retry_count) mod (base * jitter_ratio)`, yielding reproducible delays — useful for tests. Random jitter samples uniformly in `[base, base * (1 + jitter_ratio))`.
 
-### Defaults precedence
+### Defaults and kill switch
 
-Two layers in v1, matching Airflow's `default_args` spirit while staying compatible with parallel work on the config surface:
+Two distinct concepts, kept separate to avoid the precedence trap of "default doubles as kill switch":
 
-1. Per-session policy in the create request.
-2. Cluster default in etcd: `config/manager/retry_policy_default` (ship default `max_retries=0` — no behavior change).
-
-Effective policy = deep-merge top-down; per-session wins.
+- **Cluster default** in etcd: `config/manager/retry_policy_default` (ship default `max_retries=0` — no behavior change). This is a default; per-session policy wins on merge. Effective policy = deep-merge of cluster default and per-session policy.
+- **Cluster kill switch** in etcd: `config/manager/retry_disabled` (boolean, default `false`). Checked at the **top** of the decision flow, before any policy merge. When `true`, no retries are scheduled regardless of per-session policy. Useful for incident response (e.g., disabling retries cluster-wide during a registry outage that would otherwise cause a retry storm).
 
 **Project / domain default is deferred.** [BEP-1052 (Scoped App Config Redesign)](BEP-1052-scoped-app-config-redesign.md) is concurrently rewriting the project / domain config surface around scoped `AppConfigFragment` rows. Adding `retry_policy_default` to the legacy project config row would conflict with that work. After BEP-1052 lands, a follow-up BEP can wire retry defaults into `AppConfigFragment` as a third precedence layer.
 
@@ -171,26 +169,48 @@ One Alembic migration adds to `sessions`:
 | `retry_policy` | `JSONB NULL` | Full policy. |
 | `retry_cause` | `TEXT NULL` | Classified cause that triggered the most recent retry into this attempt. |
 
-The migration also adds a **partial unique index** on `(parent_session_id, retry_count) WHERE parent_session_id IS NOT NULL`. This is the actual idempotency guarantee for retry dispatch: even if two workers race past the parent row lock (different transactions, different timing), the second `INSERT` of a child with the same `(parent, attempt-number)` fails on the unique violation. `creation_id` remains non-unique and is used only for log/trace correlation.
+The migration also adds a **partial unique index** on `(parent_session_id, retry_count) WHERE parent_session_id IS NOT NULL`. This is the actual idempotency guarantee for retry dispatch: even if two workers race past the parent row lock (different transactions, different timing), the second `INSERT` of a child with the same `(parent, attempt-number)` fails on the unique violation. `creation_id` is unchanged and remains a per-attempt random token (no retry encoding).
+
+A second small table `session_retry_dispatch_queue` is added for durable delayed dispatch (see "Decision and dispatch"):
+
+| Column | Type | Description |
+|---|---|---|
+| `parent_session_id` | `UUID NOT NULL` | FK to `sessions.id`. |
+| `retry_count` | `INT NOT NULL` | Target attempt number (= parent.retry_count + 1). |
+| `scheduled_at` | `TIMESTAMPTZ NOT NULL` | Earliest dispatch time. |
+| `claimed_at` | `TIMESTAMPTZ NULL` | Set when a dispatcher worker claims the row. |
+| `dispatched_at` | `TIMESTAMPTZ NULL` | Set when the child session has been created. |
+
+Primary key `(parent_session_id, retry_count)` — the same constraint that protects `sessions` also serializes queue inserts. The queue lets retry decisions survive manager restarts, mirrors the durable-outbox pattern used by the existing pipeline orchestrator on top of Backend.AI, and avoids inventing in-memory scheduling.
 
 `parent_session_id`, `retry_count`, and `max_retries` are first-class columns because they appear in filters, joins, and the unique index; the rest live in JSONB. `parent_session_id` is the canonical query for "show me the retry chain of this session." **No new history table** — the chain is already a linked list of real `SessionRow`s, each with its own status, kernels, logs, and `status_data`. The migration is idempotent and backportable per `src/ai/backend/manager/models/alembic/README.md`.
 
 ### Decision and dispatch
 
-The retry decision lives in `SessionEventHandler` (`event_dispatcher/handlers/session.py:52`), as a new `handle_session_failure` method on the existing class. Rationale: failure metadata (`session.status_data["error"]`) is already loaded there for endpoint-route bookkeeping, the handler runs after the session has reached a terminal status (so the parent state is settled), and adding logic here does not interact with the recently refactored sokovan termination flow (#11250 — `mark_sessions_for_termination()` in `sokovan/scheduling_controller/scheduling_controller.py:266`). A sokovan post-processor was considered but rejected for v1: it runs *during* scheduling iterations, which complicates idempotency and timing without adding capability the event-handler path lacks.
+The retry decision is **folded into the existing `SessionEventHandler.handle_batch_result`** (`event_dispatcher/handlers/session.py:152`), not added as a sibling handler. Rationale:
 
-The decision flow:
+- `SessionFailureAnycastEvent` is **already** subscribed by `handle_batch_result` (`event_dispatcher/dispatch.py:520`). Adding a second handler on the same event would race against bookkeeping work (`set_session_result`, etc.) and depend on undefined dispatch ordering.
+- Failure metadata (`session.status_data["error"]`) is already loaded in `handle_batch_result` for the existing failure path; the retry decision can reuse it without new DB roundtrips.
+- The handler runs after the session has reached a terminal status, so parent state is settled, and the change does not interact with the recently refactored sokovan termination flow (#11250 — `mark_sessions_for_termination()` in `sokovan/scheduling_controller/scheduling_controller.py:266`).
 
-1. Load the parent session. **Short-circuit unless `session.session_type == SessionTypes.BATCH`** — interactive and inference sessions share `SessionEventHandler` (see line 210's INFERENCE-specific routing in `handle_session_terminated`) and are explicitly out of scope for v1. Then, if `retry_count >= max_retries`, emit `session.retry_exhausted` and return.
+A sokovan post-processor was considered but rejected for v1: post-processors run *during* scheduling iterations, complicating idempotency and timing without adding capability the event-handler path lacks.
+
+**Dispatch primitive.** `BackgroundTaskManager.start_retriable()` (`common/bgtask/bgtask.py:444`) is **not** suitable: it accepts no `delay` parameter and fires the task immediately via `asyncio.create_task` ("retriable" refers to the task body retrying on failure, not delayed scheduling). Instead, retries are persisted to the new `session_retry_dispatch_queue` table (see Data Model). A periodic loop in the manager (a sokovan-style worker — same cadence as existing periodic tasks) claims rows where `scheduled_at <= now() AND claimed_at IS NULL` via `UPDATE ... SET claimed_at = now() RETURNING ...` (atomic claim under PostgreSQL's row lock) and invokes `SessionService.create_from_params()`. This pattern is durable across manager restarts and matches the outbox approach used by the sibling pipeline orchestrator.
+
+The decision flow inside `handle_batch_result` (in the `SessionFailureAnycastEvent` arm):
+
+1. Load the parent session. **Short-circuit unless `session.session_type == SessionTypes.BATCH`** — interactive and inference sessions share `SessionEventHandler` and are out of scope for v1. Then, if `retry_count >= max_retries`, emit `session.retry_exhausted` and return.
 2. Classify failure via `classify_failure(session, status_data)`. The shape of `status_data["error"]` is defined by `manager/exceptions.py:convert_to_status_data` (returns `ErrorStatusInfo` / `ErrorDetail` TypedDicts at line 97); classification reads `error.name` and `error.src` to map to a `RetryEligibleCause`. If the cause is hardcoded never-retriable, or not in `policy.eligible_causes`, return.
-3. Inside the session repository's `begin_session()` transaction, lock the parent row with `sa.select(SessionRow).where(SessionRow.id == parent.id).with_for_update()` and re-read `retry_count` to handle racing handlers on the same parent.
+3. Inside the session repository's `begin_session()` transaction, lock the parent row with `sa.select(SessionRow).where(SessionRow.id == parent.id).with_for_update()` and re-read `retry_count`.
 4. Compute `delay` per the formula above.
-5. Hand off to `BackgroundTaskManager.start_retriable()` (already injected into `SessionService` at `services/session/service.py:245,408`) with the computed delay and a `CreateFromParamsAction` derived from the parent. The background task framework is already the canonical primitive for durable, replayable, delayed work in the manager — using it avoids inventing a new scheduling path.
-6. The child `INSERT` is the second idempotency boundary: the partial unique index on `(parent_session_id, retry_count)` rejects duplicate dispatches that bypass step 3 (e.g., handler crash + replay).
+5. `INSERT` into `session_retry_dispatch_queue` with `(parent_session_id, retry_count + 1, now() + delay)`. The PK on `(parent_session_id, retry_count)` makes this idempotent: a duplicate dispatch (handler replay, concurrent handlers) hits a unique-violation and the `INSERT` is skipped. Emit `session.retry_scheduled`.
+6. The dispatcher worker eventually claims the row, runs `SessionService.create_from_params` with a `CreateFromParamsAction` derived from the parent, and stamps `dispatched_at`. The child `INSERT` is the second idempotency boundary: the partial unique index on `sessions.(parent_session_id, retry_count)` rejects duplicate child rows even if two workers claim the same queue row through PG bug, replication lag, or operational error.
 
 The child inherits `retry_policy`, sets `parent_session_id` to the parent, and `retry_count = parent.retry_count + 1`. The `CreateFromParamsAction` carries the same image, mounts, `resource_slots`, env, cluster spec, and batch entrypoint as the parent.
 
-**Failure mode of the retry handler itself.** If `classify_failure` raises, the session stays in its terminal state and the failure is logged at ERROR level — no retry, no crash propagation. If `BackgroundTaskManager.start_retriable()` fails to enqueue, the parent's `status_data` is annotated with the dispatch failure and `session.retry_exhausted` is emitted. The handler must not raise out of `handle_session_failure`; an unhandled exception in an event handler can stall the dispatcher.
+**Failure mode of the retry decision.** If `classify_failure` raises, the session stays in its terminal state and the failure is logged at ERROR level — no retry, no crash propagation. If the queue `INSERT` fails (DB unavailable), the parent's `status_data` is annotated with the dispatch failure and `session.retry_exhausted` is emitted. The decision must not raise out of `handle_batch_result`; an unhandled exception there would also break existing batch-result bookkeeping.
+
+**Failure mode of the dispatcher worker.** If `create_from_params` raises after the queue row is claimed, the worker stamps `dispatched_at` to a sentinel value and emits `session.retry_exhausted` with the underlying error. Manager restart while a row is claimed-but-not-dispatched: the worker re-claims rows whose `claimed_at` is older than a configurable lease (e.g., 5 minutes) on startup.
 
 **No new `RETRYING` status.** The parent goes to `ERROR` as today; the child starts in `PENDING` as today. A computed `retry_state` (resolved at the API layer, not stored) tells clients "attempt N of M" or "this session has a pending child." This avoids touching the scheduler state machine entirely.
 
@@ -231,7 +251,7 @@ A retry attempt is a fresh `SessionRow` and counts against the user's concurrent
 
 ### Operational kill switch
 
-The cluster-level etcd default doubles as a kill switch: setting `config/manager/retry_policy_default` to `{max_retries: 0}` disables retries globally without redeploying the manager. Per-project / per-user kill switches are deferred until the project-default layer lands (see [BEP-1052](BEP-1052-scoped-app-config-redesign.md) dependency above).
+`config/manager/retry_disabled` (etcd, boolean) is the cluster-level kill switch — see "Defaults and kill switch" above. Per-project / per-user kill switches are deferred until the project-default layer lands (see [BEP-1052](BEP-1052-scoped-app-config-redesign.md) dependency above).
 
 ## Implementation Plan
 
@@ -239,12 +259,13 @@ Six PRs, each tracked by its own sub-issue under #11320:
 
 1. **BEP draft** (this document) — #11321.
 2. **Foundation:** `RetryPolicy` DTO, `classify_failure`, backoff utility with deterministic jitter. Pure, no I/O, unit-test heavy.
-3. **Schema:** Alembic migration, `SessionRow` field expansion, repository read/write for the retry chain.
-4. **Retry engine:** decision integration in the termination-event path, `SessionService.create_from_params` extension to inherit retry context, defaults precedence (project/domain/etcd), counters/events/audit.
-5. **API surface:** REST v2 and GraphQL v2 fields, `attempts` endpoint.
-6. **Client:** SDK v2, CLI v2 (`./bai session info` retry view), user docs.
+3. **Schema:** Alembic migration adding `SessionRow` retry columns (with the partial unique index) and the `session_retry_dispatch_queue` table; repository read/write for the retry chain.
+4. **Retry decision:** fold the decision into `handle_batch_result` in `SessionEventHandler`, queue insert with idempotency, etcd kill switch and cluster default, counters/events/audit.
+5. **Dispatcher worker:** periodic claim loop on `session_retry_dispatch_queue`, `SessionService.create_from_params` extension to inherit retry context, lease-based recovery on manager restart.
+6. **API surface:** REST v2 and GraphQL v2 fields, `attempts` endpoint.
+7. **Client:** SDK v2, CLI v2 (`./bai session info` retry view), user docs.
 
-Tests live with the code under test. Cross-cutting integration tests — transient → retry → success, exhaustion, concurrent dispatch idempotency, jitter determinism — ship with the retry-engine PR. Estimated effort: three to four weeks for one engineer.
+Tests live with the code under test. Cross-cutting integration tests — transient → retry → success, exhaustion, concurrent dispatch idempotency, jitter determinism, manager-restart recovery of claimed-but-undispatched queue rows — ship with the dispatcher-worker PR. Estimated effort: four to five weeks for one engineer.
 
 ## References
 
