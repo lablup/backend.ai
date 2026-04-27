@@ -3446,6 +3446,17 @@ type DeploymentRevisionPresetEdge {
 }
 
 """
+Added in 26.4.2. A single environment variable key-value pair injected into the inference container when a deployment revision preset is applied.
+"""
+type DeploymentRevisionPresetEnvironEntry {
+  """Environment variable key."""
+  key: String!
+
+  """Environment variable value."""
+  value: String!
+}
+
+"""
 Added in UNRELEASED. A single environment variable key-value pair to inject into the inference container when a deployment revision preset is applied.
 """
 input DeploymentRevisionPresetEnvironEntryInput {
@@ -7718,7 +7729,7 @@ type PresetExecutionSpec {
   bootstrapScript: String
 
   """Environment variables."""
-  environ: [EnvironmentVariableEntry!]!
+  environ: [DeploymentRevisionPresetEnvironEntry!]!
 }
 
 """

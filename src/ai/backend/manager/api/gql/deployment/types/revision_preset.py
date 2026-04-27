@@ -95,9 +95,6 @@ from ai.backend.manager.api.gql.deployment.types.resource_slot import (
     AllocatedResourceSlotOrderByGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import (
-    EnvironmentVariableEntryGQL as EnvironEntryInfoGQL,
-)
-from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelDefinitionGQL,
     ModelDefinitionInputGQL,
 )
@@ -202,7 +199,7 @@ class PresetExecutionSpecGQL(PydanticOutputMixin[PresetExecutionSpecDTO]):
     bootstrap_script: str | None = gql_field(
         description="Script executed before the main process starts, used for setup tasks like downloading model weights."
     )
-    environ: list[EnvironEntryInfoGQL] = gql_field(
+    environ: list[EnvironEntryGQL] = gql_field(
         description="Environment variables injected into the inference container."
     )
 
