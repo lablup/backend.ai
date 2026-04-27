@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
+import click
 import pytest
 from click.testing import CliRunner
 
-from ai.backend.cli.main import main as cli_main
-from ai.backend.client.cli import v2 as _v2_register  # noqa: F401  # registers v2 on cli_main
 from ai.backend.client.cli.v2 import helpers
 
 
@@ -35,9 +34,13 @@ def dotenv_environment(
     yield tmp_path
 
 
-def test_v2_cli_auto_loads_dotenv(dotenv_environment: Path) -> None:
+def test_v2_cli_auto_loads_dotenv(
+    runner: CliRunner,
+    cli_entrypoint: Callable[[], click.Group],
+    dotenv_environment: Path,
+) -> None:
     """``./bai v2 ...`` auto-loads ``.env`` from cwd, matching v1 CLI behavior."""
-    result = CliRunner().invoke(cli_main, ["v2", "config", "show"])
+    result = runner.invoke(cli_entrypoint, ["v2", "config", "show"])
 
     assert result.exit_code == 0, result.output
     assert "from-dotenv.example" in result.output
