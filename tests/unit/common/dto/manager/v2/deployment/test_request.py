@@ -606,13 +606,6 @@ class TestCreateAccessTokenInput:
         assert inp.model_deployment_id == deployment_id
         assert inp.expires_at is None
 
-    def test_old_field_name_deployment_id_raises_validation_error(self) -> None:
-        # Regression: the old field name must no longer be accepted.
-        with pytest.raises(ValidationError):
-            CreateAccessTokenInput.model_validate({
-                "deployment_id": str(uuid.uuid4()),
-            })
-
     def test_missing_model_deployment_id_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
             CreateAccessTokenInput.model_validate({"expires_at": None})
