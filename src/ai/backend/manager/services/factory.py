@@ -311,6 +311,7 @@ def create_services(args: ServiceArgs) -> Services:
             runtime_variant_repository=repositories.runtime_variant.repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
+            route_controller=args.route_controller,
         ),
         model_serving_auto_scaling=AutoScalingService(
             repository=repositories.model_serving.repository,

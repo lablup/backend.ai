@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 
 from .hooks.registry import HookRegistry, HookRegistryArgs
 from .launcher.launcher import SessionLauncher
@@ -36,17 +35,15 @@ def create_scheduler_components(
     launcher: SessionLauncher,
     terminator: SessionTerminator,
     repository: SchedulerRepository,
-    deployment_repository: DeploymentRepository,
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
-    event_producer: EventProducer,
+    route_controller: RouteController,
 ) -> SchedulerComponents:
     """Create SchedulerComponents with all required dependencies."""
     hook_registry = HookRegistry(
         HookRegistryArgs(
-            deployment_repository=deployment_repository,
             agent_client_pool=agent_client_pool,
-            event_producer=event_producer,
+            route_controller=route_controller,
         )
     )
     return SchedulerComponents(

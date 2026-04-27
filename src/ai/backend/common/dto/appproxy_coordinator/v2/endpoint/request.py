@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
-from .types import CreateEndpointItem, DeleteEndpointItem
+from .types import CreateEndpointItem, DeleteEndpointItem, UpdateRoutesItem
 
 
 class BulkCreateEndpointRequest(BaseRequestModel):
@@ -40,5 +40,25 @@ class BulkDeleteEndpointRequest(BaseRequestModel):
         description=(
             "Endpoints to remove. Entries are processed in order and "
             "the response returns a matching per-entry result."
+        ),
+    )
+
+
+class BulkUpdateRoutesRequest(BaseRequestModel):
+    """Bulk replace the routing table of multiple endpoints in one coordinator call.
+
+    The coordinator processes all entries inside a single connection,
+    replaces each circuit's ``route_info`` with the supplied list, and
+    propagates the new route set to workers in one batch after commit.
+    Per-entry failures (e.g. circuit not registered yet, race against
+    delete) are reported in the response without aborting the call.
+    """
+
+    endpoints: list[UpdateRoutesItem] = Field(
+        ...,
+        description=(
+            "Endpoints whose routing tables should be replaced. Entries "
+            "are processed in order and the response returns a matching "
+            "per-entry result."
         ),
     )

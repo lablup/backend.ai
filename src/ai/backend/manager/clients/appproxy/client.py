@@ -16,10 +16,12 @@ from ai.backend.common.clients.http_client.client_pool import (
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
+    BulkUpdateRoutesRequest,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkCreateEndpointResponse,
     BulkDeleteEndpointResponse,
+    BulkUpdateRoutesResponse,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -149,6 +151,30 @@ class AppProxyClient:
             },
         ):
             pass
+
+    @appproxy_client_resilience.apply()
+    async def bulk_update_routes(
+        self,
+        body: BulkUpdateRoutesRequest,
+    ) -> BulkUpdateRoutesResponse:
+        """Replace routing tables for many endpoints in a single coordinator call.
+
+        AppProxy commits the new ``circuit.route_info`` set in one
+        transaction and then propagates per circuit; per-entry failures
+        (e.g. circuit not yet registered) come back in the response so
+        the caller can retry on the next sync cycle without aborting
+        the whole batch.
+        """
+        async with self._client_session.post(
+            "/v2/endpoints/bulk/routes",
+            json=body.model_dump(mode="json"),
+            headers={
+                "X-BackendAI-Token": self._token,
+            },
+        ) as resp:
+            resp.raise_for_status()
+            payload = await resp.json()
+            return BulkUpdateRoutesResponse.model_validate(payload)
 
     @appproxy_client_resilience.apply()
     async def delete_endpoints_bulk(

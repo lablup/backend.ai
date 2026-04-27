@@ -17,10 +17,13 @@ from ai.backend.appproxy.coordinator.repositories.endpoint import (
     EndpointRepository,
     SyncedEndpoint,
 )
+from ai.backend.appproxy.coordinator.types import CircuitRouteUpdateItem
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     CreatedEndpointItem,
     CreateEndpointItem,
     DeletedEndpointItem,
+    UpdatedRoutesItem,
+    UpdateRoutesItem,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging import BraceStyleAdapter
@@ -66,6 +69,69 @@ class EndpointService:
         circuits = await self._repository.delete_endpoints([deployment_id])
         if circuits:
             await self._circuit_manager.unload_circuits(circuits)
+
+    async def update_routes_bulk(
+        self,
+        items: list[UpdateRoutesItem],
+    ) -> list[UpdatedRoutesItem]:
+        """Bulk-replace routing tables for many endpoints.
+
+        Repository commits the new ``circuit.route_info`` set in a
+        single transaction; this layer then fans the change out to the
+        affected workers (each worker call acquires its own circuit
+        lock). Worker propagation failures don't roll back the DB write,
+        but we surface them as ``success=False`` so the manager retries
+        on the next short cycle and converges.
+        """
+        if not items:
+            return []
+        try:
+            results = await self._repository.update_routes(items)
+        except Exception as exc:
+            log.warning("Bulk routes update failed: {}", exc)
+            return [
+                UpdatedRoutesItem(
+                    deployment_id=item.deployment_id,
+                    success=False,
+                    error=str(exc),
+                )
+                for item in items
+            ]
+
+        update_items = [
+            CircuitRouteUpdateItem(circuit=result.circuit, old_routes=result.old_routes)
+            for result in results
+            if result.success and result.circuit is not None
+        ]
+        if update_items:
+            try:
+                await self._circuit_manager.update_circuit_routes_bulk(update_items)
+            except Exception as exc:
+                # Locks are per-circuit but the bulk propagation either
+                # completes or aborts as a unit (one Traefik put_prefix
+                # / one event broadcast loop). On failure the DB write
+                # is already committed, so we mark every propagated
+                # entry as failed and let the manager retry on the
+                # next short cycle.
+                log.warning("Bulk worker propagation failed: {}", exc)
+                propagated_ids = {item.circuit.endpoint_id for item in update_items}
+                for result in results:
+                    if (
+                        result.success
+                        and result.circuit is not None
+                        and (result.circuit.endpoint_id in propagated_ids)
+                    ):
+                        result.success = False
+                        result.error = f"Worker propagation failed: {exc}"
+
+        return [
+            UpdatedRoutesItem(
+                deployment_id=result.deployment_id,
+                success=result.success,
+                error=result.error,
+            )
+            for result in results
+        ]
 
     async def delete_endpoints_bulk(
         self,

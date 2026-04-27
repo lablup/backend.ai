@@ -60,9 +60,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
 )
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    EndpointRouteListUpdatedEvent,
-)
 from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
@@ -2074,31 +2071,6 @@ class AgentRegistry:
 
         wsproxy_client = self._load_app_proxy_client(wsproxy_addr, wsproxy_api_token)
         await wsproxy_client.delete_endpoint(endpoint.id)
-
-    async def notify_endpoint_route_update_to_appproxy(self, endpoint_id: uuid.UUID) -> None:
-        async with self.db.begin_readonly_session() as db_sess:
-            endpoint = await EndpointRow.get(
-                db_sess,
-                endpoint_id,
-                load_created_user=True,
-                load_session_owner=True,
-                load_revisions=True,
-                load_routes=True,
-            )
-            connection_info = await endpoint.generate_route_info(db_sess)
-            active_rev = endpoint._find_active_revision()
-            if active_rev is None or active_rev.model is None:
-                raise InvalidAPIParameters("Model not set for endpoint")
-            endpoint_data = endpoint.to_data()
-
-        health_check_config = self._resolve_health_check(endpoint_data)
-        await self.valkey_live.update_appproxy_redis_info(
-            endpoint.id,
-            connection_info,
-            health_check_config,
-        )
-
-        await self.event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint.id))
 
 
 async def check_scaling_group(

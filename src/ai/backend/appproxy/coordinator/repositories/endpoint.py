@@ -36,13 +36,17 @@ from ai.backend.appproxy.common.types import (
     EndpointConfig,
     FrontendMode,
     ProxyProtocol,
+    RouteInfo,
     SessionConfig,
 )
 from ai.backend.appproxy.coordinator.errors import InvalidURLError
 from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
 from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
-from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import CreateEndpointItem
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
+    CreateEndpointItem,
+    UpdateRoutesItem,
+)
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging import BraceStyleAdapter
 
@@ -57,6 +61,22 @@ class SyncedEndpoint:
     url: URL
     health_check_enabled: bool
     new_circuit: Circuit | None
+
+
+@dataclass
+class UpdatedRouteSet:
+    """One endpoint's routing-table update result.
+
+    ``circuit`` and ``old_routes`` are only populated on success so the
+    service layer can fan the new route set out to workers after the
+    transaction commits.
+    """
+
+    deployment_id: DeploymentID
+    success: bool
+    error: str | None
+    circuit: Circuit | None
+    old_routes: list[RouteInfo]
 
 
 class EndpointRepository:
@@ -146,6 +166,86 @@ class EndpointRepository:
             for item in items:
                 results.append(
                     await self._sync_one(sess, item, endpoints_by_id, circuits_by_endpoint)
+                )
+
+        return results
+
+    async def update_routes(
+        self,
+        items: list[UpdateRoutesItem],
+    ) -> list[UpdatedRouteSet]:
+        """Bulk-replace routing tables for many endpoints in one transaction.
+
+        One SELECT batches every circuit lookup so this path costs O(1)
+        DB roundtrips instead of one per endpoint. Per-entry errors
+        (no circuit registered yet) are reported in the result without
+        aborting the call so a partial set of endpoints can still be
+        synced. The service layer reads ``circuit`` / ``old_routes`` to
+        fan changes out to workers after commit.
+        """
+        if not items:
+            return []
+
+        deployment_ids = [item.deployment_id for item in items]
+        items_by_id: dict[UUID, UpdateRoutesItem] = {item.deployment_id: item for item in items}
+
+        results: list[UpdatedRouteSet] = []
+
+        async with self._begin_session_read_committed() as sess:
+            circuit_rows = (
+                await sess.scalars(
+                    sa.select(Circuit).where(Circuit.endpoint_id.in_(deployment_ids))
+                )
+            ).all()
+            circuits_by_endpoint: dict[UUID, Circuit] = {
+                c.endpoint_id: c for c in circuit_rows if c.endpoint_id is not None
+            }
+
+            for deployment_id in deployment_ids:
+                circuit = circuits_by_endpoint.get(deployment_id)
+                if circuit is None:
+                    # Manager pushes routes for any HEALTHY route; the
+                    # deployment may not yet have its endpoint registered
+                    # if a sync race happens. Mark as failed so the
+                    # manager retries on the next short cycle.
+                    results.append(
+                        UpdatedRouteSet(
+                            deployment_id=DeploymentID(deployment_id),
+                            success=False,
+                            error="No circuit registered for this endpoint yet.",
+                            circuit=None,
+                            old_routes=[],
+                        )
+                    )
+                    continue
+
+                item = items_by_id[deployment_id]
+                new_routes = [
+                    RouteInfo(
+                        session_id=entry.session_id,
+                        session_name=None,
+                        route_id=entry.route_id,
+                        kernel_host=entry.kernel_host,
+                        kernel_port=entry.kernel_port,
+                        # Inference circuits are always HTTP; manager does
+                        # not push traffic_ratio yet (planned), so the
+                        # legacy default keeps every route equal-weighted.
+                        protocol=ProxyProtocol.HTTP,
+                        traffic_ratio=1.0,
+                    )
+                    for entry in item.routes
+                ]
+                old_routes = list(circuit.route_info or [])
+                circuit.route_info = new_routes
+
+                results.append(
+                    UpdatedRouteSet(
+                        deployment_id=DeploymentID(deployment_id),
+                        success=True,
+                        error=None,
+                        circuit=circuit,
+                        old_routes=old_routes,
+                    )
                 )
 
         return results

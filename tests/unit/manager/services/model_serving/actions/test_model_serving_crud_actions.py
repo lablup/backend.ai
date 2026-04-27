@@ -142,6 +142,12 @@ class ModelServingCRUDBaseFixtures:
         return mock
 
     @pytest.fixture
+    def mock_route_controller(self) -> MagicMock:
+        mock = MagicMock()
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
     def mock_runtime_variant_repository(self) -> MagicMock:
         return MagicMock(spec=RuntimeVariantRepository)
 
@@ -160,6 +166,7 @@ class ModelServingCRUDBaseFixtures:
         mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
+        mock_route_controller: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -174,6 +181,7 @@ class ModelServingCRUDBaseFixtures:
             runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            route_controller=mock_route_controller,
         )
 
     @pytest.fixture
@@ -393,17 +401,10 @@ class TestForceSync(ModelServingCRUDBaseFixtures):
         )
 
     @pytest.fixture
-    def mock_notify_appproxy(self, mocker: Any, mock_agent_registry: Any) -> AsyncMock:
-        mock = cast(
-            AsyncMock,
-            mocker.patch.object(
-                mock_agent_registry,
-                "notify_endpoint_route_update_to_appproxy",
-                new_callable=AsyncMock,
-            ),
-        )
-        mock.return_value = None
-        return mock
+    def mock_notify_appproxy(self, mock_route_controller: MagicMock) -> AsyncMock:
+        # ForceSync now hands off via the route controller's lifecycle
+        # hint instead of touching AppProxy directly from the API path.
+        return cast(AsyncMock, mock_route_controller.mark_lifecycle_needed)
 
     def _make_validation_data(self, user_data: UserData) -> MagicMock:
         return MagicMock(
@@ -421,7 +422,7 @@ class TestForceSync(ModelServingCRUDBaseFixtures):
         user_data: UserData,
         service_id: uuid.UUID,
     ) -> None:
-        """Valid service_id returns success=true with notify called once."""
+        """Valid service_id returns success=true with the route controller hint marked once."""
         mock_get_endpoint_access_validation_data.return_value = self._make_validation_data(
             user_data
         )
@@ -430,7 +431,7 @@ class TestForceSync(ModelServingCRUDBaseFixtures):
         result = await model_serving_processors.force_sync.wait_for_complete(action)
 
         assert result.success is True
-        mock_notify_appproxy.assert_called_once_with(service_id)
+        mock_notify_appproxy.assert_awaited_once()
 
     async def test_non_existent_service_raises(
         self,

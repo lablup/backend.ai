@@ -17,6 +17,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -61,6 +62,7 @@ class SokovanOrchestratorInput:
     resource_usage_repository: ResourceUsageHistoryRepository
     config_provider: ManagerConfigProvider
     agent_client_pool: AgentClientPool
+    appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
@@ -110,13 +112,12 @@ class SokovanOrchestratorDependency(
         # Create scheduler components
         scheduler_components = create_default_scheduler_components(
             setup_input.scheduler_repository,
-            setup_input.deployment_repository,
             setup_input.fair_share_repository,
             setup_input.config_provider,
             setup_input.agent_client_pool,
             setup_input.network_plugin_ctx,
-            setup_input.event_producer,
             setup_input.valkey_schedule,
+            setup_input.route_controller,
         )
 
         # Create HTTP client pool for deployment operations
@@ -149,6 +150,7 @@ class SokovanOrchestratorDependency(
             scheduling_controller=setup_input.scheduling_controller,
             client_pool=client_pool,
             service_discovery=setup_input.service_discovery,
+            appproxy_client_pool=setup_input.appproxy_client_pool,
         )
 
         # Create fair share components

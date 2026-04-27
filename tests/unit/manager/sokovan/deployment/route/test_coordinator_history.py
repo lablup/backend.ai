@@ -296,6 +296,7 @@ def coordinator_with_provisioning_routes(
         scheduling_controller=mock_scheduling_controller,
         client_pool=mock_client_pool,
         service_discovery=mock_service_discovery,
+        appproxy_client_pool=MagicMock(),
     )
     yield coordinator
 
@@ -323,6 +324,7 @@ def coordinator_without_routes(
         scheduling_controller=mock_scheduling_controller,
         client_pool=mock_client_pool,
         service_discovery=mock_service_discovery,
+        appproxy_client_pool=MagicMock(),
     )
     yield coordinator
 
