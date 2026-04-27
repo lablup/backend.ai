@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
-from dotenv import find_dotenv, load_dotenv
 from yarl import URL
 
 if TYPE_CHECKING:
@@ -28,17 +27,6 @@ DEFAULTS = {
     "api_version": "v9.20250722",
     "skip_ssl_verification": False,
 }
-
-
-def load_cwd_dotenv() -> None:
-    """Load ``.env`` from the current working directory (walking upward).
-
-    Called from the v2 CLI entry point so all v2 subcommands see
-    ``BACKEND_*`` variables defined in a project-local ``.env``. Mirrors v1
-    CLI behavior; ``override=True`` preserves v1 semantics where ``.env``
-    wins over pre-existing shell env vars.
-    """
-    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
 
 
 @dataclass(frozen=True)

@@ -29,9 +29,9 @@ def v2() -> None:
     # when the inner group is invoked directly (e.g. tests, REPL), so we
     # mirror the wrapper's `.env` auto-load here as a safety net.
     # `load_dotenv` is idempotent — running on both paths is harmless.
-    from .helpers import load_cwd_dotenv
+    from dotenv import find_dotenv, load_dotenv
 
-    load_cwd_dotenv()
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
 
 
 # Infrastructure commands
