@@ -41,3 +41,6 @@ mkdir -p "$SCENARIO_STATE_DIR"
 # Temp dir for upload/download artifacts
 export SCENARIO_TMP_DIR="${SCENARIO_TMP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.tmp}"
 mkdir -p "$SCENARIO_TMP_DIR"
+
+# Shared Python helpers used by both lib/common.sh and individual scenarios.
+export SCN_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/py"

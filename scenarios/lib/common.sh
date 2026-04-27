@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for scenario scripts.
+# Shared helpers for scenario scripts. Most JSON parsing lives in $SCN_PY/*.py.
 
 # ---- Colors / logging ----
 if [[ -t 1 ]]; then
@@ -77,138 +77,46 @@ wait_until() {
 # ---- ID lookup helpers ----
 
 lookup_project_id() {
-    local name="$1"
-    ./bai admin project search --limit 50 2>&1 | NAME="$name" python3 -c "
-import json, sys, os
-target = os.environ['NAME']
-for it in json.load(sys.stdin).get('items', []):
-    if it.get('basic_info', {}).get('name') == target:
-        print(it['id']); break
-"
+    ./bai admin project search --limit 50 2>&1 | NAME="$1" python3 "$SCN_PY/lookup_project_id.py"
 }
 
 lookup_user_id() {
-    local email="$1"
-    ./bai admin user search --email-contains "$email" --limit 5 2>&1 | EMAIL="$email" python3 -c "
-import json, sys, os
-target = os.environ['EMAIL']
-for it in json.load(sys.stdin).get('items', []):
-    info = it.get('basic_info') or {}
-    if info.get('email') == target or it.get('email') == target:
-        print(it['id']); break
-"
+    ./bai admin user search --email-contains "$1" --limit 5 2>&1 | EMAIL="$1" python3 "$SCN_PY/lookup_user_id.py"
 }
 
 lookup_image_id() {
-    local name="$1"
-    ./bai admin image search --name-contains "$name" --limit 50 2>&1 | NAME="$name" python3 -c "
-import json, sys, os
-target = os.environ['NAME']
-for it in json.load(sys.stdin).get('items', []):
-    if it.get('name') == target:
-        print(it['id']); break
-"
+    ./bai admin image search --name-contains "$1" --limit 50 2>&1 | NAME="$1" python3 "$SCN_PY/lookup_image_id.py"
 }
 
 # Skips deleted states. Used from a user context (user-owned vfolders).
 lookup_my_vfolder_id() {
-    local name="$1"
-    ./bai vfolder my-search --limit 200 2>&1 | NAME="$name" python3 -c "
-import json, sys, os
-target = os.environ['NAME']
-DELETED = {'delete-pending','delete-ongoing','delete-complete','delete-error','delete-aborted'}
-for it in json.load(sys.stdin).get('items', []):
-    name_v = (it.get('metadata') or {}).get('name') or it.get('name')
-    if name_v == target and it.get('status') not in DELETED:
-        print(it['id']); break
-"
+    ./bai vfolder my-search --limit 200 2>&1 | NAME="$1" python3 "$SCN_PY/lookup_vfolder_id.py"
 }
 
 # Admin context: any vfolder by exact name, skipping deleted.
 lookup_admin_vfolder_id() {
-    local name="$1"
-    ./bai vfolder admin-search --limit 500 2>&1 | NAME="$name" python3 -c "
-import json, sys, os
-target = os.environ['NAME']
-DELETED = {'delete-pending','delete-ongoing','delete-complete','delete-error','delete-aborted'}
-try: d = json.load(sys.stdin)
-except Exception: sys.exit(0)
-for it in d.get('items', []):
-    name = (it.get('metadata') or {}).get('name') or it.get('name') or ''
-    if name == target and it.get('status') not in DELETED:
-        print(it['id']); break
-"
+    ./bai vfolder admin-search --limit 500 2>&1 | NAME="$1" python3 "$SCN_PY/lookup_vfolder_id.py"
 }
 
 # Project-scoped vfolder lookup (caller chooses whether admin or member).
 lookup_project_vfolder_id() {
-    local pid="$1" name="$2"
-    ./bai vfolder project-search "$pid" --limit 200 2>/dev/null | NAME="$name" python3 -c "
-import json, sys, os
-target = os.environ['NAME']
-DELETED = {'delete-pending','delete-ongoing','delete-complete','delete-error','delete-aborted'}
-try: d = json.load(sys.stdin)
-except Exception: sys.exit(0)
-for it in d.get('items', []):
-    md = it.get('metadata') or {}
-    if (md.get('name') or it.get('name')) != target: continue
-    if it.get('status') in DELETED: continue
-    print(it['id']); break
-"
+    ./bai vfolder project-search "$1" --limit 200 2>/dev/null | NAME="$2" python3 "$SCN_PY/lookup_vfolder_id.py"
 }
 
 lookup_card_id() {
-    local name="$1"
-    ./bai admin model-card search --name-contains "$name" --limit 10 2>&1 | NAME="$name" python3 -c "
-import json, sys, os
-target = os.environ['NAME']
-try: d = json.load(sys.stdin)
-except Exception: sys.exit(0)
-for it in d.get('items', []):
-    if (it.get('name') or '') == target:
-        print(it['id']); break
-"
+    ./bai admin model-card search --name-contains "$1" --limit 10 2>&1 | NAME="$1" python3 "$SCN_PY/lookup_card_id.py"
 }
 
-# ---- Response parsers ----
+# ---- Response parsers (read JSON from stdin) ----
 
-# Extract session id from `bai session enqueue` JSON. Reads stdin.
-session_id_from() {
-    python3 -c "
-import json, sys
-try: d = json.load(sys.stdin)
-except Exception: sys.exit(1)
-sid = (d.get('session') or {}).get('id') or d.get('id') or d.get('session_id')
-if sid: print(sid)
-"
-}
-
-# Extract deployment id from `bai deployment create` / `model-card deploy`. Reads stdin.
-deployment_id_from() {
-    python3 -c "
-import json, sys
-try: d = json.load(sys.stdin)
-except Exception: sys.exit(1)
-print(d.get('id') or d.get('deployment_id') or d.get('deployment',{}).get('id') or '')
-"
-}
+session_id_from()    { python3 "$SCN_PY/session_id_from.py"; }
+deployment_id_from() { python3 "$SCN_PY/deployment_id_from.py"; }
 
 # ---- Session state machine ----
 
 # Print live status of a session id (querying current user's my-search).
 session_status() {
-    local sid="$1"
-    SID="$sid" ./bai my session search --limit 50 2>/dev/null | SID="$sid" python3 -c "
-import json, sys, os
-sid = os.environ['SID']
-try: d = json.load(sys.stdin)
-except Exception: print('NOT_FOUND'); sys.exit(0)
-for it in d.get('items', []):
-    if it.get('id') == sid:
-        print((it.get('lifecycle') or {}).get('status') or it.get('status', 'UNKNOWN'))
-        sys.exit(0)
-print('NOT_FOUND')
-"
+    SID="$1" ./bai my session search --limit 50 2>/dev/null | SID="$1" python3 "$SCN_PY/session_status.py"
 }
 
 # wait_session_status <sid> <iters> <interval> <state> [<state>...]

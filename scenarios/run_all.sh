@@ -13,22 +13,22 @@ source scenarios/lib/env.sh
 source scenarios/lib/common.sh
 
 SCRIPTS=(
-    scenarios/00_setup.sh
-    scenarios/01_vfolder_lifecycle.sh
-    scenarios/02_session_lifecycle.sh
-    scenarios/03_model_card_deploy.sh
-    scenarios/04_deployment_revision.sh
-    scenarios/05_teardown_verification.sh
-    scenarios/06_multi_user_access.sh
-    scenarios/07_vfolder_invite_clone.sh
-    scenarios/08_cross_project_isolation.sh
-    scenarios/09_vfolder_mounted_delete.sh
-    scenarios/10_vfolder_cloneable_false.sh
-    scenarios/11_vfolder_bulk_ops.sh
-    scenarios/12_vfolder_file_io.sh
-    scenarios/13_session_exec_logs.sh
-    scenarios/14_deployment_endpoint_serve.sh
-    scenarios/15_session_concurrency_cap.sh
+    scenarios/00_setup/run.sh
+    scenarios/01_vfolder_lifecycle/run.sh
+    scenarios/02_session_lifecycle/run.sh
+    scenarios/03_model_card_deploy/run.sh
+    scenarios/04_deployment_revision/run.sh
+    scenarios/05_teardown_verification/run.sh
+    scenarios/06_multi_user_access/run.sh
+    scenarios/07_vfolder_invite_clone/run.sh
+    scenarios/08_cross_project_isolation/run.sh
+    scenarios/09_vfolder_mounted_delete/run.sh
+    scenarios/10_vfolder_cloneable_false/run.sh
+    scenarios/11_vfolder_bulk_ops/run.sh
+    scenarios/12_vfolder_file_io/run.sh
+    scenarios/13_session_exec_logs/run.sh
+    scenarios/14_deployment_endpoint_serve/run.sh
+    scenarios/15_session_concurrency_cap/run.sh
 )
 
 if [[ -n "${ONLY:-}" ]]; then
@@ -53,9 +53,9 @@ for script in "${SCRIPTS[@]}"; do
 done
 
 if [[ -z "${SKIP_TEARDOWN:-}" ]]; then
-    bash scenarios/99_teardown.sh \
-        && PASSED+=("scenarios/99_teardown.sh") \
-        || FAILED+=("scenarios/99_teardown.sh")
+    bash scenarios/99_teardown/run.sh \
+        && PASSED+=("scenarios/99_teardown/run.sh") \
+        || FAILED+=("scenarios/99_teardown/run.sh")
 fi
 
 printf '\n%s========================================================================%s\n' "$_C_BOLD" "$_C_RESET"
