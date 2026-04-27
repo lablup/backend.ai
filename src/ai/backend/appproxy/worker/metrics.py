@@ -2,7 +2,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Final
+from typing import Any
 from uuid import UUID
 
 from prometheus_client.parser import text_string_to_metric_families
@@ -27,8 +27,6 @@ from .types import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-CACHE_LIFESPAN: Final[int] = 120
 
 
 def add_matrices(*ms: tuple[float | int | Decimal, ...]) -> tuple[Decimal, ...]:
@@ -404,7 +402,6 @@ async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> N
                                     sum=replica_inference_metrics.sum,
                                 )
 
-        # push to the Redis server
         app_metrics_updates = {
             circuit.endpoint_id: {
                 key: obj.to_serializable_dict()
@@ -435,12 +432,6 @@ async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> N
                 "stats: replica_updates: {}",
                 replica_metrics_updates,
             )
-
-        await root_ctx.valkey_stat.store_inference_metrics(
-            app_metrics_updates,
-            replica_metrics_updates,
-            CACHE_LIFESPAN,
-        )
     except Exception:
         log.exception("collect_inference_metrics(): error while collecting metric:")
         raise

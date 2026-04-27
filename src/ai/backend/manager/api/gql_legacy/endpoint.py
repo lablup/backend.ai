@@ -4,7 +4,7 @@ import datetime
 import decimal
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 import graphene
@@ -963,11 +963,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         return errors
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(
-            graph_ctx, "EndpointStatistics.by_endpoint"
-        )
-        return cast(Mapping[str, Any] | None, await loader.load(self.endpoint_id))
+        raise InvalidAPIParameters("Endpoint live_stat is no longer supported.")
 
 
 class EndpointList(graphene.ObjectType):  # type: ignore[misc]

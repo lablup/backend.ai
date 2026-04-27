@@ -56,22 +56,3 @@ class EndpointStatistics:
     ) -> Sequence[Mapping[str, Any] | None]:
         endpoint_id_strs = [str(endpoint_id) for endpoint_id in endpoint_ids]
         return await valkey_stat_client.get_inference_app_statistics_batch(endpoint_id_strs)
-
-    @classmethod
-    async def batch_load_by_endpoint(
-        cls,
-        ctx: GraphQueryContext,
-        endpoint_ids: Sequence[UUID],
-    ) -> Sequence[Mapping[str, Any] | None]:
-        return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat, endpoint_ids)
-
-    @classmethod
-    async def batch_load_by_replica(
-        cls,
-        ctx: GraphQueryContext,
-        endpoint_replica_ids: Sequence[tuple[UUID, UUID]],
-    ) -> Sequence[Mapping[str, Any] | None]:
-        endpoint_replica_pairs = [
-            (str(endpoint_id), str(replica_id)) for endpoint_id, replica_id in endpoint_replica_ids
-        ]
-        return await ctx.valkey_stat.get_inference_replica_statistics_batch(endpoint_replica_pairs)
