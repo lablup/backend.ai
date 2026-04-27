@@ -19,7 +19,7 @@ def register_v2_app_config_policy_routes(
 ) -> RouteRegistry:
     """Register all v2 app-config policy routes.
 
-    Reads (`GET /{config_name}`, `POST /search`) are available to any
+    Reads (`GET /{policy_id}`, `POST /search`) are available to any
     authenticated user. Writes are bulk-only and admin-only —
     `/bulk-create`, `/bulk-update`, `/bulk-purge`.
     """
@@ -27,7 +27,7 @@ def register_v2_app_config_policy_routes(
 
     # Reads
     reg.add("POST", "/search", handler.search, middlewares=[auth_required])
-    reg.add("GET", "/{config_name}", handler.get, middlewares=[auth_required])
+    reg.add("GET", "/{policy_id}", handler.get, middlewares=[auth_required])
     # Admin bulk writes
     reg.add("POST", "/bulk-create", handler.admin_bulk_create, middlewares=[superadmin_required])
     reg.add("POST", "/bulk-update", handler.admin_bulk_update, middlewares=[superadmin_required])

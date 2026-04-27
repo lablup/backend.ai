@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.app_config_policy.request import (
     SearchAppConfigPoliciesInput,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.rest.v2.path_params import AppConfigPolicyConfigNamePathParam
+from ai.backend.manager.api.rest.v2.path_params import AppConfigPolicyIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.app_config_policy import AppConfigPolicyAdapter
@@ -37,10 +37,10 @@ class V2AppConfigPolicyHandler:
 
     async def get(
         self,
-        path: PathParam[AppConfigPolicyConfigNamePathParam],
+        path: PathParam[AppConfigPolicyIdPathParam],
     ) -> APIResponse:
-        """Read a single policy by `config_name` (any authenticated user)."""
-        result = await self._adapter.get(path.parsed.config_name)
+        """Read a single policy by row id (any authenticated user)."""
+        result = await self._adapter.get(path.parsed.policy_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search(
@@ -73,6 +73,6 @@ class V2AppConfigPolicyHandler:
         self,
         body: BodyParam[AdminBulkPurgeAppConfigPoliciesInput],
     ) -> APIResponse:
-        """Hard-delete (admin only); referenced `config_name`s fail per-item."""
+        """Hard-delete by row id (admin only); rows still referenced by fragments fail per-item."""
         result = await self._adapter.admin_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
