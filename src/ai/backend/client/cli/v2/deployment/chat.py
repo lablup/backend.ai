@@ -70,9 +70,9 @@ def chat(
     import json
     import sys
 
-    from ai.backend.client.v2.domains_v2.inference_chat import (
-        InferenceChatAuthError,
-        InferenceChatClient,
+    from ai.backend.client.v2.deployment_chat import (
+        DeploymentChatAuthError,
+        DeploymentChatClient,
     )
 
     config = load_v2_config()
@@ -87,7 +87,7 @@ def chat(
     extra_body: dict[str, Any] = params
     entry = cache.get(deployment_id)
 
-    async def _resolve_endpoint() -> DeploymentChatCacheEntry:
+    async def _ensure_endpoint_entry() -> DeploymentChatCacheEntry:
         if entry is not None and entry.endpoint_url:
             return entry
         registry = await create_v2_registry(config)
@@ -103,7 +103,6 @@ def chat(
             )
         new_entry = DeploymentChatCacheEntry(
             endpoint_url=endpoint_url,
-            api_key=entry.api_key if entry is not None else None,
             default_model=entry.default_model if entry is not None else None,
             last_synced_at=datetime.now(UTC),
         )
@@ -114,8 +113,8 @@ def chat(
     async def _run() -> None:
         from ai.backend.client.exceptions import BackendAPIError
 
-        resolved = await _resolve_endpoint()
-        request_model = model or resolved.default_model
+        endpoint_entry = await _ensure_endpoint_entry()
+        request_model = model or endpoint_entry.default_model
         if request_model is None:
             raise click.ClickException(
                 f"No --model given and no default_model cached for deployment {deployment_id}.\n"
@@ -129,23 +128,18 @@ def chat(
             "model": request_model,
             "messages": [{"role": "user", "content": content}],
         }
-        async with InferenceChatClient(
+        api_key = cache.get_token(deployment_id)
+        async with DeploymentChatClient(
             skip_ssl_verification=config.skip_ssl_verification,
         ) as client:
             try:
                 response = await client.chat_completion(
-                    resolved.endpoint_url,
-                    resolved.api_key,
+                    endpoint_entry.endpoint_url,
+                    api_key,
                     body,
                 )
-            except InferenceChatAuthError as e:
-                invalidated = DeploymentChatCacheEntry(
-                    endpoint_url=resolved.endpoint_url,
-                    api_key=None,
-                    default_model=resolved.default_model,
-                    last_synced_at=datetime.now(UTC),
-                )
-                cache.upsert(deployment_id, invalidated)
+            except DeploymentChatAuthError as e:
+                cache.clear_token(deployment_id)
                 save_chat_cache(cache)
                 raise click.ClickException(
                     f"The inference endpoint rejected the configured API key for "

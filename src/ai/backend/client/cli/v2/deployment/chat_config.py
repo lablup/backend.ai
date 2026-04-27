@@ -94,7 +94,7 @@ def set_(
     elif api_key is not None:
         resolved_key = api_key
     else:
-        resolved_key = existing.api_key if existing is not None else None
+        resolved_key = cache.get_token(deployment_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(config)
@@ -123,11 +123,14 @@ def set_(
             deployment_id,
             DeploymentChatCacheEntry(
                 endpoint_url=endpoint_url,
-                api_key=resolved_key,
                 default_model=served_model,
                 last_synced_at=datetime.now(UTC),
             ),
         )
+        if resolved_key is None:
+            cache.clear_token(deployment_id)
+        else:
+            cache.set_token(deployment_id, resolved_key)
         save_chat_cache(cache)
         click.echo(f"Updated chat cache entry for deployment {deployment_id}.")
         if served_model:
@@ -150,15 +153,15 @@ async def _discover_model(
     does not contain any model entries.
     """
     from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-    from ai.backend.client.v2.domains_v2.inference_chat import (
-        InferenceChatAuthError,
-        InferenceChatClient,
+    from ai.backend.client.v2.deployment_chat import (
+        DeploymentChatAuthError,
+        DeploymentChatClient,
     )
 
-    async with InferenceChatClient(skip_ssl_verification=skip_ssl_verification) as client:
+    async with DeploymentChatClient(skip_ssl_verification=skip_ssl_verification) as client:
         try:
             payload = await client.list_models(endpoint_url, api_key)
-        except (InferenceChatAuthError, BackendAPIError, BackendClientError):
+        except (DeploymentChatAuthError, BackendAPIError, BackendClientError):
             return fallback
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list):
@@ -180,23 +183,25 @@ def show(deployment_id: UUID | None) -> None:
 
     if deployment_id is not None:
         entry = cache.get(deployment_id)
-        if entry is None:
+        token = cache.get_token(deployment_id)
+        if entry is None and token is None:
             raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
-        _print_entry(deployment_id, entry)
+        _print_entry(deployment_id, entry, token)
         return
 
-    if not cache.entries:
+    dep_ids = set(cache.entries) | set(cache.tokens)
+    if not dep_ids:
         click.echo("No chat cache entries.")
         return
-    for dep_id, entry in cache.entries.items():
-        _print_entry(dep_id, entry)
+    for dep_id in dep_ids:
+        _print_entry(dep_id, cache.get(dep_id), cache.get_token(dep_id))
         click.echo("")
 
 
 @chat_config.command(name="clear")
 @click.argument("deployment_id", type=click.UUID)
 def clear(deployment_id: UUID) -> None:
-    """Remove the chat cache entry for a deployment."""
+    """Remove the chat cache entry and stored token for a deployment."""
     try:
         cache = load_chat_cache()
     except IncompatibleChatCacheError as e:
@@ -208,12 +213,16 @@ def clear(deployment_id: UUID) -> None:
         click.echo(f"No chat cache entry for deployment {deployment_id}.")
 
 
-def _print_entry(deployment_id: UUID, entry: DeploymentChatCacheEntry) -> None:
+def _print_entry(
+    deployment_id: UUID,
+    entry: DeploymentChatCacheEntry | None,
+    token: str | None,
+) -> None:
     click.echo(f"deployment_id : {deployment_id}")
-    click.echo(f"endpoint_url  : {entry.endpoint_url}")
-    click.echo(f"api_key       : {mask_token(entry.api_key)}")
-    click.echo(f"default_model : {entry.default_model or '-'}")
-    click.echo(f"last_synced_at: {entry.last_synced_at.isoformat()}")
+    click.echo(f"endpoint_url  : {entry.endpoint_url if entry else '-'}")
+    click.echo(f"api_key       : {mask_token(token)}")
+    click.echo(f"default_model : {(entry.default_model if entry else None) or '-'}")
+    click.echo(f"last_synced_at: {entry.last_synced_at.isoformat() if entry else '-'}")
 
 
 __all__ = ("chat_config",)
