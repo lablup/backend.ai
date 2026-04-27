@@ -17,6 +17,7 @@ services:
 
   backendai-half-db-exporter:
     image: prometheuscommunity/postgres-exporter:v0.17.1
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -29,6 +30,7 @@ services:
 
   backendai-half-redis-exporter-node01:
     image: oliver006/redis_exporter:v1.73.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -44,6 +46,7 @@ services:
 
   backendai-half-redis-exporter-node02:
     image: oliver006/redis_exporter:v1.73.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -59,6 +62,7 @@ services:
 
   backendai-half-redis-exporter-node03:
     image: oliver006/redis_exporter:v1.73.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -281,6 +285,7 @@ services:
 
   backendai-half-grafana:
     image: grafana/grafana-enterprise:11.4.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -297,6 +302,7 @@ services:
 
   backendai-half-pyroscope:
     image: grafana/pyroscope:1.9.2
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -307,6 +313,7 @@ services:
 
   backendai-half-prometheus:
     image: prom/prometheus:v3.1.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -321,6 +328,7 @@ services:
 
   backendai-half-otel-collector:
     image: otel/opentelemetry-collector-contrib:0.126.0
+    profiles: ["observability"]
     networks:
       - half
     command: ["--config=/etc/otel-collector-config.yaml"]
@@ -332,6 +340,7 @@ services:
 
   backendai-half-loki:
     image: grafana/loki:3.5.0
+    profiles: ["observability"]
     networks:
       - half
     command: -config.file=/etc/loki/local-config.yaml
@@ -342,6 +351,7 @@ services:
 
   backendai-half-tempo:
     image: grafana/tempo:2.7.2
+    profiles: ["observability"]
     networks:
       - half
     command: [ "-config.file=/etc/tempo.yaml" ]
@@ -371,6 +381,7 @@ services:
 
   backendai-half-minio:
     image: minio/minio:latest
+    profiles: ["storage"]
     restart: unless-stopped
     networks:
       - half
