@@ -62,11 +62,10 @@ Summary matrix:
 > tooling:
 > - `domain` — values semantically owned by the domain, often
 >   admin-only (e.g. a `theme` policy with `scope_sources=["domain"]`
->   and `userWritable=false`; see §7 S4).
+>  ; see §7 S4).
 > - `domain_user_defaults` — values positioned as per-user seeds the
 >   user can override (e.g. a `preferences` policy with
->   `scope_sources=["domain_user_defaults", "user"]` and
->   `userWritable=true`; see §7 S5 and S8).
+>   `scope_sources=["domain_user_defaults", "user"]`; see §7 S5 and S8).
 >
 > Both can participate in any resolved chain when the policy says so.
 
@@ -184,11 +183,11 @@ rows persist: callers "clear" a document by `*Update*`-ing with
 **A matching `app_config_policies` row is required for every write
 (required-policy invariant).** The service layer rejects items
 per-row when:
-- no policy exists for `name` (policy-not-found),
-- `scope_type ∉ policy.scope_sources`, or
-- the caller is on the my-path and `policy.user_writable = False`.
-  The admin-path ignores `user_writable` — admins may seed USER
-  rows regardless.
+- no policy exists for `name` (policy-not-found), or
+- `scope_type ∉ policy.scope_sources`.
+
+The my-path additionally rejects writes whose `scope_type` is not
+USER; the admin-path may write any allowed scope.
 
 Because every row is created under a matching policy, the merge
 chain (§5) always resolves — no "policy-less fallback" path.
@@ -217,8 +216,6 @@ class AppConfigPolicyRow(Base):
                                  # drives both the merge order (§5) and the
                                  # write allow-list. String-typed so that
                                  # adding a scope does not require migration.
-    user_writable: Mapped[bool]  # Gate for the `bulk*MyAppConfigFragments` path.
-                                 # Admin-path writes are not gated.
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime]
 
@@ -232,8 +229,8 @@ class AppConfigPolicyRow(Base):
 - **Create**: service rejects items with no matching policy
   (friendly error); FK catches any bypass path.
 - **Policy rename**: forbidden — `config_name` is immutable
-  (updates touch `scope_sources` / `user_writable` only). Removes
-  the "rename orphans configs" failure mode.
+  (updates touch `scope_sources` only). Removes the "rename
+  orphans configs" failure mode.
 - **Policy purge**: only via `adminBulkPurgeAppConfigPolicies` (§3);
   the service rejects if any AppConfigFragment row still references
   the policy. Admin purges referencing rows first, then the policy.
@@ -275,7 +272,7 @@ repositories/app_config_policy/
 | Repository                   | Methods                                                                                                              |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------|
 | `AppConfigFragmentRepository`  | Scope-parameterized CRUD (`get / get_by_id / create / update / purge`) taking an `AppConfigFragmentKey`. `search(scope, querier)` for a bound scope (via `AppConfigFragmentSearchScope`), `admin_search(querier)` for cross-scope (admin). Plus merge-specific reads that serve the merged view (`AppConfig`): `get_app_config(user_id, config_name)`, `search_app_configs(scope, querier)` (`UserAppConfigSearchScope`), and `admin_search_app_configs(querier)` for cross-user admin search. All three derive the chain in SQL via a policy join — see §5. |
-| `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources, user_writable)`, `update(config_name, scope_sources, user_writable)`, `purge(config_name)`, `search(querier)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigFragment` row still references the `config_name`. |
+| `AppConfigPolicyRepository`  | `get(config_name)`, `get_by_id(id)`, `create(config_name, scope_sources)`, `update(config_name, scope_sources)`, `purge(config_name)`, `search(querier)`. Updates do not touch `config_name` (immutable — §1). The `purge` call rejects at the service layer if any `AppConfigFragment` row still references the `config_name`. |
 
 `AppConfigFragmentRepository` plays a **dual role** — raw CRUD (served
 as `AppConfigFragment`) + merged-view reads (served as `AppConfig`,
@@ -403,9 +400,9 @@ FK-driven join surface. Exposes the six-operation shape (§1 allows
 Write orchestration for `app_config_fragments` consults policies in
 the **service layer**: for each batch the service fetches the
 distinct `name`s' policies once (batch cache), then applies §1's
-three checks (policy-not-found / `scope_type ∉ scope_sources` /
-`user_writable = False` on the my-path) before calling the
-fragment repository. `AppConfigPolicyRepository.update` refuses to change
+two checks (policy-not-found / `scope_type ∉ scope_sources`)
+before calling the fragment repository. The my-path additionally
+restricts `scope_type` to `USER`. `AppConfigPolicyRepository.update` refuses to change
 `config_name`; `.purge` rejects when any `app_config_fragments` row
 still references the policy (required-policy invariant preserved).
 
@@ -711,7 +708,6 @@ enum AppConfigOrderField {
 
 input AppConfigPolicyFilter {
   configName: StringFilter = null
-  userWritable: Boolean = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
   AND: [AppConfigPolicyFilter!] = null
@@ -779,7 +775,7 @@ type Mutation {
     input: AdminBulkCreateAppConfigPolicyInput!
   ): AdminBulkCreateAppConfigPoliciesPayload!
 
-  """Replace `scope_sources` / `user_writable`; `configName` is immutable (§1)."""
+  """Replace `scope_sources`; `configName` is immutable (§1)."""
   adminBulkUpdateAppConfigPolicies(
     input: AdminBulkUpdateAppConfigPolicyInput!
   ): AdminBulkUpdateAppConfigPoliciesPayload!
@@ -936,7 +932,6 @@ input AdminAppConfigPolicyItemInput {
   scopeSources: [String!]!
 
   """Whether the owner may write their own `USER` row (my-path gate)."""
-  userWritable: Boolean!
 }
 
 input AdminBulkCreateAppConfigPolicyInput {
@@ -1041,7 +1036,6 @@ type AppConfigPolicy implements Node {
   scopeSources: [String!]!
 
   """Gate for the `bulk*MyAppConfigFragments` path. Admin-path is ungated."""
-  userWritable: Boolean!
 
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -1707,11 +1701,10 @@ mutation SaveMyConfig($input: BulkUpdateMyAppConfigFragmentInput!) {
 - **Replace** semantics: anything the caller wants to keep must be
   sent in the same payload — there is no partial-merge or per-key
   patch.
-- **Policy**: if an `AppConfigPolicy` exists for `name` and either
-  `USER ∉ scope_sources` or `user_writable = False`, the item is
-  appended to `failed` with a policy-violation message. Clients can
-  discover this ahead of time by reading the policy via
-  `appConfigPolicy(configName:)`.
+- **Policy**: if an `AppConfigPolicy` exists for `name` and
+  `USER ∉ scope_sources`, the item is appended to `failed` with a
+  policy-violation message. Clients can discover this ahead of time
+  by reading the policy via `appConfigPolicy(configName:)`.
 - **First write vs. subsequent writes**: `bulkUpdateMyAppConfigFragments`
   places items with no USER row into `failed`. For the very first
   save of a given `name`, the client calls `bulkCreateMyAppConfigFragments`
@@ -1737,7 +1730,7 @@ mutation PublishThemePolicy(
   $input: AdminBulkCreateAppConfigPolicyInput!
 ) {
   adminBulkCreateAppConfigPolicies(input: $input) {
-    created { id configName scopeSources userWritable }
+    created { id configName scopeSources }
     failed { index configName message }
   }
 }
@@ -1750,7 +1743,6 @@ mutation PublishThemePolicy(
       {
         "configName": "theme",
         "scopeSources": ["domain"],
-        "userWritable": false
       }
     ]
   }
@@ -1761,8 +1753,8 @@ mutation PublishThemePolicy(
 - Effect:
   - Writes to `theme` at any scope other than `DOMAIN` are rejected
     at the service layer.
-  - `bulk*MyAppConfigFragments` calls targeting `theme` are rejected because
-    `user_writable = false`.
+  - `bulk*MyAppConfigFragments` calls targeting `theme` are rejected
+    because the policy's `scope_sources` does not include `USER`.
   - `myAppConfigs` entries for `theme` are resolved through the
     chain `[DOMAIN]` (single-scope — `fragments` has at most one
     element, and `config` equals that element's `config`
@@ -1772,23 +1764,23 @@ mutation PublishThemePolicy(
 
 ### S5. Varied policy shapes
 
-Same mechanics as S4 with different `scopeSources` / `userWritable`
-combinations. Each shape backs a different product decision:
+Same mechanics as S4 with different `scopeSources` combinations.
+Each shape backs a different product decision:
 
-- **`[user]`, `userWritable=true`** — purely user-local document.
+- **`[user]`** — purely user-local document.
   Admin seeding and domain defaults play no role; the resolved view
   is either the user's own row or nothing. Fits "this tab's column
   order", "editor keybindings", or other state the user alone
   authors.
-- **`[domain]`, `userWritable=false`** — strict admin-owned document
+- **`[domain]`** — strict admin-owned document
   with no per-user override. Fits the default `theme` setup used in
   S4 / S8.
-- **`[domain, user]`, `userWritable=true`** — admin establishes a
+- **`[domain, user]`** — admin establishes a
   baseline at `DOMAIN`, users may override it on their own `USER`
   row. The per-user merge produces the domain value plus whatever
   the user set on top. Site operators pick this shape when they want
   a default everyone starts with but individuals can customize.
-- **`[domain, domain_user_defaults, user]`, `userWritable=true`** —
+- **`[domain, domain_user_defaults, user]`** —
   three-layer chain. The admin can publish a domain-wide value
   (`DOMAIN`) as the strongest admin signal, a softer per-user seed
   (`DOMAIN_USER_DEFAULTS`) that newcomers inherit at boot, and then
@@ -1797,8 +1789,7 @@ combinations. Each shape backs a different product decision:
   each user.
 
 Any of the above may be switched live: an admin editing
-`adminBulkUpdateAppConfigPolicies` for `theme` from `[domain]` +
-`userWritable=false` to `[domain, user]` + `userWritable=true`
+`adminBulkUpdateAppConfigPolicies` for `theme` from `[domain]` to `[domain, user]`
 immediately loosens the document — existing admin rows remain, and
 from the next `bulkUpdateMyAppConfigFragments` onward users can layer their
 own customization on top (§7 S6).
@@ -1806,7 +1797,7 @@ own customization on top (§7 S6).
 ### S6. Promoting a document from admin-only to user-customizable
 
 A site operator initially published `theme` under the strict policy
-from S4 (`scopeSources=["domain"]`, `userWritable=false`). After
+from S4 (`scopeSources=["domain"]`). After
 user feedback, they decide individual users should be able to tweak
 accent colors on top of the domain's theme.
 
@@ -1815,7 +1806,7 @@ mutation PromoteThemePolicy(
   $input: AdminBulkUpdateAppConfigPolicyInput!
 ) {
   adminBulkUpdateAppConfigPolicies(input: $input) {
-    updated { id configName scopeSources userWritable }
+    updated { id configName scopeSources }
     failed { index configName message }
   }
 }
@@ -1828,7 +1819,6 @@ mutation PromoteThemePolicy(
       {
         "configName": "theme",
         "scopeSources": ["domain", "user"],
-        "userWritable": true
       }
     ]
   }
@@ -1845,7 +1835,7 @@ mutation PromoteThemePolicy(
     `fragments` is `[<DOMAIN row>, <USER row if present>]` and whose
     `config` is `domain ⊕ user`.
 - Reversibility: flipping the policy back to
-  `scopeSources=["domain"]` + `userWritable=false` blocks new user
+  `scopeSources=["domain"]` blocks new user
   writes and excludes `USER` rows from the resolved view, but leaves
   any pre-existing `USER` rows untouched at the DB level (they
   simply stop being read). Admins who want those rows gone target
@@ -1910,7 +1900,7 @@ mutation PurgeBadPolicy($input: AdminBulkPurgeAppConfigPolicyInput!) {
 The domain admin publishes the `preferences` document's per-user
 default — every user in the domain inherits it at merge time as the
 base for their own `USER` row. The policy for `preferences` (S5's
-"`[domain_user_defaults, user]` + `userWritable=true`" shape) admits
+"`[domain_user_defaults, user]`" shape) admits
 both admin-written `DOMAIN_USER_DEFAULTS` entries and user overrides;
 this scenario exercises the admin side. The first publish uses
 `adminBulkCreateAppConfigFragments` with `key.scopeType =
@@ -2001,9 +1991,8 @@ mutation AdminCreateAppConfigsForUser($input: AdminBulkCreateAppConfigFragmentIn
 - `adminBulkCreateAppConfigFragments` fails the item if a row already exists
   for the key; use `adminBulkUpdateAppConfigFragments` instead to overwrite.
 - Policy: if an `AppConfigPolicy` for `preferences` has `USER ∉
-  scope_sources`, the admin path still rejects the item
-  (`scope_sources` applies to both paths — admins just bypass
-  `user_writable`, not the scope list). With the usual
+  scope_sources`, the admin path still rejects the item —
+  `scope_sources` applies to both paths. With the usual
   `preferences`-style policy (`scope_sources` includes `USER`) this
   write passes.
 - The response is a list of raw `AppConfigFragment`; the target user's
@@ -2028,7 +2017,7 @@ query AuditConfigs(
       cursor
       node {
         id scopeType scopeId name config updatedAt
-        policy { configName scopeSources userWritable }
+        policy { configName scopeSources }
       }
     }
     pageInfo { hasNextPage endCursor }
