@@ -23,6 +23,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
@@ -511,7 +512,7 @@ class AuthService:
             raise InternalServerError("Error creating user account") from e
 
         # Assign the new user to the default project
-        group_name = user_data_overriden.get("group", "default")
+        group_name = user_data_overriden.get("group", DEFAULT_PROJECT_NAME)
         project_id = await self._group_repository.project_id_by_name_in_domain(
             action.domain_name, group_name
         )

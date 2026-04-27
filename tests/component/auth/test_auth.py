@@ -40,6 +40,7 @@ from ai.backend.common.dto.manager.auth.response import (
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -107,7 +108,7 @@ class _SignupDefaultProjectData:
     """Holds the test domain's ``default`` project and tracks signup-created
     user emails so the fixture can clean them up on teardown."""
 
-    group_id: uuid.UUID
+    project_id: ProjectID
     cleanup_emails: list[str]
 
 
@@ -126,11 +127,11 @@ async def signup_default_project(
     signup flow can bind new users to it. On teardown, removes any ASE rows
     scoped to this project, the signup-registered users / keypairs, and the
     project itself."""
-    data = _SignupDefaultProjectData(group_id=uuid.uuid4(), cleanup_emails=[])
+    data = _SignupDefaultProjectData(project_id=ProjectID(uuid.uuid4()), cleanup_emails=[])
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(GroupRow.__table__).values(
-                id=data.group_id,
+                id=data.project_id,
                 name="default",
                 description="Default project for signup binding test",
                 is_active=True,
@@ -142,14 +143,14 @@ async def signup_default_project(
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.delete(AssociationScopesEntitiesRow).where(
-                AssociationScopesEntitiesRow.scope_id == str(data.group_id),
+                AssociationScopesEntitiesRow.scope_id == str(data.project_id),
             ),
         )
         for email in data.cleanup_emails:
             await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
             await conn.execute(users.delete().where(users.c.email == email))
         await conn.execute(
-            GroupRow.__table__.delete().where(GroupRow.__table__.c.id == data.group_id),
+            GroupRow.__table__.delete().where(GroupRow.__table__.c.id == data.project_id),
         )
 
 
@@ -1029,7 +1030,7 @@ class TestSignup:
             ase_count = await conn.scalar(
                 sa.select(sa.func.count()).where(
                     AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(signup_default_project.group_id),
+                    AssociationScopesEntitiesRow.scope_id == str(signup_default_project.project_id),
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(user_uuid),
                 ),
