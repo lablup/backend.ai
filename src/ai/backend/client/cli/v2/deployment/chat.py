@@ -18,6 +18,11 @@ from ai.backend.client.cli.v2.deployment_chat_cache import (
     load_chat_cache,
     save_chat_cache,
 )
+from ai.backend.client.cli.v2.deployment_chat_config import (
+    IncompatibleChatConfigError,
+    load_chat_config,
+    save_chat_config,
+)
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 
 
@@ -75,11 +80,15 @@ def chat(
         DeploymentChatClient,
     )
 
-    config = load_v2_config()
+    connection = load_v2_config()
 
     try:
         cache = load_chat_cache()
     except IncompatibleChatCacheError as e:
+        raise click.ClickException(str(e)) from e
+    try:
+        chat_config = load_chat_config()
+    except IncompatibleChatConfigError as e:
         raise click.ClickException(str(e)) from e
 
     if not isinstance(params, dict):
@@ -90,7 +99,7 @@ def chat(
     async def _ensure_endpoint_entry() -> DeploymentChatCacheEntry:
         if entry is not None and entry.endpoint_url:
             return entry
-        registry = await create_v2_registry(config)
+        registry = await create_v2_registry(connection)
         try:
             deployment = await registry.deployment.get(deployment_id)
         finally:
@@ -128,9 +137,9 @@ def chat(
             "model": request_model,
             "messages": [{"role": "user", "content": content}],
         }
-        api_key = cache.get_token(deployment_id)
+        api_key = chat_config.get_token(deployment_id)
         async with DeploymentChatClient(
-            skip_ssl_verification=config.skip_ssl_verification,
+            skip_ssl_verification=connection.skip_ssl_verification,
         ) as client:
             try:
                 response = await client.chat_completion(
@@ -139,8 +148,8 @@ def chat(
                     body,
                 )
             except DeploymentChatAuthError as e:
-                cache.clear_token(deployment_id)
-                save_chat_cache(cache)
+                chat_config.clear_token(deployment_id)
+                save_chat_config(chat_config)
                 raise click.ClickException(
                     f"The inference endpoint rejected the configured API key for "
                     f"deployment {deployment_id}. The cached key has been cleared.\n"
