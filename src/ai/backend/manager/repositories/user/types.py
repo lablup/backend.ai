@@ -14,7 +14,10 @@ import sqlalchemy as sa
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
@@ -63,18 +66,22 @@ class ProjectUserSearchScope(SearchScope):
     """Required scope for searching users within a project.
 
     Used for project_users query (project member+).
-    Requires JOIN with association_groups_users table.
+    Requires JOIN with association_scopes_entities (PROJECT scope, USER entity).
     """
 
     project_id: UUID
     """Required. The project (group) to search within."""
 
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for AssocGroupUserRow."""
-        project_id = self.project_id
+        """Convert scope to a query condition for AssociationScopesEntitiesRow.
+
+        The JOIN added in db_source already filters by scope_type=PROJECT and
+        entity_type=USER, so this only narrows the scope_id to the requested project.
+        """
+        project_id_str = str(self.project_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssocGroupUserRow.group_id == project_id
+            return AssociationScopesEntitiesRow.scope_id == project_id_str
 
         return inner
 

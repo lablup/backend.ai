@@ -19,6 +19,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
@@ -26,11 +27,13 @@ from ai.backend.manager.errors.auth import (
     UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
-from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -97,13 +100,14 @@ class AuthDBSource:
     async def fetch_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
         """Fetch group membership from database."""
         async with self._db.begin() as conn:
-            query = (
-                sa.select(association_groups_users.c.group_id, association_groups_users.c.user_id)
-                .select_from(association_groups_users)
-                .where(
-                    (association_groups_users.c.group_id == group_id)
-                    & (association_groups_users.c.user_id == user_id)
-                )
+            query = sa.select(
+                AssociationScopesEntitiesRow.scope_id,
+                AssociationScopesEntitiesRow.entity_id,
+            ).where(
+                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                AssociationScopesEntitiesRow.scope_id == str(group_id),
+                AssociationScopesEntitiesRow.entity_id == str(user_id),
             )
             result = await conn.execute(query)
             row = result.first()
@@ -111,7 +115,7 @@ class AuthDBSource:
                 raise GroupMembershipNotFoundError(
                     extra_msg="No such project or you are not the member of it."
                 )
-        return GroupMembershipData(group_id=row.group_id, user_id=row.user_id)
+        return GroupMembershipData(group_id=group_id, user_id=user_id)
 
     @auth_db_source_resilience.apply()
     async def verify_email_exists(self, email: str) -> bool:

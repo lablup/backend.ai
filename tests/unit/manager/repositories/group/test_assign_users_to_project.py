@@ -646,6 +646,24 @@ class TestUnassignUsersFromProject:
 
     # --- Test cases ---
 
+    async def test_unassign_returns_unassigned_users(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        project_with_role_registered: uuid.UUID,
+        test_role: uuid.UUID,
+        same_domain_user_1: uuid.UUID,
+    ) -> None:
+        """Unassign reports the users it removed from the project scope."""
+        project_id = project_with_role_registered
+        await group_db_source.assign_users_to_project(project_id, [same_domain_user_1], test_role)
+
+        result = await group_db_source.unassign_users_from_project(
+            UserProjectEntityUnbinder(user_uuids=[same_domain_user_1], project_id=project_id)
+        )
+        assert len(result.unassigned_users) == 1
+        assert result.unassigned_users[0].uuid == same_domain_user_1
+
     async def test_unassign_deletes_scope_entity_rows(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

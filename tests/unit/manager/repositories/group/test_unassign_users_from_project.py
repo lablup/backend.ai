@@ -252,7 +252,7 @@ class TestUnassignUsersFromProject:
         assert result_uuids == set(assigned_users)
         assert result.failures == []
 
-        # Verify association rows removed
+        # Verify project-scope membership rows removed
         async with db_with_cleanup.begin_readonly_session() as session:
             remaining = (
                 await session.execute(

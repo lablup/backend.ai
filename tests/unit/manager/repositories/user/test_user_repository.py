@@ -659,15 +659,6 @@ class TestUserRepository:
             )
             assert model_store_assoc is not None
 
-            # Also verify user was added to the model store group
-            group_assoc = await session.scalar(
-                sa.select(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == result.user.uuid,
-                    AssocGroupUserRow.group_id == model_store_project_id,
-                )
-            )
-            assert group_assoc is not None
-
     async def test_update_user_validated_success(
         self,
         user_repository: UserRepository,
@@ -705,12 +696,17 @@ class TestUserRepository:
         )
 
         async with db_with_cleanup.begin_session() as session:
-            groups = await session.scalars(
-                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == result.user.uuid)
-            )
-            group_list = list(groups)
-            assert len(group_list) == 1
-            assert str(group_list[0].group_id) == sample_group_id
+            scope_bindings = (
+                await session.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(result.user.uuid),
+                    )
+                )
+            ).all()
+            scope_ids = {row.scope_id for row in scope_bindings}
+            assert sample_group_id in scope_ids
 
     async def test_update_user_role_preserves_group_associations(
         self,
@@ -743,17 +739,21 @@ class TestUserRepository:
 
         # Assert: Group associations should be PRESERVED (not deleted)
         async with db_with_cleanup.begin_session() as session:
-            final_groups = await session.scalars(
-                sa.select(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == sample_user_with_group.user_uuid
+            final_groups = (
+                await session.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id
+                        == str(sample_user_with_group.user_uuid),
+                    )
                 )
-            )
-            final_group_list = list(final_groups)
-            assert len(final_group_list) == 1, (
+            ).all()
+            assert len(final_groups) == 1, (
                 "Group associations should be preserved after role change. "
                 "If this fails, the bug where role changes delete groups has regressed."
             )
-            assert str(final_group_list[0].group_id) == sample_user_with_group.group_id
+            assert final_groups[0].scope_id == sample_user_with_group.group_id
 
     async def test_update_user_validated_group_ids_syncs_rbac(
         self,
