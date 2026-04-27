@@ -8,12 +8,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class AppConfigPolicyBulkItem:
-    """One item for `adminBulkCreate/Update` — config_name + scope chain.
-
-    `user_writable` was dropped pre-landing — user writes are blocked
-    entirely in this iteration; re-introduce when user writes are
-    enabled.
-    """
+    """One item for `adminBulkCreate/Update` — config_name + scope chain."""
 
     config_name: str
     scope_sources: Sequence[str]

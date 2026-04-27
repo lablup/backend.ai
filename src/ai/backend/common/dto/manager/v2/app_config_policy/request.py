@@ -41,11 +41,7 @@ class AppConfigPolicyOrder(BaseRequestModel):
 
 
 class AdminAppConfigPolicyItemInput(BaseRequestModel):
-    """Per-item input for `adminBulkCreate/UpdateAppConfigPolicies`.
-
-    `user_writable` is intentionally omitted — user writes are blocked
-    in this iteration; re-add when user writes are enabled.
-    """
+    """Per-item input for `adminBulkCreate/UpdateAppConfigPolicies`."""
 
     config_name: str = Field(
         min_length=1,
