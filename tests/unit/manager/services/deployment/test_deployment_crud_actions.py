@@ -362,6 +362,33 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         assert result.data is not None
         assert result.data.activeness_status == ActivenessStatus.INACTIVE
 
+    async def test_unassigned_session_id_is_none(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        endpoint_id: uuid.UUID,
+    ) -> None:
+        """Regression for BA-5838: a route without a compute session must yield
+        ``session_id=None``, not a fallback to ``route_id``."""
+        route = RouteInfo(
+            route_id=uuid.uuid4(),
+            deployment_id=DeploymentID(endpoint_id),
+            session_id=None,
+            status=RouteStatus.PROVISIONING,
+            health_status=RouteHealthStatus.NOT_CHECKED,
+            traffic_ratio=1.0,
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            revision_id=uuid.uuid4(),
+            traffic_status=RouteTrafficStatus.ACTIVE,
+        )
+        mock_deployment_repository.get_route = AsyncMock(return_value=route)
+
+        action = GetReplicaByIdAction(replica_id=route.route_id)
+        result = await processors.get_replica_by_id.wait_for_complete(action)
+
+        assert result.data is not None
+        assert result.data.session_id is None
+
 
 class TestSearchReplicas(DeploymentCRUDBaseFixtures):
     """Tests for DeploymentService.search_replicas"""
