@@ -860,7 +860,7 @@ class ModelDeploymentAccessTokenData:
 class ModelReplicaData:
     id: UUID
     revision_id: UUID
-    session_id: UUID
+    session_id: UUID | None
     readiness_status: ReadinessStatus
     liveness_status: LivenessStatus
     activeness_status: ActivenessStatus

@@ -411,7 +411,10 @@ class ReplicaNode(BaseResponseModel):
 
     id: UUID = Field(description="Replica ID")
     revision_id: UUID = Field(description="Associated revision ID")
-    session_id: UUID = Field(description="Associated session ID")
+    session_id: UUID | None = Field(
+        default=None,
+        description="Associated session ID. Null while the replica is still provisioning and no compute session has been assigned yet.",
+    )
     readiness_status: ReadinessStatus = Field(description="Readiness status")
     liveness_status: LivenessStatus = Field(description="Liveness status")
     activeness_status: ActivenessStatus = Field(description="Activeness status")
