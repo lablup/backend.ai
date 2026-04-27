@@ -126,11 +126,7 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
             description=self.description,
             rank=self.rank,
             image_id=self.image_id,
-            model_definition=(
-                self.model_definition.model_dump(by_alias=True, exclude_none=True)
-                if self.model_definition
-                else None
-            ),
+            model_definition=self.model_definition,
             resource_opts=[
                 ResourceOptsEntryData(name=e.name, value=e.value)
                 for e in (self.resource_opts or [])
