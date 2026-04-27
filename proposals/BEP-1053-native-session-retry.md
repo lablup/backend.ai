@@ -153,7 +153,7 @@ delay = min(delay, max_retry_delay or MAX_RETRY_DELAY)
 Two distinct concepts, kept separate to avoid the precedence trap of "default doubles as kill switch":
 
 - **Cluster default** in etcd: `config/manager/retry_policy_default` (ship default `max_retries=0` — no behavior change). This is a default; per-session policy wins on merge. Effective policy = deep-merge of cluster default and per-session policy.
-- **Cluster kill switch** in etcd: `config/manager/retry_disabled` (boolean, default `false`). Checked at the **top** of the decision flow, before any policy merge. When `true`, no retries are scheduled regardless of per-session policy. Useful for incident response (e.g., disabling retries cluster-wide during a registry outage that would otherwise cause a retry storm).
+- **Cluster kill switch** in etcd: `config/manager/retry_disabled` (boolean, default `false`). Loaded at startup and refreshed via the existing `EtcdConfigWatcher` (`manager/config/provider.py:20`) so changes propagate without per-event etcd reads. Checked at the **top** of the decision flow, before any policy merge, **and** by the dispatcher worker before claiming a queue row — so flipping the switch mid-incident also halts in-flight queued retries. When `true`, no retries are scheduled or dispatched regardless of per-session policy. Useful for incident response (e.g., disabling retries cluster-wide during a registry outage that would otherwise cause a retry storm).
 
 **Project / domain default is deferred.** [BEP-1052 (Scoped App Config Redesign)](BEP-1052-scoped-app-config-redesign.md) is concurrently rewriting the project / domain config surface around scoped `AppConfigFragment` rows. Adding `retry_policy_default` to the legacy project config row would conflict with that work. After BEP-1052 lands, a follow-up BEP can wire retry defaults into `AppConfigFragment` as a third precedence layer.
 
@@ -195,12 +195,30 @@ The retry decision is **folded into the existing `SessionEventHandler.handle_bat
 
 A sokovan post-processor was considered but rejected for v1: post-processors run *during* scheduling iterations, complicating idempotency and timing without adding capability the event-handler path lacks.
 
-**Dispatch primitive.** `BackgroundTaskManager.start_retriable()` (`common/bgtask/bgtask.py:444`) is **not** suitable: it accepts no `delay` parameter and fires the task immediately via `asyncio.create_task` ("retriable" refers to the task body retrying on failure, not delayed scheduling). Instead, retries are persisted to the new `session_retry_dispatch_queue` table (see Data Model). A periodic loop in the manager (a sokovan-style worker — same cadence as existing periodic tasks) claims rows where `scheduled_at <= now() AND claimed_at IS NULL` via `UPDATE ... SET claimed_at = now() RETURNING ...` (atomic claim under PostgreSQL's row lock) and invokes `SessionService.create_from_params()`. This pattern is durable across manager restarts and matches the outbox approach used by the sibling pipeline orchestrator.
+**Dispatch primitive.** `BackgroundTaskManager.start_retriable()` (`common/bgtask/bgtask.py:444`) is **not** suitable: it accepts no `delay` parameter and fires the task immediately via `asyncio.create_task` ("retriable" refers to the task body retrying on failure, not delayed scheduling). Instead, retries are persisted to the new `session_retry_dispatch_queue` table (see Data Model). A periodic loop in the manager (placed under `sokovan/` alongside other periodic workers, e.g., `sokovan/scheduler/retry_dispatcher.py`) claims **one row at a time** via:
+
+```sql
+UPDATE session_retry_dispatch_queue
+SET claimed_at = now()
+WHERE (parent_session_id, retry_count) = (
+    SELECT parent_session_id, retry_count
+    FROM session_retry_dispatch_queue
+    WHERE scheduled_at <= now()
+      AND claimed_at IS NULL
+      AND dispatched_at IS NULL
+    ORDER BY scheduled_at
+    FOR UPDATE SKIP LOCKED
+    LIMIT 1
+)
+RETURNING parent_session_id, retry_count;
+```
+
+`FOR UPDATE SKIP LOCKED` lets multiple manager replicas claim disjoint rows without contention, and `LIMIT 1` avoids multi-row claim deadlocks. The worker invokes `SessionService.create_from_params()` for the claimed row and stamps `dispatched_at = now()` on success or `dispatched_at = '1970-01-01'::timestamptz` (sentinel) on failure. This pattern is durable across manager restarts and matches the outbox approach used by the sibling pipeline orchestrator.
 
 The decision flow inside `handle_batch_result` (in the `SessionFailureAnycastEvent` arm):
 
 1. Load the parent session. **Short-circuit unless `session.session_type == SessionTypes.BATCH`** — interactive and inference sessions share `SessionEventHandler` and are out of scope for v1. Then, if `retry_count >= max_retries`, emit `session.retry_exhausted` and return.
-2. Classify failure via `classify_failure(session, status_data)`. The shape of `status_data["error"]` is defined by `manager/exceptions.py:convert_to_status_data` (returns `ErrorStatusInfo` / `ErrorDetail` TypedDicts at line 97); classification reads `error.name` and `error.src` to map to a `RetryEligibleCause`. If the cause is hardcoded never-retriable, or not in `policy.eligible_causes`, return.
+2. Classify failure via `classify_failure(session, status_data)`. The shape of `status_data["error"]` is defined by `manager/exceptions.py:convert_to_status_data` (returns `ErrorStatusInfo` / `ErrorDetail` TypedDicts at line 97); classification reads `error.name` and `error.src` to map to a `RetryEligibleCause`. **Malformed-input fallback:** if `status_data` is `None`, `status_data["error"]` is missing, or required keys (`name`, `src`) are missing, `classify_failure` does **not** return `UNKNOWN`. Instead it logs a WARNING and returns the hardcoded never-retriable sentinel — a malformed error envelope is treated as a permanent failure to avoid retry storms on serialization bugs. Only well-formed failures with an unrecognized `error.name` map to `UNKNOWN`. If the cause is hardcoded never-retriable, or not in `policy.eligible_causes`, return.
 3. Inside the session repository's `begin_session()` transaction, lock the parent row with `sa.select(SessionRow).where(SessionRow.id == parent.id).with_for_update()` and re-read `retry_count`.
 4. Compute `delay` per the formula above.
 5. `INSERT` into `session_retry_dispatch_queue` with `(parent_session_id, retry_count + 1, now() + delay)`. The PK on `(parent_session_id, retry_count)` makes this idempotent: a duplicate dispatch (handler replay, concurrent handlers) hits a unique-violation and the `INSERT` is skipped. Emit `session.retry_scheduled`.
