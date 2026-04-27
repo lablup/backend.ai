@@ -13,7 +13,9 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import (
     BinarySize,
+    DefaultForUnspecified,
     ResourceSlot,
+    VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
@@ -27,6 +29,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.errors.storage import VFolderFilterStatusFailed, VFolderNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -345,6 +348,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -501,6 +505,85 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         )
 
         assert isinstance(result, VFolderHostPermissionMap)
+
+    # -- get_user_with_keypair_policy_vfolder_hosts --
+
+    @pytest.fixture
+    async def keypair_policy_with_hosts(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """KeyPair resource policy with non-empty allowed_vfolder_hosts."""
+        policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = KeyPairResourcePolicyRow(
+                name=policy_name,
+                default_for_unspecified=DefaultForUnspecified.LIMITED,
+                total_resource_slots=ResourceSlot(),
+                max_session_lifetime=0,
+                max_concurrent_sessions=10,
+                max_concurrent_sftp_sessions=1,
+                max_containers_per_session=1,
+                idle_timeout=0,
+                allowed_vfolder_hosts=VFolderHostPermissionMap({
+                    "local:volume1": {
+                        VFolderHostPermission.CREATE,
+                        VFolderHostPermission.MODIFY,
+                    },
+                }),
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+        return policy_name
+
+    @pytest.fixture
+    async def user_with_active_keypair(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user: uuid.UUID,
+        keypair_policy_with_hosts: str,
+    ) -> uuid.UUID:
+        """Bind an active keypair (pointing to keypair_policy_with_hosts) to ``test_user``."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairRow(
+                    user_id=f"test-{test_user.hex[:8]}@example.com",
+                    user=test_user,
+                    access_key=f"AK{test_user.hex[:14]}",
+                    secret_key="test-secret",
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy=keypair_policy_with_hosts,
+                    rate_limit=1000,
+                )
+            )
+            await db_sess.flush()
+        return test_user
+
+    async def test_get_user_with_keypair_policy_vfolder_hosts_success(
+        self,
+        vfolder_repository: VfolderRepository,
+        user_with_active_keypair: uuid.UUID,
+    ) -> None:
+        """Returns email/role and the merged allowed_vfolder_hosts from active keypairs."""
+        result = await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(
+            user_with_active_keypair
+        )
+        assert result.email == f"test-{user_with_active_keypair.hex[:8]}@example.com"
+        assert result.role == UserRole.USER
+        assert "local:volume1" in result.allowed_vfolder_hosts
+        assert result.allowed_vfolder_hosts["local:volume1"] == {
+            VFolderHostPermission.CREATE,
+            VFolderHostPermission.MODIFY,
+        }
+
+    async def test_get_user_with_keypair_policy_vfolder_hosts_user_not_found(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        """Unknown user UUID raises UserNotFound."""
+        with pytest.raises(UserNotFound):
+            await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(uuid.uuid4())
 
 
 class TestVfolderRepositoryPurge:
