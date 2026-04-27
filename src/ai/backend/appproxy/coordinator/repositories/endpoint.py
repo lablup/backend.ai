@@ -192,9 +192,17 @@ class EndpointRepository:
         results: list[UpdatedRouteSet] = []
 
         async with self._begin_session_read_committed() as sess:
+            # Eager-load worker_row + endpoint_row because the service
+            # layer keeps propagating to workers after this transaction
+            # closes; touching them lazily would raise DetachedInstanceError.
             circuit_rows = (
                 await sess.scalars(
-                    sa.select(Circuit).where(Circuit.endpoint_id.in_(deployment_ids))
+                    sa.select(Circuit)
+                    .where(Circuit.endpoint_id.in_(deployment_ids))
+                    .options(
+                        selectinload(Circuit.worker_row),
+                        selectinload(Circuit.endpoint_row),
+                    )
                 )
             ).all()
             circuits_by_endpoint: dict[UUID, Circuit] = {
