@@ -97,6 +97,12 @@ class AppProxyClient:
                 extra_msg=f"Invalid response from AppProxy at {self._address}"
             ) from e
 
+    def _auth_headers(self) -> dict[str, str]:
+        return {
+            "Accept": "application/json",
+            "X-BackendAI-Token": self._token,
+        }
+
     @appproxy_client_resilience.apply()
     async def create_endpoint(
         self,
@@ -106,9 +112,7 @@ class AppProxyClient:
         async with self._client_session.post(
             f"/v2/endpoints/{endpoint_id}",
             json=body.model_dump(mode="json"),
-            headers={
-                "X-BackendAI-Token": self._token,
-            },
+            headers=self._auth_headers(),
         ) as resp:
             resp.raise_for_status()
             result: dict[str, Any] = await resp.json()
@@ -129,9 +133,7 @@ class AppProxyClient:
         async with self._client_session.post(
             "/v2/endpoints/bulk",
             json=body.model_dump(mode="json"),
-            headers={
-                "X-BackendAI-Token": self._token,
-            },
+            headers=self._auth_headers(),
         ) as resp:
             resp.raise_for_status()
             payload = await resp.json()
@@ -144,9 +146,7 @@ class AppProxyClient:
     ) -> None:
         async with self._client_session.delete(
             f"/v2/endpoints/{endpoint_id}",
-            headers={
-                "X-BackendAI-Token": self._token,
-            },
+            headers=self._auth_headers(),
         ):
             pass
 
@@ -165,9 +165,7 @@ class AppProxyClient:
             "DELETE",
             "/v2/endpoints/bulk",
             json=body.model_dump(mode="json"),
-            headers={
-                "X-BackendAI-Token": self._token,
-            },
+            headers=self._auth_headers(),
         ) as resp:
             resp.raise_for_status()
             payload = await resp.json()
