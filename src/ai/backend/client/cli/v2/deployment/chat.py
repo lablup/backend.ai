@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import click
 
+from ai.backend.cli.params import JSONParamType
 from ai.backend.client.cli.v2.deployment_chat_cache import (
     CHAT_CACHE_FILE,
     DeploymentChatCacheEntry,
@@ -35,26 +35,6 @@ def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
         raise click.ClickException(f"{status}: {detail}") from e
 
 
-def _parse_params(spec: str) -> dict[str, Any]:
-    """Parse the ``--params`` value as a JSON object (or ``@/path/to/file.json``)."""
-    import json
-
-    if spec.startswith("@"):
-        try:
-            text = Path(spec[1:]).read_text(encoding="utf-8")
-        except OSError as e:
-            raise click.ClickException(f"--params file not readable: {e}") from e
-    else:
-        text = spec
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError as e:
-        raise click.ClickException(f"--params is not valid JSON: {e.msg}") from e
-    if not isinstance(parsed, dict):
-        raise click.ClickException("--params must be a JSON object.")
-    return parsed
-
-
 @click.command(name="chat")
 @click.argument("deployment_id", type=click.UUID)
 @click.argument("content", type=str)
@@ -66,11 +46,10 @@ def _parse_params(spec: str) -> dict[str, Any]:
 )
 @click.option(
     "--params",
-    "params_spec",
     default=None,
-    type=str,
+    type=JSONParamType(),
     help=(
-        "Extra request-body fields as a JSON object, or '@PATH' to read from a file. "
+        "Extra request-body fields as a JSON object. "
         "Forwarded to the inference endpoint as-is "
         '(e.g. \'{"temperature": 0.7, "max_tokens": 256}\'). '
         "The 'model' and 'messages' fields are always overridden by --model and CONTENT."
@@ -80,7 +59,7 @@ def chat(
     deployment_id: UUID,
     content: str,
     model: str | None,
-    params_spec: str | None,
+    params: Any,
 ) -> None:
     """Send a one-shot chat completion request to a deployed model.
 
@@ -103,7 +82,9 @@ def chat(
     except IncompatibleChatCacheError as e:
         raise click.ClickException(str(e)) from e
 
-    extra_body = _parse_params(params_spec) if params_spec else {}
+    if params is not None and not isinstance(params, dict):
+        raise click.ClickException("--params must be a JSON object.")
+    extra_body: dict[str, Any] = params or {}
     entry = cache.get(deployment_id)
 
     async def _resolve_endpoint() -> DeploymentChatCacheEntry:
