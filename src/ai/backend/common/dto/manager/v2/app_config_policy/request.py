@@ -4,6 +4,8 @@ Request DTOs for app_config_policy DTO v2.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
@@ -12,7 +14,8 @@ from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from .types import AppConfigPolicyOrderField, OrderDirection
 
 __all__ = (
-    "AdminAppConfigPolicyItemInput",
+    "AdminAppConfigPolicyCreateItemInput",
+    "AdminAppConfigPolicyUpdateItemInput",
     "AdminBulkCreateAppConfigPoliciesInput",
     "AdminBulkPurgeAppConfigPoliciesInput",
     "AdminBulkUpdateAppConfigPoliciesInput",
@@ -40,8 +43,9 @@ class AppConfigPolicyOrder(BaseRequestModel):
 # ── Bulk mutation inputs (bulk-only writes) ──────────────────────
 
 
-class AdminAppConfigPolicyItemInput(BaseRequestModel):
-    """Per-item input for `adminBulkCreate/UpdateAppConfigPolicies`."""
+class AdminAppConfigPolicyCreateItemInput(BaseRequestModel):
+    """Per-item input for `adminBulkCreateAppConfigPolicies` —
+    immutable `config_name` + initial `scope_sources`."""
 
     config_name: str = Field(
         min_length=1,
@@ -62,16 +66,27 @@ class AdminAppConfigPolicyItemInput(BaseRequestModel):
         return stripped
 
 
+class AdminAppConfigPolicyUpdateItemInput(BaseRequestModel):
+    """Per-item input for `adminBulkUpdateAppConfigPolicies` — target
+    row id + new `scope_sources`. `config_name` is immutable so it's
+    not part of the update payload."""
+
+    id: UUID = Field(description="Policy row id.")
+    scope_sources: list[str] = Field(
+        description="Ordered scope chain (low → high merge priority).",
+    )
+
+
 class AdminBulkCreateAppConfigPoliciesInput(BaseRequestModel):
-    items: list[AdminAppConfigPolicyItemInput] = Field(description="Policies to create.")
+    items: list[AdminAppConfigPolicyCreateItemInput] = Field(description="Policies to create.")
 
 
 class AdminBulkUpdateAppConfigPoliciesInput(BaseRequestModel):
-    items: list[AdminAppConfigPolicyItemInput] = Field(description="Policies to update.")
+    items: list[AdminAppConfigPolicyUpdateItemInput] = Field(description="Policies to update.")
 
 
 class AdminBulkPurgeAppConfigPoliciesInput(BaseRequestModel):
-    config_names: list[str] = Field(description="`config_name`s to purge.")
+    ids: list[UUID] = Field(description="Policy row ids to purge.")
 
 
 class SearchAppConfigPoliciesInput(BaseRequestModel):

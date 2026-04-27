@@ -6,22 +6,23 @@ from typing import override
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.app_config_policy.bulk_types import (
-    AppConfigPolicyBulkItem,
+from ai.backend.manager.data.app_config_policy.types import (
     AppConfigPolicyBulkItemError,
+    AppConfigPolicyBulkUpdateItem,
+    AppConfigPolicyData,
 )
-from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
 
 
 @dataclass
-class AdminBulkUpdateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyBulkItem]):
-    """See `AdminBulkCreateAppConfigPoliciesAction` for the entity_ids /
-    items convention."""
+class AdminBulkUpdateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyBulkUpdateItem]):
+    """`items` carries `(id, scope_sources)` pairs targeting existing
+    policy rows. `config_name` is immutable and therefore not on the
+    update payload."""
 
-    items: list[AppConfigPolicyBulkItem] = field(default_factory=list)
+    items: list[AppConfigPolicyBulkUpdateItem] = field(default_factory=list)
 
     @override
-    def typed_entity_ids(self) -> list[AppConfigPolicyBulkItem]:
+    def typed_entity_ids(self) -> list[AppConfigPolicyBulkUpdateItem]:
         return list(self.items)
 
     @override

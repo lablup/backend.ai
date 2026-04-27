@@ -1,24 +1,22 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.app_config_policy.bulk_types import (
-    AppConfigPolicyBulkItemError,
-)
+from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyBulkItemError
 
 
 @dataclass
-class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[str]):
-    """`entity_ids` carries the `config_name`s to purge — the natural
-    Policy identifier."""
+class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[uuid.UUID]):
+    """`entity_ids` carries the row ids to purge."""
 
     @override
-    def typed_entity_ids(self) -> list[str]:
-        return list(self.entity_ids)
+    def typed_entity_ids(self) -> list[uuid.UUID]:
+        return [uuid.UUID(eid) for eid in self.entity_ids]
 
     @override
     @classmethod
@@ -33,9 +31,9 @@ class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[str]):
 
 @dataclass
 class AdminBulkPurgeAppConfigPoliciesActionResult(BaseBulkActionResult):
-    purged_config_names: list[str]
+    purged_ids: list[uuid.UUID]
     failed: list[AppConfigPolicyBulkItemError]
 
     @override
     def entity_ids(self) -> list[str]:
-        return list(self.purged_config_names)
+        return [str(i) for i in self.purged_ids]

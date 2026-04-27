@@ -68,15 +68,6 @@ class AppConfigPolicyDBSource:
         self._db = db
 
     @app_config_policy_db_source_resilience.apply()
-    async def get(self, config_name: str) -> AppConfigPolicyData | None:
-        """Look up a policy by its `config_name` (UNIQUE)."""
-        async with self._db.begin_readonly_session() as db_sess:
-            row = await db_sess.scalar(
-                sa.select(AppConfigPolicyRow).where(AppConfigPolicyRow.config_name == config_name)
-            )
-            return row.to_data() if row is not None else None
-
-    @app_config_policy_db_source_resilience.apply()
     async def get_by_id(self, id: uuid.UUID) -> AppConfigPolicyData | None:
         """Look up a policy by row id."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -95,22 +86,6 @@ class AppConfigPolicyDBSource:
         async with self._db.begin_session() as db_sess:
             result = await execute_creator(db_sess, creator)
             return result.row.to_data()
-
-    @app_config_policy_db_source_resilience.apply()
-    async def resolve_pk_by_config_name(
-        self,
-        config_name: str,
-    ) -> uuid.UUID | None:
-        """Resolve a policy's `config_name` (UNIQUE) to the row's UUID
-        ``id``. Returns ``None`` when no row matches — callers translate
-        to a domain-appropriate response."""
-        async with self._db.begin_readonly_session() as db_sess:
-            pk: uuid.UUID | None = await db_sess.scalar(
-                sa.select(AppConfigPolicyRow.id).where(
-                    AppConfigPolicyRow.config_name == config_name
-                )
-            )
-            return pk
 
     @app_config_policy_db_source_resilience.apply()
     async def update(self, updater: Updater[AppConfigPolicyRow]) -> AppConfigPolicyData | None:

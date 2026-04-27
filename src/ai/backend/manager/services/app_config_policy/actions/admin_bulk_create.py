@@ -6,26 +6,22 @@ from typing import override
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.app_config_policy.bulk_types import (
-    AppConfigPolicyBulkItem,
+from ai.backend.manager.data.app_config_policy.types import (
+    AppConfigPolicyBulkCreateItem,
     AppConfigPolicyBulkItemError,
+    AppConfigPolicyData,
 )
-from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
 
 
 @dataclass
-class AdminBulkCreateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyBulkItem]):
+class AdminBulkCreateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyBulkCreateItem]):
     """`entity_ids` carries the per-item `config_name`s; `items` carries
-    the matching payloads. Construct with both: the framework's
-    `BulkActionProcessor` only ever rebuilds the action via
-    `entity_ids=...`, so we never observe a mismatch in practice (no
-    bulk validators are wired for this action).
-    """
+    the matching payloads."""
 
-    items: list[AppConfigPolicyBulkItem] = field(default_factory=list)
+    items: list[AppConfigPolicyBulkCreateItem] = field(default_factory=list)
 
     @override
-    def typed_entity_ids(self) -> list[AppConfigPolicyBulkItem]:
+    def typed_entity_ids(self) -> list[AppConfigPolicyBulkCreateItem]:
         return list(self.items)
 
     @override

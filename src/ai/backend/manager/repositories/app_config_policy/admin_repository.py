@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.exception import BackendAIError
@@ -48,10 +49,6 @@ app_config_policy_admin_repository_resilience = Resilience(
 )
 
 
-def _missing(config_name: str) -> AppConfigPolicyNotFound:
-    return AppConfigPolicyNotFound(extra_msg=f"config_name={config_name!r}")
-
-
 class AppConfigPolicyAdminRepository:
     """Admin-only operations on AppConfigPolicy.
 
@@ -91,36 +88,27 @@ class AppConfigPolicyAdminRepository:
     @app_config_policy_admin_repository_resilience.apply()
     async def update(
         self,
-        config_name: str,
+        id: uuid.UUID,
         scope_sources: Sequence[str],
     ) -> AppConfigPolicyData:
-        """Update a policy. Resolves `config_name` to the row's UUID,
-        builds an ``Updater``, and delegates to the DB source. Raises
-        :class:`AppConfigPolicyNotFound` when no row exists (or the
-        row vanishes between resolve and write)."""
-        pk_value = await self._db_source.resolve_pk_by_config_name(config_name)
-        if pk_value is None:
-            raise _missing(config_name)
+        """Update a policy by id. Raises :class:`AppConfigPolicyNotFound`
+        when the row is missing."""
         updater: Updater[AppConfigPolicyRow] = Updater(
             spec=AppConfigPolicyUpdaterSpec(scope_sources=scope_sources),
-            pk_value=pk_value,
+            pk_value=id,
         )
         result = await self._db_source.update(updater)
         if result is None:
-            raise _missing(config_name)
+            raise AppConfigPolicyNotFound(extra_msg=f"id={id!s}")
         return result
 
     @app_config_policy_admin_repository_resilience.apply()
-    async def purge(self, config_name: str) -> bool:
-        """Delete a policy by `config_name`. Resolves `config_name` to
-        the row's UUID, builds a ``Purger``, and delegates to the DB
-        source. Returns ``True`` only when a row was actually removed."""
-        pk_value = await self._db_source.resolve_pk_by_config_name(config_name)
-        if pk_value is None:
-            return False
+    async def purge(self, id: uuid.UUID) -> bool:
+        """Delete a policy by id. Returns ``True`` only when a row was
+        actually removed."""
         purger: Purger[AppConfigPolicyRow] = Purger(
             row_class=AppConfigPolicyRow,
-            pk_value=pk_value,
+            pk_value=id,
         )
         return await self._db_source.purge(purger)
 

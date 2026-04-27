@@ -1,5 +1,6 @@
 from .request import (
-    AdminAppConfigPolicyItemInput,
+    AdminAppConfigPolicyCreateItemInput,
+    AdminAppConfigPolicyUpdateItemInput,
     AdminBulkCreateAppConfigPoliciesInput,
     AdminBulkPurgeAppConfigPoliciesInput,
     AdminBulkUpdateAppConfigPoliciesInput,
@@ -19,7 +20,8 @@ from .response import (
 from .types import AppConfigPolicyOrderField, OrderDirection
 
 __all__ = (
-    "AdminAppConfigPolicyItemInput",
+    "AdminAppConfigPolicyCreateItemInput",
+    "AdminAppConfigPolicyUpdateItemInput",
     "AdminBulkCreateAppConfigPoliciesInput",
     "AdminBulkCreateAppConfigPoliciesPayload",
     "AdminBulkPurgeAppConfigPoliciesInput",

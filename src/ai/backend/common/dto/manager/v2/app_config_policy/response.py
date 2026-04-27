@@ -56,7 +56,6 @@ class AppConfigPolicyBulkError(BaseResponseModel):
     """Per-item failure info for bulk Policy mutations."""
 
     index: int = Field(description="Original position in the input list.")
-    config_name: str = Field(description="`config_name` of the failed row.")
     message: str = Field(description="Reason for the failure.")
 
 
@@ -77,7 +76,7 @@ class AdminBulkUpdateAppConfigPoliciesPayload(BaseResponseModel):
 class AdminBulkPurgeAppConfigPoliciesPayload(BaseResponseModel):
     """Payload for `adminBulkPurgeAppConfigPolicies`."""
 
-    purged_config_names: list[str] = Field(
-        description="`config_name`s of policies actually removed (absent names no-oped).",
+    purged_ids: list[UUID] = Field(
+        description="Ids of policies actually removed (absent ids no-oped).",
     )
     failed: list[AppConfigPolicyBulkError] = Field(description="Per-item failures.")

@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -9,11 +10,11 @@ from ai.backend.manager.services.app_config_policy.actions.base import AppConfig
 
 @dataclass
 class GetAppConfigPolicyAction(AppConfigPolicyAction):
-    config_name: str
+    id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:
-        return self.config_name
+        return str(self.id)
 
     @override
     @classmethod
@@ -27,4 +28,4 @@ class GetAppConfigPolicyActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> str | None:
-        return self.policy.config_name if self.policy is not None else None
+        return str(self.policy.id) if self.policy is not None else None

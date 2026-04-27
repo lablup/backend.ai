@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -40,7 +41,7 @@ class TestAppConfigPolicyRepository:
     def admin_repository(self, db: ExtendedAsyncSAEngine) -> AppConfigPolicyAdminRepository:
         return AppConfigPolicyAdminRepository(db)
 
-    async def test_create_and_get_by_config_name(
+    async def test_create_and_get_by_id(
         self,
         repository: AppConfigPolicyRepository,
         admin_repository: AppConfigPolicyAdminRepository,
@@ -52,12 +53,12 @@ class TestAppConfigPolicyRepository:
         assert created.config_name == "theme"
         assert list(created.scope_sources) == ["domain"]
 
-        fetched = await repository.get("theme")
+        fetched = await repository.get_by_id(created.id)
         assert fetched is not None
         assert fetched.id == created.id
         assert list(fetched.scope_sources) == ["domain"]
 
-    async def test_get_by_id(
+    async def test_get_by_id_returns_full_record(
         self,
         repository: AppConfigPolicyRepository,
         admin_repository: AppConfigPolicyAdminRepository,
@@ -72,11 +73,11 @@ class TestAppConfigPolicyRepository:
         assert fetched.config_name == "preferences"
         assert list(fetched.scope_sources) == ["domain_user_defaults", "user"]
 
-    async def test_get_returns_none_for_missing_config_name(
+    async def test_get_by_id_returns_none_for_missing(
         self,
         repository: AppConfigPolicyRepository,
     ) -> None:
-        assert await repository.get("nonexistent") is None
+        assert await repository.get_by_id(uuid.uuid4()) is None
 
 
 class TestAppConfigPolicyAdminRepository:
@@ -101,24 +102,24 @@ class TestAppConfigPolicyAdminRepository:
         self,
         admin_repository: AppConfigPolicyAdminRepository,
     ) -> None:
-        await admin_repository.create(
+        created = await admin_repository.create(
             config_name="theme",
             scope_sources=["domain"],
         )
         updated = await admin_repository.update(
-            config_name="theme",
+            id=created.id,
             scope_sources=["domain", "user"],
         )
         assert updated is not None
         assert list(updated.scope_sources) == ["domain", "user"]
 
-    async def test_update_raises_for_missing_config_name(
+    async def test_update_raises_for_missing_id(
         self,
         admin_repository: AppConfigPolicyAdminRepository,
     ) -> None:
         with pytest.raises(AppConfigPolicyNotFound):
             await admin_repository.update(
-                config_name="nonexistent",
+                id=uuid.uuid4(),
                 scope_sources=["user"],
             )
 
@@ -126,14 +127,14 @@ class TestAppConfigPolicyAdminRepository:
         self,
         admin_repository: AppConfigPolicyAdminRepository,
     ) -> None:
-        await admin_repository.create(
+        created = await admin_repository.create(
             config_name="theme",
             scope_sources=["domain"],
         )
-        assert await admin_repository.purge("theme") is True
+        assert await admin_repository.purge(created.id) is True
 
     async def test_purge_missing_policy_returns_false(
         self,
         admin_repository: AppConfigPolicyAdminRepository,
     ) -> None:
-        assert await admin_repository.purge("nonexistent") is False
+        assert await admin_repository.purge(uuid.uuid4()) is False
