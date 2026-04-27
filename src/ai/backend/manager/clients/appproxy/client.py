@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID
 
@@ -97,22 +99,93 @@ class AppProxyClient:
                 extra_msg=f"Invalid response from AppProxy at {self._address}"
             ) from e
 
+    @asynccontextmanager
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        operation: str,
+        json_body: Any = None,
+    ) -> AsyncIterator[aiohttp.ClientResponse]:
+        """Issue an authenticated request and translate transport errors.
+
+        Connection failures become ``AppProxyConnectionError``. Non-2xx
+        responses become ``AppProxyResponseError`` with the upstream body
+        attached as ``extra_data`` so a structured ``BackendAIError``
+        payload returned by the coordinator survives the translation.
+        """
+        try:
+            async with self._client_session.request(
+                method,
+                path,
+                headers={
+                    "Accept": "application/json",
+                    "X-BackendAI-Token": self._token,
+                },
+                json=json_body,
+            ) as resp:
+                if resp.status >= 400:
+                    text = await resp.text()
+                    try:
+                        error_body: Any = json.loads(text) if text else None
+                    except json.JSONDecodeError:
+                        error_body = text
+                    log.error(
+                        "AppProxy at {} returned {} during {}: {!r}",
+                        self._address,
+                        resp.status,
+                        operation,
+                        error_body,
+                    )
+                    raise AppProxyResponseError(
+                        extra_msg=(f"AppProxy returned HTTP {resp.status} during {operation}"),
+                        extra_data={"status": resp.status, "body": error_body},
+                    )
+                yield resp
+        except aiohttp.ClientConnectorError as e:
+            log.error(
+                "Failed to connect to AppProxy at {} during {}: {}",
+                self._address,
+                operation,
+                e,
+            )
+            raise AppProxyConnectionError(
+                extra_msg=f"Failed to connect to AppProxy at {self._address}"
+            ) from e
+
+    async def _parse_json(
+        self,
+        resp: aiohttp.ClientResponse,
+        *,
+        operation: str,
+    ) -> Any:
+        try:
+            return await resp.json()
+        except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
+            log.error(
+                "Failed to parse AppProxy {} response from {}: {}",
+                operation,
+                self._address,
+                e,
+            )
+            raise AppProxyResponseError(
+                extra_msg=(f"Invalid response from AppProxy at {self._address} during {operation}"),
+            ) from e
+
     @appproxy_client_resilience.apply()
     async def create_endpoint(
         self,
         endpoint_id: UUID,
         body: CreateEndpointRequestBody,
     ) -> dict[str, Any]:
-        async with self._client_session.post(
+        async with self._request(
+            "POST",
             f"/v2/endpoints/{endpoint_id}",
-            json=body.model_dump(mode="json"),
-            headers={
-                "Accept": "application/json",
-                "X-BackendAI-Token": self._token,
-            },
+            operation="create_endpoint",
+            json_body=body.model_dump(mode="json"),
         ) as resp:
-            resp.raise_for_status()
-            result: dict[str, Any] = await resp.json()
+            result: dict[str, Any] = await self._parse_json(resp, operation="create_endpoint")
             return result
 
     @appproxy_client_resilience.apply()
@@ -127,16 +200,13 @@ class AppProxyClient:
         so this is the preferred way to register many deployments at
         once (e.g. from the deployment provisioning handler).
         """
-        async with self._client_session.post(
+        async with self._request(
+            "POST",
             "/v2/endpoints/bulk",
-            json=body.model_dump(mode="json"),
-            headers={
-                "Accept": "application/json",
-                "X-BackendAI-Token": self._token,
-            },
+            operation="create_endpoints_bulk",
+            json_body=body.model_dump(mode="json"),
         ) as resp:
-            resp.raise_for_status()
-            payload = await resp.json()
+            payload = await self._parse_json(resp, operation="create_endpoints_bulk")
             return BulkCreateEndpointResponse.model_validate(payload)
 
     @appproxy_client_resilience.apply()
@@ -144,12 +214,10 @@ class AppProxyClient:
         self,
         endpoint_id: UUID,
     ) -> None:
-        async with self._client_session.delete(
+        async with self._request(
+            "DELETE",
             f"/v2/endpoints/{endpoint_id}",
-            headers={
-                "Accept": "application/json",
-                "X-BackendAI-Token": self._token,
-            },
+            operation="delete_endpoint",
         ):
             pass
 
@@ -164,15 +232,11 @@ class AppProxyClient:
         per-endpoint result in input order, so the caller can decide how
         to treat partial failures (retry, log, etc.).
         """
-        async with self._client_session.request(
+        async with self._request(
             "DELETE",
             "/v2/endpoints/bulk",
-            json=body.model_dump(mode="json"),
-            headers={
-                "Accept": "application/json",
-                "X-BackendAI-Token": self._token,
-            },
+            operation="delete_endpoints_bulk",
+            json_body=body.model_dump(mode="json"),
         ) as resp:
-            resp.raise_for_status()
-            payload = await resp.json()
+            payload = await self._parse_json(resp, operation="delete_endpoints_bulk")
             return BulkDeleteEndpointResponse.model_validate(payload)
