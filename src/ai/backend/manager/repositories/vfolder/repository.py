@@ -38,6 +38,7 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
+    UserWithVFolderHostPermissions,
     ValidatedVFolderInfo,
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -253,6 +254,45 @@ class VfolderRepository:
                 raise ObjectNotFound(object_name="User keypair resource policy")
 
             return user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts
+
+    @vfolder_repository_resilience.apply()
+    async def get_user_with_keypair_policy_vfolder_hosts(
+        self, user_uuid: uuid.UUID
+    ) -> UserWithVFolderHostPermissions:
+        """
+        Load user data together with the merged ``allowed_vfolder_hosts`` from
+        all of the user's active keypair resource policies.
+
+        A user can hold multiple keypairs, each pointing to its own keypair
+        resource policy. This method unions ``allowed_vfolder_hosts`` across
+        every active keypair so that the host-permission check reflects the
+        full set of hosts available to the user (rather than only the main
+        keypair).
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            user_row: UserRow | None = await db_session.scalar(
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    selectinload(UserRow.keypairs).selectinload(KeyPairRow.resource_policy_row)
+                )
+            )
+            if user_row is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
+            if user_row.role is None or user_row.domain_name is None:
+                raise UserNotFound(f"User with UUID {user_uuid} has invalid role or domain data.")
+            merged_hosts = VFolderHostPermissionMap()
+            for keypair in user_row.keypairs:
+                if not keypair.is_active:
+                    continue
+                merged_hosts = VFolderHostPermissionMap(
+                    merged_hosts | keypair.resource_policy_row.allowed_vfolder_hosts
+                )
+            return UserWithVFolderHostPermissions(
+                email=user_row.email,
+                role=user_row.role,
+                allowed_vfolder_hosts=merged_hosts,
+            )
 
     @vfolder_repository_resilience.apply()
     async def get_max_vfolder_count(
