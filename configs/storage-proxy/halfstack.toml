@@ -64,7 +64,7 @@ secret = "some-secret-shared-with-manager"
 
 
 [pyroscope]
-enabled = true
+enabled = false
 app-name = "backendai-half-storage-proxy"
 server-addr = "http://localhost:4040"
 sample-rate = 100
@@ -103,7 +103,7 @@ backend = "vfs"
 path = "vfolder/local/volume1"
 
 [otel]
-enabled = true
+enabled = false
 log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
 
