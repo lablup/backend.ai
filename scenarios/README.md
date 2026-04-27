@@ -72,16 +72,27 @@ upstream attention. They are kept strict so regressions stay visible — do
 
 | #  | Scenario                  | Symptom                                                                                                                                                                                                                                       | Root cause                                                                                                                                                              |
 |----|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 03 | model_card_deploy         | `[FAIL] no model cards available` — `model-store` project exists but `model-card project-search` returns 0 items.                                                                                                                              | Cluster fixture: dev DB ships with the `model-store` project but no model cards registered. Provision a card (or run `./scripts/install-dev.sh`'s model card seed) before this passes. |
+| 03 | model_card_deploy         | `[FAIL] card has no revision presets` — `model-card project-search` now finds the auto-provisioned card, but `available-presets` returns an empty list.                                                                                       | Two-stage fixture gap. `00_setup.sh` now provisions a model card row (`scn-model-card-fixture`), removing the original "no model cards available" gate. The remaining gap: `deployment_revision_preset` table is empty on a fresh dev DB (verified via `gql { deploymentRevisionPresets }`). Seeding presets requires more than scenario fixtures should do — extend `./scripts/install-dev.sh` to insert at least one preset bound to a runtime variant (`cmd`, `nim`, `sglang`, etc.). |
 | 04 | deployment_revision       | After `./bai deployment delete`, `project-search` returns the row with an empty `lifecycle.status` (`NOT TERMINAL: ` — empty string). Scenario expects one of `STOPPED\|DESTROYED\|DELETED\|TERMINATED\|CANCELLED`.                            | Manager bug: soft-delete leaves `lifecycle.status` unset rather than transitioning to a terminal state. The row should report a terminal status synchronously after delete. |
 | 07 | vfolder_invite_clone      | `./bai vfolder clone` returns HTTP 403 `PermissionDeniedError: User <uid> lacks permission read on RBACElementRef(VFOLDER, <new_vfolder_id>)` from the post-clone `GET` in `vfolder/adapter.py:626`.                                            | RBAC eventual consistency: the cloned vfolder row is committed, but the owner's `read` permission edge has not been replicated when the immediate post-clone GET runs.   |
-| 14 | deployment_endpoint_serve | `[FAIL] no model cards available` — same fixture gap as 03 (this scenario also reaches into `model-store` to pick a card to deploy).                                                                                                            | Same as 03. Once a model card is seeded, the rest of this scenario also exercises endpoint URL population + L7 reachability.                                              |
+| 14 | deployment_endpoint_serve | `[FAIL] no presets available` — same revision-preset gap as 03; this scenario also needs L7-reachable model artifacts on the fixture vfolder once the preset is in place.                                                                       | Same as 03 for the preset gap. Beyond that, the fixture vfolder ships empty — for L7 reachability you also need a real `model-definition.yaml` + weights uploaded to it. Seeding both should live in the dev installer.                                                  |
 
 ### Notes for fixers
 
-* **Scenario 03 / 14:** unblock by registering at least one model card in the
-  `model-store` project. If the cluster doesn't ship one, the dev installer
-  needs to be extended to seed one.
+* **Scenario 03 / 14:** `00_setup.sh` now provisions a fixture vfolder
+  (`scn-model-card-fixture`, usage=model) inside the `model-store` project
+  and registers it as a model card via `./bai admin model-card create`. With
+  that, `model-card project-search` returns the card and 03/14 progress past
+  the original "no model cards available" gate. They now stop at the next
+  gate — `deployment_revision_preset` rows aren't seeded on a fresh dev DB,
+  so `model-card available-presets` returns an empty list. To unblock fully:
+    1. Extend `./scripts/install-dev.sh` to insert at least one
+       `deployment_revision_preset` row, bound to one of the seeded
+       `runtime_variant` rows (`cmd`, `nim`, `sglang`, etc.). Without this
+       both 03 and 14 stop at "no presets available."
+    2. For 14's L7 reachability: also upload a real `model-definition.yaml`
+       and matching weights into the fixture vfolder — the auto-provisioned
+       vfolder is empty.
 * **Scenario 04:** manager `deployment delete` should transition
   `lifecycle.status` to a terminal state inside the same transaction as the
   row update. The current empty-string state breaks any client that filters
