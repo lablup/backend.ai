@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -34,6 +35,26 @@ def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
         raise click.ClickException(f"{status}: {detail}") from e
 
 
+def _parse_params(spec: str) -> dict[str, Any]:
+    """Parse the ``--params`` value as a JSON object (or ``@/path/to/file.json``)."""
+    import json
+
+    if spec.startswith("@"):
+        try:
+            text = Path(spec[1:]).read_text(encoding="utf-8")
+        except OSError as e:
+            raise click.ClickException(f"--params file not readable: {e}") from e
+    else:
+        text = spec
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise click.ClickException(f"--params is not valid JSON: {e.msg}") from e
+    if not isinstance(parsed, dict):
+        raise click.ClickException("--params must be a JSON object.")
+    return parsed
+
+
 @click.command(name="chat")
 @click.argument("deployment_id", type=click.UUID)
 @click.argument("content", type=str)
@@ -44,60 +65,29 @@ def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
     help="Model name to send (defaults to cached default_model).",
 )
 @click.option(
-    "--temperature",
+    "--params",
+    "params_spec",
     default=None,
-    type=click.FloatRange(min=0.0, max=2.0),
-    help="Sampling temperature.",
-)
-@click.option(
-    "--top-p",
-    default=None,
-    type=click.FloatRange(min=0.0, max=1.0),
-    help="Nucleus sampling probability mass.",
-)
-@click.option(
-    "--frequency-penalty",
-    default=None,
-    type=click.FloatRange(min=-2.0, max=2.0),
-    help="Penalty for token frequency.",
-)
-@click.option(
-    "--presence-penalty",
-    default=None,
-    type=click.FloatRange(min=-2.0, max=2.0),
-    help="Penalty for token presence.",
-)
-@click.option(
-    "--seed",
-    default=None,
-    type=int,
-    help="Random seed for deterministic sampling.",
-)
-@click.option(
-    "--stop",
-    multiple=True,
     type=str,
-    help="Stop sequence (repeatable).",
-)
-@click.option(
-    "--max-tokens",
-    default=None,
-    type=click.IntRange(min=1),
-    help="Maximum number of tokens to generate.",
+    help=(
+        "Extra request-body fields as a JSON object, or '@PATH' to read from a file. "
+        "Forwarded to the inference endpoint as-is "
+        '(e.g. \'{"temperature": 0.7, "max_tokens": 256}\'). '
+        "The 'model' and 'messages' fields are always overridden by --model and CONTENT."
+    ),
 )
 def chat(
     deployment_id: UUID,
     content: str,
     model: str | None,
-    temperature: float | None,
-    top_p: float | None,
-    frequency_penalty: float | None,
-    presence_penalty: float | None,
-    seed: int | None,
-    stop: tuple[str, ...],
-    max_tokens: int | None,
+    params_spec: str | None,
 ) -> None:
-    """Send a one-shot chat completion request to a deployed model."""
+    """Send a one-shot chat completion request to a deployed model.
+
+    Sampling parameters (temperature, top_p, max_tokens, etc.) are not
+    exposed as individual flags because their schema differs across
+    runtime variants. Pass them through ``--params`` instead.
+    """
     import json
     import sys
 
@@ -113,6 +103,7 @@ def chat(
     except IncompatibleChatCacheError as e:
         raise click.ClickException(str(e)) from e
 
+    extra_body = _parse_params(params_spec) if params_spec else {}
     entry = cache.get(deployment_id)
 
     async def _resolve_endpoint() -> DeploymentChatCacheEntry:
@@ -139,27 +130,6 @@ def chat(
         save_chat_cache(cache)
         return new_entry
 
-    def _build_request_body(model_name: str) -> dict[str, Any]:
-        body: dict[str, Any] = {
-            "model": model_name,
-            "messages": [{"role": "user", "content": content}],
-        }
-        if temperature is not None:
-            body["temperature"] = temperature
-        if top_p is not None:
-            body["top_p"] = top_p
-        if frequency_penalty is not None:
-            body["frequency_penalty"] = frequency_penalty
-        if presence_penalty is not None:
-            body["presence_penalty"] = presence_penalty
-        if seed is not None:
-            body["seed"] = seed
-        if stop:
-            body["stop"] = list(stop)
-        if max_tokens is not None:
-            body["max_tokens"] = max_tokens
-        return body
-
     async def _run() -> None:
         from ai.backend.client.exceptions import BackendAPIError
 
@@ -173,7 +143,11 @@ def chat(
                 "(this auto-discovers the served model from the inference endpoint)."
             )
 
-        body = _build_request_body(request_model)
+        body: dict[str, Any] = {
+            **extra_body,
+            "model": request_model,
+            "messages": [{"role": "user", "content": content}],
+        }
         async with InferenceChatClient(
             skip_ssl_verification=config.skip_ssl_verification,
         ) as client:
