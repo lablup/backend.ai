@@ -16,6 +16,7 @@ from ai.backend.common.cli import LazyGroup
 from .admin import admin
 from .config_cmd import config
 from .gql_cmd import gql
+from .helpers import _load_dotenv_once
 from .login_cmd import login, logout
 from .my import my
 
@@ -23,6 +24,9 @@ from .my import my
 @click.group()
 def v2() -> None:
     """V2 REST API commands."""
+    # Auto-load .env from the working directory so BACKEND_* vars are picked up
+    # before any subcommand reads os.environ (matches v1 CLI behavior).
+    _load_dotenv_once()
 
 
 # Infrastructure commands

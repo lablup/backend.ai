@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
+from dotenv import find_dotenv, load_dotenv
 from yarl import URL
 
 if TYPE_CHECKING:
@@ -27,6 +28,21 @@ DEFAULTS = {
     "api_version": "v9.20250722",
     "skip_ssl_verification": False,
 }
+
+_dotenv_loaded = False
+
+
+def _load_dotenv_once() -> None:
+    """Load ``.env`` from the current working directory (walking upward) once per process.
+
+    Mirrors v1 CLI behavior where ``get_env()`` implicitly loaded ``.env`` on every lookup.
+    Uses ``override=True`` to preserve v1 semantics (``.env`` wins over pre-existing env vars).
+    """
+    global _dotenv_loaded
+    if _dotenv_loaded:
+        return
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
+    _dotenv_loaded = True
 
 
 @dataclass(frozen=True)
@@ -52,6 +68,8 @@ def load_v2_config() -> V2ConnectionConfig:
     4. Built-in defaults
     """
     import tomllib
+
+    _load_dotenv_once()
 
     cfg: dict[str, Any] = dict(DEFAULTS)
 
