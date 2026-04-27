@@ -139,3 +139,21 @@ class InvalidContainerMeasurementError(BackendAIError, web.HTTPInternalServerErr
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_DATA_FORMAT,
         )
+
+
+class PortPoolExhaustedError(BackendAIError, web.HTTPServiceUnavailable):
+    """Raised when no host ports are available for allocation.
+
+    This covers two cases: the pool is fully empty, or every remaining
+    port is still within its post-release cooldown window.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/port-pool-exhausted"
+    error_title = "Host port pool exhausted."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )

@@ -42,18 +42,26 @@ class HostPortObserver(AbstractObserver):
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
 
-        unused_ports = self._agent.current_used_port_set() - occupied_host_ports
+        port_pool = self._agent.port_pool
+        unused_ports = port_pool.used_ports() - occupied_host_ports
         for previous_unused_port in list(self._port_unused_counts.keys()):
             if previous_unused_port not in unused_ports:
                 del self._port_unused_counts[previous_unused_port]
 
-        ports_to_release = set()
+        ports_to_release: set[int] = set()
         for unused_port in unused_ports:
             self._port_unused_counts[unused_port] += 1
             if self._port_unused_counts[unused_port] >= PORT_USAGE_THRESHOLD:
                 ports_to_release.add(unused_port)
                 del self._port_unused_counts[unused_port]
-        self._agent.release_unused_ports(ports_to_release)
+        if ports_to_release:
+            log.info(
+                "releasing unused ports back to port pool. "
+                "current port-pool length: {}, releasing length: {}",
+                len(port_pool),
+                len(ports_to_release),
+            )
+            port_pool.release_many(ports_to_release)
 
     @override
     def observe_interval(self) -> float:
