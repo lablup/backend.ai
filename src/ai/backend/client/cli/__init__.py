@@ -63,6 +63,13 @@ def resource_usage() -> None:
 @cli_main.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2:v2")
 def v2() -> None:
     """V2 REST API commands."""
+    # Auto-load .env from cwd so BACKEND_* vars are picked up before any
+    # subcommand reads os.environ. The v2/__init__.py callback is unreachable
+    # because LazyGroup only wraps click.Group methods, not MultiCommand.invoke,
+    # so this wrapper is the actual entry point for `./bai v2 ...`.
+    from ai.backend.client.cli.v2.helpers import _load_cwd_dotenv
+
+    _load_cwd_dotenv()
 
 
 # Groups with aliases in subcommands - still eager load

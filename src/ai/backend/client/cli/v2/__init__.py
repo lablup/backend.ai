@@ -16,7 +16,6 @@ from ai.backend.common.cli import LazyGroup
 from .admin import admin
 from .config_cmd import config
 from .gql_cmd import gql
-from .helpers import _load_cwd_dotenv
 from .login_cmd import login, logout
 from .my import my
 
@@ -24,8 +23,14 @@ from .my import my
 @click.group()
 def v2() -> None:
     """V2 REST API commands."""
-    # Auto-load .env from the working directory so BACKEND_* vars are picked up
-    # before any subcommand reads os.environ (matches v1 CLI behavior).
+    # The real entry point for `./bai v2 ...` is the `LazyGroup` wrapper in
+    # `client/cli/__init__.py`, because `LazyGroup` does not delegate
+    # `MultiCommand.invoke` to the underlying group. This callback only runs
+    # when the inner group is invoked directly (e.g. tests, REPL), so we
+    # mirror the wrapper's `.env` auto-load here as a safety net.
+    # `load_dotenv` is idempotent — running on both paths is harmless.
+    from .helpers import _load_cwd_dotenv
+
     _load_cwd_dotenv()
 
 

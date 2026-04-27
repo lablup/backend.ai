@@ -2,22 +2,23 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
-from ai.backend.client.cli.v2 import helpers, v2
+from ai.backend.cli.main import main as cli_main
+from ai.backend.client.cli import v2 as _v2_register  # noqa: F401  # registers v2 on cli_main
+from ai.backend.client.cli.v2 import helpers
 
 
 @pytest.fixture
-def isolated_env(
+def dotenv_environment(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> Iterator[Path]:
-    """Isolate cwd and clear BACKEND_* env vars for each test."""
+    """Place a ``.env`` in an isolated cwd with no fallback config/credentials."""
     monkeypatch.chdir(tmp_path)
     for key in (
         "BACKEND_ENDPOINT",
@@ -26,70 +27,18 @@ def isolated_env(
         "BACKEND_SECRET_KEY",
     ):
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(helpers, "CONFIG_FILE", tmp_path / "missing-config.toml")
+    monkeypatch.setattr(helpers, "CREDENTIALS_FILE", tmp_path / "missing-creds.toml")
+    (tmp_path / ".env").write_text(
+        "BACKEND_ENDPOINT=https://from-dotenv.example\nBACKEND_ACCESS_KEY=ak-from-dotenv\n",
+    )
     yield tmp_path
 
 
-def test_load_cwd_dotenv_picks_up_cwd_dotenv(
-    isolated_env: Path,
-) -> None:
-    (isolated_env / ".env").write_text(
-        "BACKEND_ENDPOINT=https://from-dotenv.example\nBACKEND_ACCESS_KEY=ak-from-dotenv\n",
-    )
-
-    helpers._load_cwd_dotenv()
-
-    assert os.environ["BACKEND_ENDPOINT"] == "https://from-dotenv.example"
-    assert os.environ["BACKEND_ACCESS_KEY"] == "ak-from-dotenv"
-
-
-def test_load_cwd_dotenv_overrides_existing_env(
-    isolated_env: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("BACKEND_ENDPOINT", "https://from-shell.example")
-    (isolated_env / ".env").write_text(
-        "BACKEND_ENDPOINT=https://from-dotenv.example\n",
-    )
-
-    helpers._load_cwd_dotenv()
-
-    # ``override=True`` preserves v1 semantics — .env wins over pre-existing env.
-    assert os.environ["BACKEND_ENDPOINT"] == "https://from-dotenv.example"
-
-
-def test_v2_group_callback_loads_dotenv(
-    isolated_env: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """End-to-end: invoking a v2 subcommand fires the group callback which loads ``.env``."""
-    monkeypatch.setattr(helpers, "CONFIG_FILE", isolated_env / "missing-config.toml")
-    monkeypatch.setattr(helpers, "CREDENTIALS_FILE", isolated_env / "missing-creds.toml")
-    (isolated_env / ".env").write_text(
-        "BACKEND_ENDPOINT=https://group-cb.example\nBACKEND_ACCESS_KEY=ak-x\n",
-    )
-
-    # ``config show`` is a no-network command that triggers the group callback.
-    result = CliRunner().invoke(v2, ["config", "show"])
+def test_v2_cli_auto_loads_dotenv(dotenv_environment: Path) -> None:
+    """``./bai v2 ...`` auto-loads ``.env`` from cwd, matching v1 CLI behavior."""
+    result = CliRunner().invoke(cli_main, ["v2", "config", "show"])
 
     assert result.exit_code == 0, result.output
-    assert os.environ["BACKEND_ENDPOINT"] == "https://group-cb.example"
-    assert "group-cb.example" in result.output
-    assert "ak-x" in result.output
-
-
-def test_load_v2_config_reads_env_vars(
-    isolated_env: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """``load_v2_config`` reads ``BACKEND_*`` from ``os.environ`` (already-loaded state)."""
-    monkeypatch.setattr(helpers, "CONFIG_FILE", isolated_env / "missing-config.toml")
-    monkeypatch.setattr(helpers, "CREDENTIALS_FILE", isolated_env / "missing-creds.toml")
-    monkeypatch.setenv("BACKEND_ENDPOINT", "https://from-env.example")
-    monkeypatch.setenv("BACKEND_ACCESS_KEY", "ak-x")
-    monkeypatch.setenv("BACKEND_SECRET_KEY", "sk-x")
-
-    cfg = helpers.load_v2_config()
-
-    assert str(cfg.endpoint) == "https://from-env.example"
-    assert cfg.access_key == "ak-x"
-    assert cfg.secret_key == "sk-x"
+    assert "from-dotenv.example" in result.output
+    assert "ak-from-dotenv" in result.output
