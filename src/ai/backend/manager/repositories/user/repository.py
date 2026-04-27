@@ -12,6 +12,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -96,6 +97,11 @@ class UserRepository:
         Create a new user with default keypair and group associations.
         """
         return await self._db_source.create_user_validated(creator, group_ids)
+
+    @user_repository_resilience.apply()
+    async def assign_project_membership(self, user_uuid: UUID, project_id: ProjectID) -> None:
+        """Add a user to a project, mapping the user to the project's member role."""
+        await self._db_source.assign_project_membership(user_uuid, project_id)
 
     @user_repository_resilience.apply()
     async def bulk_create_users_validated(

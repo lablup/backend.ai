@@ -17,6 +17,7 @@ from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -1021,6 +1022,15 @@ class UserDBSource:
         for project_id in to_remove:
             await self._remove_user_from_project_in_session(session, user_uuid, project_id)
         for project_id in to_add:
+            await self._add_user_to_project_in_session(session, user_uuid, project_id)
+
+    async def assign_project_membership(
+        self,
+        user_uuid: UUID,
+        project_id: ProjectID,
+    ) -> None:
+        """Add a user to a project, mapping the user to the project's member role."""
+        async with self._db.begin_session_read_committed() as session:
             await self._add_user_to_project_in_session(session, user_uuid, project_id)
 
     async def _add_user_to_project_in_session(
