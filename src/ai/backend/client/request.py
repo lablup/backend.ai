@@ -282,15 +282,20 @@ class Request:
         """
         Apply caller-supplied header overrides on top of the auto-set headers.
 
-        If ``Date`` is overridden, parse it back into ``self.date`` so that
-        request signing uses the same value the upstream server will see.
-        Required for use cases like proxying a pre-signed request where the
-        original ``Date`` must be preserved end-to-end.
+        If ``Date`` is overridden, also parse it back into ``self.date`` so
+        that request signing uses the same value the upstream server will
+        see. If the override value cannot be parsed, the header is still
+        forwarded but ``self.date`` is left untouched; signing should not
+        be enabled in that case (e.g., the proxy gates this on anonymous
+        sessions where ``_sign()`` is skipped).
         """
         for key, value in overrides.items():
             self.headers[key] = value
             if key.lower() == "date":
-                self.date = parse_datetime(value)
+                try:
+                    self.date = parse_datetime(value)
+                except (ValueError, OverflowError):
+                    pass
 
     def _build_url(self) -> URL:
         base_url = self.config.endpoint.path.rstrip("/")

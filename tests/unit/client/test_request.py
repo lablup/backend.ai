@@ -313,3 +313,21 @@ async def test_fetch_passes_through_arbitrary_header_overrides(dummy_endpoint: s
 
         sent_kwargs = next(iter(m.requests.values()))[0].kwargs
         assert sent_kwargs["headers"]["X-Custom-Header"] == "custom-value"
+
+
+async def test_fetch_unparseable_date_override_does_not_crash(
+    dummy_endpoint: str,
+) -> None:
+    # An unparseable Date must not raise — the header is still forwarded
+    # (upstream can reject) but `self.date` falls back to the auto-set value
+    # so any signing path stays internally consistent.
+    with aioresponses() as m:
+        m.post(dummy_endpoint + "function", status=HTTPStatus.OK, body=b"")
+        async with AsyncSession():
+            rqst = Request("POST", "function")
+            async with rqst.fetch(headers={"Date": "not a date"}):
+                pass
+
+        sent_kwargs = next(iter(m.requests.values()))[0].kwargs
+        assert sent_kwargs["headers"]["Date"] == "not a date"
+        assert rqst.date is not None  # untouched by the parse failure
