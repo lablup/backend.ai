@@ -33,9 +33,10 @@ DEFAULTS = {
 def _load_cwd_dotenv() -> None:
     """Load ``.env`` from the current working directory (walking upward).
 
-    Mirrors v1 CLI behavior where ``get_env()`` implicitly called ``load_dotenv()``
-    on every lookup. ``override=True`` preserves v1 semantics where ``.env`` wins
-    over pre-existing shell env vars.
+    Called from the ``v2()`` Click group callback so all v2 subcommands see
+    ``BACKEND_*`` variables defined in a project-local ``.env``. Mirrors v1
+    CLI behavior; ``override=True`` preserves v1 semantics where ``.env``
+    wins over pre-existing shell env vars.
     """
     load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
 
@@ -63,8 +64,6 @@ def load_v2_config() -> V2ConnectionConfig:
     4. Built-in defaults
     """
     import tomllib
-
-    _load_cwd_dotenv()
 
     cfg: dict[str, Any] = dict(DEFAULTS)
 
