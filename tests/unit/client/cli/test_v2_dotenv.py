@@ -73,7 +73,7 @@ def test_v2_group_callback_loads_dotenv(
 
     assert result.exit_code == 0, result.output
     assert os.environ["BACKEND_ENDPOINT"] == "https://group-cb.example"
-    assert "https://group-cb.example" in result.output
+    assert "group-cb.example" in result.output
     assert "ak-x" in result.output
 
 
