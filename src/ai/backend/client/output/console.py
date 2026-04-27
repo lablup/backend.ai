@@ -151,10 +151,15 @@ class ConsoleOutputHandler(BaseOutputHandler):
         plain: bool = False,
     ) -> None:
         fields: list[FieldSpec] = []
+        # When the user passes --limit (page_size is not None), it should cap the
+        # total number of items returned. When page_size is None, the pager-driven
+        # flow streams pages until exhaustion as before.
+        max_items: int | None = page_size
 
         def infinite_fetch(_page_size: int) -> Iterator[_Item]:
             nonlocal fields
             current_offset = initial_page_offset
+            yielded = 0
             while True:
                 result = fetch_func(current_offset, _page_size)
                 if not fields:
@@ -166,7 +171,11 @@ class ConsoleOutputHandler(BaseOutputHandler):
                     else:
                         raise NoItems
                 current_offset += len(result.items)
-                yield from cast(Sequence[_Item], result.items)
+                for item in cast(Sequence[_Item], result.items):
+                    yield item
+                    yielded += 1
+                    if max_items is not None and yielded >= max_items:
+                        return
                 if current_offset >= result.total_count:
                     break
 
