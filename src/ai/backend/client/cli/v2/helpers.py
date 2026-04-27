@@ -29,20 +29,15 @@ DEFAULTS = {
     "skip_ssl_verification": False,
 }
 
-_dotenv_loaded = False
 
+def _load_cwd_dotenv() -> None:
+    """Load ``.env`` from the current working directory (walking upward).
 
-def _load_dotenv_once() -> None:
-    """Load ``.env`` from the current working directory (walking upward) once per process.
-
-    Mirrors v1 CLI behavior where ``get_env()`` implicitly loaded ``.env`` on every lookup.
-    Uses ``override=True`` to preserve v1 semantics (``.env`` wins over pre-existing env vars).
+    Mirrors v1 CLI behavior where ``get_env()`` implicitly called ``load_dotenv()``
+    on every lookup. ``override=True`` preserves v1 semantics where ``.env`` wins
+    over pre-existing shell env vars.
     """
-    global _dotenv_loaded
-    if _dotenv_loaded:
-        return
     load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
-    _dotenv_loaded = True
 
 
 @dataclass(frozen=True)
@@ -69,7 +64,7 @@ def load_v2_config() -> V2ConnectionConfig:
     """
     import tomllib
 
-    _load_dotenv_once()
+    _load_cwd_dotenv()
 
     cfg: dict[str, Any] = dict(DEFAULTS)
 
