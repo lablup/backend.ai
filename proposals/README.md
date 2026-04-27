@@ -123,6 +123,7 @@ BEP numbers start from 1000.
 | [1050](BEP-1050-prometheus-query-preset-system.md) | Prometheus Query Preset System | BoKeum Kim | Draft |
 | [1051](BEP-1051-kata-containers-agent.md) | Kata Containers Agent Backend | Kyujin Cho | Draft |
 | [1052](BEP-1052-scoped-app-config-redesign.md) | Scoped App Config Redesign | Gyubong Lee | Draft |
+| [1053](BEP-1053-native-session-retry.md) | Native Session Retry | Jeongseok Kang | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
