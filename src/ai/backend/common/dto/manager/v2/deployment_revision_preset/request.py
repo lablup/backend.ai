@@ -7,23 +7,18 @@ from pydantic import Field
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import (
+    EnvironmentVariableEntryInput,
+    OrderDirection,
+    ResourceSlotEntryInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
+from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-
-
-class EnvironEntryInput(BaseRequestModel):
-    key: str = Field(description="Environment variable key.")
-    value: str = Field(description="Environment variable value.")
-
-
-class ResourceOptsEntryInput(BaseRequestModel):
-    name: str = Field(description="Resource option name (e.g. shmem).")
-    value: str = Field(description="Resource option value (e.g. 1g).")
 
 
 class PresetValueInput(BaseRequestModel):
@@ -44,14 +39,14 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     resource_slots: list[ResourceSlotEntryInput] | None = Field(
         default=None, description="Resource slot allocations."
     )
-    resource_opts: list[ResourceOptsEntryInput] | None = Field(
+    resource_opts: list[ResourceOptsEntryDTO] | None = Field(
         default=None, description="Additional resource options."
     )
     cluster_mode: str | None = Field(default=None, max_length=16, description="Cluster mode.")
     cluster_size: int | None = Field(default=None, ge=1, description="Cluster size.")
     startup_command: str | None = Field(default=None, description="Startup command.")
     bootstrap_script: str | None = Field(default=None, description="Bootstrap script.")
-    environ: list[EnvironEntryInput] | None = Field(
+    environ: list[EnvironmentVariableEntryInput] | None = Field(
         default=None, description="Environment variables."
     )
     preset_values: list[PresetValueInput] | None = Field(
@@ -86,12 +81,12 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     image_id: ImageID | Sentinel | None = Field(default=SENTINEL)
     model_definition: ModelDefinition | Sentinel | None = Field(default=SENTINEL)
     resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
-    resource_opts: list[ResourceOptsEntryInput] | None = Field(default=None)
+    resource_opts: list[ResourceOptsEntryDTO] | None = Field(default=None)
     cluster_mode: str | None = Field(default=None, max_length=16)
     cluster_size: int | None = Field(default=None, ge=1)
     startup_command: str | Sentinel | None = Field(default=SENTINEL)
     bootstrap_script: str | Sentinel | None = Field(default=SENTINEL)
-    environ: list[EnvironEntryInput] | None = Field(default=None)
+    environ: list[EnvironmentVariableEntryInput] | None = Field(default=None)
     preset_values: list[PresetValueInput] | None = Field(default=None)
     open_to_public: bool | Sentinel | None = Field(default=SENTINEL)
     replica_count: int | Sentinel | None = Field(default=SENTINEL, ge=0)

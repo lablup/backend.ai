@@ -26,13 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     DeploymentRevisionPresetOrder as OrderDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
-    EnvironEntryInput as EnvironEntryInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     PresetValueInput as PresetValueInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
-    ResourceOptsEntryInput as ResourceOptsEntryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     UpdateDeploymentRevisionPresetInput as UpdateInputDTO,
@@ -69,7 +63,11 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
-from ai.backend.manager.api.gql.common.types import ClusterModeGQL
+from ai.backend.manager.api.gql.common.types import (
+    ClusterModeGQL,
+    EnvironEntryInputGQL,
+    ResourceOptsEntryInput,
+)
 from ai.backend.manager.api.gql.common.types import ResourceOptsEntryGQL as ResourceOptsEntryInfoGQL
 from ai.backend.manager.api.gql.common_types import ResourceSlotEntryInputGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -375,30 +373,6 @@ class DeploymentRevisionPresetConnection(Connection[DeploymentRevisionPresetGQL]
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A single environment variable key-value pair to inject into the inference container when a deployment revision preset is applied.",
-    ),
-    name="DeploymentRevisionPresetEnvironEntryInput",
-)
-class PresetEnvironEntryInputGQL(PydanticInputMixin[EnvironEntryInputDTO]):
-    key: str = gql_field(description="The environment variable name.")
-    value: str = gql_field(description="The value assigned to the environment variable.")
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="A single additional resource option (e.g. shared memory size) for a deployment revision preset.",
-    ),
-    name="DeploymentRevisionPresetResourceOptsEntryInput",
-)
-class PresetResourceOptsEntryInputGQL(PydanticInputMixin[ResourceOptsEntryInputDTO]):
-    name: str = gql_field(description="Resource option name (e.g. 'shmem').")
-    value: str = gql_field(description="Resource option value (e.g. '1g').")
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
         description="A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.",
     ),
     name="DeploymentRevisionPresetValueEntryInput",
@@ -510,7 +484,7 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         ),
         default=None,
     )
-    resource_opts: list[PresetResourceOptsEntryInputGQL] | None = gql_added_field(
+    resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Additional resource options such as shared memory (shmem) size.",
@@ -545,7 +519,7 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         ),
         default=None,
     )
-    environ: list[PresetEnvironEntryInputGQL] | None = gql_added_field(
+    environ: list[EnvironEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Environment variables injected into the inference container.",
@@ -628,7 +602,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         ),
         default=None,
     )
-    resource_opts: list[PresetResourceOptsEntryInputGQL] | None = gql_added_field(
+    resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Replace additional resource options. Omit to leave unchanged.",
@@ -649,7 +623,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         ),
         default=None,
     )
-    environ: list[PresetEnvironEntryInputGQL] | None = gql_added_field(
+    environ: list[EnvironEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Replace environment variables. Omit to leave unchanged.",

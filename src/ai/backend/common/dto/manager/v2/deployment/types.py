@@ -235,14 +235,27 @@ class ReplicaOrderField(StrEnum):
 
 
 class EnvironmentVariableEntryInfoDTO(BaseResponseModel):
-    """A single environment variable entry with name and value."""
+    """A single environment variable entry with name and value.
+
+    .. deprecated::
+        Retained only for legacy deployment/session response DTOs that already expose ``name``.
+        New code should use
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariableEntryInfo`
+        (``key``/``value``) instead.
+    """
 
     name: str
     value: str
 
 
 class EnvironmentVariablesInfoDTO(BaseResponseModel):
-    """A collection of environment variable entries."""
+    """A collection of environment variable entries.
+
+    .. deprecated::
+        Retained only for legacy deployment/session response DTOs.
+        New code should use
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariablesInfo`.
+    """
 
     entries: list[EnvironmentVariableEntryInfoDTO]
 

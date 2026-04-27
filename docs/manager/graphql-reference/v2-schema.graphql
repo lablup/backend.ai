@@ -1926,7 +1926,7 @@ input CreateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Additional resource options such as shared memory (shmem) size.
   """
-  resourceOpts: [DeploymentRevisionPresetResourceOptsEntryInput!] = null
+  resourceOpts: [ResourceOptsEntryInput!] = null
 
   """
   Added in UNRELEASED. Deployment topology mode (single-node or multi-node).
@@ -1949,7 +1949,7 @@ input CreateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Environment variables injected into the inference container.
   """
-  environ: [DeploymentRevisionPresetEnvironEntryInput!] = null
+  environ: [EnvironEntryInput!] = null
 
   """
   Added in UNRELEASED. Runtime variant preset values applied when using this deployment preset.
@@ -3456,17 +3456,6 @@ type DeploymentRevisionPresetEnvironEntry {
   value: String!
 }
 
-"""
-Added in UNRELEASED. A single environment variable key-value pair to inject into the inference container when a deployment revision preset is applied.
-"""
-input DeploymentRevisionPresetEnvironEntryInput {
-  """The environment variable name."""
-  key: String!
-
-  """The value assigned to the environment variable."""
-  value: String!
-}
-
 """Added in 26.4.2. Filter for deployment revision presets."""
 input DeploymentRevisionPresetFilter {
   """Name filter."""
@@ -3490,17 +3479,6 @@ enum DeploymentRevisionPresetOrderField {
   NAME
   RANK
   CREATED_AT
-}
-
-"""
-Added in UNRELEASED. A single additional resource option (e.g. shared memory size) for a deployment revision preset.
-"""
-input DeploymentRevisionPresetResourceOptsEntryInput {
-  """Resource option name (e.g. 'shmem')."""
-  name: String!
-
-  """Resource option value (e.g. '1g')."""
-  value: String!
 }
 
 """
@@ -4278,6 +4256,17 @@ type EntityTimestamps {
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
+}
+
+"""
+Added in UNRELEASED. A single environment variable entry with key and value.
+"""
+input EnvironEntryInput {
+  """Environment variable key (e.g., 'CUDA_VISIBLE_DEVICES')."""
+  key: String!
+
+  """Environment variable value."""
+  value: String!
 }
 
 """
@@ -12160,7 +12149,7 @@ input UpdateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Replace additional resource options. Omit to leave unchanged.
   """
-  resourceOpts: [DeploymentRevisionPresetResourceOptsEntryInput!] = null
+  resourceOpts: [ResourceOptsEntryInput!] = null
 
   """
   Added in UNRELEASED. New cluster topology mode. Omit to leave unchanged.
@@ -12173,7 +12162,7 @@ input UpdateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Replace environment variables. Omit to leave unchanged.
   """
-  environ: [DeploymentRevisionPresetEnvironEntryInput!] = null
+  environ: [EnvironEntryInput!] = null
 
   """
   Added in UNRELEASED. Replace runtime variant preset values. Omit to leave unchanged.

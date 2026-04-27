@@ -14,6 +14,15 @@ from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 class EnvironEntryInfo(BaseResponseModel):
+    """A single environment variable entry with key and value.
+
+    .. deprecated::
+        Equivalent to
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariableEntryInfo`.
+        New code should prefer the common type; this class is retained only for
+        the deployment revision preset response schema.
+    """
+
     key: str = Field(description="Environment variable key.")
     value: str = Field(description="Environment variable value.")
 
@@ -24,6 +33,15 @@ class ResourceSlotEntryInfo(BaseResponseModel):
 
 
 class ResourceOptsEntryInfo(BaseResponseModel):
+    """A single resource option entry with name and value.
+
+    .. deprecated::
+        Equivalent to
+        :class:`ai.backend.common.dto.manager.v2.resource_slot.types.ResourceOptsEntryInfoDTO`.
+        New code should prefer the common type; this class is retained only for
+        the deployment revision preset response schema.
+    """
+
     name: str = Field(description="Resource option name (e.g. shmem).")
     value: str = Field(description="Resource option value (e.g. 1g).")
 
