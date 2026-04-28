@@ -16,13 +16,11 @@ import stat
 import tempfile
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
 from pydantic import ValidationError
 
 from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
-    DeploymentChatCacheEntry,
     DeploymentChatConfig,
 )
 from ai.backend.client.cli.v2.helpers import CONFIG_DIR
@@ -37,21 +35,10 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
     raw = _read_json(path)
     if raw is None:
         return DeploymentChatCache()
-    deployments: dict[UUID, DeploymentChatCacheEntry] = {}
-    deployments_raw = raw.get("deployments") or {}
-    if isinstance(deployments_raw, dict):
-        for key, value in deployments_raw.items():
-            try:
-                dep_id = UUID(str(key))
-            except ValueError:
-                continue
-            if not isinstance(value, dict):
-                continue
-            try:
-                deployments[dep_id] = DeploymentChatCacheEntry.model_validate(value)
-            except ValidationError:
-                continue
-    return DeploymentChatCache(deployments=deployments)
+    try:
+        return DeploymentChatCache.model_validate(raw)
+    except ValidationError:
+        return DeploymentChatCache()
 
 
 def save_chat_cache(cache: DeploymentChatCache, path: Path = CHAT_CACHE_FILE) -> None:
@@ -64,17 +51,10 @@ def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
     raw = _read_json(path)
     if raw is None:
         return DeploymentChatConfig()
-    tokens: dict[UUID, str] = {}
-    tokens_raw = raw.get("tokens") or {}
-    if isinstance(tokens_raw, dict):
-        for key, value in tokens_raw.items():
-            try:
-                dep_id = UUID(str(key))
-            except ValueError:
-                continue
-            if isinstance(value, str):
-                tokens[dep_id] = value
-    return DeploymentChatConfig(tokens=tokens)
+    try:
+        return DeploymentChatConfig.model_validate(raw)
+    except ValidationError:
+        return DeploymentChatConfig()
 
 
 def save_chat_config(config: DeploymentChatConfig, path: Path = CHAT_CONFIG_FILE) -> None:

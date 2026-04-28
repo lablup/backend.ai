@@ -5,7 +5,7 @@ import os
 import stat
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -100,9 +100,8 @@ class TestCacheLoaderResilience:
         path.write_text("[]", encoding="utf-8")
         assert load_chat_cache(path).deployments == {}
 
-    def test_load_skips_invalid_uuid_keys(self, tmp_path: Path) -> None:
+    def test_load_returns_empty_on_invalid_uuid_key(self, tmp_path: Path) -> None:
         path = tmp_path / "cache.json"
-        good_id = UUID("12345678-1234-5678-1234-567812345678")
         path.write_text(
             json.dumps({
                 "deployments": {
@@ -111,37 +110,23 @@ class TestCacheLoaderResilience:
                         "default_model": None,
                         "last_synced_at": "2026-04-27T12:00:00+00:00",
                     },
-                    str(good_id): {
-                        "endpoint_url": "https://y.example",
-                        "default_model": "m",
-                        "last_synced_at": "2026-04-27T12:00:00+00:00",
-                    },
                 },
             }),
             encoding="utf-8",
         )
-        loaded = load_chat_cache(path)
-        assert list(loaded.deployments.keys()) == [good_id]
+        assert load_chat_cache(path).deployments == {}
 
-    def test_load_skips_malformed_entry_payload(self, tmp_path: Path) -> None:
+    def test_load_returns_empty_on_malformed_entry_payload(self, tmp_path: Path) -> None:
         path = tmp_path / "cache.json"
-        good_id = UUID("12345678-1234-5678-1234-567812345678")
-        bad_id = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         path.write_text(
             json.dumps({
                 "deployments": {
-                    str(bad_id): {"default_model": "m"},
-                    str(good_id): {
-                        "endpoint_url": "https://y.example",
-                        "default_model": "m",
-                        "last_synced_at": "2026-04-27T12:00:00+00:00",
-                    },
+                    "12345678-1234-5678-1234-567812345678": {"default_model": "m"},
                 },
             }),
             encoding="utf-8",
         )
-        loaded = load_chat_cache(path)
-        assert list(loaded.deployments.keys()) == [good_id]
+        assert load_chat_cache(path).deployments == {}
 
 
 class TestConfigLoaderResilience:
@@ -150,20 +135,13 @@ class TestConfigLoaderResilience:
         path.write_text("not-json{", encoding="utf-8")
         assert load_chat_config(path).tokens == {}
 
-    def test_load_skips_invalid_uuid_keys(self, tmp_path: Path) -> None:
+    def test_load_returns_empty_on_invalid_uuid_key(self, tmp_path: Path) -> None:
         path = tmp_path / "config.json"
-        good_id = UUID("12345678-1234-5678-1234-567812345678")
         path.write_text(
-            json.dumps({
-                "tokens": {
-                    "not-a-uuid": "sk-x",
-                    str(good_id): "sk-y",
-                },
-            }),
+            json.dumps({"tokens": {"not-a-uuid": "sk-x"}}),
             encoding="utf-8",
         )
-        loaded = load_chat_config(path)
-        assert loaded.tokens == {good_id: "sk-y"}
+        assert load_chat_config(path).tokens == {}
 
 
 class TestMaskToken:
