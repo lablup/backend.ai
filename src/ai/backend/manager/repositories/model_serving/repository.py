@@ -161,20 +161,6 @@ class ModelServingRepository:
             )
 
     @model_serving_repository_resilience.apply()
-    async def get_endpoint_by_name_validated(
-        self, name: str, user_id: uuid.UUID
-    ) -> EndpointData | None:
-        """
-        Get endpoint by name with ownership validation.
-        Returns None if endpoint doesn't exist or user doesn't own it.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            endpoint = await self._get_endpoint_by_name(session, name, user_id, load_revisions=True)
-            if not endpoint:
-                return None
-            return endpoint.to_data()
-
-    @model_serving_repository_resilience.apply()
     async def list_endpoints_by_owner_validated(
         self, session_owner_id: uuid.UUID, name: str | None = None
     ) -> list[EndpointData]:
@@ -469,27 +455,6 @@ class ModelServingRepository:
             )
         except NoResultFound:
             return None
-
-    async def _get_endpoint_by_name(
-        self,
-        session: SASession,
-        name: str,
-        user_id: uuid.UUID,
-        load_revisions: bool = False,
-    ) -> EndpointRow | None:
-        """
-        Private method to get endpoint by name and owner using an existing session.
-        """
-        query = sa.select(EndpointRow).where(
-            (EndpointRow.name == name) & (EndpointRow.session_owner == user_id)
-        )
-        if load_revisions:
-            query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
-            )
-        result = await session.execute(query)
-
-        return result.scalar()
 
     async def _get_route_by_id(
         self,
