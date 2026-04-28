@@ -72,6 +72,7 @@ from .deployment import (
     create_auto_scaling_rule,
     # Deployment
     create_model_deployment,
+    delete_access_token,
     delete_auto_scaling_rule,
     delete_model_deployment,
     deployment,
@@ -727,6 +728,7 @@ class Mutation:
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
+    delete_access_token = delete_access_token
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
     # Fair Share - Admin APIs

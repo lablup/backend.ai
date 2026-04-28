@@ -2820,6 +2820,18 @@ input DelegateeTarget {
   targetRegistryId: ID!
 }
 
+"""Added in UNRELEASED. Input for deleting an access token."""
+input DeleteAccessTokenInput {
+  """The ID of the access token to delete."""
+  id: ID!
+}
+
+"""Added in UNRELEASED. Payload for deleting an access token."""
+type DeleteAccessTokenPayload {
+  """ID of the deleted access token"""
+  id: UUID!
+}
+
 """
 Added in 24.09.0. Input for soft-deleting artifacts from the system.
 
@@ -6706,6 +6718,9 @@ type Mutation {
 
   """Added in 25.16.0. Create access token."""
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload!
+
+  """Added in UNRELEASED. Delete access token."""
+  deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload!
 
   """
   Added in 25.19.0. Activate a specific revision to be the current revision

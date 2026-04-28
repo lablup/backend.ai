@@ -4379,6 +4379,22 @@ type DelegateScanArtifactsPayload
   artifacts: [Artifact!]!
 }
 
+"""Added in UNRELEASED. Input for deleting an access token."""
+input DeleteAccessTokenInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the access token to delete."""
+  id: ID!
+}
+
+"""Added in UNRELEASED. Payload for deleting an access token."""
+type DeleteAccessTokenPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted access token"""
+  id: UUID!
+}
+
 """
 Added in 24.09.0. Input for soft-deleting artifacts from the system.
 
@@ -10766,6 +10782,9 @@ type Mutation
 
   """Added in 25.16.0. Create access token."""
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete access token."""
+  deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.19.0. Activate a specific revision to be the current revision
