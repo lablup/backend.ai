@@ -49,17 +49,17 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
 
 
 @dataclass
-class AssocGroupUserCreatorSpec(CreatorSpec[AssociationScopesEntitiesRow]):
+class ProjectUserMembershipCreatorSpec(CreatorSpec[AssociationScopesEntitiesRow]):
     """CreatorSpec for user-project membership (PROJECT/USER ASE row)."""
 
     user_id: UUID
-    group_id: UUID
+    project_id: UUID
 
     @override
     def build_row(self) -> AssociationScopesEntitiesRow:
         return AssociationScopesEntitiesRow(
             scope_type=ScopeType.PROJECT,
-            scope_id=str(self.group_id),
+            scope_id=str(self.project_id),
             entity_type=EntityType.USER,
             entity_id=str(self.user_id),
             relation_type=RelationType.AUTO,

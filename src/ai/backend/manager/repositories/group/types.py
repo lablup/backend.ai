@@ -81,9 +81,10 @@ class UserProjectSearchScope(SearchScope):
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition on AssociationScopesEntitiesRow.
 
-        This will be used in a JOIN query with GroupRow. The caller is
-        responsible for joining ASE with the correct ``scope_type`` and
-        ``entity_type`` filters; this condition only narrows ``entity_id``.
+        Used as a WHERE predicate in a JOIN query with GroupRow. Applies the
+        ``scope_type=PROJECT`` / ``entity_type=USER`` filters and narrows
+        ``entity_id`` to this user; the JOIN side may also re-state the
+        scope/entity-type filters for redundancy without affecting results.
         """
         user_uuid_str = str(self.user_uuid)
 

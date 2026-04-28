@@ -86,8 +86,8 @@ from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import (
-    AssocGroupUserCreatorSpec,
     GroupCreatorSpec,
+    ProjectUserMembershipCreatorSpec,
 )
 from ai.backend.manager.repositories.group.purgers import (
     GroupBatchPurgerSpec,
@@ -250,7 +250,7 @@ class GroupDBSource:
         project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
         pairs = [
             RBACScopeBindingPair(
-                spec=AssocGroupUserCreatorSpec(user_id=row.uuid, group_id=project_id),
+                spec=ProjectUserMembershipCreatorSpec(user_id=row.uuid, project_id=project_id),
                 entity_ref=RBACElementRef(RBACElementType.USER, str(row.uuid)),
                 scope_ref=project_scope_ref,
             )
@@ -786,7 +786,7 @@ class GroupDBSource:
             project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
             pairs = [
                 RBACScopeBindingPair(
-                    spec=AssocGroupUserCreatorSpec(user_id=row.uuid, group_id=project_id),
+                    spec=ProjectUserMembershipCreatorSpec(user_id=row.uuid, project_id=project_id),
                     entity_ref=RBACElementRef(RBACElementType.USER, str(row.uuid)),
                     scope_ref=project_scope_ref,
                 )
@@ -888,7 +888,7 @@ class GroupDBSource:
 
             project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
             pair = RBACScopeBindingPair(
-                spec=AssocGroupUserCreatorSpec(user_id=user_id, group_id=project_id),
+                spec=ProjectUserMembershipCreatorSpec(user_id=user_id, project_id=project_id),
                 entity_ref=RBACElementRef(RBACElementType.USER, str(user_id)),
                 scope_ref=project_scope_ref,
             )

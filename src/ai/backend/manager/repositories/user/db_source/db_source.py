@@ -113,7 +113,7 @@ from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     execute_rbac_scope_entity_unbinder,
 )
 from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater, execute_updater
-from ai.backend.manager.repositories.group.creators import AssocGroupUserCreatorSpec
+from ai.backend.manager.repositories.group.creators import ProjectUserMembershipCreatorSpec
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
@@ -1052,7 +1052,7 @@ class UserDBSource:
         """
         project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
         pair = RBACScopeBindingPair(
-            spec=AssocGroupUserCreatorSpec(user_id=user_uuid, group_id=project_id),
+            spec=ProjectUserMembershipCreatorSpec(user_id=user_uuid, project_id=project_id),
             entity_ref=RBACElementRef(RBACElementType.USER, str(user_uuid)),
             scope_ref=project_scope_ref,
         )
