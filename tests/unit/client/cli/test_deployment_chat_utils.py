@@ -45,7 +45,7 @@ class TestCacheLoadSaveRoundTrip:
         cache = DeploymentChatCache()
         dep_id = uuid4()
         original = _make_entry(default_model="gpt-test")
-        cache.upsert(dep_id, original)
+        cache.set(dep_id, original)
         save_chat_cache(cache, path)
 
         loaded = load_chat_cache(path)
@@ -76,7 +76,7 @@ class TestPermissions:
     def test_save_chat_cache_enforces_0600(self, tmp_path: Path) -> None:
         path = tmp_path / "cache.json"
         cache = DeploymentChatCache()
-        cache.upsert(uuid4(), _make_entry())
+        cache.set(uuid4(), _make_entry())
         save_chat_cache(cache, path)
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 

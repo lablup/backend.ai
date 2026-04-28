@@ -33,7 +33,7 @@ class DeploymentChatCache(BaseModel):
     def get(self, deployment_id: UUID) -> DeploymentChatCacheEntry | None:
         return self.deployments.get(deployment_id)
 
-    def upsert(self, deployment_id: UUID, entry: DeploymentChatCacheEntry) -> None:
+    def set(self, deployment_id: UUID, entry: DeploymentChatCacheEntry) -> None:
         self.deployments[deployment_id] = entry
 
     def remove(self, deployment_id: UUID) -> bool:

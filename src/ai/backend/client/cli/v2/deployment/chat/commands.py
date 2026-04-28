@@ -82,7 +82,7 @@ async def _resolve_endpoint_entry(
         default_model=served_model,
         last_synced_at=datetime.now(UTC),
     )
-    cache.upsert(deployment_id, new_entry)
+    cache.set(deployment_id, new_entry)
     save_chat_cache(cache)
     return new_entry
 
