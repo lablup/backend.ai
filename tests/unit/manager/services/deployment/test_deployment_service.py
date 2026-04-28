@@ -333,11 +333,11 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     def _setup_default_repository_mocks(
         self,
         mock_deployment_repository: MagicMock,
-        endpoint_info: DeploymentInfo,
+        deployment_info: DeploymentInfo,
         revision_data: ModelRevisionData,
     ) -> None:
         """Set up default mock responses for repository methods used in add_model_revision."""
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
         mock_deployment_repository.create_revision_with_next_number = AsyncMock(
             return_value=revision_data
         )
@@ -355,7 +355,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
         return uuid.uuid4()
 
     @pytest.fixture
-    def endpoint_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
+    def deployment_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
             id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
@@ -514,7 +514,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         return uuid.uuid4()
 
     @pytest.fixture
-    def endpoint_info(
+    def deployment_info(
         self,
         deployment_id: uuid.UUID,
         session_owner_id: uuid.UUID,
@@ -557,7 +557,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         return "eyJhbGciOiJIUzI1NiJ9.coordinator-signed-payload.signature"
 
     @pytest.fixture
-    def created_token_row(
+    def sample_token_row(
         self,
         deployment_id: uuid.UUID,
         coordinator_jwt: str,
@@ -574,15 +574,15 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
     def configure_repository(
         self,
         mock_deployment_repository: MagicMock,
-        endpoint_info: DeploymentInfo,
+        deployment_info: DeploymentInfo,
         proxy_target: ScalingGroupProxyTarget,
-        created_token_row: MagicMock,
+        sample_token_row: MagicMock,
     ) -> MagicMock:
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
         mock_deployment_repository.fetch_scaling_group_proxy_targets = AsyncMock(
-            return_value={endpoint_info.metadata.resource_group: proxy_target}
+            return_value={deployment_info.metadata.resource_group: proxy_target}
         )
-        mock_deployment_repository.create_access_token = AsyncMock(return_value=created_token_row)
+        mock_deployment_repository.create_access_token = AsyncMock(return_value=sample_token_row)
         return mock_deployment_repository
 
     @pytest.fixture
@@ -608,20 +608,11 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
             appproxy_client_pool=mock_appproxy_client_pool,
         )
 
-    @pytest.fixture
-    def action(self, deployment_id: uuid.UUID) -> CreateAccessTokenAction:
-        return CreateAccessTokenAction(
-            creator=ModelDeploymentAccessTokenCreator(
-                model_deployment_id=deployment_id,
-                expires_at=None,
-            ),
-        )
-
     async def test_persists_coordinator_jwt_instead_of_random(
         self,
         deployment_service: DeploymentService,
         configure_repository: MagicMock,
-        action: CreateAccessTokenAction,
+        deployment_id: uuid.UUID,
         coordinator_jwt: str,
     ) -> None:
         """Regression: BA-5881. The token persisted via the CreatorSpec must
@@ -629,6 +620,12 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         generated random string. If this fails, ``./bai deployment access-token
         create`` is producing tokens that app-proxy worker rejects with 401.
         """
+        action = CreateAccessTokenAction(
+            creator=ModelDeploymentAccessTokenCreator(
+                model_deployment_id=deployment_id,
+                expires_at=None,
+            ),
+        )
         result = await deployment_service.create_access_token(action)
 
         assert result.data.token == coordinator_jwt
