@@ -11,6 +11,7 @@ from uuid import UUID
 import click
 
 from ai.backend.cli.params import JSONParamType
+from ai.backend.client.cli.v2.deployment.chat.formatter import DeploymentChatFormatter
 from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
@@ -277,7 +278,7 @@ def show(deployment_id: UUID) -> None:
     token = chat_config_store.get_token(deployment_id)
     if entry is None and token is None:
         raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
-    DeploymentChatCacheEntry.print_summary(deployment_id, entry, mask_token(token))
+    DeploymentChatFormatter.render(deployment_id, entry, mask_token(token))
 
 
 @chat_config.command(name="clear-cache")
@@ -292,16 +293,16 @@ def clear_cache(deployment_id: UUID) -> None:
         print(f"No cache entry for deployment {deployment_id}.")
 
 
-@chat_config.command(name="clear-token")
+@chat_config.command(name="clear-config")
 @click.argument("deployment_id", type=click.UUID)
-def clear_token(deployment_id: UUID) -> None:
+def clear_config(deployment_id: UUID) -> None:
     """Remove the stored API key for a deployment."""
     chat_config_store = load_chat_config()
     if chat_config_store.clear_token(deployment_id):
         save_chat_config(chat_config_store)
-        print(f"Removed token for deployment {deployment_id}.")
+        print(f"Removed config entry for deployment {deployment_id}.")
     else:
-        print(f"No token for deployment {deployment_id}.")
+        print(f"No config entry for deployment {deployment_id}.")
 
 
 __all__ = ("chat", "chat_config")
