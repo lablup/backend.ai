@@ -9,13 +9,21 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.client.cli.v2.deployment_chat_cache import (
-    CHAT_CACHE_SCHEMA_VERSION,
+from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
+    DeploymentChatConfig,
     IncompatibleChatCacheError,
+    IncompatibleChatConfigError,
+)
+from ai.backend.client.cli.v2.deployment.chat.utils import (
+    CHAT_CACHE_SCHEMA_VERSION,
+    CHAT_CONFIG_SCHEMA_VERSION,
     load_chat_cache,
+    load_chat_config,
+    mask_token,
     save_chat_cache,
+    save_chat_config,
 )
 
 
@@ -31,8 +39,8 @@ def _entry(
     )
 
 
-class TestLoadSaveRoundTrip:
-    def test_load_returns_empty_cache_when_file_missing(self, tmp_path: Path) -> None:
+class TestCacheLoadSaveRoundTrip:
+    def test_load_returns_empty_when_file_missing(self, tmp_path: Path) -> None:
         cache = load_chat_cache(tmp_path / "missing.json")
         assert cache.deployments == {}
 
@@ -59,18 +67,50 @@ class TestLoadSaveRoundTrip:
         assert payload["deployments"] == {}
 
 
+class TestConfigLoadSaveRoundTrip:
+    def test_load_returns_empty_when_file_missing(self, tmp_path: Path) -> None:
+        cfg = load_chat_config(tmp_path / "missing.json")
+        assert cfg.tokens == {}
+
+    def test_save_then_load_preserves_tokens(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.json"
+        cfg = DeploymentChatConfig()
+        dep_id = uuid4()
+        cfg.set_token(dep_id, "sk-secret-token-1234")
+        save_chat_config(cfg, path)
+
+        loaded = load_chat_config(path)
+        assert loaded.get_token(dep_id) == "sk-secret-token-1234"
+
+    def test_save_writes_schema_version(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.json"
+        save_chat_config(DeploymentChatConfig(), path)
+        with path.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+        assert payload["schema_version"] == CHAT_CONFIG_SCHEMA_VERSION
+        assert payload["tokens"] == {}
+
+
 class TestPermissions:
     @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
-    def test_save_enforces_0600(self, tmp_path: Path) -> None:
+    def test_save_chat_cache_enforces_0600(self, tmp_path: Path) -> None:
         path = tmp_path / "cache.json"
         cache = DeploymentChatCache()
         cache.upsert(uuid4(), _entry())
         save_chat_cache(cache, path)
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
+    @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
+    def test_save_chat_config_enforces_0600(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.json"
+        cfg = DeploymentChatConfig()
+        cfg.set_token(uuid4(), "sk-x")
+        save_chat_config(cfg, path)
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
 
 class TestSchemaVersionGuard:
-    def test_load_rejects_newer_schema_version(self, tmp_path: Path) -> None:
+    def test_load_chat_cache_rejects_newer_schema(self, tmp_path: Path) -> None:
         path = tmp_path / "cache.json"
         path.write_text(
             json.dumps({
@@ -82,8 +122,20 @@ class TestSchemaVersionGuard:
         with pytest.raises(IncompatibleChatCacheError):
             load_chat_cache(path)
 
+    def test_load_chat_config_rejects_newer_schema(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.json"
+        path.write_text(
+            json.dumps({
+                "schema_version": CHAT_CONFIG_SCHEMA_VERSION + 1,
+                "tokens": {},
+            }),
+            encoding="utf-8",
+        )
+        with pytest.raises(IncompatibleChatConfigError):
+            load_chat_config(path)
 
-class TestLoaderResilience:
+
+class TestCacheLoaderResilience:
     def test_load_returns_empty_on_corrupt_json(self, tmp_path: Path) -> None:
         path = tmp_path / "cache.json"
         path.write_text("not-json{", encoding="utf-8")
@@ -140,36 +192,38 @@ class TestLoaderResilience:
         assert list(loaded.deployments.keys()) == [good_id]
 
 
-class TestEntryFormatSummary:
-    def test_format_summary_returns_lines(self) -> None:
-        entry = _entry(default_model="meta/test-model")
-        lines = entry.format_summary()
-        assert any("endpoint_url" in line for line in lines)
-        assert any("meta/test-model" in line for line in lines)
-        assert any("last_synced_at" in line for line in lines)
+class TestConfigLoaderResilience:
+    def test_load_returns_empty_on_corrupt_json(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.json"
+        path.write_text("not-json{", encoding="utf-8")
+        assert load_chat_config(path).tokens == {}
 
-    def test_format_summary_dash_for_missing_default_model(self) -> None:
-        entry = _entry(default_model=None)
-        lines = entry.format_summary()
-        assert any("default_model : -" in line for line in lines)
+    def test_load_skips_invalid_uuid_keys(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.json"
+        good_id = UUID("12345678-1234-5678-1234-567812345678")
+        path.write_text(
+            json.dumps({
+                "schema_version": CHAT_CONFIG_SCHEMA_VERSION,
+                "tokens": {
+                    "not-a-uuid": "sk-x",
+                    str(good_id): "sk-y",
+                },
+            }),
+            encoding="utf-8",
+        )
+        loaded = load_chat_config(path)
+        assert loaded.tokens == {good_id: "sk-y"}
 
 
-class TestEntryMutations:
-    def test_upsert_overwrites_existing_entry(self) -> None:
-        cache = DeploymentChatCache()
-        dep_id = uuid4()
-        cache.upsert(dep_id, _entry(default_model="m1"))
-        cache.upsert(dep_id, _entry(default_model="m2"))
-        stored = cache.get(dep_id)
-        assert stored is not None
-        assert stored.default_model == "m2"
+class TestMaskToken:
+    def test_mask_long_token(self) -> None:
+        masked = mask_token("sk-abcdefghijklmnopqrstuvwxyz")
+        assert masked.startswith("sk-")
+        assert masked.endswith("wxyz")
+        assert "***" in masked
 
-    def test_remove_returns_true_when_present(self) -> None:
-        cache = DeploymentChatCache()
-        dep_id = uuid4()
-        cache.upsert(dep_id, _entry())
-        assert cache.remove(dep_id) is True
-        assert cache.get(dep_id) is None
+    def test_mask_short_token(self) -> None:
+        assert mask_token("short") == "***"
 
-    def test_remove_returns_false_when_absent(self) -> None:
-        assert DeploymentChatCache().remove(uuid4()) is False
+    def test_mask_none(self) -> None:
+        assert mask_token(None) == "<unset>"

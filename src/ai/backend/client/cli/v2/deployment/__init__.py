@@ -1,7 +1,6 @@
 from .access_token import access_token
 from .auto_scaling_rule import auto_scaling_rule
-from .chat import chat
-from .chat_config import chat_config
+from .chat import chat, chat_config
 from .commands import deployment as deployment
 from .options import options
 from .policy import policy
