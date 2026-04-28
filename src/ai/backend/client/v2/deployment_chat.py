@@ -43,18 +43,13 @@ class DeploymentChatClient:
 
     _session: aiohttp.ClientSession
 
-    def __init__(self, session: aiohttp.ClientSession) -> None:
-        self._session = session
-
-    @classmethod
-    async def create(cls, args: DeploymentChatClientArgs) -> Self:
+    def __init__(self, args: DeploymentChatClientArgs) -> None:
         connector = aiohttp.TCPConnector(ssl=not args.skip_ssl_verification)
         timeout = aiohttp.ClientTimeout(
             sock_connect=args.connect_timeout,
             sock_read=args.read_timeout,
         )
-        session = aiohttp.ClientSession(connector=connector, timeout=timeout)
-        return cls(session)
+        self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
 
     async def __aenter__(self) -> Self:
         return self

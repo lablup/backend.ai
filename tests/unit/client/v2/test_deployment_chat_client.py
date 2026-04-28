@@ -61,7 +61,7 @@ async def _start_server(
 
 @pytest.fixture
 async def chat_client() -> AsyncIterator[DeploymentChatClient]:
-    client = await DeploymentChatClient.create(DeploymentChatClientArgs())
+    client = DeploymentChatClient(DeploymentChatClientArgs())
     try:
         yield client
     finally:
