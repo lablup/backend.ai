@@ -14,11 +14,15 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
+    MintEndpointTokenRequest,
+)
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
@@ -46,6 +50,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
     PresetValueData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
@@ -382,6 +387,7 @@ class DeploymentService:
 
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
+    _appproxy_client_pool: AppProxyClientPool
     _deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
     _runtime_variant_preset_repository: RuntimeVariantPresetRepository | None
 
@@ -389,12 +395,14 @@ class DeploymentService:
         self,
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
+        appproxy_client_pool: AppProxyClientPool,
         deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None = None,
         runtime_variant_preset_repository: RuntimeVariantPresetRepository | None = None,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
+        self._appproxy_client_pool = appproxy_client_pool
         self._deployment_revision_preset_repository = deployment_revision_preset_repository
         self._runtime_variant_preset_repository = runtime_variant_preset_repository
 
@@ -889,10 +897,49 @@ class DeploymentService:
 
     # ========== Access Token ==========
 
+    async def _mint_endpoint_jwt(
+        self,
+        *,
+        deployment_id: UUID,
+        resource_group: str,
+        user_uuid: UUID,
+        expires_at: datetime,
+    ) -> str:
+        """Ask the deployment's app-proxy coordinator to mint an inference JWT.
+
+        Resolves the coordinator behind the deployment's scaling group and
+        delegates to :class:`AppProxyClient`. Raises
+        :class:`InvalidAPIParameters` when the scaling group has no proxy
+        target configured — an opaque local fallback would not pass the
+        worker's HS256 check, so refusing here is the only safe option.
+        """
+        proxy_targets = await self._deployment_repository.fetch_scaling_group_proxy_targets({
+            resource_group
+        })
+        proxy_target = proxy_targets.get(resource_group)
+        if proxy_target is None:
+            raise InvalidAPIParameters(
+                f"No app-proxy target configured for scaling group {resource_group!r}; "
+                "cannot issue a deployment access token."
+            )
+
+        client = self._appproxy_client_pool.load_client(proxy_target.addr, proxy_target.api_token)
+        response = await client.mint_endpoint_token(
+            endpoint_id=deployment_id,
+            body=MintEndpointTokenRequest(user_uuid=user_uuid, exp=expires_at),
+        )
+        return response.token
+
     async def create_access_token(
         self, action: CreateAccessTokenAction
     ) -> CreateAccessTokenActionResult:
         """Create a new access token for a model deployment.
+
+        The token returned to the caller is a JWT issued by the app-proxy
+        coordinator (signed with the coordinator's ``jwt_secret``). The
+        inference frontend in the worker validates this JWT against the
+        circuit id, so a randomly generated opaque token would always be
+        rejected with 401.
 
         Args:
             action: CreateAccessTokenAction containing the creator spec.
@@ -900,19 +947,28 @@ class DeploymentService:
         Returns:
             CreateAccessTokenActionResult with the created token data.
         """
-        # Get endpoint info to retrieve domain, project, session_owner
+        # Get endpoint info to retrieve domain, project, session_owner, resource_group
         endpoint_info = await self._deployment_repository.get_endpoint_info(
             action.creator.model_deployment_id
         )
 
-        # Create the RBACEntityCreator with EndpointTokenCreatorSpec
+        expires_at = action.creator.expires_at
+        jwt_token = await self._mint_endpoint_jwt(
+            deployment_id=action.creator.model_deployment_id,
+            resource_group=endpoint_info.metadata.resource_group,
+            user_uuid=endpoint_info.metadata.session_owner,
+            expires_at=expires_at,
+        )
+
+        # Create the RBACEntityCreator with the JWT-bearing spec
         deployment_id = DeploymentID(action.creator.model_deployment_id)
         spec = EndpointTokenCreatorSpec(
             deployment_id=deployment_id,
             domain=endpoint_info.metadata.domain,
             project_id=endpoint_info.metadata.project,
             session_owner_id=endpoint_info.metadata.session_owner,
-            expires_at=action.creator.expires_at,
+            expires_at=expires_at,
+            token=jwt_token,
         )
         creator: RBACEntityCreator[EndpointTokenRow] = RBACEntityCreator(
             spec=spec,

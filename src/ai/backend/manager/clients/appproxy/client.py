@@ -17,11 +17,13 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
     BulkUpdateRoutesRequest,
+    MintEndpointTokenRequest,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkCreateEndpointResponse,
     BulkDeleteEndpointResponse,
     BulkUpdateRoutesResponse,
+    MintEndpointTokenResponse,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -178,6 +180,31 @@ class AppProxyClient:
             resp.raise_for_status()
             payload = await resp.json()
             return BulkUpdateRoutesResponse.model_validate(payload)
+
+    @appproxy_client_resilience.apply()
+    async def mint_endpoint_token(
+        self,
+        endpoint_id: UUID,
+        body: MintEndpointTokenRequest,
+    ) -> MintEndpointTokenResponse:
+        """Ask the coordinator to issue a per-endpoint JWT.
+
+        The worker's inference-frontend auth check requires a token
+        signed with the shared ``jwt_secret`` and bound to the
+        endpoint's circuit, so this is the only correct way to produce
+        an Authorization: Bearer token for ``./bai deployment chat`` and
+        peer SDK callers.
+        """
+        async with self._client_session.post(
+            f"/v2/endpoints/{endpoint_id}/token",
+            json=body.model_dump(mode="json"),
+            headers={
+                "X-BackendAI-Token": self._token,
+            },
+        ) as resp:
+            resp.raise_for_status()
+            payload = await resp.json()
+            return MintEndpointTokenResponse.model_validate(payload)
 
     @appproxy_client_resilience.apply()
     async def delete_endpoints_bulk(

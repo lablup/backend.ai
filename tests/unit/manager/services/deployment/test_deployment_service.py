@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -15,6 +16,9 @@ import pytest
 from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
+    MintEndpointTokenResponse,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
@@ -27,6 +31,8 @@ from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACVali
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.clients.appproxy.client import AppProxyClient, AppProxyClientPool
+from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
@@ -50,12 +56,18 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
+from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
+    CreateAccessTokenAction,
+)
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     SearchDeploymentPoliciesAction,
     UpsertDeploymentPolicyAction,
@@ -82,15 +94,22 @@ class DeploymentServiceBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
+    def mock_appproxy_client_pool(self) -> MagicMock:
+        """Mock AppProxyClientPool for testing."""
+        return MagicMock(spec=AppProxyClientPool)
+
+    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
+            appproxy_client_pool=mock_appproxy_client_pool,
         )
 
     @pytest.fixture
@@ -314,11 +333,11 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     def _setup_default_repository_mocks(
         self,
         mock_deployment_repository: MagicMock,
-        endpoint_info: DeploymentInfo,
+        deployment_info: DeploymentInfo,
         revision_data: ModelRevisionData,
     ) -> None:
         """Set up default mock responses for repository methods used in add_model_revision."""
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
         mock_deployment_repository.create_revision_with_next_number = AsyncMock(
             return_value=revision_data
         )
@@ -336,7 +355,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
         return uuid.uuid4()
 
     @pytest.fixture
-    def endpoint_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
+    def deployment_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
             id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
@@ -470,3 +489,149 @@ class TestAddModelRevision(ModelRevisionFixtures):
             revision=revision_creator,
             auto_activate=False,
         )
+
+
+class TestCreateAccessToken(DeploymentServiceBaseFixtures):
+    """Regression tests for DeploymentService.create_access_token (BA-5881).
+
+    The previous implementation persisted ``secrets.token_urlsafe(32)`` as the
+    deployment access token, which app-proxy worker rejects with 401 because
+    it expects a coordinator-signed JWT. These tests pin the new contract:
+    the service must call the app-proxy coordinator to mint a JWT, persist it
+    via the CreatorSpec, and return it to the caller.
+    """
+
+    @pytest.fixture
+    def deployment_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def session_owner_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def project_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def deployment_info(
+        self,
+        deployment_id: uuid.UUID,
+        session_owner_id: uuid.UUID,
+        project_id: uuid.UUID,
+    ) -> DeploymentInfo:
+        return DeploymentInfo(
+            id=DeploymentID(deployment_id),
+            metadata=DeploymentMetadata(
+                name="ba5881-test",
+                domain="default",
+                project=project_id,
+                resource_group="default",
+                created_user=uuid.uuid4(),
+                session_owner=session_owner_id,
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                revision_history_limit=10,
+            ),
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica_spec=ReplicaSpec(replica_count=1),
+            network=DeploymentNetworkSpec(open_to_public=False),
+            model_revisions=[],
+            options=DeploymentOptions(),
+        )
+
+    @pytest.fixture
+    def sample_proxy_target(self) -> ScalingGroupProxyTarget:
+        return ScalingGroupProxyTarget(
+            addr="http://app-proxy.local:10200",
+            api_token="proxy-api-token",
+        )
+
+    @pytest.fixture
+    def sample_coordinator_jwt(self) -> str:
+        # The exact bytes are irrelevant; the test only cares that this string
+        # round-trips from the (mocked) coordinator into the persisted token.
+        return "eyJhbGciOiJIUzI1NiJ9.coordinator-signed-payload.signature"
+
+    @pytest.fixture
+    def sample_token_row(
+        self,
+        deployment_id: uuid.UUID,
+        sample_coordinator_jwt: str,
+    ) -> MagicMock:
+        row = MagicMock()
+        row.id = uuid.uuid4()
+        row.token = sample_coordinator_jwt
+        row.endpoint = DeploymentID(deployment_id)
+        row.expires_at = None
+        row.created_at = datetime(2024, 1, 1, tzinfo=UTC)
+        return row
+
+    @pytest.fixture
+    def configure_repository(
+        self,
+        mock_deployment_repository: MagicMock,
+        deployment_info: DeploymentInfo,
+        sample_proxy_target: ScalingGroupProxyTarget,
+        sample_token_row: MagicMock,
+    ) -> MagicMock:
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
+        mock_deployment_repository.fetch_scaling_group_proxy_targets = AsyncMock(
+            return_value={deployment_info.metadata.resource_group: sample_proxy_target}
+        )
+        mock_deployment_repository.create_access_token = AsyncMock(return_value=sample_token_row)
+        return mock_deployment_repository
+
+    @pytest.fixture
+    def mock_appproxy_client_pool(self, sample_coordinator_jwt: str) -> MagicMock:
+        client = MagicMock(spec=AppProxyClient)
+        client.mint_endpoint_token = AsyncMock(
+            return_value=MintEndpointTokenResponse(token=sample_coordinator_jwt)
+        )
+        pool = MagicMock(spec=AppProxyClientPool)
+        pool.load_client = MagicMock(return_value=client)
+        return pool
+
+    @pytest.fixture
+    def deployment_service(
+        self,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> DeploymentService:
+        return DeploymentService(
+            deployment_controller=mock_deployment_controller,
+            deployment_repository=mock_deployment_repository,
+            appproxy_client_pool=mock_appproxy_client_pool,
+        )
+
+    async def test_persists_coordinator_jwt_instead_of_random(
+        self,
+        deployment_service: DeploymentService,
+        configure_repository: MagicMock,
+        deployment_id: uuid.UUID,
+        sample_coordinator_jwt: str,
+    ) -> None:
+        """Regression: BA-5881. The token persisted via the CreatorSpec must
+        be the JWT returned by the app-proxy coordinator, not a locally
+        generated random string. If this fails, ``./bai deployment access-token
+        create`` is producing tokens that app-proxy worker rejects with 401.
+        """
+        action = CreateAccessTokenAction(
+            creator=ModelDeploymentAccessTokenCreator(
+                model_deployment_id=deployment_id,
+                expires_at=datetime(2099, 1, 1, tzinfo=UTC),
+            ),
+        )
+        result = await deployment_service.create_access_token(action)
+
+        assert result.data.token == sample_coordinator_jwt
+
+        repo_call = configure_repository.create_access_token.await_args
+        assert repo_call is not None
+        creator = cast(RBACEntityCreator[object], repo_call.args[0])
+        spec = cast(EndpointTokenCreatorSpec, creator.spec)
+        assert spec.token == sample_coordinator_jwt

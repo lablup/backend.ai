@@ -30,6 +30,7 @@ from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACVali
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     ClusterConfigData,
@@ -91,14 +92,20 @@ class DeploymentCRUDBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
+    def mock_appproxy_client_pool(self) -> MagicMock:
+        return MagicMock(spec=AppProxyClientPool)
+
+    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
+            appproxy_client_pool=mock_appproxy_client_pool,
         )
 
     @pytest.fixture

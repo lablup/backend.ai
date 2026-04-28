@@ -28,6 +28,7 @@ from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -81,6 +82,12 @@ async def _seed_resource_slot_types(db_engine: SAEngine) -> None:
 
 
 @pytest.fixture()
+def mock_appproxy_client_pool() -> MagicMock:
+    """Stub AppProxyClientPool for tests that do not exercise app-proxy IO."""
+    return MagicMock(spec=AppProxyClientPool)
+
+
+@pytest.fixture()
 def deployment_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: StorageSessionManager,
@@ -89,6 +96,7 @@ def deployment_processors(
     event_producer: EventProducer,
     network_plugin_ctx: NetworkPluginContext,
     hook_plugin_ctx: HookPluginContext,
+    mock_appproxy_client_pool: MagicMock,
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
     repo = DeploymentRepository(
@@ -130,6 +138,7 @@ def deployment_processors(
     service = DeploymentService(
         deployment_controller,
         repo,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(

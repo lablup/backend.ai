@@ -50,3 +50,12 @@ class BulkUpdateRoutesResponse(BaseResponseModel):
         ...,
         description="Per-endpoint results, in the same order as the request.",
     )
+
+
+class MintEndpointTokenResponse(BaseResponseModel):
+    """JWT minted by the coordinator for a single endpoint."""
+
+    token: str = Field(
+        ...,
+        description="HS256-signed JWT carrying the circuit binding and exp claim.",
+    )

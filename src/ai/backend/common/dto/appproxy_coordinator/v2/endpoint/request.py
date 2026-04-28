@@ -2,11 +2,33 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
 from .types import CreateEndpointItem, DeleteEndpointItem, UpdateRoutesItem
+
+
+class MintEndpointTokenRequest(BaseRequestModel):
+    """Ask the coordinator to mint a per-endpoint JWT.
+
+    The coordinator signs the token with the worker-shared ``jwt_secret``
+    and embeds the circuit binding so that the worker's
+    ``Authorization: Bearer <jwt>`` check accepts it for this endpoint
+    only and rejects it after ``exp``.
+    """
+
+    user_uuid: UUID = Field(
+        ...,
+        description="User who will present the minted token.",
+    )
+    exp: datetime = Field(
+        ...,
+        description="Token expiration timestamp.",
+    )
 
 
 class BulkCreateEndpointRequest(BaseRequestModel):

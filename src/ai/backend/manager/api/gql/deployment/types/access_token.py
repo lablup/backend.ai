@@ -122,8 +122,11 @@ class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
     model_deployment_id: ID = gql_field(
         description="The ID of the model deployment for which the access token is created."
     )
-    expires_at: datetime | None = gql_field(
-        description="The expiration timestamp of the access token."
+    expires_at: datetime = gql_field(
+        description=(
+            "The expiration timestamp of the access token. Required — callers must "
+            "decide the token lifetime themselves."
+        )
     )
 
 

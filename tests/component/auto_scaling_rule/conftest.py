@@ -23,6 +23,7 @@ from ai.backend.manager.api.rest.auto_scaling_rule.handler import AutoScalingRul
 from ai.backend.manager.api.rest.auto_scaling_rule.registry import register_auto_scaling_rule_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -51,10 +52,17 @@ class UserFixtureData:
 
 
 @pytest.fixture()
+def mock_appproxy_client_pool() -> MagicMock:
+    """Stub AppProxyClientPool for tests that do not exercise app-proxy IO."""
+    return MagicMock(spec=AppProxyClientPool)
+
+
+@pytest.fixture()
 def deployment_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: AsyncMock,
     valkey_clients: ValkeyClients,
+    mock_appproxy_client_pool: MagicMock,
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors for auto-scaling-rule tests."""
     repo = DeploymentRepository(
@@ -68,6 +76,7 @@ def deployment_processors(
     service = DeploymentService(
         deployment_controller,
         repo,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
