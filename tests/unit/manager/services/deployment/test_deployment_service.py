@@ -544,14 +544,14 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         )
 
     @pytest.fixture
-    def proxy_target(self) -> ScalingGroupProxyTarget:
+    def sample_proxy_target(self) -> ScalingGroupProxyTarget:
         return ScalingGroupProxyTarget(
             addr="http://app-proxy.local:10200",
             api_token="proxy-api-token",
         )
 
     @pytest.fixture
-    def coordinator_jwt(self) -> str:
+    def sample_coordinator_jwt(self) -> str:
         # The exact bytes are irrelevant; the test only cares that this string
         # round-trips from the (mocked) coordinator into the persisted token.
         return "eyJhbGciOiJIUzI1NiJ9.coordinator-signed-payload.signature"
@@ -560,11 +560,11 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
     def sample_token_row(
         self,
         deployment_id: uuid.UUID,
-        coordinator_jwt: str,
+        sample_coordinator_jwt: str,
     ) -> MagicMock:
         row = MagicMock()
         row.id = uuid.uuid4()
-        row.token = coordinator_jwt
+        row.token = sample_coordinator_jwt
         row.endpoint = DeploymentID(deployment_id)
         row.expires_at = None
         row.created_at = datetime(2024, 1, 1, tzinfo=UTC)
@@ -575,21 +575,21 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         self,
         mock_deployment_repository: MagicMock,
         deployment_info: DeploymentInfo,
-        proxy_target: ScalingGroupProxyTarget,
+        sample_proxy_target: ScalingGroupProxyTarget,
         sample_token_row: MagicMock,
     ) -> MagicMock:
         mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
         mock_deployment_repository.fetch_scaling_group_proxy_targets = AsyncMock(
-            return_value={deployment_info.metadata.resource_group: proxy_target}
+            return_value={deployment_info.metadata.resource_group: sample_proxy_target}
         )
         mock_deployment_repository.create_access_token = AsyncMock(return_value=sample_token_row)
         return mock_deployment_repository
 
     @pytest.fixture
-    def mock_appproxy_client_pool(self, coordinator_jwt: str) -> MagicMock:
+    def mock_appproxy_client_pool(self, sample_coordinator_jwt: str) -> MagicMock:
         client = MagicMock(spec=AppProxyClient)
         client.mint_endpoint_token = AsyncMock(
-            return_value=MintEndpointTokenResponse(token=coordinator_jwt)
+            return_value=MintEndpointTokenResponse(token=sample_coordinator_jwt)
         )
         pool = MagicMock(spec=AppProxyClientPool)
         pool.load_client = MagicMock(return_value=client)
@@ -613,7 +613,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         deployment_service: DeploymentService,
         configure_repository: MagicMock,
         deployment_id: uuid.UUID,
-        coordinator_jwt: str,
+        sample_coordinator_jwt: str,
     ) -> None:
         """Regression: BA-5881. The token persisted via the CreatorSpec must
         be the JWT returned by the app-proxy coordinator, not a locally
@@ -628,10 +628,10 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         )
         result = await deployment_service.create_access_token(action)
 
-        assert result.data.token == coordinator_jwt
+        assert result.data.token == sample_coordinator_jwt
 
         repo_call = configure_repository.create_access_token.await_args
         assert repo_call is not None
         creator = cast(RBACEntityCreator[object], repo_call.args[0])
         spec = cast(EndpointTokenCreatorSpec, creator.spec)
-        assert spec.token == coordinator_jwt
+        assert spec.token == sample_coordinator_jwt
