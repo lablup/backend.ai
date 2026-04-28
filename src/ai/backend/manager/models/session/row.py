@@ -79,7 +79,6 @@ from ai.backend.manager.exceptions import AgentError
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    EnumType,
     PydanticColumn,
     ResourceSlotColumn,
     SessionIDColumnType,
@@ -587,7 +586,7 @@ class SessionRow(Base):  # type: ignore[misc]
     startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
     result: Mapped[SessionResult] = mapped_column(
         "result",
-        EnumType(SessionResult),
+        StrEnumType(SessionResult, use_name=True),
         default=SessionResult.UNDEFINED,
         server_default=SessionResult.UNDEFINED.name,
         nullable=False,

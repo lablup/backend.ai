@@ -6,6 +6,7 @@ Create Date: 2019-09-16 02:08:41.396372
 
 """
 
+import logging
 import textwrap
 
 import sqlalchemy as sa
@@ -20,6 +21,8 @@ revision = "405aa2c39458"
 down_revision = "5b45f28d2cac"
 branch_labels = None
 depends_on = None
+
+log = logging.getLogger(__name__)
 
 sessionresult = postgresql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresult")
 
@@ -58,7 +61,10 @@ kernelstatus_old = postgresql.ENUM(*kernelstatus_old_values, name="kernelstatus"
 
 def upgrade() -> None:
     conn = op.get_bind()
-    sessionresult.create(conn)
+    try:
+        sessionresult.create(conn)
+    except Exception as e:
+        log.warning("Skipping CREATE TYPE sessionresult: %s", e)
     sessiontypes.create(conn)
     conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_old;"))
     kernelstatus_new.create(conn)
@@ -119,16 +125,19 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_kernel_dependencies_kernel_id"), "kernel_dependencies", ["kernel_id"], unique=False
     )
-    op.add_column(
-        "kernels",
-        sa.Column(
-            "result",
-            sa.Enum("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresult"),
-            default="UNDEFINED",
-            server_default="UNDEFINED",
-            nullable=False,
-        ),
-    )
+    try:
+        op.add_column(
+            "kernels",
+            sa.Column(
+                "result",
+                sa.Enum("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresult"),
+                default="UNDEFINED",
+                server_default="UNDEFINED",
+                nullable=False,
+            ),
+        )
+    except Exception as e:
+        log.warning("Skipping ADD COLUMN kernels.result (sessionresult): %s", e)
     op.add_column("kernels", sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True))
     op.add_column(
         "kernels",
@@ -141,7 +150,10 @@ def upgrade() -> None:
         ),
     )
     op.alter_column("kernels", "agent_addr", existing_type=sa.VARCHAR(length=128), nullable=True)
-    op.create_index(op.f("ix_kernels_result"), "kernels", ["result"], unique=False)
+    try:
+        op.create_index(op.f("ix_kernels_result"), "kernels", ["result"], unique=False)
+    except Exception as e:
+        log.warning("Skipping CREATE INDEX ix_kernels_result: %s", e)
     op.create_index(op.f("ix_kernels_type"), "kernels", ["type"], unique=False)
 
 
@@ -192,15 +204,24 @@ def downgrade() -> None:
         conn.execute(text(query))
 
     # op.drop_index(op.f("ix_kernels_type"), table_name="kernels")
-    op.drop_index(op.f("ix_kernels_result"), table_name="kernels")
+    try:
+        op.drop_index(op.f("ix_kernels_result"), table_name="kernels")
+    except Exception as e:
+        log.warning("Skipping DROP INDEX ix_kernels_result: %s", e)
     op.alter_column("kernels", "agent_addr", existing_type=sa.VARCHAR(length=128), nullable=False)
     op.drop_column("kernels", "type")
     op.drop_column("kernels", "status_changed")
-    op.drop_column("kernels", "result")
+    try:
+        op.drop_column("kernels", "result")
+    except Exception as e:
+        log.warning("Skipping DROP COLUMN kernels.result: %s", e)
     op.drop_column("agents", "status_changed")
     op.drop_index(op.f("ix_kernel_dependencies_kernel_id"), table_name="kernel_dependencies")
     op.drop_index(op.f("ix_kernel_dependencies_depends_on"), table_name="kernel_dependencies")
     op.drop_table("kernel_dependencies")
 
-    sessionresult.drop(op.get_bind())
+    try:
+        sessionresult.drop(op.get_bind())
+    except Exception as e:
+        log.warning("Skipping DROP TYPE sessionresult: %s", e)
     sessiontypes.drop(op.get_bind())
