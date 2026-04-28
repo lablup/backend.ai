@@ -162,7 +162,7 @@ def chat(
         client_args = DeploymentChatClientArgs(
             skip_ssl_verification=connection.skip_ssl_verification,
         )
-        async with await DeploymentChatClient.create(client_args) as client:
+        async with DeploymentChatClient(client_args) as client:
             try:
                 response = await client.chat_completion(
                     endpoint_entry.endpoint_url,
