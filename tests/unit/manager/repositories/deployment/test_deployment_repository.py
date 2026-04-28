@@ -61,7 +61,7 @@ from ai.backend.manager.models.deployment_policy import (
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -3548,6 +3548,7 @@ class TestDeploymentRepositoryDuplicateName:
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
+                EndpointTokenRow,
                 RuntimeVariantRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
@@ -3957,3 +3958,109 @@ class TestDeploymentRepositoryDuplicateName:
                 )
             ).scalar_one()
             assert target_stage == EndpointLifecycle.DESTROYING
+
+    async def test_destroy_endpoint_deletes_associated_tokens(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """Destroying an endpoint also wipes its access tokens in the same
+        transaction so the destroyed endpoint cannot be re-authenticated.
+        Tokens for unrelated endpoints are left untouched."""
+        endpoint_id = DeploymentID(uuid.uuid4())
+        sibling_id = DeploymentID(uuid.uuid4())
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add_all([
+                EndpointRow(
+                    id=endpoint_id,
+                    name=f"with-tokens-{uuid.uuid4().hex[:8]}",
+                    created_user=user_id,
+                    session_owner=user_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    resource_group=test_scaling_group.name,
+                    replicas=1,
+                    desired_replicas=1,
+                    url=None,
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.CREATED,
+                ),
+                EndpointRow(
+                    id=sibling_id,
+                    name=f"sibling-{uuid.uuid4().hex[:8]}",
+                    created_user=user_id,
+                    session_owner=user_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    resource_group=test_scaling_group.name,
+                    replicas=1,
+                    desired_replicas=1,
+                    url=None,
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.CREATED,
+                ),
+            ])
+            target_token_ids = [uuid.uuid4(), uuid.uuid4()]
+            sibling_token_id = uuid.uuid4()
+            db_sess.add_all([
+                EndpointTokenRow(
+                    id=target_token_ids[0],
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=endpoint_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+                EndpointTokenRow(
+                    id=target_token_ids[1],
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=endpoint_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+                EndpointTokenRow(
+                    id=sibling_token_id,
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=sibling_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+            ])
+            await db_sess.commit()
+
+        succeeded = await deployment_repository.destroy_endpoint(endpoint_id)
+        assert succeeded is True
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            remaining_target_tokens = (
+                (
+                    await db_sess.execute(
+                        sa.select(EndpointTokenRow.id).where(
+                            EndpointTokenRow.endpoint == endpoint_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert remaining_target_tokens == []
+
+            remaining_sibling_tokens = (
+                (
+                    await db_sess.execute(
+                        sa.select(EndpointTokenRow.id).where(
+                            EndpointTokenRow.endpoint == sibling_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert set(remaining_sibling_tokens) == {sibling_token_id}
