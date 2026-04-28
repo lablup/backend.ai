@@ -42,6 +42,7 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
 )
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ObjectNotFound,
@@ -963,7 +964,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         return errors
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
-        raise InvalidAPIParameters("Endpoint live_stat is no longer supported.")
+        raise NotImplementedAPI(extra_msg="Endpoint live_stat is no longer supported.")
 
 
 class EndpointList(graphene.ObjectType):  # type: ignore[misc]
