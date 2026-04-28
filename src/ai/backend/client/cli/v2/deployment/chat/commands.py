@@ -251,27 +251,17 @@ def set_(
 
 
 @chat_config.command(name="show")
-@click.argument("deployment_id", type=click.UUID, required=False)
-def show(deployment_id: UUID | None) -> None:
-    """Print one or all chat cache entries (API keys are masked)."""
+@click.argument("deployment_id", type=click.UUID)
+def show(deployment_id: UUID) -> None:
+    """Print the chat cache entry for a deployment (API keys are masked)."""
     cache = load_chat_cache()
     chat_config_store = load_chat_config()
 
-    if deployment_id is not None:
-        entry = cache.get(deployment_id)
-        token = chat_config_store.get_token(deployment_id)
-        if entry is None and token is None:
-            raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
-        _print_entry(deployment_id, entry, token)
-        return
-
-    dep_ids = set(cache.deployments) | set(chat_config_store.tokens)
-    if not dep_ids:
-        print("No chat cache entries.")
-        return
-    for dep_id in dep_ids:
-        _print_entry(dep_id, cache.get(dep_id), chat_config_store.get_token(dep_id))
-        print()
+    entry = cache.get(deployment_id)
+    token = chat_config_store.get_token(deployment_id)
+    if entry is None and token is None:
+        raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
+    _print_entry(deployment_id, entry, token)
 
 
 @chat_config.command(name="clear")
