@@ -20,13 +20,10 @@ import aiohttp
 from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.v2.exceptions import DeploymentChatAuthError
 
 DEFAULT_CHAT_PATH = "/v1/chat/completions"
 DEFAULT_MODELS_PATH = "/v1/models"
-
-
-class DeploymentChatAuthError(BackendAPIError):
-    """Raised when the inference endpoint rejects the configured API key."""
 
 
 @dataclass(frozen=True)

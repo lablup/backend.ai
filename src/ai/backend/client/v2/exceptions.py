@@ -41,6 +41,10 @@ STATUS_CODE_EXCEPTION_MAP: dict[int, type[BackendAPIError]] = {
 }
 
 
+class DeploymentChatAuthError(BackendAPIError):
+    """Raised when a deployment's inference endpoint rejects the configured API key."""
+
+
 class WebSocketError(BackendClientError):
     """Error during WebSocket connection or communication."""
 

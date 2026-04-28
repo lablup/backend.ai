@@ -146,10 +146,10 @@ def chat(
     import json
 
     from ai.backend.client.v2.deployment_chat import (
-        DeploymentChatAuthError,
         DeploymentChatClient,
         DeploymentChatClientArgs,
     )
+    from ai.backend.client.v2.exceptions import DeploymentChatAuthError
 
     connection = load_v2_config()
 
