@@ -56,7 +56,7 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
 
 def save_chat_cache(cache: DeploymentChatCache, path: Path = CHAT_CACHE_FILE) -> None:
     """Atomically write the chat cache."""
-    _atomic_write(path, cache.model_dump_json(indent=2))
+    _atomic_write_text(path, cache.model_dump_json(indent=2))
 
 
 def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
@@ -79,7 +79,7 @@ def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
 
 def save_chat_config(config: DeploymentChatConfig, path: Path = CHAT_CONFIG_FILE) -> None:
     """Atomically write the chat config and enforce ``0600`` permissions."""
-    _atomic_write(path, config.model_dump_json(indent=2))
+    _atomic_write_text(path, config.model_dump_json(indent=2))
 
 
 def mask_token(token: str | None) -> str:
@@ -102,7 +102,7 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     return raw if isinstance(raw, dict) else None
 
 
-def _atomic_write(path: Path, text: str) -> None:
+def _atomic_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path_str = tempfile.mkstemp(
         prefix=path.name + ".",
