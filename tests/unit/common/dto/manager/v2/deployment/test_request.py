@@ -573,7 +573,7 @@ class TestCreateAccessTokenInput:
 
     def test_valid_creation(self) -> None:
         deployment_id = uuid.uuid4()
-        expires = datetime(2026, 12, 31, 23, 59, 59, tzinfo=UTC)
+        expires = datetime(2099, 12, 31, 23, 59, 59, tzinfo=UTC)
         inp = CreateAccessTokenInput(model_deployment_id=deployment_id, expires_at=expires)
         assert inp.model_deployment_id == deployment_id
         assert inp.expires_at == expires
@@ -592,7 +592,7 @@ class TestCreateAccessTokenInput:
 
     def test_model_validate_with_isoformat_expires_at_succeeds(self) -> None:
         deployment_id = uuid.uuid4()
-        expires = datetime(2027, 1, 1, tzinfo=UTC)
+        expires = datetime(2099, 1, 1, tzinfo=UTC)
         inp = CreateAccessTokenInput.model_validate({
             "model_deployment_id": str(deployment_id),
             "expires_at": expires.isoformat(),
@@ -603,14 +603,14 @@ class TestCreateAccessTokenInput:
     def test_missing_model_deployment_id_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
             CreateAccessTokenInput.model_validate({
-                "expires_at": datetime(2027, 1, 1, tzinfo=UTC).isoformat(),
+                "expires_at": datetime(2099, 1, 1, tzinfo=UTC).isoformat(),
             })
 
     def test_uuid_string_is_coerced_to_uuid(self) -> None:
         deployment_id = uuid.uuid4()
         inp = CreateAccessTokenInput.model_validate({
             "model_deployment_id": str(deployment_id),
-            "expires_at": datetime(2027, 1, 1, tzinfo=UTC).isoformat(),
+            "expires_at": datetime(2099, 1, 1, tzinfo=UTC).isoformat(),
         })
         assert isinstance(inp.model_deployment_id, uuid.UUID)
         assert inp.model_deployment_id == deployment_id
