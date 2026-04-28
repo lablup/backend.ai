@@ -8,10 +8,10 @@ from aiohttp import web
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.v2.deployment_chat import (
-    DeploymentChatAuthError,
     DeploymentChatClient,
     DeploymentChatClientArgs,
 )
+from ai.backend.client.v2.exceptions import DeploymentChatAuthError
 
 HandlerFn = Callable[[web.Request], Awaitable[web.StreamResponse]]
 
