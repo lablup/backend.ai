@@ -82,6 +82,12 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    - name: Resolve project Python version
+      id: pyver
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "version=$PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+
     - name: Build Docker image
       id: build
       uses: docker/build-push-action@v6
@@ -91,6 +97,8 @@ jobs:
         platforms: linux/amd64
         tags: backendai-${{ matrix.name }}:sbom
         load: true
+        build-args: |
+          PYTHON_VERSION=${{ steps.pyver.outputs.version }}
 
     - name: Generate SBOM with Syft
       uses: anchore/sbom-action@v0
