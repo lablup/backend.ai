@@ -53,11 +53,3 @@ class DeploymentChatConfig(BaseModel):
 
     def clear_token(self, deployment_id: UUID) -> bool:
         return self.tokens.pop(deployment_id, None) is not None
-
-
-class IncompatibleChatCacheError(Exception):
-    """Raised when the on-disk cache file uses a newer schema than this build."""
-
-
-class IncompatibleChatConfigError(Exception):
-    """Raised when the on-disk config file uses a newer schema than this build."""
