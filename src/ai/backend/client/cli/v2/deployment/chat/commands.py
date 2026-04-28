@@ -243,7 +243,15 @@ def set_(
     api_key: str | None,
     default_model: str | None,
 ) -> None:
-    """Register or update the chat config for a deployment."""
+    """Register or update the chat config for a deployment.
+
+    Token registration succeeds even when the deployment has not yet
+    finished provisioning. The endpoint cache is only written when the
+    manager already has an ``endpoint_url`` for the deployment;
+    otherwise the cache is populated lazily on the first ``chat`` call.
+    """
+    import sys
+
     if api_key is None and default_model is None:
         raise click.ClickException("Nothing to set: provide --token and/or --default-model.")
 
@@ -252,19 +260,43 @@ def set_(
     chat_config_store = DeploymentChatConfig.load()
 
     async def _run() -> None:
-        endpoint_entry = await _resolve_endpoint_entry(
-            cache,
-            deployment_id,
-            connection,
-            default_model_override=default_model,
-        )
+        registry = await create_v2_registry(connection)
+        try:
+            deployment = await registry.deployment.get(deployment_id)
+        finally:
+            await registry.close()
+        endpoint_url = deployment.network_access.endpoint_url
+
         if api_key is not None:
             chat_config_store.set_token(deployment_id, api_key)
             save_chat_config(chat_config_store)
 
+        cached_default_model: str | None = None
+        if endpoint_url:
+            existing_entry = cache.get(deployment_id)
+            cached_default_model = default_model or (
+                existing_entry.default_model if existing_entry is not None else None
+            )
+            cache.set(
+                deployment_id,
+                DeploymentChatCacheEntry(
+                    endpoint_url=endpoint_url,
+                    default_model=cached_default_model,
+                    last_synced_at=datetime.now(UTC),
+                ),
+            )
+            save_chat_cache(cache)
+        elif default_model is not None:
+            print(
+                f"WARNING: deployment {deployment_id} has no endpoint_url yet; "
+                "--default-model will be applied on the first 'chat' call after the "
+                "deployment is READY.",
+                file=sys.stderr,
+            )
+
         print(f"Updated chat config for deployment {deployment_id}.")
-        if endpoint_entry.default_model:
-            print(f"  default_model: {endpoint_entry.default_model}")
+        if cached_default_model:
+            print(f"  default_model: {cached_default_model}")
         if api_key is not None:
             print(f"  api_key:       {mask_token(api_key)}")
 
