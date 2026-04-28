@@ -15,10 +15,6 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
 )
-from ai.backend.client.cli.v2.deployment.chat.utils import (
-    save_chat_cache,
-    save_chat_config,
-)
 
 
 @pytest.fixture
@@ -56,7 +52,7 @@ class TestCacheLoadSaveRoundTrip:
         dep_id = uuid4()
         original = _make_entry(default_model="gpt-test")
         cache.set(dep_id, original)
-        save_chat_cache(cache)
+        cache.save()
 
         loaded = DeploymentChatCache.load()
         restored = loaded.deployments[dep_id]
@@ -73,7 +69,7 @@ class TestConfigLoadSaveRoundTrip:
         cfg = DeploymentChatConfig()
         dep_id = uuid4()
         cfg.set_token(dep_id, "sk-secret-token-1234")
-        save_chat_config(cfg)
+        cfg.save()
 
         loaded = DeploymentChatConfig.load()
         assert loaded.get_token(dep_id) == "sk-secret-token-1234"
@@ -81,10 +77,10 @@ class TestConfigLoadSaveRoundTrip:
 
 class TestPermissions:
     @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
-    def test_save_chat_config_enforces_0600(self, config_path: Path) -> None:
+    def test_config_save_enforces_0600(self, config_path: Path) -> None:
         cfg = DeploymentChatConfig()
         cfg.set_token(uuid4(), "sk-x")
-        save_chat_config(cfg)
+        cfg.save()
         assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
 
 
