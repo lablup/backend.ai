@@ -22,13 +22,18 @@ from authlib.common.security import generate_token  # pants: no-infer-dep
 from authlib.integrations.httpx_client import AsyncOAuth2Client  # pants: no-infer-dep
 from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
 from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
-from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
+from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair, generate_ssh_keypair
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
@@ -150,11 +155,17 @@ async def associate_user_with_group(
     )
     group_id = await conn.scalar(query)
     if group_id:
-        query = association_groups_users.insert().values({
-            "user_id": user.uuid,
-            "group_id": group_id,
-        })
-        await conn.execute(query)
+        await conn.execute(
+            pg_insert(AssociationScopesEntitiesRow.__table__)
+            .values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_id),
+                entity_type=EntityType.USER,
+                entity_id=str(user.uuid),
+                relation_type=RelationType.AUTO,
+            )
+            .on_conflict_do_nothing()
+        )
 
 
 async def create_user_if_not_exists(
