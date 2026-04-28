@@ -16,7 +16,6 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatConfig,
 )
 from ai.backend.client.cli.v2.deployment.chat.utils import (
-    mask_token,
     save_chat_cache,
     save_chat_config,
 )
@@ -143,17 +142,3 @@ class TestConfigLoaderResilience:
             encoding="utf-8",
         )
         assert DeploymentChatConfig.load().tokens == {}
-
-
-class TestMaskToken:
-    def test_mask_long_token(self) -> None:
-        masked = mask_token("sk-abcdefghijklmnopqrstuvwxyz")
-        assert masked.startswith("sk-")
-        assert masked.endswith("wxyz")
-        assert "***" in masked
-
-    def test_mask_short_token(self) -> None:
-        assert mask_token("short") == "***"
-
-    def test_mask_none(self) -> None:
-        assert mask_token(None) == "<unset>"

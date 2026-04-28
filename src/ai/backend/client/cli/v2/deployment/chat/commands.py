@@ -11,14 +11,16 @@ from uuid import UUID
 import click
 
 from ai.backend.cli.params import JSONParamType
-from ai.backend.client.cli.v2.deployment.chat.formatter import DeploymentChatFormatter
+from ai.backend.client.cli.v2.deployment.chat.formatter import (
+    DeploymentChatFormatter,
+    mask_token,
+)
 from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
 )
 from ai.backend.client.cli.v2.deployment.chat.utils import (
-    mask_token,
     save_chat_cache,
     save_chat_config,
 )
@@ -280,7 +282,7 @@ def show(deployment_id: UUID) -> None:
     token = chat_config_store.get_token(deployment_id)
     if entry is None and token is None:
         raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
-    DeploymentChatFormatter.print_summary(deployment_id, entry, mask_token(token))
+    DeploymentChatFormatter.print_summary(deployment_id, entry, token)
 
 
 @chat_config.command(name="clear-cache")

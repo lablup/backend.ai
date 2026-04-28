@@ -7,6 +7,15 @@ from uuid import UUID
 from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatCacheEntry
 
 
+def mask_token(token: str | None) -> str:
+    """Render a token as ``sk-***...***xxxx`` for diagnostic display."""
+    if token is None:
+        return "<unset>"
+    if len(token) <= 8:
+        return "***"
+    return f"{token[:3]}***...***{token[-4:]}"
+
+
 class DeploymentChatFormatter:
     """Formatting helpers for chat cache entries.
 
@@ -34,9 +43,9 @@ class DeploymentChatFormatter:
         cls,
         deployment_id: UUID,
         entry: DeploymentChatCacheEntry | None,
-        token_display: str,
+        token: str | None,
     ) -> None:
         print(f"deployment_id : {deployment_id}")
         for line in cls.entry_lines(entry):
             print(line)
-        print(f"api_key       : {token_display}")
+        print(f"api_key       : {mask_token(token)}")
