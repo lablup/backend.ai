@@ -152,14 +152,27 @@ class ImageInput(BaseRequestModel):
 
 
 class EnvironmentVariableEntryInput(BaseRequestModel):
-    """A single environment variable entry with name and value."""
+    """A single environment variable entry with name and value.
+
+    .. deprecated::
+        Retained only for legacy deployment/session DTOs that already expose ``name``.
+        New code should use
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariableEntryInput`
+        (``key``/``value``) instead.
+    """
 
     name: str = Field(description="Environment variable name")
     value: str = Field(description="Environment variable value")
 
 
 class EnvironmentVariablesInput(BaseRequestModel):
-    """A collection of environment variable entries."""
+    """A collection of environment variable entries.
+
+    .. deprecated::
+        Retained only for legacy deployment/session DTOs.
+        New code should use
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariablesInput`.
+    """
 
     entries: list[EnvironmentVariableEntryInput] = Field(
         description="List of environment variable entries"
