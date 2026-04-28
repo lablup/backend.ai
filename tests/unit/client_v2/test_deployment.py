@@ -169,7 +169,7 @@ class TestDeploymentCRUD:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(

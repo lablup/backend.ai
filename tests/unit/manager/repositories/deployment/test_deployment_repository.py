@@ -2026,7 +2026,7 @@ class TestDeploymentRevisionOperations:
     ) -> None:
         """Test that update_endpoint returns DeploymentInfo with updated values."""
         new_name = "updated-deployment-name"
-        new_desired_replica_count = 5
+        new_replica_count = 5
 
         updater = Updater(
             spec=DeploymentUpdaterSpec(
@@ -2034,7 +2034,7 @@ class TestDeploymentRevisionOperations:
                     name=OptionalState.update(new_name),
                 ),
                 replica_spec=ReplicaSpecUpdaterSpec(
-                    desired_replica_count=OptionalState.update(new_desired_replica_count),
+                    replica_count=OptionalState.update(new_replica_count),
                 ),
                 revision_state=RevisionStateUpdaterSpec(
                     current_revision=TriState.update(test_revision_data.id),
@@ -2047,7 +2047,7 @@ class TestDeploymentRevisionOperations:
         # Verify returned DeploymentInfo contains updated values
         assert deployment_info.id == test_endpoint_id
         assert deployment_info.metadata.name == new_name
-        assert deployment_info.replica_spec.desired_replica_count == new_desired_replica_count
+        assert deployment_info.replica_spec.replica_count == new_replica_count
         assert deployment_info.current_revision_id == test_revision_data.id
 
         # Verify database state matches returned values
@@ -2056,7 +2056,7 @@ class TestDeploymentRevisionOperations:
             result = await db_sess.execute(query)
             endpoint = result.scalar_one()
             assert endpoint.name == new_name
-            assert endpoint.desired_replicas == new_desired_replica_count
+            assert endpoint.replicas == new_replica_count
             assert endpoint.current_revision == test_revision_data.id
 
 

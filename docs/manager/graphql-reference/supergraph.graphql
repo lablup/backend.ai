@@ -3068,7 +3068,7 @@ input CreateDeploymentInput
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
   defaultDeploymentStrategy: DeploymentStrategyInput!
-  desiredReplicaCount: Int!
+  replicaCount: Int!
   initialRevision: CreateRevisionInput = null
 }
 
@@ -17749,7 +17749,7 @@ input UpdateDeploymentInput
   tags: [String!]
   defaultDeploymentStrategy: DeploymentStrategyInput
   activeRevisionId: ID
-  desiredReplicaCount: Int
+  replicaCount: Int
   name: String
   preferredDomainName: String
 }
