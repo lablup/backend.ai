@@ -35,11 +35,17 @@ class DeploymentChatCacheEntry(BaseModel):
     default_model: str | None = None
     last_synced_at: datetime
 
+    def format_summary(self) -> list[str]:
+        return [
+            f"endpoint_url  : {self.endpoint_url}",
+            f"default_model : {self.default_model or '-'}",
+            f"last_synced_at: {self.last_synced_at.isoformat()}",
+        ]
+
 
 class DeploymentChatCache(BaseModel):
     """In-memory representation of the chat cache file."""
 
-    schema_version: int = Field(default=CHAT_CACHE_SCHEMA_VERSION)
     deployments: dict[UUID, DeploymentChatCacheEntry] = Field(default_factory=dict)
 
     def get(self, deployment_id: UUID) -> DeploymentChatCacheEntry | None:
@@ -93,7 +99,8 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
 def save_chat_cache(cache: DeploymentChatCache, path: Path = CHAT_CACHE_FILE) -> None:
     """Atomically write the chat cache."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = cache.model_dump_json(indent=2)
+    body = {"schema_version": CHAT_CACHE_SCHEMA_VERSION, **cache.model_dump(mode="json")}
+    payload = json.dumps(body, indent=2, ensure_ascii=False)
     fd, tmp_path_str = tempfile.mkstemp(
         prefix=path.name + ".",
         suffix=".tmp",
