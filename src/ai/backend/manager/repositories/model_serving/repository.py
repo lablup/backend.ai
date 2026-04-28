@@ -180,6 +180,12 @@ class ModelServingRepository:
     ) -> list[EndpointData]:
         """
         List endpoints owned by a specific user with optional name filter.
+
+        Eagerly loads every relationship that ``EndpointRow.to_data()``
+        traverses (``routings``, ``session_owner_row``, ``created_user_row``,
+        ``revisions`` -> ``image_row``) so the projection runs entirely on
+        cached state and never triggers ``MissingGreenlet`` from sync
+        ``to_data()`` invoked inside an async transaction.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query_conds = (EndpointRow.session_owner == session_owner_id) & (
@@ -191,11 +197,13 @@ class ModelServingRepository:
             query = (
                 sa.select(EndpointRow)
                 .where(query_conds)
-                .options(selectinload(EndpointRow.routings))
                 .options(
+                    selectinload(EndpointRow.routings),
+                    selectinload(EndpointRow.session_owner_row),
+                    selectinload(EndpointRow.created_user_row),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
-                    )
+                    ),
                 )
             )
             result = await session.execute(query)
