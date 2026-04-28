@@ -1009,12 +1009,16 @@ class UserDBSource:
             )
         )
 
-        current_rows = (
+        current_entity_ids = (
             await session.scalars(
-                sa.select(AssocGroupUserRow.group_id).where(AssocGroupUserRow.user_id == user_uuid)
+                sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+                )
             )
         ).all()
-        current_project_ids = set(current_rows)
+        current_project_ids = {UUID(sid) for sid in current_entity_ids}
 
         to_remove = current_project_ids - target_project_ids
         to_add = target_project_ids - current_project_ids
@@ -1042,8 +1046,9 @@ class UserDBSource:
         """Add a user to a project within an existing session.
 
         Mirrors GroupDBSource._add_users_to_project_in_session for the
-        single-user case: inserts the business association, creates the RBAC
-        scope binding, and maps the user to the project's member role (only).
+        single-user case: inserts the RBAC scope binding (ASE) via
+        ``RBACScopeBinder`` and maps the user to the project's member role
+        (only).
         """
         project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
         pair = RBACScopeBindingPair(
@@ -1095,8 +1100,8 @@ class UserDBSource:
         """Remove a user from a project within an existing session.
 
         Mirrors GroupDBSource._remove_users_from_project_in_session for the
-        single-user case: deletes the business association, removes the RBAC
-        scope binding, and unmaps the user from any project-scoped roles.
+        single-user case: deletes the RBAC scope binding (ASE) via the
+        unbinder API and unmaps the user from any project-scoped roles.
         """
         unbinder = UserProjectEntityUnbinder(
             user_uuids=[user_uuid],

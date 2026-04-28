@@ -8,10 +8,14 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
@@ -67,21 +71,28 @@ class UserProjectSearchScope(SearchScope):
     """Required scope for searching projects a user is member of.
 
     Used for user-scoped project search (any authenticated user).
-    Requires checking association_groups_users table.
+    Filters via the association_scopes_entities table (PROJECT scope, USER
+    entity).
     """
 
     user_uuid: UUID
     """Required. The user UUID to search projects for."""
 
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for AssocGroupUserRow.
+        """Convert scope to a query condition on AssociationScopesEntitiesRow.
 
-        This will be used in a JOIN query with GroupRow.
+        This will be used in a JOIN query with GroupRow. The caller is
+        responsible for joining ASE with the correct ``scope_type`` and
+        ``entity_type`` filters; this condition only narrows ``entity_id``.
         """
-        user_uuid = self.user_uuid
+        user_uuid_str = str(self.user_uuid)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssocGroupUserRow.user_id == user_uuid
+            return sa.and_(
+                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                AssociationScopesEntitiesRow.entity_id == user_uuid_str,
+            )
 
         return inner
 

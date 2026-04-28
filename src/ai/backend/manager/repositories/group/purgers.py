@@ -7,10 +7,13 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.group.row import AssocGroupUserRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 
@@ -71,17 +74,18 @@ class GroupBatchPurgerSpec(BatchPurgerSpec[GroupRow]):
 
 
 @dataclass
-class UsersForProjectPurgerSpec(BatchPurgerSpec[AssocGroupUserRow]):
-    """PurgerSpec for removing specific users from a project."""
+class UsersForProjectPurgerSpec(BatchPurgerSpec[AssociationScopesEntitiesRow]):
+    """PurgerSpec for removing user-project memberships (PROJECT/USER ASE rows)."""
 
     user_uuids: list[UUID]
     project_id: UUID
 
     @override
-    def build_subquery(self) -> sa.sql.Select[tuple[AssocGroupUserRow]]:
-        return sa.select(AssocGroupUserRow).where(
-            sa.and_(
-                AssocGroupUserRow.user_id.in_(self.user_uuids),
-                AssocGroupUserRow.group_id == self.project_id,
-            )
+    def build_subquery(self) -> sa.sql.Select[tuple[AssociationScopesEntitiesRow]]:
+        entity_ids = [str(uid) for uid in self.user_uuids]
+        return sa.select(AssociationScopesEntitiesRow).where(
+            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+            AssociationScopesEntitiesRow.scope_id == str(self.project_id),
+            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+            AssociationScopesEntitiesRow.entity_id.in_(entity_ids),
         )

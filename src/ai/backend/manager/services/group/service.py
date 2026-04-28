@@ -230,7 +230,7 @@ class GroupService:
     ) -> ScopedSearchProjectsActionResult:
         """Search projects a user is member of.
 
-        Filters by association_groups_users table.
+        Filters by association_scopes_entities (PROJECT scope, USER entity).
 
         Args:
             action: SearchProjectsByUserAction with scope and querier.

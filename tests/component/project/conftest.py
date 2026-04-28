@@ -20,6 +20,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
+from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
@@ -34,9 +35,11 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -228,9 +231,12 @@ async def assigned_users(
                 )
             )
             await conn.execute(
-                sa.insert(association_groups_users).values(
-                    group_id=str(group_fixture),
-                    user_id=str(uid),
+                sa.insert(AssociationScopesEntitiesRow).values(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_fixture),
+                    entity_type=EntityType.USER,
+                    entity_id=str(uid),
+                    relation_type=RelationType.AUTO,
                 )
             )
             user_ids.append(uid)
@@ -242,8 +248,11 @@ async def assigned_users(
     async with db_engine.begin() as conn:
         for uid in reversed(user_ids):
             await conn.execute(
-                association_groups_users.delete().where(
-                    association_groups_users.c.user_id == str(uid)
+                sa.delete(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(group_fixture),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(uid),
                 )
             )
         for ak in reversed(access_keys):

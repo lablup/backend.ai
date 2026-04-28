@@ -763,9 +763,9 @@ class TestUserRepository:
         sample_group_id: str,
     ) -> None:
         """Assigning a user to a new project via update_user_validated must
-        produce the same RBAC state as the modifyGroup path: business
-        association, (PROJECT, user) scope binding, and a user-role mapping
-        to the project member role (not the admin role).
+        produce the same RBAC state as the modifyGroup path: a (PROJECT, user)
+        scope binding and a user-role mapping to the project member role
+        (not the admin role).
         """
         updater_spec = UserUpdaterSpec(
             group_ids=OptionalState.update([sample_group_id]),
@@ -784,14 +784,6 @@ class TestUserRepository:
                 sa.select(UserRow.uuid).where(UserRow.email == sample_user_email)
             )
             assert user_uuid is not None
-
-            business_assoc = await session.scalar(
-                sa.select(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == user_uuid,
-                    AssocGroupUserRow.group_id == project_id,
-                )
-            )
-            assert business_assoc is not None
 
             scope_binding = await session.scalar(
                 sa.select(AssociationScopesEntitiesRow).where(
@@ -870,16 +862,6 @@ class TestUserRepository:
                 sa.select(UserRow.uuid).where(UserRow.email == sample_user_email)
             )
             assert user_uuid is not None
-
-            business_assocs = (
-                await session.scalars(
-                    sa.select(AssocGroupUserRow).where(
-                        AssocGroupUserRow.user_id == user_uuid,
-                        AssocGroupUserRow.group_id == project_id,
-                    )
-                )
-            ).all()
-            assert len(business_assocs) == 0
 
             scope_bindings = (
                 await session.scalars(

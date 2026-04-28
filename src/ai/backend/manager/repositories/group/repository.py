@@ -142,22 +142,15 @@ class GroupRepository:
 
     @group_repository_resilience.apply()
     async def bind_user_to_project(self, user_id: UUID, project_id: UUID) -> None:
-        """Add a user to a project (business association + RBAC scope binding).
+        """Add a user to a project via the RBAC scope binding (ASE).
 
-        Skips if the user is already a member of the project.
-
-        TODO: Remove once association_groups_users is fully migrated to
-        association_scopes_entities.
+        Idempotent: re-binding an existing member is a no-op.
         """
         await self._db_source.bind_user_to_project(user_id, project_id)
 
     @group_repository_resilience.apply()
     async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
-        """Remove a user from a project (business association + RBAC scope binding).
-
-        TODO: Remove once association_groups_users is fully migrated to
-        association_scopes_entities.
-        """
+        """Remove a user from a project (RBAC scope binding only)."""
         await self._db_source.unbind_user_from_project(user_id, project_id)
 
     @group_repository_resilience.apply()

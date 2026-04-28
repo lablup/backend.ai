@@ -44,7 +44,7 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, association_groups_users
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -255,7 +255,6 @@ class TestGroupRepository:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                AssocGroupUserRow,  # User-Group association table
                 AssociationScopesEntitiesRow,  # RBAC scopes-entities association
                 ImageRow,
                 VFolderRow,
@@ -1019,13 +1018,15 @@ class TestGroupRepository:
 
         async with db_with_cleanup.begin_session() as session:
             assoc_result = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.group_id == test_group
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(test_group),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                 )
             )
             associations = assoc_result.fetchall()
             assert len(associations) == 2
-            added_user_ids = {a.user_id for a in associations}
+            added_user_ids = {uuid.UUID(a.entity_id) for a in associations}
             assert test_users_for_group[0] in added_user_ids
             assert test_users_for_group[1] in added_user_ids
 
@@ -1101,13 +1102,15 @@ class TestGroupRepository:
 
         async with db_with_cleanup.begin_session() as session:
             assoc_result = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.group_id == test_group
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(test_group),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                 )
             )
             associations = assoc_result.fetchall()
             assert len(associations) == 2  # 3 added - 1 removed = 2
-            remaining_user_ids = {a.user_id for a in associations}
+            remaining_user_ids = {uuid.UUID(a.entity_id) for a in associations}
             assert test_users_for_group[0] not in remaining_user_ids
             assert test_users_for_group[1] in remaining_user_ids
             assert test_users_for_group[2] in remaining_user_ids
