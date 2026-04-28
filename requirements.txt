@@ -70,7 +70,7 @@ pyhumps~=3.8.0
 pyotp~=2.9.0
 pyroscope-io~=0.8.8
 python-dateutil>=2.9
-python-dotenv~=0.20.0
+python-dotenv~=1.0.1
 python-json-logger~=3.2.0
 pyzmq~=26.4
 PyJWT~=2.10.1
@@ -106,7 +106,7 @@ yarl~=1.19.0
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
-pytest>=8.3.3
+pytest>=8.4.0
 pytest-aiohttp~=1.1.0
 pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
