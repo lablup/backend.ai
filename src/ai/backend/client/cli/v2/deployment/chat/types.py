@@ -5,13 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class DeploymentChatCacheEntry(BaseModel):
     """One deployment's auto-managed endpoint metadata."""
-
-    model_config = ConfigDict(frozen=True)
 
     endpoint_url: str
     default_model: str | None = None
