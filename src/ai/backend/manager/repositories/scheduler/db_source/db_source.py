@@ -53,6 +53,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -1470,6 +1471,23 @@ class ScheduleDBSource:
                 ).one_or_none()
                 if sg_row is None:
                     raise ScalingGroupNotFound(f"Resource group {resource_group_name} not found")
+                # Every production caller of ``enqueue_session_from_draft`` populates
+                # access_key/domain_name/project_id alongside resource_group_name; this
+                # branch flags the contract violation rather than letting the SG
+                # access check silently degrade to fail-open.
+                if access_key is None or domain_name is None or project_id is None:
+                    raise InternalServerError(
+                        "Unreachable: resource_group_name supplied without identity context",
+                    )
+                # The draft's access_key is the owner's for delegated sessions, so
+                # this check enforces SG access against the owner's allowlist.
+                allowed_sgs = await self._query_allowed_scaling_groups(
+                    db_sess, domain_name, str(project_id), access_key
+                )
+                if resource_group_name not in {sg.name for sg in allowed_sgs}:
+                    raise InvalidAPIParameters(
+                        f"Resource group '{resource_group_name}' is not accessible"
+                    )
                 network_info = ScalingGroupNetworkInfo(
                     use_host_network=sg_row.use_host_network,
                     wsproxy_addr=sg_row.wsproxy_addr,
