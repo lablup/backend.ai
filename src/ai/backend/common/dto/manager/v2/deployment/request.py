@@ -256,7 +256,12 @@ class AddRevisionOptions(BaseRequestModel):
 
 
 class AddRevisionGQLInputDTO(BaseRequestModel):
-    """Input for adding a revision. Used by both GQL and REST v2 APIs."""
+    """Input for adding a revision — pure revision data.
+
+    Behavior toggles (e.g. ``auto_activate``) live on a sibling
+    :class:`AddRevisionOptions` object that callers pass alongside this
+    input: a separate mutation argument on GQL, a query string on REST v2.
+    """
 
     name: str | None = Field(default=None, description="Revision name")
     revision_preset_id: DeploymentPresetID | None = Field(
@@ -275,10 +280,6 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     )
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
-    )
-    options: AddRevisionOptions | None = Field(
-        default=None,
-        description="Additional options for the add revision operation.",
     )
 
 
