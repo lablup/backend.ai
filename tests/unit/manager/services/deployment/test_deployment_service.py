@@ -7,8 +7,9 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime, timedelta
+from typing import cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -27,6 +28,7 @@ from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACVali
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
@@ -50,12 +52,19 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
+from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
+    CreateAccessTokenAction,
+)
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     SearchDeploymentPoliciesAction,
     UpsertDeploymentPolicyAction,
@@ -470,3 +479,225 @@ class TestAddModelRevision(ModelRevisionFixtures):
             revision=revision_creator,
             auto_activate=False,
         )
+
+
+class TestCreateAccessToken(DeploymentServiceBaseFixtures):
+    """Regression tests for DeploymentService.create_access_token (BA-5881).
+
+    The previous implementation persisted ``secrets.token_urlsafe(32)`` as the
+    deployment access token, which app-proxy worker rejects with 401 because
+    it expects a coordinator-signed JWT. These tests pin the new contract:
+    the service must call the app-proxy coordinator to mint a JWT, persist it
+    via the CreatorSpec, and return it to the caller.
+    """
+
+    @pytest.fixture
+    def deployment_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def session_owner_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def project_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def endpoint_info(
+        self,
+        deployment_id: uuid.UUID,
+        session_owner_id: uuid.UUID,
+        project_id: uuid.UUID,
+    ) -> DeploymentInfo:
+        return DeploymentInfo(
+            id=DeploymentID(deployment_id),
+            metadata=DeploymentMetadata(
+                name="ba5881-test",
+                domain="default",
+                project=project_id,
+                resource_group="default",
+                created_user=uuid.uuid4(),
+                session_owner=session_owner_id,
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                revision_history_limit=10,
+            ),
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica_spec=ReplicaSpec(replica_count=1),
+            network=DeploymentNetworkSpec(open_to_public=False),
+            model_revisions=[],
+            options=DeploymentOptions(),
+        )
+
+    @pytest.fixture
+    def proxy_target(self) -> ScalingGroupProxyTarget:
+        return ScalingGroupProxyTarget(
+            addr="http://app-proxy.local:10200",
+            api_token="proxy-api-token",
+        )
+
+    @pytest.fixture
+    def coordinator_jwt(self) -> str:
+        # The exact bytes are irrelevant; the test only cares that this string
+        # round-trips from the (mocked) coordinator into the persisted token.
+        return "eyJhbGciOiJIUzI1NiJ9.coordinator-signed-payload.signature"
+
+    @pytest.fixture
+    def created_token_row(
+        self,
+        deployment_id: uuid.UUID,
+        coordinator_jwt: str,
+    ) -> MagicMock:
+        row = MagicMock()
+        row.id = uuid.uuid4()
+        row.token = coordinator_jwt
+        row.endpoint = DeploymentID(deployment_id)
+        row.expires_at = None
+        row.created_at = datetime(2024, 1, 1, tzinfo=UTC)
+        return row
+
+    @pytest.fixture
+    def configure_repository(
+        self,
+        mock_deployment_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+        proxy_target: ScalingGroupProxyTarget,
+        created_token_row: MagicMock,
+    ) -> MagicMock:
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.fetch_scaling_group_proxy_targets = AsyncMock(
+            return_value={endpoint_info.metadata.resource_group: proxy_target}
+        )
+        mock_deployment_repository.create_access_token = AsyncMock(return_value=created_token_row)
+        return mock_deployment_repository
+
+    @pytest.fixture
+    def action(self, deployment_id: uuid.UUID) -> CreateAccessTokenAction:
+        return CreateAccessTokenAction(
+            creator=ModelDeploymentAccessTokenCreator(
+                model_deployment_id=deployment_id,
+                expires_at=None,
+            ),
+        )
+
+    async def test_persists_coordinator_jwt_instead_of_random(
+        self,
+        deployment_service: DeploymentService,
+        configure_repository: MagicMock,
+        action: CreateAccessTokenAction,
+        proxy_target: ScalingGroupProxyTarget,
+        endpoint_info: DeploymentInfo,
+        deployment_id: uuid.UUID,
+        coordinator_jwt: str,
+    ) -> None:
+        """Regression: BA-5881. The token returned by create_access_token must
+        be the JWT minted by the coordinator, not a locally generated random
+        string. The CreatorSpec passed to the repository must carry that JWT.
+        """
+        with patch(
+            "ai.backend.manager.services.deployment.service._request_endpoint_jwt",
+            new=AsyncMock(return_value=coordinator_jwt),
+        ) as mocked_mint:
+            result = await deployment_service.create_access_token(action)
+
+        assert result.data.token == coordinator_jwt
+
+        mocked_mint.assert_awaited_once()
+        assert mocked_mint.await_args is not None
+        call_kwargs = mocked_mint.await_args.kwargs
+        assert call_kwargs["proxy_addr"] == proxy_target.addr
+        assert call_kwargs["api_token"] == proxy_target.api_token
+        assert call_kwargs["deployment_id"] == deployment_id
+        assert call_kwargs["user_uuid"] == endpoint_info.metadata.session_owner
+
+        configure_repository.create_access_token.assert_awaited_once()
+        repo_call = configure_repository.create_access_token.await_args
+        assert repo_call is not None
+        creator = cast(RBACEntityCreator[object], repo_call.args[0])
+        spec = cast(EndpointTokenCreatorSpec, creator.spec)
+        assert spec.token == coordinator_jwt
+        assert spec.domain == endpoint_info.metadata.domain
+        assert spec.project_id == endpoint_info.metadata.project
+        assert spec.session_owner_id == endpoint_info.metadata.session_owner
+
+    async def test_uses_action_expires_at_when_provided(
+        self,
+        deployment_service: DeploymentService,
+        configure_repository: MagicMock,
+        deployment_id: uuid.UUID,
+        coordinator_jwt: str,
+    ) -> None:
+        """The expires_at supplied on the action must be forwarded to the
+        coordinator request and stored on the spec; otherwise the persisted
+        token's lifetime would silently default to 24h.
+        """
+        explicit_expiry = datetime(2030, 6, 1, 12, 0, 0, tzinfo=UTC)
+        action = CreateAccessTokenAction(
+            creator=ModelDeploymentAccessTokenCreator(
+                model_deployment_id=deployment_id,
+                expires_at=explicit_expiry,
+            ),
+        )
+
+        with patch(
+            "ai.backend.manager.services.deployment.service._request_endpoint_jwt",
+            new=AsyncMock(return_value=coordinator_jwt),
+        ) as mocked_mint:
+            await deployment_service.create_access_token(action)
+
+        assert mocked_mint.await_args is not None
+        assert mocked_mint.await_args.kwargs["expires_at"] == explicit_expiry
+        repo_call = configure_repository.create_access_token.await_args
+        assert repo_call is not None
+        creator = cast(RBACEntityCreator[object], repo_call.args[0])
+        spec = cast(EndpointTokenCreatorSpec, creator.spec)
+        assert spec.expires_at == explicit_expiry
+
+    async def test_defaults_expiry_to_24h_when_unspecified(
+        self,
+        deployment_service: DeploymentService,
+        configure_repository: MagicMock,
+        action: CreateAccessTokenAction,
+        coordinator_jwt: str,
+    ) -> None:
+        """When the action carries no expiry, the service must still pass a
+        non-null expires_at to the coordinator (a JWT without exp would let
+        the token live forever)."""
+        before = datetime.now(UTC)
+        with patch(
+            "ai.backend.manager.services.deployment.service._request_endpoint_jwt",
+            new=AsyncMock(return_value=coordinator_jwt),
+        ) as mocked_mint:
+            await deployment_service.create_access_token(action)
+        after = datetime.now(UTC)
+
+        assert mocked_mint.await_args is not None
+        forwarded_expiry = mocked_mint.await_args.kwargs["expires_at"]
+        # Default is now+24h; allow some scheduling slack on either side.
+        assert before + timedelta(hours=23, minutes=59) <= forwarded_expiry
+        assert forwarded_expiry <= after + timedelta(hours=24, minutes=1)
+
+    async def test_raises_when_scaling_group_has_no_proxy_target(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+        action: CreateAccessTokenAction,
+    ) -> None:
+        """If the deployment's scaling group has no app-proxy target, the
+        service cannot mint a JWT and must raise InvalidAPIParameters rather
+        than silently fall back to a random token."""
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.fetch_scaling_group_proxy_targets = AsyncMock(
+            return_value={endpoint_info.metadata.resource_group: None}
+        )
+        mock_deployment_repository.create_access_token = AsyncMock()
+
+        with pytest.raises(InvalidAPIParameters):
+            await deployment_service.create_access_token(action)
+
+        mock_deployment_repository.create_access_token.assert_not_awaited()
