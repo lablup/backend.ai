@@ -63,6 +63,8 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimit,
 )
+from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.base import (
@@ -72,6 +74,7 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -84,6 +87,9 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -1341,13 +1347,6 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        from ai.backend.manager.data.permission.types import EntityType
-        from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
-        from ai.backend.manager.models.group import GroupRow
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
-
         project_ids_stmt = (
             sa.select(GroupRow.id)
             .join(
