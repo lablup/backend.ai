@@ -11,7 +11,6 @@ Two on-disk JSON files live side by side under ``~/.backend.ai/``:
 
 from __future__ import annotations
 
-import json
 import os
 import stat
 import tempfile
@@ -27,6 +26,7 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatConfig,
 )
 from ai.backend.client.cli.v2.helpers import CONFIG_DIR
+from ai.backend.common.json import load_json
 
 CHAT_CACHE_FILE = CONFIG_DIR / "deployment_chat.json"
 CHAT_CONFIG_FILE = CONFIG_DIR / "deployment_chat_config.json"
@@ -95,14 +95,14 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        with path.open("r", encoding="utf-8") as f:
-            raw = json.load(f)
-    except (OSError, json.JSONDecodeError):
+        with path.open("rb") as f:
+            raw = load_json(f.read())
+    except (OSError, ValueError):
         return None
     return raw if isinstance(raw, dict) else None
 
 
-def _atomic_write(path: Path, payload: str) -> None:
+def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path_str = tempfile.mkstemp(
         prefix=path.name + ".",
@@ -112,7 +112,7 @@ def _atomic_write(path: Path, payload: str) -> None:
     tmp_path = Path(tmp_path_str)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(payload)
+            f.write(text)
         tmp_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
         tmp_path.replace(path)
     except Exception:
