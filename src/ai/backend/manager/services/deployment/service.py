@@ -1,9 +1,12 @@
 """Deployment service for managing model deployments."""
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
 from typing import cast
 from uuid import UUID
+
+import aiohttp
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -46,6 +49,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
     PresetValueData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
@@ -894,25 +898,54 @@ class DeploymentService:
     ) -> CreateAccessTokenActionResult:
         """Create a new access token for a model deployment.
 
+        The token returned to the caller is a JWT issued by the app-proxy
+        coordinator (signed with the coordinator's ``jwt_secret``). The
+        inference frontend in the worker validates this JWT against the
+        circuit id, so a randomly generated opaque token would always be
+        rejected with 401.
+
         Args:
             action: CreateAccessTokenAction containing the creator spec.
 
         Returns:
             CreateAccessTokenActionResult with the created token data.
         """
-        # Get endpoint info to retrieve domain, project, session_owner
+        # Get endpoint info to retrieve domain, project, session_owner, resource_group
         endpoint_info = await self._deployment_repository.get_endpoint_info(
             action.creator.model_deployment_id
         )
 
-        # Create the RBACEntityCreator with EndpointTokenCreatorSpec
+        # Resolve the app-proxy coordinator behind this deployment's scaling group
+        resource_group = endpoint_info.metadata.resource_group
+        proxy_targets = await self._deployment_repository.fetch_scaling_group_proxy_targets({
+            resource_group
+        })
+        proxy_target = proxy_targets.get(resource_group)
+        if proxy_target is None:
+            raise InvalidAPIParameters(
+                f"No app-proxy target configured for scaling group {resource_group!r}; "
+                "cannot issue a deployment access token."
+            )
+
+        # Ask the coordinator to mint a JWT for this deployment's circuit
+        expires_at = action.creator.expires_at or (datetime.now(UTC) + timedelta(days=1))
+        jwt_token = await _request_endpoint_jwt(
+            proxy_addr=proxy_target.addr,
+            api_token=proxy_target.api_token,
+            deployment_id=action.creator.model_deployment_id,
+            user_uuid=endpoint_info.metadata.session_owner,
+            expires_at=expires_at,
+        )
+
+        # Create the RBACEntityCreator with the JWT-bearing spec
         deployment_id = DeploymentID(action.creator.model_deployment_id)
         spec = EndpointTokenCreatorSpec(
             deployment_id=deployment_id,
             domain=endpoint_info.metadata.domain,
             project_id=endpoint_info.metadata.project,
             session_owner_id=endpoint_info.metadata.session_owner,
-            expires_at=action.creator.expires_at,
+            expires_at=expires_at,
+            token=jwt_token,
         )
         creator: RBACEntityCreator[EndpointTokenRow] = RBACEntityCreator(
             spec=spec,
@@ -1000,3 +1033,39 @@ class DeploymentService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+
+async def _request_endpoint_jwt(
+    *,
+    proxy_addr: str,
+    api_token: str,
+    deployment_id: UUID,
+    user_uuid: UUID,
+    expires_at: datetime,
+) -> str:
+    """Mint an inference-frontend JWT via the app-proxy coordinator."""
+    body = {
+        "user_uuid": str(user_uuid),
+        "exp": expires_at.isoformat(),
+    }
+    url = f"{proxy_addr.rstrip('/')}/v2/endpoints/{deployment_id}/token"
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(
+            url,
+            json=body,
+            headers={
+                "accept": "application/json",
+                "X-BackendAI-Token": api_token,
+            },
+        ) as resp,
+    ):
+        payload = await resp.json()
+        if resp.status != HTTPStatus.OK:
+            raise InvalidAPIParameters(
+                f"app-proxy refused to mint a JWT ({resp.status} {resp.reason}): {payload}"
+            )
+        token = payload.get("token")
+        if not isinstance(token, str):
+            raise InvalidAPIParameters(f"app-proxy returned an invalid token payload: {payload!r}")
+        return token

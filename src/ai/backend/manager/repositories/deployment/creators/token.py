@@ -18,8 +18,12 @@ class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
     """CreatorSpec for endpoint access token creation.
 
     Creates an access token that can be used to authenticate requests
-    to a specific deployment. Token ID and token value are generated
-    automatically in build_row().
+    to a specific deployment. Token ID is generated automatically. The
+    token value defaults to a random ``secrets.token_urlsafe(32)`` for
+    backward compatibility, but the service layer typically passes a
+    pre-generated JWT signed by the app-proxy coordinator so that the
+    inference frontend's auth check (Authorization: Bearer <jwt>) can
+    succeed.
     """
 
     deployment_id: DeploymentID
@@ -27,12 +31,13 @@ class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
     project_id: uuid.UUID
     session_owner_id: uuid.UUID
     expires_at: datetime | None = None
+    token: str | None = None
 
     @override
     def build_row(self) -> EndpointTokenRow:
         return EndpointTokenRow(
             id=uuid.uuid4(),
-            token=secrets.token_urlsafe(32),
+            token=self.token if self.token is not None else secrets.token_urlsafe(32),
             endpoint=self.deployment_id,
             domain=self.domain,
             project=self.project_id,
