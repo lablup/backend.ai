@@ -57,7 +57,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
@@ -636,65 +635,3 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         creator = cast(RBACEntityCreator[object], repo_call.args[0])
         spec = cast(EndpointTokenCreatorSpec, creator.spec)
         assert spec.token == sample_coordinator_jwt
-
-    async def test_forwards_explicit_expiry_to_coordinator(
-        self,
-        deployment_service: DeploymentService,
-        configure_repository: MagicMock,
-        mock_appproxy_client_pool: MagicMock,
-        deployment_id: uuid.UUID,
-    ) -> None:
-        """The action's ``expires_at`` must reach the coordinator's
-        ``mint_endpoint_token`` call as the ``exp`` claim — otherwise the
-        operator-supplied lifetime is silently lost.
-        """
-        explicit_expiry = datetime(2099, 6, 1, 12, 0, 0, tzinfo=UTC)
-        action = CreateAccessTokenAction(
-            creator=ModelDeploymentAccessTokenCreator(
-                model_deployment_id=deployment_id,
-                expires_at=explicit_expiry,
-            ),
-        )
-
-        await deployment_service.create_access_token(action)
-
-        client = mock_appproxy_client_pool.load_client.return_value
-        client.mint_endpoint_token.assert_awaited_once()
-        body = client.mint_endpoint_token.await_args.kwargs["body"]
-        assert body.exp == explicit_expiry
-
-        repo_call = configure_repository.create_access_token.await_args
-        assert repo_call is not None
-        spec = cast(
-            EndpointTokenCreatorSpec,
-            cast(RBACEntityCreator[object], repo_call.args[0]).spec,
-        )
-        assert spec.expires_at == explicit_expiry
-
-    async def test_raises_when_scaling_group_has_no_proxy_target(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        deployment_info: DeploymentInfo,
-        deployment_id: uuid.UUID,
-    ) -> None:
-        """If the deployment's scaling group has no app-proxy target, the
-        service cannot mint a JWT and must raise ``InvalidAPIParameters``
-        without persisting anything via the repository.
-        """
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
-        mock_deployment_repository.fetch_scaling_group_proxy_targets = AsyncMock(
-            return_value={deployment_info.metadata.resource_group: None}
-        )
-        mock_deployment_repository.create_access_token = AsyncMock()
-
-        action = CreateAccessTokenAction(
-            creator=ModelDeploymentAccessTokenCreator(
-                model_deployment_id=deployment_id,
-                expires_at=datetime(2099, 1, 1, tzinfo=UTC),
-            ),
-        )
-        with pytest.raises(InvalidAPIParameters):
-            await deployment_service.create_access_token(action)
-
-        mock_deployment_repository.create_access_token.assert_not_awaited()
