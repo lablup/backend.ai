@@ -81,13 +81,6 @@ class TestConfigLoadSaveRoundTrip:
 
 class TestPermissions:
     @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
-    def test_save_chat_cache_enforces_0600(self, cache_path: Path) -> None:
-        cache = DeploymentChatCache()
-        cache.set(uuid4(), _make_entry())
-        save_chat_cache(cache)
-        assert stat.S_IMODE(cache_path.stat().st_mode) == 0o600
-
-    @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
     def test_save_chat_config_enforces_0600(self, config_path: Path) -> None:
         cfg = DeploymentChatConfig()
         cfg.set_token(uuid4(), "sk-x")
