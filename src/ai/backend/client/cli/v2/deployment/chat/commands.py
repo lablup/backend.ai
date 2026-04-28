@@ -102,6 +102,17 @@ async def _resolve_endpoint_entry(
     help="Model name to send (defaults to cached default_model).",
 )
 @click.option(
+    "--path",
+    "request_path",
+    default="/v1/chat/completions",
+    type=str,
+    help=(
+        "Endpoint path appended to the deployment's endpoint_url. "
+        "Defaults to the OpenAI Chat Completions path; override for "
+        "runtime variants that expose a different route."
+    ),
+)
+@click.option(
     "--params",
     default="{}",
     type=JSONParamType(),
@@ -116,13 +127,17 @@ def chat(
     deployment_id: UUID,
     content: str,
     model: str | None,
+    request_path: str,
     params: Any,
 ) -> None:
     """Send a one-shot chat completion request to a deployed model.
 
-    Sampling parameters (temperature, top_p, max_tokens, etc.) are not
-    exposed as individual flags because their schema differs across
-    runtime variants. Pass them through ``--params`` instead.
+    Targets OpenAI-compatible Chat Completions endpoints
+    (vLLM / SGLang / NIM / TGI in messages-api mode / custom containers
+    that follow the same contract). Sampling parameters such as
+    temperature and top_p differ between runtime variants — pass them
+    through ``--params``. Use ``--path`` for runtime variants whose
+    route is not ``/v1/chat/completions``.
     """
     import json
 
@@ -168,6 +183,7 @@ def chat(
                     endpoint_entry.endpoint_url,
                     api_key,
                     body,
+                    path=request_path,
                 )
             except DeploymentChatAuthError as e:
                 raise click.ClickException(
