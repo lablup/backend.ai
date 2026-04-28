@@ -62,7 +62,8 @@ kernelstatus_old = postgresql.ENUM(*kernelstatus_old_values, name="kernelstatus"
 def upgrade() -> None:
     conn = op.get_bind()
     try:
-        sessionresult.create(conn)
+        with conn.begin_nested():
+            sessionresult.create(conn)
     except Exception as e:
         log.warning("Skipping CREATE TYPE sessionresult: %s", e)
     sessiontypes.create(conn)
@@ -126,16 +127,17 @@ def upgrade() -> None:
         op.f("ix_kernel_dependencies_kernel_id"), "kernel_dependencies", ["kernel_id"], unique=False
     )
     try:
-        op.add_column(
-            "kernels",
-            sa.Column(
-                "result",
-                sa.Enum("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresult"),
-                default="UNDEFINED",
-                server_default="UNDEFINED",
-                nullable=False,
-            ),
-        )
+        with op.get_bind().begin_nested():
+            op.add_column(
+                "kernels",
+                sa.Column(
+                    "result",
+                    sa.Enum("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresult"),
+                    default="UNDEFINED",
+                    server_default="UNDEFINED",
+                    nullable=False,
+                ),
+            )
     except Exception as e:
         log.warning("Skipping ADD COLUMN kernels.result (sessionresult): %s", e)
     op.add_column("kernels", sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True))
@@ -151,7 +153,8 @@ def upgrade() -> None:
     )
     op.alter_column("kernels", "agent_addr", existing_type=sa.VARCHAR(length=128), nullable=True)
     try:
-        op.create_index(op.f("ix_kernels_result"), "kernels", ["result"], unique=False)
+        with op.get_bind().begin_nested():
+            op.create_index(op.f("ix_kernels_result"), "kernels", ["result"], unique=False)
     except Exception as e:
         log.warning("Skipping CREATE INDEX ix_kernels_result: %s", e)
     op.create_index(op.f("ix_kernels_type"), "kernels", ["type"], unique=False)
@@ -205,14 +208,16 @@ def downgrade() -> None:
 
     # op.drop_index(op.f("ix_kernels_type"), table_name="kernels")
     try:
-        op.drop_index(op.f("ix_kernels_result"), table_name="kernels")
+        with op.get_bind().begin_nested():
+            op.drop_index(op.f("ix_kernels_result"), table_name="kernels")
     except Exception as e:
         log.warning("Skipping DROP INDEX ix_kernels_result: %s", e)
     op.alter_column("kernels", "agent_addr", existing_type=sa.VARCHAR(length=128), nullable=False)
     op.drop_column("kernels", "type")
     op.drop_column("kernels", "status_changed")
     try:
-        op.drop_column("kernels", "result")
+        with op.get_bind().begin_nested():
+            op.drop_column("kernels", "result")
     except Exception as e:
         log.warning("Skipping DROP COLUMN kernels.result: %s", e)
     op.drop_column("agents", "status_changed")
@@ -221,7 +226,8 @@ def downgrade() -> None:
     op.drop_table("kernel_dependencies")
 
     try:
-        sessionresult.drop(op.get_bind())
+        with op.get_bind().begin_nested():
+            sessionresult.drop(op.get_bind())
     except Exception as e:
         log.warning("Skipping DROP TYPE sessionresult: %s", e)
     sessiontypes.drop(op.get_bind())

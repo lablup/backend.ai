@@ -26,22 +26,23 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     try:
-        # Check if both types exist (edge case: database has both enum types)
-        result_singular = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_type WHERE typname = 'sessionresult'"
-        )
-        has_singular = result_singular.fetchone() is not None
+        with conn.begin_nested():
+            # Check if both types exist (edge case: database has both enum types)
+            result_singular = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = 'sessionresult'"
+            )
+            has_singular = result_singular.fetchone() is not None
 
-        result_plural = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_type WHERE typname = 'sessionresults'"
-        )
-        has_plural = result_plural.fetchone() is not None
+            result_plural = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = 'sessionresults'"
+            )
+            has_plural = result_plural.fetchone() is not None
 
-        if has_plural and not has_singular:
-            # Normal case: plural exists, rename it to singular
-            conn.exec_driver_sql("ALTER TYPE sessionresults RENAME TO sessionresult")
-        # If both exist, skip rename to avoid conflict
-        # If only singular exists, no action needed
+            if has_plural and not has_singular:
+                # Normal case: plural exists, rename it to singular
+                conn.exec_driver_sql("ALTER TYPE sessionresults RENAME TO sessionresult")
+            # If both exist, skip rename to avoid conflict
+            # If only singular exists, no action needed
     except Exception as e:
         log.warning("Skipping rename of sessionresults -> sessionresult enum type: %s", e)
 
@@ -52,20 +53,21 @@ def downgrade() -> None:
     conn = op.get_bind()
 
     try:
-        result_singular = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_type WHERE typname = 'sessionresult'"
-        )
-        has_singular = result_singular.fetchone() is not None
+        with conn.begin_nested():
+            result_singular = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = 'sessionresult'"
+            )
+            has_singular = result_singular.fetchone() is not None
 
-        result_plural = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_type WHERE typname = 'sessionresults'"
-        )
-        has_plural = result_plural.fetchone() is not None
+            result_plural = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = 'sessionresults'"
+            )
+            has_plural = result_plural.fetchone() is not None
 
-        if has_singular and not has_plural:
-            # Normal case: singular exists, rename it to plural
-            conn.exec_driver_sql("ALTER TYPE sessionresult RENAME TO sessionresults")
-        # If both exist, skip rename to avoid conflict
-        # If only plural exists, no action needed
+            if has_singular and not has_plural:
+                # Normal case: singular exists, rename it to plural
+                conn.exec_driver_sql("ALTER TYPE sessionresult RENAME TO sessionresults")
+            # If both exist, skip rename to avoid conflict
+            # If only plural exists, no action needed
     except Exception as e:
         log.warning("Skipping rename of sessionresult -> sessionresults enum type: %s", e)

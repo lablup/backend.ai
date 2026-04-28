@@ -45,62 +45,71 @@ def _column_type_name(conn: Connection, table: str, column: str) -> str | None:
 
 def _drop_column_default(conn: Connection, table: str, column: str) -> None:
     try:
-        conn.exec_driver_sql(f"ALTER TABLE {table} ALTER COLUMN {column} DROP DEFAULT")
+        with conn.begin_nested():
+            conn.exec_driver_sql(f"ALTER TABLE {table} ALTER COLUMN {column} DROP DEFAULT")
     except Exception as e:
         log.warning("Skipping DROP DEFAULT on %s.%s: %s", table, column, e)
 
 
 def _alter_column_to_varchar(conn: Connection, table: str, column: str) -> None:
     try:
-        conn.exec_driver_sql(
-            f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR(64) USING {column}::text"
-        )
+        with conn.begin_nested():
+            conn.exec_driver_sql(
+                f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR(64) USING {column}::text"
+            )
     except Exception as e:
         log.warning("Skipping TYPE conversion of %s.%s to VARCHAR: %s", table, column, e)
 
 
 def _set_column_default_undefined(conn: Connection, table: str, column: str) -> None:
     try:
-        conn.exec_driver_sql(f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT 'UNDEFINED'")
+        with conn.begin_nested():
+            conn.exec_driver_sql(
+                f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT 'UNDEFINED'"
+            )
     except Exception as e:
         log.warning("Skipping SET DEFAULT on %s.%s: %s", table, column, e)
 
 
 def _drop_enum_type(conn: Connection, type_name: str) -> None:
     try:
-        conn.exec_driver_sql(f"DROP TYPE IF EXISTS {type_name}")
+        with conn.begin_nested():
+            conn.exec_driver_sql(f"DROP TYPE IF EXISTS {type_name}")
     except Exception as e:
         log.warning("Skipping DROP TYPE %s: %s", type_name, e)
 
 
 def _create_sessionresult_type_if_missing(conn: Connection) -> None:
     try:
-        conn.exec_driver_sql(
-            "DO $$ BEGIN"
-            " IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'sessionresult') THEN"
-            "   CREATE TYPE sessionresult AS ENUM ('UNDEFINED', 'SUCCESS', 'FAILURE');"
-            " END IF;"
-            " END $$;"
-        )
+        with conn.begin_nested():
+            conn.exec_driver_sql(
+                "DO $$ BEGIN"
+                " IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'sessionresult') THEN"
+                "   CREATE TYPE sessionresult AS ENUM ('UNDEFINED', 'SUCCESS', 'FAILURE');"
+                " END IF;"
+                " END $$;"
+            )
     except Exception as e:
         log.warning("Skipping CREATE TYPE sessionresult: %s", e)
 
 
 def _alter_column_to_sessionresult(conn: Connection, table: str, column: str) -> None:
     try:
-        conn.exec_driver_sql(
-            f"ALTER TABLE {table} ALTER COLUMN {column}"
-            f" TYPE sessionresult USING {column}::text::sessionresult"
-        )
+        with conn.begin_nested():
+            conn.exec_driver_sql(
+                f"ALTER TABLE {table} ALTER COLUMN {column}"
+                f" TYPE sessionresult USING {column}::text::sessionresult"
+            )
     except Exception as e:
         log.warning("Skipping TYPE conversion of %s.%s to sessionresult: %s", table, column, e)
 
 
 def _set_column_default_undefined_sessionresult(conn: Connection, table: str, column: str) -> None:
     try:
-        conn.exec_driver_sql(
-            f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT 'UNDEFINED'::sessionresult"
-        )
+        with conn.begin_nested():
+            conn.exec_driver_sql(
+                f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT 'UNDEFINED'::sessionresult"
+            )
     except Exception as e:
         log.warning("Skipping SET DEFAULT on %s.%s: %s", table, column, e)
 

@@ -24,31 +24,32 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     try:
-        result_singular = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_type WHERE typname = 'sessionresult'"
-        )
-        has_singular = result_singular.fetchone() is not None
-
-        result_plural = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_type WHERE typname = 'sessionresults'"
-        )
-        has_plural = result_plural.fetchone() is not None
-
-        if has_plural and has_singular:
-            # Both types coexist (normal migration path):
-            #   - "sessionresult" was created by 405aa2c39458 (2019, kernels.result)
-            #   - "sessionresults" was created by b6b884fbae1f (2022, sessions.result)
-            #   - ffcf0ed13a26 skipped rename because both existed
-            # Fix: alter sessions.result to use the singular type, then drop plural.
-            conn.exec_driver_sql(
-                "ALTER TABLE sessions ALTER COLUMN result"
-                " TYPE sessionresult USING result::text::sessionresult"
+        with conn.begin_nested():
+            result_singular = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = 'sessionresult'"
             )
-            conn.exec_driver_sql("DROP TYPE sessionresults")
-        elif has_plural and not has_singular:
-            # Only plural exists (ffcf0ed13a26 was never applied, or was skipped).
-            # Rename to singular to match EnumType(SessionResult) convention.
-            conn.exec_driver_sql("ALTER TYPE sessionresults RENAME TO sessionresult")
+            has_singular = result_singular.fetchone() is not None
+
+            result_plural = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = 'sessionresults'"
+            )
+            has_plural = result_plural.fetchone() is not None
+
+            if has_plural and has_singular:
+                # Both types coexist (normal migration path):
+                #   - "sessionresult" was created by 405aa2c39458 (2019, kernels.result)
+                #   - "sessionresults" was created by b6b884fbae1f (2022, sessions.result)
+                #   - ffcf0ed13a26 skipped rename because both existed
+                # Fix: alter sessions.result to use the singular type, then drop plural.
+                conn.exec_driver_sql(
+                    "ALTER TABLE sessions ALTER COLUMN result"
+                    " TYPE sessionresult USING result::text::sessionresult"
+                )
+                conn.exec_driver_sql("DROP TYPE sessionresults")
+            elif has_plural and not has_singular:
+                # Only plural exists (ffcf0ed13a26 was never applied, or was skipped).
+                # Rename to singular to match EnumType(SessionResult) convention.
+                conn.exec_driver_sql("ALTER TYPE sessionresults RENAME TO sessionresult")
     except Exception as e:
         log.warning("Skipping sessionresult/sessionresults coexistence fix: %s", e)
 
@@ -57,24 +58,25 @@ def downgrade() -> None:
     conn = op.get_bind()
 
     try:
-        result_singular = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_type WHERE typname = 'sessionresult'"
-        )
-        has_singular = result_singular.fetchone() is not None
-
-        result_plural = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_type WHERE typname = 'sessionresults'"
-        )
-        has_plural = result_plural.fetchone() is not None
-
-        if has_singular and not has_plural:
-            # Recreate the plural type and revert sessions.result to use it.
-            conn.exec_driver_sql(
-                "CREATE TYPE sessionresults AS ENUM ('UNDEFINED', 'SUCCESS', 'FAILURE')"
+        with conn.begin_nested():
+            result_singular = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = 'sessionresult'"
             )
-            conn.exec_driver_sql(
-                "ALTER TABLE sessions ALTER COLUMN result"
-                " TYPE sessionresults USING result::text::sessionresults"
+            has_singular = result_singular.fetchone() is not None
+
+            result_plural = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = 'sessionresults'"
             )
+            has_plural = result_plural.fetchone() is not None
+
+            if has_singular and not has_plural:
+                # Recreate the plural type and revert sessions.result to use it.
+                conn.exec_driver_sql(
+                    "CREATE TYPE sessionresults AS ENUM ('UNDEFINED', 'SUCCESS', 'FAILURE')"
+                )
+                conn.exec_driver_sql(
+                    "ALTER TABLE sessions ALTER COLUMN result"
+                    " TYPE sessionresults USING result::text::sessionresults"
+                )
     except Exception as e:
         log.warning("Skipping sessionresult/sessionresults coexistence revert: %s", e)

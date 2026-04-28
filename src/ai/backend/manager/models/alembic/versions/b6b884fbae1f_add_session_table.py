@@ -54,9 +54,10 @@ def upgrade() -> None:
     # SessionRow.__table__.create(connection) below does not fail if the
     # type already exists from a diverged migration history.
     try:
-        pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults").create(
-            connection, checkfirst=True
-        )
+        with connection.begin_nested():
+            pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults").create(
+                connection, checkfirst=True
+            )
     except Exception as e:
         log.warning("Skipping pre-create of TYPE sessionresults: %s", e)
     kernels = sa.Table(
@@ -274,7 +275,8 @@ def upgrade() -> None:
     op.create_index(op.f("ix_sessions_created_at"), "sessions", ["created_at"], unique=False)
     op.create_index(op.f("ix_sessions_name"), "sessions", ["name"], unique=False)
     try:
-        op.create_index(op.f("ix_sessions_result"), "sessions", ["result"], unique=False)
+        with connection.begin_nested():
+            op.create_index(op.f("ix_sessions_result"), "sessions", ["result"], unique=False)
     except Exception as e:
         log.warning("Skipping CREATE INDEX ix_sessions_result: %s", e)
     op.create_index(
@@ -657,7 +659,8 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_sessions_session_type"), table_name="sessions")
     op.drop_index(op.f("ix_sessions_scaling_group_name"), table_name="sessions")
     try:
-        op.drop_index(op.f("ix_sessions_result"), table_name="sessions")
+        with op.get_bind().begin_nested():
+            op.drop_index(op.f("ix_sessions_result"), table_name="sessions")
     except Exception as e:
         log.warning("Skipping DROP INDEX ix_sessions_result: %s", e)
     op.drop_index(op.f("ix_sessions_name"), table_name="sessions")
@@ -673,7 +676,8 @@ def downgrade() -> None:
 
     sess_statues.drop(op.get_bind())
     try:
-        sess_results.drop(op.get_bind(), checkfirst=True)
+        with op.get_bind().begin_nested():
+            sess_results.drop(op.get_bind(), checkfirst=True)
     except Exception as e:
         log.warning("Skipping DROP TYPE sessionresults: %s", e)
 
