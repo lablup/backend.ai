@@ -204,7 +204,10 @@ async def exception_middleware(
         if ex.status_code == 500:
             log.warning("Internal server error raised inside handlers")
         log.exception("")
-        if mime_match(request.headers.get("accept", "text/html"), "application/json"):
+        # The coordinator only serves JSON APIs, so default to JSON when the
+        # client did not send an Accept header. The HTML template is kept as a
+        # fallback for clients that explicitly prefer text/html (e.g. browsers).
+        if mime_match(request.headers.get("accept", "application/json"), "application/json"):
             return web.json_response(
                 ensure_json_serializable(ex.body_dict),
                 status=ex.status_code,
