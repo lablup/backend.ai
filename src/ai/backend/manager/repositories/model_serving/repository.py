@@ -45,6 +45,7 @@ from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -160,25 +161,17 @@ class ModelServingRepository:
             )
 
     @model_serving_repository_resilience.apply()
-    async def get_endpoint_by_name_validated(
-        self, name: str, user_id: uuid.UUID
-    ) -> EndpointData | None:
-        """
-        Get endpoint by name with ownership validation.
-        Returns None if endpoint doesn't exist or user doesn't own it.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            endpoint = await self._get_endpoint_by_name(session, name, user_id)
-            if not endpoint:
-                return None
-            return endpoint.to_data()
-
-    @model_serving_repository_resilience.apply()
     async def list_endpoints_by_owner_validated(
         self, session_owner_id: uuid.UUID, name: str | None = None
     ) -> list[EndpointData]:
         """
         List endpoints owned by a specific user with optional name filter.
+
+        Eagerly loads every relationship that ``EndpointRow.to_data()``
+        traverses (``routings``, ``session_owner_row``, ``created_user_row``,
+        ``revisions`` -> ``image_row``) so the projection runs entirely on
+        cached state and never triggers ``MissingGreenlet`` from sync
+        ``to_data()`` invoked inside an async transaction.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query_conds = (EndpointRow.session_owner == session_owner_id) & (
@@ -190,7 +183,14 @@ class ModelServingRepository:
             query = (
                 sa.select(EndpointRow)
                 .where(query_conds)
-                .options(selectinload(EndpointRow.routings))
+                .options(
+                    selectinload(EndpointRow.routings),
+                    selectinload(EndpointRow.session_owner_row),
+                    selectinload(EndpointRow.created_user_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
             result = await session.execute(query)
             rows = cast(list[EndpointRow], result.scalars().all())
@@ -347,7 +347,11 @@ class ModelServingRepository:
             await session.execute(query)
 
             endpoint = await self._get_endpoint_by_id(
-                session, service_id, load_routes=True, load_session_owner=True
+                session,
+                service_id,
+                load_routes=True,
+                load_session_owner=True,
+                load_revisions=True,
             )
             if endpoint is None:
                 raise NoResultFound
@@ -451,19 +455,6 @@ class ModelServingRepository:
             )
         except NoResultFound:
             return None
-
-    async def _get_endpoint_by_name(
-        self, session: SASession, name: str, user_id: uuid.UUID
-    ) -> EndpointRow | None:
-        """
-        Private method to get endpoint by name and owner using an existing session.
-        """
-        query = sa.select(EndpointRow).where(
-            (EndpointRow.name == name) & (EndpointRow.session_owner == user_id)
-        )
-        result = await session.execute(query)
-
-        return result.scalar()
 
     async def _get_route_by_id(
         self,
