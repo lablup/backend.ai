@@ -13,6 +13,7 @@ import click
 from ai.backend.cli.params import JSONParamType
 from ai.backend.client.cli.v2.deployment.chat.formatter import DeploymentChatFormatter
 from ai.backend.client.cli.v2.deployment.chat.types import (
+    CACHE_ENTRY_TTL,
     DeploymentChatCache,
     DeploymentChatCacheEntry,
 )
@@ -57,7 +58,12 @@ async def _resolve_endpoint_entry(
     with the new model regardless of an existing entry.
     """
     existing = cache.get(deployment_id)
-    if existing is not None and default_model_override is None:
+    now = datetime.now(UTC)
+    if (
+        existing is not None
+        and default_model_override is None
+        and now - existing.last_synced_at < CACHE_ENTRY_TTL
+    ):
         return existing
 
     registry = await create_v2_registry(connection)
