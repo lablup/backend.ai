@@ -9,13 +9,16 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
+    MintEndpointTokenResponse,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
@@ -28,6 +31,7 @@ from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACVali
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.clients.appproxy.client import AppProxyClient, AppProxyClientPool
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
@@ -90,15 +94,22 @@ class DeploymentServiceBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
+    def mock_appproxy_client_pool(self) -> MagicMock:
+        """Mock AppProxyClientPool for testing."""
+        return MagicMock(spec=AppProxyClientPool)
+
+    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
+            appproxy_client_pool=mock_appproxy_client_pool,
         )
 
     @pytest.fixture
@@ -575,6 +586,29 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         return mock_deployment_repository
 
     @pytest.fixture
+    def mock_appproxy_client_pool(self, coordinator_jwt: str) -> MagicMock:
+        client = MagicMock(spec=AppProxyClient)
+        client.mint_endpoint_token = AsyncMock(
+            return_value=MintEndpointTokenResponse(token=coordinator_jwt)
+        )
+        pool = MagicMock(spec=AppProxyClientPool)
+        pool.load_client = MagicMock(return_value=client)
+        return pool
+
+    @pytest.fixture
+    def deployment_service(
+        self,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> DeploymentService:
+        return DeploymentService(
+            deployment_controller=mock_deployment_controller,
+            deployment_repository=mock_deployment_repository,
+            appproxy_client_pool=mock_appproxy_client_pool,
+        )
+
+    @pytest.fixture
     def action(self, deployment_id: uuid.UUID) -> CreateAccessTokenAction:
         return CreateAccessTokenAction(
             creator=ModelDeploymentAccessTokenCreator(
@@ -595,11 +629,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         generated random string. If this fails, ``./bai deployment access-token
         create`` is producing tokens that app-proxy worker rejects with 401.
         """
-        with patch(
-            "ai.backend.manager.services.deployment.service._request_endpoint_jwt",
-            new=AsyncMock(return_value=coordinator_jwt),
-        ):
-            result = await deployment_service.create_access_token(action)
+        result = await deployment_service.create_access_token(action)
 
         assert result.data.token == coordinator_jwt
 

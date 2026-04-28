@@ -385,6 +385,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.deployment.repository,
             deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
+            appproxy_client_pool=args.appproxy_client_pool,
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),

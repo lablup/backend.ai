@@ -20,6 +20,7 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -91,14 +92,20 @@ class DeploymentCRUDBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
+    def mock_appproxy_client_pool(self) -> MagicMock:
+        return MagicMock(spec=AppProxyClientPool)
+
+    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
+            appproxy_client_pool=mock_appproxy_client_pool,
         )
 
     @pytest.fixture

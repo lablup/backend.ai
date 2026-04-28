@@ -2,11 +2,8 @@
 
 import logging
 from datetime import UTC, datetime, timedelta
-from http import HTTPStatus
 from typing import cast
 from uuid import UUID
-
-import aiohttp
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -17,11 +14,15 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
+    MintEndpointTokenRequest,
+)
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
@@ -386,6 +387,7 @@ class DeploymentService:
 
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
+    _appproxy_client_pool: AppProxyClientPool
     _deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
     _runtime_variant_preset_repository: RuntimeVariantPresetRepository | None
 
@@ -393,12 +395,14 @@ class DeploymentService:
         self,
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
+        appproxy_client_pool: AppProxyClientPool,
         deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None = None,
         runtime_variant_preset_repository: RuntimeVariantPresetRepository | None = None,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
+        self._appproxy_client_pool = appproxy_client_pool
         self._deployment_revision_preset_repository = deployment_revision_preset_repository
         self._runtime_variant_preset_repository = runtime_variant_preset_repository
 
@@ -929,13 +933,15 @@ class DeploymentService:
 
         # Ask the coordinator to mint a JWT for this deployment's circuit
         expires_at = action.creator.expires_at or (datetime.now(UTC) + timedelta(days=1))
-        jwt_token = await _request_endpoint_jwt(
-            proxy_addr=proxy_target.addr,
-            api_token=proxy_target.api_token,
-            deployment_id=action.creator.model_deployment_id,
-            user_uuid=endpoint_info.metadata.session_owner,
-            expires_at=expires_at,
+        client = self._appproxy_client_pool.load_client(proxy_target.addr, proxy_target.api_token)
+        token_response = await client.mint_endpoint_token(
+            endpoint_id=action.creator.model_deployment_id,
+            body=MintEndpointTokenRequest(
+                user_uuid=endpoint_info.metadata.session_owner,
+                exp=expires_at,
+            ),
         )
+        jwt_token = token_response.token
 
         # Create the RBACEntityCreator with the JWT-bearing spec
         deployment_id = DeploymentID(action.creator.model_deployment_id)
@@ -1033,39 +1039,3 @@ class DeploymentService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
-
-
-async def _request_endpoint_jwt(
-    *,
-    proxy_addr: str,
-    api_token: str,
-    deployment_id: UUID,
-    user_uuid: UUID,
-    expires_at: datetime,
-) -> str:
-    """Mint an inference-frontend JWT via the app-proxy coordinator."""
-    body = {
-        "user_uuid": str(user_uuid),
-        "exp": expires_at.isoformat(),
-    }
-    url = f"{proxy_addr.rstrip('/')}/v2/endpoints/{deployment_id}/token"
-    async with (
-        aiohttp.ClientSession() as session,
-        session.post(
-            url,
-            json=body,
-            headers={
-                "accept": "application/json",
-                "X-BackendAI-Token": api_token,
-            },
-        ) as resp,
-    ):
-        payload = await resp.json()
-        if resp.status != HTTPStatus.OK:
-            raise InvalidAPIParameters(
-                f"app-proxy refused to mint a JWT ({resp.status} {resp.reason}): {payload}"
-            )
-        token = payload.get("token")
-        if not isinstance(token, str):
-            raise InvalidAPIParameters(f"app-proxy returned an invalid token payload: {payload!r}")
-        return token
