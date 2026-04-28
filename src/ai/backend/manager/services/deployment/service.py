@@ -897,6 +897,39 @@ class DeploymentService:
 
     # ========== Access Token ==========
 
+    async def _mint_endpoint_jwt(
+        self,
+        *,
+        deployment_id: UUID,
+        resource_group: str,
+        user_uuid: UUID,
+        expires_at: datetime,
+    ) -> str:
+        """Ask the deployment's app-proxy coordinator to mint an inference JWT.
+
+        Resolves the coordinator behind the deployment's scaling group and
+        delegates to :class:`AppProxyClient`. Raises
+        :class:`InvalidAPIParameters` when the scaling group has no proxy
+        target configured — an opaque local fallback would not pass the
+        worker's HS256 check, so refusing here is the only safe option.
+        """
+        proxy_targets = await self._deployment_repository.fetch_scaling_group_proxy_targets({
+            resource_group
+        })
+        proxy_target = proxy_targets.get(resource_group)
+        if proxy_target is None:
+            raise InvalidAPIParameters(
+                f"No app-proxy target configured for scaling group {resource_group!r}; "
+                "cannot issue a deployment access token."
+            )
+
+        client = self._appproxy_client_pool.load_client(proxy_target.addr, proxy_target.api_token)
+        response = await client.mint_endpoint_token(
+            endpoint_id=deployment_id,
+            body=MintEndpointTokenRequest(user_uuid=user_uuid, exp=expires_at),
+        )
+        return response.token
+
     async def create_access_token(
         self, action: CreateAccessTokenAction
     ) -> CreateAccessTokenActionResult:
@@ -919,29 +952,13 @@ class DeploymentService:
             action.creator.model_deployment_id
         )
 
-        # Resolve the app-proxy coordinator behind this deployment's scaling group
-        resource_group = endpoint_info.metadata.resource_group
-        proxy_targets = await self._deployment_repository.fetch_scaling_group_proxy_targets({
-            resource_group
-        })
-        proxy_target = proxy_targets.get(resource_group)
-        if proxy_target is None:
-            raise InvalidAPIParameters(
-                f"No app-proxy target configured for scaling group {resource_group!r}; "
-                "cannot issue a deployment access token."
-            )
-
-        # Ask the coordinator to mint a JWT for this deployment's circuit
         expires_at = action.creator.expires_at or (datetime.now(UTC) + timedelta(days=1))
-        client = self._appproxy_client_pool.load_client(proxy_target.addr, proxy_target.api_token)
-        token_response = await client.mint_endpoint_token(
-            endpoint_id=action.creator.model_deployment_id,
-            body=MintEndpointTokenRequest(
-                user_uuid=endpoint_info.metadata.session_owner,
-                exp=expires_at,
-            ),
+        jwt_token = await self._mint_endpoint_jwt(
+            deployment_id=action.creator.model_deployment_id,
+            resource_group=endpoint_info.metadata.resource_group,
+            user_uuid=endpoint_info.metadata.session_owner,
+            expires_at=expires_at,
         )
-        jwt_token = token_response.token
 
         # Create the RBACEntityCreator with the JWT-bearing spec
         deployment_id = DeploymentID(action.creator.model_deployment_id)
