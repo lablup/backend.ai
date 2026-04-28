@@ -41,7 +41,6 @@ from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.group.row import (
-    AssocGroupUserRow,
     GroupRow,
 )
 from ai.backend.manager.models.kernel import (
@@ -87,8 +86,8 @@ from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import (
-    AssocGroupUserCreatorSpec,
     GroupCreatorSpec,
+    ProjectUserMembershipCreatorSpec,
 )
 from ai.backend.manager.repositories.group.purgers import (
     GroupBatchPurgerSpec,
@@ -216,12 +215,12 @@ class GroupDBSource:
     ) -> None:
         """Add users to a project within an existing session.
 
-        Creates the business association (association_groups_users), the RBAC
-        scope binding, and a user-role mapping to the project's member role.
-        Admin roles are intentionally NOT granted here; the modifyGroup
-        add path represents "make this user a project member", not
-        "make this user a project admin". Already-assigned users are
-        filtered out to avoid unique-constraint conflicts.
+        Creates the RBAC scope binding (association_scopes_entities) via
+        ``RBACScopeBinder`` and a user-role mapping to the project's member
+        role. Admin roles are intentionally NOT granted here; the modifyGroup
+        add path represents "make this user a project member", not "make this
+        user a project admin". Already-assigned users are filtered out to
+        avoid unique-constraint conflicts.
         """
         project_domain_subq = (
             sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
@@ -230,14 +229,18 @@ class GroupDBSource:
             await session.scalars(
                 sa.select(UserRow)
                 .outerjoin(
-                    AssocGroupUserRow,
-                    (UserRow.uuid == AssocGroupUserRow.user_id)
-                    & (AssocGroupUserRow.group_id == project_id),
+                    AssociationScopesEntitiesRow,
+                    sa.and_(
+                        sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(project_id),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    ),
                 )
                 .where(
                     UserRow.uuid.in_(user_uuids)
                     & (UserRow.domain_name == project_domain_subq)
-                    & AssocGroupUserRow.user_id.is_(None)
+                    & AssociationScopesEntitiesRow.entity_id.is_(None)
                 )
             )
         ).all()
@@ -247,7 +250,7 @@ class GroupDBSource:
         project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
         pairs = [
             RBACScopeBindingPair(
-                spec=AssocGroupUserCreatorSpec(user_id=row.uuid, group_id=project_id),
+                spec=ProjectUserMembershipCreatorSpec(user_id=row.uuid, project_id=project_id),
                 entity_ref=RBACElementRef(RBACElementType.USER, str(row.uuid)),
                 scope_ref=project_scope_ref,
             )
@@ -296,23 +299,27 @@ class GroupDBSource:
     ) -> None:
         """Remove users from a project within an existing session.
 
-        Deletes the business N:N association, the RBAC scope binding, and any
+        Deletes the RBAC scope binding (association_scopes_entities) and any
         user-role mappings for roles scoped to this project, mirroring
         `unassign_users_from_project`.
         """
-        assigned_user_ids = (
+        target_entity_ids = [str(uid) for uid in user_uuids]
+        assigned_entity_ids = (
             await session.scalars(
-                sa.select(AssocGroupUserRow.user_id).where(
-                    AssocGroupUserRow.user_id.in_(user_uuids),
-                    AssocGroupUserRow.group_id == project_id,
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id.in_(target_entity_ids),
                 )
             )
         ).all()
-        if not assigned_user_ids:
+        if not assigned_entity_ids:
             return
 
+        assigned_user_uuids = [uuid.UUID(eid) for eid in assigned_entity_ids]
         unbinder = UserProjectEntityUnbinder(
-            user_uuids=list(assigned_user_ids),
+            user_uuids=assigned_user_uuids,
             project_id=project_id,
         )
         await execute_rbac_scope_entity_unbinder(session, unbinder)
@@ -326,7 +333,7 @@ class GroupDBSource:
         )
         await session.execute(
             sa.delete(UserRoleRow).where(
-                UserRoleRow.user_id.in_(assigned_user_ids),
+                UserRoleRow.user_id.in_(assigned_user_uuids),
                 sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids_subq),
             )
         )
@@ -725,9 +732,9 @@ class GroupDBSource:
         """Assign users to a project with domain validation and RBAC scope binding.
 
         Validates that the project exists, users are in the same domain and active,
-        and filters out already-assigned users. Creates both the business association
-        (association_groups_users) and the RBAC scope association atomically.
-        Also creates user-role mappings for the specified role.
+        and filters out already-assigned users. Inserts the RBAC scope association
+        (association_scopes_entities) and creates user-role mappings for the
+        specified role.
 
         Returns the list of newly assigned users.
         """
@@ -742,7 +749,7 @@ class GroupDBSource:
                 raise InvalidAPIParameters(f"Role not found: {role_id}")
 
             # Find assignable users in a single query:
-            # same domain as the project and not already assigned
+            # same domain as the project and not already assigned (per ASE).
             # TODO: This pre-filtering can be removed once execute_rbac_scope_binder_partial
             # is implemented (BA-5488), which handles unique constraint conflicts via
             # per-row savepoints instead of requiring callers to filter duplicates.
@@ -753,14 +760,19 @@ class GroupDBSource:
                 await session.scalars(
                     sa.select(UserRow)
                     .outerjoin(
-                        AssocGroupUserRow,
-                        (UserRow.uuid == AssocGroupUserRow.user_id)
-                        & (AssocGroupUserRow.group_id == project_id),
+                        AssociationScopesEntitiesRow,
+                        sa.and_(
+                            sa.cast(UserRow.uuid, sa.String)
+                            == AssociationScopesEntitiesRow.entity_id,
+                            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                            AssociationScopesEntitiesRow.scope_id == str(project_id),
+                            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        ),
                     )
                     .where(
                         UserRow.uuid.in_(user_ids)
                         & (UserRow.domain_name == project_domain_subq)
-                        & AssocGroupUserRow.user_id.is_(None)
+                        & AssociationScopesEntitiesRow.entity_id.is_(None)
                     )
                 )
             ).all()
@@ -768,11 +780,13 @@ class GroupDBSource:
             if not new_user_rows:
                 return []
 
-            # Build scope binder pairs for atomic business + RBAC association
+            # Build scope binder pairs for atomic ASE write via the binder API.
+            # Both the spec and the binder's own ASE insert target ASE; the
+            # latter is an ON CONFLICT DO NOTHING no-op for project-user.
             project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
             pairs = [
                 RBACScopeBindingPair(
-                    spec=AssocGroupUserCreatorSpec(user_id=row.uuid, group_id=project_id),
+                    spec=ProjectUserMembershipCreatorSpec(user_id=row.uuid, project_id=project_id),
                     entity_ref=RBACElementRef(RBACElementType.USER, str(row.uuid)),
                     scope_ref=project_scope_ref,
                 )
@@ -793,12 +807,13 @@ class GroupDBSource:
     ) -> UnassignUsersResult:
         """Remove users from a project and return unassigned users and failures.
 
-        Deletes both the business N:N mapping (association_groups_users) and
-        RBAC scope associations (AssociationScopesEntitiesRow) atomically.
-        Also reports which requested user IDs could not be unassigned and why.
+        Deletes RBAC scope associations (AssociationScopesEntitiesRow) and any
+        project-scoped user-role mappings. Reports which requested user IDs
+        could not be unassigned and why.
         """
         async with self._db.begin_session_read_committed() as session:
             requested_ids = set(unbinder.user_uuids)
+            target_entity_ids = [str(uid) for uid in unbinder.user_uuids]
 
             # Find which requested UUIDs actually exist in the system
             existing_query = sa.select(UserRow.uuid).where(UserRow.uuid.in_(unbinder.user_uuids))
@@ -806,15 +821,14 @@ class GroupDBSource:
             existing_ids = set(existing_result.all())
 
             # Fetch users that are actually associated before removing
-            actual_assoc_query = (
-                sa.select(UserRow)
-                .join(
-                    AssocGroupUserRow,
-                    UserRow.uuid == AssocGroupUserRow.user_id,
-                )
-                .where(
-                    AssocGroupUserRow.user_id.in_(unbinder.user_uuids)
-                    & (AssocGroupUserRow.group_id == unbinder.project_id),
+            actual_assoc_query = sa.select(UserRow).where(
+                sa.cast(UserRow.uuid, sa.String).in_(
+                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(unbinder.project_id),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id.in_(target_entity_ids),
+                    )
                 )
             )
             result = await session.scalars(actual_assoc_query)
@@ -822,11 +836,11 @@ class GroupDBSource:
             assigned_ids = {row.uuid for row in assigned_rows}
             unassigned_users = [row.to_data() for row in assigned_rows]
 
-            # Delete business N:N rows and RBAC scope associations
+            # Delete RBAC scope associations via the unbinder API
             await execute_rbac_scope_entity_unbinder(session, unbinder)
 
-            # Delete user-role mappings for project-scoped roles
             if assigned_rows:
+                # Delete user-role mappings for project-scoped roles
                 project_role_ids_subq = sa.select(
                     AssociationScopesEntitiesRow.entity_id,
                 ).where(
@@ -856,18 +870,17 @@ class GroupDBSource:
             )
 
     async def bind_user_to_project(self, user_id: UUID, project_id: UUID) -> None:
-        """Add a user to a project (business association + RBAC scope binding).
+        """Add a user to a project via the RBAC scope binding (ASE).
 
         Skips if the user is already a member of the project.
-
-        TODO: Remove once association_groups_users is fully migrated to
-        association_scopes_entities.
         """
         async with self._db.begin_session() as session:
             already_bound = await session.scalar(
-                sa.select(AssocGroupUserRow.user_id).where(
-                    AssocGroupUserRow.user_id == user_id,
-                    AssocGroupUserRow.group_id == project_id,
+                sa.select(AssociationScopesEntitiesRow.id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_id),
                 )
             )
             if already_bound is not None:
@@ -875,25 +888,15 @@ class GroupDBSource:
 
             project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
             pair = RBACScopeBindingPair(
-                spec=AssocGroupUserCreatorSpec(user_id=user_id, group_id=project_id),
+                spec=ProjectUserMembershipCreatorSpec(user_id=user_id, project_id=project_id),
                 entity_ref=RBACElementRef(RBACElementType.USER, str(user_id)),
                 scope_ref=project_scope_ref,
             )
             await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=[pair]))
 
     async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
-        """Remove a user from a project (business association + RBAC scope binding).
-
-        TODO: Remove once association_groups_users is fully migrated to
-        association_scopes_entities.
-        """
+        """Remove a user from a project (RBAC scope binding only)."""
         async with self._db.begin_session() as session:
-            await session.execute(
-                sa.delete(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == user_id,
-                    AssocGroupUserRow.group_id == project_id,
-                )
-            )
             await session.execute(
                 sa.delete(AssociationScopesEntitiesRow).where(
                     AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
@@ -1007,7 +1010,9 @@ class GroupDBSource:
     ) -> GroupSearchResult:
         """Search projects a user is member of.
 
-        Joins with association_groups_users to find user's projects.
+        Joins with association_scopes_entities (PROJECT/USER) to find user's
+        projects. Casts GroupRow.id to String for the JOIN since ASE.scope_id
+        is a non-UUID String column.
 
         Args:
             scope: UserProjectSearchScope defining the user to search for.
@@ -1020,7 +1025,14 @@ class GroupDBSource:
             query = (
                 sa.select(GroupRow)
                 .select_from(GroupRow)
-                .join(AssocGroupUserRow, GroupRow.id == AssocGroupUserRow.group_id)
+                .join(
+                    AssociationScopesEntitiesRow,
+                    sa.and_(
+                        sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    ),
+                )
             )
             result = await execute_batch_querier(db_sess, query, querier, scope=scope)
 

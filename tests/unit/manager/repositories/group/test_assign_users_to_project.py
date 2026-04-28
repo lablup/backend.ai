@@ -15,8 +15,7 @@ from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, association_groups_users
-from ai.backend.manager.models.group.row import AssocGroupUserRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -73,7 +72,6 @@ class TestAssignUsersToProject:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                AssocGroupUserRow,
                 AssociationScopesEntitiesRow,
                 ImageRow,
                 VFolderRow,
@@ -291,11 +289,13 @@ class TestAssignUsersToProject:
         result_uuids = {u.uuid for u in result}
         assert result_uuids == {same_domain_user_1, same_domain_user_2}
 
-        # Verify association rows created
+        # Verify ASE rows created (PROJECT scope, USER entity)
         async with db_with_cleanup.begin_readonly_session() as session:
             assoc_result = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.group_id == test_project
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                 )
             )
             assert len(assoc_result.fetchall()) == 2
@@ -331,11 +331,13 @@ class TestAssignUsersToProject:
         assert len(result) == 1
         assert result[0].uuid == same_domain_user_2
 
-        # Verify total 2 associations
+        # Verify total 2 ASE associations
         async with db_with_cleanup.begin_readonly_session() as session:
             assoc_result = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.group_id == test_project
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                 )
             )
             assert len(assoc_result.fetchall()) == 2
@@ -459,7 +461,6 @@ class TestUnassignUsersFromProject:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                AssocGroupUserRow,
                 AssociationScopesEntitiesRow,
                 ImageRow,
                 VFolderRow,
@@ -644,33 +645,6 @@ class TestUnassignUsersFromProject:
         return GroupDBSource(db=db_with_cleanup)
 
     # --- Test cases ---
-
-    async def test_unassign_deletes_business_association(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
-        project_with_role_registered: uuid.UUID,
-        test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
-    ) -> None:
-        """Unassign removes AssocGroupUserRow records."""
-        project_id = project_with_role_registered
-        await group_db_source.assign_users_to_project(project_id, [same_domain_user_1], test_role)
-
-        result = await group_db_source.unassign_users_from_project(
-            UserProjectEntityUnbinder(user_uuids=[same_domain_user_1], project_id=project_id)
-        )
-        assert len(result.unassigned_users) == 1
-
-        async with db_with_cleanup.begin_readonly_session() as session:
-            assoc_rows = (
-                await session.execute(
-                    sa.select(association_groups_users).where(
-                        association_groups_users.c.group_id == project_id
-                    )
-                )
-            ).fetchall()
-            assert len(assoc_rows) == 0
 
     async def test_unassign_deletes_scope_entity_rows(
         self,

@@ -6,9 +6,12 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.group.row import AssocGroupUserRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -46,15 +49,18 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
 
 
 @dataclass
-class AssocGroupUserCreatorSpec(CreatorSpec[AssocGroupUserRow]):
-    """CreatorSpec for user-project association."""
+class ProjectUserMembershipCreatorSpec(CreatorSpec[AssociationScopesEntitiesRow]):
+    """CreatorSpec for user-project membership (PROJECT/USER ASE row)."""
 
     user_id: UUID
-    group_id: UUID
+    project_id: UUID
 
     @override
-    def build_row(self) -> AssocGroupUserRow:
-        return AssocGroupUserRow(
-            user_id=self.user_id,
-            group_id=self.group_id,
+    def build_row(self) -> AssociationScopesEntitiesRow:
+        return AssociationScopesEntitiesRow(
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(self.project_id),
+            entity_type=EntityType.USER,
+            entity_id=str(self.user_id),
+            relation_type=RelationType.AUTO,
         )

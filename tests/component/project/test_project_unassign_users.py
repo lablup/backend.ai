@@ -11,8 +11,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.dto.manager.v2.group.request import UnassignUsersFromProjectInput
-from ai.backend.manager.models.group.row import AssocGroupUserRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 
 
 class TestUnassignUsersFromProject:
@@ -36,13 +39,17 @@ class TestUnassignUsersFromProject:
         assert returned_ids == set(assigned_users)
         assert result.failed == []
 
-        # Verify rows removed from association_groups_users
+        # Verify ASE rows removed (PROJECT scope, USER entity)
         async with db_engine.begin() as conn:
             rows = (
                 await conn.execute(
-                    sa.select(AssocGroupUserRow.user_id).where(
-                        (AssocGroupUserRow.group_id == group_fixture)
-                        & (AssocGroupUserRow.user_id.in_(assigned_users))
+                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id.in_([
+                            str(uid) for uid in assigned_users
+                        ]),
                     )
                 )
             ).all()
@@ -89,13 +96,17 @@ class TestUnassignUsersFromProject:
         assert len(result.failed) == 1
         assert result.failed[0].user_id == fake_id
 
-        # The other assigned users should still be in the association
+        # The other assigned users should still be bound (ASE)
         async with db_engine.begin() as conn:
             remaining = (
                 await conn.execute(
-                    sa.select(AssocGroupUserRow.user_id).where(
-                        (AssocGroupUserRow.group_id == group_fixture)
-                        & (AssocGroupUserRow.user_id.in_(assigned_users[1:]))
+                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id.in_([
+                            str(uid) for uid in assigned_users[1:]
+                        ]),
                     )
                 )
             ).all()
