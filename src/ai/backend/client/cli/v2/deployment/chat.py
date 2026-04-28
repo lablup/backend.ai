@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -25,7 +25,7 @@ from ai.backend.client.cli.v2.deployment_chat_config import (
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 
 
-def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
+def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
     from ai.backend.client.exceptions import BackendAPIError
 
     try:
@@ -82,11 +82,8 @@ def chat(
 
     try:
         cache = load_chat_cache()
-    except IncompatibleChatCacheError as e:
-        raise click.ClickException(str(e)) from e
-    try:
         chat_config = load_chat_config()
-    except IncompatibleChatConfigError as e:
+    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
         raise click.ClickException(str(e)) from e
 
     if not isinstance(params, dict):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -36,7 +36,7 @@ class _ServedModelsResponse(BaseModel):
     data: list[_ServedModelEntry] = Field(default_factory=list)
 
 
-def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
+def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
     from ai.backend.client.exceptions import BackendAPIError
 
     try:
@@ -90,11 +90,8 @@ def set_(
     connection = load_v2_config()
     try:
         cache = load_chat_cache()
-    except IncompatibleChatCacheError as e:
-        raise click.ClickException(str(e)) from e
-    try:
         chat_config_store = load_chat_config()
-    except IncompatibleChatConfigError as e:
+    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
         raise click.ClickException(str(e)) from e
 
     existing_entry = cache.get(deployment_id)
@@ -180,11 +177,8 @@ def show(deployment_id: UUID | None) -> None:
     """Print one or all chat cache entries (API keys are masked)."""
     try:
         cache = load_chat_cache()
-    except IncompatibleChatCacheError as e:
-        raise click.ClickException(str(e)) from e
-    try:
         chat_config_store = load_chat_config()
-    except IncompatibleChatConfigError as e:
+    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
         raise click.ClickException(str(e)) from e
 
     if deployment_id is not None:
@@ -210,11 +204,8 @@ def clear(deployment_id: UUID) -> None:
     """Remove the chat cache entry and stored token for a deployment."""
     try:
         cache = load_chat_cache()
-    except IncompatibleChatCacheError as e:
-        raise click.ClickException(str(e)) from e
-    try:
         chat_config_store = load_chat_config()
-    except IncompatibleChatConfigError as e:
+    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
         raise click.ClickException(str(e)) from e
 
     removed_entry = cache.remove(deployment_id)
