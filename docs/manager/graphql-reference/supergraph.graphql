@@ -2883,8 +2883,10 @@ input CreateAccessTokenInput
   """The ID of the model deployment for which the access token is created."""
   modelDeploymentId: ID!
 
-  """The expiration timestamp of the access token."""
-  expiresAt: DateTime
+  """
+  The expiration timestamp of the access token. Required — callers must decide the token lifetime themselves.
+  """
+  expiresAt: DateTime!
 }
 
 """Added in 25.16.0. Payload for creating an access token."""
