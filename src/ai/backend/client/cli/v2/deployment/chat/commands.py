@@ -9,10 +9,10 @@ from typing import Any
 from uuid import UUID
 
 import click
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ai.backend.cli.params import JSONParamType
 from ai.backend.client.cli.v2.deployment.chat.types import (
+    DeploymentChatCache,
     DeploymentChatCacheEntry,
     IncompatibleChatCacheError,
     IncompatibleChatConfigError,
@@ -24,17 +24,7 @@ from ai.backend.client.cli.v2.deployment.chat.utils import (
     save_chat_cache,
     save_chat_config,
 )
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
-
-
-class _ServedModelEntry(BaseModel):
-    model_config = ConfigDict(extra="allow")
-    id: str
-
-
-class _ServedModelsResponse(BaseModel):
-    model_config = ConfigDict(extra="allow")
-    data: list[_ServedModelEntry] = Field(default_factory=list)
+from ai.backend.client.cli.v2.helpers import V2ConnectionConfig, create_v2_registry, load_v2_config
 
 
 def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
@@ -49,6 +39,54 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
         status = e.args[0] if e.args else "?"
         detail = title or msg or str(e)
         raise click.ClickException(f"{status}: {detail}") from e
+
+
+async def _resolve_endpoint_entry(
+    cache: DeploymentChatCache,
+    deployment_id: UUID,
+    connection: V2ConnectionConfig,
+    *,
+    default_model_override: str | None = None,
+) -> DeploymentChatCacheEntry:
+    """Return the deployment's cached endpoint entry, fetching from the manager on miss.
+
+    This is the only place that writes to the chat cache. ``set_`` and the
+    ``chat`` command both delegate here so the cache file is touched at
+    most once per command invocation.
+
+    When ``default_model_override`` is given, the cached entry is rewritten
+    with the new model regardless of an existing entry.
+    """
+    existing = cache.get(deployment_id)
+    if existing is not None and default_model_override is None:
+        return existing
+
+    registry = await create_v2_registry(connection)
+    try:
+        deployment = await registry.deployment.get(deployment_id)
+    finally:
+        await registry.close()
+    endpoint_url = deployment.network_access.endpoint_url
+    if not endpoint_url:
+        raise click.ClickException(
+            f"Deployment {deployment_id} has no endpoint_url yet "
+            "(it may still be provisioning). Wait until the deployment is READY."
+        )
+
+    served_model: str | None
+    if default_model_override is not None:
+        served_model = default_model_override
+    else:
+        served_model = existing.default_model if existing is not None else None
+
+    new_entry = DeploymentChatCacheEntry(
+        endpoint_url=endpoint_url,
+        default_model=served_model,
+        last_synced_at=datetime.now(UTC),
+    )
+    cache.upsert(deployment_id, new_entry)
+    save_chat_cache(cache)
+    return new_entry
 
 
 # ---------------------------------------------------------------------------
@@ -107,42 +145,17 @@ def chat(
     if not isinstance(params, dict):
         raise click.ClickException("--params must be a JSON object.")
     extra_body: dict[str, Any] = params
-    entry = cache.get(deployment_id)
-
-    async def _ensure_endpoint_entry() -> DeploymentChatCacheEntry:
-        if entry is not None and entry.endpoint_url:
-            return entry
-        registry = await create_v2_registry(connection)
-        try:
-            deployment = await registry.deployment.get(deployment_id)
-        finally:
-            await registry.close()
-        endpoint_url = deployment.network_access.endpoint_url
-        if not endpoint_url:
-            raise click.ClickException(
-                f"Deployment {deployment_id} has no endpoint_url yet "
-                "(it may still be provisioning). Wait until the deployment is READY."
-            )
-        new_entry = DeploymentChatCacheEntry(
-            endpoint_url=endpoint_url,
-            default_model=entry.default_model if entry is not None else None,
-            last_synced_at=datetime.now(UTC),
-        )
-        cache.upsert(deployment_id, new_entry)
-        save_chat_cache(cache)
-        return new_entry
 
     async def _run() -> None:
         from ai.backend.client.exceptions import BackendAPIError
 
-        endpoint_entry = await _ensure_endpoint_entry()
+        endpoint_entry = await _resolve_endpoint_entry(cache, deployment_id, connection)
         request_model = model or endpoint_entry.default_model
         if request_model is None:
             raise click.ClickException(
                 f"No --model given and no default_model cached for deployment {deployment_id}.\n"
                 "Set one with:\n"
-                f"  ./bai deployment chat-config set {deployment_id} --token <api_key>\n"
-                "(this auto-discovers the served model from the inference endpoint)."
+                f"  ./bai deployment chat-config set {deployment_id} --default-model <name>"
             )
 
         body: dict[str, Any] = {
@@ -183,11 +196,10 @@ def chat(
 
 @click.group(name="chat-config")
 def chat_config() -> None:
-    """Manage stored API keys and discovered model names for deployment chat.
+    """Manage stored API keys and default model names for deployment chat.
 
-    The deployment's ``endpoint_url`` and the served model name are
-    resolved automatically (from the manager and the inference endpoint
-    respectively); only the API key is registered through this command.
+    The deployment's ``endpoint_url`` is auto-managed; ``--token`` and
+    ``--default-model`` are user-supplied.
     """
 
 
@@ -207,17 +219,17 @@ def chat_config() -> None:
     "--default-model",
     default=None,
     type=str,
-    help=(
-        "Override the auto-discovered served model name. "
-        "If omitted, the model is fetched from the inference endpoint's /v1/models."
-    ),
+    help="Default model name sent with chat requests when --model is omitted.",
 )
 def set_(
     deployment_id: UUID,
     api_key: str | None,
     default_model: str | None,
 ) -> None:
-    """Register or update the chat cache entry for a deployment."""
+    """Register or update the chat config for a deployment."""
+    if api_key is None and default_model is None:
+        raise click.ClickException("Nothing to set: provide --token and/or --default-model.")
+
     connection = load_v2_config()
     try:
         cache = load_chat_cache()
@@ -225,78 +237,25 @@ def set_(
     except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
         raise click.ClickException(str(e)) from e
 
-    existing_entry = cache.get(deployment_id)
     resolved_key = api_key if api_key is not None else chat_config_store.get_token(deployment_id)
 
     async def _run() -> None:
-        registry = await create_v2_registry(connection)
-        try:
-            deployment = await registry.deployment.get(deployment_id)
-        finally:
-            await registry.close()
-        endpoint_url = deployment.network_access.endpoint_url
-        if not endpoint_url:
-            raise click.ClickException(
-                f"Deployment {deployment_id} has no endpoint_url yet "
-                "(it may still be provisioning). Wait until the deployment is READY."
-            )
-
-        if default_model is not None:
-            served_model: str | None = default_model
-        else:
-            served_model = await _discover_model(
-                endpoint_url,
-                resolved_key,
-                connection.skip_ssl_verification,
-                existing_entry.default_model if existing_entry is not None else None,
-            )
-
-        cache.upsert(
+        endpoint_entry = await _resolve_endpoint_entry(
+            cache,
             deployment_id,
-            DeploymentChatCacheEntry(
-                endpoint_url=endpoint_url,
-                default_model=served_model,
-                last_synced_at=datetime.now(UTC),
-            ),
+            connection,
+            default_model_override=default_model,
         )
-        save_chat_cache(cache)
-        if resolved_key is not None:
-            chat_config_store.set_token(deployment_id, resolved_key)
+        if api_key is not None:
+            chat_config_store.set_token(deployment_id, api_key)
             save_chat_config(chat_config_store)
 
-        print(f"Updated chat cache entry for deployment {deployment_id}.")
-        if served_model:
-            print(f"  default_model: {served_model}")
+        print(f"Updated chat config for deployment {deployment_id}.")
+        if endpoint_entry.default_model:
+            print(f"  default_model: {endpoint_entry.default_model}")
         print(f"  api_key:       {mask_token(resolved_key)}")
 
     _run_async(_run)
-
-
-async def _discover_model(
-    endpoint_url: str,
-    api_key: str | None,
-    skip_ssl_verification: bool,
-    fallback: str | None,
-) -> str | None:
-    """Call ``GET {endpoint}/v1/models`` to learn the served model name."""
-    from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-    from ai.backend.client.v2.deployment_chat import (
-        DeploymentChatAuthError,
-        DeploymentChatClient,
-        DeploymentChatClientArgs,
-    )
-
-    client_args = DeploymentChatClientArgs(skip_ssl_verification=skip_ssl_verification)
-    async with await DeploymentChatClient.create(client_args) as client:
-        try:
-            payload = await client.list_models(endpoint_url, api_key)
-        except (DeploymentChatAuthError, BackendAPIError, BackendClientError):
-            return fallback
-    try:
-        parsed = _ServedModelsResponse.model_validate(payload)
-    except ValidationError:
-        return fallback
-    return parsed.data[0].id if parsed.data else fallback
 
 
 @chat_config.command(name="show")
