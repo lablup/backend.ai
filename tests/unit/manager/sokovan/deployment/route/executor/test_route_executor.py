@@ -490,6 +490,8 @@ class TestCleanupRoutesByConfig:
         deployment.id = unhealthy_route.deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
+        deployment.current_revision_id = unhealthy_route.revision_id
+        deployment.deploying_revision_id = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -521,6 +523,8 @@ class TestCleanupRoutesByConfig:
         deployment.id = healthy_route.deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
+        deployment.current_revision_id = healthy_route.revision_id
+        deployment.deploying_revision_id = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -550,6 +554,137 @@ class TestCleanupRoutesByConfig:
         # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 0
+
+    async def test_orphan_revision_route_marked_for_cleanup(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        cleanup_config_unhealthy_only: MagicMock,
+    ) -> None:
+        """RE-004: Route whose revision is neither current nor deploying is evicted.
+
+        Given: HEALTHY RUNNING route whose revision_id matches neither
+            ``current_revision_id`` nor ``deploying_revision_id`` of its
+            endpoint (e.g. leftover from a preempted rollout)
+        When: Cleanup routes by config
+        Then: Route is in successes (orphan eviction), independent of
+            the scaling group's health policy.
+        """
+        deployment_id = DeploymentID(uuid4())
+        current_revision_id = DeploymentRevisionID(uuid4())
+        deploying_revision_id = DeploymentRevisionID(uuid4())
+        orphan_route = RouteData(
+            route_id=uuid4(),
+            deployment_id=deployment_id,
+            session_id=SessionId(uuid4()),
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
+            traffic_ratio=1.0,
+            created_at=datetime.now(tzutc()),
+            revision_id=DeploymentRevisionID(uuid4()),  # neither current nor deploying
+        )
+
+        deployment = MagicMock()
+        deployment.id = deployment_id
+        deployment.metadata = MagicMock()
+        deployment.metadata.resource_group = "default"
+        deployment.current_revision_id = current_revision_id
+        deployment.deploying_revision_id = deploying_revision_id
+        mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
+        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+            "default": cleanup_config_unhealthy_only
+        }
+
+        with RouteRecorderContext.scope("test", entity_ids=[orphan_route.route_id]):
+            result = await route_executor.cleanup_routes_by_config([orphan_route])
+
+        assert len(result.successes) == 1
+        assert result.successes[0].route_id == orphan_route.route_id
+
+    async def test_provisioning_route_for_deploying_revision_kept(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        cleanup_config_unhealthy_only: MagicMock,
+    ) -> None:
+        """RE-005: PROVISIONING route on the deploying revision is not orphan.
+
+        Given: PROVISIONING route whose ``revision_id`` matches the
+            endpoint's ``deploying_revision_id`` (active rollout)
+        When: Cleanup routes by config
+        Then: Route is not flagged — neither orphan nor health-policy match.
+        """
+        deployment_id = DeploymentID(uuid4())
+        deploying_revision_id = DeploymentRevisionID(uuid4())
+        provisioning_route = RouteData(
+            route_id=uuid4(),
+            deployment_id=deployment_id,
+            session_id=None,
+            status=RouteStatus.PROVISIONING,
+            health_status=RouteHealthStatus.NOT_CHECKED,
+            traffic_ratio=1.0,
+            created_at=datetime.now(tzutc()),
+            revision_id=deploying_revision_id,
+        )
+
+        deployment = MagicMock()
+        deployment.id = deployment_id
+        deployment.metadata = MagicMock()
+        deployment.metadata.resource_group = "default"
+        deployment.current_revision_id = None
+        deployment.deploying_revision_id = deploying_revision_id
+        mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
+        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+            "default": cleanup_config_unhealthy_only
+        }
+
+        with RouteRecorderContext.scope("test", entity_ids=[provisioning_route.route_id]):
+            result = await route_executor.cleanup_routes_by_config([provisioning_route])
+
+        assert len(result.successes) == 0
+
+    async def test_orphan_check_skipped_when_no_known_revisions(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        cleanup_config_unhealthy_only: MagicMock,
+    ) -> None:
+        """RE-006: Endpoint with no current/deploying revisions skips orphan check.
+
+        Given: An endpoint that has no ``current_revision_id`` and no
+            ``deploying_revision_id`` yet (transient bootstrap state)
+            with a HEALTHY RUNNING route attached
+        When: Cleanup routes by config
+        Then: The route is not evicted — the orphan check needs at least
+            one known valid revision before it can declare orphans.
+        """
+        deployment_id = DeploymentID(uuid4())
+        bootstrap_route = RouteData(
+            route_id=uuid4(),
+            deployment_id=deployment_id,
+            session_id=SessionId(uuid4()),
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
+            traffic_ratio=1.0,
+            created_at=datetime.now(tzutc()),
+            revision_id=DeploymentRevisionID(uuid4()),
+        )
+
+        deployment = MagicMock()
+        deployment.id = deployment_id
+        deployment.metadata = MagicMock()
+        deployment.metadata.resource_group = "default"
+        deployment.current_revision_id = None
+        deployment.deploying_revision_id = None
+        mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
+        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+            "default": cleanup_config_unhealthy_only
+        }
+
+        with RouteRecorderContext.scope("test", entity_ids=[bootstrap_route.route_id]):
+            result = await route_executor.cleanup_routes_by_config([bootstrap_route])
+
+        assert len(result.successes) == 0
 
 
 # =============================================================================

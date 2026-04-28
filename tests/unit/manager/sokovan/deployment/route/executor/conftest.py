@@ -183,6 +183,7 @@ def _create_route_data(
     session_id: SessionId | None = None,
     status: RouteStatus = RouteStatus.PROVISIONING,
     health_status: RouteHealthStatus = RouteHealthStatus.NOT_CHECKED,
+    revision_id: DeploymentRevisionID | None = None,
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
@@ -193,7 +194,7 @@ def _create_route_data(
         health_status=health_status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
-        revision_id=DeploymentRevisionID(uuid4()),
+        revision_id=revision_id or DeploymentRevisionID(uuid4()),
     )
 
 
