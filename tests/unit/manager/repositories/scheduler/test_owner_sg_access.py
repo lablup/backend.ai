@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
@@ -67,6 +68,31 @@ def _build_delegated_draft(
     )
 
 
+def _accessible_sg() -> AllowedScalingGroup:
+    return AllowedScalingGroup(
+        name=SG_NAME,
+        is_private=False,
+        scheduler_opts=ScalingGroupOpts(
+            allowed_session_types=[],
+            pending_timeout=timedelta(hours=1),
+            config={},
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class SGAccessCase:
+    """Parametrize input — names a scenario and pins its mocked allowlist /
+    expected behavior. ``allowed_sgs`` mirrors what the SG access query
+    returns for the spec identity; ``raises_invalid_api`` flags whether the
+    access check is expected to reject the request.
+    """
+
+    label: str
+    allowed_sgs: list[AllowedScalingGroup]
+    raises_invalid_api: bool
+
+
 class TestOwnerOnlyScalingGroupForDelegation:
     """SG access at enqueue time MUST follow the spec identity's allowlist."""
 
@@ -100,12 +126,33 @@ class TestOwnerOnlyScalingGroupForDelegation:
                 )
             yield database_connection
 
-    async def test_requested_sg_inaccessible_to_owner_raises(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            SGAccessCase(
+                label="inaccessible_raises",
+                allowed_sgs=[],
+                raises_invalid_api=True,
+            ),
+            SGAccessCase(
+                label="accessible_passes",
+                allowed_sgs=[_accessible_sg()],
+                raises_invalid_api=False,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    async def test_sg_access_uses_spec_identity_access_key(
         self,
         db_with_sg: ExtendedAsyncSAEngine,
+        case: SGAccessCase,
     ) -> None:
-        """Owner has no SG association rows — request is rejected, and the
-        allowlist lookup is verified to use the spec identity's access key.
+        """Two scenarios share one invariant: the SG access lookup is scoped
+        to the spec identity's access key. With an empty allowlist the
+        request is rejected (``InvalidAPIParameters``); with a matching
+        allowlist the access check passes (downstream DB reads then fail
+        because we only seeded the SG row, but those failures are not
+        ``InvalidAPIParameters``).
         """
         draft = _build_delegated_draft(
             owner_access_key=OWNER_AK,
@@ -118,65 +165,29 @@ class TestOwnerOnlyScalingGroupForDelegation:
             ScheduleDBSource,
             "_query_allowed_scaling_groups",
             new_callable=AsyncMock,
-            return_value=[],
+            return_value=case.allowed_sgs,
         ) as mock_query:
-            with pytest.raises(InvalidAPIParameters, match=SG_NAME):
-                await db_source.fetch_session_spec_contexts(
-                    draft,
-                    storage_manager=AsyncMock(),
-                    allowed_vfolder_types=[],
+            if case.raises_invalid_api:
+                with pytest.raises(InvalidAPIParameters, match=SG_NAME):
+                    await db_source.fetch_session_spec_contexts(
+                        draft,
+                        storage_manager=AsyncMock(),
+                        allowed_vfolder_types=[],
+                    )
+            else:
+                with pytest.raises(Exception) as exc_info:
+                    await db_source.fetch_session_spec_contexts(
+                        draft,
+                        storage_manager=AsyncMock(),
+                        allowed_vfolder_types=[],
+                    )
+                assert not isinstance(exc_info.value, InvalidAPIParameters), (
+                    f"SG access check must not raise when owner has access; got {exc_info.value!r}"
                 )
 
-        mock_query.assert_awaited_once()
         # Lookup MUST be scoped to the spec identity's access key — not
         # the requester's. This is the core invariant.
+        mock_query.assert_awaited_once()
         assert mock_query.call_args.args[3] == OWNER_AK, (
             "Scaling group lookup must use the spec identity's access key"
         )
-
-    async def test_requested_sg_accessible_to_owner_passes_check(
-        self,
-        db_with_sg: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Sanity: when the owner is associated with the SG, the access check
-        passes and the lookup still uses the owner's access key.
-        """
-        draft = _build_delegated_draft(
-            owner_access_key=OWNER_AK,
-            scaling_group=SG_NAME,
-        )
-
-        db_source = ScheduleDBSource(db_with_sg)
-
-        with patch.object(
-            ScheduleDBSource,
-            "_query_allowed_scaling_groups",
-            new_callable=AsyncMock,
-            return_value=[
-                AllowedScalingGroup(
-                    name=SG_NAME,
-                    is_private=False,
-                    scheduler_opts=ScalingGroupOpts(
-                        allowed_session_types=[],
-                        pending_timeout=timedelta(hours=1),
-                        config={},
-                    ),
-                ),
-            ],
-        ) as mock_query:
-            # Downstream DB lookups (images, vfolder mounts, dotfiles) will
-            # fail because we only seeded the SG row; that is fine — the
-            # invariant under test is "the access check did NOT raise
-            # InvalidAPIParameters", which we assert via raises(Exception).
-            with pytest.raises(Exception) as exc_info:
-                await db_source.fetch_session_spec_contexts(
-                    draft,
-                    storage_manager=AsyncMock(),
-                    allowed_vfolder_types=[],
-                )
-            assert not isinstance(exc_info.value, InvalidAPIParameters), (
-                f"SG access check must not raise when owner has access; got {exc_info.value!r}"
-            )
-
-        mock_query.assert_awaited_once()
-        assert mock_query.call_args.args[3] == OWNER_AK
