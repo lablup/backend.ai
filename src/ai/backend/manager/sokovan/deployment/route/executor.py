@@ -20,6 +20,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
@@ -598,11 +599,15 @@ class RouteExecutor:
 
     async def cleanup_routes_by_config(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """
-        Filter routes for cleanup based on scaling group configuration.
+        Filter routes that should be terminated.
 
-        Checks if each route's status (unhealthy/degraded) is in the scaling group's
-        cleanup_target_statuses. Routes that should be cleaned up are returned as successes,
-        others are filtered out.
+        A route is flagged when at least one of the following holds:
+
+        - **Orphan revision**: ``route.revision_id`` matches neither the
+          endpoint's ``current_revision_id`` nor its ``deploying_revision_id``.
+          Catches leftovers from a preempted rollout.
+        - **Health policy**: ``route.health_status`` is listed in the
+          scaling group's ``cleanup_target_statuses`` (default: UNHEALTHY).
 
         Args:
             routes: Routes to check for cleanup eligibility
@@ -629,18 +634,27 @@ class RouteExecutor:
 
         # Create mapping of deployment_id -> cleanup config (no phase - transformation only)
         deployment_cleanup_config: dict[DeploymentID, set[RouteHealthStatus]] = {}
+        deployment_valid_revisions: dict[DeploymentID, set[DeploymentRevisionID]] = {}
         for deployment in deployments:
             config = cleanup_configs.get(deployment.metadata.resource_group, None)
             if config:
                 deployment_cleanup_config[deployment.id] = set(config.cleanup_target_statuses)
             else:
                 deployment_cleanup_config[deployment.id] = set()
+            valid_revisions: set[DeploymentRevisionID] = set()
+            if deployment.current_revision_id is not None:
+                valid_revisions.add(deployment.current_revision_id)
+            if deployment.deploying_revision_id is not None:
+                valid_revisions.add(deployment.deploying_revision_id)
+            deployment_valid_revisions[deployment.id] = valid_revisions
 
         successes: list[RouteData] = []
 
         # Phase 2: Identify cleanup targets (per-route)
         for route in routes:
-            should_cleanup = self._check_route_cleanup_eligibility(route, deployment_cleanup_config)
+            should_cleanup = self._check_route_cleanup_eligibility(
+                route, deployment_cleanup_config, deployment_valid_revisions
+            )
             if should_cleanup:
                 successes.append(route)
                 log.info(
@@ -725,12 +739,28 @@ class RouteExecutor:
         self,
         route: RouteData,
         deployment_cleanup_config: Mapping[DeploymentID, set[RouteHealthStatus]],
+        deployment_valid_revisions: Mapping[DeploymentID, set[DeploymentRevisionID]],
     ) -> bool:
-        """Check if route should be cleaned up based on cleanup config."""
+        """Return True if the route should be evicted.
+
+        Checked reasons (OR-combined):
+
+        1. Orphan revision: ``route.revision_id`` is not the endpoint's
+           current or deploying revision. The check is skipped when the
+           endpoint has no revisions known yet (transient bootstrap state)
+           to avoid wiping freshly-created routes.
+        2. Scaling-group health policy: ``route.health_status`` is in
+           ``cleanup_target_statuses`` for the route's scaling group.
+        """
         pool = RouteRecorderContext.current_pool()
         recorder = pool.recorder(route.route_id)
 
         with recorder.phase("identify_cleanup_target"):
+            with recorder.step("check_orphan_revision"):
+                valid_revisions = deployment_valid_revisions.get(route.deployment_id, set())
+                if valid_revisions and route.revision_id not in valid_revisions:
+                    return True
+
             with recorder.step("check_cleanup_eligibility"):
                 cleanup_targets = deployment_cleanup_config.get(route.deployment_id, set())
                 return route.health_status in cleanup_targets

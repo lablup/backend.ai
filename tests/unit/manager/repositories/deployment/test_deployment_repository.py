@@ -3959,6 +3959,75 @@ class TestDeploymentRepositoryDuplicateName:
             ).scalar_one()
             assert target_stage == EndpointLifecycle.DESTROYING
 
+    async def test_set_deploying_revision_overrides_in_flight(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """``set_deploying_revision`` overwrites a non-NULL deploying_revision.
+
+        A previous rollout's ``deploying_revision`` no longer guards
+        against re-activation; orphan routes from the preempted rollout
+        are cleaned up by ``RouteEvictionHandler``'s orphan branch.
+        """
+        endpoint_id = uuid.uuid4()
+        previous_deploying = uuid.uuid4()
+        new_deploying = uuid.uuid4()
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                EndpointRow(
+                    id=endpoint_id,
+                    name=f"override-{uuid.uuid4().hex[:8]}",
+                    created_user=user_id,
+                    session_owner=user_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    resource_group=test_scaling_group.name,
+                    replicas=1,
+                    desired_replicas=1,
+                    url=None,
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                    deploying_revision=previous_deploying,
+                )
+            )
+            await db_sess.commit()
+
+        previous_current, updated = await deployment_repository.set_deploying_revision(
+            endpoint_id, new_deploying
+        )
+
+        assert updated is True
+        assert previous_current is None  # current_revision was not set on this fixture
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(EndpointRow.deploying_revision, EndpointRow.lifecycle_stage).where(
+                        EndpointRow.id == endpoint_id
+                    )
+                )
+            ).one()
+            assert row.deploying_revision == new_deploying
+            assert row.lifecycle_stage == EndpointLifecycle.DEPLOYING
+
+    async def test_set_deploying_revision_returns_false_for_missing_endpoint(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """``set_deploying_revision`` returns updated=False when the endpoint id
+        does not match any row, instead of raising."""
+        previous_current, updated = await deployment_repository.set_deploying_revision(
+            uuid.uuid4(), uuid.uuid4()
+        )
+        assert updated is False
+        assert previous_current is None
+
     async def test_destroy_endpoint_deletes_associated_tokens(
         self,
         deployment_repository: DeploymentRepository,

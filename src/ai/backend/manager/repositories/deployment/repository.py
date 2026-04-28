@@ -1311,12 +1311,13 @@ class DeploymentRepository:
     ) -> tuple[uuid.UUID | None, bool]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
-        Uses ``deploying_revision IS NULL`` as an atomic guard against
-        concurrent activations.
+        Overrides any previous ``deploying_revision`` unconditionally;
+        leftover routes from the preempted rollout are picked up by
+        ``RouteEvictionHandler``'s orphan-revision branch.
 
         Returns:
             Tuple of (previous_current_revision_id, updated).
-            ``updated=False`` means the guard fired (another deployment in progress).
+            ``updated=False`` means the endpoint row was not found.
         """
         return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 

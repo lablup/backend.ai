@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.4rc2 (2026-04-28)
+
+### Features
+* Migrate image project membership check from `association_groups_users` to `association_scopes_entities` (ASE). ([#11357](https://github.com/lablup/backend.ai/issues/11357))
+
+### Fixes
+* Auto-load `.env` from the working directory in the v2 CLI, restoring the v1 behavior where `BACKEND_*` variables are picked up implicitly. ([#11327](https://github.com/lablup/backend.ai/issues/11327))
+* Apply domain and keypair-resource-policy `allowed_vfolder_hosts` when creating a project-owned vfolder. ([#11347](https://github.com/lablup/backend.ai/issues/11347))
+* Expose missing image, cluster, resource, and execution fields on the GraphQL `CreateDeploymentRevisionPresetInput` and `UpdateDeploymentRevisionPresetInput`, and fix the response type mismatch on `PresetExecutionSpec.environ` so that querying environment variables on a deployment revision preset no longer fails. ([#11354](https://github.com/lablup/backend.ai/issues/11354))
+* Reject negative resource slot quantities at `ResourceSlot._normalize_value` so that requests like `cpu: -1` fail fast with HTTP 400 (`InvalidResourceSlotQuantity`) at the API boundary instead of being deferred to the scheduler. ([#11365](https://github.com/lablup/backend.ai/issues/11365))
+* Replace the misleading `desired_replica_count` / `desired_replicas` input field with `replica_count` on deployment create/update across REST v1, GraphQL v2, and CLI. The previous name accepted an autoscaling-internal target that was overwritten on the next reconcile tick; clients now set the user-controllable `replica_count` directly, matching the data layer and the `endpoints.replicas` column. Response DTOs continue to expose `desired_replica_count` as a read-only view of the current scheduling state. ([#11367](https://github.com/lablup/backend.ai/issues/11367))
+* Fix superadmin session creation in `model-store` after the RBAC scope-binding migration by backfilling `association_scopes_entities` rows in seed fixtures. ([#11368](https://github.com/lablup/backend.ai/issues/11368))
+* Wipe a deployment's access tokens (`endpoint_tokens`) in the same transaction that flips the endpoint to `DESTROYING`, so destroyed deployments no longer leave behind never-expiring token rows that were still resolvable through direct lookups. ([#11369](https://github.com/lablup/backend.ai/issues/11369))
+* Evict orphan-revision routes (active routes whose `revision_id` is neither the endpoint's `current_revision` nor its `deploying_revision`) through `RouteEvictionHandler` alongside the existing scaling-group health-policy eviction, so a preempted rollout no longer leaves behind PROVISIONING / RUNNING routes pointing at a stale revision. ([#11370](https://github.com/lablup/backend.ai/issues/11370))
+* Allow re-activating a deployment revision while another rollout is still in progress: `set_deploying_revision` now overrides any in-flight `deploying_revision` and `activate_revision` no longer raises `DeploymentAlreadyInProgress`. Routes belonging to the preempted rollout are cleaned up on the next route tick by `RouteEvictionHandler`'s orphan-revision branch. ([#11371](https://github.com/lablup/backend.ai/issues/11371))
+
+### Miscellaneous
+* Drop Intel macOS (x86_64) builds from CI; only Apple Silicon (arm64) installers are produced going forward. ([#11361](https://github.com/lablup/backend.ai/issues/11361))
+* Always restart the Apollo Router halfstack container in `scripts/refresh-graphql-gateway.sh` instead of asking for an interactive `y/N` confirmation, so the script can be run unattended and never silently skips the restart. ([#11363](https://github.com/lablup/backend.ai/issues/11363))
+
+
 ## 26.4.4rc1 (2026-04-27)
 
 ### Features
