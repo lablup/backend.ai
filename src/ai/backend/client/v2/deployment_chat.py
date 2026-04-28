@@ -31,7 +31,7 @@ class DeploymentChatAuthError(BackendAPIError):
 
 @dataclass(frozen=True)
 class DeploymentChatClientArgs:
-    """Connection knobs for :meth:`DeploymentChatClient.create`."""
+    """Connection knobs for :class:`DeploymentChatClient`."""
 
     skip_ssl_verification: bool = False
     connect_timeout: float | None = 10.0
@@ -56,9 +56,9 @@ class DeploymentChatClient:
 
     async def __aexit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
+        _exc_type: type[BaseException] | None,
+        _exc: BaseException | None,
+        _tb: TracebackType | None,
     ) -> None:
         await self.close()
 
@@ -75,8 +75,7 @@ class DeploymentChatClient:
         path: str = DEFAULT_CHAT_PATH,
     ) -> dict[str, Any]:
         """POST a chat completion request to the deployment endpoint."""
-        target = self._build_url(endpoint_url, path)
-        return await self._post(target, api_key, body)
+        return await self._request("POST", endpoint_url, path, api_key, body=body)
 
     async def list_models(
         self,
@@ -86,46 +85,30 @@ class DeploymentChatClient:
         path: str = DEFAULT_MODELS_PATH,
     ) -> dict[str, Any]:
         """GET the list of models served by the deployment endpoint."""
+        return await self._request("GET", endpoint_url, path, api_key)
+
+    async def _request(
+        self,
+        method: str,
+        endpoint_url: str,
+        path: str,
+        api_key: str | None,
+        *,
+        body: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         target = self._build_url(endpoint_url, path)
-        return await self._get(target, api_key)
-
-    async def _post(
-        self,
-        target: str,
-        api_key: str | None,
-        body: dict[str, Any],
-    ) -> dict[str, Any]:
-        headers = self._auth_headers(api_key, json_body=True)
-        try:
-            async with self._session.post(target, headers=headers, json=body) as resp:
-                payload = await self._read_payload(resp)
-                self._raise_for_status(resp, payload)
-        except aiohttp.ClientConnectionError as e:
-            raise BackendClientError(f"failed to reach inference endpoint: {e!r}") from e
-        return self._ensure_dict(payload)
-
-    async def _get(
-        self,
-        target: str,
-        api_key: str | None,
-    ) -> dict[str, Any]:
-        headers = self._auth_headers(api_key, json_body=False)
-        try:
-            async with self._session.get(target, headers=headers) as resp:
-                payload = await self._read_payload(resp)
-                self._raise_for_status(resp, payload)
-        except aiohttp.ClientConnectionError as e:
-            raise BackendClientError(f"failed to reach inference endpoint: {e!r}") from e
-        return self._ensure_dict(payload)
-
-    @staticmethod
-    def _auth_headers(api_key: str | None, *, json_body: bool) -> dict[str, str]:
         headers: dict[str, str] = {}
-        if json_body:
+        if body is not None:
             headers["Content-Type"] = "application/json"
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
-        return headers
+        try:
+            async with self._session.request(method, target, headers=headers, json=body) as resp:
+                payload = await self._read_payload(resp)
+                self._raise_for_status(resp, payload)
+        except aiohttp.ClientConnectionError as e:
+            raise BackendClientError(f"failed to reach inference endpoint: {e!r}") from e
+        return self._ensure_dict(payload)
 
     @staticmethod
     def _build_url(endpoint_url: str, path: str) -> str:
