@@ -104,9 +104,7 @@ class UpdateDeploymentRequest(BaseRequestModel):
     """Request to update a deployment."""
 
     name: str | None = Field(default=None, description="Updated deployment name")
-    desired_replicas: int | None = Field(
-        default=None, ge=0, description="Updated desired replica count"
-    )
+    replica_count: int | None = Field(default=None, ge=0, description="Updated replica count")
 
 
 class DeploymentPathParam(BaseRequestModel):
@@ -299,7 +297,7 @@ class CreateDeploymentRequest(BaseRequestModel):
     default_deployment_strategy: DeploymentStrategyInput = Field(
         description="Default deployment strategy"
     )
-    desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
+    replica_count: int = Field(ge=0, description="Number of replicas")
     initial_revision: RevisionInput = Field(description="Initial revision configuration")
 
 

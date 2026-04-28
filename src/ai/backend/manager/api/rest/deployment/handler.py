@@ -244,9 +244,9 @@ class DeploymentAPIHandler:
             )
 
         replica_spec: ReplicaSpecUpdaterSpec | None = None
-        if body.parsed.desired_replicas is not None:
+        if body.parsed.replica_count is not None:
             replica_spec = ReplicaSpecUpdaterSpec(
-                desired_replica_count=OptionalState.update(body.parsed.desired_replicas),
+                replica_count=OptionalState.update(body.parsed.replica_count),
             )
 
         updater_spec = DeploymentUpdaterSpec(

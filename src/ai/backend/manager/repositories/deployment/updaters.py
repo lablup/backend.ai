@@ -55,7 +55,6 @@ class ReplicaSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
     """UpdaterSpec for replica specification updates."""
 
     replica_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    desired_replica_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
 
     @property
     @override
@@ -67,7 +66,6 @@ class ReplicaSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
         to_update: dict[str, Any] = {}
         # Use the actual database column names
         self.replica_count.update_dict(to_update, "replicas")
-        self.desired_replica_count.update_dict(to_update, "desired_replicas")
         return to_update
 
 

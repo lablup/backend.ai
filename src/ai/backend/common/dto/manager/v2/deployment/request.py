@@ -416,7 +416,7 @@ class CreateDeploymentInput(BaseRequestModel):
     default_deployment_strategy: DeploymentStrategyInput = Field(
         description="Deployment strategy configuration"
     )
-    desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
+    replica_count: int = Field(ge=0, description="Number of replicas")
     initial_revision: CreateRevisionInputDTO | None = Field(
         default=None,
         description="Initial revision configuration. If omitted, deployment is created without a revision and must be added later via add_revision.",
@@ -427,9 +427,7 @@ class UpdateDeploymentInput(BaseRequestModel):
     """Input for updating a deployment."""
 
     name: str | None = Field(default=None, description="Updated deployment name")
-    desired_replica_count: int | None = Field(
-        default=None, ge=0, description="Updated desired replica count"
-    )
+    replica_count: int | None = Field(default=None, ge=0, description="Updated replica count")
     tags: list[str] | Sentinel | None = Field(
         default=SENTINEL, description="Updated tags. Use SENTINEL to clear."
     )
