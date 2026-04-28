@@ -261,42 +261,31 @@ def show(deployment_id: UUID) -> None:
     token = chat_config_store.get_token(deployment_id)
     if entry is None and token is None:
         raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
-    _print_entry(deployment_id, entry, token)
+    DeploymentChatCacheEntry.print_summary(deployment_id, entry, mask_token(token))
 
 
-@chat_config.command(name="clear")
+@chat_config.command(name="clear-cache")
 @click.argument("deployment_id", type=click.UUID)
-def clear(deployment_id: UUID) -> None:
-    """Remove the chat cache entry and stored token for a deployment."""
+def clear_cache(deployment_id: UUID) -> None:
+    """Remove the cached endpoint entry for a deployment."""
     cache = load_chat_cache()
-    chat_config_store = load_chat_config()
-
-    removed_entry = cache.remove(deployment_id)
-    removed_token = chat_config_store.clear_token(deployment_id)
-    if removed_entry:
+    if cache.remove(deployment_id):
         save_chat_cache(cache)
-    if removed_token:
+        print(f"Removed cache entry for deployment {deployment_id}.")
+    else:
+        print(f"No cache entry for deployment {deployment_id}.")
+
+
+@chat_config.command(name="clear-token")
+@click.argument("deployment_id", type=click.UUID)
+def clear_token(deployment_id: UUID) -> None:
+    """Remove the stored API key for a deployment."""
+    chat_config_store = load_chat_config()
+    if chat_config_store.clear_token(deployment_id):
         save_chat_config(chat_config_store)
-    if removed_entry or removed_token:
-        print(f"Removed chat cache entry for deployment {deployment_id}.")
+        print(f"Removed token for deployment {deployment_id}.")
     else:
-        print(f"No chat cache entry for deployment {deployment_id}.")
-
-
-def _print_entry(
-    deployment_id: UUID,
-    entry: DeploymentChatCacheEntry | None,
-    token: str | None,
-) -> None:
-    print(f"deployment_id : {deployment_id}")
-    if entry is not None:
-        for line in entry.format_summary():
-            print(line)
-    else:
-        print("endpoint_url  : -")
-        print("default_model : -")
-        print("last_synced_at: -")
-    print(f"api_key       : {mask_token(token)}")
+        print(f"No token for deployment {deployment_id}.")
 
 
 __all__ = ("chat", "chat_config")
