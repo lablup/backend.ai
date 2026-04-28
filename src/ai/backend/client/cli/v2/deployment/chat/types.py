@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+CACHE_ENTRY_TTL = timedelta(hours=24)
+"""Endpoint cache entries older than this are treated as a cache miss."""
 
 
 class DeploymentChatCacheEntry(BaseModel):
