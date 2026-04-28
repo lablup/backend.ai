@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
-import aiohttp
 import pytest
 from aiohttp import web
 
@@ -11,6 +10,7 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.v2.deployment_chat import (
     DeploymentChatAuthError,
     DeploymentChatClient,
+    DeploymentChatClientArgs,
 )
 
 HandlerFn = Callable[[web.Request], Awaitable[web.StreamResponse]]
@@ -61,14 +61,14 @@ async def _start_server(
 
 @pytest.fixture
 async def chat_client() -> AsyncIterator[DeploymentChatClient]:
-    client = DeploymentChatClient()
+    client = await DeploymentChatClient.create(DeploymentChatClientArgs())
     try:
         yield client
     finally:
         await client.close()
 
 
-def _request_body() -> dict[str, Any]:
+def _make_body() -> dict[str, Any]:
     return {
         "model": "meta/test-model",
         "messages": [{"role": "user", "content": "hello"}],
@@ -96,7 +96,7 @@ class TestChatCompletionSuccess:
             resp = await chat_client.chat_completion(
                 server.base_url,
                 "sk-test-token",
-                _request_body(),
+                _make_body(),
             )
         finally:
             await server.stop()
@@ -105,7 +105,7 @@ class TestChatCompletionSuccess:
         assert server.recorded["path"] == "/v1/chat/completions"
         assert server.recorded["headers"]["Authorization"] == "Bearer sk-test-token"
         assert server.recorded["headers"]["Content-Type"] == "application/json"
-        assert server.recorded["json"] == _request_body()
+        assert server.recorded["json"] == _make_body()
         assert resp["choices"][0]["message"]["content"] == "hi"
 
     async def test_endpoint_url_already_ending_in_chat_completions(
@@ -117,7 +117,7 @@ class TestChatCompletionSuccess:
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
             full_url = f"{server.base_url}/v1/chat/completions"
-            await chat_client.chat_completion(full_url, "sk-x", _request_body())
+            await chat_client.chat_completion(full_url, "sk-x", _make_body())
         finally:
             await server.stop()
         assert server.recorded["path"] == "/v1/chat/completions"
@@ -131,7 +131,7 @@ class TestChatCompletionSuccess:
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
             full_url = f"{server.base_url}/v1/chat/completions/"
-            await chat_client.chat_completion(full_url, "sk-x", _request_body())
+            await chat_client.chat_completion(full_url, "sk-x", _make_body())
         finally:
             await server.stop()
         assert server.recorded["path"] == "/v1/chat/completions"
@@ -144,7 +144,7 @@ class TestChatCompletionSuccess:
 
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
-            await chat_client.chat_completion(server.base_url, None, _request_body())
+            await chat_client.chat_completion(server.base_url, None, _make_body())
         finally:
             await server.stop()
         assert "Authorization" not in server.recorded["headers"]
@@ -177,7 +177,7 @@ class TestAuthErrors:
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
             with pytest.raises(DeploymentChatAuthError) as exc_info:
-                await chat_client.chat_completion(server.base_url, "bad", _request_body())
+                await chat_client.chat_completion(server.base_url, "bad", _make_body())
         finally:
             await server.stop()
         assert exc_info.value.status == 401
@@ -191,7 +191,7 @@ class TestAuthErrors:
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
             with pytest.raises(DeploymentChatAuthError):
-                await chat_client.chat_completion(server.base_url, "bad", _request_body())
+                await chat_client.chat_completion(server.base_url, "bad", _make_body())
         finally:
             await server.stop()
 
@@ -206,7 +206,7 @@ class TestServerErrors:
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
             with pytest.raises(BackendAPIError) as exc_info:
-                await chat_client.chat_completion(server.base_url, "sk", _request_body())
+                await chat_client.chat_completion(server.base_url, "sk", _make_body())
         finally:
             await server.stop()
         assert not isinstance(exc_info.value, DeploymentChatAuthError)
@@ -223,14 +223,6 @@ class TestNonJsonResponse:
         server = await _start_server("POST", "/v1/chat/completions", handler)
         try:
             with pytest.raises(BackendClientError):
-                await chat_client.chat_completion(server.base_url, "sk", _request_body())
+                await chat_client.chat_completion(server.base_url, "sk", _make_body())
         finally:
             await server.stop()
-
-
-class TestExternalSession:
-    async def test_does_not_close_externally_owned_session(self) -> None:
-        async with aiohttp.ClientSession() as external:
-            client = DeploymentChatClient(session=external)
-            await client.close()
-            assert external.closed is False

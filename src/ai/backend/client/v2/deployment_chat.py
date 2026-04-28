@@ -12,6 +12,7 @@ interpreting the response.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, Self
 
@@ -28,31 +29,32 @@ class DeploymentChatAuthError(BackendAPIError):
     """Raised when the inference endpoint rejects the configured API key."""
 
 
+@dataclass(frozen=True)
+class DeploymentChatClientArgs:
+    """Connection knobs for :meth:`DeploymentChatClient.create`."""
+
+    skip_ssl_verification: bool = False
+    connect_timeout: float | None = 10.0
+    read_timeout: float | None = 300.0
+
+
 class DeploymentChatClient:
     """Direct HTTP client for OpenAI-compatible inference endpoints."""
 
     _session: aiohttp.ClientSession
-    _owns_session: bool
 
-    def __init__(
-        self,
-        *,
-        session: aiohttp.ClientSession | None = None,
-        skip_ssl_verification: bool = False,
-        connect_timeout: float | None = 10.0,
-        read_timeout: float | None = 300.0,
-    ) -> None:
-        if session is not None:
-            self._session = session
-            self._owns_session = False
-        else:
-            connector = aiohttp.TCPConnector(ssl=not skip_ssl_verification)
-            timeout = aiohttp.ClientTimeout(
-                sock_connect=connect_timeout,
-                sock_read=read_timeout,
-            )
-            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
-            self._owns_session = True
+    def __init__(self, session: aiohttp.ClientSession) -> None:
+        self._session = session
+
+    @classmethod
+    async def create(cls, args: DeploymentChatClientArgs) -> Self:
+        connector = aiohttp.TCPConnector(ssl=not args.skip_ssl_verification)
+        timeout = aiohttp.ClientTimeout(
+            sock_connect=args.connect_timeout,
+            sock_read=args.read_timeout,
+        )
+        session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+        return cls(session)
 
     async def __aenter__(self) -> Self:
         return self
@@ -66,20 +68,20 @@ class DeploymentChatClient:
         await self.close()
 
     async def close(self) -> None:
-        if self._owns_session and not self._session.closed:
+        if not self._session.closed:
             await self._session.close()
 
     async def chat_completion(
         self,
         endpoint_url: str,
         api_key: str | None,
-        request: dict[str, Any],
+        body: dict[str, Any],
         *,
         path: str = DEFAULT_CHAT_PATH,
     ) -> dict[str, Any]:
         """POST a chat completion request to the deployment endpoint."""
         target = self._build_url(endpoint_url, path)
-        return await self._post(target, api_key, request)
+        return await self._post(target, api_key, body)
 
     async def list_models(
         self,

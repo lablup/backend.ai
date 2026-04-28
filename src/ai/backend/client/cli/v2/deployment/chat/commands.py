@@ -93,6 +93,7 @@ def chat(
     from ai.backend.client.v2.deployment_chat import (
         DeploymentChatAuthError,
         DeploymentChatClient,
+        DeploymentChatClientArgs,
     )
 
     connection = load_v2_config()
@@ -150,9 +151,10 @@ def chat(
             "messages": [{"role": "user", "content": content}],
         }
         api_key = chat_config_store.get_token(deployment_id)
-        async with DeploymentChatClient(
+        client_args = DeploymentChatClientArgs(
             skip_ssl_verification=connection.skip_ssl_verification,
-        ) as client:
+        )
+        async with await DeploymentChatClient.create(client_args) as client:
             try:
                 response = await client.chat_completion(
                     endpoint_entry.endpoint_url,
@@ -281,9 +283,11 @@ async def _discover_model(
     from ai.backend.client.v2.deployment_chat import (
         DeploymentChatAuthError,
         DeploymentChatClient,
+        DeploymentChatClientArgs,
     )
 
-    async with DeploymentChatClient(skip_ssl_verification=skip_ssl_verification) as client:
+    client_args = DeploymentChatClientArgs(skip_ssl_verification=skip_ssl_verification)
+    async with await DeploymentChatClient.create(client_args) as client:
         try:
             payload = await client.list_models(endpoint_url, api_key)
         except (DeploymentChatAuthError, BackendAPIError, BackendClientError):

@@ -10,7 +10,7 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
 )
 
 
-def _entry(
+def _make_entry(
     *,
     endpoint: str = "https://infer.example.test/api",
     default_model: str | None = None,
@@ -24,24 +24,24 @@ def _entry(
 
 class TestEntryFormatSummary:
     def test_format_summary_returns_lines(self) -> None:
-        entry = _entry(default_model="meta/test-model")
+        entry = _make_entry(default_model="meta/test-model")
         lines = entry.format_summary()
         assert any("endpoint_url" in line for line in lines)
         assert any("meta/test-model" in line for line in lines)
         assert any("last_synced_at" in line for line in lines)
 
     def test_format_summary_dash_for_missing_default_model(self) -> None:
-        entry = _entry(default_model=None)
+        entry = _make_entry(default_model=None)
         lines = entry.format_summary()
         assert any("default_model : -" in line for line in lines)
 
 
 class TestCacheMutations:
-    def test_upsert_overwrites_existing_entry(self) -> None:
+    def test_upsert_overwrites_existing_make_entry(self) -> None:
         cache = DeploymentChatCache()
         dep_id = uuid4()
-        cache.upsert(dep_id, _entry(default_model="m1"))
-        cache.upsert(dep_id, _entry(default_model="m2"))
+        cache.upsert(dep_id, _make_entry(default_model="m1"))
+        cache.upsert(dep_id, _make_entry(default_model="m2"))
         stored = cache.get(dep_id)
         assert stored is not None
         assert stored.default_model == "m2"
@@ -49,7 +49,7 @@ class TestCacheMutations:
     def test_remove_returns_true_when_present(self) -> None:
         cache = DeploymentChatCache()
         dep_id = uuid4()
-        cache.upsert(dep_id, _entry())
+        cache.upsert(dep_id, _make_entry())
         assert cache.remove(dep_id) is True
         assert cache.get(dep_id) is None
 

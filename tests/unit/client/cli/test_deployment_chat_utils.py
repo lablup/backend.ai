@@ -27,7 +27,7 @@ from ai.backend.client.cli.v2.deployment.chat.utils import (
 )
 
 
-def _entry(
+def _make_entry(
     *,
     endpoint: str = "https://infer.example.test/api",
     default_model: str | None = None,
@@ -44,11 +44,11 @@ class TestCacheLoadSaveRoundTrip:
         cache = load_chat_cache(tmp_path / "missing.json")
         assert cache.deployments == {}
 
-    def test_save_then_load_preserves_entry(self, tmp_path: Path) -> None:
+    def test_save_then_load_preserves_make_entry(self, tmp_path: Path) -> None:
         path = tmp_path / "deployment_chat.json"
         cache = DeploymentChatCache()
         dep_id = uuid4()
-        original = _entry(default_model="gpt-test")
+        original = _make_entry(default_model="gpt-test")
         cache.upsert(dep_id, original)
         save_chat_cache(cache, path)
 
@@ -96,7 +96,7 @@ class TestPermissions:
     def test_save_chat_cache_enforces_0600(self, tmp_path: Path) -> None:
         path = tmp_path / "cache.json"
         cache = DeploymentChatCache()
-        cache.upsert(uuid4(), _entry())
+        cache.upsert(uuid4(), _make_entry())
         save_chat_cache(cache, path)
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
