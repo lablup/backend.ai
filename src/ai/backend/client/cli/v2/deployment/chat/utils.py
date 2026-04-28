@@ -3,8 +3,8 @@
 Two on-disk JSON files live side by side under ``~/.backend.ai/``:
 
 - ``deployment_chat.json`` — auto-managed endpoint cache (resolved from
-  the manager). Refetched on cache miss; never user-edited. Loaded via
-  :meth:`DeploymentChatCache.load`.
+  the manager). Holds no secrets, written with default umask. Loaded
+  via :meth:`DeploymentChatCache.load`.
 - ``deployment_chat_config.json`` — user-managed API keys for the
   inference endpoints. Stored in plaintext, so the file is written with
   ``0600`` permissions. Loaded via :meth:`DeploymentChatConfig.load`.
@@ -28,14 +28,15 @@ CHAT_CONFIG_FILE = CONFIG_DIR / "deployment_chat_config.json"
 
 
 def save_chat_cache(cache: DeploymentChatCache) -> None:
-    """Write the chat cache and enforce ``0600`` permissions."""
+    """Write the chat cache. The file holds no secrets (endpoint URL + model name
+    + timestamp), so default umask permissions apply."""
     CHAT_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     CHAT_CACHE_FILE.write_text(cache.model_dump_json(indent=2), encoding="utf-8")
-    CHAT_CACHE_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
 def save_chat_config(config: DeploymentChatConfig) -> None:
-    """Write the chat config and enforce ``0600`` permissions."""
+    """Write the chat config and enforce ``0600`` permissions because it stores
+    plaintext API keys."""
     CHAT_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     CHAT_CONFIG_FILE.write_text(config.model_dump_json(indent=2), encoding="utf-8")
     CHAT_CONFIG_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
