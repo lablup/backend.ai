@@ -621,7 +621,13 @@ class DeploymentDBSource:
         endpoint_id: uuid.UUID,
         lifecycle: EndpointLifecycle,
     ) -> bool:
-        """Update endpoint lifecycle status."""
+        """Update endpoint lifecycle status.
+
+        Transitioning to ``DESTROYING`` also wipes any access tokens
+        bound to the endpoint in the same transaction, so a destroyed
+        deployment cannot be re-authenticated against once the routes
+        are torn down.
+        """
         async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.update(EndpointRow)
@@ -629,7 +635,12 @@ class DeploymentDBSource:
                 .values(lifecycle_stage=lifecycle)
             )
             result = await db_sess.execute(query)
-            return cast(CursorResult[Any], result).rowcount > 0
+            updated = cast(CursorResult[Any], result).rowcount > 0
+            if updated and lifecycle == EndpointLifecycle.DESTROYING:
+                await db_sess.execute(
+                    sa.delete(EndpointTokenRow).where(EndpointTokenRow.endpoint == endpoint_id)
+                )
+            return updated
 
     async def get_modified_endpoint(
         self,
