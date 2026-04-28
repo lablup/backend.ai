@@ -354,21 +354,18 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
-        # TODO(#11232): Consolidate per-plugin streamer into a single shared instance owned by the agent.
-        self._stats_streamer = DockerStatsStreamer(self._docker)
 
     async def cleanup(self) -> None:
-        await self._stats_streamer.close()
         await self._docker.close()
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
 
-    async def notify_container_started(self, container_id: str) -> None:
-        self._stats_streamer.start(container_id)
-
-    async def notify_container_destroyed(self, container_id: str) -> None:
-        await self._stats_streamer.stop(container_id)
+    def attach_stats_streamer(self, streamer: DockerStatsStreamer) -> None:
+        """Attach the agent-owned :class:`DockerStatsStreamer` used for reading
+        per-container stats. Called once by :class:`DockerAgent` after plugin
+        init so the streamer is shared across intrinsic plugins."""
+        self._stats_streamer = streamer
 
     async def list_devices(self) -> Collection[CPUDevice]:
         cores = await libnuma.get_available_cores()
@@ -687,21 +684,18 @@ class MemoryPlugin(AbstractComputePlugin):
 
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
-        # TODO(#11232): Consolidate per-plugin streamer into a single shared instance owned by the agent.
-        self._stats_streamer = DockerStatsStreamer(self._docker)
 
     async def cleanup(self) -> None:
-        await self._stats_streamer.close()
         await self._docker.close()
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
 
-    async def notify_container_started(self, container_id: str) -> None:
-        self._stats_streamer.start(container_id)
-
-    async def notify_container_destroyed(self, container_id: str) -> None:
-        await self._stats_streamer.stop(container_id)
+    def attach_stats_streamer(self, streamer: DockerStatsStreamer) -> None:
+        """Attach the agent-owned :class:`DockerStatsStreamer` used for reading
+        per-container stats. Called once by :class:`DockerAgent` after plugin
+        init so the streamer is shared across intrinsic plugins."""
+        self._stats_streamer = streamer
 
     async def list_devices(self) -> Collection[MemoryDevice]:
         memory_size = psutil.virtual_memory().total

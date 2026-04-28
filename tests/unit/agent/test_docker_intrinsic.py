@@ -6,7 +6,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -14,6 +14,7 @@ import pytest
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
@@ -21,9 +22,7 @@ from ai.backend.agent.docker.intrinsic import (
     MemoryPlugin,
     read_proc_net_dev,
 )
-from ai.backend.agent.resources import ComputerContext
 from ai.backend.agent.stats import StatModes
-from ai.backend.common.types import ContainerId, DeviceName
 
 
 class BaseDockerIntrinsicTest:
@@ -878,71 +877,170 @@ class TestDockerStatsStreamerReconnect:
             assert streamer.get_latest("cid_gone") is None
 
 
-class _AgentStub:
-    """Minimal stand-in exposing only the attributes the notify helpers read."""
+class TestSharedStatsStreamerWiring:
+    """Verify the agent owns a single streamer that both intrinsic plugins share."""
 
-    def __init__(self, computers: dict[DeviceName, ComputerContext]) -> None:
-        self.computers = computers
+    async def test_agent_owns_single_statsstreamer_shared_with_plugins(self) -> None:
+        """After :meth:`DockerAgent.attach_stats_streamer` is called for each
+        intrinsic plugin, both plugins must reference the SAME streamer
+        instance that the agent owns on ``self._stats_streamer``."""
+        streamer = DockerStatsStreamer(AsyncMock())
 
+        cpu_plugin = CPUPlugin.__new__(CPUPlugin)
+        mem_plugin = MemoryPlugin.__new__(MemoryPlugin)
+        cpu_plugin.attach_stats_streamer(streamer)
+        mem_plugin.attach_stats_streamer(streamer)
 
-class TestAgentContainerLifecycleHooks:
-    """Tests that the agent's start/clean event handlers notify compute plugins."""
+        assert cpu_plugin._stats_streamer is streamer
+        assert mem_plugin._stats_streamer is streamer
+        assert cpu_plugin._stats_streamer is mem_plugin._stats_streamer
 
-    @staticmethod
-    def _make_agent_stub(
-        computers: dict[str, ComputerContext],
-    ) -> AbstractAgent[Any, Any]:
-        """Build a stub exposing ``self.computers`` so the notify helpers can
-        be exercised without instantiating the full AbstractAgent (which is
-        abstract with many required overrides)."""
-        typed_computers: dict[DeviceName, ComputerContext] = {
-            DeviceName(k): v for k, v in computers.items()
-        }
-        return cast(AbstractAgent[Any, Any], _AgentStub(typed_computers))
+    async def test_agent_stats_streamer_closed_on_shutdown(self) -> None:
+        """``DockerAgent.shutdown`` must close the shared streamer so in-flight
+        reader tasks are cancelled before the underlying Docker client goes
+        away."""
+        streamer = DockerStatsStreamer(AsyncMock())
+        streamer.start("cid_000")
+        assert "cid_000" in streamer._tasks
 
-    async def test_notify_started_calls_plugin_hook(self) -> None:
-        """The agent's helper invokes notify_container_started on every plugin."""
-        plugin = AsyncMock()
-        plugin.notify_container_started = AsyncMock()
-        plugin.notify_container_destroyed = AsyncMock()
-        agent = self._make_agent_stub({
-            "cpu": ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock()),
-        })
+        await streamer.close()
 
-        await AbstractAgent._notify_compute_plugins_container_started(agent, ContainerId("cid_000"))
-        plugin.notify_container_started.assert_awaited_once_with("cid_000")
-        plugin.notify_container_destroyed.assert_not_called()
+        assert streamer._tasks == {}
+        assert streamer._latest == {}
 
-    async def test_notify_destroyed_calls_plugin_hook(self) -> None:
-        """The agent's helper invokes notify_container_destroyed on every plugin."""
-        plugin = AsyncMock()
-        plugin.notify_container_started = AsyncMock()
-        plugin.notify_container_destroyed = AsyncMock()
-        agent = self._make_agent_stub({
-            "cpu": ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock()),
-        })
+    async def test_stats_streamer_available_before_scan_running_kernels(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ordering invariant: ``DockerAgent.__ainit__`` must install the shared
+        :class:`DockerStatsStreamer` on ``self`` and attach it to the intrinsic
+        plugins BEFORE ``super().__ainit__()`` runs.
 
-        await AbstractAgent._notify_compute_plugins_container_destroyed(
-            agent, ContainerId("cid_000")
+        ``AbstractAgent.__ainit__`` calls :meth:`scan_running_kernels` and
+        starts the container lifecycle handler; on warm restart either of
+        those can fire ``_on_container_started`` -> ``self._stats_streamer``
+        before any code placed AFTER ``super().__ainit__()`` gets to execute.
+        If the streamer is not set by then, ``_on_container_started`` raises
+        ``AttributeError`` on a bare class annotation.
+
+        This test monkeypatches :meth:`AbstractAgent.scan_running_kernels`
+        (the exact point where the blocker bites) and asserts the streamer
+        is already set when it runs. It also confirms the intrinsic plugins
+        received the same streamer instance before the super init is reached.
+        """
+        observed_streamer: list[DockerStatsStreamer | None] = []
+        observed_cpu_streamer: list[DockerStatsStreamer | None] = []
+        observed_mem_streamer: list[DockerStatsStreamer | None] = []
+
+        class _StopAfterOrderingAssertion(BaseException):
+            """Sentinel used to short-circuit ``__ainit__`` once the ordering
+            invariant has been verified. A ``BaseException`` subclass ensures
+            it propagates past any ``except Exception:`` guards in the init
+            flow below the stubbed ``super().__ainit__()`` call."""
+
+        cpu_plugin = CPUPlugin.__new__(CPUPlugin)
+        mem_plugin = MemoryPlugin.__new__(MemoryPlugin)
+
+        computer_ctx_cpu = MagicMock()
+        computer_ctx_cpu.instance = cpu_plugin
+        computer_ctx_mem = MagicMock()
+        computer_ctx_mem.instance = mem_plugin
+
+        async def fake_scan_running_kernels(self: Any) -> None:
+            # Record the streamer state at the exact moment the race would
+            # bite on warm restart.
+            observed_streamer.append(getattr(self, "_stats_streamer", None))
+            observed_cpu_streamer.append(getattr(cpu_plugin, "_stats_streamer", None))
+            observed_mem_streamer.append(getattr(mem_plugin, "_stats_streamer", None))
+
+        async def fake_super_ainit(self: Any) -> None:
+            # Emulate the part of AbstractAgent.__ainit__ that matters for
+            # this ordering test: call scan_running_kernels, which is where
+            # the blocker actually fires on warm restart. Then bail out
+            # so the post-super section (which depends on ``self.id``,
+            # Redis, networks, etc.) is not exercised.
+            await self.scan_running_kernels()
+            raise _StopAfterOrderingAssertion()
+
+        # Patch the exact targets of the race.
+        monkeypatch.setattr(
+            AbstractAgent,
+            "scan_running_kernels",
+            fake_scan_running_kernels,
+            raising=True,
         )
-        plugin.notify_container_destroyed.assert_awaited_once_with("cid_000")
-        plugin.notify_container_started.assert_not_called()
+        monkeypatch.setattr(
+            AbstractAgent,
+            "__ainit__",
+            fake_super_ainit,
+            raising=True,
+        )
 
-    async def test_notify_tolerates_plugin_exceptions(self) -> None:
-        """If one plugin raises, others are still notified; the error is logged."""
-        broken = AsyncMock()
-        broken.notify_container_started = AsyncMock(side_effect=RuntimeError("boom"))
-        healthy = AsyncMock()
-        healthy.notify_container_started = AsyncMock()
+        # Stub the pre-super Docker interactions so __ainit__ does not
+        # require a live Docker daemon. Only the ordering is under test.
+        mock_docker_client = AsyncMock()
+        mock_docker_client.version = AsyncMock(
+            return_value={"Version": "0", "ApiVersion": "0", "KernelVersion": "test"},
+        )
+        mock_docker_client.system = MagicMock()
+        mock_docker_client.system.info = AsyncMock(return_value={"CgroupDriver": "cgroupfs"})
+        mock_docker_client.connector = aiohttp.UnixConnector(path="/var/run/docker.sock")
 
-        agent = self._make_agent_stub({
-            "broken": ComputerContext(instance=broken, devices=[], alloc_map=MagicMock()),
-            "healthy": ComputerContext(instance=healthy, devices=[], alloc_map=MagicMock()),
-        })
+        def docker_factory(*args: Any, **kwargs: Any) -> AsyncMock:
+            return mock_docker_client
 
-        await AbstractAgent._notify_compute_plugins_container_started(agent, ContainerId("cid_000"))
-        broken.notify_container_started.assert_awaited_once_with("cid_000")
-        healthy.notify_container_started.assert_awaited_once_with("cid_000")
+        monkeypatch.setattr(
+            "ai.backend.agent.docker.agent.Docker",
+            docker_factory,
+        )
+
+        # ``async with closing_async(Docker()) as docker`` is used in the
+        # pre-super section; wrap the mock in an async context manager.
+        class _AsyncCMWrapper:
+            def __init__(self, obj: Any) -> None:
+                self._obj = obj
+
+            async def __aenter__(self) -> Any:
+                return self._obj
+
+            async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+                return None
+
+        monkeypatch.setattr(
+            "ai.backend.agent.docker.agent.closing_async",
+            lambda obj: _AsyncCMWrapper(obj),
+        )
+
+        # Construct a minimally-initialised DockerAgent without running
+        # the heavy synchronous __init__ (which needs real etcd, registries,
+        # etc.). Only the attributes touched before super().__ainit__() need
+        # to be populated.
+        agent = DockerAgent.__new__(DockerAgent)
+        agent.local_config = MagicMock()
+        agent.local_config.agent.docker_mode = "native"
+        agent._kernel_recovery_adapter = MagicMock()
+        agent._kernel_recovery_adapter.adapt_recovery_data = AsyncMock(return_value=None)
+        # Typed as ``Mapping[DeviceName, ComputerContext]`` in AbstractAgent;
+        # the test uses ``MagicMock`` stand-ins so the attach loop can iterate.
+        fake_computers: Any = {
+            "cpu": computer_ctx_cpu,
+            "mem": computer_ctx_mem,
+        }
+        agent.computers = fake_computers
+
+        with pytest.raises(_StopAfterOrderingAssertion):
+            await agent.__ainit__()
+
+        # The patched scan_running_kernels ran exactly once (via the stub
+        # super) and at that moment the streamer must already be set.
+        assert len(observed_streamer) == 1
+        assert observed_streamer[0] is not None
+        assert isinstance(observed_streamer[0], DockerStatsStreamer)
+        # Both intrinsic plugins must already hold the same streamer instance.
+        assert observed_cpu_streamer[0] is observed_streamer[0]
+        assert observed_mem_streamer[0] is observed_streamer[0]
+
+        await agent._stats_streamer.close()
 
 
 def aiohttp_client_connection_error(msg: str) -> Exception:

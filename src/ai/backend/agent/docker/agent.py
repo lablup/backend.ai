@@ -50,6 +50,9 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
+from ai.backend.agent.docker.intrinsic import (
+    DockerStatsStreamer,
+)
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.exception import (
     ContainerCreationError,
@@ -1422,6 +1425,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
+    _stats_streamer: DockerStatsStreamer
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1517,6 +1521,26 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
             self.docker_info = docker_info
         await self._kernel_recovery_adapter.adapt_recovery_data()
+
+        # For legacy accelerator plugins
+        self.docker = Docker()
+
+        # Single DockerStatsStreamer shared across intrinsic compute plugins.
+        # Keeps one long-lived ``container.stats(stream=True)`` reader per
+        # container instead of one per plugin, cutting open connections to
+        # dockerd in half for CPU + Memory plugins.
+        #
+        # NOTE: the streamer MUST be created and attached to plugins BEFORE
+        # ``super().__ainit__()`` runs. ``AbstractAgent.__ainit__`` calls
+        # ``scan_running_kernels()`` and then starts the lifecycle handler
+        # task (``process_lifecycle_events``); on warm restart that pipeline
+        # can fire container-start events which land in
+        # ``_on_container_started`` -> ``self._stats_streamer.start(...)``
+        # before any code AFTER ``super().__ainit__()`` gets to run.
+        self._stats_streamer = DockerStatsStreamer(self.docker)
+        for computer_ctx in self.computers.values():
+            computer_ctx.instance.attach_stats_streamer(self._stats_streamer)
+
         await super().__ainit__()
         try:
             async with Docker() as docker:
@@ -1556,9 +1580,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
         self.docker_ptask_group = aiotools.PersistentTaskGroup()
 
-        # For legacy accelerator plugins
-        self.docker = Docker()
-
         self.network_plugin_ctx = NetworkPluginContext(
             self.etcd, self.local_config.model_dump(by_alias=True)
         )
@@ -1576,6 +1597,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if self.docker_ptask_group is not None:
             await self.docker_ptask_group.shutdown()
 
+        # Close the shared stats streamer before the underlying Docker client
+        # so in-flight reader tasks can cleanly drain their stream iterators.
+        # ``_stats_streamer`` is declared non-Optional and is assigned
+        # synchronously at the top of ``__ainit__`` before any ``await``,
+        # so it always exists once the agent is constructed.
+        await self._stats_streamer.close()
+
         try:
             await super().shutdown(stop_signal)
         finally:
@@ -1586,6 +1614,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         if self.docker:
             await self.docker.close()
+
+    @override
+    async def _on_container_started(self, container_id: ContainerId) -> None:
+        self._stats_streamer.start(str(container_id))
+
+    @override
+    async def _on_container_destroyed(self, container_id: ContainerId) -> None:
+        await self._stats_streamer.stop(str(container_id))
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:

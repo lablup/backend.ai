@@ -77,6 +77,8 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
+    from ai.backend.agent.docker.intrinsic import DockerStatsStreamer
+
 
 type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
@@ -451,25 +453,6 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return {}
 
-    async def notify_container_started(self, container_id: str) -> None:
-        """
-        Lifecycle hook invoked by the agent when a container transitions to RUNNING.
-
-        Subclasses may override this to eagerly spin up per-container resources
-        (e.g. start a long-lived stats stream reader) instead of relying on
-        lazy initialisation from the next stat collection cycle. Default: no-op.
-        """
-        return
-
-    async def notify_container_destroyed(self, container_id: str) -> None:
-        """
-        Lifecycle hook invoked by the agent when a container is being cleaned up.
-
-        Subclasses may override this to release per-container resources
-        (e.g. cancel the long-lived stats stream reader task). Default: no-op.
-        """
-        return
-
     @abstractmethod
     async def restore_from_container(
         self,
@@ -534,6 +517,16 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
         """
         return []
+
+    def attach_stats_streamer(self, streamer: DockerStatsStreamer) -> None:
+        """
+        Hook point for Docker-backed plugins that need the agent-owned
+        :class:`DockerStatsStreamer` to read per-container stats from a
+        single shared stream. The base implementation is a no-op so
+        plugins that do not consume the streamer (e.g. K8s, Dummy,
+        third-party accelerators) can inherit the default safely.
+        """
+        pass
 
 
 type ComputersMap = Mapping[DeviceName, ComputerContext]
