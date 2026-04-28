@@ -1,4 +1,4 @@
-"""User-facing CLI: ``./bai deployment chat-config`` (manage local chat cache)."""
+"""User-facing CLI: ``./bai deployment chat`` and ``chat-config``."""
 
 from __future__ import annotations
 
@@ -11,16 +11,17 @@ from uuid import UUID
 import click
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from ai.backend.client.cli.v2.deployment_chat_cache import (
+from ai.backend.cli.params import JSONParamType
+from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCacheEntry,
     IncompatibleChatCacheError,
-    load_chat_cache,
-    save_chat_cache,
-)
-from ai.backend.client.cli.v2.deployment_chat_config import (
     IncompatibleChatConfigError,
+)
+from ai.backend.client.cli.v2.deployment.chat.utils import (
+    load_chat_cache,
     load_chat_config,
     mask_token,
+    save_chat_cache,
     save_chat_config,
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
@@ -48,6 +49,134 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
         status = e.args[0] if e.args else "?"
         detail = title or msg or str(e)
         raise click.ClickException(f"{status}: {detail}") from e
+
+
+# ---------------------------------------------------------------------------
+# chat
+# ---------------------------------------------------------------------------
+
+
+@click.command(name="chat")
+@click.argument("deployment_id", type=click.UUID)
+@click.argument("content", type=str)
+@click.option(
+    "--model",
+    default=None,
+    type=str,
+    help="Model name to send (defaults to cached default_model).",
+)
+@click.option(
+    "--params",
+    default="{}",
+    type=JSONParamType(),
+    help=(
+        "Extra request-body fields as a JSON object. "
+        "Forwarded to the inference endpoint as-is "
+        '(e.g. \'{"temperature": 0.7, "max_tokens": 256}\'). '
+        "The 'model' and 'messages' fields are always overridden by --model and CONTENT."
+    ),
+)
+def chat(
+    deployment_id: UUID,
+    content: str,
+    model: str | None,
+    params: Any,
+) -> None:
+    """Send a one-shot chat completion request to a deployed model.
+
+    Sampling parameters (temperature, top_p, max_tokens, etc.) are not
+    exposed as individual flags because their schema differs across
+    runtime variants. Pass them through ``--params`` instead.
+    """
+    import json
+
+    from ai.backend.client.v2.deployment_chat import (
+        DeploymentChatAuthError,
+        DeploymentChatClient,
+    )
+
+    connection = load_v2_config()
+
+    try:
+        cache = load_chat_cache()
+        chat_config_store = load_chat_config()
+    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
+        raise click.ClickException(str(e)) from e
+
+    if not isinstance(params, dict):
+        raise click.ClickException("--params must be a JSON object.")
+    extra_body: dict[str, Any] = params
+    entry = cache.get(deployment_id)
+
+    async def _ensure_endpoint_entry() -> DeploymentChatCacheEntry:
+        if entry is not None and entry.endpoint_url:
+            return entry
+        registry = await create_v2_registry(connection)
+        try:
+            deployment = await registry.deployment.get(deployment_id)
+        finally:
+            await registry.close()
+        endpoint_url = deployment.network_access.endpoint_url
+        if not endpoint_url:
+            raise click.ClickException(
+                f"Deployment {deployment_id} has no endpoint_url yet "
+                "(it may still be provisioning). Wait until the deployment is READY."
+            )
+        new_entry = DeploymentChatCacheEntry(
+            endpoint_url=endpoint_url,
+            default_model=entry.default_model if entry is not None else None,
+            last_synced_at=datetime.now(UTC),
+        )
+        cache.upsert(deployment_id, new_entry)
+        save_chat_cache(cache)
+        return new_entry
+
+    async def _run() -> None:
+        from ai.backend.client.exceptions import BackendAPIError
+
+        endpoint_entry = await _ensure_endpoint_entry()
+        request_model = model or endpoint_entry.default_model
+        if request_model is None:
+            raise click.ClickException(
+                f"No --model given and no default_model cached for deployment {deployment_id}.\n"
+                "Set one with:\n"
+                f"  ./bai deployment chat-config set {deployment_id} --token <api_key>\n"
+                "(this auto-discovers the served model from the inference endpoint)."
+            )
+
+        body: dict[str, Any] = {
+            **extra_body,
+            "model": request_model,
+            "messages": [{"role": "user", "content": content}],
+        }
+        api_key = chat_config_store.get_token(deployment_id)
+        async with DeploymentChatClient(
+            skip_ssl_verification=connection.skip_ssl_verification,
+        ) as client:
+            try:
+                response = await client.chat_completion(
+                    endpoint_entry.endpoint_url,
+                    api_key,
+                    body,
+                )
+            except DeploymentChatAuthError as e:
+                raise click.ClickException(
+                    f"The inference endpoint rejected the configured API key for "
+                    f"deployment {deployment_id}. Re-register with:\n"
+                    f"  ./bai deployment chat-config set {deployment_id} --token <api_key>"
+                ) from e
+            except BackendAPIError as e:
+                raise click.ClickException(
+                    f"Inference endpoint error ({e.status} {e.reason}): {e.data}"
+                ) from e
+        print(json.dumps(response, indent=2, ensure_ascii=False, default=str))
+
+    _run_async(_run)
+
+
+# ---------------------------------------------------------------------------
+# chat-config
+# ---------------------------------------------------------------------------
 
 
 @click.group(name="chat-config")
@@ -147,12 +276,7 @@ async def _discover_model(
     skip_ssl_verification: bool,
     fallback: str | None,
 ) -> str | None:
-    """Call ``GET {endpoint}/v1/models`` to learn the served model name.
-
-    Returns the first model id reported by the inference endpoint. Falls
-    back to *fallback* when the endpoint is unreachable or the response
-    does not contain any model entries.
-    """
+    """Call ``GET {endpoint}/v1/models`` to learn the served model name."""
     from ai.backend.client.exceptions import BackendAPIError, BackendClientError
     from ai.backend.client.v2.deployment_chat import (
         DeploymentChatAuthError,
@@ -236,4 +360,4 @@ def _print_entry(
     print(f"api_key       : {mask_token(token)}")
 
 
-__all__ = ("chat_config",)
+__all__ = ("chat", "chat_config")
