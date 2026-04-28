@@ -9,18 +9,31 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.client.cli.v2.deployment.chat import utils as chat_utils
 from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
 )
 from ai.backend.client.cli.v2.deployment.chat.utils import (
-    load_chat_cache,
-    load_chat_config,
     mask_token,
     save_chat_cache,
     save_chat_config,
 )
+
+
+@pytest.fixture
+def cache_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    path = tmp_path / "deployment_chat.json"
+    monkeypatch.setattr(chat_utils, "CHAT_CACHE_FILE", path)
+    return path
+
+
+@pytest.fixture
+def config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    path = tmp_path / "deployment_chat_config.json"
+    monkeypatch.setattr(chat_utils, "CHAT_CONFIG_FILE", path)
+    return path
 
 
 def _make_entry(
@@ -36,19 +49,17 @@ def _make_entry(
 
 
 class TestCacheLoadSaveRoundTrip:
-    def test_load_returns_empty_when_file_missing(self, tmp_path: Path) -> None:
-        cache = load_chat_cache(tmp_path / "missing.json")
-        assert cache.deployments == {}
+    def test_load_returns_empty_when_file_missing(self, cache_path: Path) -> None:
+        assert DeploymentChatCache.load().deployments == {}
 
-    def test_save_then_load_preserves_entry(self, tmp_path: Path) -> None:
-        path = tmp_path / "deployment_chat.json"
+    def test_save_then_load_preserves_entry(self, cache_path: Path) -> None:
         cache = DeploymentChatCache()
         dep_id = uuid4()
         original = _make_entry(default_model="gpt-test")
         cache.set(dep_id, original)
-        save_chat_cache(cache, path)
+        save_chat_cache(cache)
 
-        loaded = load_chat_cache(path)
+        loaded = DeploymentChatCache.load()
         restored = loaded.deployments[dep_id]
         assert restored.endpoint_url == original.endpoint_url
         assert restored.default_model == original.default_model
@@ -56,53 +67,46 @@ class TestCacheLoadSaveRoundTrip:
 
 
 class TestConfigLoadSaveRoundTrip:
-    def test_load_returns_empty_when_file_missing(self, tmp_path: Path) -> None:
-        cfg = load_chat_config(tmp_path / "missing.json")
-        assert cfg.tokens == {}
+    def test_load_returns_empty_when_file_missing(self, config_path: Path) -> None:
+        assert DeploymentChatConfig.load().tokens == {}
 
-    def test_save_then_load_preserves_tokens(self, tmp_path: Path) -> None:
-        path = tmp_path / "config.json"
+    def test_save_then_load_preserves_tokens(self, config_path: Path) -> None:
         cfg = DeploymentChatConfig()
         dep_id = uuid4()
         cfg.set_token(dep_id, "sk-secret-token-1234")
-        save_chat_config(cfg, path)
+        save_chat_config(cfg)
 
-        loaded = load_chat_config(path)
+        loaded = DeploymentChatConfig.load()
         assert loaded.get_token(dep_id) == "sk-secret-token-1234"
 
 
 class TestPermissions:
     @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
-    def test_save_chat_cache_enforces_0600(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
+    def test_save_chat_cache_enforces_0600(self, cache_path: Path) -> None:
         cache = DeploymentChatCache()
         cache.set(uuid4(), _make_entry())
-        save_chat_cache(cache, path)
-        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        save_chat_cache(cache)
+        assert stat.S_IMODE(cache_path.stat().st_mode) == 0o600
 
     @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
-    def test_save_chat_config_enforces_0600(self, tmp_path: Path) -> None:
-        path = tmp_path / "config.json"
+    def test_save_chat_config_enforces_0600(self, config_path: Path) -> None:
         cfg = DeploymentChatConfig()
         cfg.set_token(uuid4(), "sk-x")
-        save_chat_config(cfg, path)
-        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        save_chat_config(cfg)
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
 
 
 class TestCacheLoaderResilience:
-    def test_load_returns_empty_on_corrupt_json(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        path.write_text("not-json{", encoding="utf-8")
-        assert load_chat_cache(path).deployments == {}
+    def test_load_returns_empty_on_corrupt_json(self, cache_path: Path) -> None:
+        cache_path.write_text("not-json{", encoding="utf-8")
+        assert DeploymentChatCache.load().deployments == {}
 
-    def test_load_returns_empty_when_top_level_not_object(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        path.write_text("[]", encoding="utf-8")
-        assert load_chat_cache(path).deployments == {}
+    def test_load_returns_empty_when_top_level_not_object(self, cache_path: Path) -> None:
+        cache_path.write_text("[]", encoding="utf-8")
+        assert DeploymentChatCache.load().deployments == {}
 
-    def test_load_returns_empty_on_invalid_uuid_key(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        path.write_text(
+    def test_load_returns_empty_on_invalid_uuid_key(self, cache_path: Path) -> None:
+        cache_path.write_text(
             json.dumps({
                 "deployments": {
                     "not-a-uuid": {
@@ -114,11 +118,10 @@ class TestCacheLoaderResilience:
             }),
             encoding="utf-8",
         )
-        assert load_chat_cache(path).deployments == {}
+        assert DeploymentChatCache.load().deployments == {}
 
-    def test_load_returns_empty_on_malformed_entry_payload(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        path.write_text(
+    def test_load_returns_empty_on_malformed_entry_payload(self, cache_path: Path) -> None:
+        cache_path.write_text(
             json.dumps({
                 "deployments": {
                     "12345678-1234-5678-1234-567812345678": {"default_model": "m"},
@@ -126,22 +129,20 @@ class TestCacheLoaderResilience:
             }),
             encoding="utf-8",
         )
-        assert load_chat_cache(path).deployments == {}
+        assert DeploymentChatCache.load().deployments == {}
 
 
 class TestConfigLoaderResilience:
-    def test_load_returns_empty_on_corrupt_json(self, tmp_path: Path) -> None:
-        path = tmp_path / "config.json"
-        path.write_text("not-json{", encoding="utf-8")
-        assert load_chat_config(path).tokens == {}
+    def test_load_returns_empty_on_corrupt_json(self, config_path: Path) -> None:
+        config_path.write_text("not-json{", encoding="utf-8")
+        assert DeploymentChatConfig.load().tokens == {}
 
-    def test_load_returns_empty_on_invalid_uuid_key(self, tmp_path: Path) -> None:
-        path = tmp_path / "config.json"
-        path.write_text(
+    def test_load_returns_empty_on_invalid_uuid_key(self, config_path: Path) -> None:
+        config_path.write_text(
             json.dumps({"tokens": {"not-a-uuid": "sk-x"}}),
             encoding="utf-8",
         )
-        assert load_chat_config(path).tokens == {}
+        assert DeploymentChatConfig.load().tokens == {}
 
 
 class TestMaskToken:

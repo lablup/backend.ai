@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timedelta
+from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 CACHE_ENTRY_TTL = timedelta(hours=24)
 """Endpoint cache entries older than this are treated as a cache miss."""
@@ -37,6 +39,26 @@ class DeploymentChatCache(BaseModel):
     def remove(self, deployment_id: UUID) -> bool:
         return self.deployments.pop(deployment_id, None) is not None
 
+    @classmethod
+    def load(cls) -> Self:
+        """Load the chat cache; return an empty cache when the file is absent or unreadable."""
+        from ai.backend.client.cli.v2.deployment.chat.utils import (
+            CHAT_CACHE_FILE,
+            read_json_file,
+        )
+
+        raw = read_json_file(CHAT_CACHE_FILE)
+        if raw is None:
+            return cls()
+        try:
+            return cls.model_validate(raw)
+        except ValidationError:
+            print(
+                f"WARNING: {CHAT_CACHE_FILE} is in an invalid format and was ignored.",
+                file=sys.stderr,
+            )
+            return cls()
+
 
 class DeploymentChatConfig(BaseModel):
     """Per-deployment API key registry (user-managed)."""
@@ -51,3 +73,24 @@ class DeploymentChatConfig(BaseModel):
 
     def clear_token(self, deployment_id: UUID) -> bool:
         return self.tokens.pop(deployment_id, None) is not None
+
+    @classmethod
+    def load(cls) -> Self:
+        """Load the chat config; return an empty config when the file is absent or unreadable."""
+        from ai.backend.client.cli.v2.deployment.chat.utils import (
+            CHAT_CONFIG_FILE,
+            read_json_file,
+        )
+
+        raw = read_json_file(CHAT_CONFIG_FILE)
+        if raw is None:
+            return cls()
+        try:
+            return cls.model_validate(raw)
+        except ValidationError:
+            print(
+                f"WARNING: {CHAT_CONFIG_FILE} is in an invalid format and was ignored. "
+                "Re-register tokens with `./bai deployment chat-config set`.",
+                file=sys.stderr,
+            )
+            return cls()
