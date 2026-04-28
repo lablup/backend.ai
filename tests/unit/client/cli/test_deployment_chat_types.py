@@ -40,8 +40,8 @@ class TestCacheMutations:
     def test_upsert_overwrites_existing_make_entry(self) -> None:
         cache = DeploymentChatCache()
         dep_id = uuid4()
-        cache.upsert(dep_id, _make_entry(default_model="m1"))
-        cache.upsert(dep_id, _make_entry(default_model="m2"))
+        cache.set(dep_id, _make_entry(default_model="m1"))
+        cache.set(dep_id, _make_entry(default_model="m2"))
         stored = cache.get(dep_id)
         assert stored is not None
         assert stored.default_model == "m2"
@@ -49,7 +49,7 @@ class TestCacheMutations:
     def test_remove_returns_true_when_present(self) -> None:
         cache = DeploymentChatCache()
         dep_id = uuid4()
-        cache.upsert(dep_id, _make_entry())
+        cache.set(dep_id, _make_entry())
         assert cache.remove(dep_id) is True
         assert cache.get(dep_id) is None
 
