@@ -18,6 +18,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.data.session.types import SchedulingResult
@@ -30,6 +31,7 @@ from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdate
 from ai.backend.manager.repositories.scheduling_history.creators import RouteHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers import (
+    AppProxySyncRouteHandler,
     HealthCheckRouteHandler,
     ProvisioningRouteHandler,
     RouteEvictionHandler,
@@ -105,6 +107,7 @@ class RouteCoordinator:
         scheduling_controller: SchedulingController,
         client_pool: ClientPool,
         service_discovery: ServiceDiscovery,
+        appproxy_client_pool: AppProxyClientPool,
     ) -> None:
         """Initialize the route coordinator."""
         self._valkey_schedule = valkey_schedule
@@ -121,6 +124,8 @@ class RouteCoordinator:
             client_pool=client_pool,
             valkey_schedule=self._valkey_schedule,
             service_discovery=service_discovery,
+            event_producer=self._event_producer,
+            appproxy_client_pool=appproxy_client_pool,
         )
         self._route_handlers = self._init_handlers(executor)
         self._route_observers = self._init_observers()
@@ -158,6 +163,10 @@ class RouteCoordinator:
                 event_producer=self._event_producer,
             ),
             RouteLifecycleType.SERVICE_DISCOVERY_SYNC: ServiceDiscoverySyncHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.APPPROXY_SYNC: AppProxySyncRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
@@ -439,6 +448,16 @@ class RouteCoordinator:
                 short_interval=None,  # No short-cycle for sync
                 long_interval=60.0,
                 initial_delay=30.0,
+            ),
+            # AppProxy sync - hint-driven push of HEALTHY routes to AppProxy.
+            # Short cycle drains the lifecycle mark set by API/hooks; long
+            # cycle is a safety net so the AppProxy state eventually
+            # converges with the manager's DB even if marks are missed.
+            RouteTaskSpec(
+                RouteLifecycleType.APPPROXY_SYNC,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=15.0,
             ),
             # Health observer - manager fallback health check for stale routes
             RouteTaskSpec(

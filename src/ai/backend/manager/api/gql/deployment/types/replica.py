@@ -179,7 +179,7 @@ class ReplicaOrderBy(PydanticInputMixin[ReplicaOrderDTO]):
 )
 class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
-    session_id: ID
+    session_id: ID | None
     revision_id: ID
     readiness_status: ReadinessStatus = gql_field(
         description="Whether the replica has been checked and its health state."
@@ -193,10 +193,12 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 
     @gql_field(
-        description="The session ID associated with the replica. This can be null right after replica creation.",
+        description="The session associated with the replica. Can be null if the replica is still provisioning.",
         deprecation_reason="Use session_v2 instead.",
     )  # type: ignore[misc]
-    async def session(self, info: Info[StrawberryGQLContext]) -> Session:
+    async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
+        if self.session_id is None:
+            return None
         session_global_id = to_global_id(
             ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
@@ -217,6 +219,8 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         ]
         | None
     ):
+        if self.session_id is None:
+            return None
         from ai.backend.common.types import SessionId
 
         return await info.context.data_loaders.session_loader.load(

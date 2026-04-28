@@ -51,7 +51,7 @@ def create(deployment_id: uuid.UUID, expires_at: Any) -> None:
     from ai.backend.common.dto.manager.v2.deployment.request import CreateAccessTokenInput
 
     body = CreateAccessTokenInput(
-        deployment_id=deployment_id,
+        model_deployment_id=deployment_id,
         expires_at=datetime.fromisoformat(expires_at.isoformat()) if expires_at else None,
     )
 

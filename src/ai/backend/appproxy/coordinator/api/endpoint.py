@@ -30,10 +30,12 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
+    BulkUpdateRoutesRequest,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkCreateEndpointResponse,
     BulkDeleteEndpointResponse,
+    BulkUpdateRoutesResponse,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     CreateEndpointItem,
@@ -172,6 +174,17 @@ async def bulk_remove_endpoints(
     return PydanticResponse(BulkDeleteEndpointResponse(endpoints=items))
 
 
+@auth_required("manager")
+@pydantic_api_handler(BulkUpdateRoutesRequest)
+async def bulk_update_routes(
+    request: web.Request, params: BulkUpdateRoutesRequest
+) -> PydanticResponse[BulkUpdateRoutesResponse]:
+    """Bulk replace routing tables for many endpoints in one coordinator call."""
+    root_ctx: RootContext = request.app["_root.context"]
+    items = await root_ctx.endpoint_service.update_routes_bulk(params.endpoints)
+    return PydanticResponse(BulkUpdateRoutesResponse(endpoints=items))
+
+
 class UpdateModelHealthCheckRequestModel(BaseModel):
     health_check: ModelHealthCheck | None
 
@@ -252,6 +265,7 @@ def create_app(
     cors.add(app.router.add_resource(r""))
     # Static '/bulk' routes must be registered before the parametric
     # '/{endpoint_id}' so aiohttp doesn't resolve them to the parametric handler.
+    cors.add(add_route("POST", "/bulk/routes", bulk_update_routes))
     cors.add(add_route("POST", "/bulk", bulk_create_or_update_endpoints))
     cors.add(add_route("DELETE", "/bulk", bulk_remove_endpoints))
     cors.add(add_route("POST", "/{endpoint_id}", create_or_update_endpoint))

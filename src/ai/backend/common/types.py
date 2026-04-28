@@ -53,7 +53,11 @@ from pydantic import (
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
-from .exception import GenericNotImplementedError, InvalidIpAddressValue
+from .exception import (
+    GenericNotImplementedError,
+    InvalidIpAddressValue,
+    InvalidResourceSlotQuantity,
+)
 
 # Deprecated re-export: new code should import ``ImageID`` from
 # ``ai.backend.common.identifier.image``. This line lets existing
@@ -1131,10 +1135,11 @@ class ResourceSlot(UserDict[str, Decimal]):
         try:
             if unit == SlotTypes.BYTES:
                 if isinstance(value, Decimal):
-                    return value
-                if isinstance(value, (int, float)):
-                    return Decimal(value)
-                value = Decimal(BinarySize.from_str(value))
+                    pass
+                elif isinstance(value, (int, float)):
+                    value = Decimal(value)
+                else:
+                    value = Decimal(BinarySize.from_str(value))
             else:
                 value = Decimal(value)
                 if value.is_finite():
@@ -1144,6 +1149,8 @@ class ResourceSlot(UserDict[str, Decimal]):
             ValueError,  # catch wrapped errors from BinarySize.from_str()
         ) as e:
             raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}") from e
+        if value.is_finite() and value < 0:
+            raise InvalidResourceSlotQuantity(f"Resource slot {key!r} cannot be negative: {value}")
         return value
 
     @classmethod

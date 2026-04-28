@@ -33,14 +33,20 @@ fi
 # Update VERSION file
 echo $TARGET_VERSION > VERSION
 
-# Freeze NEXT_RELEASE_VERSION references to the actual version string
-echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
-python3 scripts/freeze_release_version.py "${TARGET_VERSION}"
-pants fix ::
-pants fmt ::
+# Freeze NEXT_RELEASE_VERSION references to the actual version string.
+# Skip for pre-release versions (PEP 440: rc, a, b, dev, post) so the
+# placeholder survives until the eventual stable release is cut.
+if [[ "$TARGET_VERSION" =~ (rc|a|b|dev|post)[0-9]+ ]]; then
+    echo "Skipping NEXT_RELEASE_VERSION freeze for pre-release version ${TARGET_VERSION}"
+else
+    echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
+    python3 scripts/freeze_release_version.py "${TARGET_VERSION}"
+    pants fix ::
+    pants fmt ::
+fi
 
-# Update the changelog
-LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
+# Update the changelog (--yes consumes news fragments without an interactive prompt)
+LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier --yes
 
 # Update sample config files (unmask secrets to show actual default values)
 ./backend.ai mgr config generate-sample --overwrite --unmask-secrets

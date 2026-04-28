@@ -311,6 +311,7 @@ def create_services(args: ServiceArgs) -> Services:
             runtime_variant_repository=repositories.runtime_variant.repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
+            route_controller=args.route_controller,
         ),
         model_serving_auto_scaling=AutoScalingService(
             repository=repositories.model_serving.repository,
@@ -321,6 +322,8 @@ def create_services(args: ServiceArgs) -> Services:
             config_provider=args.config_provider,
             valkey_session_client=args.valkey_session_client,
             user_resource_policy_repository=repositories.user_resource_policy.repository,
+            user_repository=repositories.user.repository,
+            group_repository=repositories.group.repository,
         ),
         login_client_type=LoginClientTypeService(
             repository=repositories.auth.login_client_type,

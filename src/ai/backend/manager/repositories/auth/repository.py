@@ -49,12 +49,8 @@ class AuthRepository:
         self,
         user_data: dict[str, Any],
         keypair_data: dict[str, Any],
-        group_name: str,
-        domain_name: str,
     ) -> UserData:
-        return await self._db_source.insert_user_with_keypair(
-            user_data, keypair_data, group_name, domain_name
-        )
+        return await self._db_source.insert_user_with_keypair(user_data, keypair_data)
 
     @auth_repository_resilience.apply()
     async def update_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:

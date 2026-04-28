@@ -40,14 +40,19 @@ from ai.backend.common.dto.manager.auth.response import (
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import UserRole, users
 
 from .conftest import AuthUserFixtureData
@@ -98,9 +103,55 @@ class _RSAKeypairData:
     private_key: str
 
 
+@dataclass
+class _SignupDefaultProjectData:
+    """Holds the test domain's ``default`` project and tracks signup-created
+    user emails so the fixture can clean them up on teardown."""
+
+    project_id: ProjectID
+    cleanup_emails: list[str]
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+async def signup_default_project(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[_SignupDefaultProjectData]:
+    """Create a project named ``default`` in the test domain so that the
+    signup flow can bind new users to it. On teardown, removes any ASE rows
+    scoped to this project, the signup-registered users / keypairs, and the
+    project itself."""
+    data = _SignupDefaultProjectData(project_id=ProjectID(uuid.uuid4()), cleanup_emails=[])
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(GroupRow.__table__).values(
+                id=data.project_id,
+                name="default",
+                description="Default project for signup binding test",
+                is_active=True,
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+    yield data
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.delete(AssociationScopesEntitiesRow).where(
+                AssociationScopesEntitiesRow.scope_id == str(data.project_id),
+            ),
+        )
+        for email in data.cleanup_emails:
+            await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
+            await conn.execute(users.delete().where(users.c.email == email))
+        await conn.execute(
+            GroupRow.__table__.delete().where(GroupRow.__table__.c.id == data.project_id),
+        )
 
 
 @pytest.fixture()
@@ -944,6 +995,47 @@ class TestSignup:
         async with db_engine.begin() as conn:
             await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
             await conn.execute(users.delete().where(users.c.email == email))
+
+    async def test_signup_binds_user_to_default_project_via_ase(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+        db_engine: SAEngine,
+        signup_default_project: _SignupDefaultProjectData,
+    ) -> None:
+        """When a project named ``default`` exists in the signup domain, the
+        signup flow must bind the new user to that project via
+        ``association_scopes_entities`` (scope_type=PROJECT, entity_type=USER).
+        """
+        unique = secrets.token_hex(4)
+        email = f"signup-bind-{unique}@test.local"
+        signup_default_project.cleanup_emails.append(email)
+
+        result = await admin_registry.auth.signup(
+            SignupRequest(
+                domain=domain_fixture,
+                email=email,
+                password=f"SignupP@ss{unique}",
+                username=f"signup-bind-{unique}",
+                full_name=f"Signup Bind User {unique}",
+            ),
+        )
+        assert isinstance(result, SignupResponse)
+
+        async with db_engine.begin() as conn:
+            user_uuid = await conn.scalar(
+                sa.select(users.c.uuid).where(users.c.email == email),
+            )
+            assert user_uuid is not None
+            ase_count = await conn.scalar(
+                sa.select(sa.func.count()).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(signup_default_project.project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+                ),
+            )
+            assert ase_count == 1
 
 
 class TestCrossDomainAccess:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
@@ -165,11 +165,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         resource_opts = self._convert_resource_opts_input(input.resource_opts)
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
-        model_def = (
-            ModelDefinition.model_validate(input.model_definition)
-            if input.model_definition
-            else None
-        )
+        model_def = input.model_definition
         strategy, strategy_spec = self._convert_strategy_input(input.deployment_strategy)
 
         creator = Creator(
@@ -451,13 +447,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_model_definition_state(
-        value: Any,
+        value: ModelDefinition | Sentinel | None,
     ) -> TriState[ModelDefinition]:
         if value is SENTINEL:
             return TriState.nop()
         if value is None:
             return TriState.nullify()
-        return TriState.update(ModelDefinition.model_validate(value))
+        return TriState.update(value)
 
     @staticmethod
     def _convert_tri_state(value: Any) -> TriState[Any]:

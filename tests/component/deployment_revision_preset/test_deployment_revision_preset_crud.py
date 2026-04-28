@@ -24,10 +24,10 @@ from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
-    ResourceOptsEntryInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
 )
+from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
@@ -78,7 +78,7 @@ class TestDeploymentRevisionPresetCRUD:
                     ResourceSlotEntryInput(resource_type="cpu", quantity="4"),
                     ResourceSlotEntryInput(resource_type="mem", quantity="8g"),
                 ],
-                resource_opts=[ResourceOptsEntryInput(name="shmem", value="1g")],
+                resource_opts=[ResourceOptsEntryDTO(name="shmem", value="1g")],
                 cluster_mode="single-node",
                 cluster_size=1,
             )

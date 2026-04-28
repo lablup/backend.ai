@@ -96,7 +96,7 @@ class TestSearchDeployments:
                 default_deployment_strategy=DeploymentStrategyInput(
                     type=DeploymentStrategy.ROLLING,
                 ),
-                desired_replica_count=1,
+                replica_count=1,
                 initial_revision=RevisionInput(
                     name="v1",
                     cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
@@ -156,7 +156,7 @@ class TestGetDeployment:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
@@ -268,7 +268,7 @@ class TestSearchRoutes:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),

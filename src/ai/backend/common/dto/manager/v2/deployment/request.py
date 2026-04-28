@@ -152,14 +152,27 @@ class ImageInput(BaseRequestModel):
 
 
 class EnvironmentVariableEntryInput(BaseRequestModel):
-    """A single environment variable entry with name and value."""
+    """A single environment variable entry with name and value.
+
+    .. deprecated::
+        Retained only for legacy deployment/session DTOs that already expose ``name``.
+        New code should use
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariableEntryInput`
+        (``key``/``value``) instead.
+    """
 
     name: str = Field(description="Environment variable name")
     value: str = Field(description="Environment variable value")
 
 
 class EnvironmentVariablesInput(BaseRequestModel):
-    """A collection of environment variable entries."""
+    """A collection of environment variable entries.
+
+    .. deprecated::
+        Retained only for legacy deployment/session DTOs.
+        New code should use
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariablesInput`.
+    """
 
     entries: list[EnvironmentVariableEntryInput] = Field(
         description="List of environment variable entries"
@@ -403,7 +416,7 @@ class CreateDeploymentInput(BaseRequestModel):
     default_deployment_strategy: DeploymentStrategyInput = Field(
         description="Deployment strategy configuration"
     )
-    desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
+    replica_count: int = Field(ge=0, description="Number of replicas")
     initial_revision: CreateRevisionInputDTO | None = Field(
         default=None,
         description="Initial revision configuration. If omitted, deployment is created without a revision and must be added later via add_revision.",
@@ -414,9 +427,7 @@ class UpdateDeploymentInput(BaseRequestModel):
     """Input for updating a deployment."""
 
     name: str | None = Field(default=None, description="Updated deployment name")
-    desired_replica_count: int | None = Field(
-        default=None, ge=0, description="Updated desired replica count"
-    )
+    replica_count: int | None = Field(default=None, ge=0, description="Updated replica count")
     tags: list[str] | Sentinel | None = Field(
         default=SENTINEL, description="Updated tags. Use SENTINEL to clear."
     )
@@ -806,7 +817,7 @@ class SearchDeploymentPoliciesInput(BaseRequestModel):
 class CreateAccessTokenInput(BaseRequestModel):
     """Input for creating an access token."""
 
-    deployment_id: UUID = Field(description="Deployment ID")
+    model_deployment_id: UUID = Field(description="Model deployment ID")
     expires_at: datetime | None = Field(default=None, description="Token expiration timestamp")
 
 

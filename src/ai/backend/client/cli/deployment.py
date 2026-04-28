@@ -58,7 +58,7 @@ def create_deployment_cmd(
         "default_deployment_strategy": {
             "type": "ROLLING"
         },
-        "desired_replica_count": 1,
+        "replica_count": 1,
         "initial_revision": {
             "name": "optional string",
             "cluster_config": {"mode": "single-node", "size": 1},
@@ -169,7 +169,7 @@ def info_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
 @pass_ctx_obj
 @click.argument("deployment_id", type=str)
 @click.option("--name", type=str, default=None, help="Update deployment name")
-@click.option("--replicas", type=int, default=None, help="Update desired replica count")
+@click.option("--replicas", type=int, default=None, help="Update replica count")
 def update_deployment_cmd(
     ctx: CLIContext,
     deployment_id: str,
@@ -185,7 +185,7 @@ def update_deployment_cmd(
 
     with Session() as session:
         try:
-            request = UpdateDeploymentRequest(name=name, desired_replicas=replicas)
+            request = UpdateDeploymentRequest(name=name, replica_count=replicas)
             result = session.Deployment.update(UUID(deployment_id), request)
             print_done(f"Deployment updated: {deployment_id}")
             print(json.dumps(result.deployment.model_dump(mode="json"), indent=2, default=str))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -17,6 +18,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionInput,
     BlueGreenConfigInput,
     ClusterConfigInput,
+    CreateAccessTokenInput,
     CreateDeploymentInput,
     CreateRevisionInputDTO,
     DeleteDeploymentInput,
@@ -306,7 +308,7 @@ class TestCreateDeploymentInput:
             "default_deployment_strategy": DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            "desired_replica_count": 2,
+            "replica_count": 2,
             "initial_revision": _make_create_revision_input_dto(),
         }
         defaults.update(kwargs)
@@ -320,7 +322,7 @@ class TestCreateDeploymentInput:
         assert inp.metadata.project_id == project_id
         assert inp.metadata.domain_name == "default"
         assert inp.default_deployment_strategy.type == DeploymentStrategy.ROLLING
-        assert inp.desired_replica_count == 2
+        assert inp.replica_count == 2
 
     def test_default_open_to_public_is_false(self) -> None:
         inp = self._make_input()
@@ -352,13 +354,13 @@ class TestCreateDeploymentInput:
                 metadata=self._make_metadata(name=""),
             )
 
-    def test_desired_replica_count_zero_is_valid(self) -> None:
-        inp = self._make_input(desired_replica_count=0)
-        assert inp.desired_replica_count == 0
+    def test_replica_count_zero_is_valid(self) -> None:
+        inp = self._make_input(replica_count=0)
+        assert inp.replica_count == 0
 
     def test_negative_replica_count_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            self._make_input(desired_replica_count=-1)
+            self._make_input(replica_count=-1)
 
     def test_blue_green_strategy(self) -> None:
         inp = self._make_input(
@@ -405,7 +407,7 @@ class TestCreateDeploymentInput:
             CreateDeploymentInput.model_validate({
                 "network_access": {},
                 "default_deployment_strategy": {"type": "ROLLING"},
-                "desired_replica_count": 1,
+                "replica_count": 1,
             })
 
 
@@ -413,9 +415,9 @@ class TestUpdateDeploymentInput:
     """Tests for UpdateDeploymentInput model creation and validation."""
 
     def test_all_none_fields_is_valid(self) -> None:
-        inp = UpdateDeploymentInput(name=None, desired_replica_count=None, tags=None)
+        inp = UpdateDeploymentInput(name=None, replica_count=None, tags=None)
         assert inp.name is None
-        assert inp.desired_replica_count is None
+        assert inp.replica_count is None
         assert inp.tags is None
 
     def test_default_tags_is_sentinel(self) -> None:
@@ -448,18 +450,18 @@ class TestUpdateDeploymentInput:
         with pytest.raises(ValidationError):
             UpdateDeploymentInput(name="")
 
-    def test_desired_replicas_zero_is_valid(self) -> None:
-        inp = UpdateDeploymentInput(desired_replica_count=0)
-        assert inp.desired_replica_count == 0
+    def test_replica_count_zero_is_valid_for_update(self) -> None:
+        inp = UpdateDeploymentInput(replica_count=0)
+        assert inp.replica_count == 0
 
     def test_negative_replicas_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            UpdateDeploymentInput(desired_replica_count=-1)
+            UpdateDeploymentInput(replica_count=-1)
 
     def test_partial_update_name_only(self) -> None:
         inp = UpdateDeploymentInput(name="updated-name")
         assert inp.name == "updated-name"
-        assert inp.desired_replica_count is None
+        assert inp.replica_count is None
 
 
 class TestDeleteDeploymentInput:
@@ -560,3 +562,58 @@ class TestAddRevisionInput:
         restored = AddRevisionInput.model_validate_json(json_str)
         assert restored.deployment_id == deployment_id
         assert restored.revision.cluster_mode == ClusterMode.SINGLE_NODE
+
+
+class TestCreateAccessTokenInput:
+    """Regression tests for CreateAccessTokenInput (BA-5854).
+
+    Verifies that the DTO uses model_deployment_id (matching the GQL/supergraph
+    schema) rather than the old deployment_id field name.
+    """
+
+    def test_valid_creation_with_model_deployment_id(self) -> None:
+        deployment_id = uuid.uuid4()
+        inp = CreateAccessTokenInput(model_deployment_id=deployment_id)
+        assert inp.model_deployment_id == deployment_id
+
+    def test_expires_at_defaults_to_none(self) -> None:
+        inp = CreateAccessTokenInput(model_deployment_id=uuid.uuid4())
+        assert inp.expires_at is None
+
+    def test_valid_creation_with_expires_at(self) -> None:
+        deployment_id = uuid.uuid4()
+        expires = datetime(2026, 12, 31, 23, 59, 59, tzinfo=UTC)
+        inp = CreateAccessTokenInput(model_deployment_id=deployment_id, expires_at=expires)
+        assert inp.model_deployment_id == deployment_id
+        assert inp.expires_at == expires
+
+    def test_model_validate_with_model_deployment_id_succeeds(self) -> None:
+        deployment_id = uuid.uuid4()
+        expires = datetime(2027, 1, 1, tzinfo=UTC)
+        inp = CreateAccessTokenInput.model_validate({
+            "model_deployment_id": str(deployment_id),
+            "expires_at": expires.isoformat(),
+        })
+        assert inp.model_deployment_id == deployment_id
+        assert inp.expires_at == expires
+
+    def test_model_validate_with_expires_at_none(self) -> None:
+        deployment_id = uuid.uuid4()
+        inp = CreateAccessTokenInput.model_validate({
+            "model_deployment_id": str(deployment_id),
+            "expires_at": None,
+        })
+        assert inp.model_deployment_id == deployment_id
+        assert inp.expires_at is None
+
+    def test_missing_model_deployment_id_raises_validation_error(self) -> None:
+        with pytest.raises(ValidationError):
+            CreateAccessTokenInput.model_validate({"expires_at": None})
+
+    def test_uuid_string_is_coerced_to_uuid(self) -> None:
+        deployment_id = uuid.uuid4()
+        inp = CreateAccessTokenInput.model_validate({
+            "model_deployment_id": str(deployment_id),
+        })
+        assert isinstance(inp.model_deployment_id, uuid.UUID)
+        assert inp.model_deployment_id == deployment_id

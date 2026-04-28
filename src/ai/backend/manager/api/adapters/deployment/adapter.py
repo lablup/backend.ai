@@ -554,7 +554,7 @@ class DeploymentAdapter(BaseAdapter):
                 revision_history_limit=10,
                 tag=",".join(meta.tags) if meta.tags else None,
             ),
-            replica_spec=ReplicaSpec(replica_count=input.desired_replica_count),
+            replica_spec=ReplicaSpec(replica_count=input.replica_count),
             network=DeploymentNetworkSpec(
                 open_to_public=input.network_access.open_to_public,
                 preferred_domain_name=input.network_access.preferred_domain_name,
@@ -821,9 +821,9 @@ class DeploymentAdapter(BaseAdapter):
                 tag=TriState[str].from_graphql(tag_str),
             )
         replica_spec: ReplicaSpecUpdaterSpec | None = None
-        if input.desired_replica_count is not None:
+        if input.replica_count is not None:
             replica_spec = ReplicaSpecUpdaterSpec(
-                desired_replica_count=OptionalState.update(input.desired_replica_count),
+                replica_count=OptionalState.update(input.replica_count),
             )
         network_spec: DeploymentNetworkSpecUpdaterSpec | None = None
         if input.open_to_public is not None:
@@ -941,7 +941,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> CreateAccessTokenPayload:
         """Create a new access token for a deployment."""
         creator = ModelDeploymentAccessTokenCreator(
-            model_deployment_id=input.deployment_id,
+            model_deployment_id=input.model_deployment_id,
             expires_at=input.expires_at,
         )
         action_result = await self._processors.deployment.create_access_token.wait_for_complete(

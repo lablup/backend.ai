@@ -83,6 +83,28 @@ def mock_service_discovery() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_event_producer() -> AsyncMock:
+    """Mock EventProducer."""
+    producer = AsyncMock()
+    producer.anycast_event = AsyncMock(return_value=None)
+    return producer
+
+
+@pytest.fixture
+def mock_appproxy_client_pool() -> MagicMock:
+    """Mock AppProxyClientPool that hands out a single AsyncMock client.
+
+    Tests can introspect ``pool.load_client.return_value.bulk_update_routes``
+    to assert how many calls Manager made and what the payload looked like.
+    """
+    pool = MagicMock()
+    client = AsyncMock()
+    client.bulk_update_routes = AsyncMock()
+    pool.load_client = MagicMock(return_value=client)
+    return pool
+
+
+@pytest.fixture
 def route_executor(
     mock_deployment_repo: AsyncMock,
     mock_scheduling_controller: AsyncMock,
@@ -90,6 +112,8 @@ def route_executor(
     mock_client_pool: MagicMock,
     mock_valkey_schedule: AsyncMock,
     mock_service_discovery: AsyncMock,
+    mock_event_producer: AsyncMock,
+    mock_appproxy_client_pool: MagicMock,
 ) -> RouteExecutor:
     """Create RouteExecutor with mocked dependencies."""
     return RouteExecutor(
@@ -99,6 +123,8 @@ def route_executor(
         client_pool=mock_client_pool,
         valkey_schedule=mock_valkey_schedule,
         service_discovery=mock_service_discovery,
+        event_producer=mock_event_producer,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
 
 
@@ -157,6 +183,7 @@ def _create_route_data(
     session_id: SessionId | None = None,
     status: RouteStatus = RouteStatus.PROVISIONING,
     health_status: RouteHealthStatus = RouteHealthStatus.NOT_CHECKED,
+    revision_id: DeploymentRevisionID | None = None,
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
@@ -167,7 +194,7 @@ def _create_route_data(
         health_status=health_status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
-        revision_id=DeploymentRevisionID(uuid4()),
+        revision_id=revision_id or DeploymentRevisionID(uuid4()),
     )
 
 

@@ -124,6 +124,12 @@ class TestSearchServices:
         return mock
 
     @pytest.fixture
+    def mock_route_controller(self) -> MagicMock:
+        mock = MagicMock()
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
     def mock_runtime_variant_repository(self) -> MagicMock:
         return MagicMock(spec=RuntimeVariantRepository)
 
@@ -142,6 +148,7 @@ class TestSearchServices:
         mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
+        mock_route_controller: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -156,6 +163,7 @@ class TestSearchServices:
             runtime_variant_repository=mock_runtime_variant_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            route_controller=mock_route_controller,
         )
 
     @pytest.fixture

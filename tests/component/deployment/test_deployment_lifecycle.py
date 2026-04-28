@@ -64,7 +64,7 @@ class TestCreateDeployment:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 name="rev-1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
@@ -105,7 +105,7 @@ class TestCreateDeployment:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
@@ -139,7 +139,7 @@ class TestUpdateDeployment:
         with pytest.raises(NotFoundError):
             await admin_registry.deployment.update_deployment(
                 _RANDOM_DEPLOYMENT_ID,
-                UpdateDeploymentRequest(desired_replicas=5),
+                UpdateDeploymentRequest(replica_count=5),
             )
 
     async def test_update_deployment_name_nonexistent(
@@ -161,7 +161,7 @@ class TestUpdateDeployment:
         scaling_group_fixture: str,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
-        """Updating deployment config (name, desired_replicas) succeeds."""
+        """Updating deployment config (name, replica_count) succeeds."""
         image_id, vfolder_id = deployment_seed_data
         # Create deployment
         request = CreateDeploymentRequest(
@@ -174,7 +174,7 @@ class TestUpdateDeployment:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
@@ -199,7 +199,7 @@ class TestUpdateDeployment:
         new_name = f"updated-deployment-{secrets.token_hex(4)}"
         await admin_registry.deployment.update_deployment(
             deployment.id,
-            UpdateDeploymentRequest(name=new_name, desired_replicas=3),
+            UpdateDeploymentRequest(name=new_name, replica_count=3),
         )
 
         # Verify update
@@ -245,7 +245,7 @@ class TestDestroyDeployment:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
@@ -329,7 +329,7 @@ class TestRevisionManagement:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=0,
+            replica_count=0,
             initial_revision=revision_input,
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -375,7 +375,7 @@ class TestRevisionManagement:
 
 
 class TestReplicaManagement:
-    async def test_change_desired_replicas(
+    async def test_change_replica_count(
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
@@ -383,7 +383,7 @@ class TestReplicaManagement:
         scaling_group_fixture: str,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
-        """Changing desired_replicas updates the replica count."""
+        """Changing replica_count updates the replica count."""
         image_id, vfolder_id = deployment_seed_data
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
@@ -395,7 +395,7 @@ class TestReplicaManagement:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
@@ -419,7 +419,7 @@ class TestReplicaManagement:
         # Scale to 5 replicas
         await admin_registry.deployment.update_deployment(
             deployment.id,
-            UpdateDeploymentRequest(desired_replicas=5),
+            UpdateDeploymentRequest(replica_count=5),
         )
 
         # Verify replica count updated

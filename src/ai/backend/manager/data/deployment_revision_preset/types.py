@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
@@ -42,7 +43,7 @@ class DeploymentRevisionPresetData:
     description: str | None
     rank: int
     image_id: ImageID
-    model_definition: dict[str, Any] | None
+    model_definition: ModelDefinition | None
     resource_opts: list[ResourceOptsEntryData]
     cluster_mode: str
     cluster_size: int
