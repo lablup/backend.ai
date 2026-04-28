@@ -45,6 +45,7 @@ from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -168,7 +169,7 @@ class ModelServingRepository:
         Returns None if endpoint doesn't exist or user doesn't own it.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            endpoint = await self._get_endpoint_by_name(session, name, user_id)
+            endpoint = await self._get_endpoint_by_name(session, name, user_id, load_revisions=True)
             if not endpoint:
                 return None
             return endpoint.to_data()
@@ -191,6 +192,11 @@ class ModelServingRepository:
                 sa.select(EndpointRow)
                 .where(query_conds)
                 .options(selectinload(EndpointRow.routings))
+                .options(
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    )
+                )
             )
             result = await session.execute(query)
             rows = cast(list[EndpointRow], result.scalars().all())
@@ -347,7 +353,11 @@ class ModelServingRepository:
             await session.execute(query)
 
             endpoint = await self._get_endpoint_by_id(
-                session, service_id, load_routes=True, load_session_owner=True
+                session,
+                service_id,
+                load_routes=True,
+                load_session_owner=True,
+                load_revisions=True,
             )
             if endpoint is None:
                 raise NoResultFound
@@ -453,7 +463,11 @@ class ModelServingRepository:
             return None
 
     async def _get_endpoint_by_name(
-        self, session: SASession, name: str, user_id: uuid.UUID
+        self,
+        session: SASession,
+        name: str,
+        user_id: uuid.UUID,
+        load_revisions: bool = False,
     ) -> EndpointRow | None:
         """
         Private method to get endpoint by name and owner using an existing session.
@@ -461,6 +475,10 @@ class ModelServingRepository:
         query = sa.select(EndpointRow).where(
             (EndpointRow.name == name) & (EndpointRow.session_owner == user_id)
         )
+        if load_revisions:
+            query = query.options(
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+            )
         result = await session.execute(query)
 
         return result.scalar()
