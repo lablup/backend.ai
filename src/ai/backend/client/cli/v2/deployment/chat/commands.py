@@ -14,8 +14,6 @@ from ai.backend.cli.params import JSONParamType
 from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
-    IncompatibleChatCacheError,
-    IncompatibleChatConfigError,
 )
 from ai.backend.client.cli.v2.deployment.chat.utils import (
     load_chat_cache,
@@ -136,11 +134,8 @@ def chat(
 
     connection = load_v2_config()
 
-    try:
-        cache = load_chat_cache()
-        chat_config_store = load_chat_config()
-    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
-        raise click.ClickException(str(e)) from e
+    cache = load_chat_cache()
+    chat_config_store = load_chat_config()
 
     if not isinstance(params, dict):
         raise click.ClickException("--params must be a JSON object.")
@@ -231,11 +226,8 @@ def set_(
         raise click.ClickException("Nothing to set: provide --token and/or --default-model.")
 
     connection = load_v2_config()
-    try:
-        cache = load_chat_cache()
-        chat_config_store = load_chat_config()
-    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
-        raise click.ClickException(str(e)) from e
+    cache = load_chat_cache()
+    chat_config_store = load_chat_config()
 
     resolved_key = api_key if api_key is not None else chat_config_store.get_token(deployment_id)
 
@@ -262,11 +254,8 @@ def set_(
 @click.argument("deployment_id", type=click.UUID, required=False)
 def show(deployment_id: UUID | None) -> None:
     """Print one or all chat cache entries (API keys are masked)."""
-    try:
-        cache = load_chat_cache()
-        chat_config_store = load_chat_config()
-    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
-        raise click.ClickException(str(e)) from e
+    cache = load_chat_cache()
+    chat_config_store = load_chat_config()
 
     if deployment_id is not None:
         entry = cache.get(deployment_id)
@@ -289,11 +278,8 @@ def show(deployment_id: UUID | None) -> None:
 @click.argument("deployment_id", type=click.UUID)
 def clear(deployment_id: UUID) -> None:
     """Remove the chat cache entry and stored token for a deployment."""
-    try:
-        cache = load_chat_cache()
-        chat_config_store = load_chat_config()
-    except (IncompatibleChatCacheError, IncompatibleChatConfigError) as e:
-        raise click.ClickException(str(e)) from e
+    cache = load_chat_cache()
+    chat_config_store = load_chat_config()
 
     removed_entry = cache.remove(deployment_id)
     removed_token = chat_config_store.clear_token(deployment_id)

@@ -13,12 +13,8 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
-    IncompatibleChatCacheError,
-    IncompatibleChatConfigError,
 )
 from ai.backend.client.cli.v2.deployment.chat.utils import (
-    CHAT_CACHE_SCHEMA_VERSION,
-    CHAT_CONFIG_SCHEMA_VERSION,
     load_chat_cache,
     load_chat_config,
     mask_token,
@@ -44,7 +40,7 @@ class TestCacheLoadSaveRoundTrip:
         cache = load_chat_cache(tmp_path / "missing.json")
         assert cache.deployments == {}
 
-    def test_save_then_load_preserves_make_entry(self, tmp_path: Path) -> None:
+    def test_save_then_load_preserves_entry(self, tmp_path: Path) -> None:
         path = tmp_path / "deployment_chat.json"
         cache = DeploymentChatCache()
         dep_id = uuid4()
@@ -57,14 +53,6 @@ class TestCacheLoadSaveRoundTrip:
         assert restored.endpoint_url == original.endpoint_url
         assert restored.default_model == original.default_model
         assert restored.last_synced_at == original.last_synced_at
-
-    def test_save_writes_schema_version(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        save_chat_cache(DeploymentChatCache(), path)
-        with path.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-        assert payload["schema_version"] == CHAT_CACHE_SCHEMA_VERSION
-        assert payload["deployments"] == {}
 
 
 class TestConfigLoadSaveRoundTrip:
@@ -81,14 +69,6 @@ class TestConfigLoadSaveRoundTrip:
 
         loaded = load_chat_config(path)
         assert loaded.get_token(dep_id) == "sk-secret-token-1234"
-
-    def test_save_writes_schema_version(self, tmp_path: Path) -> None:
-        path = tmp_path / "config.json"
-        save_chat_config(DeploymentChatConfig(), path)
-        with path.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-        assert payload["schema_version"] == CHAT_CONFIG_SCHEMA_VERSION
-        assert payload["tokens"] == {}
 
 
 class TestPermissions:
@@ -109,32 +89,6 @@ class TestPermissions:
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
 
-class TestSchemaVersionGuard:
-    def test_load_chat_cache_rejects_newer_schema(self, tmp_path: Path) -> None:
-        path = tmp_path / "cache.json"
-        path.write_text(
-            json.dumps({
-                "schema_version": CHAT_CACHE_SCHEMA_VERSION + 1,
-                "deployments": {},
-            }),
-            encoding="utf-8",
-        )
-        with pytest.raises(IncompatibleChatCacheError):
-            load_chat_cache(path)
-
-    def test_load_chat_config_rejects_newer_schema(self, tmp_path: Path) -> None:
-        path = tmp_path / "config.json"
-        path.write_text(
-            json.dumps({
-                "schema_version": CHAT_CONFIG_SCHEMA_VERSION + 1,
-                "tokens": {},
-            }),
-            encoding="utf-8",
-        )
-        with pytest.raises(IncompatibleChatConfigError):
-            load_chat_config(path)
-
-
 class TestCacheLoaderResilience:
     def test_load_returns_empty_on_corrupt_json(self, tmp_path: Path) -> None:
         path = tmp_path / "cache.json"
@@ -151,7 +105,6 @@ class TestCacheLoaderResilience:
         good_id = UUID("12345678-1234-5678-1234-567812345678")
         path.write_text(
             json.dumps({
-                "schema_version": CHAT_CACHE_SCHEMA_VERSION,
                 "deployments": {
                     "not-a-uuid": {
                         "endpoint_url": "https://x.example",
@@ -176,7 +129,6 @@ class TestCacheLoaderResilience:
         bad_id = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         path.write_text(
             json.dumps({
-                "schema_version": CHAT_CACHE_SCHEMA_VERSION,
                 "deployments": {
                     str(bad_id): {"default_model": "m"},
                     str(good_id): {
@@ -203,7 +155,6 @@ class TestConfigLoaderResilience:
         good_id = UUID("12345678-1234-5678-1234-567812345678")
         path.write_text(
             json.dumps({
-                "schema_version": CHAT_CONFIG_SCHEMA_VERSION,
                 "tokens": {
                     "not-a-uuid": "sk-x",
                     str(good_id): "sk-y",

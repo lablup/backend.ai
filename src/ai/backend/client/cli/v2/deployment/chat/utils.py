@@ -25,15 +25,11 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
-    IncompatibleChatCacheError,
-    IncompatibleChatConfigError,
 )
 from ai.backend.client.cli.v2.helpers import CONFIG_DIR
 
 CHAT_CACHE_FILE = CONFIG_DIR / "deployment_chat.json"
 CHAT_CONFIG_FILE = CONFIG_DIR / "deployment_chat_config.json"
-CHAT_CACHE_SCHEMA_VERSION = 1
-CHAT_CONFIG_SCHEMA_VERSION = 1
 
 
 def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
@@ -41,9 +37,6 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
     raw = _read_json(path)
     if raw is None:
         return DeploymentChatCache()
-    _check_schema(
-        raw, CHAT_CACHE_SCHEMA_VERSION, IncompatibleChatCacheError, "deployment_chat.json"
-    )
     deployments: dict[UUID, DeploymentChatCacheEntry] = {}
     deployments_raw = raw.get("deployments") or {}
     if isinstance(deployments_raw, dict):
@@ -63,8 +56,7 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
 
 def save_chat_cache(cache: DeploymentChatCache, path: Path = CHAT_CACHE_FILE) -> None:
     """Atomically write the chat cache."""
-    body = {"schema_version": CHAT_CACHE_SCHEMA_VERSION, **cache.model_dump(mode="json")}
-    _atomic_write(path, json.dumps(body, indent=2, ensure_ascii=False))
+    _atomic_write(path, cache.model_dump_json(indent=2))
 
 
 def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
@@ -72,12 +64,6 @@ def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
     raw = _read_json(path)
     if raw is None:
         return DeploymentChatConfig()
-    _check_schema(
-        raw,
-        CHAT_CONFIG_SCHEMA_VERSION,
-        IncompatibleChatConfigError,
-        "deployment_chat_config.json",
-    )
     tokens: dict[UUID, str] = {}
     tokens_raw = raw.get("tokens") or {}
     if isinstance(tokens_raw, dict):
@@ -93,8 +79,7 @@ def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
 
 def save_chat_config(config: DeploymentChatConfig, path: Path = CHAT_CONFIG_FILE) -> None:
     """Atomically write the chat config and enforce ``0600`` permissions."""
-    body = {"schema_version": CHAT_CONFIG_SCHEMA_VERSION, **config.model_dump(mode="json")}
-    _atomic_write(path, json.dumps(body, indent=2, ensure_ascii=False))
+    _atomic_write(path, config.model_dump_json(indent=2))
 
 
 def mask_token(token: str | None) -> str:
@@ -115,20 +100,6 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError):
         return None
     return raw if isinstance(raw, dict) else None
-
-
-def _check_schema(
-    raw: dict[str, Any],
-    supported_version: int,
-    error_cls: type[Exception],
-    filename: str,
-) -> None:
-    schema = raw.get("schema_version")
-    if schema is not None and isinstance(schema, int) and schema > supported_version:
-        raise error_cls(
-            f"{filename} schema version {schema} is newer than supported "
-            f"{supported_version}; please upgrade the client."
-        )
 
 
 def _atomic_write(path: Path, payload: str) -> None:
