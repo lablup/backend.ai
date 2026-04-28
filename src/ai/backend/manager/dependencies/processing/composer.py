@@ -61,6 +61,7 @@ from ai.backend.manager.services.processors import Processors, ServiceArgs
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
@@ -116,6 +117,7 @@ class ProcessingInput:
     error_monitor: ErrorPluginContext
     hook_plugin_ctx: HookPluginContext
     deployment_controller: DeploymentController
+    route_controller: RouteController
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
@@ -240,6 +242,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             hook_plugin_ctx=setup_input.hook_plugin_ctx,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
+            route_controller=setup_input.route_controller,
             event_producer=setup_input.event_producer,
             agent_cache=setup_input.agent_cache,
             notification_center=setup_input.notification_center,

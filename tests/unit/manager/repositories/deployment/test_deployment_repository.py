@@ -61,7 +61,7 @@ from ai.backend.manager.models.deployment_policy import (
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -2026,7 +2026,7 @@ class TestDeploymentRevisionOperations:
     ) -> None:
         """Test that update_endpoint returns DeploymentInfo with updated values."""
         new_name = "updated-deployment-name"
-        new_desired_replica_count = 5
+        new_replica_count = 5
 
         updater = Updater(
             spec=DeploymentUpdaterSpec(
@@ -2034,7 +2034,7 @@ class TestDeploymentRevisionOperations:
                     name=OptionalState.update(new_name),
                 ),
                 replica_spec=ReplicaSpecUpdaterSpec(
-                    desired_replica_count=OptionalState.update(new_desired_replica_count),
+                    replica_count=OptionalState.update(new_replica_count),
                 ),
                 revision_state=RevisionStateUpdaterSpec(
                     current_revision=TriState.update(test_revision_data.id),
@@ -2047,7 +2047,7 @@ class TestDeploymentRevisionOperations:
         # Verify returned DeploymentInfo contains updated values
         assert deployment_info.id == test_endpoint_id
         assert deployment_info.metadata.name == new_name
-        assert deployment_info.replica_spec.desired_replica_count == new_desired_replica_count
+        assert deployment_info.replica_spec.replica_count == new_replica_count
         assert deployment_info.current_revision_id == test_revision_data.id
 
         # Verify database state matches returned values
@@ -2056,7 +2056,7 @@ class TestDeploymentRevisionOperations:
             result = await db_sess.execute(query)
             endpoint = result.scalar_one()
             assert endpoint.name == new_name
-            assert endpoint.desired_replicas == new_desired_replica_count
+            assert endpoint.replicas == new_replica_count
             assert endpoint.current_revision == test_revision_data.id
 
 
@@ -3548,6 +3548,7 @@ class TestDeploymentRepositoryDuplicateName:
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
+                EndpointTokenRow,
                 RuntimeVariantRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
@@ -3957,3 +3958,178 @@ class TestDeploymentRepositoryDuplicateName:
                 )
             ).scalar_one()
             assert target_stage == EndpointLifecycle.DESTROYING
+
+    async def test_set_deploying_revision_overrides_in_flight(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """``set_deploying_revision`` overwrites a non-NULL deploying_revision.
+
+        A previous rollout's ``deploying_revision`` no longer guards
+        against re-activation; orphan routes from the preempted rollout
+        are cleaned up by ``RouteEvictionHandler``'s orphan branch.
+        """
+        endpoint_id = uuid.uuid4()
+        previous_deploying = uuid.uuid4()
+        new_deploying = uuid.uuid4()
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                EndpointRow(
+                    id=endpoint_id,
+                    name=f"override-{uuid.uuid4().hex[:8]}",
+                    created_user=user_id,
+                    session_owner=user_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    resource_group=test_scaling_group.name,
+                    replicas=1,
+                    desired_replicas=1,
+                    url=None,
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                    deploying_revision=previous_deploying,
+                )
+            )
+            await db_sess.commit()
+
+        previous_current, updated = await deployment_repository.set_deploying_revision(
+            endpoint_id, new_deploying
+        )
+
+        assert updated is True
+        assert previous_current is None  # current_revision was not set on this fixture
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(EndpointRow.deploying_revision, EndpointRow.lifecycle_stage).where(
+                        EndpointRow.id == endpoint_id
+                    )
+                )
+            ).one()
+            assert row.deploying_revision == new_deploying
+            assert row.lifecycle_stage == EndpointLifecycle.DEPLOYING
+
+    async def test_set_deploying_revision_returns_false_for_missing_endpoint(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """``set_deploying_revision`` returns updated=False when the endpoint id
+        does not match any row, instead of raising."""
+        previous_current, updated = await deployment_repository.set_deploying_revision(
+            uuid.uuid4(), uuid.uuid4()
+        )
+        assert updated is False
+        assert previous_current is None
+
+    async def test_destroy_endpoint_deletes_associated_tokens(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """Destroying an endpoint also wipes its access tokens in the same
+        transaction so the destroyed endpoint cannot be re-authenticated.
+        Tokens for unrelated endpoints are left untouched."""
+        endpoint_id = DeploymentID(uuid.uuid4())
+        sibling_id = DeploymentID(uuid.uuid4())
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add_all([
+                EndpointRow(
+                    id=endpoint_id,
+                    name=f"with-tokens-{uuid.uuid4().hex[:8]}",
+                    created_user=user_id,
+                    session_owner=user_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    resource_group=test_scaling_group.name,
+                    replicas=1,
+                    desired_replicas=1,
+                    url=None,
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.CREATED,
+                ),
+                EndpointRow(
+                    id=sibling_id,
+                    name=f"sibling-{uuid.uuid4().hex[:8]}",
+                    created_user=user_id,
+                    session_owner=user_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    resource_group=test_scaling_group.name,
+                    replicas=1,
+                    desired_replicas=1,
+                    url=None,
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.CREATED,
+                ),
+            ])
+            target_token_ids = [uuid.uuid4(), uuid.uuid4()]
+            sibling_token_id = uuid.uuid4()
+            db_sess.add_all([
+                EndpointTokenRow(
+                    id=target_token_ids[0],
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=endpoint_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+                EndpointTokenRow(
+                    id=target_token_ids[1],
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=endpoint_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+                EndpointTokenRow(
+                    id=sibling_token_id,
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=sibling_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+            ])
+            await db_sess.commit()
+
+        succeeded = await deployment_repository.destroy_endpoint(endpoint_id)
+        assert succeeded is True
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            remaining_target_tokens = (
+                (
+                    await db_sess.execute(
+                        sa.select(EndpointTokenRow.id).where(
+                            EndpointTokenRow.endpoint == endpoint_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert remaining_target_tokens == []
+
+            remaining_sibling_tokens = (
+                (
+                    await db_sess.execute(
+                        sa.select(EndpointTokenRow.id).where(
+                            EndpointTokenRow.endpoint == sibling_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert set(remaining_sibling_tokens) == {sibling_token_id}

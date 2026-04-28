@@ -67,6 +67,7 @@ def model_serving_processors(
         runtime_variant_repository=AsyncMock(),
         deployment_controller=AsyncMock(),
         scheduling_controller=AsyncMock(),
+        route_controller=AsyncMock(),
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return ModelServingProcessors(

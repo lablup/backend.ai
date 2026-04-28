@@ -168,6 +168,8 @@ from ai.backend.manager.services.model_serving.exceptions import (
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import MountOptionModel, UserScope
@@ -189,6 +191,7 @@ class ModelServingService:
     _valkey_live: ValkeyLiveClient
     _deployment_controller: DeploymentController
     _scheduling_controller: SchedulingController
+    _route_controller: RouteController
 
     def __init__(
         self,
@@ -204,6 +207,7 @@ class ModelServingService:
         runtime_variant_repository: RuntimeVariantRepository,
         deployment_controller: DeploymentController,
         scheduling_controller: SchedulingController,
+        route_controller: RouteController,
     ) -> None:
         self._agent_registry = agent_registry
         self._background_task_manager = background_task_manager
@@ -217,6 +221,7 @@ class ModelServingService:
         self._runtime_variant_repository = runtime_variant_repository
         self._deployment_controller = deployment_controller
         self._scheduling_controller = scheduling_controller
+        self._route_controller = route_controller
         # Map SessionStatus to legacy event names for backward compatibility
         self._status_to_event_name: dict[SessionStatus, str] = {
             SessionStatus.PENDING: "session_enqueued",
@@ -821,9 +826,10 @@ class ModelServingService:
         if not updated_endpoint_data:
             raise ModelServiceNotFound
 
-        await self._agent_registry.notify_endpoint_route_update_to_appproxy(
-            updated_endpoint_data.id
-        )
+        # AppProxy push happens out-of-band: hint the route coordinator
+        # to resync at its next short cycle instead of issuing a
+        # synchronous call from the API path.
+        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.APPPROXY_SYNC)
 
         return UpdateRouteActionResult(route_id=action.route_id)
 
@@ -948,7 +954,7 @@ class ModelServingService:
         if not validate_endpoint_access(validation_data):
             raise EndpointAccessForbiddenError
 
-        await self._agent_registry.notify_endpoint_route_update_to_appproxy(action.service_id)
+        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.APPPROXY_SYNC)
 
         return ForceSyncActionResult(success=True)
 

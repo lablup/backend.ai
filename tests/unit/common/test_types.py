@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 from typeguard import TypeCheckError
 
+from ai.backend.common.exception import InvalidResourceSlotQuantity
 from ai.backend.common.types import (
     BinarySize,
     DefaultForUnspecified,
@@ -312,6 +313,28 @@ def test_resource_slot_parsing_typeless_user_input_serialize_again_2() -> None:
                 SlotName("mem"): SlotTypes("bytes"),
                 # missing "shmem": should raise an unknown slot error
             },
+        )
+
+
+def test_resource_slot_rejects_negative_count() -> None:
+    with pytest.raises(InvalidResourceSlotQuantity, match="cannot be negative"):
+        ResourceSlot.from_user_input({"cpu": "-1"}, None)
+    with pytest.raises(InvalidResourceSlotQuantity, match="cannot be negative"):
+        ResourceSlot.from_user_input({"cpu": -1}, None)
+
+
+def test_resource_slot_rejects_negative_bytes() -> None:
+    with pytest.raises(InvalidResourceSlotQuantity, match="cannot be negative"):
+        ResourceSlot.from_user_input({"mem": Decimal(-1)}, None)
+    with pytest.raises(InvalidResourceSlotQuantity, match="cannot be negative"):
+        ResourceSlot.from_user_input({"mem": -1}, None)
+
+
+def test_resource_slot_rejects_negative_with_typed_slots() -> None:
+    with pytest.raises(InvalidResourceSlotQuantity, match="cannot be negative"):
+        ResourceSlot.from_user_input(
+            {"cpu": "-2"},
+            {SlotName("cpu"): SlotTypes("count")},
         )
 
 

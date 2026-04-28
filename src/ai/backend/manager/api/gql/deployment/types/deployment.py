@@ -737,7 +737,7 @@ class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
     default_deployment_strategy: DeploymentStrategyInputGQL
-    desired_replica_count: int
+    replica_count: int
     initial_revision: CreateRevisionInput | None = None
 
 
@@ -750,7 +750,7 @@ class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     tags: list[str] | None = UNSET
     default_deployment_strategy: DeploymentStrategyInputGQL | None = UNSET
     active_revision_id: ID | None = UNSET
-    desired_replica_count: int | None = UNSET
+    replica_count: int | None = UNSET
     name: str | None = UNSET
     preferred_domain_name: str | None = UNSET
 

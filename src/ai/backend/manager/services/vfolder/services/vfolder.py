@@ -1441,13 +1441,6 @@ class VFolderService:
             await _check_vfolder_status(row["status"], action.required_status)
         return GetAccessibleVFolderActionResult(row=row)
 
-    async def _load_user(self, user_uuid: uuid.UUID) -> tuple[str, UserRole]:
-        """Load user and return ``(email, role)``. Raises if the record is incomplete."""
-        user = await self._user_repository.get_user_by_uuid(user_uuid)
-        if user.role is None or user.domain_name is None:
-            raise ObjectNotFound(object_name="User")
-        return user.email, user.role
-
     def _check_user_role_for_group(
         self, user_role: UserRole, group_type: ProjectType | None
     ) -> None:
@@ -1557,7 +1550,11 @@ class VFolderService:
         domain_name = action.domain_name
         project_id = action.project_id
 
-        email, user_role = await self._load_user(user_uuid)
+        user_with_hosts = await self._vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(
+            user_uuid
+        )
+        email = user_with_hosts.email
+        user_role = user_with_hosts.role
         folder_host = await self._resolve_host(action.host)
         self._check_name_parameter(action.name, is_group=project_id is not None)
 
@@ -1698,7 +1695,12 @@ class VFolderService:
         domain_name = action.domain_name
         project_id = action.project_id
 
-        email, user_role = await self._load_user(user_uuid)
+        user_with_hosts = await self._vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(
+            user_uuid
+        )
+        email = user_with_hosts.email
+        user_role = user_with_hosts.role
+        allowed_vfolder_hosts = user_with_hosts.allowed_vfolder_hosts
         folder_host = await self._resolve_host(action.host)
         self._check_name_parameter(action.name, is_group=True)
 
@@ -1712,11 +1714,14 @@ class VFolderService:
         allowed_types = await self._check_ownership_allowed("group")
         self._check_model_store_usage_mode(group_type, action.usage_mode)
 
-        # Host permission check
-        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+        # Host permission check — merges domain, group, and keypair policy
+        await self._vfolder_repository.ensure_host_permission_allowed(
             folder_host,
             permission=VFolderHostPermission.CREATE,
+            allowed_vfolder_types=allowed_types,
             user_uuid=user_uuid,
+            resource_policy={"allowed_vfolder_hosts": allowed_vfolder_hosts},
+            domain_name=domain_name,
             group_id=group_uuid,
         )
 

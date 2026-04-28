@@ -5,7 +5,7 @@ import itertools
 import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Sequence
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from typing import (
@@ -82,6 +82,21 @@ class CoordinatorMetricRegistry:
 
 class DistributedLockFactory(Protocol):
     def __call__(self, lock_id: LockID, lifetime_hint: float) -> AbstractDistributedLock: ...
+
+
+@dataclass
+class CircuitRouteUpdateItem:
+    """One circuit's route-table change pending propagation to workers.
+
+    ``old_routes`` is kept alongside ``circuit`` so the legacy and
+    Traefik propagation paths share a single entry shape: legacy
+    propagation does not consult ``old_routes``, but Traefik's per-
+    session cleanup historically did, and pre-bundling them keeps the
+    bulk method's caller from re-reading state per circuit.
+    """
+
+    circuit: Circuit
+    old_routes: list[RouteInfo]
 
 
 @dataclass
@@ -176,65 +191,79 @@ class CircuitManager:
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
-        async with self.circuit_lock(circuit.id):
-            await self._update_circuit_routes_unlocked(circuit, old_routes)
+        # Single-circuit entry point still exists for callers that don't
+        # batch (delete cleanups etc.). It just degenerates to the bulk
+        # path with one item so propagation logic lives in one place.
+        await self.update_circuit_routes_bulk([
+            CircuitRouteUpdateItem(circuit=circuit, old_routes=old_routes)
+        ])
 
-    async def _update_circuit_routes_unlocked(
-        self, circuit: Circuit, old_routes: list[RouteInfo]
-    ) -> None:
-        if self.local_config.proxy_coordinator.enable_traefik:
-            await self.update_traefik_circuit_routes(circuit, old_routes)
-        else:
-            await self.update_legacy_circuit_routes(circuit, old_routes)
+    async def update_circuit_routes_bulk(self, items: Sequence[CircuitRouteUpdateItem]) -> None:
+        """Apply many circuits' route-table changes under their per-circuit locks.
 
-    async def update_traefik_circuit_routes(
-        self, circuit: Circuit, old_routes: list[RouteInfo]
+        Locks are acquired in deterministic id order to avoid a deadlock
+        if two callers happen to bulk-update overlapping circuit sets.
+        Worker propagation is then issued in one batched call (Traefik:
+        one combined ``put_prefix``; legacy: one broadcast event per
+        worker authority) so the AppProxy side does not pay per-circuit
+        DB connection / etcd round-trip cost.
+        """
+        if not items:
+            return
+        ordered = sorted(items, key=lambda it: it.circuit.id)
+        async with AsyncExitStack() as stack:
+            for item in ordered:
+                await stack.enter_async_context(self.circuit_lock(item.circuit.id))
+            if self.local_config.proxy_coordinator.enable_traefik:
+                await self._update_traefik_circuit_routes_bulk(ordered)
+            else:
+                await self._update_legacy_circuit_routes_bulk(ordered)
+
+    async def _update_traefik_circuit_routes_bulk(
+        self, items: Sequence[CircuitRouteUpdateItem]
     ) -> None:
-        log.debug("update_traefik_circuit_routes(): start")
         if not self.traefik_etcd:
             raise ServerMisconfiguredError("proxy-coordinator.traefik")
 
-        worker_authority = circuit.worker_row.authority
-        etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
+        # Drop the per-circuit service prefixes first; ``put_prefix``
+        # below re-publishes the new config in one round-trip.
+        # ``Circuit.traefik_services`` emits a single
+        # ``bai_service_{circuit.id}`` entry per circuit, so the prefix
+        # set we delete is exactly one per item.
+        for item in items:
+            worker_authority = item.circuit.worker_row.authority
+            etcd_prefix = f"worker_{worker_authority}/{item.circuit.protocol.value.lower()}"
+            await self.traefik_etcd.delete_prefix(
+                f"{etcd_prefix}/services/bai_service_{item.circuit.id}"
+            )
 
-        # Circuit.traefik_services now emits a single bai_service_{circuit.id}
-        # loadBalancer (see models/circuit.py) instead of one weighted entry
-        # per session, so cleanup only needs to drop that single prefix before
-        # re-publishing the new config. The old_routes argument is kept for
-        # signature compatibility but is no longer consulted.
-        del old_routes  # legacy signature; no per-session cleanup needed
-        new_services = circuit.traefik_services
-
-        log.debug(
-            "traefik_etcd.delete_prefix {}", f"{etcd_prefix}/services/bai_service_{circuit.id}"
+        total_map: defaultdict[str, Any] = defaultdict(
+            lambda: defaultdict(lambda: {"services": {}})
         )
-        await self.traefik_etcd.delete_prefix(f"{etcd_prefix}/services/bai_service_{circuit.id}")
+        for item in items:
+            worker_authority = item.circuit.worker_row.authority
+            new_services = item.circuit.traefik_services
+            total_map[f"worker_{worker_authority}"][item.circuit.protocol.value.lower()][
+                "services"
+            ].update(new_services)
+        await self.traefik_etcd.put_prefix("", convert_to_etcd_dict(total_map))
 
-        log.debug(
-            "traefik_etcd.put_prefix {} {}",
-            f"{etcd_prefix}/services",
-            convert_to_etcd_dict(new_services),
-        )
-        await self.traefik_etcd.put_prefix(
-            f"{etcd_prefix}/services",
-            convert_to_etcd_dict(new_services),
-        )
-        log.debug("update_traefik_circuit_routes(): end")
-
-    async def update_legacy_circuit_routes(
-        self, circuit: Circuit, old_routes: list[RouteInfo]
+    async def _update_legacy_circuit_routes_bulk(
+        self, items: Sequence[CircuitRouteUpdateItem]
     ) -> None:
-        # Propagate the full route list to the worker. Healthy-route filtering
-        # is now a worker-side concern: the worker's per-backend route pool
-        # tracks TCP reachability and excludes unhealthy upstreams from traffic
-        # selection. The coordinator ships the canonical DB state and the
-        # worker decides which routes to dispatch traffic to.
-        event = AppProxyCircuitRouteUpdatedEvent(
-            target_worker_authority=circuit.worker_row.authority,
-            circuit=SerializableCircuit(**circuit.dump_model()),
-            routes=circuit.route_info,
-        )
-        await self.event_producer.broadcast_event(event)
+        # Legacy mode broadcasts one event per circuit because each
+        # event carries a single SerializableCircuit payload that the
+        # worker's RoutePool consumes. Batching them into a multi-
+        # circuit event would require a new wire shape on the worker
+        # side, which is out of scope for this change. Healthy-route
+        # filtering remains worker-side.
+        for item in items:
+            event = AppProxyCircuitRouteUpdatedEvent(
+                target_worker_authority=item.circuit.worker_row.authority,
+                circuit=SerializableCircuit(**item.circuit.dump_model()),
+                routes=item.circuit.route_info,
+            )
+            await self.event_producer.broadcast_event(event)
 
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
         for circuit in circuits:

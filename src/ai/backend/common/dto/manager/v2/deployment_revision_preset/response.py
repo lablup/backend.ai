@@ -7,12 +7,22 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 class EnvironEntryInfo(BaseResponseModel):
+    """A single environment variable entry with key and value.
+
+    .. deprecated::
+        Equivalent to
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariableEntryInfo`.
+        New code should prefer the common type; this class is retained only for
+        the deployment revision preset response schema.
+    """
+
     key: str = Field(description="Environment variable key.")
     value: str = Field(description="Environment variable value.")
 
@@ -23,6 +33,15 @@ class ResourceSlotEntryInfo(BaseResponseModel):
 
 
 class ResourceOptsEntryInfo(BaseResponseModel):
+    """A single resource option entry with name and value.
+
+    .. deprecated::
+        Equivalent to
+        :class:`ai.backend.common.dto.manager.v2.resource_slot.types.ResourceOptsEntryInfoDTO`.
+        New code should prefer the common type; this class is retained only for
+        the deployment revision preset response schema.
+    """
+
     name: str = Field(description="Resource option name (e.g. shmem).")
     value: str = Field(description="Resource option value (e.g. 1g).")
 
@@ -92,7 +111,7 @@ class DeploymentRevisionPresetNode(BaseResponseModel):
         default_factory=PresetDeploymentDefaults,
         description="Deployment-level default values provided by this preset.",
     )
-    model_definition: dict[str, Any] | None = Field(
+    model_definition: ModelDefinition | None = Field(
         default=None, description="Model definition configuration."
     )
     preset_values: list[PresetValueInfo] = Field(default_factory=list, description="Preset values.")

@@ -77,6 +77,7 @@ from ai.backend.manager.data.deployment.types import (
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -1096,47 +1097,14 @@ class DeploymentRepository:
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
 
     @deployment_repository_resilience.apply()
-    async def update_endpoint_route_info(
+    async def fetch_route_connection_infos(
         self,
-        endpoint_id: uuid.UUID,
-    ) -> None:
-        # Generate route connection info
-        connection_info = await self._db_source.generate_route_connection_info(endpoint_id)
-
-        # Get health check config
-        health_check_config = await self._db_source.get_endpoint_health_check_config(endpoint_id)
-
-        # Update Redis with route info
-        await self._valkey_live.update_appproxy_redis_info(
-            endpoint_id,
-            connection_info,
-            health_check_config,
-        )
-
-    @deployment_repository_resilience.apply()
-    async def update_endpoint_route_info_for_termination(
-        self,
-        endpoint_id: uuid.UUID,
-    ) -> None:
-        connection_info = await self._db_source.generate_route_connection_info(endpoint_id)
-
-        try:
-            health_check_config = await self._db_source.get_endpoint_health_check_config(
-                endpoint_id
-            )
-        except Exception:
-            log.warning(
-                "Failed to get health check config for endpoint {} during termination, "
-                "proceeding without it",
-                endpoint_id,
-                exc_info=True,
-            )
-            health_check_config = None
-
-        await self._valkey_live.update_appproxy_redis_info(
-            endpoint_id,
-            connection_info,
-            health_check_config,
+        *,
+        route_querier: BatchQuerier,
+    ) -> Mapping[uuid.UUID, list[AppProxyRouteEntry]]:
+        """Resolve routing-table entries per endpoint via a caller-composed querier."""
+        return await self._db_source.fetch_route_connection_infos(
+            route_querier=route_querier,
         )
 
     @deployment_repository_resilience.apply()
@@ -1343,12 +1311,13 @@ class DeploymentRepository:
     ) -> tuple[uuid.UUID | None, bool]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
-        Uses ``deploying_revision IS NULL`` as an atomic guard against
-        concurrent activations.
+        Overrides any previous ``deploying_revision`` unconditionally;
+        leftover routes from the preempted rollout are picked up by
+        ``RouteEvictionHandler``'s orphan-revision branch.
 
         Returns:
             Tuple of (previous_current_revision_id, updated).
-            ``updated=False`` means the guard fired (another deployment in progress).
+            ``updated=False`` means the endpoint row was not found.
         """
         return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 

@@ -319,6 +319,9 @@ if TYPE_CHECKING:
         VFSStorageService,
     )
     from ai.backend.manager.sokovan.deployment import DeploymentController
+    from ai.backend.manager.sokovan.deployment.route.route_controller import (
+        RouteController,
+    )
     from ai.backend.manager.sokovan.scheduling_controller import (
         SchedulingController,
     )
@@ -346,6 +349,7 @@ class ServiceArgs:
     hook_plugin_ctx: HookPluginContext
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
+    route_controller: RouteController
     event_producer: EventProducer
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter

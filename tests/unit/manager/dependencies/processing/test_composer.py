@@ -53,6 +53,7 @@ def _make_processing_input() -> ProcessingInput:
         error_monitor=MagicMock(),
         hook_plugin_ctx=MagicMock(),
         deployment_controller=MagicMock(),
+        route_controller=MagicMock(),
         agent_cache=MagicMock(),
         notification_center=MagicMock(),
         appproxy_client_pool=MagicMock(),

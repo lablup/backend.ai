@@ -443,6 +443,18 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class InvalidResourceSlotQuantity(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-resource-slot-quantity"
+    error_title = "Invalid resource slot quantity."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class ResourcePresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-resource"
     error_title = "Duplicate Resource Preset"

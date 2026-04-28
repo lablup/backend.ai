@@ -664,9 +664,8 @@ jobs:
       matrix:
         # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm: aarch64
-        # macos-15-intel: intel
         # macos-15: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15-intel, macos-15]
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15]
     runs-on: ${{ matrix.os }}
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
@@ -978,14 +977,6 @@ jobs:
           "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
         }'
         curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-x86_64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-x86_64"
-        }'
-        curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-aarch64' \
           -H 'accept: application/json' \
           -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
@@ -1016,14 +1007,6 @@ jobs:
           -H 'Content-Type: application/json' \
           -d '{
           "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-x86_64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-x86_64"
         }'
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \

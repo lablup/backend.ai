@@ -50,6 +50,7 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.exception import (
     ContainerCreationError,
@@ -79,6 +80,7 @@ from ai.backend.agent.plugin.network import (
     ContainerNetworkInfo,
     NetworkPluginContext,
 )
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
@@ -295,7 +297,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     container_configs: list[Mapping[str, Any]]
     domain_socket_proxies: list[DomainSocketProxy]
     computer_docker_args: dict[str, Any]
-    port_pool: set[int]
+    port_pool: PortPool
     agent_sockpath: Path
     resource_lock: asyncio.Lock
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
@@ -312,7 +314,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         distro: str,
         local_config: AgentUnifiedConfig,
         computers: Mapping[DeviceName, ComputerContext],
-        port_pool: set[int],
+        port_pool: PortPool,
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
@@ -1105,11 +1107,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         container_bind_host = self.local_config.container.bind_host
         advertised_kernel_host = self.local_config.container.advertised_host
         if len(service_ports) + len(self.repl_ports) > len(self.port_pool):
-            raise RuntimeError(
-                f"Container ports are not sufficiently available. (remaining ports: {self.port_pool})"
+            raise PortPoolExhaustedError(
+                f"Container ports are not sufficiently available. "
+                f"(remaining ports: {self.port_pool.remaining()})"
             )
         exposed_ports = [*self.repl_ports]
-        host_ports = [self.port_pool.pop() for _ in self.repl_ports]
+        host_ports = [self.port_pool.acquire() for _ in self.repl_ports]
         host_ips = []
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
@@ -1124,7 +1127,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             ):
                 host_ports.append(ssh_host_port[1])
             else:
-                hport = self.port_pool.pop()
+                hport = self.port_pool.acquire()
                 host_ports.append(hport)
         protected_service_ports: set[int] = set()
         for sport in service_ports:
@@ -1275,7 +1278,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 self.local_config.container.scratch_root,
                 self.kernel_id,
             )
-            self.port_pool.update(host_ports)
+            self.port_pool.release_many(host_ports)
             async with self.resource_lock:
                 for dev_name, device_alloc in resource_spec.allocations.items():
                     self.computers[dev_name].alloc_map.free(device_alloc)

@@ -82,6 +82,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
@@ -620,7 +621,13 @@ class DeploymentDBSource:
         endpoint_id: uuid.UUID,
         lifecycle: EndpointLifecycle,
     ) -> bool:
-        """Update endpoint lifecycle status."""
+        """Update endpoint lifecycle status.
+
+        Transitioning to ``DESTROYING`` also wipes any access tokens
+        bound to the endpoint in the same transaction, so a destroyed
+        deployment cannot be re-authenticated against once the routes
+        are torn down.
+        """
         async with self._begin_session_read_committed() as db_sess:
             query = (
                 sa.update(EndpointRow)
@@ -628,7 +635,12 @@ class DeploymentDBSource:
                 .values(lifecycle_stage=lifecycle)
             )
             result = await db_sess.execute(query)
-            return cast(CursorResult[Any], result).rowcount > 0
+            updated = cast(CursorResult[Any], result).rowcount > 0
+            if updated and lifecycle == EndpointLifecycle.DESTROYING:
+                await db_sess.execute(
+                    sa.delete(EndpointTokenRow).where(EndpointTokenRow.endpoint == endpoint_id)
+                )
+            return updated
 
     async def get_modified_endpoint(
         self,
@@ -2105,19 +2117,79 @@ class DeploymentDBSource:
 
             return status_map
 
-    async def generate_route_connection_info(
+    async def fetch_route_connection_infos(
         self,
-        endpoint_id: uuid.UUID,
-    ) -> dict[str, Any]:
+        *,
+        route_querier: BatchQuerier,
+    ) -> Mapping[uuid.UUID, list[AppProxyRouteEntry]]:
+        """Resolve routing-table entries grouped by endpoint id.
+
+        The caller composes ``route_querier`` with every filter that
+        applies (lifecycle / health / traffic_status / endpoint id set,
+        etc.) — db_source does not impose defaults and does not take a
+        separate ``endpoint_ids`` argument. The returned mapping only
+        contains endpoints that actually have at least one matching
+        route; the caller treats a missing key as "no traffic-receiving
+        routes for this endpoint" itself.
+
+        Internally fetches the filtered ``RoutingRow`` set, then bulk-
+        loads the main kernel for each running session and extracts
+        the inference port. Sessions that are not RUNNING/CREATING are
+        skipped because their kernel host:port is not stable.
+        """
+        result_map: dict[uuid.UUID, list[AppProxyRouteEntry]] = {}
+
         async with self._begin_readonly_session_read_committed() as db_sess:
-            endpoint = await EndpointRow.get(
-                db_sess,
-                endpoint_id,
-                load_routes=True,
+            route_query = sa.select(RoutingRow).options(
+                selectinload(RoutingRow.session_row),
             )
-            if not endpoint:
-                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-            return await endpoint.generate_route_info(db_sess)
+            route_result = await execute_batch_querier(db_sess, route_query, route_querier)
+            route_rows: list[RoutingRow] = [r.RoutingRow for r in route_result.rows]
+            if not route_rows:
+                return result_map
+
+            # Only sessions whose kernel network address is stable contribute
+            # to the routing table; the rest will fall in on the next sync
+            # cycle once they reach RUNNING.
+            route_by_session: dict[uuid.UUID, RoutingRow] = {}
+            for r in route_rows:
+                if r.session is None or r.session_row is None:
+                    continue
+                if r.session_row.status not in (
+                    SessionStatus.RUNNING,
+                    SessionStatus.CREATING,
+                ):
+                    continue
+                route_by_session[r.session] = r
+
+            if not route_by_session:
+                return result_map
+
+            kernels = await KernelRow.batch_load_main_kernels_by_session_id(
+                db_sess, list(route_by_session.keys())
+            )
+
+            for kernel in kernels:
+                route = route_by_session.get(kernel.session_id)
+                if route is None or kernel.service_ports is None or not kernel.kernel_host:
+                    continue
+                # First inference port wins (legacy single-inference-port
+                # contract preserved during the row-method removal).
+                inference_port = next(
+                    (p for p in kernel.service_ports if p.get("is_inference")),
+                    None,
+                )
+                if inference_port is None or not inference_port.get("host_ports"):
+                    continue
+                entry = AppProxyRouteEntry(
+                    session_id=kernel.session_id,
+                    route_id=route.id,
+                    kernel_host=kernel.kernel_host,
+                    kernel_port=inference_port["host_ports"][0],
+                )
+                result_map.setdefault(uuid.UUID(str(route.endpoint)), []).append(entry)
+
+        return result_map
 
     async def search_deployment_ids(self, *, querier: BatchQuerier) -> list[DeploymentID]:
         """Search deployment ids using ``BatchQuerier``.
@@ -2612,20 +2684,18 @@ class DeploymentDBSource:
     ) -> tuple[uuid.UUID | None, bool]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
-        Uses ``deploying_revision IS NULL`` as an atomic guard against
-        concurrent activations.
+        Overrides any previous ``deploying_revision`` unconditionally;
+        leftover routes from the previous rollout are picked up by
+        ``RouteEvictionHandler``'s orphan-revision branch.
 
         Returns:
             Tuple of (previous_current_revision_id, updated).
-            ``updated=False`` means the guard fired (another deployment in progress).
+            ``updated=False`` means the endpoint row was not found.
         """
         async with self._begin_session_read_committed() as db_sess:
             update_query = (
                 sa.update(EndpointRow)
-                .where(
-                    EndpointRow.id == endpoint_id,
-                    EndpointRow.deploying_revision.is_(None),
-                )
+                .where(EndpointRow.id == endpoint_id)
                 .values(
                     deploying_revision=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,

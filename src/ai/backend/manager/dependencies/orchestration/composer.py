@@ -13,6 +13,7 @@ from ai.backend.common.leader import ValkeyLeaderElection
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -61,6 +62,7 @@ class OrchestrationInput:
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     agent_client_pool: AgentClientPool
+    appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
@@ -136,6 +138,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             resource_usage_repository=setup_input.resource_usage_repository,
             config_provider=setup_input.config_provider,
             agent_client_pool=setup_input.agent_client_pool,
+            appproxy_client_pool=setup_input.appproxy_client_pool,
             network_plugin_ctx=setup_input.network_plugin_ctx,
             event_producer=setup_input.event_producer,
             valkey_schedule=setup_input.valkey_schedule,

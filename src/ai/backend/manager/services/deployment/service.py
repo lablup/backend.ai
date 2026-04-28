@@ -340,7 +340,7 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
     return ModelReplicaData(
         id=route.route_id,
         revision_id=route.revision_id or route.deployment_id,
-        session_id=route.session_id or route.route_id,
+        session_id=route.session_id,
         readiness_status=readiness,
         liveness_status=liveness,
         activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),

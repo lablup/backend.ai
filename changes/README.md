@@ -34,6 +34,12 @@ There are a few exceptions historically, but it is always recommended to keep mu
 
 Note: maintainers may modify the news fragment without notice before merge.
 
+### Filename convention
+
+News fragments live in `changes/` and must be named `<PR-number>.<type>.md`, where `<type>` matches one of the `directory` values defined by the `[[tool.towncrier.type]]` entries in `pyproject.toml` (e.g., `fix`, `feature`, `breaking`, `misc`).
+
+The number in the filename must be the **pull request number** — not an issue number, Linear/Jira ticket, or any other identifier. When you don't yet know the PR number, leave it empty and commit a placeholder such as `.fix.md` or `fix.md`; the `assign-pr-number` CI workflow will fill in the PR number on push. For PRs targeting `main`, the same workflow rewrites the prefix of any fragment *added by the PR* whose number does not match the current PR, so mistakenly using an issue number is recoverable. Backport PRs (targeting release branches) preserve the original fragment numbering so release notes keep linking back to the original change.
+
 ## In the middle: Pull request titles
 
 The title of a pull request is a *conventional commit stylization of the news fragment*, usually as a shorter and more brief version, because it will **become a commit message in the main branch**.

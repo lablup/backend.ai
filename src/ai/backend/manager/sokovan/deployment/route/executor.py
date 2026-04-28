@@ -10,19 +10,36 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     RouteHealthRecord,
     ValkeyScheduleClient,
 )
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
+    BulkUpdateRoutesRequest,
+)
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
+    RouteEntry,
+    UpdateRoutesItem,
+)
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteHealthStatus
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.errors.deployment import (
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
 )
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
@@ -65,6 +82,8 @@ class RouteExecutor:
         client_pool: ClientPool,
         valkey_schedule: ValkeyScheduleClient,
         service_discovery: ServiceDiscovery,
+        event_producer: EventProducer,
+        appproxy_client_pool: AppProxyClientPool,
     ) -> None:
         self._deployment_repo = deployment_repo
         self._scheduling_controller = scheduling_controller
@@ -72,6 +91,8 @@ class RouteExecutor:
         self._client_pool = client_pool
         self._valkey_schedule = valkey_schedule
         self._service_discovery = service_discovery
+        self._event_producer = event_producer
+        self._appproxy_client_pool = appproxy_client_pool
 
     async def provision_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Provision routes by creating sessions.
@@ -443,13 +464,150 @@ class RouteExecutor:
 
         return RouteExecutionResult(successes=[], errors=[])
 
+    async def sync_appproxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Push the current HEALTHY routing tables for affected endpoints to AppProxy.
+
+        Steps:
+        1. Group the input routes by endpoint (the AppProxy contract is
+           endpoint-scoped: one ``circuit.route_info`` per deployment).
+        2. Resolve each endpoint's proxy target (wsproxy_addr / token)
+           via the deployment repository in two batched calls.
+        3. Re-read the authoritative RUNNING + HEALTHY route set per
+           endpoint with a caller-composed ``BatchQuerier`` so the same
+           plumbing works for sync, debug, and reporting paths — no
+           ``only_healthy`` flag and no Row-side query method.
+        4. Group endpoints by proxy target and issue one
+           ``bulk_update_routes`` HTTP call per target instead of one
+           event per endpoint, which previously meant one DB connection
+           per endpoint on the AppProxy side.
+        5. Map per-entry response status back to the lifecycle handler's
+           per-route success / error result so failed pushes are picked
+           up by the next short cycle.
+        """
+        if not routes:
+            return RouteExecutionResult(successes=[], errors=[])
+
+        routes_by_endpoint: dict[DeploymentID, list[RouteData]] = {}
+        for route in routes:
+            routes_by_endpoint.setdefault(route.deployment_id, []).append(route)
+        endpoint_ids = list(routes_by_endpoint.keys())
+
+        successes: list[RouteData] = []
+        errors: list[RouteExecutionError] = []
+
+        deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
+        deployment_by_id = {dep.id: dep for dep in deployments}
+        scaling_groups = {dep.metadata.resource_group for dep in deployments}
+        proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
+            scaling_groups
+        )
+
+        # Caller composes the filter so the conditions stay explicit at
+        # the call site instead of hiding behind a flag-laden helper.
+        route_querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                RouteConditions.by_endpoint_ids(endpoint_ids),
+                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
+                RouteConditions.by_health_statuses([RouteHealthStatus.HEALTHY]),
+                RouteConditions.by_traffic_status_equals(RouteTrafficStatus.ACTIVE),
+            ],
+        )
+        connection_infos = await self._deployment_repo.fetch_route_connection_infos(
+            route_querier=route_querier,
+        )
+
+        items_by_target: dict[tuple[str, str], list[UpdateRoutesItem]] = {}
+        for endpoint_id in endpoint_ids:
+            deployment = deployment_by_id.get(endpoint_id)
+            if deployment is None:
+                for route in routes_by_endpoint[endpoint_id]:
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="Deployment row not found for AppProxy sync",
+                            error_detail=f"deployment {endpoint_id} disappeared between fetch and sync",
+                            error_code=None,
+                        )
+                    )
+                continue
+            target = proxy_targets.get(deployment.metadata.resource_group)
+            if target is None:
+                for route in routes_by_endpoint[endpoint_id]:
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="No proxy target configured for scaling group",
+                            error_detail=f"scaling group {deployment.metadata.resource_group}",
+                            error_code=None,
+                        )
+                    )
+                continue
+            entries = connection_infos.get(endpoint_id, [])
+            items_by_target.setdefault((target.addr, target.api_token), []).append(
+                UpdateRoutesItem(
+                    deployment_id=endpoint_id,
+                    routes=[
+                        RouteEntry(
+                            session_id=entry.session_id,
+                            route_id=entry.route_id,
+                            kernel_host=entry.kernel_host,
+                            kernel_port=entry.kernel_port,
+                        )
+                        for entry in entries
+                    ],
+                )
+            )
+
+        for (addr, token), items in items_by_target.items():
+            client = self._appproxy_client_pool.load_client(addr, token)
+            try:
+                response = await client.bulk_update_routes(BulkUpdateRoutesRequest(endpoints=items))
+            except Exception as exc:
+                log.exception("AppProxy bulk routes-sync request failed for target {}", addr)
+                error_code = _extract_error_code(exc)
+                for item in items:
+                    ep_id = DeploymentID(item.deployment_id)
+                    for route in routes_by_endpoint.get(ep_id, []):
+                        errors.append(
+                            RouteExecutionError(
+                                route_info=route,
+                                reason="AppProxy bulk routes-sync request failed",
+                                error_detail=str(exc),
+                                error_code=error_code,
+                            )
+                        )
+                continue
+
+            for resp_item in response.endpoints:
+                ep_id = DeploymentID(resp_item.deployment_id)
+                ep_routes = routes_by_endpoint.get(ep_id, [])
+                if resp_item.success:
+                    successes.extend(ep_routes)
+                else:
+                    for route in ep_routes:
+                        errors.append(
+                            RouteExecutionError(
+                                route_info=route,
+                                reason="AppProxy bulk routes-sync entry failed",
+                                error_detail=resp_item.error or "unknown",
+                                error_code=None,
+                            )
+                        )
+
+        return RouteExecutionResult(successes=successes, errors=errors)
+
     async def cleanup_routes_by_config(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """
-        Filter routes for cleanup based on scaling group configuration.
+        Filter routes that should be terminated.
 
-        Checks if each route's status (unhealthy/degraded) is in the scaling group's
-        cleanup_target_statuses. Routes that should be cleaned up are returned as successes,
-        others are filtered out.
+        A route is flagged when at least one of the following holds:
+
+        - **Orphan revision**: ``route.revision_id`` matches neither the
+          endpoint's ``current_revision_id`` nor its ``deploying_revision_id``.
+          Catches leftovers from a preempted rollout.
+        - **Health policy**: ``route.health_status`` is listed in the
+          scaling group's ``cleanup_target_statuses`` (default: UNHEALTHY).
 
         Args:
             routes: Routes to check for cleanup eligibility
@@ -476,18 +634,27 @@ class RouteExecutor:
 
         # Create mapping of deployment_id -> cleanup config (no phase - transformation only)
         deployment_cleanup_config: dict[DeploymentID, set[RouteHealthStatus]] = {}
+        deployment_valid_revisions: dict[DeploymentID, set[DeploymentRevisionID]] = {}
         for deployment in deployments:
             config = cleanup_configs.get(deployment.metadata.resource_group, None)
             if config:
                 deployment_cleanup_config[deployment.id] = set(config.cleanup_target_statuses)
             else:
                 deployment_cleanup_config[deployment.id] = set()
+            valid_revisions: set[DeploymentRevisionID] = set()
+            if deployment.current_revision_id is not None:
+                valid_revisions.add(deployment.current_revision_id)
+            if deployment.deploying_revision_id is not None:
+                valid_revisions.add(deployment.deploying_revision_id)
+            deployment_valid_revisions[deployment.id] = valid_revisions
 
         successes: list[RouteData] = []
 
         # Phase 2: Identify cleanup targets (per-route)
         for route in routes:
-            should_cleanup = self._check_route_cleanup_eligibility(route, deployment_cleanup_config)
+            should_cleanup = self._check_route_cleanup_eligibility(
+                route, deployment_cleanup_config, deployment_valid_revisions
+            )
             if should_cleanup:
                 successes.append(route)
                 log.info(
@@ -572,12 +739,28 @@ class RouteExecutor:
         self,
         route: RouteData,
         deployment_cleanup_config: Mapping[DeploymentID, set[RouteHealthStatus]],
+        deployment_valid_revisions: Mapping[DeploymentID, set[DeploymentRevisionID]],
     ) -> bool:
-        """Check if route should be cleaned up based on cleanup config."""
+        """Return True if the route should be evicted.
+
+        Checked reasons (OR-combined):
+
+        1. Orphan revision: ``route.revision_id`` is not the endpoint's
+           current or deploying revision. The check is skipped when the
+           endpoint has no revisions known yet (transient bootstrap state)
+           to avoid wiping freshly-created routes.
+        2. Scaling-group health policy: ``route.health_status`` is in
+           ``cleanup_target_statuses`` for the route's scaling group.
+        """
         pool = RouteRecorderContext.current_pool()
         recorder = pool.recorder(route.route_id)
 
         with recorder.phase("identify_cleanup_target"):
+            with recorder.step("check_orphan_revision"):
+                valid_revisions = deployment_valid_revisions.get(route.deployment_id, set())
+                if valid_revisions and route.revision_id not in valid_revisions:
+                    return True
+
             with recorder.step("check_cleanup_eligibility"):
                 cleanup_targets = deployment_cleanup_config.get(route.deployment_id, set())
                 return route.health_status in cleanup_targets

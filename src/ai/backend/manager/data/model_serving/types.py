@@ -224,6 +224,22 @@ class RouteConnectionInfo:
     kernel_port: int
 
 
+@dataclass(frozen=True)
+class AppProxyRouteEntry:
+    """One (session, kernel host:port) entry pushed to AppProxy.
+
+    Manager builds these from RoutingRow + KernelRow joins so the
+    AppProxy coordinator can install them on ``circuit.route_info``
+    without needing a manager-side Redis hand-off or a back-channel
+    DB read.
+    """
+
+    session_id: uuid.UUID
+    route_id: uuid.UUID
+    kernel_host: str
+    kernel_port: int
+
+
 @dataclass
 class ServiceConfig:
     model: str

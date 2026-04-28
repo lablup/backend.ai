@@ -10,10 +10,6 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    EndpointRouteListUpdatedEvent,
-)
 from ai.backend.common.types import (
     AgentId,
     SessionId,
@@ -21,8 +17,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.data import SessionWithKernels
+from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -50,8 +47,7 @@ class RunningHookDependencies:
     """Dependencies for RunningTransitionHook."""
 
     agent_client_pool: AgentClientPool
-    deployment_repository: DeploymentRepository
-    event_producer: EventProducer
+    route_controller: RouteController
 
 
 class RunningTransitionHook(StatusTransitionHook):
@@ -125,22 +121,15 @@ class RunningTransitionHook(StatusTransitionHook):
         )
 
     async def _execute_inference_running(self, session: SessionWithKernels) -> None:
-        """Create model service route for INFERENCE sessions."""
+        """Mark AppProxy resync needed for INFERENCE sessions reaching RUNNING.
+
+        We do not push to AppProxy directly here. The route coordinator's
+        APPPROXY_SYNC short cycle picks up the lifecycle hint and resyncs
+        every endpoint that owns at least one HEALTHY route, so the
+        AppProxy state becomes consistent regardless of which manager
+        instance handled the transition.
+        """
         session_id = session.session_info.identity.id
-        log.info(
-            "Creating model service route for inference session {}",
-            session_id,
-        )
-
-        # Get endpoint ID from session
-        endpoint_id = await self._deps.deployment_repository.get_endpoint_id_by_session(session_id)
-        if not endpoint_id:
-            log.warning(
-                "No endpoint ID found for inference session {}, skipping route update",
-                session_id,
-            )
-            return
-
         pool = RecorderContext[SessionId].current_pool()
         recorder = pool.recorder(session_id)
         with recorder.phase(
@@ -149,38 +138,22 @@ class RunningTransitionHook(StatusTransitionHook):
         ):
             with recorder.step(
                 "setup_route",
-                success_detail=f"Set up route for endpoint {endpoint_id}",
+                success_detail="Marked AppProxy resync after RUNNING",
             ):
-                try:
-                    # Update route info
-                    await self._deps.deployment_repository.update_endpoint_route_info(endpoint_id)
-
-                    # Send event to app proxy
-                    await self._deps.event_producer.anycast_event(
-                        EndpointRouteListUpdatedEvent(endpoint_id)
-                    )
-
-                    log.info(
-                        "Successfully updated route info and notified app proxy for endpoint {} (session {})",
-                        endpoint_id,
-                        session_id,
-                    )
-                except Exception as e:
-                    log.exception(
-                        "Unexpected error updating route info for endpoint {} (session {}): {}",
-                        endpoint_id,
-                        session_id,
-                        e,
-                    )
-                    raise
+                await self._deps.route_controller.mark_lifecycle_needed(
+                    RouteLifecycleType.APPPROXY_SYNC
+                )
+                log.info(
+                    "Marked AppProxy resync after inference session {} reached RUNNING",
+                    session_id,
+                )
 
 
 @dataclass
 class TerminatedHookDependencies:
     """Dependencies for TerminatedTransitionHook."""
 
-    deployment_repository: DeploymentRepository
-    event_producer: EventProducer
+    route_controller: RouteController
 
 
 class TerminatedTransitionHook(StatusTransitionHook):
@@ -208,22 +181,14 @@ class TerminatedTransitionHook(StatusTransitionHook):
                 )
 
     async def _execute_inference_terminated(self, session: SessionWithKernels) -> None:
-        """Delete model service route for INFERENCE sessions."""
+        """Mark AppProxy resync needed for INFERENCE sessions reaching TERMINATED.
+
+        Same rationale as the RUNNING hook: leave the actual Redis update
+        and AppProxy fan-out to the route coordinator's APPPROXY_SYNC
+        cycle, so a route that just lost its session falls out of the
+        push set on the next sync.
+        """
         session_id = session.session_info.identity.id
-        log.info(
-            "Deleting model service route for inference session {}",
-            session_id,
-        )
-
-        # Get endpoint ID from session
-        endpoint_id = await self._deps.deployment_repository.get_endpoint_id_by_session(session_id)
-        if not endpoint_id:
-            log.warning(
-                "No endpoint ID found for inference session {}, skipping route update",
-                session_id,
-            )
-            return
-
         pool = RecorderContext[SessionId].current_pool()
         recorder = pool.recorder(session_id)
         with recorder.phase(
@@ -232,31 +197,12 @@ class TerminatedTransitionHook(StatusTransitionHook):
         ):
             with recorder.step(
                 "cleanup_route",
-                success_detail=f"Cleaned up route for endpoint {endpoint_id}",
+                success_detail="Marked AppProxy resync after TERMINATED",
             ):
-                try:
-                    # Update route info (removal)
-                    await (
-                        self._deps.deployment_repository.update_endpoint_route_info_for_termination(
-                            endpoint_id
-                        )
-                    )
-
-                    # Send event to app proxy
-                    await self._deps.event_producer.anycast_event(
-                        EndpointRouteListUpdatedEvent(endpoint_id)
-                    )
-
-                    log.info(
-                        "Successfully updated route info and notified app proxy of route removal for endpoint {} (session {})",
-                        endpoint_id,
-                        session_id,
-                    )
-                except Exception as e:
-                    log.exception(
-                        "Unexpected error updating route info for endpoint {} (session {}): {}",
-                        endpoint_id,
-                        session_id,
-                        e,
-                    )
-                    raise
+                await self._deps.route_controller.mark_lifecycle_needed(
+                    RouteLifecycleType.APPPROXY_SYNC
+                )
+                log.info(
+                    "Marked AppProxy resync after inference session {} reached TERMINATED",
+                    session_id,
+                )

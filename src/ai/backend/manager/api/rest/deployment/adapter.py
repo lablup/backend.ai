@@ -535,7 +535,7 @@ class CreateDeploymentAdapter:
         )
 
         # Build replica spec
-        replica_spec = ReplicaSpec(replica_count=request.desired_replica_count)
+        replica_spec = ReplicaSpec(replica_count=request.replica_count)
 
         # Build network spec
         network = DeploymentNetworkSpec(

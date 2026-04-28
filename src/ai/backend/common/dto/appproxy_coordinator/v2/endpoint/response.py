@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
-from .types import CreatedEndpointItem, DeletedEndpointItem
+from .types import CreatedEndpointItem, DeletedEndpointItem, UpdatedRoutesItem
 
 
 class BulkCreateEndpointResponse(BaseResponseModel):
@@ -32,6 +32,21 @@ class BulkDeleteEndpointResponse(BaseResponseModel):
     """
 
     endpoints: list[DeletedEndpointItem] = Field(
+        ...,
+        description="Per-endpoint results, in the same order as the request.",
+    )
+
+
+class BulkUpdateRoutesResponse(BaseResponseModel):
+    """Result of a bulk routes-sync call.
+
+    ``endpoints`` follows the same order as the request so callers can
+    match each result back to its input entry by index. Individual
+    entries may fail independently — check ``success`` / ``error`` on
+    each.
+    """
+
+    endpoints: list[UpdatedRoutesItem] = Field(
         ...,
         description="Per-endpoint results, in the same order as the request.",
     )
