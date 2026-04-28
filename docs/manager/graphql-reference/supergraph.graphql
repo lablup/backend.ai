@@ -4379,7 +4379,7 @@ type DelegateScanArtifactsPayload
   artifacts: [Artifact!]!
 }
 
-"""Added in 25.16.0. Input for deleting an access token."""
+"""Added in UNRELEASED. Input for deleting an access token."""
 input DeleteAccessTokenInput
   @join__type(graph: STRAWBERRY)
 {
@@ -4387,7 +4387,7 @@ input DeleteAccessTokenInput
   id: ID!
 }
 
-"""Added in 25.16.0. Payload for deleting an access token."""
+"""Added in UNRELEASED. Payload for deleting an access token."""
 type DeleteAccessTokenPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -10783,7 +10783,7 @@ type Mutation
   """Added in 25.16.0. Create access token."""
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.16.0. Delete access token."""
+  """Added in UNRELEASED. Delete access token."""
   deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload! @join__field(graph: STRAWBERRY)
 
   """

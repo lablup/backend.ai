@@ -2820,13 +2820,13 @@ input DelegateeTarget {
   targetRegistryId: ID!
 }
 
-"""Added in 25.16.0. Input for deleting an access token."""
+"""Added in UNRELEASED. Input for deleting an access token."""
 input DeleteAccessTokenInput {
   """The ID of the access token to delete."""
   id: ID!
 }
 
-"""Added in 25.16.0. Payload for deleting an access token."""
+"""Added in UNRELEASED. Payload for deleting an access token."""
 type DeleteAccessTokenPayload {
   """ID of the deleted access token"""
   id: UUID!
@@ -6719,7 +6719,7 @@ type Mutation {
   """Added in 25.16.0. Create access token."""
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload!
 
-  """Added in 25.16.0. Delete access token."""
+  """Added in UNRELEASED. Delete access token."""
   deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload!
 
   """
