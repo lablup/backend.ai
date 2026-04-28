@@ -1689,20 +1689,6 @@ class ScheduleDBSource:
                 )
         return image_infos
 
-    async def query_allowed_scaling_groups(
-        self,
-        domain_name: str,
-        group_id: str,
-        access_key: str,
-    ) -> list[AllowedScalingGroup]:
-        """
-        Query allowed scaling groups for a user (public method for external use).
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            return await self._query_allowed_scaling_groups(
-                db_sess, domain_name, group_id, access_key
-            )
-
     async def _fetch_vfolder_mounts(
         self,
         db_sess: SASession,

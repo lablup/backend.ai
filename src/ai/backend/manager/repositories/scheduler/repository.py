@@ -67,10 +67,7 @@ from .types.session import (
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
-from .types.session_creation import (
-    AllowedScalingGroup,
-    SessionSpecContextFetch,
-)
+from .types.session_creation import SessionSpecContextFetch
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -261,26 +258,6 @@ class SchedulerRepository:
             storage_manager=storage_manager,
             allowed_vfolder_types=allowed_vfolder_types,
         )
-
-    @scheduler_repository_resilience.apply()
-    async def query_allowed_scaling_groups(
-        self,
-        domain_name: str,
-        group_id: str,
-        access_key: str,
-    ) -> list[AllowedScalingGroup]:
-        """
-        Query allowed scaling groups for a user.
-
-        Args:
-            domain_name: Domain name
-            group_id: Group ID
-            access_key: Access key
-
-        Returns:
-            List of AllowedScalingGroup objects
-        """
-        return await self._db_source.query_allowed_scaling_groups(domain_name, group_id, access_key)
 
     @scheduler_repository_resilience.apply()
     async def prepare_vfolder_mounts(
