@@ -109,6 +109,7 @@ class AppProxyClient:
             f"/v2/endpoints/{endpoint_id}",
             json=body.model_dump(mode="json"),
             headers={
+                "Accept": "application/json",
                 "X-BackendAI-Token": self._token,
             },
         ) as resp:
@@ -132,6 +133,7 @@ class AppProxyClient:
             "/v2/endpoints/bulk",
             json=body.model_dump(mode="json"),
             headers={
+                "Accept": "application/json",
                 "X-BackendAI-Token": self._token,
             },
         ) as resp:
@@ -147,6 +149,7 @@ class AppProxyClient:
         async with self._client_session.delete(
             f"/v2/endpoints/{endpoint_id}",
             headers={
+                "Accept": "application/json",
                 "X-BackendAI-Token": self._token,
             },
         ):
@@ -192,6 +195,7 @@ class AppProxyClient:
             "/v2/endpoints/bulk",
             json=body.model_dump(mode="json"),
             headers={
+                "Accept": "application/json",
                 "X-BackendAI-Token": self._token,
             },
         ) as resp:
