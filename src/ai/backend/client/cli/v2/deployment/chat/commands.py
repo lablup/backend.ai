@@ -20,11 +20,7 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
 )
-from ai.backend.client.cli.v2.deployment.chat.utils import (
-    save_chat_cache,
-    save_chat_config,
-)
-from ai.backend.client.cli.v2.helpers import V2ConnectionConfig, create_v2_registry, load_v2_config
+from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 
 
 def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
@@ -39,58 +35,6 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
         status = e.args[0] if e.args else "?"
         detail = title or msg or str(e)
         raise click.ClickException(f"{status}: {detail}") from e
-
-
-async def _resolve_endpoint_entry(
-    cache: DeploymentChatCache,
-    deployment_id: UUID,
-    connection: V2ConnectionConfig,
-    *,
-    default_model_override: str | None = None,
-) -> DeploymentChatCacheEntry:
-    """Return the deployment's cached endpoint entry, fetching from the manager on miss.
-
-    This is the only place that writes to the chat cache. ``set_`` and the
-    ``chat`` command both delegate here so the cache file is touched at
-    most once per command invocation.
-
-    When ``default_model_override`` is given, the cached entry is rewritten
-    with the new model regardless of an existing entry.
-    """
-    existing = cache.get(deployment_id)
-    if (
-        existing is not None
-        and default_model_override is None
-        and existing.is_fresh(now=datetime.now(UTC))
-    ):
-        return existing
-
-    registry = await create_v2_registry(connection)
-    try:
-        deployment = await registry.deployment.get(deployment_id)
-    finally:
-        await registry.close()
-    endpoint_url = deployment.network_access.endpoint_url
-    if not endpoint_url:
-        raise click.ClickException(
-            f"Deployment {deployment_id} has no endpoint_url yet "
-            "(it may still be provisioning). Wait until the deployment is READY."
-        )
-
-    served_model: str | None
-    if default_model_override is not None:
-        served_model = default_model_override
-    else:
-        served_model = existing.default_model if existing is not None else None
-
-    new_entry = DeploymentChatCacheEntry(
-        endpoint_url=endpoint_url,
-        default_model=served_model,
-        last_synced_at=datetime.now(UTC),
-    )
-    cache.set(deployment_id, new_entry)
-    save_chat_cache(cache)
-    return new_entry
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +97,7 @@ def chat(
     )
     from ai.backend.client.v2.exceptions import DeploymentChatAuthError
 
-    connection = load_v2_config()
+    connection_config = load_v2_config()
 
     cache = DeploymentChatCache.load()
     chat_config_store = DeploymentChatConfig.load()
@@ -165,7 +109,29 @@ def chat(
     async def _run() -> None:
         from ai.backend.client.exceptions import BackendAPIError
 
-        endpoint_entry = await _resolve_endpoint_entry(cache, deployment_id, connection)
+        existing = cache.get(deployment_id)
+        if existing is not None and not existing.is_expired(now=datetime.now(UTC)):
+            endpoint_entry = existing
+        else:
+            registry = await create_v2_registry(connection_config)
+            try:
+                deployment = await registry.deployment.get(deployment_id)
+            finally:
+                await registry.close()
+            endpoint_url = deployment.network_access.endpoint_url
+            if not endpoint_url:
+                raise click.ClickException(
+                    f"Deployment {deployment_id} has no endpoint_url yet "
+                    "(it may still be provisioning). Wait until the deployment is READY."
+                )
+            endpoint_entry = DeploymentChatCacheEntry(
+                endpoint_url=endpoint_url,
+                default_model=existing.default_model if existing is not None else None,
+                last_synced_at=datetime.now(UTC),
+            )
+            cache.set(deployment_id, endpoint_entry)
+            cache.save()
+
         request_model = model or endpoint_entry.default_model
         if request_model is None:
             raise click.ClickException(
@@ -181,7 +147,7 @@ def chat(
         }
         api_key = chat_config_store.get_token(deployment_id)
         client_args = DeploymentChatClientArgs(
-            skip_ssl_verification=connection.skip_ssl_verification,
+            skip_ssl_verification=connection_config.skip_ssl_verification,
         )
         async with DeploymentChatClient(client_args) as client:
             try:
@@ -255,12 +221,12 @@ def set_(
     if api_key is None and default_model is None:
         raise click.ClickException("Nothing to set: provide --token and/or --default-model.")
 
-    connection = load_v2_config()
+    connection_config = load_v2_config()
     cache = DeploymentChatCache.load()
     chat_config_store = DeploymentChatConfig.load()
 
     async def _run() -> None:
-        registry = await create_v2_registry(connection)
+        registry = await create_v2_registry(connection_config)
         try:
             deployment = await registry.deployment.get(deployment_id)
         finally:
@@ -269,7 +235,7 @@ def set_(
 
         if api_key is not None:
             chat_config_store.set_token(deployment_id, api_key)
-            save_chat_config(chat_config_store)
+            chat_config_store.save()
 
         cached_default_model: str | None = None
         if endpoint_url:
@@ -285,7 +251,7 @@ def set_(
                     last_synced_at=datetime.now(UTC),
                 ),
             )
-            save_chat_cache(cache)
+            cache.save()
         elif default_model is not None:
             print(
                 f"WARNING: deployment {deployment_id} has no endpoint_url yet; "
@@ -323,7 +289,7 @@ def clear_cache(deployment_id: UUID) -> None:
     """Remove the cached endpoint entry for a deployment."""
     cache = DeploymentChatCache.load()
     if cache.remove(deployment_id):
-        save_chat_cache(cache)
+        cache.save()
         print(f"Removed cache entry for deployment {deployment_id}.")
     else:
         print(f"No cache entry for deployment {deployment_id}.")
@@ -335,7 +301,7 @@ def clear_config(deployment_id: UUID) -> None:
     """Remove the stored API key for a deployment."""
     chat_config_store = DeploymentChatConfig.load()
     if chat_config_store.clear_token(deployment_id):
-        save_chat_config(chat_config_store)
+        chat_config_store.save()
         print(f"Removed config entry for deployment {deployment_id}.")
     else:
         print(f"No config entry for deployment {deployment_id}.")
