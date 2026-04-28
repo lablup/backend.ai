@@ -30,7 +30,7 @@ class DeploymentChatFormatter:
         ]
 
     @classmethod
-    def render(
+    def print_summary(
         cls,
         deployment_id: UUID,
         entry: DeploymentChatCacheEntry | None,

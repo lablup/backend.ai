@@ -3,20 +3,18 @@
 Two on-disk JSON files live side by side under ``~/.backend.ai/``:
 
 - ``deployment_chat.json`` — auto-managed endpoint cache (resolved from
-  the manager). Refetched on cache miss; never user-edited.
+  the manager). Refetched on cache miss; never user-edited. Loaded via
+  :meth:`DeploymentChatCache.load`.
 - ``deployment_chat_config.json`` — user-managed API keys for the
   inference endpoints. Stored in plaintext, so the file is written with
-  ``0600`` permissions.
+  ``0600`` permissions. Loaded via :meth:`DeploymentChatConfig.load`.
 """
 
 from __future__ import annotations
 
 import stat
-import sys
 from pathlib import Path
 from typing import Any
-
-from pydantic import ValidationError
 
 from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
@@ -29,49 +27,18 @@ CHAT_CACHE_FILE = CONFIG_DIR / "deployment_chat.json"
 CHAT_CONFIG_FILE = CONFIG_DIR / "deployment_chat_config.json"
 
 
-def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
-    """Load the chat cache; return an empty cache when the file is absent or unreadable."""
-    raw = _read_json(path)
-    if raw is None:
-        return DeploymentChatCache()
-    try:
-        return DeploymentChatCache.model_validate(raw)
-    except ValidationError:
-        print(
-            f"WARNING: {path} is in an invalid format and was ignored.",
-            file=sys.stderr,
-        )
-        return DeploymentChatCache()
-
-
-def save_chat_cache(cache: DeploymentChatCache, path: Path = CHAT_CACHE_FILE) -> None:
+def save_chat_cache(cache: DeploymentChatCache) -> None:
     """Write the chat cache and enforce ``0600`` permissions."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(cache.model_dump_json(indent=2), encoding="utf-8")
-    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    CHAT_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CHAT_CACHE_FILE.write_text(cache.model_dump_json(indent=2), encoding="utf-8")
+    CHAT_CACHE_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
-def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
-    """Load the chat config; return an empty config when the file is absent or unreadable."""
-    raw = _read_json(path)
-    if raw is None:
-        return DeploymentChatConfig()
-    try:
-        return DeploymentChatConfig.model_validate(raw)
-    except ValidationError:
-        print(
-            f"WARNING: {path} is in an invalid format and was ignored. "
-            "Re-register tokens with `./bai deployment chat-config set`.",
-            file=sys.stderr,
-        )
-        return DeploymentChatConfig()
-
-
-def save_chat_config(config: DeploymentChatConfig, path: Path = CHAT_CONFIG_FILE) -> None:
+def save_chat_config(config: DeploymentChatConfig) -> None:
     """Write the chat config and enforce ``0600`` permissions."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(config.model_dump_json(indent=2), encoding="utf-8")
-    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    CHAT_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CHAT_CONFIG_FILE.write_text(config.model_dump_json(indent=2), encoding="utf-8")
+    CHAT_CONFIG_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
 def mask_token(token: str | None) -> str:
@@ -83,7 +50,8 @@ def mask_token(token: str | None) -> str:
     return f"{token[:3]}***...***{token[-4:]}"
 
 
-def _read_json(path: Path) -> dict[str, Any] | None:
+def read_json_file(path: Path) -> dict[str, Any] | None:
+    """Read a JSON file as a dict, returning None on missing or unparseable input."""
     if not path.exists():
         return None
     try:

@@ -15,10 +15,9 @@ from ai.backend.client.cli.v2.deployment.chat.formatter import DeploymentChatFor
 from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
+    DeploymentChatConfig,
 )
 from ai.backend.client.cli.v2.deployment.chat.utils import (
-    load_chat_cache,
-    load_chat_config,
     mask_token,
     save_chat_cache,
     save_chat_config,
@@ -154,8 +153,8 @@ def chat(
 
     connection = load_v2_config()
 
-    cache = load_chat_cache()
-    chat_config_store = load_chat_config()
+    cache = DeploymentChatCache.load()
+    chat_config_store = DeploymentChatConfig.load()
 
     if not isinstance(params, dict):
         raise click.ClickException("--params must be a JSON object.")
@@ -247,8 +246,8 @@ def set_(
         raise click.ClickException("Nothing to set: provide --token and/or --default-model.")
 
     connection = load_v2_config()
-    cache = load_chat_cache()
-    chat_config_store = load_chat_config()
+    cache = DeploymentChatCache.load()
+    chat_config_store = DeploymentChatConfig.load()
 
     async def _run() -> None:
         endpoint_entry = await _resolve_endpoint_entry(
@@ -274,21 +273,21 @@ def set_(
 @click.argument("deployment_id", type=click.UUID)
 def show(deployment_id: UUID) -> None:
     """Print the chat cache entry for a deployment (API keys are masked)."""
-    cache = load_chat_cache()
-    chat_config_store = load_chat_config()
+    cache = DeploymentChatCache.load()
+    chat_config_store = DeploymentChatConfig.load()
 
     entry = cache.get(deployment_id)
     token = chat_config_store.get_token(deployment_id)
     if entry is None and token is None:
         raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
-    DeploymentChatFormatter.render(deployment_id, entry, mask_token(token))
+    DeploymentChatFormatter.print_summary(deployment_id, entry, mask_token(token))
 
 
 @chat_config.command(name="clear-cache")
 @click.argument("deployment_id", type=click.UUID)
 def clear_cache(deployment_id: UUID) -> None:
     """Remove the cached endpoint entry for a deployment."""
-    cache = load_chat_cache()
+    cache = DeploymentChatCache.load()
     if cache.remove(deployment_id):
         save_chat_cache(cache)
         print(f"Removed cache entry for deployment {deployment_id}.")
@@ -300,7 +299,7 @@ def clear_cache(deployment_id: UUID) -> None:
 @click.argument("deployment_id", type=click.UUID)
 def clear_config(deployment_id: UUID) -> None:
     """Remove the stored API key for a deployment."""
-    chat_config_store = load_chat_config()
+    chat_config_store = DeploymentChatConfig.load()
     if chat_config_store.clear_token(deployment_id):
         save_chat_config(chat_config_store)
         print(f"Removed config entry for deployment {deployment_id}.")
