@@ -30,6 +30,27 @@ depends_on = None
 
 log = logging.getLogger(__name__)
 
+# PostgreSQL SQLSTATE codes accepted as "expected divergence" when guarding
+# sessionresult-related DDL with try/except. Anything else is reraised.
+_EXPECTED_DIVERGENCE_SQLSTATES = frozenset([
+    "42710",  # duplicate_object
+    "42704",  # undefined_object
+    "42P07",  # duplicate_table (index)
+    "42P01",  # undefined_table
+    "42701",  # duplicate_column
+    "42703",  # undefined_column
+    "2BP01",  # dependent_objects_still_exist
+])
+
+
+def _sqlstate_of(exc: BaseException) -> str:
+    orig = getattr(exc, "orig", None)
+    return getattr(orig, "sqlstate", None) or "?"
+
+
+def _is_expected_divergence(exc: BaseException) -> bool:
+    return _sqlstate_of(exc) in _EXPECTED_DIVERGENCE_SQLSTATES
+
 
 kernel_status = tuple(s.name for s in KernelStatus)
 
@@ -58,8 +79,12 @@ def upgrade() -> None:
             pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults").create(
                 connection, checkfirst=True
             )
-    except Exception as e:
-        log.warning("Skipping pre-create of TYPE sessionresults: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning(
+            "Skipping pre-create of TYPE sessionresults (sqlstate=%s): %s", _sqlstate_of(e), e
+        )
     kernels = sa.Table(
         "kernels",
         metadata,
@@ -236,7 +261,7 @@ def upgrade() -> None:
         startup_command = sa.Column("startup_command", sa.Text(), nullable=True)
         result: sa.Column[str] = sa.Column(
             "result",
-            pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults", create_type=False),
+            pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults", create_type=True),
             server_default="UNDEFINED",
             nullable=False,
         )
@@ -277,8 +302,12 @@ def upgrade() -> None:
     try:
         with connection.begin_nested():
             op.create_index(op.f("ix_sessions_result"), "sessions", ["result"], unique=False)
-    except Exception as e:
-        log.warning("Skipping CREATE INDEX ix_sessions_result: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning(
+            "Skipping CREATE INDEX ix_sessions_result (sqlstate=%s): %s", _sqlstate_of(e), e
+        )
     op.create_index(
         op.f("ix_sessions_scaling_group_name"), "sessions", ["scaling_group_name"], unique=False
     )
@@ -661,8 +690,10 @@ def downgrade() -> None:
     try:
         with op.get_bind().begin_nested():
             op.drop_index(op.f("ix_sessions_result"), table_name="sessions")
-    except Exception as e:
-        log.warning("Skipping DROP INDEX ix_sessions_result: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning("Skipping DROP INDEX ix_sessions_result (sqlstate=%s): %s", _sqlstate_of(e), e)
     op.drop_index(op.f("ix_sessions_name"), table_name="sessions")
     op.drop_index(op.f("ix_sessions_created_at"), table_name="sessions")
     op.drop_table("sessions")
@@ -678,8 +709,10 @@ def downgrade() -> None:
     try:
         with op.get_bind().begin_nested():
             sess_results.drop(op.get_bind(), checkfirst=True)
-    except Exception as e:
-        log.warning("Skipping DROP TYPE sessionresults: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning("Skipping DROP TYPE sessionresults (sqlstate=%s): %s", _sqlstate_of(e), e)
 
     ## Association tables
     # groups users

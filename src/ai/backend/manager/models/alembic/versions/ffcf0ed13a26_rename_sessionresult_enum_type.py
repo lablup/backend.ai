@@ -8,6 +8,7 @@ Create Date: 2026-02-25 00:00:00.000000
 
 import logging
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -17,6 +18,27 @@ branch_labels = None
 depends_on = None
 
 log = logging.getLogger(__name__)
+
+# PostgreSQL SQLSTATE codes accepted as "expected divergence" when guarding
+# sessionresult-related DDL with try/except. Anything else is reraised.
+_EXPECTED_DIVERGENCE_SQLSTATES = frozenset([
+    "42710",  # duplicate_object
+    "42704",  # undefined_object
+    "42P07",  # duplicate_table (index)
+    "42P01",  # undefined_table
+    "42701",  # duplicate_column
+    "42703",  # undefined_column
+    "2BP01",  # dependent_objects_still_exist
+])
+
+
+def _sqlstate_of(exc: BaseException) -> str:
+    orig = getattr(exc, "orig", None)
+    return getattr(orig, "sqlstate", None) or "?"
+
+
+def _is_expected_divergence(exc: BaseException) -> bool:
+    return _sqlstate_of(exc) in _EXPECTED_DIVERGENCE_SQLSTATES
 
 
 def upgrade() -> None:
@@ -43,8 +65,14 @@ def upgrade() -> None:
                 conn.exec_driver_sql("ALTER TYPE sessionresults RENAME TO sessionresult")
             # If both exist, skip rename to avoid conflict
             # If only singular exists, no action needed
-    except Exception as e:
-        log.warning("Skipping rename of sessionresults -> sessionresult enum type: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning(
+            "Skipping rename of sessionresults -> sessionresult enum type (sqlstate=%s): %s",
+            _sqlstate_of(e),
+            e,
+        )
 
 
 def downgrade() -> None:
@@ -69,5 +97,11 @@ def downgrade() -> None:
                 conn.exec_driver_sql("ALTER TYPE sessionresult RENAME TO sessionresults")
             # If both exist, skip rename to avoid conflict
             # If only plural exists, no action needed
-    except Exception as e:
-        log.warning("Skipping rename of sessionresult -> sessionresults enum type: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning(
+            "Skipping rename of sessionresult -> sessionresults enum type (sqlstate=%s): %s",
+            _sqlstate_of(e),
+            e,
+        )

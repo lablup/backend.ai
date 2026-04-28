@@ -8,6 +8,7 @@ Create Date: 2026-03-25 00:00:00.000000
 
 import logging
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -18,6 +19,27 @@ branch_labels = None
 depends_on = None
 
 log = logging.getLogger(__name__)
+
+# PostgreSQL SQLSTATE codes accepted as "expected divergence" when guarding
+# sessionresult-related DDL with try/except. Anything else is reraised.
+_EXPECTED_DIVERGENCE_SQLSTATES = frozenset([
+    "42710",  # duplicate_object
+    "42704",  # undefined_object
+    "42P07",  # duplicate_table (index)
+    "42P01",  # undefined_table
+    "42701",  # duplicate_column
+    "42703",  # undefined_column
+    "2BP01",  # dependent_objects_still_exist
+])
+
+
+def _sqlstate_of(exc: BaseException) -> str:
+    orig = getattr(exc, "orig", None)
+    return getattr(orig, "sqlstate", None) or "?"
+
+
+def _is_expected_divergence(exc: BaseException) -> bool:
+    return _sqlstate_of(exc) in _EXPECTED_DIVERGENCE_SQLSTATES
 
 
 def upgrade() -> None:
@@ -48,10 +70,17 @@ def upgrade() -> None:
                 conn.exec_driver_sql("DROP TYPE sessionresults")
             elif has_plural and not has_singular:
                 # Only plural exists (ffcf0ed13a26 was never applied, or was skipped).
-                # Rename to singular to match EnumType(SessionResult) convention.
+                # Rename to singular to match the StrEnumType(SessionResult, use_name=True)
+                # mapping used for this column.
                 conn.exec_driver_sql("ALTER TYPE sessionresults RENAME TO sessionresult")
-    except Exception as e:
-        log.warning("Skipping sessionresult/sessionresults coexistence fix: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning(
+            "Skipping sessionresult/sessionresults coexistence fix (sqlstate=%s): %s",
+            _sqlstate_of(e),
+            e,
+        )
 
 
 def downgrade() -> None:
@@ -78,5 +107,11 @@ def downgrade() -> None:
                     "ALTER TABLE sessions ALTER COLUMN result"
                     " TYPE sessionresults USING result::text::sessionresults"
                 )
-    except Exception as e:
-        log.warning("Skipping sessionresult/sessionresults coexistence revert: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning(
+            "Skipping sessionresult/sessionresults coexistence revert (sqlstate=%s): %s",
+            _sqlstate_of(e),
+            e,
+        )

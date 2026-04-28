@@ -24,6 +24,29 @@ depends_on = None
 
 log = logging.getLogger(__name__)
 
+# PostgreSQL SQLSTATE codes accepted as "expected divergence" when guarding
+# sessionresult-related DDL with try/except. Anything else is reraised so a
+# real failure is not silently swallowed.
+_EXPECTED_DIVERGENCE_SQLSTATES = frozenset([
+    "42710",  # duplicate_object
+    "42704",  # undefined_object
+    "42P07",  # duplicate_table (index)
+    "42P01",  # undefined_table
+    "42701",  # duplicate_column
+    "42703",  # undefined_column
+    "2BP01",  # dependent_objects_still_exist
+])
+
+
+def _sqlstate_of(exc: BaseException) -> str:
+    orig = getattr(exc, "orig", None)
+    return getattr(orig, "sqlstate", None) or "?"
+
+
+def _is_expected_divergence(exc: BaseException) -> bool:
+    return _sqlstate_of(exc) in _EXPECTED_DIVERGENCE_SQLSTATES
+
+
 sessionresult = postgresql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresult")
 
 sessiontypes = postgresql.ENUM("INTERACTIVE", "BATCH", name="sessiontypes")
@@ -63,9 +86,11 @@ def upgrade() -> None:
     conn = op.get_bind()
     try:
         with conn.begin_nested():
-            sessionresult.create(conn)
-    except Exception as e:
-        log.warning("Skipping CREATE TYPE sessionresult: %s", e)
+            sessionresult.create(conn, checkfirst=True)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning("Skipping CREATE TYPE sessionresult (sqlstate=%s): %s", _sqlstate_of(e), e)
     sessiontypes.create(conn)
     conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_old;"))
     kernelstatus_new.create(conn)
@@ -138,8 +163,14 @@ def upgrade() -> None:
                     nullable=False,
                 ),
             )
-    except Exception as e:
-        log.warning("Skipping ADD COLUMN kernels.result (sessionresult): %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning(
+            "Skipping ADD COLUMN kernels.result (sessionresult, sqlstate=%s): %s",
+            _sqlstate_of(e),
+            e,
+        )
     op.add_column("kernels", sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True))
     op.add_column(
         "kernels",
@@ -155,8 +186,10 @@ def upgrade() -> None:
     try:
         with op.get_bind().begin_nested():
             op.create_index(op.f("ix_kernels_result"), "kernels", ["result"], unique=False)
-    except Exception as e:
-        log.warning("Skipping CREATE INDEX ix_kernels_result: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning("Skipping CREATE INDEX ix_kernels_result (sqlstate=%s): %s", _sqlstate_of(e), e)
     op.create_index(op.f("ix_kernels_type"), "kernels", ["type"], unique=False)
 
 
@@ -210,16 +243,20 @@ def downgrade() -> None:
     try:
         with op.get_bind().begin_nested():
             op.drop_index(op.f("ix_kernels_result"), table_name="kernels")
-    except Exception as e:
-        log.warning("Skipping DROP INDEX ix_kernels_result: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning("Skipping DROP INDEX ix_kernels_result (sqlstate=%s): %s", _sqlstate_of(e), e)
     op.alter_column("kernels", "agent_addr", existing_type=sa.VARCHAR(length=128), nullable=False)
     op.drop_column("kernels", "type")
     op.drop_column("kernels", "status_changed")
     try:
         with op.get_bind().begin_nested():
             op.drop_column("kernels", "result")
-    except Exception as e:
-        log.warning("Skipping DROP COLUMN kernels.result: %s", e)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning("Skipping DROP COLUMN kernels.result (sqlstate=%s): %s", _sqlstate_of(e), e)
     op.drop_column("agents", "status_changed")
     op.drop_index(op.f("ix_kernel_dependencies_kernel_id"), table_name="kernel_dependencies")
     op.drop_index(op.f("ix_kernel_dependencies_depends_on"), table_name="kernel_dependencies")
@@ -227,7 +264,9 @@ def downgrade() -> None:
 
     try:
         with op.get_bind().begin_nested():
-            sessionresult.drop(op.get_bind())
-    except Exception as e:
-        log.warning("Skipping DROP TYPE sessionresult: %s", e)
+            sessionresult.drop(op.get_bind(), checkfirst=True)
+    except sa.exc.DBAPIError as e:
+        if not _is_expected_divergence(e):
+            raise
+        log.warning("Skipping DROP TYPE sessionresult (sqlstate=%s): %s", _sqlstate_of(e), e)
     sessiontypes.drop(op.get_bind())
