@@ -41,15 +41,6 @@ def save_chat_config(config: DeploymentChatConfig) -> None:
     CHAT_CONFIG_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
-def mask_token(token: str | None) -> str:
-    """Render a token as ``sk-***...***xxxx`` for diagnostic display."""
-    if token is None:
-        return "<unset>"
-    if len(token) <= 8:
-        return "***"
-    return f"{token[:3]}***...***{token[-4:]}"
-
-
 def read_json_file(path: Path) -> dict[str, Any] | None:
     """Read a JSON file as a dict, returning None on missing or unparseable input."""
     if not path.exists():

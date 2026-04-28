@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from ai.backend.client.cli.v2.deployment.chat.formatter import DeploymentChatFormatter
+from ai.backend.client.cli.v2.deployment.chat.formatter import (
+    DeploymentChatFormatter,
+    mask_token,
+)
 from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatCacheEntry
 
 
@@ -35,3 +38,17 @@ class TestEntryLines:
             "default_model : -",
             "last_synced_at: -",
         ]
+
+
+class TestMaskToken:
+    def test_mask_long_token(self) -> None:
+        masked = mask_token("sk-abcdefghijklmnopqrstuvwxyz")
+        assert masked.startswith("sk-")
+        assert masked.endswith("wxyz")
+        assert "***" in masked
+
+    def test_mask_short_token(self) -> None:
+        assert mask_token("short") == "***"
+
+    def test_mask_none(self) -> None:
+        assert mask_token(None) == "<unset>"

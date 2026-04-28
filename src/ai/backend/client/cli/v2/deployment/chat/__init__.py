@@ -3,7 +3,8 @@
 Submodules:
 - :mod:`commands` — Click command/group definitions.
 - :mod:`types` — Pydantic models for the on-disk cache and config files.
-- :mod:`utils` — load/save helpers and ``mask_token``.
+- :mod:`utils` — save helpers and shared JSON I/O.
+- :mod:`formatter` — display helpers (``mask_token``, ``DeploymentChatFormatter``).
 """
 
 from .commands import chat, chat_config
