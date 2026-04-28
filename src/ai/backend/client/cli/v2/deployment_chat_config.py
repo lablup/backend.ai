@@ -29,7 +29,6 @@ CHAT_CONFIG_SCHEMA_VERSION = 1
 class DeploymentChatConfig(BaseModel):
     """Per-deployment API key registry (user-managed)."""
 
-    schema_version: int = Field(default=CHAT_CONFIG_SCHEMA_VERSION)
     tokens: dict[UUID, str] = Field(default_factory=dict)
 
     def get_token(self, deployment_id: UUID) -> str | None:
@@ -79,7 +78,8 @@ def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
 def save_chat_config(config: DeploymentChatConfig, path: Path = CHAT_CONFIG_FILE) -> None:
     """Atomically write the chat config and enforce ``0600`` permissions."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = config.model_dump_json(indent=2)
+    body = {"schema_version": CHAT_CONFIG_SCHEMA_VERSION, **config.model_dump(mode="json")}
+    payload = json.dumps(body, indent=2, ensure_ascii=False)
     fd, tmp_path_str = tempfile.mkstemp(
         prefix=path.name + ".",
         suffix=".tmp",

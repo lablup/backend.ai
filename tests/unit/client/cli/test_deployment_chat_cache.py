@@ -140,6 +140,20 @@ class TestLoaderResilience:
         assert list(loaded.deployments.keys()) == [good_id]
 
 
+class TestEntryFormatSummary:
+    def test_format_summary_returns_lines(self) -> None:
+        entry = _entry(default_model="meta/test-model")
+        lines = entry.format_summary()
+        assert any("endpoint_url" in line for line in lines)
+        assert any("meta/test-model" in line for line in lines)
+        assert any("last_synced_at" in line for line in lines)
+
+    def test_format_summary_dash_for_missing_default_model(self) -> None:
+        entry = _entry(default_model=None)
+        lines = entry.format_summary()
+        assert any("default_model : -" in line for line in lines)
+
+
 class TestEntryMutations:
     def test_upsert_overwrites_existing_entry(self) -> None:
         cache = DeploymentChatCache()

@@ -21,7 +21,6 @@ from ai.backend.client.cli.v2.deployment_chat_cache import (
 from ai.backend.client.cli.v2.deployment_chat_config import (
     IncompatibleChatConfigError,
     load_chat_config,
-    save_chat_config,
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 
@@ -73,7 +72,6 @@ def chat(
     runtime variants. Pass them through ``--params`` instead.
     """
     import json
-    import sys
 
     from ai.backend.client.v2.deployment_chat import (
         DeploymentChatAuthError,
@@ -148,19 +146,16 @@ def chat(
                     body,
                 )
             except DeploymentChatAuthError as e:
-                chat_config.clear_token(deployment_id)
-                save_chat_config(chat_config)
                 raise click.ClickException(
                     f"The inference endpoint rejected the configured API key for "
-                    f"deployment {deployment_id}. The cached key has been cleared.\n"
-                    "Register a new one with:\n"
+                    f"deployment {deployment_id}. Re-register with:\n"
                     f"  ./bai deployment chat-config set {deployment_id} --token <api_key>"
                 ) from e
             except BackendAPIError as e:
                 raise click.ClickException(
                     f"Inference endpoint error ({e.status} {e.reason}): {e.data}"
                 ) from e
-        sys.stdout.write(json.dumps(response, indent=2, ensure_ascii=False, default=str) + "\n")
+        print(json.dumps(response, indent=2, ensure_ascii=False, default=str))
 
     _run_async(_run)
 

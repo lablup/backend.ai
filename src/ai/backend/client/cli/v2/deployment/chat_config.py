@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 import click
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ai.backend.client.cli.v2.deployment_chat_cache import (
     DeploymentChatCacheEntry,
@@ -23,6 +24,16 @@ from ai.backend.client.cli.v2.deployment_chat_config import (
     save_chat_config,
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
+
+
+class _ServedModelEntry(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    id: str
+
+
+class _ServedModelsResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    data: list[_ServedModelEntry] = Field(default_factory=list)
 
 
 def _run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
@@ -62,12 +73,6 @@ def chat_config() -> None:
     ),
 )
 @click.option(
-    "--no-token",
-    is_flag=True,
-    default=False,
-    help="Explicitly clear the cached API key (deployment exposes no auth).",
-)
-@click.option(
     "--default-model",
     default=None,
     type=str,
@@ -79,13 +84,9 @@ def chat_config() -> None:
 def set_(
     deployment_id: UUID,
     api_key: str | None,
-    no_token: bool,
     default_model: str | None,
 ) -> None:
     """Register or update the chat cache entry for a deployment."""
-    if api_key and no_token:
-        raise click.ClickException("--token and --no-token are mutually exclusive.")
-
     connection = load_v2_config()
     try:
         cache = load_chat_cache()
@@ -97,13 +98,7 @@ def set_(
         raise click.ClickException(str(e)) from e
 
     existing_entry = cache.get(deployment_id)
-    resolved_key: str | None
-    if no_token:
-        resolved_key = None
-    elif api_key is not None:
-        resolved_key = api_key
-    else:
-        resolved_key = chat_config_store.get_token(deployment_id)
+    resolved_key = api_key if api_key is not None else chat_config_store.get_token(deployment_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(connection)
@@ -137,16 +132,14 @@ def set_(
             ),
         )
         save_chat_cache(cache)
-        if resolved_key is None:
-            chat_config_store.clear_token(deployment_id)
-        else:
+        if resolved_key is not None:
             chat_config_store.set_token(deployment_id, resolved_key)
-        save_chat_config(chat_config_store)
+            save_chat_config(chat_config_store)
 
-        click.echo(f"Updated chat cache entry for deployment {deployment_id}.")
+        print(f"Updated chat cache entry for deployment {deployment_id}.")
         if served_model:
-            click.echo(f"  default_model: {served_model}")
-        click.echo(f"  api_key:       {mask_token(resolved_key)}")
+            print(f"  default_model: {served_model}")
+        print(f"  api_key:       {mask_token(resolved_key)}")
 
     _run_async(_run)
 
@@ -174,13 +167,11 @@ async def _discover_model(
             payload = await client.list_models(endpoint_url, api_key)
         except (DeploymentChatAuthError, BackendAPIError, BackendClientError):
             return fallback
-    data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, list):
+    try:
+        parsed = _ServedModelsResponse.model_validate(payload)
+    except ValidationError:
         return fallback
-    for entry in data:
-        if isinstance(entry, dict) and isinstance(entry.get("id"), str):
-            return str(entry["id"])
-    return fallback
+    return parsed.data[0].id if parsed.data else fallback
 
 
 @chat_config.command(name="show")
@@ -206,11 +197,11 @@ def show(deployment_id: UUID | None) -> None:
 
     dep_ids = set(cache.deployments) | set(chat_config_store.tokens)
     if not dep_ids:
-        click.echo("No chat cache entries.")
+        print("No chat cache entries.")
         return
     for dep_id in dep_ids:
         _print_entry(dep_id, cache.get(dep_id), chat_config_store.get_token(dep_id))
-        click.echo("")
+        print()
 
 
 @chat_config.command(name="clear")
@@ -233,9 +224,9 @@ def clear(deployment_id: UUID) -> None:
     if removed_token:
         save_chat_config(chat_config_store)
     if removed_entry or removed_token:
-        click.echo(f"Removed chat cache entry for deployment {deployment_id}.")
+        print(f"Removed chat cache entry for deployment {deployment_id}.")
     else:
-        click.echo(f"No chat cache entry for deployment {deployment_id}.")
+        print(f"No chat cache entry for deployment {deployment_id}.")
 
 
 def _print_entry(
@@ -243,11 +234,15 @@ def _print_entry(
     entry: DeploymentChatCacheEntry | None,
     token: str | None,
 ) -> None:
-    click.echo(f"deployment_id : {deployment_id}")
-    click.echo(f"endpoint_url  : {entry.endpoint_url if entry else '-'}")
-    click.echo(f"api_key       : {mask_token(token)}")
-    click.echo(f"default_model : {(entry.default_model if entry else None) or '-'}")
-    click.echo(f"last_synced_at: {entry.last_synced_at.isoformat() if entry else '-'}")
+    print(f"deployment_id : {deployment_id}")
+    if entry is not None:
+        for line in entry.format_summary():
+            print(line)
+    else:
+        print("endpoint_url  : -")
+        print("default_model : -")
+        print("last_synced_at: -")
+    print(f"api_key       : {mask_token(token)}")
 
 
 __all__ = ("chat_config",)
