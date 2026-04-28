@@ -623,7 +623,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         action = CreateAccessTokenAction(
             creator=ModelDeploymentAccessTokenCreator(
                 model_deployment_id=deployment_id,
-                expires_at=None,
+                expires_at=datetime(2027, 1, 1, tzinfo=UTC),
             ),
         )
         result = await deployment_service.create_access_token(action)

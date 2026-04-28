@@ -571,23 +571,26 @@ class TestCreateAccessTokenInput:
     schema) rather than the old deployment_id field name.
     """
 
-    def test_valid_creation_with_model_deployment_id(self) -> None:
-        deployment_id = uuid.uuid4()
-        inp = CreateAccessTokenInput(model_deployment_id=deployment_id)
-        assert inp.model_deployment_id == deployment_id
-
-    def test_expires_at_defaults_to_none(self) -> None:
-        inp = CreateAccessTokenInput(model_deployment_id=uuid.uuid4())
-        assert inp.expires_at is None
-
-    def test_valid_creation_with_expires_at(self) -> None:
+    def test_valid_creation(self) -> None:
         deployment_id = uuid.uuid4()
         expires = datetime(2026, 12, 31, 23, 59, 59, tzinfo=UTC)
         inp = CreateAccessTokenInput(model_deployment_id=deployment_id, expires_at=expires)
         assert inp.model_deployment_id == deployment_id
         assert inp.expires_at == expires
 
-    def test_model_validate_with_model_deployment_id_succeeds(self) -> None:
+    def test_missing_expires_at_raises_validation_error(self) -> None:
+        # BA-5881: expires_at is required — there is no safe default lifetime.
+        with pytest.raises(ValidationError):
+            CreateAccessTokenInput(model_deployment_id=uuid.uuid4())  # type: ignore[call-arg]
+
+    def test_expires_at_none_raises_validation_error(self) -> None:
+        with pytest.raises(ValidationError):
+            CreateAccessTokenInput.model_validate({
+                "model_deployment_id": str(uuid.uuid4()),
+                "expires_at": None,
+            })
+
+    def test_model_validate_with_isoformat_expires_at_succeeds(self) -> None:
         deployment_id = uuid.uuid4()
         expires = datetime(2027, 1, 1, tzinfo=UTC)
         inp = CreateAccessTokenInput.model_validate({
@@ -597,23 +600,17 @@ class TestCreateAccessTokenInput:
         assert inp.model_deployment_id == deployment_id
         assert inp.expires_at == expires
 
-    def test_model_validate_with_expires_at_none(self) -> None:
-        deployment_id = uuid.uuid4()
-        inp = CreateAccessTokenInput.model_validate({
-            "model_deployment_id": str(deployment_id),
-            "expires_at": None,
-        })
-        assert inp.model_deployment_id == deployment_id
-        assert inp.expires_at is None
-
     def test_missing_model_deployment_id_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            CreateAccessTokenInput.model_validate({"expires_at": None})
+            CreateAccessTokenInput.model_validate({
+                "expires_at": datetime(2027, 1, 1, tzinfo=UTC).isoformat(),
+            })
 
     def test_uuid_string_is_coerced_to_uuid(self) -> None:
         deployment_id = uuid.uuid4()
         inp = CreateAccessTokenInput.model_validate({
             "model_deployment_id": str(deployment_id),
+            "expires_at": datetime(2027, 1, 1, tzinfo=UTC).isoformat(),
         })
         assert isinstance(inp.model_deployment_id, uuid.UUID)
         assert inp.model_deployment_id == deployment_id

@@ -40,9 +40,9 @@ def access_token() -> None:
 @click.argument("deployment_id", type=click.UUID)
 @click.option(
     "--expires-at",
-    default=None,
+    required=True,
     type=click.DateTime(),
-    help="Token expiration timestamp (ISO8601 format).",
+    help="Token expiration timestamp (ISO8601 format). Required.",
 )
 def create(deployment_id: uuid.UUID, expires_at: Any) -> None:
     """Create an access token for a deployment."""
@@ -52,7 +52,7 @@ def create(deployment_id: uuid.UUID, expires_at: Any) -> None:
 
     body = CreateAccessTokenInput(
         model_deployment_id=deployment_id,
-        expires_at=datetime.fromisoformat(expires_at.isoformat()) if expires_at else None,
+        expires_at=datetime.fromisoformat(expires_at.isoformat()),
     )
 
     async def _run() -> None:

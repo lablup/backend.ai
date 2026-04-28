@@ -1,7 +1,7 @@
 """Deployment service for managing model deployments."""
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
@@ -952,7 +952,7 @@ class DeploymentService:
             action.creator.model_deployment_id
         )
 
-        expires_at = action.creator.expires_at or (datetime.now(UTC) + timedelta(days=1))
+        expires_at = action.creator.expires_at
         jwt_token = await self._mint_endpoint_jwt(
             deployment_id=action.creator.model_deployment_id,
             resource_group=endpoint_info.metadata.resource_group,

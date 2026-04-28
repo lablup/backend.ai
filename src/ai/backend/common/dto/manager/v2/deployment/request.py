@@ -818,7 +818,12 @@ class CreateAccessTokenInput(BaseRequestModel):
     """Input for creating an access token."""
 
     model_deployment_id: UUID = Field(description="Model deployment ID")
-    expires_at: datetime | None = Field(default=None, description="Token expiration timestamp")
+    expires_at: datetime = Field(
+        description=(
+            "Token expiration timestamp. Required: there is no safe default — "
+            "callers must decide the token lifetime themselves."
+        )
+    )
 
 
 class DeleteAccessTokenInput(BaseRequestModel):
