@@ -250,8 +250,6 @@ def set_(
     cache = load_chat_cache()
     chat_config_store = load_chat_config()
 
-    resolved_key = api_key if api_key is not None else chat_config_store.get_token(deployment_id)
-
     async def _run() -> None:
         endpoint_entry = await _resolve_endpoint_entry(
             cache,
@@ -266,7 +264,8 @@ def set_(
         print(f"Updated chat config for deployment {deployment_id}.")
         if endpoint_entry.default_model:
             print(f"  default_model: {endpoint_entry.default_model}")
-        print(f"  api_key:       {mask_token(resolved_key)}")
+        if api_key is not None:
+            print(f"  api_key:       {mask_token(api_key)}")
 
     _run_async(_run)
 
