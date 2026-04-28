@@ -15,30 +15,6 @@ class DeploymentChatCacheEntry(BaseModel):
     default_model: str | None = None
     last_synced_at: datetime
 
-    def format_summary(self) -> list[str]:
-        return [
-            f"endpoint_url  : {self.endpoint_url}",
-            f"default_model : {self.default_model or '-'}",
-            f"last_synced_at: {self.last_synced_at.isoformat()}",
-        ]
-
-    @classmethod
-    def print_summary(
-        cls,
-        deployment_id: UUID,
-        entry: DeploymentChatCacheEntry | None,
-        token_display: str,
-    ) -> None:
-        print(f"deployment_id : {deployment_id}")
-        if entry is not None:
-            for line in entry.format_summary():
-                print(line)
-        else:
-            print("endpoint_url  : -")
-            print("default_model : -")
-            print("last_synced_at: -")
-        print(f"api_key       : {token_display}")
-
 
 class DeploymentChatCache(BaseModel):
     """In-memory representation of the chat cache file."""

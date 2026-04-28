@@ -136,6 +136,10 @@ class DeploymentChatClient:
 
     @staticmethod
     async def _read_payload(resp: aiohttp.ClientResponse) -> object:
+        # Inference endpoints normally return JSON, but proxies in front of them
+        # (nginx, app-proxy, cloud LB) often emit HTML/plain-text bodies on 5xx.
+        # Fall back to text so the raw body lands in the raised exception
+        # instead of leaking aiohttp.ContentTypeError to the caller.
         try:
             return await resp.json()
         except (aiohttp.ContentTypeError, ValueError):

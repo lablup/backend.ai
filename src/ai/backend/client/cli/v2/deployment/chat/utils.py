@@ -11,9 +11,8 @@ Two on-disk JSON files live side by side under ``~/.backend.ai/``:
 
 from __future__ import annotations
 
-import os
 import stat
-import tempfile
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -38,12 +37,18 @@ def load_chat_cache(path: Path = CHAT_CACHE_FILE) -> DeploymentChatCache:
     try:
         return DeploymentChatCache.model_validate(raw)
     except ValidationError:
+        print(
+            f"WARNING: {path} is in an invalid format and was ignored.",
+            file=sys.stderr,
+        )
         return DeploymentChatCache()
 
 
 def save_chat_cache(cache: DeploymentChatCache, path: Path = CHAT_CACHE_FILE) -> None:
-    """Atomically write the chat cache."""
-    _atomic_write_text(path, cache.model_dump_json(indent=2))
+    """Write the chat cache and enforce ``0600`` permissions."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(cache.model_dump_json(indent=2), encoding="utf-8")
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
 def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
@@ -54,12 +59,19 @@ def load_chat_config(path: Path = CHAT_CONFIG_FILE) -> DeploymentChatConfig:
     try:
         return DeploymentChatConfig.model_validate(raw)
     except ValidationError:
+        print(
+            f"WARNING: {path} is in an invalid format and was ignored. "
+            "Re-register tokens with `./bai deployment chat-config set`.",
+            file=sys.stderr,
+        )
         return DeploymentChatConfig()
 
 
 def save_chat_config(config: DeploymentChatConfig, path: Path = CHAT_CONFIG_FILE) -> None:
-    """Atomically write the chat config and enforce ``0600`` permissions."""
-    _atomic_write_text(path, config.model_dump_json(indent=2))
+    """Write the chat config and enforce ``0600`` permissions."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(config.model_dump_json(indent=2), encoding="utf-8")
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
 def mask_token(token: str | None) -> str:
@@ -80,22 +92,3 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     except (OSError, ValueError):
         return None
     return raw if isinstance(raw, dict) else None
-
-
-def _atomic_write_text(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path_str = tempfile.mkstemp(
-        prefix=path.name + ".",
-        suffix=".tmp",
-        dir=str(path.parent),
-    )
-    tmp_path = Path(tmp_path_str)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(text)
-        tmp_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
-        tmp_path.replace(path)
-    except Exception:
-        if tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
-        raise
