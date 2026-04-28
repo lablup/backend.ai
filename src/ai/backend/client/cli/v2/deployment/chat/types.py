@@ -18,6 +18,10 @@ class DeploymentChatCacheEntry(BaseModel):
     default_model: str | None = None
     last_synced_at: datetime
 
+    def is_fresh(self, *, now: datetime, ttl: timedelta = CACHE_ENTRY_TTL) -> bool:
+        """Whether this entry is within the cache TTL window."""
+        return now - self.last_synced_at < ttl
+
 
 class DeploymentChatCache(BaseModel):
     """In-memory representation of the chat cache file."""
