@@ -2684,20 +2684,18 @@ class DeploymentDBSource:
     ) -> tuple[uuid.UUID | None, bool]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
-        Uses ``deploying_revision IS NULL`` as an atomic guard against
-        concurrent activations.
+        Overrides any previous ``deploying_revision`` unconditionally;
+        leftover routes from the previous rollout are picked up by
+        ``RouteEvictionHandler``'s orphan-revision branch.
 
         Returns:
             Tuple of (previous_current_revision_id, updated).
-            ``updated=False`` means the guard fired (another deployment in progress).
+            ``updated=False`` means the endpoint row was not found.
         """
         async with self._begin_session_read_committed() as db_sess:
             update_query = (
                 sa.update(EndpointRow)
-                .where(
-                    EndpointRow.id == endpoint_id,
-                    EndpointRow.deploying_revision.is_(None),
-                )
+                .where(EndpointRow.id == endpoint_id)
                 .values(
                     deploying_revision=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,

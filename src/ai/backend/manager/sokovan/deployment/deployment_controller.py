@@ -51,6 +51,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -75,7 +76,6 @@ from ai.backend.manager.repositories.deployment.updaters import (
     RouteUpdaterSpec,
 )
 from ai.backend.manager.sokovan.deployment.exceptions import (
-    DeploymentAlreadyInProgress,
     InvalidEndpointState,
 )
 from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
@@ -521,8 +521,12 @@ class DeploymentController:
         update, blue-green, etc.) and swap deploying_revision → current_revision
         on completion.
 
+        If a previous rollout is still in progress, its ``deploying_revision`` is
+        overwritten; routes belonging to the preempted revision are picked up by
+        ``RouteEvictionHandler``'s orphan-revision branch on the next route tick.
+
         Raises:
-            DeploymentAlreadyInProgress: If another revision is currently deploying.
+            EndpointNotFound: If the deployment does not exist.
             InvalidEndpointState: If the revision is already current.
         """
         # 1. Validate revision exists
@@ -530,26 +534,18 @@ class DeploymentController:
 
         # 2. Validate deployment state
         deployment_info = await self._deployment_repository.get_endpoint_info(deployment_id)
-        if deployment_info.deploying_revision_id is not None:
-            raise DeploymentAlreadyInProgress(
-                f"Deployment {deployment_id} already has deploying_revision "
-                f"{deployment_info.deploying_revision_id} in progress."
-            )
         if deployment_info.current_revision_id == revision_id:
             raise InvalidEndpointState(
                 f"Revision {revision_id} is already the current revision "
                 f"of deployment {deployment_id}."
             )
 
-        # 3. Set deploying_revision atomically (WHERE deploying_revision IS NULL)
+        # 3. Set deploying_revision (override any in-flight rollout)
         previous_revision_id, updated = await self._deployment_repository.set_deploying_revision(
             deployment_id, revision_id
         )
         if not updated:
-            raise DeploymentAlreadyInProgress(
-                f"Deployment {deployment_id} already has a deploying revision in progress "
-                f"(concurrent activation detected)."
-            )
+            raise EndpointNotFound(f"Endpoint {deployment_id} not found")
 
         # 4. Trigger DEPLOYING lifecycle
         await self.mark_lifecycle_needed(
