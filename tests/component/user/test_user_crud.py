@@ -16,8 +16,11 @@ from ai.backend.common.dto.manager.user import (
     GetUserResponse,
     UserStatus,
 )
-from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import users
 
 from .conftest import UserFactory
@@ -55,15 +58,17 @@ class TestUserCreateCrud:
         group_fixture: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
-        """S-3: User created with group_ids → verify association_groups_users mapping in DB."""
+        """S-3: User created with group_ids → verify association_scopes_entities mapping in DB."""
         result = await user_factory(group_ids=[str(group_fixture)])
 
         async with db_engine.begin() as conn:
             row = await conn.execute(
-                sa.select(association_groups_users).where(
+                sa.select(AssociationScopesEntitiesRow).where(
                     sa.and_(
-                        association_groups_users.c.group_id == str(group_fixture),
-                        association_groups_users.c.user_id == str(result.user.id),
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
                     )
                 )
             )

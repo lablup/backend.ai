@@ -48,10 +48,8 @@ from ai.backend.manager.errors.user import (
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.group import (
-    AssocGroupUserRow,
     GroupRow,
     ProjectType,
-    association_groups_users,
 )
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -247,9 +245,8 @@ class UserDBSource:
             row.main_access_key = kp_data.access_key
             created_user.main_access_key = kp_data.access_key
 
-            # Add user to groups (using already-resolved project_ids)
-            if project_ids:
-                await self._add_user_to_groups(db_session, created_user.uuid, project_ids)
+            # User-project membership is recorded as AssociationScopesEntitiesRow rows
+            # by RBACEntityCreator above (via additional_scope_refs).
 
             # Create RBAC role and map user to role
             # Note: Entity-Scope association is handled by RBACEntityCreator above
@@ -346,9 +343,8 @@ class UserDBSource:
         row.main_access_key = kp_data.access_key
         created_user.main_access_key = kp_data.access_key
 
-        # Add user to groups (using already-resolved project_ids)
-        if project_ids:
-            await self._add_user_to_groups(db_session, created_user.uuid, project_ids)
+        # User-project membership is recorded as AssociationScopesEntitiesRow rows
+        # by RBACEntityCreator above (via additional_scope_refs).
 
         # Create RBAC role and map user to role
         role = await self._role_manager.create_system_role(db_session, created_user)
@@ -870,18 +866,6 @@ class UserDBSource:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return cast(UserRow, res)
 
-    async def _add_user_to_groups(
-        self, db_session: SASession, user_uuid: UUID, project_ids: Iterable[UUID]
-    ) -> None:
-        """Add user to groups using pre-resolved project IDs.
-
-        Note: RBAC scope associations are handled by RBACEntityCreator in create_user_validated().
-        This method only handles the association_groups_users table.
-        """
-        group_data = [{"user_id": user_uuid, "group_id": pid} for pid in project_ids]
-        if group_data:
-            await db_session.execute(sa.insert(association_groups_users).values(group_data))
-
     async def _get_project_scope_ids_for_user(
         self, db_session: SASession, domain_name: str, project_ids: Iterable[UUID]
     ) -> list[UUID]:
@@ -1328,7 +1312,8 @@ class UserDBSource:
     ) -> UserSearchResult:
         """Search users within a project.
 
-        Joins with association_groups_users to find project members.
+        Joins with association_scopes_entities (PROJECT scope, USER entity)
+        to find project members.
 
         Args:
             scope: ProjectUserSearchScope defining the project to search within.
@@ -1342,8 +1327,12 @@ class UserDBSource:
                 sa.select(UserRow)
                 .select_from(UserRow)
                 .join(
-                    AssocGroupUserRow,
-                    UserRow.uuid == AssocGroupUserRow.user_id,
+                    AssociationScopesEntitiesRow,
+                    sa.and_(
+                        sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    ),
                 )
             )
             result = await execute_batch_querier(db_session, query, querier, scope=scope)

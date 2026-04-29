@@ -13,11 +13,13 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -25,12 +27,15 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, association_groups_users
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -93,6 +98,7 @@ class TestAuthRepository:
                 KeyPairRow,
                 GroupRow,
                 AssocGroupUserRow,
+                AssociationScopesEntitiesRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -291,11 +297,14 @@ class TestAuthRepository:
             db_sess.add(group)
             await db_sess.flush()
 
-            # Add user to group
+            # Add user to group via RBAC scope-entity association
             await db_sess.execute(
-                association_groups_users.insert().values(
-                    user_id=sample_user_data.uuid,
-                    group_id=group_id,
+                sa.insert(AssociationScopesEntitiesRow).values(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(sample_user_data.uuid),
+                    relation_type=RelationType.AUTO,
                 )
             )
             await db_sess.flush()
