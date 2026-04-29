@@ -220,7 +220,7 @@ def delete(role_id: str) -> None:
     asyncio.run(_run())
 
 
-def _resolve_role_selector(role_id: str | None, by_name: str | None) -> None:
+def _resolve_role_selector(role_id: UUID | None, by_name: str | None) -> None:
     if not role_id and not by_name:
         raise click.UsageError("Provide ROLE_ID or --by-name.")
     if role_id and by_name:
@@ -228,7 +228,7 @@ def _resolve_role_selector(role_id: str | None, by_name: str | None) -> None:
 
 
 @role.command(name="add-permission")
-@click.argument("role_id", type=str, required=False)
+@click.argument("role_id", type=click.UUID, required=False)
 @click.option("--by-name", type=str, default=None, help="Resolve role by name.")
 @click.option(
     "--kind",
@@ -236,7 +236,7 @@ def _resolve_role_selector(role_id: str | None, by_name: str | None) -> None:
     required=True,
     help="Operation set kind to grant on every resource entity type.",
 )
-def add_permission(role_id: str | None, by_name: str | None, kind: str) -> None:
+def add_permission(role_id: UUID | None, by_name: str | None, kind: str) -> None:
     """Add the standard <kind> permissions for every resource entity type to a role."""
     _resolve_role_selector(role_id, by_name)
     raise click.ClickException(
@@ -245,7 +245,7 @@ def add_permission(role_id: str | None, by_name: str | None, kind: str) -> None:
 
 
 @role.command(name="remove-permission")
-@click.argument("role_id", type=str, required=False)
+@click.argument("role_id", type=click.UUID, required=False)
 @click.option("--by-name", type=str, default=None, help="Resolve role by name.")
 @click.option(
     "--kind",
@@ -254,7 +254,7 @@ def add_permission(role_id: str | None, by_name: str | None, kind: str) -> None:
     help="Operation set kind to revoke.",
 )
 def remove_permission(
-    role_id: str | None,
+    role_id: UUID | None,
     by_name: str | None,
     kind: str,
 ) -> None:
@@ -266,11 +266,11 @@ def remove_permission(
 
 
 @role.command(name="replace-permission")
-@click.argument("role_id", type=str, required=False)
+@click.argument("role_id", type=click.UUID, required=False)
 @click.argument("payload", type=str)
 @click.option("--by-name", type=str, default=None, help="Resolve role by name.")
 def replace_permission(
-    role_id: str | None,
+    role_id: UUID | None,
     payload: str,
     by_name: str | None,
 ) -> None:
