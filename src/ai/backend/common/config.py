@@ -159,7 +159,7 @@ model_definition_iv = t.Dict({
                         t.Key("args"): t.Dict().allow_extra("*"),
                     })
                 ),
-                t.Key("start_command"): t.String | t.List(t.String),
+                t.Key("start_command", default=None): t.Null | t.String | t.List(t.String),
                 t.Key("shell", default="/bin/bash"): t.String,  # used if start_command is a string
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
@@ -246,7 +246,8 @@ class ModelServiceConfig(BaseConfigModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: str | list[str] = Field(
+    start_command: str | list[str] | None = Field(
+        default=None,
         description="Command to start the model service.",
         examples=["python service.py", ["python", "service.py"]],
     )
@@ -508,8 +509,6 @@ class ModelServiceConfigDraft(BaseConfigModel):
     health_check: ModelHealthCheckDraft | None = None
 
     def to_resolved(self) -> ModelServiceConfig:
-        if self.start_command is None:
-            raise ValueError("ModelServiceConfig.start_command is required")
         if self.port is None:
             raise ValueError("ModelServiceConfig.port is required")
         return ModelServiceConfig(

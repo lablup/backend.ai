@@ -72,7 +72,6 @@
       "type": "object",
       "description": "Service configuration that defines how to start and monitor the model service.",
       "required": [
-        "start_command",
         "port"
       ],
       "additionalProperties": true,
@@ -96,8 +95,12 @@
               "items": {
                 "type": "string"
               }
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "examples": [
             "python service.py",
             [

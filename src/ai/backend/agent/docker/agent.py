@@ -1654,10 +1654,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return cast(str, self.docker_info["CgroupVersion"])
 
     @override
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | list[str] | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
-            return cast(str | None, result["Config"].get("Cmd"))
+            return cast(str | list[str] | None, result["Config"].get("Cmd"))
 
     @override
     async def enumerate_containers(

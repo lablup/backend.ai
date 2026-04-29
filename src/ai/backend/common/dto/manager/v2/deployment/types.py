@@ -23,7 +23,11 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.types import ClusterMode, MountPermission, RuntimeVariant
+from ai.backend.common.types import (
+    ClusterMode,
+    MountPermission,
+    RuntimeVariant,
+)
 
 __all__ = (
     "AccessTokenOrderField",
@@ -293,7 +297,9 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: str | list[str] = Field(description="Command to start the model service.")
+    start_command: str | list[str] | None = Field(
+        default=None, description="Command to start the model service."
+    )
     shell: str = Field(
         default="/bin/bash", description="Shell to use if start_command is a string."
     )

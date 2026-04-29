@@ -1,11 +1,13 @@
 import pickle
 from typing import Any
 
+import pytest
 import tomli
 
 from ai.backend.common.config import (
     ModelConfig,
     ModelDefinition,
+    ModelDefinitionDraft,
     ModelHealthCheck,
     ModelMetadata,
     ModelServiceConfig,
@@ -177,24 +179,50 @@ class TestMergeFieldCoverage:
         assert not missing, f"_merge_definition() does not handle: {missing}"
 
 
-def test_sanitize_inline_dicts() -> None:
-    sample = """
-    [section]
-    a = { x = 1, y = 1 }
-    b = { x = 1, y = { t = 2, u = 2 } }
-    """
+class TestModelConfigs:
+    def test_sanitize_inline_dicts(self) -> None:
+        sample = """
+        [section]
+        a = { x = 1, y = 1 }
+        b = { x = 1, y = { t = 2, u = 2 } }
+        """
 
-    result = tomli.loads(sample)
-    assert isinstance(result["section"]["a"], dict)
-    assert isinstance(result["section"]["b"], dict)
-    assert isinstance(result["section"]["b"]["y"], dict)
+        result = tomli.loads(sample)
+        assert isinstance(result["section"]["a"], dict)
+        assert isinstance(result["section"]["b"], dict)
+        assert isinstance(result["section"]["b"]["y"], dict)
 
-    # Also ensure the result is picklable.
-    data = pickle.dumps(result)
-    result = pickle.loads(data)
-    assert result == {
-        "section": {
-            "a": {"x": 1, "y": 1},
-            "b": {"x": 1, "y": {"t": 2, "u": 2}},
-        },
-    }
+        # Also ensure the result is picklable.
+        data = pickle.dumps(result)
+        result = pickle.loads(data)
+        assert result == {
+            "section": {
+                "a": {"x": 1, "y": 1},
+                "b": {"x": 1, "y": {"t": 2, "u": 2}},
+            },
+        }
+
+    @pytest.fixture
+    def model_definition_draft_with_minimal_service(self) -> ModelDefinitionDraft:
+        return ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "demo",
+                    "model_path": "/models/demo",
+                    "service": {
+                        "port": 8000,
+                    },
+                }
+            ]
+        })
+
+    def test_model_service_config_draft_allows_missing_start_command(
+        self, model_definition_draft_with_minimal_service: ModelDefinitionDraft
+    ) -> None:
+        model_definition = model_definition_draft_with_minimal_service
+        resolved = model_definition.to_resolved()
+
+        service = resolved.models[0].service
+        assert service is not None
+        assert service.start_command is None
+        assert service.port == 8000
