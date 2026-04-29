@@ -24,8 +24,12 @@ __all__ = (
     "SearchRoleAssignmentsPayload",
     "AdminSearchRolesPayload",
     "AssociationScopesEntitiesNode",
+    "BulkAddRolePermissionFailureInfo",
+    "BulkAddRolePermissionsPayload",
     "BulkAssignRoleFailureInfo",
     "BulkAssignRoleResultPayload",
+    "BulkRemoveRolePermissionFailureInfo",
+    "BulkRemoveRolePermissionsPayload",
     "BulkRevokeRoleFailureInfo",
     "BulkRevokeRoleResultPayload",
     "CreateRolePayload",
@@ -37,8 +41,11 @@ __all__ = (
     "OperationInfo",
     "PermissionNode",
     "PurgeRolePayload",
+    "ReplaceRolePermissionFailureInfo",
+    "ReplaceRolePermissionsPayload",
     "RoleAssignmentNode",
     "RoleNode",
+    "RolePermissionEntryNode",
     "ScopeEntityCombinationInfo",
     "ScopeEntityOperationCombinationInfo",
     "UpdateRolePayload",
@@ -131,6 +138,78 @@ class BulkRevokeRoleResultPayload(BaseResponseModel):
     )
     failed: list[BulkRevokeRoleFailureInfo] = Field(
         default_factory=list, description="Users that failed to be revoked"
+    )
+
+
+class RolePermissionEntryNode(BaseResponseModel):
+    """A scoped permission entry tied to a role, without server-assigned fields.
+
+    Used inside bulk-permission failure payloads to identify the failed
+    input entry; mirrors the shape of ``RolePermissionInput``.
+    """
+
+    role_id: UUID = Field(description="Role ID this permission belongs to")
+    scope_type: str = Field(description="Scope element type")
+    scope_id: str = Field(description="Scope element ID")
+    entity_type: str = Field(description="Entity element type")
+    operation: str = Field(description="Operation type")
+
+
+class BulkAddRolePermissionFailureInfo(BaseResponseModel):
+    """Failure detail for a single permission entry in bulk role-permission insertion."""
+
+    entry: RolePermissionEntryNode = Field(description="The permission entry that failed")
+    message: str = Field(description="Error message describing the failure")
+
+
+class BulkRemoveRolePermissionFailureInfo(BaseResponseModel):
+    """Failure detail for a single permission ID in bulk role-permission deletion."""
+
+    permission_id: UUID = Field(description="Permission row ID that failed to delete")
+    message: str = Field(description="Error message describing the failure")
+
+
+class ReplaceRolePermissionFailureInfo(BaseResponseModel):
+    """Failure detail for a single permission entry in replace operation."""
+
+    entry: RolePermissionEntryNode = Field(description="The permission entry that failed")
+    message: str = Field(description="Error message describing the failure")
+
+
+class BulkAddRolePermissionsPayload(BaseResponseModel):
+    """Result payload for bulk role-permission insertion."""
+
+    items: list[PermissionNode] = Field(
+        default_factory=list, description="Successfully inserted permission rows"
+    )
+    failed: list[BulkAddRolePermissionFailureInfo] = Field(
+        default_factory=list, description="Permission entries that failed to insert"
+    )
+
+
+class BulkRemoveRolePermissionsPayload(BaseResponseModel):
+    """Result payload for bulk role-permission deletion."""
+
+    items: list[PermissionNode] = Field(
+        default_factory=list, description="Successfully deleted permission rows"
+    )
+    failed: list[BulkRemoveRolePermissionFailureInfo] = Field(
+        default_factory=list, description="Permission IDs that failed to delete"
+    )
+
+
+class ReplaceRolePermissionsPayload(BaseResponseModel):
+    """Result payload for replacing a role's entire scoped-permission set.
+
+    ``items`` contains the new rows that became the role's permission set;
+    pre-existing rows wiped before the insert are not echoed back.
+    """
+
+    items: list[PermissionNode] = Field(
+        default_factory=list, description="Permission rows that make up the new set"
+    )
+    failed: list[ReplaceRolePermissionFailureInfo] = Field(
+        default_factory=list, description="Permission entries that failed to insert"
     )
 
 

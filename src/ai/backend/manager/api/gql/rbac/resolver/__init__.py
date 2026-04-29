@@ -2,9 +2,12 @@
 
 from .entity import admin_entities
 from .permission import (
+    admin_bulk_add_role_permissions,
+    admin_bulk_remove_role_permissions,
     admin_create_permission,
     admin_delete_permission,
     admin_permissions,
+    admin_replace_role_permissions,
     admin_update_permission,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
@@ -48,6 +51,9 @@ __all__ = [
     "admin_create_permission",
     "admin_update_permission",
     "admin_delete_permission",
+    "admin_bulk_add_role_permissions",
+    "admin_bulk_remove_role_permissions",
+    "admin_replace_role_permissions",
     # Role queries
     "admin_role",
     "admin_roles",

@@ -26,7 +26,9 @@ __all__ = (
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
     "AssignRoleInput",
+    "BulkAddRolePermissionsInput",
     "BulkAssignRoleInput",
+    "BulkRemoveRolePermissionsInput",
     "BulkRevokeRoleInput",
     "CreatePermissionInput",
     "CreateRoleInput",
@@ -38,12 +40,14 @@ __all__ = (
     "PermissionNestedFilter",
     "PermissionOrderBy",
     "PurgeRoleInput",
+    "ReplaceRolePermissionsInput",
     "RevokeRoleInput",
     "RoleAssignmentFilter",
     "RoleAssignmentOrderBy",
     "RoleFilter",
     "RoleNestedFilter",
     "RoleOrderBy",
+    "RolePermissionInput",
     "UpdatePermissionInput",
     "UpdateRoleInput",
 )
@@ -160,6 +164,53 @@ class BulkRevokeRoleInput(BaseRequestModel):
 
     role_id: UUID = Field(description="Role ID to revoke")
     user_ids: list[UUID] = Field(description="List of user IDs to revoke the role from")
+
+
+class RolePermissionInput(BaseRequestModel):
+    """A single scoped permission entry tied to a role.
+
+    Mirrors the manager-side ``PermissionCreatorSpec`` so it is self-contained:
+    ``role_id`` is carried in the entry rather than inferred from the URL,
+    which lets a single bulk call span multiple roles.
+    """
+
+    role_id: UUID = Field(description="Role ID this permission belongs to")
+    scope_type: str = Field(description="Scope element type (e.g. 'domain', 'project', 'user')")
+    scope_id: str = Field(description="Scope element ID")
+    entity_type: str = Field(description="Entity element type (e.g. 'session', 'vfolder')")
+    operation: str = Field(description="Operation type (e.g. 'read', 'create')")
+
+
+class BulkAddRolePermissionsInput(BaseRequestModel):
+    """Input for bulk-adding scoped permissions across one or more roles."""
+
+    permissions: list[RolePermissionInput] = Field(
+        description="Permission entries to insert. Duplicates are surfaced as failures.",
+    )
+
+
+class BulkRemoveRolePermissionsInput(BaseRequestModel):
+    """Input for bulk-deleting permission rows by primary key.
+
+    The permission row ID is globally unique, so a single call can remove rows
+    belonging to multiple roles.
+    """
+
+    permission_ids: list[UUID] = Field(
+        description="Permission row IDs to delete. Unknown IDs are silently ignored.",
+    )
+
+
+class ReplaceRolePermissionsInput(BaseRequestModel):
+    """Input for replacing one role's entire scoped-permission set in one call.
+
+    All entries must carry the same ``role_id`` as the URL; the server enforces
+    this so the operation cannot accidentally span multiple roles.
+    """
+
+    permissions: list[RolePermissionInput] = Field(
+        description="New permission set for the role. An empty list clears all permissions.",
+    )
 
 
 class RoleFilter(BaseRequestModel):

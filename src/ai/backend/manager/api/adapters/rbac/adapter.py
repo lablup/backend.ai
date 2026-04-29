@@ -28,8 +28,10 @@ from ai.backend.common.dto.manager.rbac import (
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.rbac import (
     AssociationScopesEntitiesNode,
+    BulkAddRolePermissionsPayload,
     BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
+    BulkRemoveRolePermissionsPayload,
     BulkRevokeRoleFailureInfo,
     BulkRevokeRoleResultPayload,
     CreateRoleInput,
@@ -40,6 +42,7 @@ from ai.backend.common.dto.manager.v2.rbac import (
     OperationInfo,
     PermissionNode,
     PurgeRolePayload,
+    ReplaceRolePermissionsPayload,
     RoleAssignmentNode,
     RoleNode,
     ScopeEntityOperationCombinationInfo,
@@ -59,7 +62,13 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput as AssignRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    BulkAddRolePermissionsInput as BulkAddRolePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     BulkAssignRoleInput as BulkAssignRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    BulkRemoveRolePermissionsInput as BulkRemoveRolePermissionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     BulkRevokeRoleInput as BulkRevokeRoleInputDTO,
@@ -81,6 +90,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    ReplaceRolePermissionsInput as ReplaceRolePermissionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     RevokeRoleInput as RevokeRoleInputDTO,
@@ -1021,6 +1033,43 @@ class RBACAdapter(BaseAdapter):
                 for f in result.failures
             ],
         )
+
+    async def bulk_add_role_permissions(
+        self,
+        input: BulkAddRolePermissionsInputDTO,
+    ) -> BulkAddRolePermissionsPayload:
+        """Bulk-insert scoped permission rows across one or more roles.
+
+        TODO(BA-5906): wire to ``permission_controller.bulk_add_role_permissions``
+        processor once the BA-5906 PR (bulk repository / service / action) is merged.
+        Until then, this raises NotImplementedError so the route is reachable but
+        explicit about the missing dependency.
+        """
+        raise NotImplementedError("bulk_add_role_permissions adapter wiring is pending BA-5906")
+
+    async def bulk_remove_role_permissions(
+        self,
+        input: BulkRemoveRolePermissionsInputDTO,
+    ) -> BulkRemoveRolePermissionsPayload:
+        """Bulk-delete permission rows by primary key.
+
+        TODO(BA-5906): wire to ``permission_controller.bulk_remove_role_permissions``
+        processor once the BA-5906 PR is merged.
+        """
+        raise NotImplementedError("bulk_remove_role_permissions adapter wiring is pending BA-5906")
+
+    async def replace_role_permissions(
+        self,
+        role_id: UUID,
+        input: ReplaceRolePermissionsInputDTO,
+    ) -> ReplaceRolePermissionsPayload:
+        """Replace one role's entire scoped-permission set.
+
+        TODO(BA-5906): wire to ``permission_controller.replace_role_permissions``
+        processor once the BA-5906 PR is merged. The adapter must also validate
+        that every entry's ``role_id`` matches the path ``role_id``.
+        """
+        raise NotImplementedError("replace_role_permissions adapter wiring is pending BA-5906")
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:
         """Bulk-revoke a role from multiple users."""
