@@ -1060,14 +1060,13 @@ class RBACAdapter(BaseAdapter):
 
     async def replace_role_permissions(
         self,
-        role_id: UUID,
         input: ReplaceRolePermissionsInputDTO,
     ) -> ReplaceRolePermissionsPayload:
         """Replace one role's entire scoped-permission set.
 
         TODO(BA-5906): wire to ``permission_controller.replace_role_permissions``
         processor once the BA-5906 PR is merged. The adapter must also validate
-        that every entry's ``role_id`` matches the path ``role_id``.
+        that every entry's ``role_id`` matches ``input.role_id``.
         """
         raise NotImplementedError("replace_role_permissions adapter wiring is pending BA-5906")
 

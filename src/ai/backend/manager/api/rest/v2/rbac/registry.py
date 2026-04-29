@@ -103,7 +103,7 @@ def register_v2_rbac_routes(
     )
     registry.add(
         "POST",
-        "/roles/{role_id}/permissions/replace",
+        "/permissions/replace",
         handler.replace_role_permissions,
         middlewares=[superadmin_required],
     )

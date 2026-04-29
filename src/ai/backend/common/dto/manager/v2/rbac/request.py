@@ -204,10 +204,12 @@ class BulkRemoveRolePermissionsInput(BaseRequestModel):
 class ReplaceRolePermissionsInput(BaseRequestModel):
     """Input for replacing one role's entire scoped-permission set in one call.
 
-    All entries must carry the same ``role_id`` as the URL; the server enforces
-    this so the operation cannot accidentally span multiple roles.
+    Every entry in ``permissions`` must carry the same ``role_id`` as the
+    top-level field; the server rejects the call otherwise so the operation
+    cannot accidentally span multiple roles.
     """
 
+    role_id: UUID = Field(description="Role whose permission set is being replaced")
     permissions: list[RolePermissionInput] = Field(
         description="New permission set for the role. An empty list clears all permissions.",
     )

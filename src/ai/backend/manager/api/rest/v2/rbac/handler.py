@@ -194,11 +194,10 @@ class V2RBACHandler:
 
     async def replace_role_permissions(
         self,
-        path: PathParam[RoleIdPathParam],
         body: BodyParam[ReplaceRolePermissionsInput],
     ) -> APIResponse:
-        """Replace the given role's entire scoped-permission set in one call."""
-        result = await self._adapter.replace_role_permissions(path.parsed.role_id, body.parsed)
+        """Replace one role's entire scoped-permission set in one call."""
+        result = await self._adapter.replace_role_permissions(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # ------------------------------------------------------------------ Assignments

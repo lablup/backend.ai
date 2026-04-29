@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 import strawberry
 from strawberry import Info
 
@@ -238,9 +236,8 @@ async def admin_bulk_remove_role_permissions(
 )
 async def admin_replace_role_permissions(
     info: Info[StrawberryGQLContext],
-    role_id: UUID,
     input: ReplaceRolePermissionsInputGQL,
 ) -> ReplaceRolePermissionsPayloadGQL:
     check_admin_only()
-    result = await info.context.adapters.rbac.replace_role_permissions(role_id, input.to_pydantic())
+    result = await info.context.adapters.rbac.replace_role_permissions(input.to_pydantic())
     return ReplaceRolePermissionsPayloadGQL.from_pydantic(result)

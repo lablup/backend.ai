@@ -318,10 +318,10 @@ class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
 )
 class RolePermissionInputGQL(PydanticInputMixin[RolePermissionInputDTO]):
     role_id: UUID
-    scope_type: str
+    scope_type: RBACElementTypeGQL
     scope_id: str
-    entity_type: str
-    operation: str
+    entity_type: RBACElementTypeGQL
+    operation: OperationTypeGQL
 
 
 @gql_pydantic_input(
@@ -354,6 +354,7 @@ class BulkRemoveRolePermissionsInputGQL(PydanticInputMixin[BulkRemoveRolePermiss
     name="ReplaceRolePermissionsInput",
 )
 class ReplaceRolePermissionsInputGQL(PydanticInputMixin[ReplaceRolePermissionsInputDTO]):
+    role_id: UUID
     permissions: list[RolePermissionInputGQL]
 
 

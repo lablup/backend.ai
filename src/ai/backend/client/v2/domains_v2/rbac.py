@@ -185,13 +185,12 @@ class V2RBACClient(BaseDomainClient):
 
     async def replace_role_permissions(
         self,
-        role_id: UUID,
         request: ReplaceRolePermissionsInput,
     ) -> ReplaceRolePermissionsPayload:
-        """Replace the given role's entire scoped-permission set in a single call."""
+        """Replace one role's entire scoped-permission set in a single call."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/roles/{role_id}/permissions/replace",
+            f"{_PATH}/permissions/replace",
             request=request,
             response_model=ReplaceRolePermissionsPayload,
         )
