@@ -76,6 +76,7 @@ from ai.backend.manager.models.base import (
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
+    URLColumn,
 )
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import users
@@ -383,7 +384,7 @@ class KernelRow(Base):  # type: ignore[misc]
         "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
     )
     callback_url: Mapped[yarl.URL | None] = mapped_column(
-        "callback_url", sa.UnicodeText, nullable=True, default=sa.null()
+        "callback_url", URLColumn, nullable=True, default=sa.null()
     )
     startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
     result: Mapped[SessionResult] = mapped_column(
