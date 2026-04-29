@@ -63,16 +63,18 @@ class TestCacheLoadSaveRoundTrip:
 
 class TestConfigLoadSaveRoundTrip:
     def test_load_returns_empty_when_file_missing(self, config_path: Path) -> None:
-        assert DeploymentChatConfig.load().tokens == {}
+        assert DeploymentChatConfig.load().deployments == {}
 
-    def test_save_then_load_preserves_tokens(self, config_path: Path) -> None:
+    def test_save_then_load_preserves_token_and_model(self, config_path: Path) -> None:
         cfg = DeploymentChatConfig()
         dep_id = uuid4()
         cfg.set_token(dep_id, "sk-secret-token-1234")
+        cfg.set_model(dep_id, "llama-3-8b-instruct")
         cfg.save()
 
         loaded = DeploymentChatConfig.load()
         assert loaded.get_token(dep_id) == "sk-secret-token-1234"
+        assert loaded.get_model(dep_id) == "llama-3-8b-instruct"
 
 
 class TestCacheLoaderResilience:
@@ -114,11 +116,13 @@ class TestCacheLoaderResilience:
 class TestConfigLoaderResilience:
     def test_load_returns_empty_on_corrupt_json(self, config_path: Path) -> None:
         config_path.write_text("not-json{", encoding="utf-8")
-        assert DeploymentChatConfig.load().tokens == {}
+        assert DeploymentChatConfig.load().deployments == {}
 
     def test_load_returns_empty_on_invalid_uuid_key(self, config_path: Path) -> None:
         config_path.write_text(
-            json.dumps({"tokens": {"not-a-uuid": "sk-x"}}),
+            json.dumps({
+                "deployments": {"not-a-uuid": {"token": "sk-x", "model": None}},
+            }),
             encoding="utf-8",
         )
-        assert DeploymentChatConfig.load().tokens == {}
+        assert DeploymentChatConfig.load().deployments == {}
