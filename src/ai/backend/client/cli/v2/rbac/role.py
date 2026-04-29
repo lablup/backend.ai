@@ -218,3 +218,65 @@ def delete(role_id: str) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+def _resolve_role_selector(role_id: str | None, by_name: str | None) -> None:
+    if not role_id and not by_name:
+        raise click.UsageError("Provide ROLE_ID or --by-name.")
+    if role_id and by_name:
+        raise click.UsageError("ROLE_ID and --by-name are mutually exclusive.")
+
+
+@role.command(name="add-permission")
+@click.argument("role_id", type=str, required=False)
+@click.option("--by-name", type=str, default=None, help="Resolve role by name.")
+@click.option(
+    "--kind",
+    type=click.Choice(["admin", "owner", "member"]),
+    required=True,
+    help="Operation set kind to grant on every resource entity type.",
+)
+def add_permission(role_id: str | None, by_name: str | None, kind: str) -> None:
+    """Add the standard <kind> permissions for every resource entity type to a role."""
+    _resolve_role_selector(role_id, by_name)
+    raise click.ClickException(
+        f"Not yet wired to SDK (BA-5912 pending): role={role_id or by_name!r}, kind={kind!r}."
+    )
+
+
+@role.command(name="remove-permission")
+@click.argument("role_id", type=str, required=False)
+@click.option("--by-name", type=str, default=None, help="Resolve role by name.")
+@click.option(
+    "--kind",
+    type=click.Choice(["admin", "owner", "member"]),
+    required=True,
+    help="Operation set kind to revoke.",
+)
+def remove_permission(
+    role_id: str | None,
+    by_name: str | None,
+    kind: str,
+) -> None:
+    """Remove the standard <kind> permissions for every resource entity type from a role."""
+    _resolve_role_selector(role_id, by_name)
+    raise click.ClickException(
+        f"Not yet wired to SDK (BA-5912 pending): role={role_id or by_name!r}, kind={kind!r}."
+    )
+
+
+@role.command(name="replace-permission")
+@click.argument("role_id", type=str, required=False)
+@click.argument("payload", type=str)
+@click.option("--by-name", type=str, default=None, help="Resolve role by name.")
+def replace_permission(
+    role_id: str | None,
+    payload: str,
+    by_name: str | None,
+) -> None:
+    """Replace the role's entire permission set with PAYLOAD (JSON string or @path/to/file.json)."""
+    _resolve_role_selector(role_id, by_name)
+    raise click.ClickException(
+        f"Not yet wired to SDK (BA-5912 pending): "
+        f"role={role_id or by_name!r}, payload_len={len(payload)}."
+    )
