@@ -45,7 +45,6 @@ __all__ = (
     "ReplaceRolePermissionsPayload",
     "RoleAssignmentNode",
     "RoleNode",
-    "RolePermissionEntryNode",
     "ScopeEntityCombinationInfo",
     "ScopeEntityOperationCombinationInfo",
     "UpdateRolePayload",
@@ -141,24 +140,14 @@ class BulkRevokeRoleResultPayload(BaseResponseModel):
     )
 
 
-class RolePermissionEntryNode(BaseResponseModel):
-    """A scoped permission entry tied to a role, without server-assigned fields.
-
-    Used inside bulk-permission failure payloads to identify the failed
-    input entry; mirrors the shape of ``RolePermissionInput``.
-    """
-
-    role_id: UUID = Field(description="Role ID this permission belongs to")
-    scope_type: str = Field(description="Scope element type")
-    scope_id: str = Field(description="Scope element ID")
-    entity_type: str = Field(description="Entity element type")
-    operation: str = Field(description="Operation type")
-
-
 class BulkAddRolePermissionFailureInfo(BaseResponseModel):
     """Failure detail for a single permission entry in bulk role-permission insertion."""
 
-    entry: RolePermissionEntryNode = Field(description="The permission entry that failed")
+    role_id: UUID = Field(description="Role ID of the failed entry")
+    scope_type: str = Field(description="Scope element type of the failed entry")
+    scope_id: str = Field(description="Scope element ID of the failed entry")
+    entity_type: str = Field(description="Entity element type of the failed entry")
+    operation: str = Field(description="Operation type of the failed entry")
     message: str = Field(description="Error message describing the failure")
 
 
@@ -172,7 +161,11 @@ class BulkRemoveRolePermissionFailureInfo(BaseResponseModel):
 class ReplaceRolePermissionFailureInfo(BaseResponseModel):
     """Failure detail for a single permission entry in replace operation."""
 
-    entry: RolePermissionEntryNode = Field(description="The permission entry that failed")
+    role_id: UUID = Field(description="Role ID of the failed entry")
+    scope_type: str = Field(description="Scope element type of the failed entry")
+    scope_id: str = Field(description="Scope element ID of the failed entry")
+    entity_type: str = Field(description="Entity element type of the failed entry")
+    operation: str = Field(description="Operation type of the failed entry")
     message: str = Field(description="Error message describing the failure")
 
 

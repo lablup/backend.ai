@@ -47,7 +47,6 @@ __all__ = (
     "RoleFilter",
     "RoleNestedFilter",
     "RoleOrderBy",
-    "RolePermissionInput",
     "UpdatePermissionInput",
     "UpdateRoleInput",
 )
@@ -166,25 +165,10 @@ class BulkRevokeRoleInput(BaseRequestModel):
     user_ids: list[UUID] = Field(description="List of user IDs to revoke the role from")
 
 
-class RolePermissionInput(BaseRequestModel):
-    """A single scoped permission entry tied to a role.
-
-    Mirrors the manager-side ``PermissionCreatorSpec`` so it is self-contained:
-    ``role_id`` is carried in the entry rather than inferred from the URL,
-    which lets a single bulk call span multiple roles.
-    """
-
-    role_id: UUID = Field(description="Role ID this permission belongs to")
-    scope_type: str = Field(description="Scope element type (e.g. 'domain', 'project', 'user')")
-    scope_id: str = Field(description="Scope element ID")
-    entity_type: str = Field(description="Entity element type (e.g. 'session', 'vfolder')")
-    operation: str = Field(description="Operation type (e.g. 'read', 'create')")
-
-
 class BulkAddRolePermissionsInput(BaseRequestModel):
     """Input for bulk-adding scoped permissions across one or more roles."""
 
-    permissions: list[RolePermissionInput] = Field(
+    permissions: list[CreatePermissionInput] = Field(
         description="Permission entries to insert. Duplicates are surfaced as failures.",
     )
 
@@ -210,7 +194,7 @@ class ReplaceRolePermissionsInput(BaseRequestModel):
     """
 
     role_id: UUID = Field(description="Role whose permission set is being replaced")
-    permissions: list[RolePermissionInput] = Field(
+    permissions: list[CreatePermissionInput] = Field(
         description="New permission set for the role. An empty list clears all permissions.",
     )
 

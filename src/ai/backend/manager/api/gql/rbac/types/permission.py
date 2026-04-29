@@ -38,9 +38,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     ReplaceRolePermissionsInput as ReplaceRolePermissionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    RolePermissionInput as RolePermissionInputDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -73,9 +70,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     ReplaceRolePermissionsPayload as ReplaceRolePermissionsPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.response import (
-    RolePermissionEntryNode as RolePermissionEntryNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
@@ -311,28 +305,13 @@ class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Single scoped permission entry tied to a role",
-        added_version=NEXT_RELEASE_VERSION,
-    ),
-    name="RolePermissionInput",
-)
-class RolePermissionInputGQL(PydanticInputMixin[RolePermissionInputDTO]):
-    role_id: UUID
-    scope_type: RBACElementTypeGQL
-    scope_id: str
-    entity_type: RBACElementTypeGQL
-    operation: OperationTypeGQL
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
         description="Input for bulk-inserting scoped permissions across one or more roles",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="BulkAddRolePermissionsInput",
 )
 class BulkAddRolePermissionsInputGQL(PydanticInputMixin[BulkAddRolePermissionsInputDTO]):
-    permissions: list[RolePermissionInputGQL]
+    permissions: list[CreatePermissionInput]
 
 
 @gql_pydantic_input(
@@ -355,7 +334,7 @@ class BulkRemoveRolePermissionsInputGQL(PydanticInputMixin[BulkRemoveRolePermiss
 )
 class ReplaceRolePermissionsInputGQL(PydanticInputMixin[ReplaceRolePermissionsInputDTO]):
     role_id: UUID
-    permissions: list[RolePermissionInputGQL]
+    permissions: list[CreatePermissionInput]
 
 
 # ==================== Payload Types ====================
@@ -375,22 +354,6 @@ class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        description="A scoped permission entry tied to a role (no server-assigned fields)",
-        added_version=NEXT_RELEASE_VERSION,
-    ),
-    model=RolePermissionEntryNodeDTO,
-    name="RolePermissionEntryNode",
-)
-class RolePermissionEntryNodeGQL(PydanticOutputMixin[RolePermissionEntryNodeDTO]):
-    role_id: UUID = gql_field(description="Role ID this permission belongs to.")
-    scope_type: str = gql_field(description="Scope element type.")
-    scope_id: str = gql_field(description="Scope element ID.")
-    entity_type: str = gql_field(description="Entity element type.")
-    operation: str = gql_field(description="Operation type.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
         description="Failure detail for a single permission entry in bulk add",
         added_version=NEXT_RELEASE_VERSION,
     ),
@@ -400,7 +363,11 @@ class RolePermissionEntryNodeGQL(PydanticOutputMixin[RolePermissionEntryNodeDTO]
 class BulkAddRolePermissionFailureInfoGQL(
     PydanticOutputMixin[BulkAddRolePermissionFailureInfoDTO],
 ):
-    entry: RolePermissionEntryNodeGQL = gql_field(description="The permission entry that failed.")
+    role_id: UUID = gql_field(description="Role ID of the failed entry.")
+    scope_type: str = gql_field(description="Scope element type of the failed entry.")
+    scope_id: str = gql_field(description="Scope element ID of the failed entry.")
+    entity_type: str = gql_field(description="Entity element type of the failed entry.")
+    operation: str = gql_field(description="Operation type of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
 
 
@@ -430,7 +397,11 @@ class BulkRemoveRolePermissionFailureInfoGQL(
 class ReplaceRolePermissionFailureInfoGQL(
     PydanticOutputMixin[ReplaceRolePermissionFailureInfoDTO],
 ):
-    entry: RolePermissionEntryNodeGQL = gql_field(description="The permission entry that failed.")
+    role_id: UUID = gql_field(description="Role ID of the failed entry.")
+    scope_type: str = gql_field(description="Scope element type of the failed entry.")
+    scope_id: str = gql_field(description="Scope element ID of the failed entry.")
+    entity_type: str = gql_field(description="Entity element type of the failed entry.")
+    operation: str = gql_field(description="Operation type of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
 
 
