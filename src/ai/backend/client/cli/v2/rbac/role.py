@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 import click
 
+from ai.backend.cli.params import JSONParamType
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
@@ -325,15 +328,40 @@ def remove_permission(
 
 @role.command(name="replace-permission")
 @click.argument("role_id", type=click.UUID, required=False)
-@click.argument("payload", type=str)
 @click.option("--by-name", type=str, default=None, help="Resolve role by name.")
+@click.option(
+    "--json",
+    "json_str",
+    type=JSONParamType(),
+    default=None,
+    help="Permission entries as a JSON-array string. Mutually exclusive with --from-file.",
+)
+@click.option(
+    "--from-file",
+    "file_path",
+    type=click.Path(exists=True, dir_okay=False, readable=True, path_type=Path),
+    default=None,
+    help="Path to a file containing permission entries as a JSON array.",
+)
 def replace_permission(
     role_id: UUID | None,
-    payload: str,
     by_name: str | None,
+    json_str: object,
+    file_path: Path | None,
 ) -> None:
-    """Replace the role's entire permission set with PAYLOAD (JSON string or @path/to/file.json)."""
+    """Replace the role's entire permission set with the entries supplied via --json or --from-file."""
     _validate_role_selector(role_id, by_name)
+    if (json_str is None) == (file_path is None):
+        raise click.UsageError("Provide exactly one of --json or --from-file.")
+    if file_path is not None:
+        try:
+            payload = json.loads(file_path.read_text())
+        except json.JSONDecodeError as e:
+            raise click.ClickException(f"Failed to parse {file_path} as JSON: {e}") from e
+    else:
+        payload = json_str
+    if not isinstance(payload, list):
+        raise click.UsageError("Payload must be a JSON array of permission entries.")
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -341,7 +369,7 @@ def replace_permission(
             resolved = await _resolve_role_id(registry, role_id, by_name)
             raise click.ClickException(
                 f"Not yet wired to SDK (BA-5912 pending): "
-                f"role_id={resolved}, payload_len={len(payload)}.",
+                f"role_id={resolved}, entries={len(payload)}.",
             )
         finally:
             await registry.close()
