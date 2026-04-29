@@ -112,12 +112,6 @@ class DeploymentChatConfigEntry(BaseModel):
 class DeploymentChatConfig(BaseModel):
     """Per-deployment user-managed registry (tokens + chosen model name)."""
 
-    # ``defaultdict`` lets ``set_token`` / ``set_model`` use bracket access to
-    # auto-create an empty entry. ``get`` / ``get_token`` / ``get_model`` /
-    # ``pop_*`` deliberately route through ``dict.get`` (or ``dict.pop``) so a
-    # plain lookup never plants a stale empty entry. The ``Annotated`` factory
-    # is mandatory — pydantic v2 only auto-derives ``defaultdict`` factories
-    # for builtin value types, not for ``BaseModel`` subclasses.
     deployments: defaultdict[
         UUID, Annotated[DeploymentChatConfigEntry, Field(default_factory=DeploymentChatConfigEntry)]
     ] = Field(default_factory=lambda: defaultdict(DeploymentChatConfigEntry))
