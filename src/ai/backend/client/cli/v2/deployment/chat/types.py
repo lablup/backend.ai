@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Self
+from typing import Annotated, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -111,7 +112,15 @@ class DeploymentChatConfigEntry(BaseModel):
 class DeploymentChatConfig(BaseModel):
     """Per-deployment user-managed registry (tokens + chosen model name)."""
 
-    deployments: dict[UUID, DeploymentChatConfigEntry] = Field(default_factory=dict)
+    # ``defaultdict`` lets ``set_token`` / ``set_model`` use bracket access to
+    # auto-create an empty entry. ``get`` / ``get_token`` / ``get_model`` /
+    # ``pop_*`` deliberately route through ``dict.get`` (or ``dict.pop``) so a
+    # plain lookup never plants a stale empty entry. The ``Annotated`` factory
+    # is mandatory — pydantic v2 only auto-derives ``defaultdict`` factories
+    # for builtin value types, not for ``BaseModel`` subclasses.
+    deployments: defaultdict[
+        UUID, Annotated[DeploymentChatConfigEntry, Field(default_factory=DeploymentChatConfigEntry)]
+    ] = Field(default_factory=lambda: defaultdict(DeploymentChatConfigEntry))
 
     def get(self, deployment_id: UUID) -> DeploymentChatConfigEntry | None:
         return self.deployments.get(deployment_id)
@@ -125,14 +134,10 @@ class DeploymentChatConfig(BaseModel):
         return entry.model if entry is not None else None
 
     def set_token(self, deployment_id: UUID, token: str) -> None:
-        entry = self.deployments.get(deployment_id) or DeploymentChatConfigEntry()
-        entry.token = token
-        self.deployments[deployment_id] = entry
+        self.deployments[deployment_id].token = token
 
     def set_model(self, deployment_id: UUID, model: str) -> None:
-        entry = self.deployments.get(deployment_id) or DeploymentChatConfigEntry()
-        entry.model = model
-        self.deployments[deployment_id] = entry
+        self.deployments[deployment_id].model = model
 
     def pop_token(self, deployment_id: UUID) -> bool:
         entry = self.deployments.get(deployment_id)
