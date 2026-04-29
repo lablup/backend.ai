@@ -252,16 +252,16 @@ async def _resolve_role_id(
         raise click.ClickException(f"No role matches name {by_name!r}.")
     if len(items) == 1:
         return items[0].id
-    if not sys.stdin.isatty():
-        raise click.ClickException(
-            f"{len(items)} roles match name {by_name!r}; "
-            f"re-run with ROLE_ID positional argument or in an interactive shell.",
-        )
     click.echo(f"Multiple roles match {by_name!r}:")
     for i, role_node in enumerate(items, start=1):
         click.echo(
             f"  [{i}] {role_node.id}  name={role_node.name}  "
             f"source={role_node.source}  status={role_node.status}",
+        )
+    if not sys.stdin.isatty():
+        raise click.ClickException(
+            f"{len(items)} roles match name {by_name!r}; "
+            f"re-run with ROLE_ID positional argument or in an interactive shell.",
         )
     choice: int = click.prompt("Select role number", type=click.IntRange(1, len(items)))
     return items[choice - 1].id
