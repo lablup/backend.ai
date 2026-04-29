@@ -1266,8 +1266,20 @@ input BlueGreenConfigInput {
 Added in UNRELEASED. Failure detail for a single permission entry in bulk add
 """
 type BulkAddRolePermissionFailureInfo {
-  """The permission entry that failed"""
-  entry: RolePermissionEntryNode!
+  """Role ID of the failed entry"""
+  roleId: UUID!
+
+  """Scope element type of the failed entry"""
+  scopeType: String!
+
+  """Scope element ID of the failed entry"""
+  scopeId: String!
+
+  """Entity element type of the failed entry"""
+  entityType: String!
+
+  """Operation type of the failed entry"""
+  operation: String!
 
   """Error message describing the failure"""
   message: String!
@@ -1277,7 +1289,7 @@ type BulkAddRolePermissionFailureInfo {
 Added in UNRELEASED. Input for bulk-inserting scoped permissions across one or more roles
 """
 input BulkAddRolePermissionsInput {
-  permissions: [RolePermissionInput!]!
+  permissions: [CreatePermissionInput!]!
 }
 
 """Added in UNRELEASED. Payload for bulk role-permission insertion"""
@@ -9608,8 +9620,20 @@ type ReplaceResourceGroupDefaultSessionOptionsPayload {
 Added in UNRELEASED. Failure detail for a single permission entry in replace
 """
 type ReplaceRolePermissionFailureInfo {
-  """The permission entry that failed"""
-  entry: RolePermissionEntryNode!
+  """Role ID of the failed entry"""
+  roleId: UUID!
+
+  """Scope element type of the failed entry"""
+  scopeType: String!
+
+  """Scope element ID of the failed entry"""
+  scopeId: String!
+
+  """Entity element type of the failed entry"""
+  entityType: String!
+
+  """Operation type of the failed entry"""
+  operation: String!
 
   """Error message describing the failure"""
   message: String!
@@ -9620,7 +9644,7 @@ Added in UNRELEASED. Input for replacing one role's entire scoped-permission set
 """
 input ReplaceRolePermissionsInput {
   roleId: UUID!
-  permissions: [RolePermissionInput!]!
+  permissions: [CreatePermissionInput!]!
 }
 
 """
@@ -10567,35 +10591,6 @@ enum RoleOrderField {
   NAME
   CREATED_AT
   UPDATED_AT
-}
-
-"""
-Added in UNRELEASED. A scoped permission entry tied to a role (no server-assigned fields)
-"""
-type RolePermissionEntryNode {
-  """Role ID this permission belongs to"""
-  roleId: UUID!
-
-  """Scope element type"""
-  scopeType: String!
-
-  """Scope element ID"""
-  scopeId: String!
-
-  """Entity element type"""
-  entityType: String!
-
-  """Operation type"""
-  operation: String!
-}
-
-"""Added in UNRELEASED. Single scoped permission entry tied to a role"""
-input RolePermissionInput {
-  roleId: UUID!
-  scopeType: RBACElementType!
-  scopeId: String!
-  entityType: RBACElementType!
-  operation: OperationType!
 }
 
 """Added in 26.3.0. Role definition source"""
