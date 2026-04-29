@@ -402,28 +402,28 @@ async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> N
                                     sum=replica_inference_metrics.sum,
                                 )
 
-        app_metrics_updates = {
-            circuit.endpoint_id: {
-                key: obj.to_serializable_dict()
-                for key, obj in circuit._app_inference_metrics.items()
-            }
-            for circuit in inference_circuits
-            if circuit._app_inference_metrics and circuit.endpoint_id
-        }
-        replica_metrics_updates: dict[tuple[UUID, UUID], Any] = {}
-
-        for circuit in inference_circuits:
-            if not circuit._replica_inference_metrics or not circuit.endpoint_id:
-                continue
-            for key, metric_pair in circuit._replica_inference_metrics.items():
-                for route_id, obj in metric_pair.items():
-                    if (circuit.endpoint_id, route_id) not in replica_metrics_updates:
-                        replica_metrics_updates[(circuit.endpoint_id, route_id)] = {}
-                    replica_metrics_updates[(circuit.endpoint_id, route_id)][key] = (
-                        obj.to_serializable_dict()
-                    )
-
         if root_ctx.local_config.debug.log_stats:
+            app_metrics_updates = {
+                circuit.endpoint_id: {
+                    key: obj.to_serializable_dict()
+                    for key, obj in circuit._app_inference_metrics.items()
+                }
+                for circuit in inference_circuits
+                if circuit._app_inference_metrics and circuit.endpoint_id
+            }
+            replica_metrics_updates: dict[tuple[UUID, UUID], Any] = {}
+
+            for circuit in inference_circuits:
+                if not circuit._replica_inference_metrics or not circuit.endpoint_id:
+                    continue
+                for key, metric_pair in circuit._replica_inference_metrics.items():
+                    for route_id, obj in metric_pair.items():
+                        if (circuit.endpoint_id, route_id) not in replica_metrics_updates:
+                            replica_metrics_updates[(circuit.endpoint_id, route_id)] = {}
+                        replica_metrics_updates[(circuit.endpoint_id, route_id)][key] = (
+                            obj.to_serializable_dict()
+                        )
+
             log.debug(
                 "stats: app_updates: {}",
                 app_metrics_updates,
@@ -433,5 +433,5 @@ async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> N
                 replica_metrics_updates,
             )
     except Exception:
-        log.exception("collect_inference_metrics(): error while collecting metric:")
+        log.exception("collect_inference_metric(): error while collecting metric:")
         raise
