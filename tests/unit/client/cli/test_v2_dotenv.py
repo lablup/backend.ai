@@ -17,7 +17,7 @@ def dotenv_environment(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> Iterator[Path]:
-    """Place a ``.env`` in an isolated cwd with no fallback config/credentials."""
+    """Place a ``.env`` in an isolated cwd with no fallback config."""
     monkeypatch.chdir(tmp_path)
     for key in (
         "BACKEND_ENDPOINT",
@@ -27,7 +27,6 @@ def dotenv_environment(
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(helpers, "CONFIG_FILE", tmp_path / "missing-config.toml")
-    monkeypatch.setattr(helpers, "CREDENTIALS_FILE", tmp_path / "missing-creds.toml")
     (tmp_path / ".env").write_text(
         "BACKEND_ENDPOINT=https://from-dotenv.example\nBACKEND_ACCESS_KEY=ak-from-dotenv\n",
     )
