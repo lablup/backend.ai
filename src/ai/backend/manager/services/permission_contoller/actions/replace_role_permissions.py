@@ -24,7 +24,7 @@ class ReplaceRolePermissionsAction(BaseAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.ROLE_PERMISSION
+        return EntityType.ROLE
 
     @override
     @classmethod
