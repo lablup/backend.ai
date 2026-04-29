@@ -545,7 +545,7 @@ class PermissionDBSource:
         that one failing row (e.g. unique-violation) does not abort siblings;
         successes and errors are reported via the returned result.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_session_read_committed() as db_session:
             return await execute_bulk_creator_partial(db_session, creator)
 
     async def bulk_remove_role_permissions(
@@ -558,7 +558,7 @@ class PermissionDBSource:
         does not abort siblings; successes and errors are reported via the
         returned result.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_session_read_committed() as db_session:
             return await execute_bulk_purger_partial(db_session, purgers)
 
     async def replace_role_permissions(
@@ -571,8 +571,14 @@ class PermissionDBSource:
         delete all existing rows for ``role_id``, then bulk-insert the rows
         defined by ``creator.specs``. Passing a creator with no specs clears
         the role's permissions.
+
+        - The role's existence is verified first; raises ``ObjectNotFound``
+          if the role does not exist.
+        - Each permission row in ``creator.specs`` is assumed to carry the
+          same ``role_id`` as the one passed to this method; the caller is
+          responsible for keeping them aligned.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_session_read_committed() as db_session:
             await self._get_role(db_session, role_id)
             await db_session.execute(
                 sa.delete(PermissionRow).where(PermissionRow.role_id == role_id)
