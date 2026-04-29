@@ -152,7 +152,7 @@ def chat(
             except DeploymentAuthError as e:
                 # 401/403: invalidate the cached token so the next ``chat`` call
                 # surfaces the same hint instead of silently re-sending a stale key.
-                if token is not None and chat_config.clear_token(deployment_id):
+                if token is not None and chat_config.pop_token(deployment_id):
                     chat_config.save()
                 raise click.ClickException(
                     f"The inference endpoint rejected the configured token for "
@@ -191,7 +191,7 @@ def chat_config() -> None:
     type=str,
     help=(
         "Token the inference runtime accepts as a Bearer credential. "
-        "Omit when the runtime was started without a token."
+        "Omit when the deployment is open to public."
     ),
 )
 @click.option(
@@ -284,7 +284,7 @@ def show(deployment_id: UUID) -> None:
 def clear_cache(deployment_id: UUID) -> None:
     """Remove the cached endpoint entry for a deployment."""
     cache = DeploymentChatCache.load()
-    if cache.remove(deployment_id):
+    if cache.pop(deployment_id):
         cache.save()
         print(f"Removed cache entry for deployment {deployment_id}.")
     else:
@@ -296,7 +296,7 @@ def clear_cache(deployment_id: UUID) -> None:
 def clear_config(deployment_id: UUID) -> None:
     """Remove the stored token for a deployment."""
     config = DeploymentChatConfig.load()
-    if config.clear_token(deployment_id):
+    if config.pop_token(deployment_id):
         config.save()
         print(f"Removed config entry for deployment {deployment_id}.")
     else:
