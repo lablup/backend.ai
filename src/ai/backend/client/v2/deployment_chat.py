@@ -25,14 +25,21 @@ from ai.backend.client.v2.exceptions import DeploymentChatAuthError
 DEFAULT_CHAT_PATH = "/v1/chat/completions"
 DEFAULT_MODELS_PATH = "/v1/models"
 
+DEFAULT_CONNECT_TIMEOUT_SEC: float = 10.0
+"""TCP connect timeout for inference-endpoint calls."""
+
+DEFAULT_READ_TIMEOUT_SEC: float = 300.0
+"""Per-socket read timeout — generous because chat-completion responses
+can take minutes for long-form generations."""
+
 
 @dataclass(frozen=True)
 class DeploymentChatClientArgs:
     """Connection knobs for :class:`DeploymentChatClient`."""
 
     skip_ssl_verification: bool = False
-    connect_timeout: float | None = 10.0
-    read_timeout: float | None = 300.0
+    connect_timeout: float | None = DEFAULT_CONNECT_TIMEOUT_SEC
+    read_timeout: float | None = DEFAULT_READ_TIMEOUT_SEC
 
 
 class DeploymentChatClient:
@@ -66,30 +73,30 @@ class DeploymentChatClient:
     async def chat_completion(
         self,
         endpoint_url: str,
-        api_key: str | None,
+        token: str | None,
         body: dict[str, Any],
         *,
         path: str = DEFAULT_CHAT_PATH,
     ) -> dict[str, Any]:
         """POST a chat completion request to the deployment endpoint."""
-        return await self._request("POST", endpoint_url, path, api_key, body=body)
+        return await self._request("POST", endpoint_url, path, token, body=body)
 
     async def list_models(
         self,
         endpoint_url: str,
-        api_key: str | None,
+        token: str | None,
         *,
         path: str = DEFAULT_MODELS_PATH,
     ) -> dict[str, Any]:
         """GET the list of models served by the deployment endpoint."""
-        return await self._request("GET", endpoint_url, path, api_key)
+        return await self._request("GET", endpoint_url, path, token)
 
     async def _request(
         self,
         method: str,
         endpoint_url: str,
         path: str,
-        api_key: str | None,
+        token: str | None,
         *,
         body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -97,8 +104,8 @@ class DeploymentChatClient:
         headers: dict[str, str] = {}
         if body is not None:
             headers["Content-Type"] = "application/json"
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         try:
             async with self._session.request(method, target, headers=headers, json=body) as resp:
                 payload = await self._read_payload(resp)
