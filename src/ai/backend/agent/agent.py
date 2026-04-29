@@ -2469,8 +2469,8 @@ class AbstractAgent[
         image_command_loaded = False
         image_command: str | list[str] | None = None
         for model in models:
-            service = model.get("service") or {}
-            if not isinstance(service, MutableMapping):
+            service = model.get("service")
+            if not isinstance(service, dict):
                 continue
             if service.get("start_command"):
                 continue
