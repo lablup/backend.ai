@@ -1420,7 +1420,9 @@ class VFolderService:
         except Exception as e:
             raise InternalServerError from e
 
-    async def get_vfolder_row(self, action: GetVFolderLegacyRowAction) -> GetVFolderLegacyRowActionResult:
+    async def get_vfolder_row(
+        self, action: GetVFolderLegacyRowAction
+    ) -> GetVFolderLegacyRowActionResult:
         row = await self._vfolder_repository.get_row_by_id(action.vfolder_uuid)
         return GetVFolderLegacyRowActionResult(row=row)
 
