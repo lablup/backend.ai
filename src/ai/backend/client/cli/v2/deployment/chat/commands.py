@@ -79,11 +79,9 @@ def chat(
     """
     import json
 
-    from ai.backend.client.v2.deployment_chat import (
-        DeploymentChatClient,
-        DeploymentChatClientArgs,
-    )
-    from ai.backend.client.v2.exceptions import DeploymentChatAuthError
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.deployment_chat import DeploymentChatClient
+    from ai.backend.client.v2.exceptions import DeploymentAuthError
 
     connection_config = load_v2_config()
 
@@ -135,17 +133,23 @@ def chat(
         })
         body = request.model_dump(mode="json")
         token = chat_config.get_token(deployment_id)
-        client_args = DeploymentChatClientArgs(
+        # ``endpoint`` is required on ClientConfig but unused by AppProxyClient
+        # (deployment URLs are passed per-request); pass through the manager
+        # endpoint so the rest of the connection knobs (TLS, timeouts) match.
+        client_config = ClientConfig(
+            endpoint=connection_config.endpoint,
+            endpoint_type=connection_config.endpoint_type,
+            api_version=connection_config.api_version,
             skip_ssl_verification=connection_config.skip_ssl_verification,
         )
-        async with DeploymentChatClient(client_args) as client:
+        async with DeploymentChatClient(client_config) as client:
             try:
                 response = await client.chat_completion(
                     endpoint_entry.endpoint_url,
                     token,
                     body,
                 )
-            except DeploymentChatAuthError as e:
+            except DeploymentAuthError as e:
                 # 401/403: invalidate the cached token so the next ``chat`` call
                 # surfaces the same hint instead of silently re-sending a stale key.
                 if token is not None and chat_config.clear_token(deployment_id):

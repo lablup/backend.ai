@@ -8,20 +8,19 @@ from aioresponses import aioresponses
 from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-from ai.backend.client.v2.deployment_chat import (
-    DeploymentChatClient,
-    DeploymentChatClientArgs,
-)
-from ai.backend.client.v2.exceptions import DeploymentChatAuthError
+from ai.backend.client.v2.config import ClientConfig
+from ai.backend.client.v2.deployment_chat import DeploymentChatClient
+from ai.backend.client.v2.exceptions import DeploymentAuthError
 
 BASE_URL = "http://infer.test.local"
 CHAT_URL = f"{BASE_URL}/v1/chat/completions"
-MODELS_URL = f"{BASE_URL}/v1/models"
 
 
 @pytest.fixture
 async def chat_client() -> AsyncIterator[DeploymentChatClient]:
-    client = DeploymentChatClient(DeploymentChatClientArgs())
+    # ``endpoint`` is required on ClientConfig but unused by AppProxyClient.
+    config = ClientConfig(endpoint=URL("http://manager.unused"))
+    client = DeploymentChatClient(config)
     try:
         yield client
     finally:
@@ -95,36 +94,18 @@ class TestChatCompletionSuccess:
         assert "Authorization" not in call.kwargs["headers"]
 
 
-class TestListModels:
-    async def test_returns_models_payload(self, chat_client: DeploymentChatClient) -> None:
-        with aioresponses() as m:
-            m.get(
-                MODELS_URL,
-                payload={
-                    "object": "list",
-                    "data": [{"id": "qwen2.5-0.5b-instruct", "object": "model"}],
-                },
-            )
-            payload = await chat_client.list_models(BASE_URL, "sk-x")
-        assert payload["data"][0]["id"] == "qwen2.5-0.5b-instruct"
-
-
 class TestAuthErrors:
-    async def test_401_raises_DeploymentChatAuthError(
-        self, chat_client: DeploymentChatClient
-    ) -> None:
+    async def test_401_raises_DeploymentAuthError(self, chat_client: DeploymentChatClient) -> None:
         with aioresponses() as m:
             m.post(CHAT_URL, status=401, payload={"error": "invalid api key"})
-            with pytest.raises(DeploymentChatAuthError) as exc_info:
+            with pytest.raises(DeploymentAuthError) as exc_info:
                 await chat_client.chat_completion(BASE_URL, "bad", _make_body())
         assert exc_info.value.status == 401
 
-    async def test_403_raises_DeploymentChatAuthError(
-        self, chat_client: DeploymentChatClient
-    ) -> None:
+    async def test_403_raises_DeploymentAuthError(self, chat_client: DeploymentChatClient) -> None:
         with aioresponses() as m:
             m.post(CHAT_URL, status=403, payload={"error": "forbidden"})
-            with pytest.raises(DeploymentChatAuthError):
+            with pytest.raises(DeploymentAuthError):
                 await chat_client.chat_completion(BASE_URL, "bad", _make_body())
 
 
@@ -136,7 +117,7 @@ class TestServerErrors:
             m.post(CHAT_URL, status=500, payload={"error": "boom"})
             with pytest.raises(BackendAPIError) as exc_info:
                 await chat_client.chat_completion(BASE_URL, "sk", _make_body())
-        assert not isinstance(exc_info.value, DeploymentChatAuthError)
+        assert not isinstance(exc_info.value, DeploymentAuthError)
         assert exc_info.value.status == 500
 
 
