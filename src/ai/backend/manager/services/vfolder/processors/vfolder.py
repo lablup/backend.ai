@@ -49,8 +49,8 @@ from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions
     GetMyStorageHostPermissionsActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.get_row import (
-    GetVFolderRowAction,
-    GetVFolderRowActionResult,
+    GetVFolderLegacyRowAction,
+    GetVFolderLegacyRowActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
@@ -160,7 +160,7 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_accessible_vfolder: ActionProcessor[
         GetAccessibleVFolderAction, GetAccessibleVFolderActionResult
     ]
-    get_vfolder_row: ActionProcessor[GetVFolderRowAction, GetVFolderRowActionResult]
+    get_vfolder_row: ActionProcessor[GetVFolderLegacyRowAction, GetVFolderLegacyRowActionResult]
     batch_load_vfolders_by_ids: ActionProcessor[
         BatchLoadVFoldersByIdsAction, BatchLoadVFoldersByIdsActionResult
     ]
@@ -311,7 +311,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             UmountHostAction.spec(),
             GetFstabContentsAction.spec(),
             GetAccessibleVFolderAction.spec(),
-            GetVFolderRowAction.spec(),
+            GetVFolderLegacyRowAction.spec(),
             BatchLoadVFoldersByIdsAction.spec(),
             CreateVFolderV2Action.spec(),
             CreateUploadSessionV2Action.spec(),

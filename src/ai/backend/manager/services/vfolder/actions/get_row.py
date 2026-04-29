@@ -16,7 +16,7 @@ from ai.backend.manager.services.vfolder.actions.base import VFolderAction
 
 
 @dataclass
-class GetVFolderRowAction(VFolderAction):
+class GetVFolderLegacyRowAction(VFolderAction):
     vfolder_uuid: VFolderUUID
 
     @override
@@ -30,7 +30,7 @@ class GetVFolderRowAction(VFolderAction):
 
 
 @dataclass
-class GetVFolderRowActionResult(BaseActionResult):
+class GetVFolderLegacyRowActionResult(BaseActionResult):
     row: Mapping[str, Any]
 
     @override

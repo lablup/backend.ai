@@ -116,8 +116,8 @@ from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions
     StorageHostPermissionEntry,
 )
 from ai.backend.manager.services.vfolder.actions.get_row import (
-    GetVFolderRowAction,
-    GetVFolderRowActionResult,
+    GetVFolderLegacyRowAction,
+    GetVFolderLegacyRowActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
@@ -1420,9 +1420,9 @@ class VFolderService:
         except Exception as e:
             raise InternalServerError from e
 
-    async def get_vfolder_row(self, action: GetVFolderRowAction) -> GetVFolderRowActionResult:
+    async def get_vfolder_row(self, action: GetVFolderLegacyRowAction) -> GetVFolderLegacyRowActionResult:
         row = await self._vfolder_repository.get_row_by_id(action.vfolder_uuid)
-        return GetVFolderRowActionResult(row=row)
+        return GetVFolderLegacyRowActionResult(row=row)
 
     async def get_accessible_vfolder(
         self, action: GetAccessibleVFolderAction

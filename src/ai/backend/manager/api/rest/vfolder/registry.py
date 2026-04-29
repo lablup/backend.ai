@@ -22,7 +22,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
 )
 from ai.backend.manager.services.vfolder.actions.base import GetAccessibleVFolderAction
-from ai.backend.manager.services.vfolder.actions.get_row import GetVFolderRowAction
+from ai.backend.manager.services.vfolder.actions.get_row import GetVFolderLegacyRowAction
 
 from .handler import VFolderHandler
 
@@ -76,7 +76,7 @@ def _vfolder_resolver(
                 request["vfolder_row"] = result.row
             else:
                 row_result = await vfolder_processors.get_vfolder_row.wait_for_complete(
-                    GetVFolderRowAction(vfolder_uuid=vfolder_uuid)
+                    GetVFolderLegacyRowAction(vfolder_uuid=vfolder_uuid)
                 )
                 request["vfolder_row"] = row_result.row
             return await handler(request)
