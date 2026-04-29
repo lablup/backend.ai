@@ -1799,46 +1799,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "aca6411a-ea6e-5504-a4bb-223fb15d8281",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "session",
-            "operation": "grant:all"
-        },
-        {
-            "id": "8273a2ca-1244-5bf0-b69f-0c7e51744565",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "session",
-            "operation": "grant:read"
-        },
-        {
-            "id": "c40b2be2-a959-5b56-be6e-0f05fafba444",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "session",
-            "operation": "grant:update"
-        },
-        {
-            "id": "b68f8d3b-3094-5bb6-92f3-153889a37562",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "session",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "eac68c09-0ac4-5ee9-9aef-d5e9b4466025",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "session",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "e6994081-56b4-5493-b79f-e5a3f16220bd",
             "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
             "scope_type": "user",
@@ -1877,46 +1837,6 @@
             "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "entity_type": "agent",
             "operation": "hard-delete"
-        },
-        {
-            "id": "256b37a5-8f57-5429-af4d-bc4153c10530",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "agent",
-            "operation": "grant:all"
-        },
-        {
-            "id": "e08b244d-e09b-569b-96c6-775d21fdc26e",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "agent",
-            "operation": "grant:read"
-        },
-        {
-            "id": "dc403440-ac31-517a-86bd-ff168483e3e4",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "agent",
-            "operation": "grant:update"
-        },
-        {
-            "id": "98fb2e98-8887-55b3-93f1-1e36d0bbfe67",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "agent",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "29c4d8ae-26d4-5bcf-a5bf-c257058972e4",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "agent",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "db699e36-04f3-57c7-8faa-38ac57cce839",
@@ -1959,46 +1879,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "7965c6d3-5e61-5a1b-b24c-c5b5ff371b2e",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "image",
-            "operation": "grant:all"
-        },
-        {
-            "id": "f43a323f-693e-5964-ab7d-7b80b10f165c",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "image",
-            "operation": "grant:read"
-        },
-        {
-            "id": "5003e854-fda7-59ec-a7b4-9b2ca9c85075",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "image",
-            "operation": "grant:update"
-        },
-        {
-            "id": "43ccb099-4c61-5d36-9d7c-4022719b042f",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "image",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "6a868bcc-09b6-5af2-9425-55174a959630",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "image",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "4fd86a7c-3721-531c-83a6-904a8d188956",
             "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
             "scope_type": "user",
@@ -2037,46 +1917,6 @@
             "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "entity_type": "keypair",
             "operation": "hard-delete"
-        },
-        {
-            "id": "62410e75-49a9-525e-a6a0-cd551e4bb1e4",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "keypair",
-            "operation": "grant:all"
-        },
-        {
-            "id": "7340b9f3-4aae-5f1f-9bf6-16f0b60cefe2",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "keypair",
-            "operation": "grant:read"
-        },
-        {
-            "id": "cc18ca49-71b6-5e27-96c7-653aeab55a87",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "keypair",
-            "operation": "grant:update"
-        },
-        {
-            "id": "63fb789d-9b4b-5a2c-9642-43a2ccaa25e0",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "keypair",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "f7c01281-c11b-5e87-a41c-bde9ce87cbf8",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "keypair",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "ee8ed54f-c717-5115-a257-eec88586b2de",
@@ -2119,46 +1959,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "bb3c0e59-5c95-53d0-a56d-5cefc7b5ef8d",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "container_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "e2b29796-478e-5c40-b45c-a70b6dadc129",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "container_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "3f348539-feab-5c23-9f04-d0283aeb7bed",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "container_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "d47de6ac-085e-5fab-b5f9-6d5881d78961",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "container_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "1da9f3db-f53c-52e4-a2e2-8ed0bde56d1e",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "container_registry",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "34ba2e04-0547-5481-9ed5-a64b1c86a3c5",
             "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
             "scope_type": "user",
@@ -2197,46 +1997,6 @@
             "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "entity_type": "resource_group",
             "operation": "hard-delete"
-        },
-        {
-            "id": "8f2ca399-495f-58b8-95c8-a183beee36cb",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "resource_group",
-            "operation": "grant:all"
-        },
-        {
-            "id": "fc405c75-5deb-52c0-9583-192cde885218",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "resource_group",
-            "operation": "grant:read"
-        },
-        {
-            "id": "b815b76a-2801-5747-a217-47216ddd8eab",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "resource_group",
-            "operation": "grant:update"
-        },
-        {
-            "id": "d4331151-f86a-5a99-8f6d-25b7cf1ca0bd",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "resource_group",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "3a28eadf-00a1-5977-91cb-b585e42db76c",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "resource_group",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "8baddd58-62fc-50ef-8355-17b96727931f",
@@ -2279,46 +2039,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "a3c6cb0c-69b1-50fb-b802-f3f5cf461336",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact",
-            "operation": "grant:all"
-        },
-        {
-            "id": "36e6b272-a07d-524e-8fb5-fd881247d21e",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact",
-            "operation": "grant:read"
-        },
-        {
-            "id": "52970d23-7f0e-5371-9394-f1405f014be3",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact",
-            "operation": "grant:update"
-        },
-        {
-            "id": "3a277ccb-9735-5672-98c8-29789e946acb",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "71705db6-baf0-56a4-8147-93593140073a",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "82f70efc-ba04-5d98-8807-228f8fce8097",
             "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
             "scope_type": "user",
@@ -2357,46 +2077,6 @@
             "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "entity_type": "artifact_registry",
             "operation": "hard-delete"
-        },
-        {
-            "id": "8c7098bb-8052-5f83-bb27-47327477bfa2",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "9022f645-57d6-596f-bbee-c6a663deb1f5",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "1a0bcbfa-0f86-5f73-babe-a22a60a866d2",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "326726a0-02a6-57d1-ad7f-d6ca8161e03d",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "8fc15f19-842d-54ee-a7b3-02941f8ad86b",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "artifact_registry",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "4ff12040-0307-591c-b556-d520d1406a05",
@@ -2439,46 +2119,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "d5ba18b7-3e1f-565c-b9aa-cbd26c630bd6",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "app_config",
-            "operation": "grant:all"
-        },
-        {
-            "id": "ac74a312-2f68-58a3-bf1d-8f3f843e2dd6",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "app_config",
-            "operation": "grant:read"
-        },
-        {
-            "id": "3d697a2c-502b-543e-bd26-de3148e4f750",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "app_config",
-            "operation": "grant:update"
-        },
-        {
-            "id": "e0b48e83-ba3b-527f-945e-b22d1d81eda6",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "app_config",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "87eaa4c8-3cf3-542a-890d-d497acda86ee",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "app_config",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "9a56f83e-18a0-52ae-9ffa-c087bf5f968d",
             "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
             "scope_type": "user",
@@ -2517,46 +2157,6 @@
             "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "entity_type": "notification_channel",
             "operation": "hard-delete"
-        },
-        {
-            "id": "21a357f8-eef0-50f9-b623-2a9a84aa8d0e",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_channel",
-            "operation": "grant:all"
-        },
-        {
-            "id": "d38b01f0-1d94-5e57-9d1f-598dee7de163",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_channel",
-            "operation": "grant:read"
-        },
-        {
-            "id": "7cf4f026-10ee-5051-af6e-2776e178d244",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_channel",
-            "operation": "grant:update"
-        },
-        {
-            "id": "9d4b9601-f79f-5e63-9581-dfabf19ce1fe",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_channel",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "d0dce51d-e236-59c6-aa18-dceac1ef7c6b",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_channel",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "2aef75ac-2282-53d7-a6e1-3ce3d2f06298",
@@ -2599,46 +2199,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "601894e0-9679-5956-bd07-15871f9e81e1",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_rule",
-            "operation": "grant:all"
-        },
-        {
-            "id": "09b05e33-b0aa-5bdb-b001-bd43f075d157",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_rule",
-            "operation": "grant:read"
-        },
-        {
-            "id": "3a3e2289-c19b-55ee-8d56-48c3fe94acc5",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_rule",
-            "operation": "grant:update"
-        },
-        {
-            "id": "17efae56-cc4f-5f75-b7b3-5e11e31f4dc0",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_rule",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "0232e18b-2f3f-5f89-b1b9-c192fdbfb726",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "notification_rule",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "ec9e220c-5e3a-5609-9bff-cec27bc75e8b",
             "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
             "scope_type": "user",
@@ -2677,46 +2237,6 @@
             "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "entity_type": "model_deployment",
             "operation": "hard-delete"
-        },
-        {
-            "id": "b602ad2e-3222-5c25-9f6a-7fc089a8bb45",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_deployment",
-            "operation": "grant:all"
-        },
-        {
-            "id": "abaa86bf-860a-5746-b7f1-7aede415cae9",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_deployment",
-            "operation": "grant:read"
-        },
-        {
-            "id": "26cf87aa-d3d1-536d-88d5-1a267f6c5db6",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_deployment",
-            "operation": "grant:update"
-        },
-        {
-            "id": "de5ed520-348c-50d3-a83b-d07517ea39e0",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_deployment",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "3dca1c77-ac36-5b6a-b136-d19aceefc77f",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_deployment",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "61bed1bb-f569-5a85-b884-29d9fa7deca0",
@@ -2759,46 +2279,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "321f5c2e-34c5-5278-a55d-38dcf25636d7",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_card",
-            "operation": "grant:all"
-        },
-        {
-            "id": "775b1521-fe2b-503f-8a6c-7ebd9ccc583a",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_card",
-            "operation": "grant:read"
-        },
-        {
-            "id": "de25e53d-acf9-51a7-aa93-4da6c6d39222",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_card",
-            "operation": "grant:update"
-        },
-        {
-            "id": "dc99b192-7fc5-5351-a2e4-d751f7e43921",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_card",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "371e3332-fa66-5843-8f0f-db468a68b08f",
-            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "entity_type": "model_card",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "92eee125-b32b-5797-8f6d-9704eae14310",
             "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "scope_type": "domain",
@@ -2837,46 +2317,6 @@
             "scope_id": "default",
             "entity_type": "session",
             "operation": "hard-delete"
-        },
-        {
-            "id": "0d3f3fcd-c965-5bc8-a5e9-73808eae8197",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "session",
-            "operation": "grant:all"
-        },
-        {
-            "id": "89153598-db24-5eaa-b147-c954be14e21f",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "session",
-            "operation": "grant:read"
-        },
-        {
-            "id": "bbc39e1e-2f86-521b-b12b-64a2ee3311c0",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "session",
-            "operation": "grant:update"
-        },
-        {
-            "id": "7fd795a1-deba-5dff-b30b-d9bac7bb0f46",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "session",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "9251a51a-f1e5-529a-82da-eb4d951dfc19",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "session",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "f05ed002-9279-5998-aa83-b207f29c567b",
@@ -2919,46 +2359,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "087eed08-3d5b-5375-841e-d9ddb1d83456",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "agent",
-            "operation": "grant:all"
-        },
-        {
-            "id": "c2c8c4b8-6456-5132-94ad-376a2fc249be",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "agent",
-            "operation": "grant:read"
-        },
-        {
-            "id": "e7db4564-56c4-5262-bb58-4de5a9228bc7",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "agent",
-            "operation": "grant:update"
-        },
-        {
-            "id": "ce26f4d0-45ab-52ad-ae05-fda210b6089d",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "agent",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "ed3c6977-ada7-5340-9d1b-de5f5e479418",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "agent",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "f1f8379b-d243-5628-b292-25f436e398f0",
             "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "scope_type": "domain",
@@ -2997,46 +2397,6 @@
             "scope_id": "default",
             "entity_type": "image",
             "operation": "hard-delete"
-        },
-        {
-            "id": "f68b4e1d-038c-59fd-b79a-a1f26cccf471",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "image",
-            "operation": "grant:all"
-        },
-        {
-            "id": "e8be05f7-4583-5094-8ab5-47e4a0661629",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "image",
-            "operation": "grant:read"
-        },
-        {
-            "id": "45658036-61f9-5993-adc8-ec42580ac2c0",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "image",
-            "operation": "grant:update"
-        },
-        {
-            "id": "5b6db888-fbc6-571e-bdff-56b2d5e96ed3",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "image",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "2d3611a9-3f52-52e2-a109-0a969e775fa4",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "image",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "66ed82ec-8584-5e32-a756-83fe4883e85b",
@@ -3079,46 +2439,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "8a3809ea-f37a-5c28-8042-41e7c1f7224e",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "keypair",
-            "operation": "grant:all"
-        },
-        {
-            "id": "8fd24dae-e18c-528b-accb-b5dd7f931bc4",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "keypair",
-            "operation": "grant:read"
-        },
-        {
-            "id": "c0eb8ac1-3ee2-56b6-b8e1-09965da4adce",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "keypair",
-            "operation": "grant:update"
-        },
-        {
-            "id": "1eb02458-ecb6-59fc-af71-9950d06b4285",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "keypair",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "77368750-01ce-55ec-89e1-9d80481528cb",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "keypair",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "31ad0203-a202-56e0-af2c-d3e0d23a3c86",
             "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "scope_type": "domain",
@@ -3157,46 +2477,6 @@
             "scope_id": "default",
             "entity_type": "container_registry",
             "operation": "hard-delete"
-        },
-        {
-            "id": "692b45ed-f868-5a08-acdf-b2855f468faa",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "container_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "80416e73-a7be-5068-8cd4-b9bcad0d5a97",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "container_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "e5110b9d-ad40-592e-8436-02ef177ca010",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "container_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "22214a27-e312-5e05-a689-fd90cb4adf4e",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "container_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "fa4f597c-d279-5d5e-aa78-b31281ce8a7c",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "container_registry",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "19cfbd57-0872-5cb8-92ac-597a6251fdaf",
@@ -3239,46 +2519,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "74abd0e4-65f4-5d59-a857-6c58595b4a1a",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "resource_group",
-            "operation": "grant:all"
-        },
-        {
-            "id": "07a3d3ae-f822-59a9-9d0c-22d92a75af87",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "resource_group",
-            "operation": "grant:read"
-        },
-        {
-            "id": "f772001e-c335-5447-814b-7c8ff65a129a",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "resource_group",
-            "operation": "grant:update"
-        },
-        {
-            "id": "8429de42-eb2a-53d1-b294-f6e232ef8826",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "resource_group",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "a58de411-020e-5f4c-81e7-d1848bb01206",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "resource_group",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "37333a3d-2a50-559b-92bf-6b0c23ab6ed3",
             "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "scope_type": "domain",
@@ -3317,46 +2557,6 @@
             "scope_id": "default",
             "entity_type": "artifact",
             "operation": "hard-delete"
-        },
-        {
-            "id": "d3ef4b19-cd26-5e03-8946-5607ccdf0576",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact",
-            "operation": "grant:all"
-        },
-        {
-            "id": "eaae3e4c-b181-53cb-802d-19855a2ff908",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact",
-            "operation": "grant:read"
-        },
-        {
-            "id": "9b764cd6-b4fd-52e0-bd8d-81374a7ae2b2",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact",
-            "operation": "grant:update"
-        },
-        {
-            "id": "c99a9100-e638-5c62-822d-cbc771c4c5b6",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "0f0b0aa2-edd2-5c62-a4f7-53d89afa47a9",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "3e6b4c3e-f490-50f8-a387-03f795e574f3",
@@ -3399,46 +2599,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "58299809-3171-5f86-ba62-0f311d138374",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "b4a8317b-8ab0-58bd-93cd-1b2096297360",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "3e14a3ca-4977-5e65-aed3-82c17eb888f7",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "e0b2a14f-40ea-5fad-9f0a-c651d257af1b",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "8a69b975-5c4b-5767-8e5e-cdd3cfaa5b51",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "artifact_registry",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "db6c5b62-4853-5784-946a-b8a4397dcb9e",
             "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "scope_type": "domain",
@@ -3477,46 +2637,6 @@
             "scope_id": "default",
             "entity_type": "app_config",
             "operation": "hard-delete"
-        },
-        {
-            "id": "d77b718a-5974-5126-bfce-a15776a17d71",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "app_config",
-            "operation": "grant:all"
-        },
-        {
-            "id": "68ef2ad6-b55a-50ed-abe1-efa5b8d756a8",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "app_config",
-            "operation": "grant:read"
-        },
-        {
-            "id": "a5dcbae3-dc2e-577b-b91b-157a4712f14a",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "app_config",
-            "operation": "grant:update"
-        },
-        {
-            "id": "24e5dee4-7b22-5707-baf9-2c85a34457a9",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "app_config",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "89f8a166-3d70-5211-ad51-7a04705dff5f",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "app_config",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "53471358-e2b6-55be-818c-0d756ecc7cf3",
@@ -3559,46 +2679,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "cae4c6fc-d158-56e1-bdd0-8a2f1ef799b5",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_channel",
-            "operation": "grant:all"
-        },
-        {
-            "id": "9a77512f-4c20-5b13-84d5-8030ffb919ba",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_channel",
-            "operation": "grant:read"
-        },
-        {
-            "id": "317a9382-2981-5f5d-afae-36dc3d4381a9",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_channel",
-            "operation": "grant:update"
-        },
-        {
-            "id": "e86f1286-211a-55ae-ba0a-6ee3e2c606e5",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_channel",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "49bd6561-5bcc-51f1-8690-3230f854a2e2",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_channel",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "63675456-0253-5f8c-872b-d2749899de50",
             "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "scope_type": "domain",
@@ -3637,46 +2717,6 @@
             "scope_id": "default",
             "entity_type": "notification_rule",
             "operation": "hard-delete"
-        },
-        {
-            "id": "49dcdfd2-2e69-55a0-ba7c-d0cec05b1ea8",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_rule",
-            "operation": "grant:all"
-        },
-        {
-            "id": "0b20fca9-94de-52e3-ab33-95406cae3372",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_rule",
-            "operation": "grant:read"
-        },
-        {
-            "id": "aeb353de-2d55-5069-bbb4-09733569c839",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_rule",
-            "operation": "grant:update"
-        },
-        {
-            "id": "eaae6c42-cbcb-52ff-8c9a-e0b65ef84f3c",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_rule",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "842205b5-96b4-51ff-937c-3daa850f6c1f",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "notification_rule",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "6bd59b5b-6143-5a62-aca2-ffbfe07951b0",
@@ -3719,46 +2759,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "712c60ac-f59b-5457-86e9-c9b3f5473af1",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_deployment",
-            "operation": "grant:all"
-        },
-        {
-            "id": "59eebf1d-9527-5a5a-84e7-4326410027db",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_deployment",
-            "operation": "grant:read"
-        },
-        {
-            "id": "ad6e2fbc-4e25-5019-a03b-bbf77ac55259",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_deployment",
-            "operation": "grant:update"
-        },
-        {
-            "id": "ebd26b8b-02c6-57e4-b3af-2025c577a7bb",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_deployment",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "86fe1a08-979c-5c43-83e7-ba34f3fd2b2b",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_deployment",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "f67361f9-aac6-5e75-9f64-09ca2bf701dd",
             "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
             "scope_type": "domain",
@@ -3797,46 +2797,6 @@
             "scope_id": "default",
             "entity_type": "model_card",
             "operation": "hard-delete"
-        },
-        {
-            "id": "3491dfda-bfd1-53f9-b4d1-96358b6283e8",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_card",
-            "operation": "grant:all"
-        },
-        {
-            "id": "4da97691-543e-5b38-bbf3-ddef75271763",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_card",
-            "operation": "grant:read"
-        },
-        {
-            "id": "10d6d7f1-e711-5a43-8bfd-c211676e4498",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_card",
-            "operation": "grant:update"
-        },
-        {
-            "id": "4e6f4f2a-4d90-52bc-898a-c0e1a65b4e50",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_card",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "038f8469-e985-5f9b-b6cf-9d2710617088",
-            "role_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
-            "scope_type": "domain",
-            "scope_id": "default",
-            "entity_type": "model_card",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "4b877a54-8f7f-5a40-87d6-83ba5ac18a29",
@@ -3879,46 +2839,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "6c9b414d-f724-5323-8e8f-94e281e994ab",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "session",
-            "operation": "grant:all"
-        },
-        {
-            "id": "c02dfd9c-a672-5261-8494-c27f537f9e17",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "session",
-            "operation": "grant:read"
-        },
-        {
-            "id": "a6c1f0a9-e780-5157-bce2-8a951445743e",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "session",
-            "operation": "grant:update"
-        },
-        {
-            "id": "34336686-ab81-5227-88e0-b9a8a4a46607",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "session",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "b34cf704-48a0-56fc-bb29-88646ba3dffa",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "session",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "021ef3fe-085d-5d9d-86b7-060a630e15f2",
             "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "scope_type": "user",
@@ -3957,46 +2877,6 @@
             "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
             "entity_type": "agent",
             "operation": "hard-delete"
-        },
-        {
-            "id": "d6fe19a4-1db4-5b38-a075-377c8dc6cf54",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "agent",
-            "operation": "grant:all"
-        },
-        {
-            "id": "9b05d9ea-5983-5f94-8a39-4e2625fd6454",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "agent",
-            "operation": "grant:read"
-        },
-        {
-            "id": "b604a325-40c9-5a3a-9dc3-eeb96ce8fe98",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "agent",
-            "operation": "grant:update"
-        },
-        {
-            "id": "590da580-3274-5579-8a86-057015d3a540",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "agent",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "b50801c3-c916-5717-a82e-69b8de3e3aa5",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "agent",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "5219cbe1-2bae-53df-b052-778d33f17317",
@@ -4039,46 +2919,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "06a50f81-5a58-55a1-8946-c8a33ded1aaf",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "image",
-            "operation": "grant:all"
-        },
-        {
-            "id": "cccc1798-b10f-59fd-99be-ff018f12d709",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "image",
-            "operation": "grant:read"
-        },
-        {
-            "id": "19eb8f4a-2223-53ca-a801-a0c050d7d978",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "image",
-            "operation": "grant:update"
-        },
-        {
-            "id": "e84d27e4-4152-58a9-b38c-69d70156018f",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "image",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "9cc982ef-6991-57ef-a7b1-4e05074c59df",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "image",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "d09fb2eb-dfa6-5f91-919a-94741382015e",
             "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "scope_type": "user",
@@ -4117,46 +2957,6 @@
             "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
             "entity_type": "keypair",
             "operation": "hard-delete"
-        },
-        {
-            "id": "e7d42646-c6e2-5e4c-b3f3-b77ea57bd9a9",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "keypair",
-            "operation": "grant:all"
-        },
-        {
-            "id": "1b4b6e12-cdc4-566a-9458-371a276de9a9",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "keypair",
-            "operation": "grant:read"
-        },
-        {
-            "id": "b824c185-772b-5d6a-9f0e-1526a8c73845",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "keypair",
-            "operation": "grant:update"
-        },
-        {
-            "id": "39e86f19-749e-55d3-8a1c-9a792c772fbf",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "keypair",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "4e6ddd0c-53ae-559e-b5d2-d97802f4f23e",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "keypair",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "d2f18ce4-3868-5611-b123-41584272e057",
@@ -4199,46 +2999,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "44936baf-a2ea-5a1c-a678-c803788961f5",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "container_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "dd607b01-2d49-5bb0-a064-1320b5de4ca5",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "container_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "0b3c36a3-e0d4-5b8a-bad6-e4b2b2da3eb3",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "container_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "c2848289-254b-52bb-8ffd-f23a6a28f82a",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "container_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "e7c830b4-14d7-56cc-9424-21fc63fa7540",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "container_registry",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "f369cba1-bbaf-53d9-af86-828053e78f1f",
             "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "scope_type": "user",
@@ -4277,46 +3037,6 @@
             "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
             "entity_type": "resource_group",
             "operation": "hard-delete"
-        },
-        {
-            "id": "9b7109f4-6c0a-5211-af9b-924d7286d2c0",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "resource_group",
-            "operation": "grant:all"
-        },
-        {
-            "id": "dc5eff71-71c6-56c3-a12c-bf4d7f390be8",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "resource_group",
-            "operation": "grant:read"
-        },
-        {
-            "id": "6f1929ff-a717-5861-8c0d-f5b48ee1a5cb",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "resource_group",
-            "operation": "grant:update"
-        },
-        {
-            "id": "eb46bf1f-dc87-5b13-84a9-2e44a607c7a3",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "resource_group",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "7fd1ffa1-c150-5657-b043-aacc41d32cbb",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "resource_group",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "38701ada-00fd-5167-b23d-18a64463cd58",
@@ -4359,46 +3079,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "17fb30dc-0d0b-5cf1-b2a5-dc6b78d35648",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact",
-            "operation": "grant:all"
-        },
-        {
-            "id": "df50c8a9-079f-57d9-b426-ea04bb6300e0",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact",
-            "operation": "grant:read"
-        },
-        {
-            "id": "59959bd2-e77f-53e6-9bd8-9cc8fab36e3a",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact",
-            "operation": "grant:update"
-        },
-        {
-            "id": "d923a3f5-185e-55b9-8fa7-4892554a0e65",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "ae3fdfe5-5390-599b-aa65-11cf47bb1d0c",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "71d44ad8-d29f-586c-98e6-9a9e29d6fbb0",
             "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "scope_type": "user",
@@ -4437,46 +3117,6 @@
             "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
             "entity_type": "artifact_registry",
             "operation": "hard-delete"
-        },
-        {
-            "id": "c4664c5c-2760-5386-9d39-ae5998325b15",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "a15df93d-0032-5f3b-8e6b-6c65eb5575e9",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "266967c4-ec12-5cdc-bcb3-c2b4507de7c1",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "75c614d0-2e55-5c26-bc7f-c4afa0a8064b",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "a3a8c8c5-b975-5b9d-8e81-272386288acf",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "artifact_registry",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "592a1565-6762-597d-9c8b-911543f90de0",
@@ -4519,46 +3159,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "971e9523-1e69-5661-9218-8c5f23d274a7",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "app_config",
-            "operation": "grant:all"
-        },
-        {
-            "id": "9a52def4-dacf-5e9d-b184-9abf971ab3d4",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "app_config",
-            "operation": "grant:read"
-        },
-        {
-            "id": "cee32629-b969-5ca7-a782-93b810d92566",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "app_config",
-            "operation": "grant:update"
-        },
-        {
-            "id": "2a474a47-d010-514e-8653-2a9b285eca45",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "app_config",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "e49a52a8-f8d7-519a-a15d-6da147979525",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "app_config",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "b522dac3-0039-50c0-80cb-7e509e6fa307",
             "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "scope_type": "user",
@@ -4597,46 +3197,6 @@
             "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
             "entity_type": "notification_channel",
             "operation": "hard-delete"
-        },
-        {
-            "id": "37c18bcd-72c8-5609-9871-2d79b10a0344",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_channel",
-            "operation": "grant:all"
-        },
-        {
-            "id": "84ed97dd-a491-529a-9dec-bddc27898220",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_channel",
-            "operation": "grant:read"
-        },
-        {
-            "id": "c441c93f-c7e7-5e02-8811-ed8bd135bc82",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_channel",
-            "operation": "grant:update"
-        },
-        {
-            "id": "84452994-8a7b-5df1-9062-f30b73b1c77c",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_channel",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "5ed6ba85-255c-584e-9386-4552ac200a83",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_channel",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "b7711cc1-d33c-57e8-ab93-c6b298da17f7",
@@ -4679,46 +3239,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "5f0f10ae-a588-5c1b-847e-209803fdeed9",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_rule",
-            "operation": "grant:all"
-        },
-        {
-            "id": "48d78f98-340c-5b0d-bf24-c6b25c1c27f7",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_rule",
-            "operation": "grant:read"
-        },
-        {
-            "id": "82e591ab-c9de-5dca-83d2-16580f45fde4",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_rule",
-            "operation": "grant:update"
-        },
-        {
-            "id": "162a9de0-65b0-5d7f-8b99-30d2ffc0eeb9",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_rule",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "6448e4b6-ec33-56fa-b15d-477c6ca376f6",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "notification_rule",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "8b4a5fc4-e94b-57c7-81f7-116a60a3b2eb",
             "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
             "scope_type": "user",
@@ -4757,46 +3277,6 @@
             "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
             "entity_type": "model_deployment",
             "operation": "hard-delete"
-        },
-        {
-            "id": "ae5f5b76-1ee4-5f0e-8431-ff592bbc65a1",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_deployment",
-            "operation": "grant:all"
-        },
-        {
-            "id": "ec2b5c3d-7cde-5d87-9c4c-d9196cb5d6fd",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_deployment",
-            "operation": "grant:read"
-        },
-        {
-            "id": "3a81681c-7869-5186-9f1a-1b5dae79f9e5",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_deployment",
-            "operation": "grant:update"
-        },
-        {
-            "id": "e44afffa-87b6-5ce1-8a22-a9aaeda50f13",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_deployment",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "d47a263f-4291-5c5e-82de-5df73b2ff3c3",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_deployment",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "0131fba5-7712-561d-86cc-5cc965701dce",
@@ -4839,46 +3319,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "26a1845c-a474-56f5-8086-65a28f436ab5",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_card",
-            "operation": "grant:all"
-        },
-        {
-            "id": "fedbfbe3-cdaa-55ca-b6ba-bded5592f8fe",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_card",
-            "operation": "grant:read"
-        },
-        {
-            "id": "83cc69ca-6ae0-5d94-a90e-7b9e4dff5ab6",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_card",
-            "operation": "grant:update"
-        },
-        {
-            "id": "1f3e9732-94ee-5162-8816-2551211d04ee",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_card",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "8e6824c6-6942-571c-84f6-4b153da8bfe4",
-            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "entity_type": "model_card",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "700af57f-bc53-58b0-b5d7-936c27244d9f",
             "role_id": "72293d83-1849-4bb5-a555-80e561515428",
             "scope_type": "user",
@@ -4917,46 +3357,6 @@
             "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
             "entity_type": "session",
             "operation": "hard-delete"
-        },
-        {
-            "id": "0ab4f770-7660-5f3c-8daa-96e1dabe8684",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "session",
-            "operation": "grant:all"
-        },
-        {
-            "id": "30fae028-04a0-5b5f-b0e9-94e47ad68245",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "session",
-            "operation": "grant:read"
-        },
-        {
-            "id": "7113ce84-c456-53b9-b1cb-56f0e854a3ef",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "session",
-            "operation": "grant:update"
-        },
-        {
-            "id": "bdf36ae3-30b8-5440-9c98-8a434658fb6c",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "session",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "e028474d-96df-5468-8b3c-1774ac17d27b",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "session",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "0f101d7f-a5cf-52fb-8834-da286b8776bf",
@@ -4999,46 +3399,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "382e4870-075b-5205-b908-b4e2d3e88e8b",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "agent",
-            "operation": "grant:all"
-        },
-        {
-            "id": "5564b891-b7e8-5558-b3ed-e273e8b4a131",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "agent",
-            "operation": "grant:read"
-        },
-        {
-            "id": "6dae118c-6c14-52fe-aeb2-e926fe3dbdcc",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "agent",
-            "operation": "grant:update"
-        },
-        {
-            "id": "6dd49c53-2ef4-568b-9b1e-648286b9a84c",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "agent",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "8c6abe09-46b2-5cf2-a65c-aa4493f50e5a",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "agent",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "3133d01f-36b6-5772-a232-e44f78846b02",
             "role_id": "72293d83-1849-4bb5-a555-80e561515428",
             "scope_type": "user",
@@ -5077,46 +3437,6 @@
             "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
             "entity_type": "image",
             "operation": "hard-delete"
-        },
-        {
-            "id": "1a91befb-2d78-52ba-942c-6bd6fd44cb4a",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "image",
-            "operation": "grant:all"
-        },
-        {
-            "id": "e5435f89-fb7c-5ee0-ae14-4a2c664d0ce6",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "image",
-            "operation": "grant:read"
-        },
-        {
-            "id": "9b3c8c53-f4b7-5630-a0a9-130298109479",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "image",
-            "operation": "grant:update"
-        },
-        {
-            "id": "52cbe066-e4d7-5d11-9b0d-68ab598106e0",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "image",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "18f615fc-ef28-5f8e-8b69-88ad7eee6a17",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "image",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "1f790880-4d3e-53e5-b643-aa0d5f0baa45",
@@ -5159,46 +3479,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "b6b10ce9-79c7-532d-80d4-c89e13d2fa4e",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "keypair",
-            "operation": "grant:all"
-        },
-        {
-            "id": "7532ba9f-12d4-5e3c-b405-856a0062daf4",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "keypair",
-            "operation": "grant:read"
-        },
-        {
-            "id": "24ddc6df-146b-5917-9295-12906e776fa8",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "keypair",
-            "operation": "grant:update"
-        },
-        {
-            "id": "f8d5efa2-051b-569d-b5ff-609b01ecf6c1",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "keypair",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "8cf1318f-698c-59b8-94f6-74b61a90c0a4",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "keypair",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "f6297d68-a8d7-57f0-8fde-4e151c1ccdd2",
             "role_id": "72293d83-1849-4bb5-a555-80e561515428",
             "scope_type": "user",
@@ -5237,46 +3517,6 @@
             "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
             "entity_type": "container_registry",
             "operation": "hard-delete"
-        },
-        {
-            "id": "a6a0fd7b-df81-5a5f-86e3-8749b2e2dff2",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "container_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "ea2959c2-b018-5420-940f-6e41847e0834",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "container_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "ba9a0680-46cc-5194-8f49-20dca3b776d7",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "container_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "0f368214-81bd-5a4e-9c45-8d6cf06bd835",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "container_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "7684c3f1-9ba7-53cc-af06-f0b05156900c",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "container_registry",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "dad3985e-322a-5404-8512-a9c2fff91b58",
@@ -5319,46 +3559,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "e3991003-3b18-5e54-aa25-5bbe4b628468",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "resource_group",
-            "operation": "grant:all"
-        },
-        {
-            "id": "fcfe3734-6018-56b2-a674-3358dd8c10fd",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "resource_group",
-            "operation": "grant:read"
-        },
-        {
-            "id": "70aeef73-12cd-5949-a790-f5d2d4f1d9ac",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "resource_group",
-            "operation": "grant:update"
-        },
-        {
-            "id": "2c43f16b-e908-5c60-a1ba-7724f14c8a88",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "resource_group",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "64ad73f0-8039-5793-a6a5-00b7ff1c8d35",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "resource_group",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "fe01f863-aa7f-5412-a274-f42b3ae5ca4a",
             "role_id": "72293d83-1849-4bb5-a555-80e561515428",
             "scope_type": "user",
@@ -5397,46 +3597,6 @@
             "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
             "entity_type": "artifact",
             "operation": "hard-delete"
-        },
-        {
-            "id": "da175f1e-4e02-5ca4-8bea-7b00472d85fa",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact",
-            "operation": "grant:all"
-        },
-        {
-            "id": "495894ec-edbe-56ec-98bc-f1ae8392788c",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact",
-            "operation": "grant:read"
-        },
-        {
-            "id": "62ec832b-bd4a-5890-808b-4f026e7bbb11",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact",
-            "operation": "grant:update"
-        },
-        {
-            "id": "78c39020-f85a-5062-8820-0e4df71169db",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "7703582d-e7ad-50da-b882-0c8c2822e05e",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "1e745938-da0d-52da-aaa7-5b24d393c4e4",
@@ -5479,46 +3639,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "f78e5283-ec90-5827-8e48-4e35882e2348",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "32dd8c0c-f362-5056-b1a3-347c3902201e",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "374db38e-b477-5d1d-9389-229616e582f6",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "0bdab0a6-4109-57ad-a0d7-062c5bc56244",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "c04a14ff-ff29-5d16-8e62-5656b94af4c6",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "artifact_registry",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "96642679-7cf4-5b84-9435-66a8a7607337",
             "role_id": "72293d83-1849-4bb5-a555-80e561515428",
             "scope_type": "user",
@@ -5557,46 +3677,6 @@
             "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
             "entity_type": "app_config",
             "operation": "hard-delete"
-        },
-        {
-            "id": "e8ab8ba7-76eb-595d-9178-6b5255ae00b5",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "app_config",
-            "operation": "grant:all"
-        },
-        {
-            "id": "e40116c8-8fd1-5fcb-be9e-67636899403a",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "app_config",
-            "operation": "grant:read"
-        },
-        {
-            "id": "515daf00-89e8-5369-8ca4-89cddbcba944",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "app_config",
-            "operation": "grant:update"
-        },
-        {
-            "id": "7ce6eb1c-8249-537d-9d22-675884a47613",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "app_config",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "388f721f-66a1-5ec3-821d-35503d80962a",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "app_config",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "c1b9dfd2-4370-5461-9bf0-81bcec40cc91",
@@ -5639,46 +3719,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "0d02c1ca-4608-5716-8cda-012debbc1bab",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_channel",
-            "operation": "grant:all"
-        },
-        {
-            "id": "9e131625-3eeb-5837-873e-eb7427147804",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_channel",
-            "operation": "grant:read"
-        },
-        {
-            "id": "89df655d-5cba-5ed2-9649-fdaf48aec21a",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_channel",
-            "operation": "grant:update"
-        },
-        {
-            "id": "6960944d-dea6-53e8-9820-e92264c33ee4",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_channel",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "2252b70b-baf6-554e-ae0c-77457ca2b13d",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_channel",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "a929df68-83ee-5ff6-a748-b0c70785d721",
             "role_id": "72293d83-1849-4bb5-a555-80e561515428",
             "scope_type": "user",
@@ -5717,46 +3757,6 @@
             "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
             "entity_type": "notification_rule",
             "operation": "hard-delete"
-        },
-        {
-            "id": "ec8a6727-3eb3-5a59-a3d4-9359bea62092",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_rule",
-            "operation": "grant:all"
-        },
-        {
-            "id": "b87b1a3e-5912-58ad-b1ce-3194efabaed4",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_rule",
-            "operation": "grant:read"
-        },
-        {
-            "id": "24b658e6-ffc7-51a2-8c76-2a2525725eb6",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_rule",
-            "operation": "grant:update"
-        },
-        {
-            "id": "3df85546-7d7d-57cf-8594-3c79e46e7f07",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_rule",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "aa98fc9e-b1e8-5044-ae5a-3c39d2c65832",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "notification_rule",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "9807b9c9-cf54-5b06-a70c-5774de353e00",
@@ -5799,46 +3799,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "c16b6512-2d83-53ba-88c3-020865208698",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_deployment",
-            "operation": "grant:all"
-        },
-        {
-            "id": "84973f19-9d72-5d3f-a7ab-9a0e868b7b2f",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_deployment",
-            "operation": "grant:read"
-        },
-        {
-            "id": "935750bf-4f61-5925-bdc8-517f0daef651",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_deployment",
-            "operation": "grant:update"
-        },
-        {
-            "id": "ddb29aae-df2c-5d8e-b66e-f0aea8eaec06",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_deployment",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "ed61e58b-3435-55ab-9cf8-408c1b46e12c",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_deployment",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "cdb36eea-259d-58a6-b900-4284d5dd25a8",
             "role_id": "72293d83-1849-4bb5-a555-80e561515428",
             "scope_type": "user",
@@ -5877,46 +3837,6 @@
             "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
             "entity_type": "model_card",
             "operation": "hard-delete"
-        },
-        {
-            "id": "842f3af1-c484-5d24-b278-00dd948618d0",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_card",
-            "operation": "grant:all"
-        },
-        {
-            "id": "647b1c55-5dce-58cd-bb5c-22ba6215f490",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_card",
-            "operation": "grant:read"
-        },
-        {
-            "id": "f788a00e-3ec5-50d8-91e5-ea3f9487e5ad",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_card",
-            "operation": "grant:update"
-        },
-        {
-            "id": "8389022a-5def-5e10-ac10-339a844e4a6f",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_card",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "10f3a32b-ee2c-5de8-a369-b4e163e2b366",
-            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "entity_type": "model_card",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "42a3ce9c-02c0-5ca6-9ae1-44e5da9eca7f",
@@ -5959,46 +3879,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "1680705b-780e-5fe2-a8e3-1e1302e42618",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "session",
-            "operation": "grant:all"
-        },
-        {
-            "id": "8f5fc011-21be-5fc9-ae93-69d6eba354b2",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "session",
-            "operation": "grant:read"
-        },
-        {
-            "id": "ad84f29b-4c59-5629-baf5-760a90fab38f",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "session",
-            "operation": "grant:update"
-        },
-        {
-            "id": "b8322c17-474c-5741-a71e-974e9b97fee4",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "session",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "1f108a62-7c60-5cfa-9044-907b91d7dc0a",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "session",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "3293bf07-3593-5a4e-b804-3e32cb149773",
             "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
             "scope_type": "user",
@@ -6037,46 +3917,6 @@
             "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "entity_type": "agent",
             "operation": "hard-delete"
-        },
-        {
-            "id": "369f0430-3a02-54d0-9903-e75b33970b84",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "agent",
-            "operation": "grant:all"
-        },
-        {
-            "id": "ddeee3b3-69d0-5b87-b340-a8da118a3e1e",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "agent",
-            "operation": "grant:read"
-        },
-        {
-            "id": "b116cd31-27a6-507d-a0e0-d5aa469f1590",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "agent",
-            "operation": "grant:update"
-        },
-        {
-            "id": "4945a06d-0e25-55e1-b4b4-d381a4c0609a",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "agent",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "62e72a04-e72b-5a0a-a95a-7b1607224f93",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "agent",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "5aa1007f-9cba-5938-811e-9b1fcde4f093",
@@ -6119,46 +3959,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "74f0bc5e-6fd2-59af-842f-16e6112fc05b",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "image",
-            "operation": "grant:all"
-        },
-        {
-            "id": "4ae9efe2-0600-5048-8cdd-38dc0bbbc92e",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "image",
-            "operation": "grant:read"
-        },
-        {
-            "id": "dafb53b3-4424-5bcd-8af8-9789ecca5707",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "image",
-            "operation": "grant:update"
-        },
-        {
-            "id": "b8829047-beca-5862-a723-195eebf2340a",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "image",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "c971eda8-f5da-51f3-854c-42c8b1fe098a",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "image",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "fb2733ec-ce05-57d2-982f-a8da78eba9c2",
             "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
             "scope_type": "user",
@@ -6197,46 +3997,6 @@
             "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "entity_type": "keypair",
             "operation": "hard-delete"
-        },
-        {
-            "id": "a021a1a8-8e62-516a-8276-5d7a400887eb",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "keypair",
-            "operation": "grant:all"
-        },
-        {
-            "id": "71ffba72-3f5a-52e9-ad0f-1b87142b2a70",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "keypair",
-            "operation": "grant:read"
-        },
-        {
-            "id": "03d77093-b520-5e44-87a2-02d29b0b68ab",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "keypair",
-            "operation": "grant:update"
-        },
-        {
-            "id": "f336d099-6e31-5363-95dd-cbf1c2de5d6a",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "keypair",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "e55c47a2-cb31-5029-b328-9b01a0cd23cf",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "keypair",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "c1339151-31ea-561b-8e3a-b7482f130c4d",
@@ -6279,46 +4039,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "85b07616-ec49-5449-ae32-cd7f39731ee8",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "container_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "7059ba21-08b0-5afc-8e90-fcba3c93dc50",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "container_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "7bc7145a-b8a4-56b5-9a8e-e839d55aebed",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "container_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "57ab9a1f-3a69-569b-8716-46ecfa254672",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "container_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "86badf9f-e39d-5f98-b166-1ebb3ea4930b",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "container_registry",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "0f3a940c-da97-5aa2-82c0-29ac55a26f9a",
             "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
             "scope_type": "user",
@@ -6357,46 +4077,6 @@
             "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "entity_type": "resource_group",
             "operation": "hard-delete"
-        },
-        {
-            "id": "16396000-3d6b-557f-912c-2adcc54c18ed",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "resource_group",
-            "operation": "grant:all"
-        },
-        {
-            "id": "56da54c5-8db6-58d4-bb22-35c9b1bbb8ed",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "resource_group",
-            "operation": "grant:read"
-        },
-        {
-            "id": "0ea0f082-3011-5659-a7c7-54c9182ccdc4",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "resource_group",
-            "operation": "grant:update"
-        },
-        {
-            "id": "425f5a18-9b99-5765-b060-cfe9383db9db",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "resource_group",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "ef0b161f-1909-56e6-9a2f-1a5f12274f6b",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "resource_group",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "c5fa597a-4d5c-5fe2-81da-59b74fbd9e0a",
@@ -6439,46 +4119,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "b95aee27-6da2-5bcd-b6be-73bbae2c2584",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact",
-            "operation": "grant:all"
-        },
-        {
-            "id": "8fc1d788-8274-5301-8f3b-7724ae33910d",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact",
-            "operation": "grant:read"
-        },
-        {
-            "id": "ef3a17ed-95b5-5310-8d90-be3b28c9a676",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact",
-            "operation": "grant:update"
-        },
-        {
-            "id": "1f47b0c3-9323-5365-b615-efd36a43f0bc",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "8d6dba73-c3c3-5f3c-92e6-41fcf6c27d41",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "663ac9c9-b665-525e-90d6-e1b9fae00b77",
             "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
             "scope_type": "user",
@@ -6517,46 +4157,6 @@
             "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "entity_type": "artifact_registry",
             "operation": "hard-delete"
-        },
-        {
-            "id": "d80035fb-d0b1-5ea3-ab81-e31431d64ebf",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "cb3002e5-bc1d-5fa6-bda8-e6d1ea336fe5",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "68af2e61-26f6-55c8-b073-c792f6524b9e",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "23626215-9f39-561b-a0b2-34ced0bbf3c2",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "d4021d57-b16d-58ce-9945-d39c7f59d35f",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "artifact_registry",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "80bfbe3c-063e-5b7a-8902-82e571810ce2",
@@ -6599,46 +4199,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "09a532cb-e68b-50bf-9669-26c674b1dc8f",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "app_config",
-            "operation": "grant:all"
-        },
-        {
-            "id": "ea60acbb-882d-530b-bc0b-99faf2d60fe4",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "app_config",
-            "operation": "grant:read"
-        },
-        {
-            "id": "5244b42e-fece-5470-8a88-93981d3871aa",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "app_config",
-            "operation": "grant:update"
-        },
-        {
-            "id": "ae1958d2-009c-578e-8191-f7e7e5494224",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "app_config",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "121d17d2-c6fe-55a4-b8e3-c45e7d7c0c08",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "app_config",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "5384dd38-f2ce-582f-bae0-6b54119d6560",
             "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
             "scope_type": "user",
@@ -6677,46 +4237,6 @@
             "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "entity_type": "notification_channel",
             "operation": "hard-delete"
-        },
-        {
-            "id": "a1ad5e5f-d42c-5da7-a4a6-20f1836647d9",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_channel",
-            "operation": "grant:all"
-        },
-        {
-            "id": "89331b92-a380-59c1-b47b-f0549105b2e7",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_channel",
-            "operation": "grant:read"
-        },
-        {
-            "id": "de54ec8c-f112-51eb-977f-128c375f34ee",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_channel",
-            "operation": "grant:update"
-        },
-        {
-            "id": "b85e6b24-6403-5ce2-b5f4-930f90ee8910",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_channel",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "867520b4-777d-5f7d-bc17-3b20ff67957f",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_channel",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "4aa22199-dc29-5e79-9927-170644164536",
@@ -6759,46 +4279,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "4170bc91-95ce-560f-8c57-ae17f84b22cd",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_rule",
-            "operation": "grant:all"
-        },
-        {
-            "id": "adea92dc-0bee-58a8-a344-018c3d13d610",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_rule",
-            "operation": "grant:read"
-        },
-        {
-            "id": "7a5c7902-3ada-56a0-ad1b-3d04d2042776",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_rule",
-            "operation": "grant:update"
-        },
-        {
-            "id": "08dd4ef6-d5b9-5aa8-800c-e8f64feccb45",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_rule",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "75d81465-363b-5245-b565-9bf0811de042",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "notification_rule",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "f01ca483-d98b-58fc-a98c-51c05e55bf7c",
             "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
             "scope_type": "user",
@@ -6837,46 +4317,6 @@
             "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "entity_type": "model_deployment",
             "operation": "hard-delete"
-        },
-        {
-            "id": "aeb1f108-e1a8-5b9a-8985-bae16dddeec1",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_deployment",
-            "operation": "grant:all"
-        },
-        {
-            "id": "b2d3f401-87bc-5a61-98fd-325d07ff532c",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_deployment",
-            "operation": "grant:read"
-        },
-        {
-            "id": "d90532e3-db94-5762-8000-e0b61916f292",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_deployment",
-            "operation": "grant:update"
-        },
-        {
-            "id": "02f2e803-0a6b-587b-bdac-b5b3b97c028f",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_deployment",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "a546152f-2aaf-5f82-9531-e768b9907dd1",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_deployment",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "a477d8df-0030-5138-85d1-7d8f6748a182",
@@ -6919,46 +4359,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "5546dad6-0b86-5628-a963-4826b33a6424",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_card",
-            "operation": "grant:all"
-        },
-        {
-            "id": "caffbf7a-ee56-5246-95cd-2f5986ba03e7",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_card",
-            "operation": "grant:read"
-        },
-        {
-            "id": "a85d9bf1-bf14-5567-a14f-e80960127f4a",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_card",
-            "operation": "grant:update"
-        },
-        {
-            "id": "68106b6f-0bf6-59c5-97b9-da99b068cd0f",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_card",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "0c53a4d8-15f6-59aa-9d75-305e32061bff",
-            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "entity_type": "model_card",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "5348fb48-a127-5f23-b6ad-6254bc40a47a",
             "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
             "scope_type": "project",
@@ -6997,46 +4397,6 @@
             "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "entity_type": "session",
             "operation": "hard-delete"
-        },
-        {
-            "id": "52afe124-bb6d-52de-9147-e7f468717b1e",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "session",
-            "operation": "grant:all"
-        },
-        {
-            "id": "28f05934-1aa3-5e40-9a23-05cf4e505ad0",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "session",
-            "operation": "grant:read"
-        },
-        {
-            "id": "f92e6015-80d7-51f9-aad2-fe6f2d97522e",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "session",
-            "operation": "grant:update"
-        },
-        {
-            "id": "d6d24caa-f2f1-538c-bb77-3092d875cfca",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "session",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "4a2a6980-d0ef-58f3-bac0-afa969cd8a7d",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "session",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "d9b7a961-f513-5fc8-ac07-1069700c02b2",
@@ -7079,46 +4439,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "2b75dcb8-5df7-5984-a1c0-6d153a975b50",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "agent",
-            "operation": "grant:all"
-        },
-        {
-            "id": "58348d81-2b58-5edf-8c8b-7d082f008948",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "agent",
-            "operation": "grant:read"
-        },
-        {
-            "id": "bd280206-7033-5cf0-800c-0c50a064845c",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "agent",
-            "operation": "grant:update"
-        },
-        {
-            "id": "c3de9c15-b9cd-52f6-a1a4-5ebf8b9eaf68",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "agent",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "6f88e44e-460d-5c38-8226-66c18125e887",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "agent",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "aa453daa-f237-5db1-b1cc-030e393ca10d",
             "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
             "scope_type": "project",
@@ -7157,46 +4477,6 @@
             "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "entity_type": "image",
             "operation": "hard-delete"
-        },
-        {
-            "id": "cb87ed1c-c150-5843-b447-7295ce30df48",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "image",
-            "operation": "grant:all"
-        },
-        {
-            "id": "d5a95cdf-f53b-54b5-b7aa-bc476dcec0ab",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "image",
-            "operation": "grant:read"
-        },
-        {
-            "id": "045a29cf-d4b7-5e62-994f-cbdc3c19cd3a",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "image",
-            "operation": "grant:update"
-        },
-        {
-            "id": "450c67aa-0992-5679-a88b-24d0a8b473f6",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "image",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "fc9f992b-cfa8-589c-a745-6425096ce1a6",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "image",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "ab68225a-c532-509e-8d93-0e87ad53ad05",
@@ -7239,46 +4519,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "374cb8e8-a00c-5509-aeeb-90dfe5988c04",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "keypair",
-            "operation": "grant:all"
-        },
-        {
-            "id": "a8337017-3461-52ba-81a5-0573f09a786a",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "keypair",
-            "operation": "grant:read"
-        },
-        {
-            "id": "e8fbf1ce-f59e-5bae-bb5e-036e57ac2d17",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "keypair",
-            "operation": "grant:update"
-        },
-        {
-            "id": "877b0d8a-ca6b-588b-a905-a472c74ea4d2",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "keypair",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "9e3cf1e0-1da8-5b78-b579-774d6479c5e7",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "keypair",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "ac214a9f-5766-5d56-a4c8-78b4108c56cf",
             "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
             "scope_type": "project",
@@ -7317,46 +4557,6 @@
             "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "entity_type": "container_registry",
             "operation": "hard-delete"
-        },
-        {
-            "id": "c5b03e41-9d73-563e-823e-67caccc00686",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "container_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "eded5247-6667-59e6-98ad-7b93c2a19702",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "container_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "c14c9c5e-9ede-5006-aa8f-bd1f25d1326f",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "container_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "40055398-8e5b-5865-ae9c-1bff89143868",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "container_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "6360f5f2-d389-5de7-b612-966f4774377d",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "container_registry",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "a69bff92-3ffd-5407-9ba0-532ecee89e81",
@@ -7399,46 +4599,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "bb39a3d5-7d16-5d6b-889b-b29b42e80da8",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "resource_group",
-            "operation": "grant:all"
-        },
-        {
-            "id": "8b0a8579-f7e2-584e-914d-fd5de5264d73",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "resource_group",
-            "operation": "grant:read"
-        },
-        {
-            "id": "f07b4969-a8d1-5dc5-a802-88767c33aee5",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "resource_group",
-            "operation": "grant:update"
-        },
-        {
-            "id": "7ca7afae-8fae-5599-be61-e395f350986f",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "resource_group",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "f256062b-bd30-510e-84e8-9a90d221e411",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "resource_group",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "f1b41304-7964-5454-9ea6-e7cd102c14ab",
             "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
             "scope_type": "project",
@@ -7477,46 +4637,6 @@
             "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "entity_type": "artifact",
             "operation": "hard-delete"
-        },
-        {
-            "id": "6a439b3d-1a66-55f9-a552-0dfac322a8f3",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact",
-            "operation": "grant:all"
-        },
-        {
-            "id": "2f448f91-c8c1-5fd8-9839-14fea5711141",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact",
-            "operation": "grant:read"
-        },
-        {
-            "id": "023415df-2b25-509a-b021-1b1f655616c3",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact",
-            "operation": "grant:update"
-        },
-        {
-            "id": "8a2817dc-fb2a-5672-a363-e3ff9fa535fe",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "ab325765-13bb-5206-b797-c6739b85cb30",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "fde64781-7870-52ea-9dc1-e942dedd2ed3",
@@ -7559,46 +4679,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "d1d11c3b-a6bf-5f20-9913-ce5fb918175d",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "8ccd8004-bd39-57ac-ac4c-f445abd78a40",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "9f2cec87-4314-513b-aeeb-af3e1217cdaf",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "398e398e-b2ad-538f-b23e-b4dd79ccdb62",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "e64a8493-2550-58c1-91e1-451a4ac58268",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "artifact_registry",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "fb428ec7-142d-5a2f-896d-9c028fdc4e29",
             "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
             "scope_type": "project",
@@ -7637,46 +4717,6 @@
             "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "entity_type": "app_config",
             "operation": "hard-delete"
-        },
-        {
-            "id": "fcda0c7e-3918-5863-8cfd-3844db6403db",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "app_config",
-            "operation": "grant:all"
-        },
-        {
-            "id": "4044a091-2b5a-5213-9cb0-ed7b2de9fd3e",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "app_config",
-            "operation": "grant:read"
-        },
-        {
-            "id": "f86e75cb-47b6-5490-b762-7c74509d6397",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "app_config",
-            "operation": "grant:update"
-        },
-        {
-            "id": "85d1d38c-a8b6-575d-a98f-74713ae30c8f",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "app_config",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "6649088d-df0d-52bb-8b72-d380dd788b38",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "app_config",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "9300f918-b75a-5f19-becd-312da897690a",
@@ -7719,46 +4759,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "94dc7220-db56-5639-ba29-aabe2c5bb9f4",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_channel",
-            "operation": "grant:all"
-        },
-        {
-            "id": "4e4371ed-175d-5fb1-b163-52802dd9a219",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_channel",
-            "operation": "grant:read"
-        },
-        {
-            "id": "5454daae-595b-5677-9584-ba079d883447",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_channel",
-            "operation": "grant:update"
-        },
-        {
-            "id": "84cb8760-5304-532b-afc5-b1ce9b14ad0d",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_channel",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "52383bcd-8d66-5107-9c93-f78305a84e79",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_channel",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "5eb2fbf6-071d-5c90-b7ff-e928120aad5a",
             "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
             "scope_type": "project",
@@ -7797,46 +4797,6 @@
             "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "entity_type": "notification_rule",
             "operation": "hard-delete"
-        },
-        {
-            "id": "6512686b-baf6-5e81-920f-f658753ff925",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_rule",
-            "operation": "grant:all"
-        },
-        {
-            "id": "4ee5746d-a355-574b-be4d-fbf71c0b580f",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_rule",
-            "operation": "grant:read"
-        },
-        {
-            "id": "03058737-14be-5f53-9bd9-59ae1993bdf7",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_rule",
-            "operation": "grant:update"
-        },
-        {
-            "id": "44123888-6463-5334-a678-9987f75a66ea",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_rule",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "b91d2406-0a09-5ea0-bf6d-23c4ced9d147",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "notification_rule",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "72d9314c-5ed6-57dc-ba88-4eedd44c09f9",
@@ -7879,46 +4839,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "b2696773-a4cb-5b18-bc70-e29a1a899d10",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_deployment",
-            "operation": "grant:all"
-        },
-        {
-            "id": "4b1e6c6f-3f7e-5f47-b2ca-94023779d21c",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_deployment",
-            "operation": "grant:read"
-        },
-        {
-            "id": "c219cbeb-881f-505d-82b0-3f34384b7406",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_deployment",
-            "operation": "grant:update"
-        },
-        {
-            "id": "6024662d-b592-5269-8044-b62ec782ab3a",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_deployment",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "e1cfc0bc-5075-56fe-aa96-fe1257706bd1",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_deployment",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "e9902cad-8023-5c10-bb54-b8e9986eba81",
             "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
             "scope_type": "project",
@@ -7957,46 +4877,6 @@
             "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "entity_type": "model_card",
             "operation": "hard-delete"
-        },
-        {
-            "id": "ac93799e-1862-57d5-878f-78d6cac905a0",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_card",
-            "operation": "grant:all"
-        },
-        {
-            "id": "0e71ccf3-6215-5db0-b2c2-8f9d0853a863",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_card",
-            "operation": "grant:read"
-        },
-        {
-            "id": "d57e9799-1657-5261-ba17-ce0f605f3b54",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_card",
-            "operation": "grant:update"
-        },
-        {
-            "id": "a9f1ec11-1d6b-5de4-950f-2c5f9972627d",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_card",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "bfb18d78-d04f-59df-ac1e-144673f0c5e4",
-            "role_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "model_card",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "8d28ac4f-02d8-5e63-947e-a58b301432f4",
@@ -8039,46 +4919,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "e208971b-3bb1-505b-abc5-ccf108411438",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "session",
-            "operation": "grant:all"
-        },
-        {
-            "id": "0ae36906-d64e-5b80-ae01-7381e5234c2f",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "session",
-            "operation": "grant:read"
-        },
-        {
-            "id": "97c18833-bf26-5c9a-839d-52215424e879",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "session",
-            "operation": "grant:update"
-        },
-        {
-            "id": "84e7888a-1cfc-5cf0-886c-c35759754461",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "session",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "093fa869-6538-5de0-b5a0-f04521229247",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "session",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "801219ba-5c20-5aa4-a4ee-b471bde8fc3f",
             "role_id": "e79d7074-076d-4629-953d-55286b26490c",
             "scope_type": "project",
@@ -8117,46 +4957,6 @@
             "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "entity_type": "agent",
             "operation": "hard-delete"
-        },
-        {
-            "id": "39239816-d5f6-528e-a3c4-f04aaecc62c9",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "agent",
-            "operation": "grant:all"
-        },
-        {
-            "id": "fc54fd62-71d3-54cd-8a39-67629569fbd5",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "agent",
-            "operation": "grant:read"
-        },
-        {
-            "id": "e499378e-bc45-57f6-936b-db73ad8a7cee",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "agent",
-            "operation": "grant:update"
-        },
-        {
-            "id": "0a24c67c-ce9d-576a-b8c4-02e22c7c94ea",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "agent",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "f6ca65dc-b2e8-5f32-94ba-33ba85eb1646",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "agent",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "59177db2-d6dc-5992-99dc-fe3c8f112ae6",
@@ -8199,46 +4999,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "4e650e74-1cfa-5b7a-96ed-b5f11c96a3f9",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "image",
-            "operation": "grant:all"
-        },
-        {
-            "id": "de2de219-1f7a-553b-9d70-8441c6abae33",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "image",
-            "operation": "grant:read"
-        },
-        {
-            "id": "243cf463-028b-50c9-9a91-1fd0813ea800",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "image",
-            "operation": "grant:update"
-        },
-        {
-            "id": "13d834f7-9454-59c8-affa-ff55aba47404",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "image",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "37da81df-027f-58cd-a12e-6e4a1e09a10a",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "image",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "9da0f4ee-5821-566b-9b2c-1907c2ce7665",
             "role_id": "e79d7074-076d-4629-953d-55286b26490c",
             "scope_type": "project",
@@ -8277,46 +5037,6 @@
             "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "entity_type": "keypair",
             "operation": "hard-delete"
-        },
-        {
-            "id": "cf1f9888-ff3f-56d3-b4d0-808d9d9f52d0",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "keypair",
-            "operation": "grant:all"
-        },
-        {
-            "id": "20ddd008-f450-52c8-8551-1c7738b45622",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "keypair",
-            "operation": "grant:read"
-        },
-        {
-            "id": "3a88c54b-1491-5cf4-982c-1d1d09b923c1",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "keypair",
-            "operation": "grant:update"
-        },
-        {
-            "id": "21d8e1c5-1ff3-500d-8094-08023ce15ce6",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "keypair",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "47d9e77e-99ef-592e-bca5-5f4838c9c917",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "keypair",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "386b0dc9-6009-5659-8a17-fcf1251c5a73",
@@ -8359,46 +5079,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "abe58662-6e88-5475-807f-559cb4d7e72f",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "container_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "71ee293f-b14a-567a-8a35-1e0d7cd0acf0",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "container_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "b744c9f5-1e41-54fa-b3ae-7912a615bffc",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "container_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "27dbb5e1-89f3-5698-91fc-196d6eb06c7a",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "container_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "a1056e87-769c-5b72-bc0a-d8fe25d966ee",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "container_registry",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "92509289-cbf9-5ad3-9477-e3465a94a50f",
             "role_id": "e79d7074-076d-4629-953d-55286b26490c",
             "scope_type": "project",
@@ -8437,46 +5117,6 @@
             "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "entity_type": "resource_group",
             "operation": "hard-delete"
-        },
-        {
-            "id": "a7487ed9-a4cc-5f68-878c-9add9390f47d",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "resource_group",
-            "operation": "grant:all"
-        },
-        {
-            "id": "d89a2193-8b3d-5c11-97fd-144ade887ba2",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "resource_group",
-            "operation": "grant:read"
-        },
-        {
-            "id": "641a365f-1df1-5576-ab33-5a46bb7ebcae",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "resource_group",
-            "operation": "grant:update"
-        },
-        {
-            "id": "a074c4ba-486e-5327-8656-32ce74352fcc",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "resource_group",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "a86b0d09-bac8-548b-bf5c-b39287bd3e39",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "resource_group",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "cafd6453-d578-5ea0-880c-dbb1ee7da4d5",
@@ -8519,46 +5159,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "d0482559-cd99-5dc0-b122-cbb00a5ece89",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact",
-            "operation": "grant:all"
-        },
-        {
-            "id": "7aae3c84-0a34-51e7-9f81-86947f77869a",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact",
-            "operation": "grant:read"
-        },
-        {
-            "id": "c91cc286-00dc-52a7-a656-d7b6c3eb1d17",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact",
-            "operation": "grant:update"
-        },
-        {
-            "id": "4b74c30a-980e-53d1-b7ab-4b1eb342bb7c",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "6f2a57dd-cd23-5a4e-bda4-90976af6c498",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "b025239a-aa40-59e2-8b2c-39179841555d",
             "role_id": "e79d7074-076d-4629-953d-55286b26490c",
             "scope_type": "project",
@@ -8597,46 +5197,6 @@
             "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "entity_type": "artifact_registry",
             "operation": "hard-delete"
-        },
-        {
-            "id": "fa82113e-f48a-55f2-9eef-c5513ace7d66",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "07b0b96a-fe35-51f1-b368-2e17c6d8609d",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "4b739ed8-0eae-5da6-8848-83889f43c116",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "ea353782-7b8d-5347-a90c-1fb62bf83afa",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "7df4e637-c0e6-5a8b-bacf-dfb0bc06e351",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "artifact_registry",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "f12d5539-4499-58bd-834b-1c9a16a6eba4",
@@ -8679,46 +5239,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "7cffd538-7389-52b0-98b3-358516be16b1",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "app_config",
-            "operation": "grant:all"
-        },
-        {
-            "id": "9aef527b-f9c4-538d-b483-cdfeeea2d6c5",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "app_config",
-            "operation": "grant:read"
-        },
-        {
-            "id": "ca3aadba-157f-58bb-85a2-bda4772c6038",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "app_config",
-            "operation": "grant:update"
-        },
-        {
-            "id": "09a4c37b-d4e2-5fe4-b541-46eac9b8ed74",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "app_config",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "411a23c3-caeb-50e1-9104-0088f063a7f3",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "app_config",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "bea067ea-326f-5c53-922f-b208feaefce1",
             "role_id": "e79d7074-076d-4629-953d-55286b26490c",
             "scope_type": "project",
@@ -8757,46 +5277,6 @@
             "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "entity_type": "notification_channel",
             "operation": "hard-delete"
-        },
-        {
-            "id": "d27593f2-cde7-5327-ba43-ddf9c2f2f166",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_channel",
-            "operation": "grant:all"
-        },
-        {
-            "id": "1eb71530-e2cb-5650-945c-fa236378181e",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_channel",
-            "operation": "grant:read"
-        },
-        {
-            "id": "aaf24a28-dd17-54a8-bf1c-63b5bcc6b2af",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_channel",
-            "operation": "grant:update"
-        },
-        {
-            "id": "b1a70060-0f90-5e0a-a01b-c774849bfaf9",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_channel",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "6d888113-1105-5021-8fcc-83ff931803e2",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_channel",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "0066001f-44d7-59a3-8cdf-82310d37a975",
@@ -8839,46 +5319,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "c1cb0d82-cb7f-5206-8364-66246448a1ca",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_rule",
-            "operation": "grant:all"
-        },
-        {
-            "id": "669d6443-19d1-55a6-814e-1ad4fc49e783",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_rule",
-            "operation": "grant:read"
-        },
-        {
-            "id": "d9cc0283-2ac5-5049-b084-346a6a26238f",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_rule",
-            "operation": "grant:update"
-        },
-        {
-            "id": "bf215b26-37d0-52de-a5d0-4c9115a73317",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_rule",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "013cf9b3-fd6d-5349-bb8f-23e255c81417",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "notification_rule",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "f22a133c-e78b-521f-8742-8c52ab40f9a5",
             "role_id": "e79d7074-076d-4629-953d-55286b26490c",
             "scope_type": "project",
@@ -8917,46 +5357,6 @@
             "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "entity_type": "model_deployment",
             "operation": "hard-delete"
-        },
-        {
-            "id": "d2fea21b-3921-5edc-b86a-73590b1be778",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_deployment",
-            "operation": "grant:all"
-        },
-        {
-            "id": "800e3bad-86e1-5d15-bf5c-a449b9fb7ae2",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_deployment",
-            "operation": "grant:read"
-        },
-        {
-            "id": "a4200e96-6f6e-5f5f-b9b1-569ca1410a32",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_deployment",
-            "operation": "grant:update"
-        },
-        {
-            "id": "bc3ecc85-c8f8-5f60-9633-6c3189f5136a",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_deployment",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "1d0f5b1f-089d-55f1-944d-b5dc9d0c0c7f",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_deployment",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "44ec7da3-e10c-518b-9325-93cc387e6d6e",
@@ -8999,46 +5399,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "c8143c40-7c67-5c57-bf39-55a9b93ce999",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_card",
-            "operation": "grant:all"
-        },
-        {
-            "id": "26d7f51c-ea26-5c0f-8ee4-d0f762b36430",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_card",
-            "operation": "grant:read"
-        },
-        {
-            "id": "a3d88e10-cc6d-5731-a2ae-be753296b95f",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_card",
-            "operation": "grant:update"
-        },
-        {
-            "id": "9cb64e9c-931e-5edd-8659-513d064450c7",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_card",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "a798c24d-e8c9-5c66-b25a-0f7021e0d98f",
-            "role_id": "e79d7074-076d-4629-953d-55286b26490c",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "model_card",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "f05e5283-2c47-5a61-93a2-24639d155499",
             "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
             "scope_type": "user",
@@ -9077,46 +5437,6 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "session",
             "operation": "hard-delete"
-        },
-        {
-            "id": "6399df7b-3d95-57f7-8590-5e55fcaa384d",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "session",
-            "operation": "grant:all"
-        },
-        {
-            "id": "e6daff62-4d82-5591-8748-b208e155b530",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "session",
-            "operation": "grant:read"
-        },
-        {
-            "id": "0af50819-ebb2-52ef-ab29-7655e560466d",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "session",
-            "operation": "grant:update"
-        },
-        {
-            "id": "1025cbb1-4fe7-5fd6-81de-5ba2748f680d",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "session",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "0bab9201-0665-5507-a0e8-8e61e0d84226",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "session",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "35d2a889-d528-5da8-853f-63682ae4939d",
@@ -9159,46 +5479,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "002fed02-82e5-5d9e-a273-a8cd575ba13d",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "agent",
-            "operation": "grant:all"
-        },
-        {
-            "id": "f3a5556b-ccab-55db-8c50-bdb5c6e4726a",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "agent",
-            "operation": "grant:read"
-        },
-        {
-            "id": "9779bca6-4d3e-5a83-b214-ee8b1f3e4e21",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "agent",
-            "operation": "grant:update"
-        },
-        {
-            "id": "d83dab2e-5bfe-5889-a84b-03e1a9050288",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "agent",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "a9b61659-ff7f-5cc9-b309-69527ac3edd2",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "agent",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "59c81578-75d5-5c1a-bce2-b9e4915a8f35",
             "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
             "scope_type": "user",
@@ -9237,46 +5517,6 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "image",
             "operation": "hard-delete"
-        },
-        {
-            "id": "e3c5575c-894f-5182-b2a5-be97db306ca4",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "image",
-            "operation": "grant:all"
-        },
-        {
-            "id": "7c2675bd-2e90-5dad-8011-ab8eef7df5ed",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "image",
-            "operation": "grant:read"
-        },
-        {
-            "id": "d6722c69-feac-5c11-a5cb-54988217d1de",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "image",
-            "operation": "grant:update"
-        },
-        {
-            "id": "b44b5844-8c3e-5dc0-9fed-40a109f543a3",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "image",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "fa534a36-b3a3-59ce-aea0-a1bcdefb69ab",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "image",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "0df6eb48-724d-5a88-a35b-3a701d99049b",
@@ -9319,46 +5559,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "742b3dea-6209-5e50-bc0a-3992e6cf09c0",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "keypair",
-            "operation": "grant:all"
-        },
-        {
-            "id": "379070e0-b8d4-5819-a2f2-ba3019f4dcba",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "keypair",
-            "operation": "grant:read"
-        },
-        {
-            "id": "4bdca93e-55e8-5086-a21a-a51ec87de084",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "keypair",
-            "operation": "grant:update"
-        },
-        {
-            "id": "15dfa904-66a1-5d9e-a4b6-c4ab2ac065f6",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "keypair",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "3c21b704-36e3-5e23-8ed6-9b066b9d6a45",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "keypair",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "89578103-1d42-580e-b02b-317e2401fce8",
             "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
             "scope_type": "user",
@@ -9397,46 +5597,6 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "container_registry",
             "operation": "hard-delete"
-        },
-        {
-            "id": "9dab75c2-46b0-588c-a747-cbf3d049cc61",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "container_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "56dbc018-74d7-50d5-8ab6-a82352618ef8",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "container_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "259287c0-bea0-572c-9682-55bd3c0492ad",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "container_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "4b71f498-9e06-5bfc-9797-47e9727ac676",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "container_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "90d2697a-4b97-5275-bf13-462ff8c1b279",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "container_registry",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "09ebbfab-ddda-557e-8074-eff59b054b29",
@@ -9479,46 +5639,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "be2f2d59-ea8f-5597-a44e-fe90b4e94ed0",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "resource_group",
-            "operation": "grant:all"
-        },
-        {
-            "id": "690defb1-b076-5bfe-a117-3e532aa9f516",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "resource_group",
-            "operation": "grant:read"
-        },
-        {
-            "id": "4189a9ad-ee1c-5034-8c90-e42a4e986c93",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "resource_group",
-            "operation": "grant:update"
-        },
-        {
-            "id": "164cd060-b403-59a1-856d-c0e0d847d636",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "resource_group",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "5a060343-632a-56ca-b333-e778f27a23d1",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "resource_group",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "bc88578c-97f1-56e2-bdba-dd1b241ac3d6",
             "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
             "scope_type": "user",
@@ -9557,46 +5677,6 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "artifact",
             "operation": "hard-delete"
-        },
-        {
-            "id": "393d76e9-836d-5e0d-b3f0-5c1a413c068c",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact",
-            "operation": "grant:all"
-        },
-        {
-            "id": "9d09f76e-afd8-58a7-8f60-e329c559660f",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact",
-            "operation": "grant:read"
-        },
-        {
-            "id": "08b14522-173e-5a2b-8531-8aa1ed92517d",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact",
-            "operation": "grant:update"
-        },
-        {
-            "id": "7a4ed871-b7d4-507a-91ba-4ed06cacaf13",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "f16cd5a8-eb58-5a60-a93d-f41ac548b40a",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "f0a9c9d6-0029-5568-8ecc-5f05a50999ec",
@@ -9639,46 +5719,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "c26d41cc-17d9-56e5-abd9-ddf0fdd21368",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact_registry",
-            "operation": "grant:all"
-        },
-        {
-            "id": "4a170e31-4c8c-58ca-8c2b-95e8af40409d",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact_registry",
-            "operation": "grant:read"
-        },
-        {
-            "id": "902e9f20-36fa-5841-9925-249111c28ce3",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact_registry",
-            "operation": "grant:update"
-        },
-        {
-            "id": "957e717e-f52f-5c6f-b85d-d9014ee14a46",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact_registry",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "b97850c8-f1d2-5481-a4b1-21b6125fe144",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "artifact_registry",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "d460edb8-0a8a-5c3b-99e8-3cc65c8cdee8",
             "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
             "scope_type": "user",
@@ -9717,46 +5757,6 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "app_config",
             "operation": "hard-delete"
-        },
-        {
-            "id": "abf9f4cc-3a35-5ced-8109-00e495142943",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "app_config",
-            "operation": "grant:all"
-        },
-        {
-            "id": "4eeede39-ec71-59df-a491-4e98e3a1d713",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "app_config",
-            "operation": "grant:read"
-        },
-        {
-            "id": "67acc4ef-bbe6-5c32-aad7-39ba3729156d",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "app_config",
-            "operation": "grant:update"
-        },
-        {
-            "id": "4e6a1003-8375-5ea0-97d4-e301e49e981f",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "app_config",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "5ca2be34-482e-5301-b810-c8d9025809bb",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "app_config",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "81d0fe6b-bb22-516a-9256-e0574aba5767",
@@ -9799,46 +5799,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "5508a6d8-5a64-5e8c-915d-a5b7c38cdb5c",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_channel",
-            "operation": "grant:all"
-        },
-        {
-            "id": "e88fe157-8124-5112-90c9-1f138afbb915",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_channel",
-            "operation": "grant:read"
-        },
-        {
-            "id": "a833a3a8-9ae2-5a86-8a14-434f84b9d7d3",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_channel",
-            "operation": "grant:update"
-        },
-        {
-            "id": "3d835d47-b4fb-577a-8135-f504f4567c24",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_channel",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "5b8e1df1-f9f8-563b-a76e-9b79609c0638",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_channel",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "4eb2fdda-045d-58b8-afeb-c954e76cab43",
             "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
             "scope_type": "user",
@@ -9877,46 +5837,6 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "notification_rule",
             "operation": "hard-delete"
-        },
-        {
-            "id": "db82c268-33c7-534c-8195-b49fe4ffd255",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_rule",
-            "operation": "grant:all"
-        },
-        {
-            "id": "31a663e3-6010-518a-8b81-febc1c7c9efe",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_rule",
-            "operation": "grant:read"
-        },
-        {
-            "id": "dcf96670-a14f-5c2a-9574-5a5411bc360c",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_rule",
-            "operation": "grant:update"
-        },
-        {
-            "id": "e353b1b5-c6bc-51cd-a91a-def37509860a",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_rule",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "c53f4f39-8f7f-5e7f-a167-d054098f10d5",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "notification_rule",
-            "operation": "grant:hard-delete"
         },
         {
             "id": "1c3b70ed-bd40-5900-83e8-c5a227d9c10d",
@@ -9959,46 +5879,6 @@
             "operation": "hard-delete"
         },
         {
-            "id": "2f5c3839-0a34-5a1d-ae4c-e609e049b76d",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_deployment",
-            "operation": "grant:all"
-        },
-        {
-            "id": "32f8f4ed-ea2d-5c2c-ad8a-6503aa66afd0",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_deployment",
-            "operation": "grant:read"
-        },
-        {
-            "id": "c13bc8bb-6172-5c9b-b85a-b2e3fd0dd3ae",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_deployment",
-            "operation": "grant:update"
-        },
-        {
-            "id": "9ad05723-58c1-5c58-8b60-d40c437dff09",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_deployment",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "6a000ad0-dd73-5df0-8863-aa25d949ca03",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_deployment",
-            "operation": "grant:hard-delete"
-        },
-        {
             "id": "85d7e2c8-c49b-5a58-b6ac-29fa2325a524",
             "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
             "scope_type": "user",
@@ -10037,46 +5917,6 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "model_card",
             "operation": "hard-delete"
-        },
-        {
-            "id": "af7731cb-e445-57a1-bdb3-fca098ac33db",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_card",
-            "operation": "grant:all"
-        },
-        {
-            "id": "a88c198d-8c80-5ee1-97a4-c1eb6fb2fd97",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_card",
-            "operation": "grant:read"
-        },
-        {
-            "id": "1f4e41f0-4291-5c3d-8fef-3eeb42a6709b",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_card",
-            "operation": "grant:update"
-        },
-        {
-            "id": "b1ad820d-2ea8-58a7-9a8b-b61abf4e437e",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_card",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "8f6a967a-22bf-5d73-bced-b7ce63b7461a",
-            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "entity_type": "model_card",
-            "operation": "grant:hard-delete"
         }
     ],
     "association_scopes_entities": [

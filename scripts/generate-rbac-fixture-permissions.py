@@ -6,15 +6,17 @@ Usage:
     python3 scripts/generate-rbac-fixture-permissions.py
 
 Behavior:
-    For each (role x scope) pair already in permissions[], emit rows for every
-    resource entity-type using the canonical session-migration rule:
+    Treats RESOURCE_ENTITY_TYPES as managed: their rows are stripped from
+    permissions[] and re-emitted from each (role x scope) pair found in the
+    remaining (base) rows using the canonical session-migration rule:
 
       - role in EXCLUDED_ROLES                                 -> skip
       - scope_type == 'domain' AND role_name endswith 'member' -> skip
       - role_name endswith 'member'                            -> {READ}
-      - else                                                   -> all owner ops
+      - else                                                   -> all standard ops
 
-    Idempotent — UUIDv5 IDs make re-runs produce identical output.
+    Idempotent — UUIDv5 IDs and strip-and-re-emit semantics make re-runs
+    produce identical output.
 """
 
 from __future__ import annotations
@@ -43,11 +45,6 @@ OWNER_OPS: tuple[str, ...] = (
     "update",
     "soft-delete",
     "hard-delete",
-    "grant:all",
-    "grant:read",
-    "grant:update",
-    "grant:soft-delete",
-    "grant:hard-delete",
 )
 MEMBER_OPS: tuple[str, ...] = ("read",)
 
@@ -66,6 +63,7 @@ RESOURCE_ENTITY_TYPES: tuple[str, ...] = (
     "model_deployment",
     "model_card",
 )
+MANAGED_ENTITY_TYPES: frozenset[str] = frozenset(RESOURCE_ENTITY_TYPES)
 
 
 def derive_operations(role_name: str, scope_type: str) -> tuple[str, ...]:
@@ -91,15 +89,14 @@ def main() -> int:
     data = json.loads(raw)
 
     roles_by_id = {r["id"]: r for r in data["roles"]}
-    permissions = data["permissions"]
 
-    existing_keys = {
-        (p["role_id"], p["scope_type"], p["scope_id"], p["entity_type"], p["operation"])
-        for p in permissions
-    }
+    base_permissions = [
+        p for p in data["permissions"] if p["entity_type"] not in MANAGED_ENTITY_TYPES
+    ]
+    stripped = len(data["permissions"]) - len(base_permissions)
 
     role_scopes: set[tuple[str, str, str]] = {
-        (p["role_id"], p["scope_type"], p["scope_id"]) for p in permissions
+        (p["role_id"], p["scope_type"], p["scope_id"]) for p in base_permissions
     }
 
     new_rows: list[dict[str, str]] = []
@@ -113,9 +110,6 @@ def main() -> int:
             continue
         for entity_type in RESOURCE_ENTITY_TYPES:
             for op in ops:
-                key = (role_id, scope_type, scope_id, entity_type, op)
-                if key in existing_keys:
-                    continue
                 new_rows.append({
                     "id": stable_id(role_id, scope_type, scope_id, entity_type, op),
                     "role_id": role_id,
@@ -125,17 +119,16 @@ def main() -> int:
                     "operation": op,
                 })
 
-    if not new_rows:
-        print("no new permission rows; fixture is already up to date")
-        return 0
-
-    data["permissions"] = permissions + new_rows
+    data["permissions"] = base_permissions + new_rows
     FIXTURE_PATH.write_text(json.dumps(data, indent=4) + "\n", encoding="utf-8")
 
     by_entity: dict[str, int] = {}
     for r in new_rows:
         by_entity[r["entity_type"]] = by_entity.get(r["entity_type"], 0) + 1
-    print(f"added {len(new_rows)} permission rows across {len(by_entity)} entity types:")
+    print(
+        f"emitted {len(new_rows)} permission rows across {len(by_entity)} entity types"
+        f" (stripped {stripped} prior rows):"
+    )
     for et in RESOURCE_ENTITY_TYPES:
         if et in by_entity:
             print(f"  {et:24s} {by_entity[et]:4d}")
