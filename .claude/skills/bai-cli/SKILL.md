@@ -114,12 +114,13 @@ For direct manager access without webserver (HMAC signature auth):
 ```bash
 ./bai config set endpoint http://127.0.0.1:8091
 ./bai config set endpoint-type api
-./bai config set access-key AKIAIOSFODNN7EXAMPLE
-./bai config set secret-key wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
+export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 ./bai config show
 ```
 
-Config stored in `~/.backend.ai/config.toml` and `credentials.toml`.
+Endpoint config stored in `~/.backend.ai/config.toml`. HMAC credentials are read
+from `BACKEND_ACCESS_KEY` / `BACKEND_SECRET_KEY` env vars only — no on-disk storage.
 
 ## Command Pattern
 

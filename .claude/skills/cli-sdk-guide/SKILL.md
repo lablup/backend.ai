@@ -303,8 +303,8 @@ When implementing new CLI/SDK feature:
 ### V2 Config (`~/.backend.ai/`)
 
 - `config.toml` — endpoint, endpoint_type, api_version
-- `credentials.toml` — access_key, secret_key
 - `session/cookie.dat` — webserver session cookie (login/logout)
+- `BACKEND_ACCESS_KEY` / `BACKEND_SECRET_KEY` env vars — HMAC credentials (no on-disk storage)
 
 **Related skills:**
 - `/api-guide` - REST API implementation (prerequisite)
