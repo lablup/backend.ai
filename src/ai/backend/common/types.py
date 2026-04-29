@@ -678,6 +678,7 @@ class MountInfoEntry(BaseModel):
     vfolder_id: VFolderUUID
     mount_destination: str | None = Field(
         validation_alias=AliasChoices("mount_destination", "kernel_path"),
+        default=None,
     )
     mount_perm: MountPermission | None = Field(default=None)
 
