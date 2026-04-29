@@ -244,9 +244,6 @@ class PresetDeploymentDefaultsGQL(PydanticOutputMixin[PresetDeploymentDefaultsDT
 )
 class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(
-        description="The unique database identifier of this deployment preset."
-    )
     runtime_variant_id: UUID = gql_field(
         description="The runtime variant this preset is designed for (e.g., vLLM, SGLang)."
     )
@@ -327,7 +324,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment_revision_preset.search_resource_slots(
-            preset_id=self.row_id,
+            preset_id=UUID(self.id),
             input=SearchAllocatedResourceSlotsInput(
                 filter=pydantic_filter,
                 order=pydantic_order,

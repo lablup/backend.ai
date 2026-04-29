@@ -68,7 +68,6 @@ class RuntimeVariantOrderFieldGQL(StrEnum):
 )
 class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(description="The unique database identifier of this runtime variant.")
     name: str = gql_field(
         description="Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi')."
     )
