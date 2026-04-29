@@ -17,14 +17,16 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
 
 @pytest.fixture
 def cache_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    path = tmp_path / "deployment_chat.json"
+    path = tmp_path / "deployment_chat" / "cache.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(chat_utils, "CHAT_CACHE_FILE", path)
     return path
 
 
 @pytest.fixture
 def config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    path = tmp_path / "deployment_chat_config.json"
+    path = tmp_path / "deployment_chat" / "config.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(chat_utils, "CHAT_CONFIG_FILE", path)
     return path
 
