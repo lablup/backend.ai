@@ -14,7 +14,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    model_validator,
 )
 
 from . import validators as tx
@@ -144,54 +143,35 @@ agent_selector_globalconfig_iv = t.Dict({}).allow_extra("*")
 agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 
 
-def _normalize_service_start_command(service: dict[str, Any] | None) -> dict[str, Any] | None:
-    """Wrap a string ``start_command`` as ``[shell, "-c", string]`` so downstream
-    consumers always see ``list[str] | None``."""
-    if service is None:
-        return service
-    return _wrap_string_start_command_dict(service)
-
-
-def _wrap_string_start_command_dict(data: dict[str, Any]) -> dict[str, Any]:
-    cmd = data.get("start_command")
-    if isinstance(cmd, str):
-        shell = data.get("shell") or "/bin/bash"
-        data["start_command"] = [shell, "-c", cmd]
-    return data
-
-
 model_definition_iv = t.Dict({
     t.Key("models"): t.List(
         t.Dict({
             t.Key("name"): t.String,
             t.Key("model_path"): t.String,
-            t.Key("service", default=None): (
-                t.Null
+            t.Key("service", default=None): t.Null
+            | t.Dict({
+                # ai.backend.kernel.service.ServiceParser.start_service()
+                # ai.backend.kernel.service_actions
+                t.Key("pre_start_actions", default=[]): t.Null
+                | t.List(
+                    t.Dict({
+                        t.Key("action"): t.String,
+                        t.Key("args"): t.Dict().allow_extra("*"),
+                    })
+                ),
+                t.Key("start_command", default=None): t.Null | t.String | t.List(t.String),
+                t.Key("shell", default="/bin/bash"): t.String,  # used if start_command is a string
+                t.Key("port"): t.ToInt[1:],
+                t.Key("health_check", default=None): t.Null
                 | t.Dict({
-                    # ai.backend.kernel.service.ServiceParser.start_service()
-                    # ai.backend.kernel.service_actions
-                    t.Key("pre_start_actions", default=[]): t.Null
-                    | t.List(
-                        t.Dict({
-                            t.Key("action"): t.String,
-                            t.Key("args"): t.Dict().allow_extra("*"),
-                        })
-                    ),
-                    t.Key("start_command", default=None): t.Null | t.String | t.List(t.String),
-                    t.Key("shell", default="/bin/bash"): t.String,
-                    t.Key("port"): t.ToInt[1:],
-                    t.Key("health_check", default=None): t.Null
-                    | t.Dict({
-                        t.Key("interval", default=10): t.Null | t.ToFloat[0:],
-                        t.Key("path"): t.String,
-                        t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
-                        t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
-                        t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
-                        t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
-                    }),
-                })
-            )
-            >> _normalize_service_start_command,
+                    t.Key("interval", default=10): t.Null | t.ToFloat[0:],
+                    t.Key("path"): t.String,
+                    t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
+                    t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
+                    t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
+                    t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
+                }),
+            }),
             t.Key("metadata", default=None): t.Null
             | t.Dict({
                 t.Key("author", default=None): t.Null | t.String(allow_blank=True),
@@ -266,14 +246,14 @@ class ModelServiceConfig(BaseConfigModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: list[str] | None = Field(
+    start_command: str | list[str] | None = Field(
         default=None,
         description="Command to start the model service.",
-        examples=[["python", "service.py"]],
+        examples=["python service.py", ["python", "service.py"]],
     )
     shell: str = Field(
         default="/bin/bash",
-        description="Shell used to wrap a string-form start_command at parse time.",
+        description="Shell to use if start_command is a string.",
         examples=["/bin/bash"],
     )
     port: int = Field(
@@ -285,13 +265,6 @@ class ModelServiceConfig(BaseConfigModel):
         default=None,
         description="Health check configuration for the model service.",
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_string_start_command(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            return _wrap_string_start_command_dict(data)
-        return data
 
 
 class ModelMetadata(BaseConfigModel):
@@ -530,17 +503,10 @@ class ModelHealthCheckDraft(BaseConfigModel):
 
 class ModelServiceConfigDraft(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
-    start_command: list[str] | None = None
+    start_command: str | list[str] | None = None
     shell: str | None = None
     port: int | None = None
     health_check: ModelHealthCheckDraft | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_string_start_command(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            return _wrap_string_start_command_dict(data)
-        return data
 
     def to_resolved(self) -> ModelServiceConfig:
         if self.port is None:
