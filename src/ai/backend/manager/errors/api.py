@@ -39,18 +39,6 @@ class NotImplementedAPI(BackendAIError, web.HTTPNotImplemented):
         )
 
 
-class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/deprecated"
-    error_title = "This API is deprecated."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.API,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.DEPRECATED,
-        )
-
-
 class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."

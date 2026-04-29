@@ -9,8 +9,8 @@ import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
 
+from ai.backend.common.exception import DeprecatedAPI
 from ai.backend.manager.data.deployment.types import RouteStatus
-from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.routing import RoutingRow
 
@@ -200,7 +200,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
         )
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
-        raise NotImplementedAPI(extra_msg="Routing live_stat is no longer supported.")
+        raise DeprecatedAPI(extra_msg="Routing live_stat is no longer supported.")
 
 
 class RoutingList(graphene.ObjectType):  # type: ignore[misc]

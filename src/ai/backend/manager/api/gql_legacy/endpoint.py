@@ -19,7 +19,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import DeprecatedAPI, InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -42,7 +42,6 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
 )
-from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ObjectNotFound,
@@ -964,7 +963,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         return errors
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
-        raise NotImplementedAPI(extra_msg="Endpoint live_stat is no longer supported.")
+        raise DeprecatedAPI(extra_msg="Endpoint live_stat is no longer supported.")
 
 
 class EndpointList(graphene.ObjectType):  # type: ignore[misc]
