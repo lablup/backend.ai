@@ -502,6 +502,8 @@ class TestDestroySession:
         result = await session_service.destroy_session(action)
 
         assert result.result == {"stats": {"status": "cancelled"}}
+        assert result.session_ids == [sample_session_id]
+        assert result.entity_id() == str(sample_session_id)
         mock_session_repository.get_target_session_ids.assert_called_once_with(
             "test-session", sample_access_key, recursive=False
         )
@@ -609,6 +611,8 @@ class TestDestroySession:
             "test-session", sample_access_key, recursive=True
         )
         assert result.result == {"stats": {"status": "cancelled"}}
+        assert result.session_ids == session_ids
+        assert result.entity_id() == ",".join(str(sid) for sid in session_ids)
 
     async def test_no_sessions_to_destroy(
         self,
@@ -638,6 +642,8 @@ class TestDestroySession:
         result = await session_service.destroy_session(action)
 
         assert result.result == {"stats": {}}
+        assert result.session_ids == []
+        assert result.entity_id() is None
 
 
 # ==================== Complete Tests ====================
