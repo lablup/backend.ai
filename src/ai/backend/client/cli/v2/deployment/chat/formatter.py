@@ -6,8 +6,6 @@ from uuid import UUID
 
 from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatCacheEntry
 
-TOKEN_PLACEHOLDER = "********"
-
 
 def mask_token(token: str | None) -> str:
     """Render a stored token as a fixed placeholder for diagnostic display.
@@ -17,7 +15,7 @@ def mask_token(token: str | None) -> str:
     """
     if token is None:
         return "<unset>"
-    return TOKEN_PLACEHOLDER
+    return "********"
 
 
 class DeploymentChatFormatter:

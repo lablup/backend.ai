@@ -58,7 +58,7 @@ class DeploymentChatCache(BaseModel):
     def set(self, deployment_id: UUID, entry: DeploymentChatCacheEntry) -> None:
         self.deployments[deployment_id] = entry
 
-    def remove(self, deployment_id: UUID) -> bool:
+    def pop(self, deployment_id: UUID) -> bool:
         return self.deployments.pop(deployment_id, None) is not None
 
     @classmethod
@@ -104,7 +104,7 @@ class DeploymentChatConfig(BaseModel):
     def set_token(self, deployment_id: UUID, token: str) -> None:
         self.tokens[deployment_id] = token
 
-    def clear_token(self, deployment_id: UUID) -> bool:
+    def pop_token(self, deployment_id: UUID) -> bool:
         return self.tokens.pop(deployment_id, None) is not None
 
     @classmethod

@@ -54,20 +54,20 @@ class TestCacheMutations:
         assert stored is not None
         assert stored.default_model == "m2"
 
-    def test_remove_returns_true_when_present(
+    def test_pop_returns_true_when_present(
         self,
         cache: DeploymentChatCache,
         cache_entry: DeploymentChatCacheEntry,
         deployment_id: UUID,
     ) -> None:
         cache.set(deployment_id, cache_entry)
-        assert cache.remove(deployment_id) is True
+        assert cache.pop(deployment_id) is True
         assert cache.get(deployment_id) is None
 
-    def test_remove_returns_false_when_absent(
+    def test_pop_returns_false_when_absent(
         self, cache: DeploymentChatCache, deployment_id: UUID
     ) -> None:
-        assert cache.remove(deployment_id) is False
+        assert cache.pop(deployment_id) is False
 
 
 class TestConfigTokenStore:
@@ -84,14 +84,14 @@ class TestConfigTokenStore:
         chat_config.set_token(deployment_id, "sk-new")
         assert chat_config.get_token(deployment_id) == "sk-new"
 
-    def test_clear_token_returns_true_when_present(
+    def test_pop_token_returns_true_when_present(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
         chat_config.set_token(deployment_id, "sk-x")
-        assert chat_config.clear_token(deployment_id) is True
+        assert chat_config.pop_token(deployment_id) is True
         assert chat_config.get_token(deployment_id) is None
 
-    def test_clear_token_returns_false_when_absent(
+    def test_pop_token_returns_false_when_absent(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
-        assert chat_config.clear_token(deployment_id) is False
+        assert chat_config.pop_token(deployment_id) is False
