@@ -117,7 +117,6 @@ class SokovanOrchestratorDependency(
             setup_input.agent_client_pool,
             setup_input.network_plugin_ctx,
             setup_input.valkey_schedule,
-            setup_input.route_controller,
         )
 
         # Create HTTP client pool for deployment operations

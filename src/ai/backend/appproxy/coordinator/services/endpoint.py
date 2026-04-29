@@ -22,6 +22,10 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     CreatedEndpointItem,
     CreateEndpointItem,
     DeletedEndpointItem,
+    RegisteredRoutesItem,
+    RegisterRoutesItem,
+    UnregisteredRoutesItem,
+    UnregisterRoutesItem,
     UpdatedRoutesItem,
     UpdateRoutesItem,
 )
@@ -128,6 +132,130 @@ class EndpointService:
             UpdatedRoutesItem(
                 deployment_id=result.deployment_id,
                 success=result.success,
+                error=result.error,
+            )
+            for result in results
+        ]
+
+    async def register_routes_bulk(
+        self,
+        items: list[RegisterRoutesItem],
+    ) -> list[RegisteredRoutesItem]:
+        """Bulk-append routes to many endpoints (delta semantics).
+
+        Repository commits the new ``circuit.route_info`` set in a
+        single transaction; this layer then fans the change out to the
+        affected workers. Worker propagation failures don't roll back
+        the DB write, but we surface them as ``success=False`` so the
+        manager retries on the next short cycle and converges.
+        """
+        if not items:
+            return []
+        try:
+            results = await self._repository.register_routes(items)
+        except Exception as exc:
+            log.warning("Bulk routes register failed: {}", exc)
+            return [
+                RegisteredRoutesItem(
+                    deployment_id=item.deployment_id,
+                    success=False,
+                    registered_route_ids=[],
+                    already_registered_route_ids=[],
+                    error=str(exc),
+                )
+                for item in items
+            ]
+
+        update_items = [
+            CircuitRouteUpdateItem(circuit=result.circuit, old_routes=result.old_routes)
+            for result in results
+            if result.success and result.circuit is not None
+        ]
+        if update_items:
+            try:
+                await self._circuit_manager.update_circuit_routes_bulk(update_items)
+            except Exception as exc:
+                # Same shape as update_routes_bulk: bulk worker
+                # propagation either completes or aborts as a unit, so
+                # we mark every propagated entry as failed and let the
+                # manager retry on the next short cycle.
+                log.warning("Bulk worker propagation (register) failed: {}", exc)
+                propagated_ids = {item.circuit.endpoint_id for item in update_items}
+                for result in results:
+                    if (
+                        result.success
+                        and result.circuit is not None
+                        and (result.circuit.endpoint_id in propagated_ids)
+                    ):
+                        result.success = False
+                        result.error = f"Worker propagation failed: {exc}"
+
+        return [
+            RegisteredRoutesItem(
+                deployment_id=result.deployment_id,
+                success=result.success,
+                registered_route_ids=result.registered_route_ids,
+                already_registered_route_ids=result.already_registered_route_ids,
+                error=result.error,
+            )
+            for result in results
+        ]
+
+    async def unregister_routes_bulk(
+        self,
+        items: list[UnregisterRoutesItem],
+    ) -> list[UnregisteredRoutesItem]:
+        """Bulk-drop routes from many endpoints (delta semantics).
+
+        Repository commits the new ``circuit.route_info`` set in a
+        single transaction; this layer then fans the change out to the
+        affected workers. Worker propagation failures don't roll back
+        the DB write, but we surface them as ``success=False`` so the
+        manager retries on the next short cycle and converges.
+        """
+        if not items:
+            return []
+        try:
+            results = await self._repository.unregister_routes(items)
+        except Exception as exc:
+            log.warning("Bulk routes unregister failed: {}", exc)
+            return [
+                UnregisteredRoutesItem(
+                    deployment_id=item.deployment_id,
+                    success=False,
+                    unregistered_route_ids=[],
+                    already_absent_route_ids=[],
+                    error=str(exc),
+                )
+                for item in items
+            ]
+
+        update_items = [
+            CircuitRouteUpdateItem(circuit=result.circuit, old_routes=result.old_routes)
+            for result in results
+            if result.success and result.circuit is not None
+        ]
+        if update_items:
+            try:
+                await self._circuit_manager.update_circuit_routes_bulk(update_items)
+            except Exception as exc:
+                log.warning("Bulk worker propagation (unregister) failed: {}", exc)
+                propagated_ids = {item.circuit.endpoint_id for item in update_items}
+                for result in results:
+                    if (
+                        result.success
+                        and result.circuit is not None
+                        and (result.circuit.endpoint_id in propagated_ids)
+                    ):
+                        result.success = False
+                        result.error = f"Worker propagation failed: {exc}"
+
+        return [
+            UnregisteredRoutesItem(
+                deployment_id=result.deployment_id,
+                success=result.success,
+                unregistered_route_ids=result.unregistered_route_ids,
+                already_absent_route_ids=result.already_absent_route_ids,
                 error=result.error,
             )
             for result in results

@@ -6,7 +6,13 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
-from .types import CreatedEndpointItem, DeletedEndpointItem, UpdatedRoutesItem
+from .types import (
+    CreatedEndpointItem,
+    DeletedEndpointItem,
+    RegisteredRoutesItem,
+    UnregisteredRoutesItem,
+    UpdatedRoutesItem,
+)
 
 
 class BulkCreateEndpointResponse(BaseResponseModel):
@@ -47,6 +53,36 @@ class BulkUpdateRoutesResponse(BaseResponseModel):
     """
 
     endpoints: list[UpdatedRoutesItem] = Field(
+        ...,
+        description="Per-endpoint results, in the same order as the request.",
+    )
+
+
+class BulkRegisterRoutesResponse(BaseResponseModel):
+    """Result of a bulk routes-register call.
+
+    ``endpoints`` follows the same order as the request so callers can
+    match each result back to its input entry by index. Each entry
+    splits the supplied routes into ``registered_route_ids`` (newly
+    added) and ``already_registered_route_ids`` (idempotent no-op).
+    """
+
+    endpoints: list[RegisteredRoutesItem] = Field(
+        ...,
+        description="Per-endpoint results, in the same order as the request.",
+    )
+
+
+class BulkUnregisterRoutesResponse(BaseResponseModel):
+    """Result of a bulk routes-unregister call.
+
+    ``endpoints`` follows the same order as the request so callers can
+    match each result back to its input entry by index. Each entry
+    splits the requested route ids into ``unregistered_route_ids``
+    (dropped) and ``already_absent_route_ids`` (idempotent no-op).
+    """
+
+    endpoints: list[UnregisteredRoutesItem] = Field(
         ...,
         description="Per-endpoint results, in the same order as the request.",
     )

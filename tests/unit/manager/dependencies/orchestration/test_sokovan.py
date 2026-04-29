@@ -140,5 +140,4 @@ class TestSokovanOrchestratorDependency:
                 agent_client_pool,
                 network_plugin_ctx,
                 valkey_schedule,
-                route_controller,
             )

@@ -95,11 +95,14 @@ def mock_appproxy_client_pool() -> MagicMock:
     """Mock AppProxyClientPool that hands out a single AsyncMock client.
 
     Tests can introspect ``pool.load_client.return_value.bulk_update_routes``
-    to assert how many calls Manager made and what the payload looked like.
+    (or ``bulk_register_routes`` / ``bulk_unregister_routes``) to assert
+    how many calls Manager made and what the payload looked like.
     """
     pool = MagicMock()
     client = AsyncMock()
     client.bulk_update_routes = AsyncMock()
+    client.bulk_register_routes = AsyncMock()
+    client.bulk_unregister_routes = AsyncMock()
     pool.load_client = MagicMock(return_value=client)
     return pool
 

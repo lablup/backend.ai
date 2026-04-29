@@ -9,7 +9,13 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
-from .types import CreateEndpointItem, DeleteEndpointItem, UpdateRoutesItem
+from .types import (
+    CreateEndpointItem,
+    DeleteEndpointItem,
+    RegisterRoutesItem,
+    UnregisterRoutesItem,
+    UpdateRoutesItem,
+)
 
 
 class MintEndpointTokenRequest(BaseRequestModel):
@@ -82,5 +88,43 @@ class BulkUpdateRoutesRequest(BaseRequestModel):
             "Endpoints whose routing tables should be replaced. Entries "
             "are processed in order and the response returns a matching "
             "per-entry result."
+        ),
+    )
+
+
+class BulkRegisterRoutesRequest(BaseRequestModel):
+    """Bulk add new routes to multiple endpoints in one coordinator call.
+
+    Delta semantics: routes are appended to each circuit's existing
+    ``route_info`` set. Already-present route ids count as success
+    (idempotent re-register). Per-entry failures are reported in the
+    response without aborting the call.
+    """
+
+    endpoints: list[RegisterRoutesItem] = Field(
+        ...,
+        description=(
+            "Endpoints whose routing tables should receive new routes. "
+            "Entries are processed in order and the response returns a "
+            "matching per-entry result."
+        ),
+    )
+
+
+class BulkUnregisterRoutesRequest(BaseRequestModel):
+    """Bulk remove routes from multiple endpoints in one coordinator call.
+
+    Delta semantics: routes whose ``route_id`` is listed are dropped
+    from each circuit's existing ``route_info`` set. Already-absent
+    route ids count as success (idempotent re-unregister). Per-entry
+    failures are reported in the response without aborting the call.
+    """
+
+    endpoints: list[UnregisterRoutesItem] = Field(
+        ...,
+        description=(
+            "Endpoints whose routing tables should drop the listed "
+            "route ids. Entries are processed in order and the response "
+            "returns a matching per-entry result."
         ),
     )

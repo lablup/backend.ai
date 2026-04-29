@@ -23,7 +23,6 @@ if TYPE_CHECKING:
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.sokovan.data import PromotionSpec
-from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
@@ -112,7 +111,6 @@ def create_default_scheduler_components(
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
     valkey_schedule: ValkeyScheduleClient,
-    route_controller: RouteController,
 ) -> SchedulerComponents:
     """
     Create scheduler components with default configuration.
@@ -124,7 +122,6 @@ def create_default_scheduler_components(
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
         valkey_schedule: Valkey client for scheduling operations
-        route_controller: Route controller for marking AppProxy resync hints
 
     Returns:
         A configured SchedulerComponents instance
@@ -187,7 +184,6 @@ def create_default_scheduler_components(
         repository=repository,
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
-        route_controller=route_controller,
     )
 
 
