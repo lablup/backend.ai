@@ -1,39 +1,22 @@
-"""Type definitions for ``./bai deployment chat`` storage."""
+"""Persistence data types for the ``./bai deployment chat`` CLI.
+
+Pure Pydantic models — no filesystem I/O. Disk load/save lives at the CLI
+side (``ai.backend.client.cli.v2.deployment.chat.storage``) so this module
+stays free of component-specific dependencies and can be reused by any
+backend.ai component that needs to inspect on-disk chat state.
+"""
 
 from __future__ import annotations
 
-import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Annotated, Self
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, Field
 
 CACHE_ENTRY_TTL = timedelta(hours=24)
 """Endpoint cache entries older than this are treated as a cache miss."""
-
-
-class ChatCompletionMessage(BaseModel):
-    """One message inside a chat-completions request."""
-
-    role: str
-    content: str
-
-
-class ChatCompletionRequest(BaseModel):
-    """Body for ``POST /v1/chat/completions`` (OpenAI-compatible).
-
-    Extra fields are forwarded so callers can pass runtime-variant-specific
-    knobs (e.g. ``temperature``, ``top_p``, vLLM/NIM extensions) through
-    ``./bai deployment chat --params`` without the CLI having to enumerate
-    them.
-    """
-
-    model_config = ConfigDict(extra="allow")
-
-    model: str
-    messages: list[ChatCompletionMessage]
 
 
 class DeploymentChatCacheEntry(BaseModel):
@@ -61,37 +44,6 @@ class DeploymentChatCache(BaseModel):
 
     def pop(self, deployment_id: UUID) -> bool:
         return self.deployments.pop(deployment_id, None) is not None
-
-    @classmethod
-    def load(cls) -> Self:
-        """Load the chat cache; return an empty cache when the file is absent or unreadable."""
-        from ai.backend.client.cli.v2.deployment.chat.utils import (
-            CHAT_CACHE_FILE,
-            read_json_file,
-        )
-
-        raw = read_json_file(CHAT_CACHE_FILE)
-        if raw is None:
-            return cls()
-        try:
-            return cls.model_validate(raw)
-        except ValidationError:
-            print(
-                f"WARNING: {CHAT_CACHE_FILE} is in an invalid format and was ignored.",
-                file=sys.stderr,
-            )
-            return cls()
-
-    def save(self) -> None:
-        """Persist the cache as a plain JSON file (matches existing CLI credential
-        storage convention; see ``client/cli/v2/config_cmd.py``).
-        """
-        from ai.backend.client.cli.v2.deployment.chat.utils import (
-            CHAT_CACHE_FILE,
-            write_json_file,
-        )
-
-        write_json_file(CHAT_CACHE_FILE, self.model_dump_json(indent=2))
 
 
 class DeploymentChatConfigEntry(BaseModel):
@@ -153,35 +105,3 @@ class DeploymentChatConfig(BaseModel):
 
     def pop(self, deployment_id: UUID) -> bool:
         return self.deployments.pop(deployment_id, None) is not None
-
-    @classmethod
-    def load(cls) -> Self:
-        """Load the chat config; return an empty config when the file is absent or unreadable."""
-        from ai.backend.client.cli.v2.deployment.chat.utils import (
-            CHAT_CONFIG_FILE,
-            read_json_file,
-        )
-
-        raw = read_json_file(CHAT_CONFIG_FILE)
-        if raw is None:
-            return cls()
-        try:
-            return cls.model_validate(raw)
-        except ValidationError:
-            print(
-                f"WARNING: {CHAT_CONFIG_FILE} is in an invalid format and was ignored. "
-                "Re-register tokens with `./bai deployment chat-config set`.",
-                file=sys.stderr,
-            )
-            return cls()
-
-    def save(self) -> None:
-        """Persist the config as a plain JSON file (matches existing CLI credential
-        storage convention; see ``client/cli/v2/config_cmd.py``).
-        """
-        from ai.backend.client.cli.v2.deployment.chat.utils import (
-            CHAT_CONFIG_FILE,
-            write_json_file,
-        )
-
-        write_json_file(CHAT_CONFIG_FILE, self.model_dump_json(indent=2))

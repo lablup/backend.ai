@@ -2,9 +2,13 @@
 
 Submodules:
 - :mod:`commands` — Click command/group definitions.
-- :mod:`types` — Pydantic models for the on-disk cache and config files.
-- :mod:`utils` — save helpers and shared JSON I/O.
+- :mod:`storage` — disk load/save for chat cache & config.
+- :mod:`utils` — file paths and shared JSON I/O helpers.
 - :mod:`formatter` — display helpers (``mask_token``, ``DeploymentChatFormatter``).
+
+Pure data types and DTOs live in :mod:`ai.backend.common.data.deployment_chat`
+and :mod:`ai.backend.common.dto.clients.openai_compat` respectively, so they
+can be reused by any backend.ai component.
 """
 
 from .commands import chat, chat_config

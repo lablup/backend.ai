@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatCacheEntry
+from ai.backend.common.data.deployment_chat import DeploymentChatCacheEntry
 
 
 def mask_token(token: str | None) -> str:
