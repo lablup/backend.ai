@@ -128,7 +128,10 @@ class DeploymentChatClient:
     @staticmethod
     def _ensure_dict(payload: object) -> dict[str, Any]:
         if not isinstance(payload, dict):
-            raise BackendClientError(f"inference endpoint returned non-JSON response: {payload!r}")
+            raise BackendClientError(
+                f"inference endpoint returned non-object payload "
+                f"(type={type(payload).__name__}): {payload!r}"
+            )
         return payload
 
     @staticmethod

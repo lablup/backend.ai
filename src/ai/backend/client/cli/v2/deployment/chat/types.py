@@ -9,10 +9,32 @@ from pathlib import Path
 from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 CACHE_ENTRY_TTL = timedelta(hours=24)
 """Endpoint cache entries older than this are treated as a cache miss."""
+
+
+class ChatCompletionMessage(BaseModel):
+    """One message inside a chat-completions request."""
+
+    role: str
+    content: str
+
+
+class ChatCompletionRequest(BaseModel):
+    """Body for ``POST /v1/chat/completions`` (OpenAI-compatible).
+
+    Extra fields are forwarded so callers can pass runtime-variant-specific
+    knobs (e.g. ``temperature``, ``top_p``, vLLM/NIM extensions) through
+    ``./bai deployment chat --params`` without the CLI having to enumerate
+    them.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    model: str
+    messages: list[ChatCompletionMessage]
 
 
 class DeploymentChatCacheEntry(BaseModel):

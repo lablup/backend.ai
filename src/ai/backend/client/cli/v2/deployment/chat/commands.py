@@ -16,6 +16,7 @@ from ai.backend.client.cli.v2.deployment.chat.formatter import (
     mask_token,
 )
 from ai.backend.client.cli.v2.deployment.chat.types import (
+    ChatCompletionRequest,
     DeploymentChatCache,
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
@@ -100,7 +101,7 @@ def chat(
     connection_config = load_v2_config()
 
     cache = DeploymentChatCache.load()
-    chat_config_store = DeploymentChatConfig.load()
+    chat_config = DeploymentChatConfig.load()
 
     if not isinstance(params, dict):
         raise click.ClickException("--params must be a JSON object.")
@@ -140,12 +141,13 @@ def chat(
                 f"  ./bai deployment chat-config set {deployment_id} --default-model <name>"
             )
 
-        body: dict[str, Any] = {
+        request = ChatCompletionRequest.model_validate({
             **extra_body,
             "model": request_model,
             "messages": [{"role": "user", "content": content}],
-        }
-        api_key = chat_config_store.get_token(deployment_id)
+        })
+        body = request.model_dump(mode="json")
+        api_key = chat_config.get_token(deployment_id)
         client_args = DeploymentChatClientArgs(
             skip_ssl_verification=connection_config.skip_ssl_verification,
         )
@@ -158,9 +160,14 @@ def chat(
                     path=request_path,
                 )
             except DeploymentChatAuthError as e:
+                # 401/403: invalidate the cached token so the next ``chat`` call
+                # surfaces the same hint instead of silently re-sending a stale key.
+                if api_key is not None and chat_config.clear_token(deployment_id):
+                    chat_config.save()
                 raise click.ClickException(
                     f"The inference endpoint rejected the configured API key for "
-                    f"deployment {deployment_id}. Re-register with:\n"
+                    f"deployment {deployment_id}. The cached token has been cleared; "
+                    f"re-register with:\n"
                     f"  ./bai deployment chat-config set {deployment_id} --token <api_key>"
                 ) from e
             except BackendAPIError as e:
@@ -223,7 +230,7 @@ def set_(
 
     connection_config = load_v2_config()
     cache = DeploymentChatCache.load()
-    chat_config_store = DeploymentChatConfig.load()
+    config = DeploymentChatConfig.load()
 
     async def _run() -> None:
         registry = await create_v2_registry(connection_config)
@@ -234,8 +241,8 @@ def set_(
         endpoint_url = deployment.network_access.endpoint_url
 
         if api_key is not None:
-            chat_config_store.set_token(deployment_id, api_key)
-            chat_config_store.save()
+            config.set_token(deployment_id, api_key)
+            config.save()
 
         cached_default_model: str | None = None
         if endpoint_url:
@@ -274,10 +281,10 @@ def set_(
 def show(deployment_id: UUID) -> None:
     """Print the chat cache entry for a deployment (API keys are masked)."""
     cache = DeploymentChatCache.load()
-    chat_config_store = DeploymentChatConfig.load()
+    config = DeploymentChatConfig.load()
 
     entry = cache.get(deployment_id)
-    token = chat_config_store.get_token(deployment_id)
+    token = config.get_token(deployment_id)
     if entry is None and token is None:
         raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
     DeploymentChatFormatter.print_summary(deployment_id, entry, token)
@@ -299,9 +306,9 @@ def clear_cache(deployment_id: UUID) -> None:
 @click.argument("deployment_id", type=click.UUID)
 def clear_config(deployment_id: UUID) -> None:
     """Remove the stored API key for a deployment."""
-    chat_config_store = DeploymentChatConfig.load()
-    if chat_config_store.clear_token(deployment_id):
-        chat_config_store.save()
+    config = DeploymentChatConfig.load()
+    if config.clear_token(deployment_id):
+        config.save()
         print(f"Removed config entry for deployment {deployment_id}.")
     else:
         print(f"No config entry for deployment {deployment_id}.")
