@@ -970,6 +970,13 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
         description="Extra vfolder mounts",
         default=None,
     )
+    options: AddRevisionOptionsGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            description="Additional options for the add revision operation.",
+        ),
+        default=None,
+    )
 
 
 ModelRevisionEdge = Edge[ModelRevision]
