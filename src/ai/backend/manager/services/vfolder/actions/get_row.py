@@ -5,11 +5,11 @@ evaluation is delegated to the downstream RBAC validator on the actual action
 (e.g., update_vfolder_attribute).
 """
 
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.vfolder.actions.base import VFolderAction
@@ -17,7 +17,7 @@ from ai.backend.manager.services.vfolder.actions.base import VFolderAction
 
 @dataclass
 class GetVFolderRowAction(VFolderAction):
-    vfolder_uuid: uuid.UUID
+    vfolder_uuid: VFolderUUID
 
     @override
     def entity_id(self) -> str | None:

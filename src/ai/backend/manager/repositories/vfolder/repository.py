@@ -205,7 +205,7 @@ class VfolderRepository:
             return self._vfolder_row_to_data(vfolder_row)
 
     @vfolder_repository_resilience.apply()
-    async def get_row_by_id(self, vfolder_id: uuid.UUID) -> Mapping[str, Any]:
+    async def get_row_by_id(self, vfolder_id: VFolderUUID) -> Mapping[str, Any]:
         """
         Fetch a vfolder row as a plain mapping by UUID, without permission filtering.
 

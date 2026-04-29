@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
     auth_required,
@@ -58,7 +59,7 @@ def _vfolder_resolver(
         async def wrapper(request: web.Request) -> web.StreamResponse:
             piece = request.match_info["name"]
             try:
-                vfolder_uuid = uuid.UUID(piece)
+                vfolder_uuid = VFolderUUID(uuid.UUID(piece))
             except ValueError:
                 result = await vfolder_processors.get_accessible_vfolder.wait_for_complete(
                     GetAccessibleVFolderAction(
