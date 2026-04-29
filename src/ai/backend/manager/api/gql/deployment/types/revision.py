@@ -369,7 +369,7 @@ class ModelServiceConfigGQL:
     pre_start_actions: list[PreStartActionGQL] = gql_field(
         description="List of pre-start actions to execute before starting the model service."
     )
-    start_command: JSON | None = gql_field(
+    start_command: str | list[str] | None = gql_field(
         description="Command to start the model service.", default=None
     )
     shell: str = gql_field(description="Shell to use if start_command is a string.")
@@ -826,7 +826,7 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDTO]):
         description="List of pre-start actions to execute before starting the model service.",
         default=strawberry.UNSET,
     )
-    start_command: JSON | None = gql_field(
+    start_command: str | list[str] | None = gql_field(
         description="Command to start the model service.", default=None
     )
     shell: str = gql_field(
