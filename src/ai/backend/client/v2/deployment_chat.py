@@ -12,6 +12,7 @@ interpreting the response.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, Self
@@ -108,11 +109,32 @@ class DeploymentChatClient:
             headers["Authorization"] = f"Bearer {token}"
         try:
             async with self._session.request(method, target, headers=headers, json=body) as resp:
-                payload = await self._read_payload(resp)
+                # Backend.AI's app-proxy fronts every deployment endpoint, and on
+                # 5xx it can emit HTML / plain-text bodies (e.g. cloud LB error
+                # pages) instead of JSON. Read text up front so the raw body is
+                # available either as the JSON-parse input or as context in the
+                # raised error.
+                raw = await resp.text()
+                try:
+                    payload = json.loads(raw) if raw else None
+                except json.JSONDecodeError as e:
+                    if resp.status >= 400:
+                        raise BackendAPIError(
+                            resp.status, resp.reason or "HTTP error", {"detail": raw}
+                        ) from e
+                    raise BackendClientError(
+                        f"inference endpoint returned non-JSON response "
+                        f"(status={resp.status}): {raw!r}"
+                    ) from e
+                if not isinstance(payload, dict):
+                    raise BackendClientError(
+                        f"inference endpoint returned non-object payload "
+                        f"(type={type(payload).__name__}, status={resp.status}): {payload!r}"
+                    )
                 self._raise_for_status(resp, payload)
+                return payload
         except aiohttp.ClientConnectionError as e:
             raise BackendClientError(f"failed to reach inference endpoint: {e!r}") from e
-        return self._ensure_dict(payload)
 
     @staticmethod
     def _build_url(endpoint_url: str, path: str) -> str:
@@ -124,30 +146,9 @@ class DeploymentChatClient:
         return str(base.with_path(f"{base_path}{target_path}"))
 
     @staticmethod
-    def _raise_for_status(resp: aiohttp.ClientResponse, payload: object) -> None:
+    def _raise_for_status(resp: aiohttp.ClientResponse, payload: dict[str, Any]) -> None:
         if resp.status < 400:
             return
-        data = payload if isinstance(payload, dict) else {"detail": payload}
         if resp.status in (401, 403):
-            raise DeploymentChatAuthError(resp.status, resp.reason or "Unauthorized", data)
-        raise BackendAPIError(resp.status, resp.reason or "HTTP error", data)
-
-    @staticmethod
-    def _ensure_dict(payload: object) -> dict[str, Any]:
-        if not isinstance(payload, dict):
-            raise BackendClientError(
-                f"inference endpoint returned non-object payload "
-                f"(type={type(payload).__name__}): {payload!r}"
-            )
-        return payload
-
-    @staticmethod
-    async def _read_payload(resp: aiohttp.ClientResponse) -> object:
-        # Inference endpoints normally return JSON, but proxies in front of them
-        # (nginx, app-proxy, cloud LB) often emit HTML/plain-text bodies on 5xx.
-        # Fall back to text so the raw body lands in the raised exception
-        # instead of leaking aiohttp.ContentTypeError to the caller.
-        try:
-            return await resp.json()
-        except (aiohttp.ContentTypeError, ValueError):
-            return await resp.text()
+            raise DeploymentChatAuthError(resp.status, resp.reason or "Unauthorized", payload)
+        raise BackendAPIError(resp.status, resp.reason or "HTTP error", payload)

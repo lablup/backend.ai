@@ -53,17 +53,6 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
     help="Model name to send (defaults to cached default_model).",
 )
 @click.option(
-    "--path",
-    "request_path",
-    default="/v1/chat/completions",
-    type=str,
-    help=(
-        "Endpoint path appended to the deployment's endpoint_url. "
-        "Defaults to the OpenAI Chat Completions path; override for "
-        "runtime variants that expose a different route."
-    ),
-)
-@click.option(
     "--params",
     default="{}",
     type=JSONParamType(),
@@ -78,7 +67,6 @@ def chat(
     deployment_id: UUID,
     content: str,
     model: str | None,
-    request_path: str,
     params: Any,
 ) -> None:
     """Send a one-shot chat completion request to a deployed model.
@@ -87,8 +75,7 @@ def chat(
     (vLLM / SGLang / NIM / TGI in messages-api mode / custom containers
     that follow the same contract). Sampling parameters such as
     temperature and top_p differ between runtime variants — pass them
-    through ``--params``. Use ``--path`` for runtime variants whose
-    route is not ``/v1/chat/completions``.
+    through ``--params``.
     """
     import json
 
@@ -157,7 +144,6 @@ def chat(
                     endpoint_entry.endpoint_url,
                     token,
                     body,
-                    path=request_path,
                 )
             except DeploymentChatAuthError as e:
                 # 401/403: invalidate the cached token so the next ``chat`` call
