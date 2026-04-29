@@ -93,8 +93,6 @@ def chat(
     extra_body: dict[str, Any] = params
 
     async def _run() -> None:
-        from ai.backend.client.exceptions import BackendAPIError
-
         existing = cache.get(deployment_id)
         if existing is not None and not existing.is_expired(now=datetime.now(UTC)):
             endpoint_entry = existing
@@ -118,20 +116,6 @@ def chat(
             cache.set(deployment_id, endpoint_entry)
             cache.save()
 
-        request_model = model or endpoint_entry.default_model
-        if request_model is None:
-            raise click.ClickException(
-                f"No --model given and no default_model cached for deployment {deployment_id}.\n"
-                "Set one with:\n"
-                f"  ./bai deployment chat-config set {deployment_id} --default-model <name>"
-            )
-
-        request = ChatCompletionRequest.model_validate({
-            **extra_body,
-            "model": request_model,
-            "messages": [{"role": "user", "content": content}],
-        })
-        body = request.model_dump(mode="json")
         token = chat_config.get_token(deployment_id)
         # ``endpoint`` is required on ClientConfig but unused by AppProxyClient
         # (deployment URLs are passed per-request); pass through the manager
@@ -144,14 +128,42 @@ def chat(
         )
         async with DeploymentChatClient(client_config) as client:
             try:
-                response = await client.chat_completion(
-                    endpoint_entry.endpoint_url,
-                    token,
-                    body,
-                )
+                request_model = model or endpoint_entry.default_model
+                if request_model is None:
+                    # No explicit --model and no cached default — ask the
+                    # OpenAI-compat endpoint itself which models it serves
+                    # and adopt the first one as the cached default
+                    # (matches webui ChatCard.tsx behaviour).
+                    models_response = await client.list_models(endpoint_entry.endpoint_url, token)
+                    if not models_response.data:
+                        raise click.ClickException(
+                            f"Deployment {deployment_id} did not advertise any models "
+                            f"on /v1/models. Set one explicitly with:\n"
+                            f"  ./bai deployment chat-config set {deployment_id} "
+                            f"--default-model <name>"
+                        )
+                    request_model = models_response.data[0].id
+                    endpoint_entry = DeploymentChatCacheEntry(
+                        endpoint_url=endpoint_entry.endpoint_url,
+                        default_model=request_model,
+                        last_synced_at=endpoint_entry.last_synced_at,
+                    )
+                    cache.set(deployment_id, endpoint_entry)
+                    cache.save()
+
+                request = ChatCompletionRequest.model_validate({
+                    **extra_body,
+                    "model": request_model,
+                    "messages": [{"role": "user", "content": content}],
+                })
+                body = request.model_dump(mode="json")
+                response = await client.chat_completion(endpoint_entry.endpoint_url, token, body)
             except DeploymentAuthError as e:
-                # 401/403: invalidate the cached token so the next ``chat`` call
-                # surfaces the same hint instead of silently re-sending a stale key.
+                # 401/403 from /v1/models or /v1/chat/completions: invalidate
+                # the cached token so the next ``chat`` call surfaces the same
+                # hint instead of silently re-sending a stale key. Other
+                # BackendAPIErrors fall through to ``_run_async`` which formats
+                # the manager-style status/title/msg payload generically.
                 if token is not None and chat_config.pop_token(deployment_id):
                     chat_config.save()
                 raise click.ClickException(
@@ -159,10 +171,6 @@ def chat(
                     f"deployment {deployment_id}. The cached token has been cleared; "
                     f"re-register with:\n"
                     f"  ./bai deployment chat-config set {deployment_id} --token <token>"
-                ) from e
-            except BackendAPIError as e:
-                raise click.ClickException(
-                    f"Inference endpoint error ({e.status} {e.reason}): {e.data}"
                 ) from e
         print(json.dumps(response, indent=2, ensure_ascii=False, default=str))
 

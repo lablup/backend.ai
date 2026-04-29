@@ -14,9 +14,35 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
 from ai.backend.client.v2.base_client import BackendAIAppProxyClient
 
 _OPENAI_COMPATIBLE_CHAT_PATH = "/v1/chat/completions"
+_OPENAI_COMPATIBLE_MODELS_PATH = "/v1/models"
+
+
+class ModelEntry(BaseModel):
+    """One entry in an OpenAI-compat ``GET /v1/models`` response.
+
+    Runtimes (vLLM, SGLang, NIM) typically include extra fields such as
+    ``created`` or ``owned_by``; ``extra="allow"`` keeps them on the
+    model so future additions don't break parsing.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    object: str = "model"
+
+
+class ListModelsResponse(BaseModel):
+    """Body of ``GET /v1/models`` on an OpenAI-compat endpoint."""
+
+    model_config = ConfigDict(extra="allow")
+
+    object: str = "list"
+    data: list[ModelEntry]
 
 
 class DeploymentChatClient(BackendAIAppProxyClient):
@@ -38,3 +64,16 @@ class DeploymentChatClient(BackendAIAppProxyClient):
         return await self._request(
             "POST", endpoint_url, _OPENAI_COMPATIBLE_CHAT_PATH, token, body=body
         )
+
+    async def list_models(
+        self,
+        endpoint_url: str,
+        token: str | None,
+    ) -> ListModelsResponse:
+        """Fetch ``GET /v1/models`` — the OpenAI-compat model listing.
+
+        Used to auto-derive a default model name when the caller did not
+        pass ``--model`` and no cached default is known.
+        """
+        payload = await self._request("GET", endpoint_url, _OPENAI_COMPATIBLE_MODELS_PATH, token)
+        return ListModelsResponse.model_validate(payload)
