@@ -539,12 +539,7 @@ class PermissionDBSource:
         self,
         creator: BulkCreator[PermissionRow],
     ) -> BulkCreatorResultWithFailures[PermissionRow]:
-        """
-        Bulk-insert permission rows defined by ``creator.specs`` in a single
-        transaction. Each spec is processed individually inside a savepoint so
-        that one failing row (e.g. unique-violation) does not abort siblings;
-        successes and errors are reported via the returned result.
-        """
+        """Bulk-insert permission rows; per-row failures are reported separately."""
         async with self._db.begin_session_read_committed() as db_session:
             return await execute_bulk_creator_partial(db_session, creator)
 
@@ -552,12 +547,7 @@ class PermissionDBSource:
         self,
         purgers: list[Purger[PermissionRow]],
     ) -> BulkPurgerResultWithFailures[PermissionRow]:
-        """
-        Bulk-delete permission rows by primary key in a single transaction.
-        Each purger is executed inside a savepoint so that one failing delete
-        does not abort siblings; successes and errors are reported via the
-        returned result.
-        """
+        """Bulk-delete permission rows by primary key; per-row failures are reported separately."""
         async with self._db.begin_session_read_committed() as db_session:
             return await execute_bulk_purger_partial(db_session, purgers)
 
