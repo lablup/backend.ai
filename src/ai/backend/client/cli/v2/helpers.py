@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 
 CONFIG_DIR = Path.home() / ".backend.ai"
 CONFIG_FILE = CONFIG_DIR / "config.toml"
-CREDENTIALS_FILE = CONFIG_DIR / "credentials.toml"
 SESSION_DIR = CONFIG_DIR / "session"
 COOKIE_FILE = SESSION_DIR / "cookie.dat"
 
@@ -47,9 +46,8 @@ def load_v2_config() -> V2ConnectionConfig:
 
     Precedence (highest to lowest):
     1. Environment variables (``BACKEND_ENDPOINT``, ``BACKEND_ACCESS_KEY``, etc.)
-    2. ``~/.backend.ai/credentials.toml``
-    3. ``~/.backend.ai/config.toml``
-    4. Built-in defaults
+    2. ``~/.backend.ai/config.toml``
+    3. Built-in defaults
     """
     import tomllib
 
@@ -62,12 +60,6 @@ def load_v2_config() -> V2ConnectionConfig:
 
     access_key: str | None = None
     secret_key: str | None = None
-
-    if CREDENTIALS_FILE.exists():
-        with CREDENTIALS_FILE.open("rb") as f:
-            creds = tomllib.load(f).get("backend-ai", {})
-        access_key = creds.get("access_key")
-        secret_key = creds.get("secret_key")
 
     # Environment variables override file settings
     if env_endpoint := os.environ.get("BACKEND_ENDPOINT"):

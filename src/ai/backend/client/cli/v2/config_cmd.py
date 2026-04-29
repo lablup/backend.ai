@@ -6,15 +6,13 @@ from typing import Any
 
 import click
 
-from .helpers import CONFIG_DIR, CONFIG_FILE, CREDENTIALS_FILE
+from .helpers import CONFIG_DIR, CONFIG_FILE
 
 CONFIGURABLE_KEYS = {
-    "endpoint": ("config", "endpoint"),
-    "endpoint-type": ("config", "endpoint_type"),
-    "api-version": ("config", "api_version"),
-    "skip-ssl-verification": ("config", "skip_ssl_verification"),
-    "access-key": ("credentials", "access_key"),
-    "secret-key": ("credentials", "secret_key"),
+    "endpoint": "endpoint",
+    "endpoint-type": "endpoint_type",
+    "api-version": "api_version",
+    "skip-ssl-verification": "skip_ssl_verification",
 }
 
 
@@ -75,17 +73,11 @@ def show() -> None:
 def set_value(key: str, value: str) -> None:
     """Set a configuration value.
 
-    KEY is one of: endpoint, endpoint-type, api-version, skip-ssl-verification,
-    access-key, secret-key.
+    KEY is one of: endpoint, endpoint-type, api-version, skip-ssl-verification.
     """
-    file_type, toml_key = CONFIGURABLE_KEYS[key]
+    toml_key = CONFIGURABLE_KEYS[key]
 
-    if file_type == "config":
-        path = CONFIG_FILE
-    else:
-        path = CREDENTIALS_FILE
-
-    data = _load_toml(path)
+    data = _load_toml(CONFIG_FILE)
     section = data.setdefault("backend-ai", {})
 
     if key == "skip-ssl-verification":
@@ -93,7 +85,7 @@ def set_value(key: str, value: str) -> None:
     else:
         section[toml_key] = value
 
-    _save_toml(path, data)
+    _save_toml(CONFIG_FILE, data)
     click.echo(f"Set {key} = {value}")
 
 
@@ -109,7 +101,5 @@ def get_value(key: str) -> None:
         "endpoint-type": cfg.endpoint_type,
         "api-version": cfg.api_version,
         "skip-ssl-verification": str(cfg.skip_ssl_verification),
-        "access-key": cfg.access_key or "(not set)",
-        "secret-key": cfg.secret_key or "(not set)",
     }
     click.echo(field_map[key])
