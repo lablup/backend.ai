@@ -35,6 +35,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
@@ -53,6 +59,9 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import (
@@ -1220,16 +1229,19 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
 
-        query = sa.select(agus.c.group_id).select_from(agus).where(agus.c.user_id == user_id)
+        membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+            AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+            AssociationScopesEntitiesRow.entity_id == str(user_id),
+        )
 
         async with graph_ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
+            membership_result = await conn.execute(membership_query)
 
-        grps = result.fetchall()
-        group_ids = [g.group_id for g in grps]
+        grps = membership_result.fetchall()
+        group_ids = [uuid.UUID(g.scope_id) for g in grps]
         j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
         query = sa.select(sa.func.count()).select_from(j).where(vfolders.c.group.in_(group_ids))
 
@@ -1255,14 +1267,17 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
 
-        query = sa.select(agus.c.group_id).select_from(agus).where(agus.c.user_id == user_id)
+        membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+            AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+            AssociationScopesEntitiesRow.entity_id == str(user_id),
+        )
         async with graph_ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
-        grps = result.fetchall()
-        group_ids = [g.group_id for g in grps]
+            membership_result = await conn.execute(membership_query)
+        grps = membership_result.fetchall()
+        group_ids = [uuid.UUID(g.scope_id) for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
             sa.select(

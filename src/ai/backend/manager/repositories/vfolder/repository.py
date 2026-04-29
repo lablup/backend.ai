@@ -64,7 +64,6 @@ from ai.backend.manager.errors.storage import (
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -1602,15 +1601,20 @@ class VfolderRepository:
             )
 
             users_table = UserRow.__table__
-            j = users_table.join(agus, users_table.c.uuid == agus.c.user_id)
+            j = users_table.join(
+                AssociationScopesEntitiesRow,
+                sa.cast(users_table.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
+            )
             db_query = (
                 sa.select(users_table.c.uuid, users_table.c.email)
                 .select_from(j)
                 .where(
-                    (users_table.c.email.in_(emails))
-                    & (users_table.c.email != requester_email)
-                    & (agus.c.group_id == vfolder_group)
-                    & (users_table.c.status.in_(ACTIVE_USER_STATUSES)),
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.scope_id == str(vfolder_group),
+                    users_table.c.email.in_(emails),
+                    users_table.c.email != requester_email,
+                    users_table.c.status.in_(ACTIVE_USER_STATUSES),
                 )
             )
             result = await session.execute(db_query)
