@@ -7107,7 +7107,7 @@ type Mutation {
   """
   Added in UNRELEASED. Replace one role's entire scoped-permission set (admin only).
   """
-  adminReplaceRolePermissions(roleId: UUID!, input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload!
+  adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload!
 
   """Added in UNRELEASED. Create role invitations by email."""
   createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload!
@@ -9619,6 +9619,7 @@ type ReplaceRolePermissionFailureInfo {
 Added in UNRELEASED. Input for replacing one role's entire scoped-permission set
 """
 input ReplaceRolePermissionsInput {
+  roleId: UUID!
   permissions: [RolePermissionInput!]!
 }
 
@@ -10591,10 +10592,10 @@ type RolePermissionEntryNode {
 """Added in UNRELEASED. Single scoped permission entry tied to a role"""
 input RolePermissionInput {
   roleId: UUID!
-  scopeType: String!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: String!
-  operation: String!
+  entityType: RBACElementType!
+  operation: OperationType!
 }
 
 """Added in 26.3.0. Role definition source"""

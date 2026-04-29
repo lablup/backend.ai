@@ -11183,7 +11183,7 @@ type Mutation
   """
   Added in UNRELEASED. Replace one role's entire scoped-permission set (admin only).
   """
-  adminReplaceRolePermissions(roleId: UUID!, input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload! @join__field(graph: STRAWBERRY)
+  adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. Create role invitations by email."""
   createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload! @join__field(graph: STRAWBERRY)
@@ -14479,6 +14479,7 @@ Added in UNRELEASED. Input for replacing one role's entire scoped-permission set
 input ReplaceRolePermissionsInput
   @join__type(graph: STRAWBERRY)
 {
+  roleId: UUID!
   permissions: [RolePermissionInput!]!
 }
 
@@ -15764,10 +15765,10 @@ input RolePermissionInput
   @join__type(graph: STRAWBERRY)
 {
   roleId: UUID!
-  scopeType: String!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: String!
-  operation: String!
+  entityType: RBACElementType!
+  operation: OperationType!
 }
 
 """Added in 26.3.0. Role definition source"""
