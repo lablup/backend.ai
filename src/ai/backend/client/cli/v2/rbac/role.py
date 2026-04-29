@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import click
@@ -13,6 +15,9 @@ from ai.backend.client.cli.v2.helpers import (
     parse_order_options,
     print_result,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 
 @click.group()
@@ -220,11 +225,46 @@ def delete(role_id: str) -> None:
     asyncio.run(_run())
 
 
-def _resolve_role_selector(role_id: UUID | None, by_name: str | None) -> None:
+def _validate_role_selector(role_id: UUID | None, by_name: str | None) -> None:
     if not role_id and not by_name:
         raise click.UsageError("Provide ROLE_ID or --by-name.")
     if role_id and by_name:
         raise click.UsageError("ROLE_ID and --by-name are mutually exclusive.")
+
+
+async def _resolve_role_id(
+    registry: V2ClientRegistry,
+    role_id: UUID | None,
+    by_name: str | None,
+) -> UUID:
+    if role_id is not None:
+        return role_id
+    if by_name is None:
+        raise click.UsageError("Provide ROLE_ID or --by-name.")
+    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.v2.rbac.request import RoleFilter, SearchRolesInput
+
+    payload = await registry.rbac.search_roles(
+        SearchRolesInput(filter=RoleFilter(name=StringFilter(equals=by_name))),
+    )
+    items = payload.items
+    if not items:
+        raise click.ClickException(f"No role matches name {by_name!r}.")
+    if len(items) == 1:
+        return items[0].id
+    if not sys.stdin.isatty():
+        raise click.ClickException(
+            f"{len(items)} roles match name {by_name!r}; "
+            f"re-run with ROLE_ID positional argument or in an interactive shell.",
+        )
+    click.echo(f"Multiple roles match {by_name!r}:")
+    for i, role_node in enumerate(items, start=1):
+        click.echo(
+            f"  [{i}] {role_node.id}  name={role_node.name}  "
+            f"source={role_node.source}  status={role_node.status}",
+        )
+    choice: int = click.prompt("Select role number", type=click.IntRange(1, len(items)))
+    return items[choice - 1].id
 
 
 @role.command(name="add-permission")
@@ -238,10 +278,19 @@ def _resolve_role_selector(role_id: UUID | None, by_name: str | None) -> None:
 )
 def add_permission(role_id: UUID | None, by_name: str | None, kind: str) -> None:
     """Add the standard <kind> permissions for every resource entity type to a role."""
-    _resolve_role_selector(role_id, by_name)
-    raise click.ClickException(
-        f"Not yet wired to SDK (BA-5912 pending): role={role_id or by_name!r}, kind={kind!r}."
-    )
+    _validate_role_selector(role_id, by_name)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            resolved = await _resolve_role_id(registry, role_id, by_name)
+            raise click.ClickException(
+                f"Not yet wired to SDK (BA-5912 pending): role_id={resolved}, kind={kind!r}.",
+            )
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
 
 
 @role.command(name="remove-permission")
@@ -259,10 +308,19 @@ def remove_permission(
     kind: str,
 ) -> None:
     """Remove the standard <kind> permissions for every resource entity type from a role."""
-    _resolve_role_selector(role_id, by_name)
-    raise click.ClickException(
-        f"Not yet wired to SDK (BA-5912 pending): role={role_id or by_name!r}, kind={kind!r}."
-    )
+    _validate_role_selector(role_id, by_name)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            resolved = await _resolve_role_id(registry, role_id, by_name)
+            raise click.ClickException(
+                f"Not yet wired to SDK (BA-5912 pending): role_id={resolved}, kind={kind!r}.",
+            )
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
 
 
 @role.command(name="replace-permission")
@@ -275,8 +333,17 @@ def replace_permission(
     by_name: str | None,
 ) -> None:
     """Replace the role's entire permission set with PAYLOAD (JSON string or @path/to/file.json)."""
-    _resolve_role_selector(role_id, by_name)
-    raise click.ClickException(
-        f"Not yet wired to SDK (BA-5912 pending): "
-        f"role={role_id or by_name!r}, payload_len={len(payload)}."
-    )
+    _validate_role_selector(role_id, by_name)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            resolved = await _resolve_role_id(registry, role_id, by_name)
+            raise click.ClickException(
+                f"Not yet wired to SDK (BA-5912 pending): "
+                f"role_id={resolved}, payload_len={len(payload)}.",
+            )
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
