@@ -147,7 +147,7 @@ def chat(
             "messages": [{"role": "user", "content": content}],
         })
         body = request.model_dump(mode="json")
-        api_key = chat_config.get_token(deployment_id)
+        token = chat_config.get_token(deployment_id)
         client_args = DeploymentChatClientArgs(
             skip_ssl_verification=connection_config.skip_ssl_verification,
         )
@@ -155,20 +155,20 @@ def chat(
             try:
                 response = await client.chat_completion(
                     endpoint_entry.endpoint_url,
-                    api_key,
+                    token,
                     body,
                     path=request_path,
                 )
             except DeploymentChatAuthError as e:
                 # 401/403: invalidate the cached token so the next ``chat`` call
                 # surfaces the same hint instead of silently re-sending a stale key.
-                if api_key is not None and chat_config.clear_token(deployment_id):
+                if token is not None and chat_config.clear_token(deployment_id):
                     chat_config.save()
                 raise click.ClickException(
-                    f"The inference endpoint rejected the configured API key for "
+                    f"The inference endpoint rejected the configured token for "
                     f"deployment {deployment_id}. The cached token has been cleared; "
                     f"re-register with:\n"
-                    f"  ./bai deployment chat-config set {deployment_id} --token <api_key>"
+                    f"  ./bai deployment chat-config set {deployment_id} --token <token>"
                 ) from e
             except BackendAPIError as e:
                 raise click.ClickException(
@@ -186,7 +186,7 @@ def chat(
 
 @click.group(name="chat-config")
 def chat_config() -> None:
-    """Manage stored API keys and default model names for deployment chat.
+    """Manage stored tokens and default model names for deployment chat.
 
     The deployment's ``endpoint_url`` is auto-managed; ``--token`` and
     ``--default-model`` are user-supplied.
@@ -197,12 +197,11 @@ def chat_config() -> None:
 @click.argument("deployment_id", type=click.UUID)
 @click.option(
     "--token",
-    "api_key",
     default=None,
     type=str,
     help=(
-        "API key the inference runtime accepts as a Bearer token. "
-        "Omit when the runtime was started without an API key."
+        "Token the inference runtime accepts as a Bearer credential. "
+        "Omit when the runtime was started without a token."
     ),
 )
 @click.option(
@@ -213,7 +212,7 @@ def chat_config() -> None:
 )
 def set_(
     deployment_id: UUID,
-    api_key: str | None,
+    token: str | None,
     default_model: str | None,
 ) -> None:
     """Register or update the chat config for a deployment.
@@ -225,7 +224,7 @@ def set_(
     """
     import sys
 
-    if api_key is None and default_model is None:
+    if token is None and default_model is None:
         raise click.ClickException("Nothing to set: provide --token and/or --default-model.")
 
     connection_config = load_v2_config()
@@ -240,8 +239,8 @@ def set_(
             await registry.close()
         endpoint_url = deployment.network_access.endpoint_url
 
-        if api_key is not None:
-            config.set_token(deployment_id, api_key)
+        if token is not None:
+            config.set_token(deployment_id, token)
             config.save()
 
         cached_default_model: str | None = None
@@ -270,8 +269,8 @@ def set_(
         print(f"Updated chat config for deployment {deployment_id}.")
         if cached_default_model:
             print(f"  default_model: {cached_default_model}")
-        if api_key is not None:
-            print(f"  api_key:       {mask_token(api_key)}")
+        if token is not None:
+            print(f"  token:         {mask_token(token)}")
 
     _run_async(_run)
 
@@ -279,7 +278,7 @@ def set_(
 @chat_config.command(name="show")
 @click.argument("deployment_id", type=click.UUID)
 def show(deployment_id: UUID) -> None:
-    """Print the chat cache entry for a deployment (API keys are masked)."""
+    """Print the chat cache entry for a deployment (tokens are masked)."""
     cache = DeploymentChatCache.load()
     config = DeploymentChatConfig.load()
 
@@ -305,7 +304,7 @@ def clear_cache(deployment_id: UUID) -> None:
 @chat_config.command(name="clear-config")
 @click.argument("deployment_id", type=click.UUID)
 def clear_config(deployment_id: UUID) -> None:
-    """Remove the stored API key for a deployment."""
+    """Remove the stored token for a deployment."""
     config = DeploymentChatConfig.load()
     if config.clear_token(deployment_id):
         config.save()

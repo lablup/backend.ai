@@ -41,14 +41,12 @@ class TestEntryLines:
 
 
 class TestMaskToken:
-    def test_mask_long_token(self) -> None:
-        masked = mask_token("sk-abcdefghijklmnopqrstuvwxyz")
-        assert masked.startswith("sk-")
-        assert masked.endswith("wxyz")
-        assert "***" in masked
+    def test_mask_long_token_returns_fixed_placeholder(self) -> None:
+        # Length-independent placeholder: never leak prefix, suffix, or length.
+        assert mask_token("sk-abcdefghijklmnopqrstuvwxyz") == "********"
 
-    def test_mask_short_token(self) -> None:
-        assert mask_token("short") == "***"
+    def test_mask_short_token_returns_fixed_placeholder(self) -> None:
+        assert mask_token("short") == "********"
 
     def test_mask_none(self) -> None:
         assert mask_token(None) == "<unset>"

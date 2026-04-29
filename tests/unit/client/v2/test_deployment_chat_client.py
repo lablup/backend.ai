@@ -136,7 +136,7 @@ class TestChatCompletionSuccess:
             await server.stop()
         assert server.recorded["path"] == "/v1/chat/completions"
 
-    async def test_omits_authorization_when_api_key_is_none(
+    async def test_omits_authorization_when_token_is_none(
         self, chat_client: DeploymentChatClient
     ) -> None:
         async def handler(_request: web.Request) -> web.Response:

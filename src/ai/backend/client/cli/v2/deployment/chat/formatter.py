@@ -6,14 +6,18 @@ from uuid import UUID
 
 from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatCacheEntry
 
+TOKEN_PLACEHOLDER = "********"
+
 
 def mask_token(token: str | None) -> str:
-    """Render a token as ``sk-***...***xxxx`` for diagnostic display."""
+    """Render a stored token as a fixed placeholder for diagnostic display.
+
+    The placeholder is length-independent so the masked output never leaks the
+    token's length, prefix, or suffix.
+    """
     if token is None:
         return "<unset>"
-    if len(token) <= 8:
-        return "***"
-    return f"{token[:3]}***...***{token[-4:]}"
+    return TOKEN_PLACEHOLDER
 
 
 class DeploymentChatFormatter:
@@ -48,4 +52,4 @@ class DeploymentChatFormatter:
         print(f"deployment_id : {deployment_id}")
         for line in cls.entry_lines(entry):
             print(line)
-        print(f"api_key       : {mask_token(token)}")
+        print(f"token         : {mask_token(token)}")
