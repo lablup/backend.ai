@@ -30,11 +30,15 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
+    BulkRegisterRoutesRequest,
+    BulkUnregisterRoutesRequest,
     BulkUpdateRoutesRequest,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkCreateEndpointResponse,
     BulkDeleteEndpointResponse,
+    BulkRegisterRoutesResponse,
+    BulkUnregisterRoutesResponse,
     BulkUpdateRoutesResponse,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
@@ -185,6 +189,28 @@ async def bulk_update_routes(
     return PydanticResponse(BulkUpdateRoutesResponse(endpoints=items))
 
 
+@auth_required("manager")
+@pydantic_api_handler(BulkRegisterRoutesRequest)
+async def bulk_register_routes(
+    request: web.Request, params: BulkRegisterRoutesRequest
+) -> PydanticResponse[BulkRegisterRoutesResponse]:
+    """Bulk add new routes to many endpoints (delta semantics)."""
+    root_ctx: RootContext = request.app["_root.context"]
+    items = await root_ctx.endpoint_service.register_routes_bulk(params.endpoints)
+    return PydanticResponse(BulkRegisterRoutesResponse(endpoints=items))
+
+
+@auth_required("manager")
+@pydantic_api_handler(BulkUnregisterRoutesRequest)
+async def bulk_unregister_routes(
+    request: web.Request, params: BulkUnregisterRoutesRequest
+) -> PydanticResponse[BulkUnregisterRoutesResponse]:
+    """Bulk drop routes from many endpoints (delta semantics)."""
+    root_ctx: RootContext = request.app["_root.context"]
+    items = await root_ctx.endpoint_service.unregister_routes_bulk(params.endpoints)
+    return PydanticResponse(BulkUnregisterRoutesResponse(endpoints=items))
+
+
 class UpdateModelHealthCheckRequestModel(BaseModel):
     health_check: ModelHealthCheck | None
 
@@ -265,6 +291,8 @@ def create_app(
     cors.add(app.router.add_resource(r""))
     # Static '/bulk' routes must be registered before the parametric
     # '/{endpoint_id}' so aiohttp doesn't resolve them to the parametric handler.
+    cors.add(add_route("POST", "/bulk/routes/register", bulk_register_routes))
+    cors.add(add_route("POST", "/bulk/routes/unregister", bulk_unregister_routes))
     cors.add(add_route("POST", "/bulk/routes", bulk_update_routes))
     cors.add(add_route("POST", "/bulk", bulk_create_or_update_endpoints))
     cors.add(add_route("DELETE", "/bulk", bulk_remove_endpoints))

@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 
 from .status import (
     RunningHookDependencies,
@@ -29,7 +28,6 @@ class HookRegistryArgs:
     """Arguments for creating HookRegistry."""
 
     agent_client_pool: AgentClientPool
-    route_controller: RouteController
 
 
 class HookRegistry:
@@ -50,14 +48,11 @@ class HookRegistry:
         # RUNNING transition hook
         running_deps = RunningHookDependencies(
             agent_client_pool=args.agent_client_pool,
-            route_controller=args.route_controller,
         )
         self._status_hooks[SessionStatus.RUNNING] = RunningTransitionHook(running_deps)
 
         # TERMINATED transition hook
-        terminated_deps = TerminatedHookDependencies(
-            route_controller=args.route_controller,
-        )
+        terminated_deps = TerminatedHookDependencies()
         self._status_hooks[SessionStatus.TERMINATED] = TerminatedTransitionHook(terminated_deps)
 
     def get_hook(self, status: SessionStatus) -> StatusTransitionHook | None:

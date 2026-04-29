@@ -262,6 +262,125 @@ class UpdatedRoutesItem(BaseFieldModel):
     )
 
 
+class RegisterRoutesItem(BaseFieldModel):
+    """One endpoint's set of routes to add to the coordinator (delta semantics).
+
+    Unlike :class:`UpdateRoutesItem`, this does NOT replace
+    ``circuit.route_info`` — it appends ``routes`` to whatever set the
+    coordinator already has. Routes whose ``route_id`` is already present
+    are silently ignored (idempotent re-register), so callers can push
+    the same route twice without producing duplicates.
+    """
+
+    deployment_id: DeploymentID = Field(
+        ...,
+        description=(
+            "Target deployment UUID. ``endpoint_id`` is accepted as a "
+            "validation alias for backward compatibility."
+        ),
+        validation_alias=AliasChoices("deployment_id", "endpoint_id"),
+        serialization_alias="deployment_id",
+    )
+    routes: list[RouteEntry] = Field(
+        ...,
+        description=(
+            "Routes to append to the endpoint's circuit. Already-present route_ids are no-ops."
+        ),
+    )
+
+
+class UnregisterRoutesItem(BaseFieldModel):
+    """One endpoint's set of routes to remove from the coordinator (delta semantics).
+
+    The caller only needs to send the ``route_id`` set — the coordinator
+    looks up the matching entries on ``circuit.route_info`` and drops
+    them. Already-absent route ids are silently ignored so the call is
+    idempotent.
+    """
+
+    deployment_id: DeploymentID = Field(
+        ...,
+        description=(
+            "Target deployment UUID. ``endpoint_id`` is accepted as a "
+            "validation alias for backward compatibility."
+        ),
+        validation_alias=AliasChoices("deployment_id", "endpoint_id"),
+        serialization_alias="deployment_id",
+    )
+    route_ids: list[UUID] = Field(
+        ...,
+        description=(
+            "Route UUIDs to remove from the endpoint's circuit. "
+            "Already-absent route ids are no-ops."
+        ),
+    )
+
+
+class RegisteredRoutesItem(BaseFieldModel):
+    """Per-endpoint result of a bulk routes-register call.
+
+    Each entry reports which route ids were freshly added vs already
+    present so callers can distinguish "first-time push" from "redundant
+    push" without comparing payloads themselves.
+    """
+
+    deployment_id: DeploymentID = Field(
+        ...,
+        description="Deployment UUID that the coordinator attempted to register.",
+        validation_alias=AliasChoices("deployment_id", "endpoint_id"),
+        serialization_alias="deployment_id",
+    )
+    success: bool = Field(
+        ...,
+        description="``True`` when the registration was applied; ``False`` otherwise.",
+    )
+    registered_route_ids: list[UUID] = Field(
+        default_factory=list,
+        description="Route UUIDs that were freshly added to the circuit.",
+    )
+    already_registered_route_ids: list[UUID] = Field(
+        default_factory=list,
+        description="Route UUIDs that were already present on the circuit (idempotent no-op).",
+    )
+    error: str | None = Field(
+        default=None,
+        description="Human-readable error when ``success`` is ``False``; ``None`` on success.",
+    )
+
+
+class UnregisteredRoutesItem(BaseFieldModel):
+    """Per-endpoint result of a bulk routes-unregister call.
+
+    Each entry reports which route ids were dropped vs already absent so
+    callers can distinguish "first-time removal" from "redundant
+    removal". When ``success`` is ``False`` the caller should retry on
+    the next sync cycle.
+    """
+
+    deployment_id: DeploymentID = Field(
+        ...,
+        description="Deployment UUID that the coordinator attempted to unregister.",
+        validation_alias=AliasChoices("deployment_id", "endpoint_id"),
+        serialization_alias="deployment_id",
+    )
+    success: bool = Field(
+        ...,
+        description="``True`` when the unregistration was applied; ``False`` otherwise.",
+    )
+    unregistered_route_ids: list[UUID] = Field(
+        default_factory=list,
+        description="Route UUIDs that were dropped from the circuit.",
+    )
+    already_absent_route_ids: list[UUID] = Field(
+        default_factory=list,
+        description="Route UUIDs that were already absent from the circuit (idempotent no-op).",
+    )
+    error: str | None = Field(
+        default=None,
+        description="Human-readable error when ``success`` is ``False``; ``None`` on success.",
+    )
+
+
 class DeletedEndpointItem(BaseFieldModel):
     """Result for a single removed endpoint.
 

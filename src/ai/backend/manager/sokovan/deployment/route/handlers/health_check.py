@@ -77,7 +77,13 @@ class HealthCheckRouteHandler(RouteHandler):
         return await self._route_executor.check_route_health(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
-        """Handle post-processing after health check."""
+        """Log health-check results.
+
+        ``RouteExecutor.check_route_health`` already pushed any
+        first-time HEALTHY routes to AppProxy synchronously, so this
+        handler is a thin logging shim — keeping ``post_process`` free
+        of work whose failure must be tolerated.
+        """
         log.debug(
             "Health check: {} healthy, {} unhealthy, {} degraded",
             len(result.successes),

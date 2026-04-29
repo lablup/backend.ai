@@ -45,6 +45,8 @@ from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     CreateEndpointItem,
+    RegisterRoutesItem,
+    UnregisterRoutesItem,
     UpdateRoutesItem,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
@@ -77,6 +79,44 @@ class UpdatedRouteSet:
     error: str | None
     circuit: Circuit | None
     old_routes: list[RouteInfo]
+
+
+@dataclass
+class RegisteredRouteSet:
+    """One endpoint's routes-register result.
+
+    Mirrors :class:`UpdatedRouteSet` so the service layer can fan the
+    new route set out to workers using the same propagation path. The
+    register / already-register split lets the caller distinguish a
+    first-time push from a redundant one.
+    """
+
+    deployment_id: DeploymentID
+    success: bool
+    error: str | None
+    circuit: Circuit | None
+    old_routes: list[RouteInfo]
+    registered_route_ids: list[UUID]
+    already_registered_route_ids: list[UUID]
+
+
+@dataclass
+class UnregisteredRouteSet:
+    """One endpoint's routes-unregister result.
+
+    Mirrors :class:`UpdatedRouteSet` so the service layer can fan the
+    smaller route set out to workers using the same propagation path.
+    The unregister / already-absent split lets the caller distinguish a
+    first-time removal from a redundant one.
+    """
+
+    deployment_id: DeploymentID
+    success: bool
+    error: str | None
+    circuit: Circuit | None
+    old_routes: list[RouteInfo]
+    unregistered_route_ids: list[UUID]
+    already_absent_route_ids: list[UUID]
 
 
 class EndpointRepository:
@@ -192,9 +232,14 @@ class EndpointRepository:
         results: list[UpdatedRouteSet] = []
 
         async with self._begin_session_read_committed() as sess:
-            # Eager-load worker_row + endpoint_row because the service
-            # layer keeps propagating to workers after this transaction
-            # closes; touching them lazily would raise DetachedInstanceError.
+            # Lock matching circuit rows for the duration of this
+            # transaction so concurrent register / unregister / update
+            # callers serialise on the same circuit and cannot lose
+            # each other's deltas via read-modify-write on the JSONB
+            # ``route_info`` blob. Eager-load worker_row + endpoint_row
+            # because the service layer keeps propagating to workers
+            # after this transaction closes; touching them lazily would
+            # raise DetachedInstanceError.
             circuit_rows = (
                 await sess.scalars(
                     sa.select(Circuit)
@@ -203,6 +248,7 @@ class EndpointRepository:
                         selectinload(Circuit.worker_row),
                         selectinload(Circuit.endpoint_row),
                     )
+                    .with_for_update()
                 )
             ).all()
             circuits_by_endpoint: dict[UUID, Circuit] = {
@@ -253,6 +299,209 @@ class EndpointRepository:
                         error=None,
                         circuit=circuit,
                         old_routes=old_routes,
+                    )
+                )
+
+        return results
+
+    async def register_routes(
+        self,
+        items: list[RegisterRoutesItem],
+    ) -> list[RegisteredRouteSet]:
+        """Bulk-append new routes to many circuits in one transaction.
+
+        Delta semantics: each ``circuit.route_info`` is replaced with
+        ``existing + new``, where new entries are matched against
+        existing ones by ``route_id`` to keep the call idempotent. Per-
+        entry errors (no circuit registered yet) are reported in the
+        result without aborting the call so a partial set of endpoints
+        can still be synced. The service layer reads ``circuit`` /
+        ``old_routes`` to fan changes out to workers after commit.
+        """
+        if not items:
+            return []
+
+        deployment_ids = [item.deployment_id for item in items]
+        items_by_id: dict[UUID, RegisterRoutesItem] = {item.deployment_id: item for item in items}
+
+        results: list[RegisteredRouteSet] = []
+
+        async with self._begin_session_read_committed() as sess:
+            # Lock matching circuit rows for the duration of this
+            # transaction so concurrent register / unregister / update
+            # callers serialise on the same circuit and cannot lose
+            # each other's deltas via read-modify-write on the JSONB
+            # ``route_info`` blob. Eager-load worker_row + endpoint_row
+            # because the service layer keeps propagating to workers
+            # after this transaction closes; touching them lazily would
+            # raise DetachedInstanceError.
+            circuit_rows = (
+                await sess.scalars(
+                    sa.select(Circuit)
+                    .where(Circuit.endpoint_id.in_(deployment_ids))
+                    .options(
+                        selectinload(Circuit.worker_row),
+                        selectinload(Circuit.endpoint_row),
+                    )
+                    .with_for_update()
+                )
+            ).all()
+            circuits_by_endpoint: dict[UUID, Circuit] = {
+                c.endpoint_id: c for c in circuit_rows if c.endpoint_id is not None
+            }
+
+            for deployment_id in deployment_ids:
+                circuit = circuits_by_endpoint.get(deployment_id)
+                if circuit is None:
+                    # Manager may push routes for an endpoint that has
+                    # not yet been registered if there is a sync race.
+                    # Mark as failed so the manager retries on the next
+                    # short cycle.
+                    results.append(
+                        RegisteredRouteSet(
+                            deployment_id=DeploymentID(deployment_id),
+                            success=False,
+                            error="No circuit registered for this endpoint yet.",
+                            circuit=None,
+                            old_routes=[],
+                            registered_route_ids=[],
+                            already_registered_route_ids=[],
+                        )
+                    )
+                    continue
+
+                item = items_by_id[deployment_id]
+                existing_routes = list(circuit.route_info or [])
+                existing_ids = {route.route_id for route in existing_routes}
+
+                newly_added: list[RouteInfo] = []
+                registered_ids: list[UUID] = []
+                already_present_ids: list[UUID] = []
+                for entry in item.routes:
+                    if entry.route_id in existing_ids:
+                        already_present_ids.append(entry.route_id)
+                        continue
+                    newly_added.append(
+                        RouteInfo(
+                            session_id=entry.session_id,
+                            session_name=None,
+                            route_id=entry.route_id,
+                            kernel_host=entry.kernel_host,
+                            kernel_port=entry.kernel_port,
+                            # Inference circuits are always HTTP; manager does
+                            # not push traffic_ratio yet (planned), so the
+                            # legacy default keeps every route equal-weighted.
+                            protocol=ProxyProtocol.HTTP,
+                            traffic_ratio=1.0,
+                        )
+                    )
+                    registered_ids.append(entry.route_id)
+
+                old_routes = list(existing_routes)
+                circuit.route_info = existing_routes + newly_added
+
+                results.append(
+                    RegisteredRouteSet(
+                        deployment_id=DeploymentID(deployment_id),
+                        success=True,
+                        error=None,
+                        circuit=circuit,
+                        old_routes=old_routes,
+                        registered_route_ids=registered_ids,
+                        already_registered_route_ids=already_present_ids,
+                    )
+                )
+
+        return results
+
+    async def unregister_routes(
+        self,
+        items: list[UnregisterRoutesItem],
+    ) -> list[UnregisteredRouteSet]:
+        """Bulk-drop routes from many circuits in one transaction.
+
+        Delta semantics: each ``circuit.route_info`` is replaced with
+        the existing entries minus those whose ``route_id`` is in the
+        request set. Already-absent ids are reported as
+        ``already_absent_route_ids`` so the call is idempotent. Per-
+        entry errors (no circuit registered yet) are reported in the
+        result without aborting the call. The service layer reads
+        ``circuit`` / ``old_routes`` to fan changes out to workers
+        after commit.
+        """
+        if not items:
+            return []
+
+        deployment_ids = [item.deployment_id for item in items]
+        items_by_id: dict[UUID, UnregisterRoutesItem] = {item.deployment_id: item for item in items}
+
+        results: list[UnregisteredRouteSet] = []
+
+        async with self._begin_session_read_committed() as sess:
+            # Lock matching circuit rows for the duration of this
+            # transaction so concurrent register / unregister / update
+            # callers serialise on the same circuit and cannot lose
+            # each other's deltas via read-modify-write on the JSONB
+            # ``route_info`` blob. Eager-load worker_row + endpoint_row
+            # because the service layer keeps propagating to workers
+            # after this transaction closes; touching them lazily would
+            # raise DetachedInstanceError.
+            circuit_rows = (
+                await sess.scalars(
+                    sa.select(Circuit)
+                    .where(Circuit.endpoint_id.in_(deployment_ids))
+                    .options(
+                        selectinload(Circuit.worker_row),
+                        selectinload(Circuit.endpoint_row),
+                    )
+                    .with_for_update()
+                )
+            ).all()
+            circuits_by_endpoint: dict[UUID, Circuit] = {
+                c.endpoint_id: c for c in circuit_rows if c.endpoint_id is not None
+            }
+
+            for deployment_id in deployment_ids:
+                circuit = circuits_by_endpoint.get(deployment_id)
+                if circuit is None:
+                    results.append(
+                        UnregisteredRouteSet(
+                            deployment_id=DeploymentID(deployment_id),
+                            success=False,
+                            error="No circuit registered for this endpoint yet.",
+                            circuit=None,
+                            old_routes=[],
+                            unregistered_route_ids=[],
+                            already_absent_route_ids=[],
+                        )
+                    )
+                    continue
+
+                item = items_by_id[deployment_id]
+                existing_routes = list(circuit.route_info or [])
+                target_ids = set(item.route_ids)
+
+                kept_routes: list[RouteInfo] = []
+                dropped_ids: list[UUID] = []
+                for route in existing_routes:
+                    if route.route_id in target_ids:
+                        dropped_ids.append(route.route_id)
+                    else:
+                        kept_routes.append(route)
+                already_absent_ids = [rid for rid in item.route_ids if rid not in dropped_ids]
+
+                old_routes = list(existing_routes)
+                circuit.route_info = kept_routes
+
+                results.append(
+                    UnregisteredRouteSet(
+                        deployment_id=DeploymentID(deployment_id),
+                        success=True,
+                        error=None,
+                        circuit=circuit,
+                        old_routes=old_routes,
+                        unregistered_route_ids=dropped_ids,
+                        already_absent_route_ids=already_absent_ids,
                     )
                 )
 
