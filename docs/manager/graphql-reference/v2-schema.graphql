@@ -130,7 +130,9 @@ input AddRevisionInput {
   """Extra vfolder mounts"""
   extraMounts: [ExtraVFolderMountInput!] = null
 
-  """Added in 26.4.2. Additional options for the add revision operation."""
+  """
+  Added in UNRELEASED. Additional options for the add revision operation.
+  """
   options: AddRevisionOptions = null
 }
 

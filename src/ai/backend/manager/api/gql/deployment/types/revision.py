@@ -972,7 +972,7 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     )
     options: AddRevisionOptionsGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.4.2",
+            added_version=NEXT_RELEASE_VERSION,
             description="Additional options for the add revision operation.",
         ),
         default=None,
