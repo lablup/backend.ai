@@ -39,10 +39,10 @@ from aiohttp.typedefs import Handler
 from pydantic import Field, TypeAdapter, ValidationError
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.exception import DeprecatedAPI
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import (
-    DeprecatedAPI,
     InvalidAPIParameters,
     NotImplementedAPI,
 )

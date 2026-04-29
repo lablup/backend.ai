@@ -8,7 +8,6 @@ from typing import (
     Self,
     cast,
 )
-from uuid import UUID
 
 from glide import (
     Batch,
@@ -34,7 +33,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import AccessKey, MetricKey, MetricValue, ValkeyTarget
+from ai.backend.common.types import AccessKey, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -479,55 +478,6 @@ class ValkeyStatClient:
             ):
                 log.warning(
                     "Failed to unpack inference app statistics for key {}: {}",
-                    keys[i],
-                    result.decode("utf-8"),
-                )
-                stats.append(None)
-        return stats
-
-    def _get_inference_replica_key(self, endpoint_id: str, replica_id: str) -> str:
-        """
-        Generate inference replica key.
-
-        :param endpoint_id: The endpoint ID.
-        :param replica_id: The replica ID.
-        :return: The generated key.
-        """
-        return f"{_INFERENCE_PREFIX}.{endpoint_id}.replica.{replica_id}"
-
-    @valkey_stat_resilience.apply()
-    async def get_inference_replica_statistics_batch(
-        self, endpoint_replica_pairs: list[tuple[str, str]]
-    ) -> list[dict[str, Any] | None]:
-        """
-        Get inference replica statistics for multiple endpoint-replica pairs.
-
-        :param endpoint_replica_pairs: List of (endpoint_id, replica_id) tuples.
-        :return: List of inference replica statistics, with None for non-existent entries.
-        """
-        if not endpoint_replica_pairs:
-            return []
-
-        keys = [
-            self._get_inference_replica_key(endpoint_id, replica_id)
-            for endpoint_id, replica_id in endpoint_replica_pairs
-        ]
-        results = await self._get_multiple_keys(keys)
-
-        stats: list[dict[str, Any] | None] = []
-        for i, result in enumerate(results):
-            if result is None:
-                stats.append(None)
-                continue
-            try:
-                stats.append(msgpack.unpackb(result))
-            except (
-                ExtraData,
-                UnpackException,
-                ValueError,
-            ):
-                log.warning(
-                    "Failed to unpack inference replica statistics for key {}: {}",
                     keys[i],
                     result.decode("utf-8"),
                 )
@@ -1429,42 +1379,6 @@ class ValkeyStatClient:
 
         if updates:
             await self.set_multiple_keys(updates)
-
-    @valkey_stat_resilience.apply()
-    async def store_inference_metrics(
-        self,
-        app_metrics_updates: dict[UUID, dict[MetricKey, MetricValue | Mapping[str, Any]]],
-        replica_metrics_updates: dict[
-            tuple[UUID, UUID], dict[MetricKey, MetricValue | Mapping[str, Any]]
-        ],
-        cache_lifespan: int = 120,
-    ) -> None:
-        """
-        Store inference metrics for apps and replicas with proper serialization and expiration.
-
-        :param app_metrics_updates: Dictionary mapping endpoint_id to app metrics
-        :param replica_metrics_updates: Dictionary mapping (endpoint_id, replica_id) to replica metrics
-        :param cache_lifespan: TTL in seconds for the stored metrics
-        """
-        if not app_metrics_updates and not replica_metrics_updates:
-            return
-
-        batch = self._create_batch()
-
-        # Store app metrics
-        for endpoint_id, app_measures in app_metrics_updates.items():
-            key = f"inference.{endpoint_id}.app"
-            value = msgpack.packb(app_measures)
-            batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, cache_lifespan))
-
-        # Store replica metrics
-        for (endpoint_id, replica_id), replica_measures in replica_metrics_updates.items():
-            key = f"inference.{endpoint_id}.replica.{replica_id}"
-            value = msgpack.packb(replica_measures)
-            batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, cache_lifespan))
-
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
 
     async def get_total_resource_slots(self) -> TotalResourceData | None:
         """

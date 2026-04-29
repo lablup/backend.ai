@@ -443,6 +443,18 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/deprecated"
+    error_title = "This API is deprecated."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.DEPRECATED,
+        )
+
+
 class InvalidResourceSlotQuantity(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-resource-slot-quantity"
     error_title = "Invalid resource slot quantity."
