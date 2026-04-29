@@ -1263,6 +1263,33 @@ input BlueGreenConfigInput {
 }
 
 """
+Added in UNRELEASED. Failure detail for a single permission entry in bulk add
+"""
+type BulkAddRolePermissionFailureInfo {
+  """The permission entry that failed"""
+  entry: RolePermissionEntryNode!
+
+  """Error message describing the failure"""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-inserting scoped permissions across one or more roles
+"""
+input BulkAddRolePermissionsInput {
+  permissions: [RolePermissionInput!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk role-permission insertion"""
+type BulkAddRolePermissionsPayload {
+  """Successfully inserted permission rows"""
+  items: [Permission!]!
+
+  """Permission entries that failed to insert"""
+  failed: [BulkAddRolePermissionFailureInfo!]!
+}
+
+"""
 Added in 26.3.0. Error information for a failed user in bulk role assignment.
 """
 type BulkAssignRoleError {
@@ -1385,6 +1412,33 @@ input BulkPurgeVFoldersV2Input {
 type BulkPurgeVFoldersV2Payload {
   """Number of virtual folders successfully purged."""
   purgedCount: Int!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single permission ID in bulk remove
+"""
+type BulkRemoveRolePermissionFailureInfo {
+  """Permission row ID that failed to delete"""
+  permissionId: UUID!
+
+  """Error message describing the failure"""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-deleting permission rows by primary key
+"""
+input BulkRemoveRolePermissionsInput {
+  permissionIds: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk role-permission deletion"""
+type BulkRemoveRolePermissionsPayload {
+  """Successfully deleted permission rows"""
+  items: [Permission!]!
+
+  """Permission IDs that failed to delete"""
+  failed: [BulkRemoveRolePermissionFailureInfo!]!
 }
 
 """
@@ -7040,6 +7094,21 @@ type Mutation {
   """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
   adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload!
 
+  """
+  Added in UNRELEASED. Bulk-insert scoped permission rows across one or more roles (admin only).
+  """
+  adminBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload!
+
+  """
+  Added in UNRELEASED. Bulk-delete permission rows by primary key (admin only).
+  """
+  adminBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload!
+
+  """
+  Added in UNRELEASED. Replace one role's entire scoped-permission set (admin only).
+  """
+  adminReplaceRolePermissions(roleId: UUID!, input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload!
+
   """Added in UNRELEASED. Create role invitations by email."""
   createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload!
 
@@ -9535,6 +9604,35 @@ type ReplaceResourceGroupDefaultSessionOptionsPayload {
   defaultSessionOptions: DefaultSessionOptionsInfo!
 }
 
+"""
+Added in UNRELEASED. Failure detail for a single permission entry in replace
+"""
+type ReplaceRolePermissionFailureInfo {
+  """The permission entry that failed"""
+  entry: RolePermissionEntryNode!
+
+  """Error message describing the failure"""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for replacing one role's entire scoped-permission set
+"""
+input ReplaceRolePermissionsInput {
+  permissions: [RolePermissionInput!]!
+}
+
+"""
+Added in UNRELEASED. Payload for replacing a role's entire scoped-permission set
+"""
+type ReplaceRolePermissionsPayload {
+  """Permission rows that make up the new set"""
+  items: [Permission!]!
+
+  """Permission entries that failed to insert"""
+  failed: [ReplaceRolePermissionFailureInfo!]!
+}
+
 """Added in 25.19.0. """
 input ReplicaFilter {
   status: ReplicaStatusFilter = null
@@ -10468,6 +10566,35 @@ enum RoleOrderField {
   NAME
   CREATED_AT
   UPDATED_AT
+}
+
+"""
+Added in UNRELEASED. A scoped permission entry tied to a role (no server-assigned fields)
+"""
+type RolePermissionEntryNode {
+  """Role ID this permission belongs to"""
+  roleId: UUID!
+
+  """Scope element type"""
+  scopeType: String!
+
+  """Scope element ID"""
+  scopeId: String!
+
+  """Entity element type"""
+  entityType: String!
+
+  """Operation type"""
+  operation: String!
+}
+
+"""Added in UNRELEASED. Single scoped permission entry tied to a role"""
+input RolePermissionInput {
+  roleId: UUID!
+  scopeType: String!
+  scopeId: String!
+  entityType: String!
+  operation: String!
 }
 
 """Added in 26.3.0. Role definition source"""

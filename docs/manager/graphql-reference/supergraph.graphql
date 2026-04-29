@@ -1857,6 +1857,39 @@ input BlueGreenConfigInput
 }
 
 """
+Added in UNRELEASED. Failure detail for a single permission entry in bulk add
+"""
+type BulkAddRolePermissionFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The permission entry that failed"""
+  entry: RolePermissionEntryNode!
+
+  """Error message describing the failure"""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-inserting scoped permissions across one or more roles
+"""
+input BulkAddRolePermissionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  permissions: [RolePermissionInput!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk role-permission insertion"""
+type BulkAddRolePermissionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Successfully inserted permission rows"""
+  items: [Permission!]!
+
+  """Permission entries that failed to insert"""
+  failed: [BulkAddRolePermissionFailureInfo!]!
+}
+
+"""
 Added in 26.3.0. Error information for a failed user in bulk role assignment.
 """
 type BulkAssignRoleError
@@ -2007,6 +2040,39 @@ type BulkPurgeVFoldersV2Payload
 {
   """Number of virtual folders successfully purged."""
   purgedCount: Int!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single permission ID in bulk remove
+"""
+type BulkRemoveRolePermissionFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Permission row ID that failed to delete"""
+  permissionId: UUID!
+
+  """Error message describing the failure"""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-deleting permission rows by primary key
+"""
+input BulkRemoveRolePermissionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  permissionIds: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk role-permission deletion"""
+type BulkRemoveRolePermissionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Successfully deleted permission rows"""
+  items: [Permission!]!
+
+  """Permission IDs that failed to delete"""
+  failed: [BulkRemoveRolePermissionFailureInfo!]!
 }
 
 """
@@ -11104,6 +11170,21 @@ type Mutation
   """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
   adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in UNRELEASED. Bulk-insert scoped permission rows across one or more roles (admin only).
+  """
+  adminBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Bulk-delete permission rows by primary key (admin only).
+  """
+  adminBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Replace one role's entire scoped-permission set (admin only).
+  """
+  adminReplaceRolePermissions(roleId: UUID!, input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload! @join__field(graph: STRAWBERRY)
+
   """Added in UNRELEASED. Create role invitations by email."""
   createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload! @join__field(graph: STRAWBERRY)
 
@@ -14379,6 +14460,41 @@ type ReplaceResourceGroupDefaultSessionOptionsPayload
   defaultSessionOptions: DefaultSessionOptionsInfo!
 }
 
+"""
+Added in UNRELEASED. Failure detail for a single permission entry in replace
+"""
+type ReplaceRolePermissionFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The permission entry that failed"""
+  entry: RolePermissionEntryNode!
+
+  """Error message describing the failure"""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for replacing one role's entire scoped-permission set
+"""
+input ReplaceRolePermissionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  permissions: [RolePermissionInput!]!
+}
+
+"""
+Added in UNRELEASED. Payload for replacing a role's entire scoped-permission set
+"""
+type ReplaceRolePermissionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Permission rows that make up the new set"""
+  items: [Permission!]!
+
+  """Permission entries that failed to insert"""
+  failed: [ReplaceRolePermissionFailureInfo!]!
+}
+
 """Added in 25.19.0. """
 input ReplicaFilter
   @join__type(graph: STRAWBERRY)
@@ -15619,6 +15735,39 @@ enum RoleOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. A scoped permission entry tied to a role (no server-assigned fields)
+"""
+type RolePermissionEntryNode
+  @join__type(graph: STRAWBERRY)
+{
+  """Role ID this permission belongs to"""
+  roleId: UUID!
+
+  """Scope element type"""
+  scopeType: String!
+
+  """Scope element ID"""
+  scopeId: String!
+
+  """Entity element type"""
+  entityType: String!
+
+  """Operation type"""
+  operation: String!
+}
+
+"""Added in UNRELEASED. Single scoped permission entry tied to a role"""
+input RolePermissionInput
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID!
+  scopeType: String!
+  scopeId: String!
+  entityType: String!
+  operation: String!
 }
 
 """Added in 26.3.0. Role definition source"""
