@@ -199,7 +199,6 @@ class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
 )
 class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(description="The unique database identifier of this preset.")
     runtime_variant_id: UUID = gql_field(description="The runtime variant this preset belongs to.")
     name: str = gql_field(
         description="Human-readable name of the configurable parameter (e.g., 'Tensor Parallel Size', 'Quantization')."

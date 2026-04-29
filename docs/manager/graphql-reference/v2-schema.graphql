@@ -3387,9 +3387,6 @@ type DeploymentRevisionPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """The unique database identifier of this deployment preset."""
-  rowId: UUID!
-
   """The runtime variant this preset is designed for (e.g., vLLM, SGLang)."""
   runtimeVariantId: UUID!
 
@@ -10729,9 +10726,6 @@ type RuntimeVariant implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """The unique database identifier of this runtime variant."""
-  rowId: UUID!
-
   """
   Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi').
   """
@@ -10795,9 +10789,6 @@ Added in 26.4.2. Defines a configurable parameter for a runtime variant. Each pr
 type RuntimeVariantPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-
-  """The unique database identifier of this preset."""
-  rowId: UUID!
 
   """The runtime variant this preset belongs to."""
   runtimeVariantId: UUID!
