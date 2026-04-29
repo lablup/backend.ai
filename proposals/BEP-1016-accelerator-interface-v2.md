@@ -49,13 +49,213 @@ See [BEP-1000](BEP-1000-redefining-accelerator-metadata.md) for the new proposal
     - e.g., Interact with a vendor-provided device management service when creating or destroying new containers in a node
 * Tidy up redundant and messy methods that only expose partial information
 * Provide more detailed accelerator metadata ([BEP-1000](BEP-1000-redefining-accelerator-metadata.md))
+* **NEW**: Replace module-level `PREFIX` constant and `key` class variable with `variant_namespace` abstract classmethod
 * **NEW**: Report per-device variant properties (PEP-817-style 3-tuples) so the Manager/Scheduler can perform capability-aware placement
 * **NEW**: Provide variant namespace descriptors that define match semantics, enabling provider-independent matching at the scheduler level
+
+### Consolidating `PREFIX` and `key` into `variant_namespace`
+
+#### Current State
+
+Every accelerator plugin defines the same identifier in two redundant places:
+
+```python
+# Module-level constant (used by __all__ export, external references)
+PREFIX = "cuda"
+
+# Class-level attribute (used by agent plugin registry)
+class CUDAPlugin(AbstractComputePlugin):
+    key = DeviceName("cuda")
+```
+
+Affected plugins and their current PREFIX/key values:
+
+| Plugin | `PREFIX` | `key` |
+| ------ | -------- | ----- |
+| `cuda_open` | `"cuda"` | `DeviceName("cuda")` |
+| `rocm` | `"rocm"` | `DeviceName("rocm")` |
+| `mock` | `"mock"` | `DeviceName(config["slot_name"])` (dynamic) |
+| `ipu` | `"ipu"` | `DeviceName("ipu")` |
+| `hyperaccel/lpu` | `"hyperaccel-lpu"` | `DeviceName(PREFIX)` |
+| `furiosa/warboy` | `"warboy"` | `DeviceName("warboy")` |
+| `furiosa/rngd` | `"rngd"` | `DeviceName("rngd")` |
+| `habana/gaudi2` | `"gaudi2"` | `DeviceName("gaudi2")` |
+| `habana/gaudi3` | `"gaudi3"` | `DeviceName("gaudi3")` |
+| `rebellions/atom` | `"atom"` | `DeviceName("atom")` |
+| `rebellions/atom_plus` | — | `DeviceName("atom-plus")` |
+| `rebellions/atom_max` | — | `DeviceName("atom-max")` |
+| `tenstorrent/n300` | `"tt-n300"` | `DeviceName("tt-n300")` |
+
+Problems:
+* The same string is declared twice — easy to drift out of sync.
+* `PREFIX` is a plain module constant with no contract — plugins may or may not export it.
+* Neither `PREFIX` nor `key` carries semantic meaning beyond "slot name prefix."
+* The mock plugin dynamically sets `key` from config, proving that a class variable is not always sufficient.
+
+#### Proposed Design
+
+Replace both with a single **abstract classmethod** `variant_namespace` on `AbstractComputePlugin`.
+The existing `key` property is derived from it for backward compatibility.
+
+```python
+# ai.backend.agent.resources
+# --------------------------
+from abc import ABCMeta, abstractmethod
+
+
+class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
+    slot_types: Sequence[tuple[SlotName, SlotTypes]]
+    exclusive_slot_types: set[str]
+
+    @classmethod
+    @abstractmethod
+    def variant_namespace(cls) -> str:
+        """Return the variant namespace that this plugin governs.
+
+        This is the single source of truth for the plugin identity.
+        It determines:
+        - The namespace in PEP-817-style variant properties (e.g., "nvidia")
+        - The DeviceName key used in the agent plugin registry (backward compat)
+        - The resource slot prefix (e.g., "cuda" → "cuda.device", "cuda.shares")
+
+        Must be a lowercase alphanumeric string with optional hyphens.
+        """
+        ...
+
+    @property
+    def key(self) -> DeviceName:
+        """DeviceName key derived from variant_namespace (backward compatible)."""
+        return DeviceName(self.variant_namespace())
+
+    # ... rest of plugin interface ...
+```
+
+#### Migration Examples
+
+**Before (CUDA plugin):**
+
+```python
+PREFIX = "cuda"
+
+class CUDAPlugin(AbstractComputePlugin):
+    key = DeviceName("cuda")
+    slot_types = ((SlotName("cuda.device"), SlotTypes("count")),)
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "cuda.device",
+            ...
+        }
+```
+
+**After (CUDA plugin):**
+
+```python
+class CUDAPlugin(AbstractComputePlugin):
+    slot_types = ((SlotName("cuda.device"), SlotTypes("count")),)
+
+    @classmethod
+    def variant_namespace(cls) -> str:
+        return "nvidia"
+
+    def get_variant_namespace_descriptors(self) -> Sequence[VariantNamespaceDescriptor]:
+        return [VariantNamespaceDescriptor(
+            namespace=self.variant_namespace(),
+            features=[
+                VariantFeatureDescriptor(
+                    name="cuda_version",
+                    match_mode=VariantMatchMode.MINIMUM,
+                    ordered_values=["12.8", "12.6", "12.4", "12.2", "12.0", "11.8"],
+                ),
+                VariantFeatureDescriptor(
+                    name="compute_capability",
+                    match_mode=VariantMatchMode.MINIMUM,
+                    ordered_values=["9.0", "8.9", "8.6", "8.0", "7.5", "7.0"],
+                ),
+                VariantFeatureDescriptor(
+                    name="precision",
+                    match_mode=VariantMatchMode.EXACT,
+                    multi_value=True,
+                    ordered_values=["fp64", "tf32", "bf16", "fp16", "fp8", "int8", "int4"],
+                ),
+            ],
+        )]
+```
+
+**Before (mock plugin — dynamic key):**
+
+```python
+PREFIX = "mock"
+
+class MockPlugin(AbstractComputePlugin):
+    # key is set dynamically in init
+    async def init(self, context: Any = None) -> None:
+        self.key = DeviceName(self.mock_config["slot_name"])
+```
+
+**After (mock plugin — dynamic namespace via override):**
+
+```python
+class MockPlugin(AbstractComputePlugin):
+    _namespace: str = "mock"
+
+    @classmethod
+    def variant_namespace(cls) -> str:
+        return cls._namespace
+
+    async def init(self, context: Any = None) -> None:
+        # Override at instance level for testing flexibility
+        self.__class__._namespace = self.mock_config.get("slot_name", "mock")
+```
+
+#### Backward Compatibility
+
+The `key` property is preserved as a derived property from `variant_namespace()`.
+Code that currently reads `plugin.key` will continue to work unchanged.
+
+For external code that imports `PREFIX` from plugin modules, a module-level
+backward-compat shim can be provided during the transition period:
+
+```python
+# ai.backend.accelerator.cuda_open.plugin (transition period)
+# -----------------------------------------------------------
+class CUDAPlugin(AbstractComputePlugin):
+    @classmethod
+    def variant_namespace(cls) -> str:
+        return "nvidia"
+
+# Backward compat: external code that does `from ... import PREFIX`
+PREFIX = CUDAPlugin.variant_namespace()
+```
+
+Note that in the CUDA case, the variant namespace changes from `"cuda"` to `"nvidia"`
+because PEP 817 namespaces identify the **vendor/provider** (e.g., `nvidia`), while the
+Backend.AI `key`/resource slot prefix identifies the **technology** (e.g., `cuda`).
+The `key` property can apply a namespace-to-device-name mapping if these differ:
+
+```python
+# Mapping for cases where vendor namespace differs from device name
+_NAMESPACE_TO_DEVICE_NAME: dict[str, str] = {
+    "nvidia": "cuda",
+}
+
+class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
+    @classmethod
+    @abstractmethod
+    def variant_namespace(cls) -> str: ...
+
+    @property
+    def key(self) -> DeviceName:
+        ns = self.variant_namespace()
+        return DeviceName(_NAMESPACE_TO_DEVICE_NAME.get(ns, ns))
+```
 
 ### `AbstractComputePlugin` API
 
 | Function                                                          | Role                                                                                                                               |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `variant_namespace()` ✨ (abstract classmethod)                    | Return the variant namespace this plugin governs — single source of truth for plugin identity                                      |
+| `key` ♻️ (derived property)                                       | `DeviceName` derived from `variant_namespace()` — backward compatible with existing plugin registry                                |
 | `list_devices()`                                                  | List the available devices in the node                                                                                             |
 | `configurable_slots()` ✨                                          | List the all possible resource slot types along with the display metadata                                                          |
 | `available_slots()` ✨                                             | List the currently allocatable resource slot types as configured                                                                   |

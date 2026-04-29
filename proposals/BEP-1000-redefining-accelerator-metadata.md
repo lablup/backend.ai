@@ -135,6 +135,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 * It is confusing whether `AcceleratorMetadata` represents a resource slot or a device (it's for resource slot!). The name should be clarified.
 * We need to expand the metadata format to include various device capabilities such as compute precision support, partition capability, and memory hierarchy.
 * The metadata is only used at Agent level and is not structured for consumption by the Manager/Scheduler. The Sokovan scheduler cannot make device-capability-aware placement decisions.
+* Every plugin redundantly defines the same identifier twice — a module-level `PREFIX` constant and a class-level `key` attribute — with no enforced contract between them (see BEP-1016 for the consolidation proposal using `variant_namespace`).
 
 ## Proposed structure
 
