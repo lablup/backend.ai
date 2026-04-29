@@ -19,7 +19,7 @@ def mask_token(token: str | None) -> str:
 
 
 class DeploymentChatFormatter:
-    """Formatting helpers for chat cache entries.
+    """Formatting helpers for chat cache + config entries.
 
     Formatting and rendering live here rather than on
     :class:`DeploymentChatCacheEntry` so the data model stays free of
@@ -46,8 +46,13 @@ class DeploymentChatFormatter:
         deployment_id: UUID,
         entry: DeploymentChatCacheEntry | None,
         token: str | None,
+        user_model: str | None,
     ) -> None:
         print(f"deployment_id : {deployment_id}")
         for line in cls.entry_lines(entry):
             print(line)
+        # ``model`` is the user's explicit pick (config.json), shown alongside
+        # the auto-derived ``default_model`` from cache.json so the user can
+        # tell at a glance which one a ``chat`` call would resolve to.
+        print(f"model         : {user_model or '-'}")
         print(f"token         : {mask_token(token)}")

@@ -93,19 +93,67 @@ class DeploymentChatCache(BaseModel):
         write_json_file(CHAT_CACHE_FILE, self.model_dump_json(indent=2))
 
 
-class DeploymentChatConfig(BaseModel):
-    """Per-deployment token registry (user-managed)."""
+class DeploymentChatConfigEntry(BaseModel):
+    """One deployment's user-managed state.
 
-    tokens: dict[UUID, str] = Field(default_factory=dict)
+    ``model`` holds the user's explicit ``--model`` choice for a deployment;
+    it takes precedence over :attr:`DeploymentChatCacheEntry.default_model`
+    (which is the value the CLI auto-derived from ``GET /v1/models``).
+    """
+
+    token: str | None = None
+    model: str | None = None
+
+    def is_empty(self) -> bool:
+        return self.token is None and self.model is None
+
+
+class DeploymentChatConfig(BaseModel):
+    """Per-deployment user-managed registry (tokens + chosen model name)."""
+
+    deployments: dict[UUID, DeploymentChatConfigEntry] = Field(default_factory=dict)
+
+    def get(self, deployment_id: UUID) -> DeploymentChatConfigEntry | None:
+        return self.deployments.get(deployment_id)
 
     def get_token(self, deployment_id: UUID) -> str | None:
-        return self.tokens.get(deployment_id)
+        entry = self.deployments.get(deployment_id)
+        return entry.token if entry is not None else None
+
+    def get_model(self, deployment_id: UUID) -> str | None:
+        entry = self.deployments.get(deployment_id)
+        return entry.model if entry is not None else None
 
     def set_token(self, deployment_id: UUID, token: str) -> None:
-        self.tokens[deployment_id] = token
+        entry = self.deployments.get(deployment_id) or DeploymentChatConfigEntry()
+        entry.token = token
+        self.deployments[deployment_id] = entry
+
+    def set_model(self, deployment_id: UUID, model: str) -> None:
+        entry = self.deployments.get(deployment_id) or DeploymentChatConfigEntry()
+        entry.model = model
+        self.deployments[deployment_id] = entry
 
     def pop_token(self, deployment_id: UUID) -> bool:
-        return self.tokens.pop(deployment_id, None) is not None
+        entry = self.deployments.get(deployment_id)
+        if entry is None or entry.token is None:
+            return False
+        entry.token = None
+        if entry.is_empty():
+            del self.deployments[deployment_id]
+        return True
+
+    def pop_model(self, deployment_id: UUID) -> bool:
+        entry = self.deployments.get(deployment_id)
+        if entry is None or entry.model is None:
+            return False
+        entry.model = None
+        if entry.is_empty():
+            del self.deployments[deployment_id]
+        return True
+
+    def pop(self, deployment_id: UUID) -> bool:
+        return self.deployments.pop(deployment_id, None) is not None
 
     @classmethod
     def load(cls) -> Self:

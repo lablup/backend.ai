@@ -50,7 +50,11 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
     "--model",
     default=None,
     type=str,
-    help="Model name to send (defaults to cached default_model).",
+    help=(
+        "Model name to send. Resolution order: this flag, then the user-set "
+        "config.json model, then the auto-cached cache.json default_model, "
+        "then GET /v1/models on the deployment."
+    ),
 )
 @click.option(
     "--params",
@@ -128,19 +132,23 @@ def chat(
         )
         async with DeploymentChatClient(client_config) as client:
             try:
-                request_model = model or endpoint_entry.default_model
+                # Resolution: --model > config.model (user-set) >
+                # cache.default_model (auto) > GET /v1/models (auto, cached).
+                request_model = (
+                    model or chat_config.get_model(deployment_id) or endpoint_entry.default_model
+                )
                 if request_model is None:
-                    # No explicit --model and no cached default — ask the
-                    # OpenAI-compat endpoint itself which models it serves
-                    # and adopt the first one as the cached default
-                    # (matches webui ChatCard.tsx behaviour).
+                    # No explicit --model, no user-set config, no cached
+                    # default — ask the OpenAI-compat endpoint itself which
+                    # models it serves and adopt the first one as the
+                    # cached default (matches webui ChatCard.tsx behaviour).
                     models_response = await client.list_models(endpoint_entry.endpoint_url, token)
                     if not models_response.data:
                         raise click.ClickException(
                             f"Deployment {deployment_id} did not advertise any models "
                             f"on /v1/models. Set one explicitly with:\n"
                             f"  ./bai deployment chat-config set {deployment_id} "
-                            f"--default-model <name>"
+                            f"--model <name>"
                         )
                     request_model = models_response.data[0].id
                     endpoint_entry = DeploymentChatCacheEntry(
@@ -168,7 +176,7 @@ def chat(
                     chat_config.save()
                 raise click.ClickException(
                     f"The inference endpoint rejected the configured token for "
-                    f"deployment {deployment_id}. The cached token has been cleared; "
+                    f"deployment {deployment_id}. The stored token has been cleared; "
                     f"re-register with:\n"
                     f"  ./bai deployment chat-config set {deployment_id} --token <token>"
                 ) from e
@@ -184,10 +192,14 @@ def chat(
 
 @click.group(name="chat-config")
 def chat_config() -> None:
-    """Manage stored tokens and default model names for deployment chat.
+    """Manage user-supplied chat config (Bearer token, chosen model) per
+    deployment.
 
-    The deployment's ``endpoint_url`` is auto-managed; ``--token`` and
-    ``--default-model`` are user-supplied.
+    The deployment's ``endpoint_url`` and the auto-derived
+    ``default_model`` from ``GET /v1/models`` live in the cache file and
+    are managed by ``./bai deployment chat`` itself; this group only
+    edits the user-managed config file (``~/.backend.ai/deployment_chat/
+    config.json``).
     """
 
 
@@ -203,112 +215,94 @@ def chat_config() -> None:
     ),
 )
 @click.option(
-    "--default-model",
+    "--model",
     default=None,
     type=str,
-    help="Default model name sent with chat requests when --model is omitted.",
+    help=(
+        "Model name to use for ``chat`` calls on this deployment. "
+        "Takes precedence over the auto-derived default_model in cache.json."
+    ),
 )
 def set_(
     deployment_id: UUID,
     token: str | None,
-    default_model: str | None,
+    model: str | None,
 ) -> None:
     """Register or update the chat config for a deployment.
 
-    Token registration succeeds even when the deployment has not yet
-    finished provisioning. The endpoint cache is only written when the
-    manager already has an ``endpoint_url`` for the deployment;
-    otherwise the cache is populated lazily on the first ``chat`` call.
+    Writes only to ``config.json`` — the manager is not contacted, so this
+    works regardless of deployment provisioning state and stays usable
+    offline.
     """
-    import sys
+    if token is None and model is None:
+        raise click.ClickException("Nothing to set: provide --token and/or --model.")
 
-    if token is None and default_model is None:
-        raise click.ClickException("Nothing to set: provide --token and/or --default-model.")
-
-    connection_config = load_v2_config()
-    cache = DeploymentChatCache.load()
     config = DeploymentChatConfig.load()
+    if token is not None:
+        config.set_token(deployment_id, token)
+    if model is not None:
+        config.set_model(deployment_id, model)
+    config.save()
 
-    async def _run() -> None:
-        registry = await create_v2_registry(connection_config)
-        try:
-            deployment = await registry.deployment.get(deployment_id)
-        finally:
-            await registry.close()
-        endpoint_url = deployment.network_access.endpoint_url
-
-        if token is not None:
-            config.set_token(deployment_id, token)
-            config.save()
-
-        cached_default_model: str | None = None
-        if endpoint_url:
-            existing_entry = cache.get(deployment_id)
-            cached_default_model = default_model or (
-                existing_entry.default_model if existing_entry is not None else None
-            )
-            cache.set(
-                deployment_id,
-                DeploymentChatCacheEntry(
-                    endpoint_url=endpoint_url,
-                    default_model=cached_default_model,
-                    last_synced_at=datetime.now(UTC),
-                ),
-            )
-            cache.save()
-        elif default_model is not None:
-            print(
-                f"WARNING: deployment {deployment_id} has no endpoint_url yet; "
-                "--default-model will be applied on the first 'chat' call after the "
-                "deployment is READY.",
-                file=sys.stderr,
-            )
-
-        print(f"Updated chat config for deployment {deployment_id}.")
-        if cached_default_model:
-            print(f"  default_model: {cached_default_model}")
-        if token is not None:
-            print(f"  token:         {mask_token(token)}")
-
-    _run_async(_run)
+    print(f"Updated chat config for deployment {deployment_id}.")
+    if model is not None:
+        print(f"  model: {model}")
+    if token is not None:
+        print(f"  token: {mask_token(token)}")
 
 
 @chat_config.command(name="show")
 @click.argument("deployment_id", type=click.UUID)
 def show(deployment_id: UUID) -> None:
-    """Print the chat cache entry for a deployment (tokens are masked)."""
+    """Print the chat cache + config entry for a deployment (tokens are masked)."""
     cache = DeploymentChatCache.load()
     config = DeploymentChatConfig.load()
 
     entry = cache.get(deployment_id)
-    token = config.get_token(deployment_id)
-    if entry is None and token is None:
-        raise click.ClickException(f"No chat cache entry for deployment {deployment_id}.")
-    DeploymentChatFormatter.print_summary(deployment_id, entry, token)
+    config_entry = config.get(deployment_id)
+    if entry is None and config_entry is None:
+        raise click.ClickException(f"No chat state for deployment {deployment_id}.")
+    DeploymentChatFormatter.print_summary(
+        deployment_id,
+        entry,
+        config_entry.token if config_entry is not None else None,
+        config_entry.model if config_entry is not None else None,
+    )
+
+
+@chat_config.command(name="clear")
+@click.argument("deployment_id", type=click.UUID)
+def clear(deployment_id: UUID) -> None:
+    """Remove the user-managed config entry (token + model) for a deployment.
+
+    The auto-managed cache entry (``endpoint_url``, ``default_model``,
+    ``last_synced_at``) is left alone — it expires on its own 24-hour TTL
+    and gets refreshed by the next ``chat`` call. Use ``clear-cache`` to
+    drop it immediately.
+    """
+    config = DeploymentChatConfig.load()
+    if config.pop(deployment_id):
+        config.save()
+        print(f"Removed config entry for deployment {deployment_id}.")
+    else:
+        print(f"No config entry for deployment {deployment_id}.")
 
 
 @chat_config.command(name="clear-cache")
 @click.argument("deployment_id", type=click.UUID)
 def clear_cache(deployment_id: UUID) -> None:
-    """Remove the cached endpoint entry for a deployment."""
+    """Remove the auto-managed cache entry for a deployment.
+
+    Forces the next ``chat`` call to re-fetch ``endpoint_url`` from the
+    manager and re-derive ``default_model`` from ``GET /v1/models``. The
+    user-managed config entry (token + model) is left alone.
+    """
     cache = DeploymentChatCache.load()
     if cache.pop(deployment_id):
         cache.save()
         print(f"Removed cache entry for deployment {deployment_id}.")
     else:
         print(f"No cache entry for deployment {deployment_id}.")
-
-
-@chat_config.command(name="clear-config")
-@click.argument("deployment_id", type=click.UUID)
-def clear_config(deployment_id: UUID) -> None:
-    """Remove the stored token for a deployment."""
-    config = DeploymentChatConfig.load()
-    if config.pop_token(deployment_id):
-        config.save()
-        print(f"Removed config entry for deployment {deployment_id}.")
-    else:
-        print(f"No config entry for deployment {deployment_id}.")
 
 
 __all__ = ("chat", "chat_config")
