@@ -1,5 +1,13 @@
 from .assign_role import AssignRoleAction, AssignRoleActionResult
+from .bulk_add_role_permissions import (
+    BulkAddRolePermissionsAction,
+    BulkAddRolePermissionsActionResult,
+)
 from .bulk_assign_role import BulkAssignRoleAction, BulkAssignRoleActionResult
+from .bulk_remove_role_permissions import (
+    BulkRemoveRolePermissionsAction,
+    BulkRemoveRolePermissionsActionResult,
+)
 from .bulk_revoke_role import BulkRevokeRoleAction, BulkRevokeRoleActionResult
 from .check_permission import CheckPermissionAction, CheckPermissionActionResult
 from .create_role import CreateRoleAction, CreateRoleActionResult
@@ -7,6 +15,10 @@ from .delete_role import DeleteRoleAction, DeleteRoleActionResult
 from .get_permission_matrix import GetPermissionMatrixAction, GetPermissionMatrixActionResult
 from .get_role_detail import GetRoleDetailAction, GetRoleDetailActionResult
 from .purge_role import PurgeRoleAction, PurgeRoleActionResult
+from .replace_role_permissions import (
+    ReplaceRolePermissionsAction,
+    ReplaceRolePermissionsActionResult,
+)
 from .resolve_effective_permissions import (
     ResolveEffectivePermissionsAction,
     ResolveEffectivePermissionsActionResult,
@@ -35,8 +47,12 @@ from .update_role_permissions import (
 __all__ = [
     "AssignRoleAction",
     "AssignRoleActionResult",
+    "BulkAddRolePermissionsAction",
+    "BulkAddRolePermissionsActionResult",
     "BulkAssignRoleAction",
     "BulkAssignRoleActionResult",
+    "BulkRemoveRolePermissionsAction",
+    "BulkRemoveRolePermissionsActionResult",
     "BulkRevokeRoleAction",
     "BulkRevokeRoleActionResult",
     "CheckPermissionAction",
@@ -51,6 +67,8 @@ __all__ = [
     "GetRoleDetailActionResult",
     "PurgeRoleAction",
     "PurgeRoleActionResult",
+    "ReplaceRolePermissionsAction",
+    "ReplaceRolePermissionsActionResult",
     "ResolveEffectivePermissionsAction",
     "ResolveEffectivePermissionsActionResult",
     "RevokeRoleAction",

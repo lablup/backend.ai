@@ -90,7 +90,12 @@ from ai.backend.manager.repositories.base.creator import (
     execute_bulk_creator_partial,
     execute_creator,
 )
-from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.purger import (
+    BulkPurgerResultWithFailures,
+    Purger,
+    execute_bulk_purger_partial,
+    execute_purger,
+)
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
@@ -529,6 +534,50 @@ class PermissionDBSource:
             # 5. Refresh and return
             await db_session.refresh(role_row)
             return role_row
+
+    async def bulk_add_role_permissions(
+        self,
+        creator: BulkCreator[PermissionRow],
+    ) -> BulkCreatorResultWithFailures[PermissionRow]:
+        """
+        Bulk-insert permission rows defined by ``creator.specs`` in a single
+        transaction. Each spec is processed individually inside a savepoint so
+        that one failing row (e.g. unique-violation) does not abort siblings;
+        successes and errors are reported via the returned result.
+        """
+        async with self._db.begin_session() as db_session:
+            return await execute_bulk_creator_partial(db_session, creator)
+
+    async def bulk_remove_role_permissions(
+        self,
+        purgers: list[Purger[PermissionRow]],
+    ) -> BulkPurgerResultWithFailures[PermissionRow]:
+        """
+        Bulk-delete permission rows by primary key in a single transaction.
+        Each purger is executed inside a savepoint so that one failing delete
+        does not abort siblings; successes and errors are reported via the
+        returned result.
+        """
+        async with self._db.begin_session() as db_session:
+            return await execute_bulk_purger_partial(db_session, purgers)
+
+    async def replace_role_permissions(
+        self,
+        role_id: uuid.UUID,
+        creator: BulkCreator[PermissionRow],
+    ) -> BulkCreatorResultWithFailures[PermissionRow]:
+        """
+        Replace the role's entire scoped-permission set in a single transaction:
+        delete all existing rows for ``role_id``, then bulk-insert the rows
+        defined by ``creator.specs``. Passing a creator with no specs clears
+        the role's permissions.
+        """
+        async with self._db.begin_session() as db_session:
+            await self._get_role(db_session, role_id)
+            await db_session.execute(
+                sa.delete(PermissionRow).where(PermissionRow.role_id == role_id)
+            )
+            return await execute_bulk_creator_partial(db_session, creator)
 
     async def get_role(self, role_id: uuid.UUID) -> RoleRow | None:
         async with self._db.begin_readonly_session_read_committed() as db_session:
