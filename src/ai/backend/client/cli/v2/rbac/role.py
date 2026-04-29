@@ -11,7 +11,6 @@ from uuid import UUID
 
 import click
 
-from ai.backend.cli.params import JSONParamType
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
@@ -332,7 +331,7 @@ def remove_permission(
 @click.option(
     "--json",
     "json_str",
-    type=JSONParamType(),
+    type=str,
     default=None,
     help="Permission entries as a JSON-array string. Mutually exclusive with --from-file.",
 )
@@ -346,20 +345,21 @@ def remove_permission(
 def replace_permission(
     role_id: UUID | None,
     by_name: str | None,
-    json_str: object,
+    json_str: str | None,
     file_path: Path | None,
 ) -> None:
     """Replace the role's entire permission set with the entries supplied via --json or --from-file."""
     _validate_role_selector(role_id, by_name)
-    if (json_str is None) == (file_path is None):
-        raise click.UsageError("Provide exactly one of --json or --from-file.")
-    if file_path is not None:
-        try:
-            payload = json.loads(file_path.read_text())
-        except json.JSONDecodeError as e:
-            raise click.ClickException(f"Failed to parse {file_path} as JSON: {e}") from e
-    else:
-        payload = json_str
+    if json_str is not None and file_path is not None:
+        raise click.UsageError("--json and --from-file are mutually exclusive.")
+    if json_str is None and file_path is None:
+        raise click.UsageError("Provide --json or --from-file.")
+
+    raw = file_path.read_text() if file_path is not None else json_str
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise click.ClickException(f"Failed to parse permission entries as JSON: {e}") from e
     if not isinstance(payload, list):
         raise click.UsageError("Payload must be a JSON array of permission entries.")
 
