@@ -1238,13 +1238,6 @@ class DeploymentAdapter(BaseAdapter):
                 auto_activate=options.auto_activate,
             )
         )
-        if options.auto_activate:
-            await self._processors.deployment.activate_revision.wait_for_complete(
-                ActivateRevisionAction(
-                    deployment_id=input.deployment_id,
-                    revision_id=action_result.revision.id,
-                )
-            )
         return AddRevisionPayload(revision=self._revision_data_to_dto(action_result.revision))
 
     async def get_revision(self, revision_id: UUID) -> RevisionNode:

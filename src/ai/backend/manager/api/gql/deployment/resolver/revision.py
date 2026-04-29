@@ -27,7 +27,6 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ActivateRevisionInputGQL,
     ActivateRevisionPayloadGQL,
     AddRevisionInput,
-    AddRevisionOptionsGQL,
     AddRevisionPayload,
     ModelRevision,
     ModelRevisionConnection,
@@ -151,12 +150,12 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 async def add_model_revision(
     input: AddRevisionInput,
     info: Info[StrawberryGQLContext],
-    options: AddRevisionOptionsGQL | None = None,
 ) -> AddRevisionPayload:
     """Add a model revision to a deployment."""
+    input_dto = input.to_pydantic()
     payload = await info.context.adapters.deployment.add_revision(
-        input.to_pydantic(),
-        options=options.to_pydantic() if options else AdapterAddRevisionOptions(),
+        input_dto,
+        options=input_dto.options or AdapterAddRevisionOptions(),
     )
     return AddRevisionPayload(revision=ModelRevision.from_pydantic(payload.revision))
 

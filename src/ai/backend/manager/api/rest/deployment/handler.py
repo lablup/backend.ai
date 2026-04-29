@@ -307,13 +307,6 @@ class DeploymentAPIHandler:
                 auto_activate=body.parsed.options.auto_activate,
             )
         )
-        if body.parsed.options.auto_activate:
-            await self._deployment.activate_revision.wait_for_complete(
-                ActivateRevisionAction(
-                    deployment_id=path.parsed.deployment_id,
-                    revision_id=action_result.revision.id,
-                )
-            )
 
         # Build response
         resp = AddRevisionResponse(revision=await self._revision_dto(action_result.revision))

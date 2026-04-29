@@ -171,6 +171,11 @@ input AddRevisionInput
 
   """Extra vfolder mounts"""
   extraMounts: [ExtraVFolderMountInput!] = null
+
+  """
+  Added in UNRELEASED. Additional options for the add revision operation.
+  """
+  options: AddRevisionOptions = null
 }
 
 """Added in 26.4.2. Options for the add_model_revision mutation."""
@@ -10635,7 +10640,7 @@ type Mutation
   syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0. Add model revision."""
-  addModelRevision(input: AddRevisionInput!, options: AddRevisionOptions = null): AddRevisionPayload! @join__field(graph: STRAWBERRY)
+  addModelRevision(input: AddRevisionInput!): AddRevisionPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.3. Rebuild and activate a fresh revision for every active deployment (superadmin). Used to repair deployments whose current revision has stale or missing model_definition after backing store migrations.
