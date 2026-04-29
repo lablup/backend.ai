@@ -103,7 +103,7 @@ class TestMergeFieldCoverage:
         base = ModelServiceConfig.model_construct(
             _fields_set=set(ModelServiceConfig.model_fields),
             pre_start_actions=[],
-            start_command="base-cmd",
+            start_command=["base-cmd"],
             shell="/bin/base",
             port=9999,
             health_check=None,
@@ -111,7 +111,7 @@ class TestMergeFieldCoverage:
         override = ModelServiceConfig.model_construct(
             _fields_set=set(),
             pre_start_actions=[],
-            start_command="",
+            start_command=[],
             shell="",
             port=2,
             health_check=None,
@@ -136,13 +136,13 @@ class TestMergeFieldCoverage:
         )
         base = ModelServiceConfig.model_construct(
             _fields_set={"health_check"},
-            start_command="",
+            start_command=[],
             port=2,
             health_check=base_hc,
         )
         override = ModelServiceConfig.model_construct(
             _fields_set={"health_check"},
-            start_command="",
+            start_command=[],
             port=2,
             health_check=override_hc,
         )

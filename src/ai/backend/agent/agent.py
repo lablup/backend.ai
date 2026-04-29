@@ -2479,7 +2479,11 @@ class AbstractAgent[
                 image_command_loaded = True
             if not image_command:
                 continue
-            service["start_command"] = image_command
+            if isinstance(image_command, str):
+                shell = service.get("shell") or "/bin/bash"
+                service["start_command"] = [shell, "-c", image_command]
+            else:
+                service["start_command"] = list(image_command)
             model["service"] = service
         return models
 

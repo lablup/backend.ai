@@ -16,7 +16,7 @@ class ModelServiceStartCommandScenario:
     id: str
     image_command: str | list[str] | None
     models: list[dict[str, Any]]
-    expected_start_commands: dict[str, str | list[str]]
+    expected_start_commands: dict[str, list[str]]
     expected_image_command_calls: int = 1
     expected_unset_models: set[str] = field(default_factory=set)
 
@@ -42,13 +42,15 @@ class _ModelServiceCommandAgent:
 def _model(
     name: str,
     port: int,
-    start_command: str | list[str] | None = None,
+    start_command: list[str] | None = None,
+    shell: str = "/bin/bash",
 ) -> dict[str, Any]:
     return {
         "name": name,
         "model_path": f"/models/{name}",
         "service": {
             "port": port,
+            "shell": shell,
             "start_command": start_command if start_command is not None else None,
         },
     }
@@ -81,23 +83,31 @@ class TestPopulateMissingModelServiceStartCommands:
                 image_command=["/etc/container/start-vllm.sh"],
                 models=[
                     _model("vllm", 8000),
-                    _model("explicit", 8001, "python serve.py"),
+                    _model("explicit", 8001, ["python", "serve.py"]),
                 ],
                 expected_start_commands={
                     "vllm": ["/etc/container/start-vllm.sh"],
-                    "explicit": "python serve.py",
+                    "explicit": ["python", "serve.py"],
                 },
             ),
             ModelServiceStartCommandScenario(
-                id="reuses_string_command_for_multiple_models",
+                id="wraps_string_command_with_shell_for_multiple_models",
                 image_command="python -m vllm.entrypoints.openai.api_server",
                 models=[
                     _model("model-a", 8000),
                     _model("model-b", 8001),
                 ],
                 expected_start_commands={
-                    "model-a": "python -m vllm.entrypoints.openai.api_server",
-                    "model-b": "python -m vllm.entrypoints.openai.api_server",
+                    "model-a": [
+                        "/bin/bash",
+                        "-c",
+                        "python -m vllm.entrypoints.openai.api_server",
+                    ],
+                    "model-b": [
+                        "/bin/bash",
+                        "-c",
+                        "python -m vllm.entrypoints.openai.api_server",
+                    ],
                 },
             ),
             ModelServiceStartCommandScenario(
@@ -113,11 +123,11 @@ class TestPopulateMissingModelServiceStartCommands:
                 id="skips_image_command_lookup_when_all_commands_are_explicit",
                 image_command=["/etc/container/start-vllm.sh"],
                 models=[
-                    _model("explicit-a", 8000, "python serve-a.py"),
+                    _model("explicit-a", 8000, ["python", "serve-a.py"]),
                     _model("explicit-b", 8001, ["python", "serve-b.py"]),
                 ],
                 expected_start_commands={
-                    "explicit-a": "python serve-a.py",
+                    "explicit-a": ["python", "serve-a.py"],
                     "explicit-b": ["python", "serve-b.py"],
                 },
                 expected_image_command_calls=0,

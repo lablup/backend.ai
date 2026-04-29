@@ -39,6 +39,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     IntOrPercent,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
+    ModelServiceConfigInfoDTO,
     ReplicaStateInfo,
     ResourceConfigInfoDTO,
     RollingUpdateConfigInfo,
@@ -200,6 +201,19 @@ class TestExtraVFolderMountNode:
         assert restored.mount_destination == "/data"
 
 
+class TestModelServiceConfigInfoDTO:
+    """Tests for ModelServiceConfigInfoDTO model."""
+
+    def test_wraps_legacy_string_start_command_with_shell(self) -> None:
+        service = ModelServiceConfigInfoDTO.model_validate({
+            "start_command": "python serve.py",
+            "shell": "/bin/sh",
+            "port": 8000,
+        })
+
+        assert service.start_command == ["/bin/sh", "-c", "python serve.py"]
+
+
 class TestRevisionNode:
     """Tests for RevisionNode model."""
 
@@ -261,7 +275,7 @@ class TestRevisionNode:
                     "name": "sample-model",
                     "model_path": "/models/sample",
                     "service": {
-                        "start_command": "python serve.py",
+                        "start_command": ["python", "serve.py"],
                         "port": 8000,
                     },
                 }
@@ -272,6 +286,7 @@ class TestRevisionNode:
         assert node.model_definition is not None
         assert node.model_definition.models[0].name == "sample-model"
         assert node.model_definition.models[0].service is not None
+        assert node.model_definition.models[0].service.start_command == ["python", "serve.py"]
         assert node.model_definition.models[0].service.port == 8000
 
     def test_round_trip(self) -> None:

@@ -369,10 +369,12 @@ class ModelServiceConfigGQL:
     pre_start_actions: list[PreStartActionGQL] = gql_field(
         description="List of pre-start actions to execute before starting the model service."
     )
-    start_command: str | list[str] | None = gql_field(
+    start_command: list[str] | None = gql_field(
         description="Command to start the model service.", default=None
     )
-    shell: str = gql_field(description="Shell to use if start_command is a string.")
+    shell: str = gql_field(
+        description="Shell used to wrap a string-form start_command at parse time."
+    )
     port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
@@ -826,11 +828,12 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDTO]):
         description="List of pre-start actions to execute before starting the model service.",
         default=strawberry.UNSET,
     )
-    start_command: str | list[str] | None = gql_field(
+    start_command: list[str] | None = gql_field(
         description="Command to start the model service.", default=None
     )
     shell: str = gql_field(
-        description="Shell to use if start_command is a string.", default="/bin/bash"
+        description="Shell used to wrap a string-form start_command at parse time.",
+        default="/bin/bash",
     )
     port: int = gql_field(description="Port number for the model service. Must be greater than 1.")
     health_check: ModelHealthCheckInputGQL | None = gql_field(

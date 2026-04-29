@@ -297,16 +297,27 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: str | list[str] | None = Field(
+    start_command: list[str] | None = Field(
         default=None, description="Command to start the model service."
     )
     shell: str = Field(
-        default="/bin/bash", description="Shell to use if start_command is a string."
+        default="/bin/bash",
+        description="Shell used to wrap a string-form start_command at parse time.",
     )
     port: int = Field(description="Port number for the model service.")
     health_check: ModelHealthCheckInfoDTO | None = Field(
         default=None, description="Health check configuration for the model service."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_string_start_command(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            cmd = data.get("start_command")
+            if isinstance(cmd, str):
+                shell = data.get("shell") or "/bin/bash"
+                data["start_command"] = [shell, "-c", cmd]
+        return data
 
 
 class ModelMetadataInfoDTO(BaseResponseModel):
