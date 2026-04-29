@@ -7,11 +7,9 @@ from typing import override
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.role import BulkRolePermissionReplaceResultData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.repositories.base.creator import (
-    BulkCreator,
-    BulkCreatorResultWithFailures,
-)
+from ai.backend.manager.repositories.base.creator import BulkCreator
 
 
 @dataclass
@@ -36,9 +34,8 @@ class ReplaceRolePermissionsAction(BaseAction):
 
 @dataclass
 class ReplaceRolePermissionsActionResult(BaseActionResult):
-    role_id: uuid.UUID
-    result: BulkCreatorResultWithFailures[PermissionRow]
+    data: BulkRolePermissionReplaceResultData
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.role_id)
+        return str(self.data.role_id)
