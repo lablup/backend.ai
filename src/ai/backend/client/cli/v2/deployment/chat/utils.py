@@ -1,13 +1,12 @@
 """Filesystem helpers for ``./bai deployment chat`` storage.
 
-Two on-disk JSON files live side by side under ``~/.backend.ai/``:
+Two on-disk JSON files live side by side under ``~/.backend.ai/`` —
+``deployment_chat.json`` for the auto-managed endpoint cache and
+``deployment_chat_config.json`` for user-supplied tokens.
 
-- ``deployment_chat.json`` — auto-managed endpoint cache (resolved from
-  the manager). Holds no secrets, written with default umask. Persisted
-  via :meth:`DeploymentChatCache.save`.
-- ``deployment_chat_config.json`` — user-managed API keys for the
-  inference endpoints. Stored in plaintext, so the file is created with
-  ``0600`` permissions. Persisted via :meth:`DeploymentChatConfig.save`.
+Both files are written as plain JSON (no atomic-rename, no special POSIX
+permissions) to stay aligned with the existing CLI credential-storage
+convention in :mod:`ai.backend.client.cli.v2.config_cmd`.
 """
 
 from __future__ import annotations
@@ -32,3 +31,9 @@ def read_json_file(path: Path) -> dict[str, Any] | None:
     except (OSError, ValueError):
         return None
     return raw if isinstance(raw, dict) else None
+
+
+def write_json_file(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` after ensuring the parent directory exists."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
