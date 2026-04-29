@@ -1,22 +1,29 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 import pytest
+from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
+    DockerStatsStreamer,
     MemoryPlugin,
     read_proc_net_dev,
 )
+from ai.backend.agent.resources import ComputerContext
 from ai.backend.agent.stats import StatModes
+from ai.backend.common.types import ContainerId, DeviceName
 
 
 class BaseDockerIntrinsicTest:
@@ -66,25 +73,24 @@ class BaseDockerIntrinsicTest:
         ctx.mode = StatModes.CGROUP
         return ctx
 
-    @pytest.fixture
-    def mock_fetch_api_stats(
-        self, docker_stats_response: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        with patch(
-            "ai.backend.agent.docker.intrinsic.fetch_api_stats",
-            return_value=docker_stats_response,
-        ) as mock:
-            yield mock
+    def _make_prewarmed_streamer(
+        self,
+        sample: dict[str, Any] | None,
+    ) -> MagicMock:
+        streamer = MagicMock(spec=DockerStatsStreamer)
+        streamer.get_latest = MagicMock(return_value=sample)
+        return streamer
 
 
 class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
     """Tests for CPUPlugin Docker client lifecycle management."""
 
     @pytest.fixture
-    def cpu_plugin(self) -> CPUPlugin:
+    def cpu_plugin(self, docker_stats_response: dict[str, Any]) -> CPUPlugin:
         plugin = CPUPlugin.__new__(CPUPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
         plugin._docker = AsyncMock()
+        plugin._stats_streamer = self._make_prewarmed_streamer(docker_stats_response)
         return plugin
 
     @pytest.fixture
@@ -121,7 +127,6 @@ class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         cpu_plugin: CPUPlugin,
         container_ids: list[str],
         docker_stat_context: MagicMock,
-        mock_fetch_api_stats: MagicMock,
     ) -> None:
         """Verify API mode uses the plugin's Docker client, not a new one."""
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
@@ -144,10 +149,11 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
     """Tests for MemoryPlugin Docker client lifecycle management."""
 
     @pytest.fixture
-    def memory_plugin(self) -> MemoryPlugin:
+    def memory_plugin(self, docker_stats_response: dict[str, Any]) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
         plugin._docker = AsyncMock()
+        plugin._stats_streamer = self._make_prewarmed_streamer(docker_stats_response)
         return plugin
 
     @pytest.fixture
@@ -225,7 +231,6 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         memory_plugin: MemoryPlugin,
         container_ids: list[str],
         docker_stat_context: MagicMock,
-        mock_fetch_api_stats: MagicMock,
     ) -> None:
         """Verify API mode uses the plugin's Docker client, not a new one."""
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
@@ -248,10 +253,11 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
     """Tests for container PID validation before reading /proc/[pid]/net/dev."""
 
     @pytest.fixture
-    def memory_plugin(self) -> MemoryPlugin:
+    def memory_plugin(self, docker_stats_response: dict[str, Any]) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
         plugin._docker = AsyncMock()
+        plugin._stats_streamer = self._make_prewarmed_streamer(docker_stats_response)
         return plugin
 
     @contextmanager
@@ -387,10 +393,11 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
     """Tests for timeout protection and error isolation in MemoryPlugin sysfs_impl."""
 
     @pytest.fixture
-    def memory_plugin(self) -> MemoryPlugin:
+    def memory_plugin(self, docker_stats_response: dict[str, Any]) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
         plugin._docker = AsyncMock()
+        plugin._stats_streamer = self._make_prewarmed_streamer(docker_stats_response)
         return plugin
 
     @pytest.fixture
@@ -610,3 +617,334 @@ class TestReadProcNetDev:
         """Raises OSError when /proc/[pid]/net/dev does not exist."""
         with pytest.raises(OSError):
             read_proc_net_dev(999999999)
+
+
+class _FakeDockerContainer:
+    """Lightweight stand-in for :class:`aiodocker.docker.DockerContainer`.
+
+    Each instance yields frames from a caller-supplied async-iter factory,
+    allowing tests to simulate transient errors, partial streams, and
+    graceful upstream shutdowns.
+    """
+
+    def __init__(self, frame_source: Any, container_id: str) -> None:
+        self._frame_source = frame_source
+        self.id = container_id
+
+    def stats(self, *, stream: bool = True) -> Any:
+        # aiodocker's .stats() returns an async iterable directly.
+        return self._frame_source(self.id)
+
+
+@pytest.fixture
+def sample_stats_frame() -> dict[str, Any]:
+    return {
+        "read": "2024-01-01T00:00:00.000000000Z",
+        "preread": "2024-01-01T00:00:01.000000000Z",
+        "cpu_stats": {"cpu_usage": {"total_usage": 1_000_000_000}},
+        "memory_stats": {"usage": 1024, "limit": 4096},
+    }
+
+
+async def _poll_for_latest(
+    streamer: DockerStatsStreamer,
+    container_id: str,
+    timeout: float = 2.0,
+) -> dict[str, Any] | None:
+    """Poll ``streamer.get_latest`` until it returns a non-None value or timeout."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        sample = streamer.get_latest(container_id)
+        if sample is not None:
+            return sample
+        await asyncio.sleep(0)
+    return streamer.get_latest(container_id)
+
+
+class TestDockerStatsStreamerLifecycle:
+    """Tests for eager start/stop lifecycle of :class:`DockerStatsStreamer`."""
+
+    async def test_start_spawns_reader_and_first_sample_lands(
+        self, sample_stats_frame: dict[str, Any]
+    ) -> None:
+        """After start(), a reader task is created and the first emitted
+        frame lands in the cache."""
+        first_emitted = asyncio.Event()
+        hold_open = asyncio.Event()
+
+        async def frames(_cid: str) -> Any:
+            yield sample_stats_frame
+            first_emitted.set()
+            # Keep the stream open until the test explicitly ends it.
+            await hold_open.wait()
+
+        def fake_container_cls(docker: Any, id: str) -> _FakeDockerContainer:
+            return _FakeDockerContainer(frames, id)
+
+        with patch(
+            "ai.backend.agent.docker.intrinsic.DockerContainer",
+            side_effect=fake_container_cls,
+        ):
+            streamer = DockerStatsStreamer(AsyncMock())
+            streamer.start("cid_000")
+            assert "cid_000" in streamer._tasks
+            sample = await _poll_for_latest(streamer, "cid_000", timeout=2.0)
+            assert sample == sample_stats_frame
+            hold_open.set()
+            await streamer.close()
+
+    async def test_stop_cancels_reader_and_drops_cache(
+        self, sample_stats_frame: dict[str, Any]
+    ) -> None:
+        """stop() cancels the in-flight reader task and removes the cached sample."""
+        hold_open = asyncio.Event()
+
+        async def frames(_cid: str) -> Any:
+            yield sample_stats_frame
+            await hold_open.wait()
+
+        def fake_container_cls(docker: Any, id: str) -> _FakeDockerContainer:
+            return _FakeDockerContainer(frames, id)
+
+        with patch(
+            "ai.backend.agent.docker.intrinsic.DockerContainer",
+            side_effect=fake_container_cls,
+        ):
+            streamer = DockerStatsStreamer(AsyncMock())
+            streamer.start("cid_000")
+            await _poll_for_latest(streamer, "cid_000", timeout=2.0)
+            task = streamer._tasks["cid_000"]
+            await streamer.stop("cid_000")
+            assert "cid_000" not in streamer._tasks
+            assert streamer.get_latest("cid_000") is None
+            assert task.done()
+
+    async def test_close_cancels_all_in_flight_tasks(self) -> None:
+        """close() cancels every reader task and clears state."""
+        hold_open = asyncio.Event()
+
+        async def frames(_cid: str) -> Any:
+            # Yield an infinite stream that the test never releases.
+            while True:
+                await hold_open.wait()
+                yield {"read": "2024-01-01T00:00:00.000000000Z", "preread": "0001-01-01T00:00:00Z"}
+
+        def fake_container_cls(docker: Any, id: str) -> _FakeDockerContainer:
+            return _FakeDockerContainer(frames, id)
+
+        with patch(
+            "ai.backend.agent.docker.intrinsic.DockerContainer",
+            side_effect=fake_container_cls,
+        ):
+            streamer = DockerStatsStreamer(AsyncMock())
+            for cid in ("cid_a", "cid_b", "cid_c"):
+                streamer.start(cid)
+            tasks = list(streamer._tasks.values())
+            assert len(tasks) == 3
+            await streamer.close()
+            for task in tasks:
+                assert task.done()
+            assert streamer._tasks == {}
+            assert streamer._latest == {}
+
+
+class TestDockerStatsStreamerReconnect:
+    """Tests for reconnect-with-backoff behaviour on transient transport failures."""
+
+    async def test_reconnect_after_client_connection_error(
+        self, sample_stats_frame: dict[str, Any]
+    ) -> None:
+        """When the stream raises ClientConnectionError once, the reader
+        sleeps briefly then reopens and eventually publishes a sample."""
+        call_count = 0
+
+        async def frames(_cid: str) -> Any:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise aiohttp_client_connection_error("daemon dropped the stream")
+            yield sample_stats_frame
+            await asyncio.Event().wait()
+
+        def fake_container_cls(docker: Any, id: str) -> _FakeDockerContainer:
+            return _FakeDockerContainer(frames, id)
+
+        # Monkey-patch asyncio.sleep to make backoff zero-cost for the test.
+        orig_sleep = asyncio.sleep
+
+        async def fast_sleep(delay: float) -> None:
+            await orig_sleep(0)
+
+        with (
+            patch(
+                "ai.backend.agent.docker.intrinsic.DockerContainer",
+                side_effect=fake_container_cls,
+            ),
+            patch("ai.backend.agent.docker.intrinsic.asyncio.sleep", fast_sleep),
+        ):
+            streamer = DockerStatsStreamer(AsyncMock())
+            streamer.start("cid_000")
+            sample = await _poll_for_latest(streamer, "cid_000", timeout=2.0)
+            assert sample == sample_stats_frame
+            assert call_count >= 2
+            await streamer.close()
+
+    async def test_cancelled_error_reraises_from_reader(self) -> None:
+        """Cancelling the reader task via close() unwinds it cleanly and does
+        NOT swallow CancelledError inside the reader (it propagates to .cancel())."""
+
+        entered = asyncio.Event()
+        sentinel: dict[str, Any] = {}
+
+        async def frames(_cid: str) -> Any:
+            entered.set()
+            # Park forever until cancelled; the final yield is unreachable
+            # but keeps this function an async generator.
+            try:
+                await asyncio.Event().wait()
+            finally:
+                # The reader's finally block must also run after CancelledError.
+                pass
+            yield sentinel
+
+        def fake_container_cls(docker: Any, id: str) -> _FakeDockerContainer:
+            return _FakeDockerContainer(frames, id)
+
+        with patch(
+            "ai.backend.agent.docker.intrinsic.DockerContainer",
+            side_effect=fake_container_cls,
+        ):
+            streamer = DockerStatsStreamer(AsyncMock())
+            streamer.start("cid_000")
+            await entered.wait()
+            task = streamer._tasks["cid_000"]
+            await streamer.close()
+            assert task.done()
+            assert task.cancelled() or task.exception() is None
+
+    async def test_reader_exits_cleanly_on_container_gone_404(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """DockerError 404 from the stats stream means the container is gone:
+        the reader must exit cleanly (no retry spin, no warning-level log)."""
+
+        call_count = 0
+
+        async def frames(_cid: str) -> Any:
+            nonlocal call_count
+            call_count += 1
+            # Raise on the very first iteration to simulate an already-gone
+            # container. A no-op ``yield`` in an unreachable branch keeps this
+            # function an async generator without tripping ``unreachable`` mypy.
+            if call_count < 0:
+                yield {}
+            raise DockerError(404, {"message": "No such container"})
+
+        def fake_container_cls(docker: Any, id: str) -> _FakeDockerContainer:
+            return _FakeDockerContainer(frames, id)
+
+        with (
+            patch(
+                "ai.backend.agent.docker.intrinsic.DockerContainer",
+                side_effect=fake_container_cls,
+            ),
+            caplog.at_level(logging.DEBUG, logger="ai.backend.agent.docker.intrinsic"),
+        ):
+            streamer = DockerStatsStreamer(AsyncMock())
+            streamer.start("cid_gone")
+            task = streamer._tasks["cid_gone"]
+            # The reader must exit on its own; 404 must NOT spin in the retry loop.
+            await asyncio.wait_for(task, timeout=2.0)
+            assert task.done()
+            assert not task.cancelled()
+            assert task.exception() is None
+            # Only one stream-open attempt; no reconnect/retry on 404.
+            assert call_count == 1
+            # ``get_latest`` may re-spawn a reader as a safety net, but the
+            # cached sample was dropped in the reader's finally block and the
+            # respawned reader will hit the same 404 path, so the return value
+            # is still ``None``.
+            assert streamer._latest.get("cid_gone") is None
+            await streamer.close()
+            # 404 is a debug-level path; container-gone is not an error.
+            intrinsic_records = [
+                r for r in caplog.records if r.name == "ai.backend.agent.docker.intrinsic"
+            ]
+            for record in intrinsic_records:
+                assert record.levelno < logging.WARNING, (
+                    f"unexpected warning-or-above log: {record.levelname} {record.getMessage()}"
+                )
+            assert streamer.get_latest("cid_gone") is None
+
+
+class _AgentStub:
+    """Minimal stand-in exposing only the attributes the notify helpers read."""
+
+    def __init__(self, computers: dict[DeviceName, ComputerContext]) -> None:
+        self.computers = computers
+
+
+class TestAgentContainerLifecycleHooks:
+    """Tests that the agent's start/clean event handlers notify compute plugins."""
+
+    @staticmethod
+    def _make_agent_stub(
+        computers: dict[str, ComputerContext],
+    ) -> AbstractAgent[Any, Any]:
+        """Build a stub exposing ``self.computers`` so the notify helpers can
+        be exercised without instantiating the full AbstractAgent (which is
+        abstract with many required overrides)."""
+        typed_computers: dict[DeviceName, ComputerContext] = {
+            DeviceName(k): v for k, v in computers.items()
+        }
+        return cast(AbstractAgent[Any, Any], _AgentStub(typed_computers))
+
+    async def test_notify_started_calls_plugin_hook(self) -> None:
+        """The agent's helper invokes notify_container_started on every plugin."""
+        plugin = AsyncMock()
+        plugin.notify_container_started = AsyncMock()
+        plugin.notify_container_destroyed = AsyncMock()
+        agent = self._make_agent_stub({
+            "cpu": ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock()),
+        })
+
+        await AbstractAgent._notify_compute_plugins_container_started(agent, ContainerId("cid_000"))
+        plugin.notify_container_started.assert_awaited_once_with("cid_000")
+        plugin.notify_container_destroyed.assert_not_called()
+
+    async def test_notify_destroyed_calls_plugin_hook(self) -> None:
+        """The agent's helper invokes notify_container_destroyed on every plugin."""
+        plugin = AsyncMock()
+        plugin.notify_container_started = AsyncMock()
+        plugin.notify_container_destroyed = AsyncMock()
+        agent = self._make_agent_stub({
+            "cpu": ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock()),
+        })
+
+        await AbstractAgent._notify_compute_plugins_container_destroyed(
+            agent, ContainerId("cid_000")
+        )
+        plugin.notify_container_destroyed.assert_awaited_once_with("cid_000")
+        plugin.notify_container_started.assert_not_called()
+
+    async def test_notify_tolerates_plugin_exceptions(self) -> None:
+        """If one plugin raises, others are still notified; the error is logged."""
+        broken = AsyncMock()
+        broken.notify_container_started = AsyncMock(side_effect=RuntimeError("boom"))
+        healthy = AsyncMock()
+        healthy.notify_container_started = AsyncMock()
+
+        agent = self._make_agent_stub({
+            "broken": ComputerContext(instance=broken, devices=[], alloc_map=MagicMock()),
+            "healthy": ComputerContext(instance=healthy, devices=[], alloc_map=MagicMock()),
+        })
+
+        await AbstractAgent._notify_compute_plugins_container_started(agent, ContainerId("cid_000"))
+        broken.notify_container_started.assert_awaited_once_with("cid_000")
+        healthy.notify_container_started.assert_awaited_once_with("cid_000")
+
+
+def aiohttp_client_connection_error(msg: str) -> Exception:
+    """Build a ClientConnectionError without requiring aiohttp internals."""
+    return aiohttp.ClientConnectionError(msg)
