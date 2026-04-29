@@ -48,6 +48,10 @@ from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions
     GetMyStorageHostPermissionsAction,
     GetMyStorageHostPermissionsActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.get_row import (
+    GetVFolderLegacyRowAction,
+    GetVFolderLegacyRowActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
@@ -156,6 +160,7 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_accessible_vfolder: ActionProcessor[
         GetAccessibleVFolderAction, GetAccessibleVFolderActionResult
     ]
+    get_vfolder_row: ActionProcessor[GetVFolderLegacyRowAction, GetVFolderLegacyRowActionResult]
     batch_load_vfolders_by_ids: ActionProcessor[
         BatchLoadVFoldersByIdsAction, BatchLoadVFoldersByIdsActionResult
     ]
@@ -247,6 +252,7 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.get_accessible_vfolder = ActionProcessor(
             service.get_accessible_vfolder, action_monitors
         )
+        self.get_vfolder_row = ActionProcessor(service.get_vfolder_row, action_monitors)
 
         # Cross-entity loaders (no RBAC validation; caller has parent access)
         self.batch_load_vfolders_by_ids = ActionProcessor(
@@ -305,6 +311,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             UmountHostAction.spec(),
             GetFstabContentsAction.spec(),
             GetAccessibleVFolderAction.spec(),
+            GetVFolderLegacyRowAction.spec(),
             BatchLoadVFoldersByIdsAction.spec(),
             CreateVFolderV2Action.spec(),
             CreateUploadSessionV2Action.spec(),

@@ -115,6 +115,10 @@ from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions
     GetMyStorageHostPermissionsActionResult,
     StorageHostPermissionEntry,
 )
+from ai.backend.manager.services.vfolder.actions.get_row import (
+    GetVFolderLegacyRowAction,
+    GetVFolderLegacyRowActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
@@ -1415,6 +1419,12 @@ class VFolderService:
             raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent") from e
         except Exception as e:
             raise InternalServerError from e
+
+    async def get_vfolder_row(
+        self, action: GetVFolderLegacyRowAction
+    ) -> GetVFolderLegacyRowActionResult:
+        row = await self._vfolder_repository.get_row_by_id(action.vfolder_uuid)
+        return GetVFolderLegacyRowActionResult(row=row)
 
     async def get_accessible_vfolder(
         self, action: GetAccessibleVFolderAction

@@ -205,6 +205,43 @@ class VfolderRepository:
             return self._vfolder_row_to_data(vfolder_row)
 
     @vfolder_repository_resilience.apply()
+    async def get_row_by_id(self, vfolder_id: VFolderUUID) -> Mapping[str, Any]:
+        """
+        Fetch a vfolder row as a plain mapping by UUID, without permission filtering.
+
+        For use only by the REST middleware; do not call from new code.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
+            if not vfolder_row:
+                raise VFolderNotFound(extra_data=str(vfolder_id))
+            return {
+                "name": vfolder_row.name,
+                "id": vfolder_row.id,
+                "host": vfolder_row.host,
+                "quota_scope_id": vfolder_row.quota_scope_id,
+                "domain_name": vfolder_row.domain_name,
+                "usage_mode": vfolder_row.usage_mode,
+                "created_at": vfolder_row.created_at,
+                "last_used": vfolder_row.last_used,
+                "max_size": vfolder_row.max_size,
+                "max_files": vfolder_row.max_files,
+                "ownership_type": vfolder_row.ownership_type,
+                "user": str(vfolder_row.user) if vfolder_row.user else None,
+                "group": str(vfolder_row.group) if vfolder_row.group else None,
+                "creator": vfolder_row.creator,
+                "creator_id": vfolder_row.creator_id,
+                "user_email": None,
+                "group_name": None,
+                "is_owner": False,
+                "permission": vfolder_row.permission,
+                "unmanaged_path": vfolder_row.unmanaged_path,
+                "cloneable": vfolder_row.cloneable,
+                "status": vfolder_row.status,
+                "cur_size": vfolder_row.cur_size,
+            }
+
+    @vfolder_repository_resilience.apply()
     async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[VFolderData | None]:
         """
         Batch fetch vfolders by IDs without permission validation.
