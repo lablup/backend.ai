@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Self
 from uuid import UUID
 
@@ -84,14 +82,19 @@ class DeploymentChatCache(BaseModel):
             return cls()
 
     def save(self) -> None:
-        """Persist the cache. Holds no secrets, default umask applies."""
-        from ai.backend.client.cli.v2.deployment.chat.utils import CHAT_CACHE_FILE
+        """Persist the cache as a plain JSON file (matches existing CLI credential
+        storage convention; see ``client/cli/v2/config_cmd.py``).
+        """
+        from ai.backend.client.cli.v2.deployment.chat.utils import (
+            CHAT_CACHE_FILE,
+            write_json_file,
+        )
 
-        _write_text_file(CHAT_CACHE_FILE, self.model_dump_json(indent=2), mode=None)
+        write_json_file(CHAT_CACHE_FILE, self.model_dump_json(indent=2))
 
 
 class DeploymentChatConfig(BaseModel):
-    """Per-deployment API key registry (user-managed)."""
+    """Per-deployment token registry (user-managed)."""
 
     tokens: dict[UUID, str] = Field(default_factory=dict)
 
@@ -126,27 +129,12 @@ class DeploymentChatConfig(BaseModel):
             return cls()
 
     def save(self) -> None:
-        """Persist the config with ``0600`` permissions because it stores plaintext API keys."""
-        from ai.backend.client.cli.v2.deployment.chat.utils import CHAT_CONFIG_FILE
+        """Persist the config as a plain JSON file (matches existing CLI credential
+        storage convention; see ``client/cli/v2/config_cmd.py``).
+        """
+        from ai.backend.client.cli.v2.deployment.chat.utils import (
+            CHAT_CONFIG_FILE,
+            write_json_file,
+        )
 
-        _write_text_file(CHAT_CONFIG_FILE, self.model_dump_json(indent=2), mode=0o600)
-
-
-def _write_text_file(path: Path, text: str, *, mode: int | None) -> None:
-    """Write ``text`` to ``path`` via a tmp-and-rename so partial writes can't
-    corrupt the destination. When ``mode`` is given, the temp file is created
-    with that POSIX permission so the final file never exists with weaker
-    permissions, even briefly.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    open_mode = mode if mode is not None else 0o666
-    fd = os.open(tmp, flags, open_mode)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(text)
-        tmp.replace(path)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
+        write_json_file(CHAT_CONFIG_FILE, self.model_dump_json(indent=2))

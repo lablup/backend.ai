@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
-import stat
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -73,15 +71,6 @@ class TestConfigLoadSaveRoundTrip:
 
         loaded = DeploymentChatConfig.load()
         assert loaded.get_token(dep_id) == "sk-secret-token-1234"
-
-
-class TestPermissions:
-    @pytest.mark.skipif(os.name == "nt", reason="POSIX-only permission check")
-    def test_config_save_enforces_0600(self, config_path: Path) -> None:
-        cfg = DeploymentChatConfig()
-        cfg.set_token(uuid4(), "sk-x")
-        cfg.save()
-        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
 
 
 class TestCacheLoaderResilience:
