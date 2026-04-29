@@ -5,8 +5,10 @@ contract (``POST /v1/chat/completions`` with an ``{model, messages, ...}``
 JSON body): vLLM, SGLang, NVIDIA NIM, and TGI in Messages API mode. Vanilla
 TGI's native ``/generate`` and arbitrary custom containers are out of scope.
 
-Session lifecycle, JSON parsing, URL normalization, and 401/403 → auth-error
-mapping live on :class:`BackendAIAppProxyClient` in
+Wire DTOs (``ChatCompletionRequest``, ``ListModelsResponse``, etc.) live in
+:mod:`ai.backend.common.dto.clients.openai_compat` so other components can
+reuse them. Session lifecycle, JSON parsing, URL normalization, and
+401/403 → auth-error mapping live on :class:`BackendAIAppProxyClient` in
 :mod:`ai.backend.client.v2.base_client`.
 """
 
@@ -14,35 +16,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-
 from ai.backend.client.v2.base_client import BackendAIAppProxyClient
+from ai.backend.common.dto.clients.openai_compat import ListModelsResponse
 
 _OPENAI_COMPATIBLE_CHAT_PATH = "/v1/chat/completions"
 _OPENAI_COMPATIBLE_MODELS_PATH = "/v1/models"
-
-
-class ModelEntry(BaseModel):
-    """One entry in an OpenAI-compat ``GET /v1/models`` response.
-
-    Runtimes (vLLM, SGLang, NIM) typically include extra fields such as
-    ``created`` or ``owned_by``; ``extra="allow"`` keeps them on the
-    model so future additions don't break parsing.
-    """
-
-    model_config = ConfigDict(extra="allow")
-
-    id: str
-    object: str = "model"
-
-
-class ListModelsResponse(BaseModel):
-    """Body of ``GET /v1/models`` on an OpenAI-compat endpoint."""
-
-    model_config = ConfigDict(extra="allow")
-
-    object: str = "list"
-    data: list[ModelEntry]
 
 
 class DeploymentChatClient(BackendAIAppProxyClient):
