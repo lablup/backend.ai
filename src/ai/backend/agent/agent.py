@@ -3182,7 +3182,16 @@ class AbstractAgent[
                             )
                         )
                         for model in populated_models:
-                            service = model.get("service") or {}
+                            service = model.get("service")
+                            if not isinstance(service, dict):
+                                log.warning(
+                                    "create_kernel(kernel:{}, session:{}) skipping model"
+                                    " '{}': no service definition",
+                                    kernel_id,
+                                    session_id,
+                                    model.get("name", "<unknown>"),
+                                )
+                                continue
                             if not service.get("start_command"):
                                 log.warning(
                                     "create_kernel(kernel:{}, session:{}) cannot start model"
