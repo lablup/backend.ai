@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import enum
+import functools
+from collections.abc import Mapping
 
 
 class PermissionStatus(enum.StrEnum):
@@ -452,3 +454,57 @@ class RelationType(enum.StrEnum):
 
     AUTO = "auto"
     REF = "ref"
+
+
+# ---------------------------------------------------------------------------
+# Per-entity allowed-operation tables
+#
+# These tables define which operations are valid for a given role-kind on a
+# given entity. Entity types not listed in an override map fall back to the
+# corresponding default set. The helper functions are cached because the
+# answer is purely a function of the inputs.
+# ---------------------------------------------------------------------------
+
+_STANDARD_OPS: frozenset[OperationType] = frozenset({
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.SOFT_DELETE,
+    OperationType.HARD_DELETE,
+})
+_READ_ONLY_OPS: frozenset[OperationType] = frozenset({OperationType.READ})
+
+_DEFAULT_ADMIN_OPS: frozenset[OperationType] = _STANDARD_OPS
+_DEFAULT_OWNER_OPS: frozenset[OperationType] = _STANDARD_OPS
+_DEFAULT_MEMBER_OPS: frozenset[OperationType] = _READ_ONLY_OPS
+
+_ADMIN_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {}
+_OWNER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {}
+_MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    # Members of a project may create their own sessions, vfolders,
+    # and model deployments (a.k.a. model services).
+    RBACElementType.SESSION: frozenset({OperationType.READ, OperationType.CREATE}),
+    RBACElementType.VFOLDER: frozenset({OperationType.READ, OperationType.CREATE}),
+    RBACElementType.MODEL_DEPLOYMENT: frozenset({
+        OperationType.READ,
+        OperationType.CREATE,
+    }),
+}
+
+
+@functools.cache
+def admin_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to an *admin* role on the given entity type."""
+    return _ADMIN_OPS_OVERRIDES.get(entity_type, _DEFAULT_ADMIN_OPS)
+
+
+@functools.cache
+def owner_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to an *owner* role on the given entity type."""
+    return _OWNER_OPS_OVERRIDES.get(entity_type, _DEFAULT_OWNER_OPS)
+
+
+@functools.cache
+def member_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to a *member* role on the given entity type."""
+    return _MEMBER_OPS_OVERRIDES.get(entity_type, _DEFAULT_MEMBER_OPS)
