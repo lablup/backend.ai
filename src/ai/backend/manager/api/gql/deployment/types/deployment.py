@@ -749,7 +749,6 @@ class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     open_to_public: bool | None = UNSET
     tags: list[str] | None = UNSET
     default_deployment_strategy: DeploymentStrategyInputGQL | None = UNSET
-    active_revision_id: ID | None = UNSET
     replica_count: int | None = UNSET
     name: str | None = UNSET
     preferred_domain_name: str | None = UNSET

@@ -116,7 +116,6 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
-    RevisionStateUpdaterSpec,
     RouteStatusUpdaterSpec,
     RouteUpdaterSpec,
 )
@@ -1929,94 +1928,6 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is True
         assert result.has_previous_page is True
 
-    async def test_update_endpoint_deploying_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: DeploymentID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test updating endpoint deploying_revision using Updater."""
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-
-        # Verify returned DeploymentInfo
-        assert deployment_info.id == test_endpoint_id
-
-        # Verify database state (deploying_revision is not part of DeploymentInfo)
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.deploying_revision == test_revision_data.id
-
-    async def test_update_endpoint_current_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: DeploymentID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test updating endpoint current_revision using Updater."""
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                current_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-
-        # Verify returned DeploymentInfo
-        assert deployment_info.id == test_endpoint_id
-        assert deployment_info.current_revision_id == test_revision_data.id
-
-        # Verify database state
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.current_revision == test_revision_data.id
-
-    async def test_update_endpoint_nullify_deploying_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: DeploymentID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test nullifying endpoint deploying_revision using TriState.nullify()."""
-        # First set deploying_revision
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-        assert deployment_info.id == test_endpoint_id
-
-        # Then nullify it
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.nullify(),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-        assert deployment_info.id == test_endpoint_id
-
-        # Verify database state (deploying_revision is not part of DeploymentInfo)
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.deploying_revision is None
-
     async def test_update_endpoint_returns_updated_deployment_info(
         self,
         deployment_repository: DeploymentRepository,
@@ -2036,9 +1947,6 @@ class TestDeploymentRevisionOperations:
                 replica_spec=ReplicaSpecUpdaterSpec(
                     replica_count=OptionalState.update(new_replica_count),
                 ),
-                revision_state=RevisionStateUpdaterSpec(
-                    current_revision=TriState.update(test_revision_data.id),
-                ),
             ),
             pk_value=test_endpoint_id,
         )
@@ -2048,7 +1956,6 @@ class TestDeploymentRevisionOperations:
         assert deployment_info.id == test_endpoint_id
         assert deployment_info.metadata.name == new_name
         assert deployment_info.replica_spec.replica_count == new_replica_count
-        assert deployment_info.current_revision_id == test_revision_data.id
 
         # Verify database state matches returned values
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -2057,7 +1964,6 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.name == new_name
             assert endpoint.replicas == new_replica_count
-            assert endpoint.current_revision == test_revision_data.id
 
 
 class TestDeploymentAutoScalingPolicyOperations:

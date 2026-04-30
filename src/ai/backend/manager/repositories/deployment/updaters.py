@@ -108,42 +108,16 @@ class MountUpdaterSpec(UpdaterSpec[EndpointRow]):
 
 
 @dataclass
-class RevisionStateUpdaterSpec(UpdaterSpec[EndpointRow]):
-    """UpdaterSpec for deployment revision state updates.
-
-    Manages which revision is currently active and which is being deployed.
-    """
-
-    current_revision: TriState[UUID] = field(default_factory=TriState[UUID].nop)
-    deploying_revision: TriState[UUID] = field(default_factory=TriState[UUID].nop)
-    revision_history_limit: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-
-    @property
-    @override
-    def row_class(self) -> type[EndpointRow]:
-        return EndpointRow
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.current_revision.update_dict(to_update, "current_revision")
-        self.deploying_revision.update_dict(to_update, "deploying_revision")
-        self.revision_history_limit.update_dict(to_update, "revision_history_limit")
-        return to_update
-
-
-@dataclass
 class DeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
     """Composite UpdaterSpec for deployment updates.
 
-    Combines metadata, replica_spec, network, mount, and revision_state updates.
+    Combines metadata, replica_spec, network, and mount updates.
     """
 
     metadata: DeploymentMetadataUpdaterSpec | None = None
     replica_spec: ReplicaSpecUpdaterSpec | None = None
     network: DeploymentNetworkSpecUpdaterSpec | None = None
     mount: MountUpdaterSpec | None = None
-    revision_state: RevisionStateUpdaterSpec | None = None
 
     @property
     @override
@@ -161,8 +135,6 @@ class DeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
             to_update.update(self.network.build_values())
         if self.mount:
             to_update.update(self.mount.build_values())
-        if self.revision_state:
-            to_update.update(self.revision_state.build_values())
         return to_update
 
 
