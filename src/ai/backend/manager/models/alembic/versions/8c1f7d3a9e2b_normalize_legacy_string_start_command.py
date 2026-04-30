@@ -24,53 +24,27 @@ branch_labels = None
 depends_on = None
 
 
-def _normalize_model(model: object) -> tuple[object, bool]:
-    if not isinstance(model, dict):
-        return model, False
-
-    service = model.get("service")
-    if not isinstance(service, dict):
-        return model, False
-
-    start_command = service.get("start_command")
-    if not isinstance(start_command, str):
-        return model, False
-
-    normalized_service = {**service, "start_command": [start_command]}
-    return {**model, "service": normalized_service}, True
-
-
-def _normalize_models(models: object) -> tuple[object, bool]:
-    if not isinstance(models, list):
-        return models, False
-
-    changed = False
-    normalized_models = []
-    for model in models:
-        normalized_model, model_changed = _normalize_model(model)
-        normalized_models.append(normalized_model)
-        changed = changed or model_changed
-
-    return normalized_models, changed
-
-
 def _normalize_model_definition(conn: Connection, table: str, column: str) -> None:
     rows = conn.execute(
         sa.text(f"SELECT id, {column} FROM {table} WHERE {column} IS NOT NULL")
     ).fetchall()
 
     for row_id, model_definition in rows:
-        if not isinstance(model_definition, dict):
-            continue
-        normalized_models, changed = _normalize_models(model_definition.get("models"))
-        if not changed:
-            continue
+        changed = False
+        for model in model_definition.get("models") or []:
+            try:
+                start_command = model["service"]["start_command"]
+            except (KeyError, TypeError):
+                continue
+            if isinstance(start_command, str):
+                model["service"]["start_command"] = [start_command]
+                changed = True
 
-        normalized_definition = {**model_definition, "models": normalized_models}
-        conn.execute(
-            sa.text(f"UPDATE {table} SET {column} = CAST(:definition AS JSONB) WHERE id = :id"),
-            {"definition": json.dumps(normalized_definition), "id": row_id},
-        )
+        if changed:
+            conn.execute(
+                sa.text(f"UPDATE {table} SET {column} = CAST(:definition AS JSONB) WHERE id = :id"),
+                {"definition": json.dumps(model_definition), "id": row_id},
+            )
 
 
 def upgrade() -> None:
