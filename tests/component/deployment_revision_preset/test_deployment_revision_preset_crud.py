@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
@@ -111,7 +112,7 @@ class TestDeploymentRevisionPresetCRUD:
         result = await admin_v2_registry.deployment_revision_preset.search(
             SearchDeploymentRevisionPresetsInput(
                 filter=DeploymentRevisionPresetFilter(
-                    runtime_variant_id=runtime_variant_id,
+                    runtime_variant_id=UUIDFilter(equals=runtime_variant_id),
                 ),
                 limit=10,
             )
