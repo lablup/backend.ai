@@ -276,6 +276,7 @@ class PermissionFilter(BaseRequestModel):
 
     role_id: UUID | None = None
     scope_type: str | None = None
+    scope_id: str | None = None
     entity_type: str | None = None
     created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None

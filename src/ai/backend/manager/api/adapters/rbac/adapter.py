@@ -28,9 +28,11 @@ from ai.backend.common.dto.manager.rbac import (
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.rbac import (
     AssociationScopesEntitiesNode,
+    BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
     BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
+    BulkRemoveRolePermissionFailureInfo,
     BulkRemoveRolePermissionsPayload,
     BulkRevokeRoleFailureInfo,
     BulkRevokeRoleResultPayload,
@@ -42,6 +44,7 @@ from ai.backend.common.dto.manager.v2.rbac import (
     OperationInfo,
     PermissionNode,
     PurgeRolePayload,
+    ReplaceRolePermissionFailureInfo,
     ReplaceRolePermissionsPayload,
     RoleAssignmentNode,
     RoleNode,
@@ -165,6 +168,9 @@ from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     BulkRoleAssignmentResultData,
+    BulkRolePermissionAddResultData,
+    BulkRolePermissionRemoveResultData,
+    BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
     RoleData,
@@ -178,6 +184,7 @@ from ai.backend.manager.data.permission.status import RoleStatus as InternalRole
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData, RoleInvitationState
+from ai.backend.manager.errors.permission import ReplaceRolePermissionRoleIdMismatch
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -232,8 +239,14 @@ from ai.backend.manager.repositories.role_invitation.types import (
     RoleInvitationSearchScope,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
+from ai.backend.manager.services.permission_contoller.actions.bulk_add_role_permissions import (
+    BulkAddRolePermissionsAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
     BulkAssignRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_permissions import (
+    BulkRemoveRolePermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
     BulkRevokeRoleAction,
@@ -251,6 +264,9 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
+from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
+    ReplaceRolePermissionsAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
@@ -1038,37 +1054,95 @@ class RBACAdapter(BaseAdapter):
         self,
         input: BulkAddRolePermissionsInputDTO,
     ) -> BulkAddRolePermissionsPayload:
-        """Bulk-insert scoped permission rows across one or more roles.
-
-        TODO(BA-5906): wire to ``permission_controller.bulk_add_role_permissions``
-        processor once the BA-5906 PR (bulk repository / service / action) is merged.
-        Until then, this raises NotImplementedError so the route is reachable but
-        explicit about the missing dependency.
-        """
-        raise NotImplementedError("bulk_add_role_permissions adapter wiring is pending BA-5906")
+        """Bulk-insert scoped permission rows across one or more roles."""
+        specs = [self._permission_creator_spec(entry) for entry in input.permissions]
+        action_result = await self._processors.permission_controller.bulk_add_role_permissions.wait_for_complete(
+            BulkAddRolePermissionsAction(creator=BulkCreator(specs=specs))
+        )
+        result: BulkRolePermissionAddResultData = action_result.data
+        return BulkAddRolePermissionsPayload(
+            items=[self._permission_data_to_node(item) for item in result.successes],
+            failed=[
+                BulkAddRolePermissionFailureInfo(
+                    role_id=f.role_id,
+                    scope_type=f.scope_type.value,
+                    scope_id=f.scope_id,
+                    entity_type=f.entity_type.value,
+                    operation=f.operation.value,
+                    message=f.message,
+                )
+                for f in result.failures
+            ],
+        )
 
     async def bulk_remove_role_permissions(
         self,
         input: BulkRemoveRolePermissionsInputDTO,
     ) -> BulkRemoveRolePermissionsPayload:
-        """Bulk-delete permission rows by primary key.
-
-        TODO(BA-5906): wire to ``permission_controller.bulk_remove_role_permissions``
-        processor once the BA-5906 PR is merged.
-        """
-        raise NotImplementedError("bulk_remove_role_permissions adapter wiring is pending BA-5906")
+        """Bulk-delete permission rows by primary key."""
+        purgers: list[Purger[PermissionRow]] = [
+            Purger(row_class=PermissionRow, pk_value=pid) for pid in input.permission_ids
+        ]
+        action_result = await self._processors.permission_controller.bulk_remove_role_permissions.wait_for_complete(
+            BulkRemoveRolePermissionsAction(purgers=purgers)
+        )
+        result: BulkRolePermissionRemoveResultData = action_result.data
+        return BulkRemoveRolePermissionsPayload(
+            items=[self._permission_data_to_node(item) for item in result.successes],
+            failed=[
+                BulkRemoveRolePermissionFailureInfo(
+                    permission_id=f.permission_id,
+                    message=f.message,
+                )
+                for f in result.failures
+            ],
+        )
 
     async def replace_role_permissions(
         self,
         input: ReplaceRolePermissionsInputDTO,
     ) -> ReplaceRolePermissionsPayload:
-        """Replace one role's entire scoped-permission set.
+        """Replace one role's entire scoped-permission set."""
+        for entry in input.permissions:
+            if entry.role_id != input.role_id:
+                raise ReplaceRolePermissionRoleIdMismatch(
+                    f"entry role_id {entry.role_id} does not match request role_id {input.role_id}",
+                )
+        specs = [self._permission_creator_spec(entry) for entry in input.permissions]
+        action_result = (
+            await self._processors.permission_controller.replace_role_permissions.wait_for_complete(
+                ReplaceRolePermissionsAction(
+                    role_id=input.role_id,
+                    creator=BulkCreator(specs=specs),
+                )
+            )
+        )
+        result: BulkRolePermissionReplaceResultData = action_result.data
+        return ReplaceRolePermissionsPayload(
+            items=[self._permission_data_to_node(item) for item in result.successes],
+            failed=[
+                ReplaceRolePermissionFailureInfo(
+                    role_id=f.role_id,
+                    scope_type=f.scope_type.value,
+                    scope_id=f.scope_id,
+                    entity_type=f.entity_type.value,
+                    operation=f.operation.value,
+                    message=f.message,
+                )
+                for f in result.failures
+            ],
+        )
 
-        TODO(BA-5906): wire to ``permission_controller.replace_role_permissions``
-        processor once the BA-5906 PR is merged. The adapter must also validate
-        that every entry's ``role_id`` matches ``input.role_id``.
-        """
-        raise NotImplementedError("replace_role_permissions adapter wiring is pending BA-5906")
+    def _permission_creator_spec(self, entry: CreatePermissionInputDTO) -> PermissionCreatorSpec:
+        scope_type = RBACElementType(entry.scope_type)
+        self._validate_scope_id(scope_type, entry.scope_id)
+        return PermissionCreatorSpec(
+            role_id=entry.role_id,
+            scope_type=scope_type,
+            scope_id=entry.scope_id,
+            entity_type=RBACElementType(entry.entity_type),
+            operation=InternalOperationType(entry.operation),
+        )
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:
         """Bulk-revoke a role from multiple users."""
@@ -1155,6 +1229,8 @@ class RBACAdapter(BaseAdapter):
             conditions.append(
                 ScopedPermissionConditions.by_scope_type(RBACElementType(f.scope_type))
             )
+        if f.scope_id is not None:
+            conditions.append(ScopedPermissionConditions.by_scope_id(f.scope_id))
         if f.entity_type is not None:
             conditions.append(
                 ScopedPermissionConditions.by_entity_type(RBACElementType(f.entity_type))

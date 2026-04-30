@@ -941,6 +941,13 @@ class ScopedPermissionConditions:
         return inner
 
     @staticmethod
+    def by_scope_id(scope_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_id == scope_id
+
+        return inner
+
+    @staticmethod
     def by_ids(permission_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.id.in_(permission_ids)

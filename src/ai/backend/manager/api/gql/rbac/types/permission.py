@@ -249,6 +249,7 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
+    scope_id: str | None = None
     entity_type: RBACElementTypeGQL | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
