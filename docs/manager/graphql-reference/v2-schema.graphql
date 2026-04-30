@@ -4300,7 +4300,7 @@ type EntityConnection {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: RBACElementType = null
+  entityType: StringFilter = null
   entityId: StringFilter = null
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
@@ -7683,10 +7683,10 @@ type PermissionEdge {
 
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
-  roleId: UUID = null
-  scopeType: RBACElementType = null
-  scopeId: String = null
-  entityType: RBACElementType = null
+  roleId: UUIDFilter = null
+  scopeType: StringFilter = null
+  scopeId: StringFilter = null
+  entityType: StringFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
