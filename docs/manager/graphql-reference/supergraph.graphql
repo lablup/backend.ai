@@ -9600,7 +9600,7 @@ type ModelServiceConfig
   """Command to start the model service."""
   startCommand: [String!]
 
-  """Shell used to wrap a string-form start_command at parse time."""
+  """Shell configured for the model service."""
   shell: String!
 
   """Port number for the model service."""
@@ -9624,7 +9624,7 @@ input ModelServiceConfigInput
   """Command to start the model service."""
   startCommand: [String!] = null
 
-  """Shell used to wrap a string-form start_command at parse time."""
+  """Shell configured for the model service."""
   shell: String! = "/bin/bash"
 
   """Port number for the model service. Must be greater than 1."""
