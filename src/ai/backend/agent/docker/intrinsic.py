@@ -92,7 +92,7 @@ class ContainerNetStat:
 @dataclasses.dataclass(frozen=True)
 class ContainerStatResult:
     mem_cur_bytes: int
-    mem_total_bytes: int
+    mem_capacity_bytes: int
     io_read_bytes: int
     io_write_bytes: int
     net_rx_bytes: int
@@ -785,7 +785,7 @@ class MemoryPlugin(AbstractComputePlugin):
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return ContainerStatResult(
                 mem_cur_bytes=mem_cur_bytes,
-                mem_total_bytes=mem_max_bytes,
+                mem_capacity_bytes=mem_max_bytes,
                 io_read_bytes=io_read_bytes,
                 io_write_bytes=io_write_bytes,
                 net_rx_bytes=net_stat.rx_bytes,
@@ -805,7 +805,7 @@ class MemoryPlugin(AbstractComputePlugin):
             if ret is None:
                 return None
             mem_cur_bytes = nmget(ret, "memory_stats.usage", 0)
-            mem_total_bytes = nmget(ret, "memory_stats.limit", 0)
+            mem_capacity_bytes = nmget(ret, "memory_stats.limit", 0)
             io_read_bytes = 0
             io_write_bytes = 0
             for item in nmget(ret, "blkio_stats.io_service_bytes_recursive", []):
@@ -822,7 +822,7 @@ class MemoryPlugin(AbstractComputePlugin):
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return ContainerStatResult(
                 mem_cur_bytes=mem_cur_bytes,
-                mem_total_bytes=mem_total_bytes,
+                mem_capacity_bytes=mem_capacity_bytes,
                 io_read_bytes=io_read_bytes,
                 io_write_bytes=io_write_bytes,
                 net_rx_bytes=net_rx_bytes,
@@ -861,7 +861,7 @@ class MemoryPlugin(AbstractComputePlugin):
             if isinstance(result, BaseException):
                 raise result
             per_container_mem_used_bytes[cid] = Measurement(
-                Decimal(result.mem_cur_bytes), capacity=Decimal(result.mem_total_bytes)
+                Decimal(result.mem_cur_bytes), capacity=Decimal(result.mem_capacity_bytes)
             )
             per_container_io_read_bytes[cid] = Measurement(Decimal(result.io_read_bytes))
             per_container_io_write_bytes[cid] = Measurement(Decimal(result.io_write_bytes))
