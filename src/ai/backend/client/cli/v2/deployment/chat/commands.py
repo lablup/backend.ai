@@ -45,7 +45,7 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
 
 @click.command(name="chat")
 @click.argument("deployment_id", type=click.UUID)
-@click.argument("content", type=str)
+@click.argument("message", type=str)
 @click.option(
     "--model",
     default=None,
@@ -64,12 +64,12 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
         "Extra request-body fields as a JSON object. "
         "Forwarded to the inference endpoint as-is "
         '(e.g. \'{"temperature": 0.7, "max_tokens": 256}\'). '
-        "The 'model' and 'messages' fields are always overridden by --model and CONTENT."
+        "The 'model' and 'messages' fields are always overridden by --model and MESSAGE."
     ),
 )
 def chat(
     deployment_id: UUID,
-    content: str,
+    message: str,
     model: str | None,
     params: Any,
 ) -> None:
@@ -162,7 +162,7 @@ def chat(
                 request = ChatCompletionRequest.model_validate({
                     **extra_body,
                     "model": request_model,
-                    "messages": [{"role": "user", "content": content}],
+                    "messages": [{"role": "user", "content": message}],
                 })
                 body = request.model_dump(mode="json")
                 response = await client.chat_completion(endpoint_entry.endpoint_url, token, body)
