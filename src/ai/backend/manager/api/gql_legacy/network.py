@@ -236,7 +236,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
     ) -> CreateNetwork:
         graph_ctx: GraphQueryContext = info.context
         network_config = graph_ctx.config_provider.config.network.inter_container
-        if network_config.enabled:
+        if not network_config.enabled:
             return CreateNetwork(
                 ok=False, msg="Inter-container networking disabled on this cluster", network=None
             )
