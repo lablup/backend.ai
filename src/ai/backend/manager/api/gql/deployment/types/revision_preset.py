@@ -63,6 +63,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
+from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
     EnvironEntryInputGQL,
@@ -392,7 +393,9 @@ class PresetValueEntryInputGQL(PydanticInputMixin[PresetValueInputDTO]):
 )
 class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
-    runtime_variant_id: UUID | None = gql_field(default=None, description="Variant ID filter.")
+    runtime_variant_id: UUIDFilterGQL | None = gql_field(
+        default=None, description="Variant ID filter."
+    )
 
 
 @gql_pydantic_input(

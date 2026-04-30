@@ -6,7 +6,11 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.repositories.base import QueryCondition
@@ -19,6 +23,26 @@ class RuntimeVariantPresetConditions:
     def by_runtime_variant_id(variant_id: UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RuntimeVariantPresetRow.runtime_variant == variant_id
+
+        return inner
+
+    @staticmethod
+    def by_runtime_variant_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = RuntimeVariantPresetRow.runtime_variant == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_runtime_variant_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = RuntimeVariantPresetRow.runtime_variant.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 

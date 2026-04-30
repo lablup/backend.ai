@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
     OrderDirection,
@@ -96,7 +96,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
-    runtime_variant_id: RuntimeVariantID | None = Field(default=None)
+    runtime_variant_id: UUIDFilter | None = Field(default=None)
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     OR: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     NOT: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

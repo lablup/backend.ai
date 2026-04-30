@@ -70,6 +70,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
+from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -373,8 +374,8 @@ class ModelCardAvailablePresetsScopeGQL(PydanticInputMixin[AvailablePresetsScope
 )
 class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
-    domain_name: str | None = gql_field(default=None, description="Domain filter.")
-    project_id: UUID | None = gql_field(default=None, description="Project filter.")
+    domain_name: StringFilterGQL | None = gql_field(default=None, description="Domain filter.")
+    project_id: UUIDFilterGQL | None = gql_field(default=None, description="Project filter.")
     storage_host: StringFilterGQL | None = gql_field(
         default=None,
         description=(

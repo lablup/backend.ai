@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.model_card.types import (
@@ -74,8 +74,8 @@ class UpdateModelCardInput(BaseRequestModel):
 
 class ModelCardFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
-    domain_name: str | None = Field(default=None)
-    project_id: UUID | None = Field(default=None)
+    domain_name: StringFilter | None = Field(default=None)
+    project_id: UUIDFilter | None = Field(default=None)
     storage_host: StringFilter | None = Field(
         default=None,
         description=(
