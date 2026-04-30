@@ -113,6 +113,16 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     help="Also install a local Harbor container registry (dev mode only).",
 )
 @click.option(
+    "--harbor-hostname",
+    type=str,
+    default=None,
+    help=(
+        "Hostname for the local Harbor instance "
+        "(must be a non-loopback address; defaults to host.docker.internal "
+        "when --public-facing-address is a loopback)."
+    ),
+)
+@click.option(
     "--harbor-http-port",
     type=int,
     default=8084,
@@ -155,6 +165,7 @@ def main(
     otel_endpoint: str | None,
     metric_access_cidr: str,
     with_harbor: bool,
+    harbor_hostname: str | None,
     harbor_http_port: int,
     harbor_admin_password: str,
     harbor_download_uri: str,
@@ -190,6 +201,7 @@ def main(
         otel_endpoint=otel_endpoint,
         metric_access_cidr=metric_access_cidr,
         with_harbor=with_harbor,
+        harbor_hostname=harbor_hostname,
         harbor_http_port=harbor_http_port,
         harbor_admin_password=harbor_admin_password,
         harbor_download_uri=harbor_download_uri,

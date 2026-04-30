@@ -72,6 +72,7 @@ class CliArgs:
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
     with_harbor: bool = False
+    harbor_hostname: str | None = None
     harbor_http_port: int = 8084
     harbor_admin_password: str = "Harbor12345"
     harbor_download_uri: str = (
@@ -226,6 +227,7 @@ class InstallVariable:
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
     with_harbor: bool = False
+    harbor_hostname: str | None = None
     harbor_http_port: int = 8084
     harbor_admin_password: str = "Harbor12345"
     harbor_download_uri: str = (

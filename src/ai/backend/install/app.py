@@ -525,6 +525,7 @@ class ModeMenu(Static):
             otel_endpoint=args.otel_endpoint,
             metric_access_cidr=args.metric_access_cidr,
             with_harbor=args.with_harbor,
+            harbor_hostname=args.harbor_hostname,
             harbor_http_port=args.harbor_http_port,
             harbor_admin_password=args.harbor_admin_password,
             harbor_download_uri=args.harbor_download_uri,

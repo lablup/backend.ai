@@ -1195,6 +1195,24 @@ class Context(metaclass=ABCMeta):
                 print(f"""echo 'Your email: {user["email"]}'""", file=fp)
                 print(f"""echo 'Your password: {user["password"]}'""", file=fp)
 
+    def _resolve_harbor_hostname(self, public_facing_address: str) -> str:
+        """
+        Pick a Harbor hostname that Harbor's ``prepare`` script will accept.
+
+        Harbor explicitly rejects loopback addresses (``127.0.0.1`` /
+        ``localhost``) and ``0.0.0.0``. When ``--public-facing-address`` is
+        one of those (the dev-installer default is ``127.0.0.1``), fall back
+        to ``host.docker.internal`` so Harbor still gets a reachable name on
+        Docker Desktop / OrbStack hosts. Users can override the choice with
+        ``--harbor-hostname``.
+        """
+        override = self.install_variable.harbor_hostname
+        if override:
+            return override
+        if public_facing_address in ("127.0.0.1", "0.0.0.0", "localhost"):
+            return "host.docker.internal"
+        return public_facing_address
+
     async def configure_harbor(self) -> None:
         """
         Configure and install a local Harbor container registry.
@@ -1533,7 +1551,7 @@ class DevContext(Context):
             appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
             appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
             harbor_enabled=self.install_variable.with_harbor,
-            harbor_hostname=public_facing_address,
+            harbor_hostname=self._resolve_harbor_hostname(public_facing_address),
             harbor_http_port=self.install_variable.harbor_http_port,
             harbor_admin_password=self.install_variable.harbor_admin_password,
         )
