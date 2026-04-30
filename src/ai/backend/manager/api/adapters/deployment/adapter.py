@@ -231,7 +231,6 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentNetworkSpecUpdaterSpec,
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
-    RevisionStateUpdaterSpec,
 )
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
@@ -830,16 +829,10 @@ class DeploymentAdapter(BaseAdapter):
             network_spec = DeploymentNetworkSpecUpdaterSpec(
                 open_to_public=OptionalState.from_graphql(input.open_to_public),
             )
-        revision_state_spec: RevisionStateUpdaterSpec | None = None
-        if input.active_revision_id is not None:
-            revision_state_spec = RevisionStateUpdaterSpec(
-                current_revision=TriState[UUID].from_graphql(input.active_revision_id),
-            )
         spec = DeploymentUpdaterSpec(
             metadata=metadata_spec,
             replica_spec=replica_spec,
             network=network_spec,
-            revision_state=revision_state_spec,
         )
         updater: Updater[EndpointRow] = Updater(spec=spec, pk_value=deployment_id)
         action_result = await self._processors.deployment.update_deployment.wait_for_complete(
