@@ -1994,7 +1994,7 @@ input CreateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Resource slot allocations (e.g. cpu, mem, cuda.device).
   """
-  resourceSlots: [ResourceSlotEntryInput!]!
+  resourceSlots: [ResourceSlotEntryInput!] = null
 
   """
   Added in UNRELEASED. Additional resource options such as shared memory (shmem) size.
