@@ -594,7 +594,7 @@ def _merge_config_draft(
         metadata = _pick(base.metadata, override.metadata, "metadata" in s)
     return ModelConfigDraft.model_construct(
         name=_pick(base.name, override.name, "name" in s),
-        model_path=_pick(base.model_path, override.model_path, "model_path" in s),
+        model_path=override.model_path if override.model_path is not None else base.model_path,
         service=service,
         metadata=metadata,
     )
