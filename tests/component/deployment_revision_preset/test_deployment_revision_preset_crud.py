@@ -12,7 +12,8 @@ Test matrix:
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -21,8 +22,10 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.config import ModelConfig, ModelDefinition
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
@@ -64,25 +67,42 @@ async def runtime_variant_id(
         )
 
 
+@pytest.fixture()
+def make_create_input(
+    runtime_variant_id: RuntimeVariantID,
+) -> Callable[..., CreateDeploymentRevisionPresetInput]:
+    def _build(**overrides: Any) -> CreateDeploymentRevisionPresetInput:
+        defaults: dict[str, Any] = {
+            "runtime_variant_id": runtime_variant_id,
+            "name": "preset",
+            "image_id": ImageID(uuid.uuid4()),
+            "resource_slots": [ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+            "cluster_mode": "single-node",
+            "cluster_size": 1,
+            "replica_count": 1,
+            "deployment_strategy": DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
+        }
+        defaults.update(overrides)
+        return CreateDeploymentRevisionPresetInput(**defaults)
+
+    return _build
+
+
 class TestDeploymentRevisionPresetCRUD:
     async def test_create_and_get(
         self,
         admin_v2_registry: V2ClientRegistry,
-        runtime_variant_id: RuntimeVariantID,
+        make_create_input: Callable[..., CreateDeploymentRevisionPresetInput],
     ) -> None:
         create_result = await admin_v2_registry.deployment_revision_preset.create(
-            CreateDeploymentRevisionPresetInput(
-                runtime_variant_id=runtime_variant_id,
+            make_create_input(
                 name="test-preset",
                 description="Test preset",
-                image_id=ImageID(uuid.uuid4()),
                 resource_slots=[
                     ResourceSlotEntryInput(resource_type="cpu", quantity="4"),
                     ResourceSlotEntryInput(resource_type="mem", quantity="8g"),
                 ],
                 resource_opts=[ResourceOptsEntryDTO(name="shmem", value="1g")],
-                cluster_mode="single-node",
-                cluster_size=1,
             )
         )
         preset = create_result.preset
@@ -100,14 +120,14 @@ class TestDeploymentRevisionPresetCRUD:
         self,
         admin_v2_registry: V2ClientRegistry,
         runtime_variant_id: RuntimeVariantID,
+        make_create_input: Callable[..., CreateDeploymentRevisionPresetInput],
     ) -> None:
         image_id = ImageID(uuid.uuid4())
         model_definition = ModelDefinition(
             models=[ModelConfig(name="llama", model_path="/models/llama")],
         )
         create_result = await admin_v2_registry.deployment_revision_preset.create(
-            CreateDeploymentRevisionPresetInput(
-                runtime_variant_id=runtime_variant_id,
+            make_create_input(
                 name="search-test-preset",
                 image_id=image_id,
                 model_definition=model_definition,
@@ -139,15 +159,10 @@ class TestDeploymentRevisionPresetCRUD:
     async def test_update(
         self,
         admin_v2_registry: V2ClientRegistry,
-        runtime_variant_id: RuntimeVariantID,
+        make_create_input: Callable[..., CreateDeploymentRevisionPresetInput],
     ) -> None:
         create_result = await admin_v2_registry.deployment_revision_preset.create(
-            CreateDeploymentRevisionPresetInput(
-                runtime_variant_id=runtime_variant_id,
-                name="update-test-preset",
-                description="Before",
-                image_id=ImageID(uuid.uuid4()),
-            )
+            make_create_input(name="update-test-preset", description="Before")
         )
         preset_id = create_result.preset.id
 
@@ -167,14 +182,10 @@ class TestDeploymentRevisionPresetCRUD:
     async def test_delete(
         self,
         admin_v2_registry: V2ClientRegistry,
-        runtime_variant_id: RuntimeVariantID,
+        make_create_input: Callable[..., CreateDeploymentRevisionPresetInput],
     ) -> None:
         create_result = await admin_v2_registry.deployment_revision_preset.create(
-            CreateDeploymentRevisionPresetInput(
-                runtime_variant_id=runtime_variant_id,
-                name="delete-test-preset",
-                image_id=ImageID(uuid.uuid4()),
-            )
+            make_create_input(name="delete-test-preset")
         )
         preset_id = create_result.preset.id
 
@@ -184,25 +195,17 @@ class TestDeploymentRevisionPresetCRUD:
     async def test_duplicate_name_conflict(
         self,
         admin_v2_registry: V2ClientRegistry,
-        runtime_variant_id: RuntimeVariantID,
+        make_create_input: Callable[..., CreateDeploymentRevisionPresetInput],
     ) -> None:
         create_result = await admin_v2_registry.deployment_revision_preset.create(
-            CreateDeploymentRevisionPresetInput(
-                runtime_variant_id=runtime_variant_id,
-                name="dup-test-preset",
-                image_id=ImageID(uuid.uuid4()),
-            )
+            make_create_input(name="dup-test-preset")
         )
         preset_id = create_result.preset.id
 
         try:
             with pytest.raises(BackendAPIError) as exc_info:
                 await admin_v2_registry.deployment_revision_preset.create(
-                    CreateDeploymentRevisionPresetInput(
-                        runtime_variant_id=runtime_variant_id,
-                        name="dup-test-preset",
-                        image_id=ImageID(uuid.uuid4()),
-                    )
+                    make_create_input(name="dup-test-preset")
                 )
             assert exc_info.value.args[0] == 409
         finally:
@@ -211,21 +214,13 @@ class TestDeploymentRevisionPresetCRUD:
     async def test_rank_auto_increment(
         self,
         admin_v2_registry: V2ClientRegistry,
-        runtime_variant_id: RuntimeVariantID,
+        make_create_input: Callable[..., CreateDeploymentRevisionPresetInput],
     ) -> None:
         r1 = await admin_v2_registry.deployment_revision_preset.create(
-            CreateDeploymentRevisionPresetInput(
-                runtime_variant_id=runtime_variant_id,
-                name="rank-test-1",
-                image_id=ImageID(uuid.uuid4()),
-            )
+            make_create_input(name="rank-test-1")
         )
         r2 = await admin_v2_registry.deployment_revision_preset.create(
-            CreateDeploymentRevisionPresetInput(
-                runtime_variant_id=runtime_variant_id,
-                name="rank-test-2",
-                image_id=ImageID(uuid.uuid4()),
-            )
+            make_create_input(name="rank-test-2")
         )
         assert r1.preset.rank == 100
         assert r2.preset.rank == 200

@@ -445,16 +445,14 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         default=None,
         description="Default open_to_public for deployments created from this preset.",
     )
-    replica_count: int | None = gql_field(
-        default=None,
+    replica_count: int = gql_field(
         description="Default replica count for deployments created from this preset.",
     )
     revision_history_limit: int | None = gql_field(
         default=None,
         description="Default revision history limit for deployments created from this preset.",
     )
-    deployment_strategy: PresetDeploymentStrategyInputGQL | None = gql_field(
-        default=None,
+    deployment_strategy: PresetDeploymentStrategyInputGQL = gql_field(
         description="Default deployment strategy for deployments created from this preset.",
     )
     image_id: UUID = gql_added_field(
@@ -477,12 +475,11 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         ),
         default=None,
     )
-    resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_added_field(
+    resource_slots: list[ResourceSlotEntryInputGQL] = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Resource slot allocations (e.g. cpu, mem, cuda.device).",
         ),
-        default=None,
     )
     resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
@@ -491,19 +488,17 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         ),
         default=None,
     )
-    cluster_mode: ClusterModeGQL | None = gql_added_field(
+    cluster_mode: ClusterModeGQL = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Deployment topology mode (single-node or multi-node).",
         ),
-        default=None,
     )
-    cluster_size: int | None = gql_added_field(
+    cluster_size: int = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Number of worker nodes in the cluster.",
         ),
-        default=None,
     )
     startup_command: str | None = gql_added_field(
         BackendAIGQLMeta(
