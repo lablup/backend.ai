@@ -137,7 +137,6 @@ services:
 
   backendai-half-prometheus:
     image: prom/prometheus:v3.1.0
-    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half

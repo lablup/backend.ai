@@ -55,7 +55,7 @@ only the **required** services start. To include optional ones, pass `--profile 
 | `backendai-half-redis` | redis:7.2-alpine | Cache / pub-sub | (required) |
 | `backendai-half-etcd` | etcd v3.5 | Config store | (required) |
 | `backendai-half-apollo-router` | Hive Gateway | GraphQL federation (manager has 2 GQL servers federated through this) | (required) |
-| `backendai-half-prometheus` | Prometheus | Metrics | `observability` |
+| `backendai-half-prometheus` | Prometheus | Metrics — manager queries it for deployment autoscale rule evaluation | (required) |
 | `backendai-half-grafana` | Grafana | Dashboards | `observability` |
 | `backendai-half-otel-collector` | OTel Collector | Telemetry | `observability` |
 | `backendai-half-loki` | Loki | Log aggregation | `observability` |
@@ -71,7 +71,7 @@ only the **required** services start. To include optional ones, pass `--profile 
 # Required only (default)
 docker compose -f docker-compose.halfstack.current.yml up -d --wait
 
-# + observability stack (Prometheus / Grafana / OTel / Loki / Tempo / Pyroscope / exporters)
+# + observability stack (Grafana / OTel / Loki / Tempo / Pyroscope / exporters; Prometheus is already required)
 docker compose -f docker-compose.halfstack.current.yml --profile observability up -d --wait
 
 # + object storage (MinIO)
