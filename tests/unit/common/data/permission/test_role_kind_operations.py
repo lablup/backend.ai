@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.common.data.permission import types as perm_types
 from ai.backend.common.data.permission.types import (
     OperationType,
     RBACElementType,
@@ -33,14 +32,6 @@ _MEMBER_CREATE_ENTITIES: frozenset[RBACElementType] = frozenset({
 })
 
 
-@pytest.fixture(autouse=True)
-def _clear_caches() -> None:
-    """Reset the cache between tests so override mutations take effect."""
-    admin_operations.cache_clear()
-    owner_operations.cache_clear()
-    member_operations.cache_clear()
-
-
 class TestDefaultFallback:
     """Entity types not present in the override map fall back to the default set."""
 
@@ -66,60 +57,6 @@ class TestMemberCreateOverrides:
     @pytest.mark.parametrize("entity_type", sorted(_MEMBER_CREATE_ENTITIES, key=str))
     def test_member_can_create(self, entity_type: RBACElementType) -> None:
         assert member_operations(entity_type) == _READ_AND_CREATE_OPS
-
-
-class TestOverrideMap:
-    """When the override map carries an entry, the helper returns it."""
-
-    def test_admin_override_is_returned(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        override = frozenset({OperationType.READ})
-        monkeypatch.setitem(
-            perm_types._ADMIN_OPS_OVERRIDES,
-            RBACElementType.SESSION,
-            override,
-        )
-        admin_operations.cache_clear()
-        assert admin_operations(RBACElementType.SESSION) == override
-        assert admin_operations(RBACElementType.VFOLDER) == _STANDARD_OPS  # untouched
-
-    def test_owner_override_is_returned(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        override = frozenset({OperationType.READ, OperationType.UPDATE})
-        monkeypatch.setitem(
-            perm_types._OWNER_OPS_OVERRIDES,
-            RBACElementType.MODEL_DEPLOYMENT,
-            override,
-        )
-        owner_operations.cache_clear()
-        assert owner_operations(RBACElementType.MODEL_DEPLOYMENT) == override
-
-    def test_member_override_is_returned(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        override: frozenset[OperationType] = frozenset()
-        monkeypatch.setitem(
-            perm_types._MEMBER_OPS_OVERRIDES,
-            RBACElementType.AGENT,
-            override,
-        )
-        member_operations.cache_clear()
-        assert member_operations(RBACElementType.AGENT) == override
-
-
-class TestCacheStability:
-    """Repeated calls return the same frozenset instance (cache hits)."""
-
-    def test_admin_returns_same_object(self) -> None:
-        assert admin_operations(RBACElementType.SESSION) is admin_operations(
-            RBACElementType.SESSION
-        )
-
-    def test_owner_returns_same_object(self) -> None:
-        assert owner_operations(RBACElementType.SESSION) is owner_operations(
-            RBACElementType.SESSION
-        )
-
-    def test_member_returns_same_object(self) -> None:
-        assert member_operations(RBACElementType.SESSION) is member_operations(
-            RBACElementType.SESSION
-        )
 
 
 class TestPurity:

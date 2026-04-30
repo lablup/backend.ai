@@ -457,7 +457,7 @@ class RelationType(enum.StrEnum):
 
 
 # ---------------------------------------------------------------------------
-# Per-entity allowed-operation tables (BEP-1012 aligned)
+# Per-entity allowed-operation tables
 #
 # These tables define which operations are valid for a given role-kind on a
 # given entity. Entity types not listed in an override map fall back to the
