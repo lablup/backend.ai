@@ -458,6 +458,11 @@ class InstallReport(Static):
                 - Username: `admin`
                 - Password: `{service.harbor_admin_password}`
 
+                The Harbor instance is also pre-registered as a Backend.AI
+                container registry named `local-harbor` (project `library`)
+                with the same admin credentials, so it appears in
+                `mgr image rescan` / the manager UI as soon as you start it.
+
                 Note: Harbor may take 30-60 seconds to become fully ready
                 after `./dev harbor start`.
                 """

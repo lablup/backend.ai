@@ -11,6 +11,7 @@ import secrets
 import shutil
 import sys
 import tempfile
+import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager as actxmgr
@@ -1346,6 +1347,10 @@ class Context(metaclass=ABCMeta):
                 f"Failed to stop Harbor containers after install (docker compose down exit {exit_code})."
             )
 
+        # 5) Register the local Harbor as a Backend.AI container registry so
+        #    images can be scanned/pulled from it without an extra manual step.
+        await self._register_local_harbor_registry()
+
         self.log.write(
             Text.from_markup(
                 f"[green]Harbor is configured.[/] "
@@ -1353,6 +1358,41 @@ class Context(metaclass=ABCMeta):
                 f"[bold]http://{service.harbor_hostname}:{service.harbor_http_port}[/]"
             )
         )
+
+    async def _register_local_harbor_registry(self) -> None:
+        """
+        Register the freshly configured local Harbor as a Backend.AI
+        ``container_registries`` row (with admin credentials) so it shows up
+        immediately in the manager API/UI without manual registration.
+
+        The fixture uses ``uuid5(NAMESPACE_URL, harbor_url)`` for the row ID
+        so re-running the installer does not create duplicate rows — the
+        manager's fixture loader treats a matching primary key as
+        idempotent.
+        """
+        service = self.install_info.service_config
+        harbor_url = f"http://{service.harbor_hostname}:{service.harbor_http_port}"
+        registry_name = "local-harbor"
+        project = "library"
+        registry_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{harbor_url}/{project}"))
+        fixture = {
+            "container_registries": [
+                {
+                    "id": registry_id,
+                    "registry_name": registry_name,
+                    "url": harbor_url,
+                    "type": "harbor2",
+                    "project": project,
+                    "username": "admin",
+                    "password": service.harbor_admin_password,
+                    "ssl_verify": False,
+                }
+            ]
+        }
+        fixture_path = self.install_info.base_path / "harbor" / "container-registry-fixture.json"
+        fixture_path.write_text(json.dumps(fixture, indent=2))
+        self.log_header("Registering local Harbor as a Backend.AI container registry...")
+        await self.run_manager_cli(["mgr", "fixture", "populate", str(fixture_path)])
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
