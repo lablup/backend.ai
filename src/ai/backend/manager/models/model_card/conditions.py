@@ -24,6 +24,20 @@ __all__ = ("ModelCardConditions",)
 
 class ModelCardConditions:
     @staticmethod
+    def by_domain(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ModelCardRow.domain == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_project(project_id: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ModelCardRow.project == project_id
+
+        return inner
+
+    @staticmethod
     def by_project_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             condition = ModelCardRow.project == spec.value

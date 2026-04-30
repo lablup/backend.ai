@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import (
@@ -17,6 +19,13 @@ __all__ = ("RuntimeVariantPresetConditions",)
 
 
 class RuntimeVariantPresetConditions:
+    @staticmethod
+    def by_runtime_variant_id(variant_id: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RuntimeVariantPresetRow.runtime_variant == variant_id
+
+        return inner
+
     @staticmethod
     def by_runtime_variant_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
