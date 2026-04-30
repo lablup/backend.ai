@@ -466,6 +466,21 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# Build the docker compose --profile flags from the ENABLE_* booleans now,
+# right after argument parsing, so every code path (including Codespaces
+# post-create that skips setup_environment) sees a consistent value.
+HALFSTACK_PROFILE_ARGS=""
+if [ $ENABLE_OBSERVABILITY -eq 1 ]; then
+  # observability profile already includes the telemetry services
+  HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile observability"
+elif [ $ENABLE_TELEMETRY -eq 1 ]; then
+  HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile telemetry"
+fi
+if [ $ENABLE_STORAGE -eq 1 ]; then
+  HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile storage"
+fi
+
 if [ "$CURRENT_BRANCH" = "main" ]; then
   EDITABLE_WEBUI=1  # auto-enable if we're on the main branch
 fi
@@ -1035,17 +1050,6 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
-
-  HALFSTACK_PROFILE_ARGS=""
-  if [ $ENABLE_OBSERVABILITY -eq 1 ]; then
-    # observability profile already includes the telemetry services
-    HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile observability"
-  elif [ $ENABLE_TELEMETRY -eq 1 ]; then
-    HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile telemetry"
-  fi
-  if [ $ENABLE_STORAGE -eq 1 ]; then
-    HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile storage"
-  fi
 
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS pull
 
