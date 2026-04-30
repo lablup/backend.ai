@@ -219,14 +219,32 @@ class Context(metaclass=ABCMeta):
                     content = pattern.sub(replacement, content)
         path.write_text(content)
 
+    def _telemetry_active(self) -> bool:
+        """Resolve the tri-state telemetry flag. ``None`` means use the install
+        mode default (ON for SOURCE/develop, OFF for PACKAGE)."""
+        if self.install_variable.enable_telemetry is not None:
+            return self.install_variable.enable_telemetry
+        return self.install_info.type == InstallType.SOURCE
+
+    def _enabled_observability_sections(self) -> tuple[str, ...]:
+        """Component config sections whose ``enabled = false`` should be flipped
+        to ``true`` based on the active observability/telemetry flags."""
+        if self.install_variable.enable_observability:
+            return ("pyroscope", "otel")
+        if self._telemetry_active():
+            return ("otel",)
+        return ()
+
     def enable_observability_in_toml(self, path: Path) -> None:
-        """Flip ``enabled = false`` to ``enabled = true`` for the ``[pyroscope]``
-        and ``[otel]`` sections of a component config. No-op when the
-        ``--enable-observability`` flag is not set."""
-        if not self.install_variable.enable_observability:
+        """Flip ``enabled = false`` to ``enabled = true`` for the relevant
+        observability sections of a component config (``[otel]`` always when
+        either observability or telemetry is on; ``[pyroscope]`` only when full
+        observability is requested). No-op when neither flag is active."""
+        sections = self._enabled_observability_sections()
+        if not sections:
             return
         content = path.read_text()
-        for section in ("pyroscope", "otel"):
+        for section in sections:
             section_pat = re.compile(
                 rf"(\[{section}\][^\[]*?)^enabled\s*=\s*false",
                 re.MULTILINE | re.DOTALL,
@@ -441,7 +459,10 @@ class Context(metaclass=ABCMeta):
         sudo = " ".join(self.docker_sudo)
         profile_args_list: list[str] = []
         if self.install_variable.enable_observability:
+            # observability profile is a superset of telemetry; no need to add both.
             profile_args_list.append("--profile observability")
+        elif self._telemetry_active():
+            profile_args_list.append("--profile telemetry")
         if self.install_variable.enable_storage:
             profile_args_list.append("--profile storage")
         profile_args = " ".join(profile_args_list)

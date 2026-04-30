@@ -122,6 +122,23 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     default=False,
     help="Bring up the halfstack 'storage' Compose profile (MinIO).",
 )
+@click.option(
+    "--enable-telemetry",
+    "enable_telemetry",
+    flag_value="on",
+    default=None,
+    help=(
+        "Bring up the halfstack 'telemetry' Compose profile (OTel collector"
+        " + Loki) and enable [otel] in component configs. Default ON in"
+        " DEVELOP install mode, OFF in PACKAGE install mode."
+    ),
+)
+@click.option(
+    "--disable-telemetry",
+    "enable_telemetry",
+    flag_value="off",
+    help="Force the 'telemetry' profile OFF (overrides DEVELOP mode default).",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -142,6 +159,7 @@ def main(
     metric_access_cidr: str,
     enable_observability: bool,
     enable_storage: bool,
+    enable_telemetry: str | None,
     accelerator: str,
 ) -> None:
     """The installer"""
@@ -175,6 +193,7 @@ def main(
         metric_access_cidr=metric_access_cidr,
         enable_observability=enable_observability,
         enable_storage=enable_storage,
+        enable_telemetry=(None if enable_telemetry is None else (enable_telemetry == "on")),
     )
     app = InstallerApp(args)
     app.run(headless=headless)

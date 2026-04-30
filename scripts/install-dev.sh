@@ -48,22 +48,31 @@ trim() {
 }
 
 enable_observability_in_toml() {
-  # Flip "enabled = false" to "enabled = true" inside the [pyroscope] and
-  # [otel] sections of a component config. No-op when --enable-observability
-  # was not passed.
+  # Flip "enabled = false" to "enabled = true" inside observability sections of
+  # a component config. Sections enabled depend on the active flags:
+  #   - --enable-observability  -> [pyroscope] and [otel]
+  #   - --enable-telemetry      -> [otel] only
+  # No-op when neither flag is active.
   local file="$1"
-  if [ $ENABLE_OBSERVABILITY -ne 1 ]; then
+  local sections=""
+  if [ $ENABLE_OBSERVABILITY -eq 1 ]; then
+    sections="pyroscope otel"
+  elif [ $ENABLE_TELEMETRY -eq 1 ]; then
+    sections="otel"
+  fi
+  if [ -z "$sections" ]; then
     return
   fi
   if [ ! -f "$file" ]; then
     return
   fi
-  python3 - "$file" <<'PY'
+  python3 - "$file" $sections <<'PY'
 import re, sys
 path = sys.argv[1]
+sections = sys.argv[2:]
 with open(path) as f:
     text = f.read()
-for section in ("pyroscope", "otel"):
+for section in sections:
     pat = re.compile(
         r"(\[" + section + r"\][^\[]*?)^enabled\s*=\s*false",
         re.MULTILINE | re.DOTALL,
@@ -128,6 +137,12 @@ usage() {
   echo "  ${LWHITE}--enable-storage${NC}"
   echo "    Bring up the halfstack 'storage' Compose profile (MinIO)."
   echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-telemetry / --disable-telemetry${NC}"
+  echo "    Bring up the halfstack 'telemetry' Compose profile (OTel collector"
+  echo "    + Loki) and enable [otel] in component configs. Default ON for the"
+  echo "    dev install; pass --disable-telemetry to opt out. Implied by"
+  echo "    --enable-observability."
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
@@ -364,6 +379,7 @@ ENABLE_CUDA_MIG_MOCK=0
 ENABLE_ROCM_MOCK=0
 ENABLE_OBSERVABILITY=0
 ENABLE_STORAGE=0
+ENABLE_TELEMETRY=1  # default ON in dev install (override with --disable-telemetry)
 CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
@@ -411,6 +427,8 @@ while [ $# -gt 0 ]; do
     --enable-rocm-mock)    ENABLE_ROCM_MOCK=1 ;;
     --enable-observability) ENABLE_OBSERVABILITY=1 ;;
     --enable-storage)      ENABLE_STORAGE=1 ;;
+    --enable-telemetry)    ENABLE_TELEMETRY=1 ;;
+    --disable-telemetry)   ENABLE_TELEMETRY=0 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -1020,7 +1038,10 @@ setup_environment() {
 
   HALFSTACK_PROFILE_ARGS=""
   if [ $ENABLE_OBSERVABILITY -eq 1 ]; then
+    # observability profile already includes the telemetry services
     HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile observability"
+  elif [ $ENABLE_TELEMETRY -eq 1 ]; then
+    HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile telemetry"
   fi
   if [ $ENABLE_STORAGE -eq 1 ]; then
     HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile storage"

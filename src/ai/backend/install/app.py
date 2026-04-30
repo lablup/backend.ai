@@ -499,6 +499,7 @@ class ModeMenu(Static):
             metric_access_cidr=args.metric_access_cidr,
             enable_observability=args.enable_observability,
             enable_storage=args.enable_storage,
+            enable_telemetry=args.enable_telemetry,
         )
 
     def compose(self) -> ComposeResult:
