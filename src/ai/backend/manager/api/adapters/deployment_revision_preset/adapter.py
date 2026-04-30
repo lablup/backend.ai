@@ -7,6 +7,7 @@ from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.deployment.types import ModelDefinitionInfoDTO
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
@@ -553,7 +554,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 deployment_strategy=data.deployment_strategy,
                 deployment_strategy_spec=data.deployment_strategy_spec,
             ),
-            model_definition=data.model_definition,
+            model_definition=(
+                ModelDefinitionInfoDTO.model_validate(
+                    data.model_definition.model_dump(by_alias=False)
+                )
+                if data.model_definition is not None
+                else None
+            ),
             preset_values=preset_value_entries,
             created_at=data.created_at,
             updated_at=data.updated_at,
