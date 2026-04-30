@@ -36,8 +36,8 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     model_definition: ModelDefinition | None = Field(
         default=None, description="Model definition configuration."
     )
-    resource_slots: list[ResourceSlotEntryInput] = Field(
-        min_length=1, description="Resource slot allocations."
+    resource_slots: list[ResourceSlotEntryInput] | None = Field(
+        default=None, description="Resource slot allocations."
     )
     resource_opts: list[ResourceOptsEntryDTO] | None = Field(
         default=None, description="Additional resource options."

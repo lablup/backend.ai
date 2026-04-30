@@ -475,11 +475,12 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         ),
         default=None,
     )
-    resource_slots: list[ResourceSlotEntryInputGQL] = gql_added_field(
+    resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Resource slot allocations (e.g. cpu, mem, cuda.device).",
         ),
+        default=None,
     )
     resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
