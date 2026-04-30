@@ -302,22 +302,12 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
     )
     shell: str = Field(
         default="/bin/bash",
-        description="Shell used to wrap a string-form start_command at parse time.",
+        description="Shell configured for the model service.",
     )
     port: int = Field(description="Port number for the model service.")
     health_check: ModelHealthCheckInfoDTO | None = Field(
         default=None, description="Health check configuration for the model service."
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_string_start_command(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            cmd = data.get("start_command")
-            if isinstance(cmd, str):
-                shell = data.get("shell") or "/bin/bash"
-                data["start_command"] = [shell, "-c", cmd]
-        return data
 
 
 class ModelMetadataInfoDTO(BaseResponseModel):

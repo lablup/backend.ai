@@ -2467,7 +2467,7 @@ class AbstractAgent[
         image: str,
     ) -> list[dict[str, Any]]:
         image_command_loaded = False
-        image_command: str | list[str] | None = None
+        image_command: list[str] | None = None
         for model in models:
             service = model.get("service")
             if not isinstance(service, dict):
@@ -2479,11 +2479,7 @@ class AbstractAgent[
                 image_command_loaded = True
             if not image_command:
                 continue
-            if isinstance(image_command, str):
-                shell = service.get("shell") or "/bin/bash"
-                service["start_command"] = [shell, "-c", image_command]
-            else:
-                service["start_command"] = list(image_command)
+            service["start_command"] = list(image_command)
             model["service"] = service
         return models
 
@@ -3336,7 +3332,7 @@ class AbstractAgent[
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
-    async def extract_image_command(self, image: str) -> str | list[str] | None:
+    async def extract_image_command(self, image: str) -> list[str] | None:
         raise NotImplementedError
 
     @abstractmethod

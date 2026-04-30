@@ -39,7 +39,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     IntOrPercent,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
-    ModelServiceConfigInfoDTO,
     ReplicaStateInfo,
     ResourceConfigInfoDTO,
     RollingUpdateConfigInfo,
@@ -199,19 +198,6 @@ class TestExtraVFolderMountNode:
         restored = ExtraVFolderMountNode.model_validate_json(json_str)
         assert restored.vfolder_id == vfolder_id
         assert restored.mount_destination == "/data"
-
-
-class TestModelServiceConfigInfoDTO:
-    """Tests for ModelServiceConfigInfoDTO model."""
-
-    def test_wraps_legacy_string_start_command_with_shell(self) -> None:
-        service = ModelServiceConfigInfoDTO.model_validate({
-            "start_command": "python serve.py",
-            "shell": "/bin/sh",
-            "port": 8000,
-        })
-
-        assert service.start_command == ["/bin/sh", "-c", "python serve.py"]
 
 
 class TestRevisionNode:

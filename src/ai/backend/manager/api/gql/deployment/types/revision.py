@@ -372,9 +372,7 @@ class ModelServiceConfigGQL:
     start_command: list[str] | None = gql_field(
         description="Command to start the model service.", default=None
     )
-    shell: str = gql_field(
-        description="Shell used to wrap a string-form start_command at parse time."
-    )
+    shell: str = gql_field(description="Shell configured for the model service.")
     port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
@@ -832,7 +830,7 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDTO]):
         description="Command to start the model service.", default=None
     )
     shell: str = gql_field(
-        description="Shell used to wrap a string-form start_command at parse time.",
+        description="Shell configured for the model service.",
         default="/bin/bash",
     )
     port: int = gql_field(description="Port number for the model service. Must be greater than 1.")

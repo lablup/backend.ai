@@ -14,7 +14,7 @@ TEST_IMAGE = "example.com/custom-vllm:latest"
 @dataclass(frozen=True)
 class ModelServiceStartCommandScenario:
     id: str
-    image_command: str | list[str] | None
+    image_command: list[str] | None
     models: list[dict[str, Any]]
     expected_start_commands: dict[str, list[str]]
     expected_image_command_calls: int = 1
@@ -24,7 +24,7 @@ class ModelServiceStartCommandScenario:
 class _ModelServiceCommandAgent:
     def __init__(
         self,
-        image_command: str | list[str] | None,
+        image_command: list[str] | None,
         *,
         raise_not_implemented: bool = False,
     ) -> None:
@@ -32,7 +32,7 @@ class _ModelServiceCommandAgent:
         self._image_command = image_command
         self._raise_not_implemented = raise_not_implemented
 
-    async def extract_image_command(self, image: str) -> str | list[str] | None:
+    async def extract_image_command(self, image: str) -> list[str] | None:
         self.calls.append(image)
         if self._raise_not_implemented:
             raise NotImplementedError
@@ -88,26 +88,6 @@ class TestPopulateMissingModelServiceStartCommands:
                 expected_start_commands={
                     "vllm": ["/etc/container/start-vllm.sh"],
                     "explicit": ["python", "serve.py"],
-                },
-            ),
-            ModelServiceStartCommandScenario(
-                id="wraps_string_command_with_shell_for_multiple_models",
-                image_command="python -m vllm.entrypoints.openai.api_server",
-                models=[
-                    _model("model-a", 8000),
-                    _model("model-b", 8001),
-                ],
-                expected_start_commands={
-                    "model-a": [
-                        "/bin/bash",
-                        "-c",
-                        "python -m vllm.entrypoints.openai.api_server",
-                    ],
-                    "model-b": [
-                        "/bin/bash",
-                        "-c",
-                        "python -m vllm.entrypoints.openai.api_server",
-                    ],
                 },
             ),
             ModelServiceStartCommandScenario(

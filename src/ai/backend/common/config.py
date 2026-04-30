@@ -159,8 +159,8 @@ model_definition_iv = t.Dict({
                         t.Key("args"): t.Dict().allow_extra("*"),
                     })
                 ),
-                t.Key("start_command", default=None): t.Null | t.String | t.List(t.String),
-                t.Key("shell", default="/bin/bash"): t.String,  # used if start_command is a string
+                t.Key("start_command", default=None): t.Null | t.List(t.String),
+                t.Key("shell", default="/bin/bash"): t.String,
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
                 | t.Dict({
@@ -246,14 +246,14 @@ class ModelServiceConfig(BaseConfigModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: str | list[str] | None = Field(
+    start_command: list[str] | None = Field(
         default=None,
         description="Command to start the model service.",
-        examples=["python service.py", ["python", "service.py"]],
+        examples=[["python", "service.py"]],
     )
     shell: str = Field(
         default="/bin/bash",
-        description="Shell to use if start_command is a string.",
+        description="Shell configured for the model service.",
         examples=["/bin/bash"],
     )
     port: int = Field(
@@ -503,7 +503,7 @@ class ModelHealthCheckDraft(BaseConfigModel):
 
 class ModelServiceConfigDraft(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
-    start_command: str | list[str] | None = None
+    start_command: list[str] | None = None
     shell: str | None = None
     port: int | None = None
     health_check: ModelHealthCheckDraft | None = None

@@ -70,8 +70,10 @@ class TestRevisionDataToDTO:
 
         assert dto.model_definition is not None
         assert dto.model_definition.models[0].name == "demo-model"
-        assert dto.model_definition.models[0].service is not None
-        assert dto.model_definition.models[0].service.port == 8000
+        service = dto.model_definition.models[0].service
+        assert service is not None
+        assert service.port == 8000
+        assert service.start_command == ["python", "serve.py"]
 
 
 class TestTriStateFromInput:

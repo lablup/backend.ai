@@ -85,16 +85,13 @@
           }
         },
         "start_command": {
-          "description": "Command to start the model service. Accepts an array of arguments, or a legacy shell string which will be wrapped with the configured shell at parse time.",
+          "description": "Command arguments to start the model service.",
           "oneOf": [
             {
               "type": "array",
               "items": {
                 "type": "string"
               }
-            },
-            {
-              "type": "string"
             },
             {
               "type": "null"
@@ -105,13 +102,12 @@
             [
               "python",
               "service.py"
-            ],
-            "python service.py"
+            ]
           ]
         },
         "shell": {
           "type": "string",
-          "description": "Shell used to wrap a legacy string-form start_command at parse time.",
+          "description": "Shell configured for the model service.",
           "default": "/bin/bash",
           "examples": [
             "/bin/bash",
