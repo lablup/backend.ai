@@ -372,11 +372,12 @@ class DeploymentController:
         merged RevisionDraft — mount identity is not a merge candidate.
 
         Merge order (low → high) is assembled by ``RevisionDraftReader``:
-            1. runtime-variant baseline model definition
-            2. revision preset (if ``preset_id`` is supplied)
-            3. deployment-config.yaml   (only when the variant reads vfolder files)
-            4. model-definition.yaml    (only when the variant reads vfolder files)
-            5. overrides (highest — explicit user input)
+            1. model mount destination as the ``model_path`` default
+            2. runtime-variant baseline model definition
+            3. revision preset (if ``preset_id`` is supplied)
+            4. deployment-config.yaml   (only when the variant reads vfolder files)
+            5. model-definition.yaml    (only when the variant reads vfolder files)
+            6. overrides (highest — explicit user input)
 
         ``runtime_variant_id`` is resolved before the draft chain runs because
         the runtime variant's baseline model definition is the first merge

@@ -105,3 +105,39 @@ class TestRevisionDraftMerge:
         later = RevisionDraft(preset_values=second)
         merged = earlier.merge(later)
         assert merged.preset_values == second
+
+    def test_model_definition_uses_lower_model_path_when_higher_omits_it(self) -> None:
+        base = RevisionDraft(
+            model_definition=ModelDefinitionDraft(
+                models=[ModelConfigDraft(name="base", model_path="/mnt/models")]
+            )
+        )
+        override = RevisionDraft(
+            model_definition=ModelDefinitionDraft(models=[ModelConfigDraft(name="override")])
+        )
+
+        merged = _merge_all(base, override)
+
+        assert merged.model_definition is not None
+        assert merged.model_definition.models is not None
+        assert merged.model_definition.models[0].name == "override"
+        assert merged.model_definition.models[0].model_path == "/mnt/models"
+
+    def test_model_definition_treats_null_model_path_as_missing(self) -> None:
+        base = RevisionDraft(
+            model_definition=ModelDefinitionDraft(
+                models=[ModelConfigDraft(name="base", model_path="/mnt/models")]
+            )
+        )
+        override = RevisionDraft(
+            model_definition=ModelDefinitionDraft(
+                models=[ModelConfigDraft(name="override", model_path=None)]
+            )
+        )
+
+        merged = _merge_all(base, override)
+
+        assert merged.model_definition is not None
+        assert merged.model_definition.models is not None
+        assert merged.model_definition.models[0].name == "override"
+        assert merged.model_definition.models[0].model_path == "/mnt/models"

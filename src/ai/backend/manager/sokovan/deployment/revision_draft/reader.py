@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -47,7 +47,8 @@ class RevisionDraftReader:
 
     One public method per API path (legacy create, legacy modify, v2 add).
     Each returns the ordered list of drafts the controller feeds into
-    ``merge_revision_drafts`` — lowest priority first.
+    ``merge_revision_drafts`` — lowest priority first. The model mount
+    destination is added as the lowest-priority ``model_path`` default.
     """
 
     _deployment_repository: DeploymentRepository
@@ -69,17 +70,21 @@ class RevisionDraftReader:
         """Legacy model-serving create: no base revision.
 
         Merge order (low → high):
-          1. runtime-variant default model definition
-          2. revision preset (if supplied)
-          3. deployment-config.yaml  (only when the variant reads vfolder files)
-          4. model-definition.yaml   (only when the variant reads vfolder files)
-          5. request
+          1. model mount destination as model_path default
+          2. runtime-variant default model definition
+          3. revision preset (if supplied)
+          4. deployment-config.yaml  (only when the variant reads vfolder files)
+          5. model-definition.yaml   (only when the variant reads vfolder files)
+          6. request
         """
         bundle = await self._deployment_repository.load_legacy_model_service_deployment_read_bundle(
             runtime_variant_id=execution.runtime_variant_id,
             preset_id=preset_id,
         )
-        drafts: list[RevisionDraft] = [self._variant_baseline_to_draft(bundle.variant)]
+        drafts: list[RevisionDraft] = [
+            self._model_mount_path_default_draft(mounts),
+            self._variant_baseline_to_draft(bundle.variant),
+        ]
         if bundle.preset is not None:
             drafts.append(self._preset_to_draft(bundle.preset, bundle.preset_resource_slots or []))
         drafts.extend(await self._read_vfolder_drafts(mounts, bundle.variant))
@@ -101,7 +106,10 @@ class RevisionDraftReader:
             preset_id=preset_id,
             endpoint_id=endpoint_id,
         )
-        drafts: list[RevisionDraft] = [self._variant_baseline_to_draft(bundle.variant)]
+        drafts: list[RevisionDraft] = [
+            self._model_mount_path_default_draft(mounts),
+            self._variant_baseline_to_draft(bundle.variant),
+        ]
         if bundle.preset is not None:
             drafts.append(self._preset_to_draft(bundle.preset, bundle.preset_resource_slots or []))
         drafts.append(bundle.base.to_draft())
@@ -122,7 +130,10 @@ class RevisionDraftReader:
             runtime_variant_id=runtime_variant_id,
             preset_id=preset_id,
         )
-        drafts: list[RevisionDraft] = [self._variant_baseline_to_draft(bundle.variant)]
+        drafts: list[RevisionDraft] = [
+            self._model_mount_path_default_draft(mounts),
+            self._variant_baseline_to_draft(bundle.variant),
+        ]
         if bundle.preset is not None:
             drafts.append(self._preset_to_draft(bundle.preset, bundle.preset_resource_slots or []))
         drafts.extend(await self._read_vfolder_drafts(mounts, bundle.variant))
@@ -160,6 +171,16 @@ class RevisionDraftReader:
             model_definition=model_definition,
             preset_values=list(preset.preset_values) or None,
         )
+
+    def _model_mount_path_default_draft(
+        self,
+        mounts: MountMetadata,
+    ) -> RevisionDraft:
+        """Build the lowest-priority model_path default draft."""
+        model_definition = ModelDefinitionDraft(
+            models=[ModelConfigDraft(model_path=mounts.model_mount_destination)]
+        )
+        return RevisionDraft(model_definition=model_definition)
 
     async def _read_vfolder_drafts(
         self,
