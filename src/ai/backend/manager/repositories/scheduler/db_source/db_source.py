@@ -29,6 +29,8 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
@@ -1482,7 +1484,7 @@ class ScheduleDBSource:
                 # The draft's access_key is the owner's for delegated sessions, so
                 # this check enforces RG access against the owner's allowlist.
                 allowed_rgs = await self._query_allowed_scaling_groups(
-                    db_sess, domain_name, str(project_id), access_key
+                    db_sess, domain_name, project_id, access_key
                 )
                 if resource_group_name not in {rg.name for rg in allowed_rgs}:
                     raise InvalidAPIParameters(
@@ -1631,6 +1633,22 @@ class ScheduleDBSource:
             active_session_count=active_session_count,
             keypair_resource_policy=keypair_policy,
         )
+
+    async def pick_default_resource_group(
+        self,
+        *,
+        access_key: AccessKey,
+        domain_name: str,
+        project_id: ProjectID,
+    ) -> ResourceGroupName:
+        """Return the first resource group from the owner's allowlist."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            allowed_rgs = await self._query_allowed_scaling_groups(
+                db_sess, domain_name, project_id, access_key
+            )
+        if not allowed_rgs:
+            raise InvalidAPIParameters("No accessible scaling group available")
+        return ResourceGroupName(allowed_rgs[0].name)
 
     async def _get_scaling_group_network_info(
         self, db_sess: SASession, scaling_group_name: str
@@ -1830,7 +1848,7 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         domain_name: str,
-        group_id: str,
+        group_id: ProjectID,
         access_key: str,
     ) -> list[AllowedScalingGroup]:
         """
@@ -1839,7 +1857,7 @@ class ScheduleDBSource:
         Args:
             db_sess: Database session
             domain_name: Domain name
-            group_id: Group ID
+            group_id: Project (group) ID
             access_key: Access key
 
         Returns:
@@ -1850,7 +1868,7 @@ class ScheduleDBSource:
         allowed_sgroups = await query_allowed_sgroups(
             conn,
             domain_name,
-            UUID(group_id),
+            group_id,
             access_key,
         )
 

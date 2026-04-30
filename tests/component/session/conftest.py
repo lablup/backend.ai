@@ -96,6 +96,7 @@ async def session_processors(
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
         session_repository=session_repository,
+        scheduler_repository=AsyncMock(),
         scheduling_controller=scheduling_controller_mock,
         appproxy_client_pool=appproxy_client_pool,
         user_repository=AsyncMock(),

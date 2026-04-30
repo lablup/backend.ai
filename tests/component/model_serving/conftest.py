@@ -66,6 +66,7 @@ def model_serving_processors(
         repository=ms_repo,
         deployment_repository=deployment_repo,
         runtime_variant_repository=AsyncMock(),
+        scheduler_repository=AsyncMock(),
         deployment_controller=AsyncMock(),
         scheduling_controller=AsyncMock(),
         route_controller=AsyncMock(),

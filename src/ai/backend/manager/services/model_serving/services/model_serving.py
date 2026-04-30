@@ -106,6 +106,7 @@ from ai.backend.manager.repositories.model_serving.creators import EndpointToken
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -187,6 +188,7 @@ class ModelServingService:
     _repository: ModelServingRepository
     _deployment_repository: DeploymentRepository
     _runtime_variant_repository: RuntimeVariantRepository
+    _scheduler_repository: SchedulerRepository
 
     _valkey_live: ValkeyLiveClient
     _deployment_controller: DeploymentController
@@ -205,6 +207,7 @@ class ModelServingService:
         repository: ModelServingRepository,
         deployment_repository: DeploymentRepository,
         runtime_variant_repository: RuntimeVariantRepository,
+        scheduler_repository: SchedulerRepository,
         deployment_controller: DeploymentController,
         scheduling_controller: SchedulingController,
         route_controller: RouteController,
@@ -219,6 +222,7 @@ class ModelServingService:
         self._repository = repository
         self._deployment_repository = deployment_repository
         self._runtime_variant_repository = runtime_variant_repository
+        self._scheduler_repository = scheduler_repository
         self._deployment_controller = deployment_controller
         self._scheduling_controller = scheduling_controller
         self._route_controller = route_controller
@@ -619,6 +623,15 @@ class ModelServingService:
         environ = dict(action.config.environ or {})
         callback_url = URL(action.callback_url.unicode_string()) if action.callback_url else None
 
+        if service_prepare_ctx.scaling_group:
+            resource_group_name = ResourceGroupName(service_prepare_ctx.scaling_group)
+        else:
+            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+                access_key=AccessKey(service_prepare_ctx.owner_access_key),
+                domain_name=action.domain_name,
+                project_id=ProjectID(service_prepare_ctx.group_id),
+            )
+
         draft = SessionSpecDraft(
             identity=SessionIdentityDraft(
                 session_id=SessionID(uuid.uuid4()),
@@ -630,11 +643,7 @@ class ModelServingService:
             scope=SessionScopeDraft(
                 domain_name=DomainName(action.domain_name),
                 project_id=ProjectID(service_prepare_ctx.group_id),
-                resource_group_name=(
-                    ResourceGroupName(service_prepare_ctx.scaling_group)
-                    if service_prepare_ctx.scaling_group
-                    else None
-                ),
+                resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(
                 session_type=SessionTypes.INFERENCE,

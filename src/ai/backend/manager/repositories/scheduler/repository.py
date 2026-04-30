@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -257,6 +259,21 @@ class SchedulerRepository:
             draft,
             storage_manager=storage_manager,
             allowed_vfolder_types=allowed_vfolder_types,
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def pick_default_resource_group(
+        self,
+        *,
+        access_key: AccessKey,
+        domain_name: str,
+        project_id: ProjectID,
+    ) -> ResourceGroupName:
+        """Return the first resource group from the owner's allowlist."""
+        return await self._db_source.pick_default_resource_group(
+            access_key=access_key,
+            domain_name=domain_name,
+            project_id=project_id,
         )
 
     @scheduler_repository_resilience.apply()

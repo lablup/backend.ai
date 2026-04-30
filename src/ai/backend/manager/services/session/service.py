@@ -95,6 +95,7 @@ from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
 )
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -247,6 +248,7 @@ class SessionServiceArgs:
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
+    scheduler_repository: SchedulerRepository
     scheduling_controller: SchedulingController
     appproxy_client_pool: AppProxyClientPool
     user_repository: UserRepository
@@ -260,6 +262,7 @@ class SessionService:
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
+    _scheduler_repository: SchedulerRepository
     _user_repository: UserRepository
     _scheduling_controller: SchedulingController
     _appproxy_client_pool: AppProxyClientPool
@@ -277,6 +280,7 @@ class SessionService:
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
+        self._scheduler_repository = args.scheduler_repository
         self._user_repository = args.user_repository
         self._scheduling_controller = args.scheduling_controller
         self._appproxy_client_pool = args.appproxy_client_pool
@@ -1587,6 +1591,15 @@ class SessionService:
         dependencies = tuple(SessionID(dep_id) for dep_id in (action.scheduling.dependencies or ()))
         callback_url = yarl.URL(action.callback_url) if action.callback_url else None
 
+        if action.resource.resource_group:
+            resource_group_name = ResourceGroupName(action.resource.resource_group)
+        else:
+            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+                access_key=access_key,
+                domain_name=domain_name,
+                project_id=ProjectID(action.group_id),
+            )
+
         draft = SessionSpecDraft(
             identity=SessionIdentityDraft(
                 session_id=SessionID(uuid.uuid4()),
@@ -1598,11 +1611,7 @@ class SessionService:
             scope=SessionScopeDraft(
                 domain_name=DomainName(domain_name),
                 project_id=ProjectID(action.group_id),
-                resource_group_name=(
-                    ResourceGroupName(action.resource.resource_group)
-                    if action.resource.resource_group
-                    else None
-                ),
+                resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(
                 session_type=action.session_type,
