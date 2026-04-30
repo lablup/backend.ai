@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 from ai.backend.client.cli.v2.deployment.chat.utils import (
     CHAT_CACHE_FILE,
     CHAT_CONFIG_FILE,
+    CHAT_HISTORY_FILE,
     read_json_file,
     write_json_file,
 )
@@ -19,6 +20,20 @@ from ai.backend.common.identifier.deployment import DeploymentID
 
 CACHE_ENTRY_TTL = timedelta(hours=24)
 """Endpoint cache entries older than this are treated as a cache miss."""
+
+DEFAULT_CHAT_HISTORY_LIMIT = 10
+"""Default number of past messages forwarded as context on each ``chat`` call.
+
+Mirrors the typical 5-turn rolling window of OpenAI-compatible chat UIs.
+Override per-call with ``--history-limit``; setting it to 0 disables context.
+"""
+
+MAX_PERSISTED_HISTORY_MESSAGES = 100
+"""Hard cap on messages kept in ``history.json`` per deployment.
+
+The file holds plain text; capping it keeps disk usage bounded even when the
+user never runs ``chat-history clear``. Older messages are dropped FIFO.
+"""
 
 
 class DeploymentChatCacheEntry(BaseModel):
@@ -151,3 +166,80 @@ class DeploymentChatConfig(BaseModel):
         storage convention; see ``client/cli/v2/config_cmd.py``).
         """
         write_json_file(CHAT_CONFIG_FILE, self.model_dump_json(indent=2))
+
+
+class ChatMessage(BaseModel):
+    """One persisted user/assistant turn.
+
+    ``created_at`` is local-only metadata for ``chat-history show``; it is
+    stripped before the message is replayed into the chat-completions request
+    body (the wire format is just ``{role, content}``).
+    """
+
+    role: str
+    content: str
+    created_at: datetime
+
+
+class DeploymentChatHistory(BaseModel):
+    """Per-deployment rolling chat transcripts.
+
+    Stored separately from the cache (auto-managed endpoint metadata) and
+    config (user-managed token/model) so that clearing one does not affect
+    the others. The transcripts are FIFO-truncated at
+    :data:`MAX_PERSISTED_HISTORY_MESSAGES` to bound disk usage.
+    """
+
+    deployments: dict[DeploymentID, list[ChatMessage]] = Field(default_factory=dict)
+
+    def get(self, deployment_id: DeploymentID) -> list[ChatMessage] | None:
+        return self.deployments.get(deployment_id)
+
+    def slice(self, deployment_id: DeploymentID, limit: int) -> list[ChatMessage]:
+        """Return the last ``limit`` turns of the transcript for replay as request context."""
+        if limit <= 0:
+            return []
+        messages = self.deployments.get(deployment_id)
+        if not messages:
+            return []
+        return messages[-limit:]
+
+    def append(
+        self,
+        deployment_id: DeploymentID,
+        role: str,
+        content: str,
+        *,
+        created_at: datetime,
+        max_persisted: int = MAX_PERSISTED_HISTORY_MESSAGES,
+    ) -> None:
+        """Append one turn and FIFO-truncate to keep the file bounded."""
+        messages = self.deployments.setdefault(deployment_id, [])
+        messages.append(ChatMessage(role=role, content=content, created_at=created_at))
+        overflow = len(messages) - max_persisted
+        if overflow > 0:
+            del messages[:overflow]
+
+    def clear(self, deployment_id: DeploymentID) -> bool:
+        return self.deployments.pop(deployment_id, None) is not None
+
+    @classmethod
+    def load(cls) -> Self:
+        """Load the chat history; return an empty history when the file is absent or unreadable."""
+        raw = read_json_file(CHAT_HISTORY_FILE)
+        if raw is None:
+            return cls()
+        try:
+            return cls.model_validate(raw)
+        except ValidationError:
+            print(
+                f"WARNING: {CHAT_HISTORY_FILE} is in an invalid format and was ignored.",
+                file=sys.stderr,
+            )
+            return cls()
+
+    def save(self) -> None:
+        """Persist the history as a plain JSON file (matches existing CLI credential
+        storage convention; see ``client/cli/v2/config_cmd.py``).
+        """
+        write_json_file(CHAT_HISTORY_FILE, self.model_dump_json(indent=2))

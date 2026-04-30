@@ -5,12 +5,14 @@ from typing import Any
 
 import pytest
 from aioresponses import aioresponses
+from pydantic import ValidationError
 from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.deployment_chat import DeploymentChatClient
 from ai.backend.client.v2.exceptions import DeploymentAuthError
+from ai.backend.common.dto.clients.openai_compat import ChatCompletionResponse
 
 BASE_URL = "http://infer.test.local"
 CHAT_URL = f"{BASE_URL}/v1/chat/completions"
@@ -66,7 +68,9 @@ class TestChatCompletionSuccess:
         assert call.kwargs["headers"]["Authorization"] == "Bearer sk-test-token"
         assert call.kwargs["headers"]["Content-Type"] == "application/json"
         assert call.kwargs["json"] == _make_body()
-        assert resp["choices"][0]["message"]["content"] == "hi"
+        assert isinstance(resp, ChatCompletionResponse)
+        assert resp.choices[0].message.content == "hi"
+        assert resp.assistant_message == "hi"
 
     async def test_endpoint_url_already_ending_in_chat_completions(
         self, chat_client: DeploymentChatClient
@@ -147,3 +151,79 @@ class TestNonJsonResponse:
                 await chat_client.chat_completion(BASE_URL, "sk", _make_body())
         assert exc_info.value.status == 502
         assert "Bad Gateway" in exc_info.value.data["detail"]
+
+
+class TestChatCompletionResponseModel:
+    """Direct coverage for the response Pydantic model.
+
+    ``DeploymentChatClient.chat_completion`` runs ``model_validate`` on the
+    payload, so failures here surface as ``ValidationError`` at the SDK
+    boundary instead of corrupting persisted chat history downstream.
+    """
+
+    def test_assistant_message_returns_first_choice_text(self) -> None:
+        resp = ChatCompletionResponse.model_validate({
+            "choices": [
+                {"message": {"role": "assistant", "content": "hi 길동"}},
+                {"message": {"role": "assistant", "content": "ignored"}},
+            ],
+        })
+        assert resp.assistant_message == "hi 길동"
+
+    def test_assistant_message_none_when_choices_empty(self) -> None:
+        # vLLM emits choices=[] on certain error paths; the CLI uses this
+        # to skip half-recorded history rounds.
+        resp = ChatCompletionResponse.model_validate({"choices": []})
+        assert resp.assistant_message is None
+
+    def test_assistant_message_none_for_tool_call_only_response(self) -> None:
+        # Function-calling responses leave message.content as null and put
+        # the call in tool_calls; nothing text-shaped to persist.
+        resp = ChatCompletionResponse.model_validate({
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {"name": "lookup", "arguments": "{}"},
+                            },
+                        ],
+                    },
+                },
+            ],
+        })
+        assert resp.assistant_message is None
+
+    def test_extra_top_level_fields_round_trip(self) -> None:
+        # Runtime-specific telemetry (usage, system_fingerprint, vLLM
+        # prompt_logprobs, NIM extras) must survive parsing so the CLI's
+        # JSON pretty-print still shows them to the user.
+        payload: dict[str, Any] = {
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1741569952,
+            "model": "vllm/test",
+            "choices": [{"message": {"role": "assistant", "content": "hi"}}],
+            "usage": {"prompt_tokens": 4, "completion_tokens": 1, "total_tokens": 5},
+            "system_fingerprint": "fp_xyz",
+        }
+        resp = ChatCompletionResponse.model_validate(payload)
+        dumped = resp.model_dump(mode="json")
+        assert dumped["usage"]["total_tokens"] == 5
+        assert dumped["system_fingerprint"] == "fp_xyz"
+        assert dumped["model"] == "vllm/test"
+
+    def test_streaming_chunk_shape_fails_validation(self) -> None:
+        # ``delta`` is the streaming-chunk shape; the SDK never sets
+        # stream=true, so its arrival means the server misbehaved.
+        # Failing loudly is preferable to silently dropping the round.
+        with pytest.raises(ValidationError):
+            ChatCompletionResponse.model_validate({
+                "choices": [
+                    {"delta": {"role": "assistant", "content": "partial"}},
+                ],
+            })

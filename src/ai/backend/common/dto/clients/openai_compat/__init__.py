@@ -7,11 +7,20 @@ agent tomorrow) can consume the same types when talking to a deployed model.
 """
 
 from .request import ChatCompletionMessage, ChatCompletionRequest
-from .response import ListModelsResponse, ModelEntry
+from .response import (
+    ChatCompletionResponse,
+    ChatCompletionResponseChoice,
+    ChatCompletionResponseMessage,
+    ListModelsResponse,
+    ModelEntry,
+)
 
 __all__ = (
     "ChatCompletionMessage",
     "ChatCompletionRequest",
+    "ChatCompletionResponse",
+    "ChatCompletionResponseChoice",
+    "ChatCompletionResponseMessage",
     "ListModelsResponse",
     "ModelEntry",
 )
