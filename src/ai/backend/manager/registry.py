@@ -126,6 +126,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
 
@@ -204,6 +205,7 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
     _scheduling_controller: SchedulingController
+    _scheduler_repository: SchedulerRepository
     _event_hub: EventHub
 
     session_creation_tracker: dict[str, asyncio.Event]
@@ -290,6 +292,7 @@ class AgentRegistry:
         hook_plugin_ctx: HookPluginContext,
         network_plugin_ctx: NetworkPluginContext,
         scheduling_controller: SchedulingController,
+        scheduler_repository: SchedulerRepository,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
@@ -310,6 +313,7 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self._scheduling_controller = scheduling_controller
+        self._scheduler_repository = scheduler_repository
         self.debug = debug
         self.rpc_keepalive_timeout = int(config_provider.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
@@ -1107,6 +1111,15 @@ class AgentRegistry:
         if not groups_by_role:
             raise InvalidAPIParameters("No kernel groups resolved from the enqueue request.")
 
+        if scaling_group:
+            resource_group_name = ResourceGroupName(scaling_group)
+        else:
+            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+                access_key=access_key,
+                domain_name=user_scope.domain_name,
+                project_id=ProjectID(user_scope.group_id),
+            )
+
         draft = SessionSpecDraft(
             identity=SessionIdentityDraft(
                 session_id=SessionID(uuid.uuid4()),
@@ -1118,7 +1131,7 @@ class AgentRegistry:
             scope=SessionScopeDraft(
                 domain_name=DomainName(user_scope.domain_name),
                 project_id=ProjectID(user_scope.group_id),
-                resource_group_name=(ResourceGroupName(scaling_group) if scaling_group else None),
+                resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(
                 session_type=session_type,
@@ -2079,7 +2092,7 @@ async def check_scaling_group(
     session_type: SessionTypes,
     access_key: AccessKey,
     domain_name: str,
-    group_id: uuid.UUID | str,
+    group_id: ProjectID | str,
     public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.

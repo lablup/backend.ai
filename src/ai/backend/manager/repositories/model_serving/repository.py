@@ -14,6 +14,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -826,7 +827,7 @@ class ModelServingRepository:
                     endpoint_row.resource_group,
                     AccessKey(session_owner.main_access_key),
                     endpoint_row.domain,
-                    endpoint_row.project,
+                    ProjectID(endpoint_row.project),
                 )
 
                 await db_session.commit()

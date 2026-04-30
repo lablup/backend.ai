@@ -170,6 +170,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 hook_plugin_ctx=setup_input.hook_plugin_ctx,
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 scheduling_controller=scheduling_controller,
+                scheduler_repository=setup_input.scheduler_repository,
                 debug=setup_input.config_provider.config.debug.enabled,
                 manager_public_key=setup_input.agent_cache.manager_public_key,
                 manager_secret_key=setup_input.agent_cache.manager_secret_key,
