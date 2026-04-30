@@ -147,7 +147,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     name="EntityFilter",
 )
 class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
-    entity_type: RBACElementTypeGQL | None = None
+    entity_type: StringFilter | None = None
     entity_id: StringFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None

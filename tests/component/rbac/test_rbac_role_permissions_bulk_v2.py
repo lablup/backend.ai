@@ -1,6 +1,6 @@
 """Component tests for bulk role-permission operations via v2 REST API.
 
-Covers the three endpoints introduced for BA-5905:
+Covers:
 - POST /v2/rbac/permissions/bulk-add
 - POST /v2/rbac/permissions/bulk-remove
 - POST /v2/rbac/permissions/replace
@@ -20,10 +20,13 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import InvalidRequestError, PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    AdminSearchPermissionsGQLInput,
     BulkAddRolePermissionsInput,
     BulkRemoveRolePermissionsInput,
     CreatePermissionInput,
+    PermissionFilter,
     ReplaceRolePermissionsInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -370,3 +373,69 @@ class TestReplaceRolePermissionsV2:
                     permissions=[],
                 ),
             )
+
+
+class TestPermissionFilterScopeIdNarrowing:
+    """Verify the new ``PermissionFilter.scope_id`` narrows search results server-side.
+
+    Regression coverage for the wiring chain
+    ``PermissionFilter.scope_id`` → ``ScopedPermissionConditions.by_scope_id_*``.
+    """
+
+    async def test_scope_id_equals_narrows_results(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        target_role: CreateRoleResponse,
+        domain_fixture: str,
+    ) -> None:
+        # Seed two permissions in the same scope and an unrelated one in another scope.
+        scope_b = f"{domain_fixture}-other"
+        await admin_v2_registry.rbac.bulk_add_role_permissions(
+            BulkAddRolePermissionsInput(
+                permissions=[
+                    _entry(target_role.role.id, domain_fixture, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture, "image", "read"),
+                    CreatePermissionInput(
+                        role_id=target_role.role.id,
+                        scope_type="domain",
+                        scope_id=scope_b,
+                        entity_type="session",
+                        operation="read",
+                    ),
+                ],
+            ),
+        )
+
+        result = await admin_v2_registry.rbac.search_permissions(
+            AdminSearchPermissionsGQLInput(
+                filter=PermissionFilter(
+                    role_id=UUIDFilter(equals=target_role.role.id),
+                    scope_id=StringFilter(equals=domain_fixture),
+                ),
+                limit=100,
+            ),
+        )
+        assert {item.scope_id for item in result.items} == {domain_fixture}
+        assert len(result.items) == 2
+
+    async def test_role_id_in_filter_returns_matching_rows(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        target_role: CreateRoleResponse,
+        domain_fixture: str,
+    ) -> None:
+        await admin_v2_registry.rbac.bulk_add_role_permissions(
+            BulkAddRolePermissionsInput(
+                permissions=[
+                    _entry(target_role.role.id, domain_fixture, "session", "read"),
+                ],
+            ),
+        )
+        result = await admin_v2_registry.rbac.search_permissions(
+            AdminSearchPermissionsGQLInput(
+                filter=PermissionFilter(role_id=UUIDFilter(in_=[target_role.role.id])),
+                limit=100,
+            ),
+        )
+        assert any(item.role_id == target_role.role.id for item in result.items)
+        assert all(item.role_id == target_role.role.id for item in result.items)

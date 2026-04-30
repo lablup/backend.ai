@@ -37,6 +37,7 @@ def search(
     entity_type: str | None,
 ) -> None:
     """Search entity associations."""
+    from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.rbac.request import (
         AdminSearchEntitiesGQLInput,
         EntityFilter,
@@ -48,7 +49,7 @@ def search(
     filter_dto: EntityFilter | None = None
     if entity_type is not None:
         filter_dto = EntityFilter(
-            entity_type=entity_type,
+            entity_type=StringFilter(equals=entity_type),
         )
 
     # Build order only if --order-by is provided

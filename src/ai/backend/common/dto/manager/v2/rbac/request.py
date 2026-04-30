@@ -261,7 +261,7 @@ RoleAssignmentFilter.model_rebuild()
 class EntityFilter(BaseRequestModel):
     """Filter for entity associations."""
 
-    entity_type: str | None = None
+    entity_type: StringFilter | None = None
     entity_id: StringFilter | None = None
     AND: list[EntityFilter] | None = None
     OR: list[EntityFilter] | None = None
@@ -274,10 +274,10 @@ EntityFilter.model_rebuild()
 class PermissionFilter(BaseRequestModel):
     """Filter for scoped permissions."""
 
-    role_id: UUID | None = None
-    scope_type: str | None = None
-    scope_id: str | None = None
-    entity_type: str | None = None
+    role_id: UUIDFilter | None = None
+    scope_type: StringFilter | None = None
+    scope_id: StringFilter | None = None
+    entity_type: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None
