@@ -187,7 +187,11 @@ def _model_config_to_dto(config: ModelConfig) -> ModelConfigInfoDTO:
     )
 
 
-def _model_definition_to_dto(definition: ModelDefinition) -> ModelDefinitionInfoDTO:
+def _model_definition_to_dto(
+    definition: ModelDefinition | None,
+) -> ModelDefinitionInfoDTO | None:
+    if definition is None:
+        return None
     return ModelDefinitionInfoDTO(
         models=[_model_config_to_dto(m) for m in definition.models],
     )
@@ -632,11 +636,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 deployment_strategy=data.deployment_strategy,
                 deployment_strategy_spec=data.deployment_strategy_spec,
             ),
-            model_definition=(
-                _model_definition_to_dto(data.model_definition)
-                if data.model_definition is not None
-                else None
-            ),
+            model_definition=_model_definition_to_dto(data.model_definition),
             preset_values=preset_value_entries,
             created_at=data.created_at,
             updated_at=data.updated_at,
