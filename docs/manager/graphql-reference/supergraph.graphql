@@ -5291,7 +5291,7 @@ input DeploymentRevisionPresetFilter
   name: StringFilter = null
 
   """Variant ID filter."""
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUIDFilter = null
 }
 
 """Added in 26.4.2. Order specification for deployment revision presets."""
@@ -9040,10 +9040,10 @@ input ModelCardV2Filter
   name: StringFilter = null
 
   """Domain filter."""
-  domainName: String = null
+  domainName: StringFilter = null
 
   """Project filter."""
-  projectId: UUID = null
+  projectId: UUIDFilter = null
 
   """
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
@@ -9676,9 +9676,9 @@ type ModelServiceConfig
   preStartActions: [PreStartAction!]!
 
   """Command to start the model service."""
-  startCommand: JSON!
+  startCommand: [String!]
 
-  """Shell to use if start_command is a string."""
+  """Shell configured for the model service."""
   shell: String!
 
   """Port number for the model service."""
@@ -9700,9 +9700,9 @@ input ModelServiceConfigInput
   preStartActions: [PreStartActionInput!]!
 
   """Command to start the model service."""
-  startCommand: JSON!
+  startCommand: [String!] = null
 
-  """Shell to use if start_command is a string."""
+  """Shell configured for the model service."""
   shell: String! = "/bin/bash"
 
   """Port number for the model service. Must be greater than 1."""
@@ -16248,7 +16248,7 @@ input RuntimeVariantPresetFilter
   name: StringFilter = null
 
   """Variant ID filter."""
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUIDFilter = null
 }
 
 """Added in 26.4.2. Order specification."""

@@ -261,7 +261,7 @@ class TestRevisionNode:
                     "name": "sample-model",
                     "model_path": "/models/sample",
                     "service": {
-                        "start_command": "python serve.py",
+                        "start_command": ["python", "serve.py"],
                         "port": 8000,
                     },
                 }
@@ -272,6 +272,7 @@ class TestRevisionNode:
         assert node.model_definition is not None
         assert node.model_definition.models[0].name == "sample-model"
         assert node.model_definition.models[0].service is not None
+        assert node.model_definition.models[0].service.start_command == ["python", "serve.py"]
         assert node.model_definition.models[0].service.port == 8000
 
     def test_round_trip(self) -> None:

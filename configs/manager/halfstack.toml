@@ -40,7 +40,7 @@ agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 ssl-verify = false
 
 [pyroscope]
-enabled = true
+enabled = false
 app-name = "backendai-half-manager"
 server-addr = "http://localhost:4040"
 sample-rate = 100
@@ -86,7 +86,7 @@ certfile = ""
 enabled = false
 
 [otel]
-enabled = true
+enabled = false
 log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
 

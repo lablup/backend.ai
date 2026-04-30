@@ -25,6 +25,11 @@ from ai.backend.manager.data.permission.role import (
     BulkPermissionCheckInput,
     BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
+    BulkRolePermissionAddFailure,
+    BulkRolePermissionAddResultData,
+    BulkRolePermissionRemoveFailure,
+    BulkRolePermissionRemoveResultData,
+    BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
     EffectivePermissionsInput,
@@ -42,18 +47,26 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
+    EntityType,
     ScopeListResult,
+    ScopeType,
 )
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    Creator,
+)
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
+from ai.backend.manager.repositories.permission_controller.creators import (
+    PermissionCreatorSpec,
+    UserRoleCreatorSpec,
+)
 from ai.backend.manager.repositories.permission_controller.types import (
     PermissionSearchScope,
     ScopedRoleSearchScope,
@@ -159,6 +172,70 @@ class PermissionControllerRepository:
         """Update role permissions using batch update."""
         result = await self._db_source.update_role_permissions(input_data=input_data)
         return result.to_detail_data_without_users()
+
+    @permission_controller_repository_resilience.apply()
+    async def bulk_add_role_permissions(
+        self,
+        creator: BulkCreator[PermissionRow],
+    ) -> BulkRolePermissionAddResultData:
+        result = await self._db_source.bulk_add_role_permissions(creator)
+        failures = [
+            BulkRolePermissionAddFailure(
+                role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
+                scope_type=ScopeType(spec.scope_type.value),
+                scope_id=spec.scope_id,
+                entity_type=EntityType(spec.entity_type.value),
+                operation=spec.operation,
+                message=str(error.exception),
+            )
+            for error in result.errors
+        ]
+        return BulkRolePermissionAddResultData(
+            successes=[row.to_data() for row in result.successes],
+            failures=failures,
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def bulk_remove_role_permissions(
+        self,
+        purgers: list[Purger[PermissionRow]],
+    ) -> BulkRolePermissionRemoveResultData:
+        result = await self._db_source.bulk_remove_role_permissions(purgers)
+        failures = [
+            BulkRolePermissionRemoveFailure(
+                permission_id=cast(uuid.UUID, error.purger.pk_value),
+                message=str(error.exception),
+            )
+            for error in result.errors
+        ]
+        return BulkRolePermissionRemoveResultData(
+            successes=[row.to_data() for row in result.successes],
+            failures=failures,
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def replace_role_permissions(
+        self,
+        role_id: uuid.UUID,
+        creator: BulkCreator[PermissionRow],
+    ) -> BulkRolePermissionReplaceResultData:
+        result = await self._db_source.replace_role_permissions(role_id=role_id, creator=creator)
+        failures = [
+            BulkRolePermissionAddFailure(
+                role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
+                scope_type=ScopeType(spec.scope_type.value),
+                scope_id=spec.scope_id,
+                entity_type=EntityType(spec.entity_type.value),
+                operation=spec.operation,
+                message=str(error.exception),
+            )
+            for error in result.errors
+        ]
+        return BulkRolePermissionReplaceResultData(
+            role_id=role_id,
+            successes=[row.to_data() for row in result.successes],
+            failures=failures,
+        )
 
     @permission_controller_repository_resilience.apply()
     async def delete_role(self, updater: Updater[RoleRow]) -> RoleData:

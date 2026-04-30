@@ -2461,6 +2461,28 @@ class AbstractAgent[
             ),
         )
 
+    async def _populate_missing_model_service_start_commands(
+        self,
+        models: list[dict[str, Any]],
+        image: str,
+    ) -> list[dict[str, Any]]:
+        image_command_loaded = False
+        image_command: list[str] | None = None
+        for model in models:
+            service = model.get("service")
+            if not isinstance(service, dict):
+                continue
+            if service.get("start_command"):
+                continue
+            if not image_command_loaded:
+                image_command = await self.extract_image_command(image)
+                image_command_loaded = True
+            if not image_command:
+                continue
+            service["start_command"] = list(image_command)
+            model["service"] = service
+        return models
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -3149,7 +3171,34 @@ class AbstractAgent[
                     }
 
                     if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
-                        for model in model_definition["models"]:
+                        populated_models = (
+                            await self._populate_missing_model_service_start_commands(
+                                model_definition["models"],
+                                ctx.image_ref.canonical,
+                            )
+                        )
+                        for model in populated_models:
+                            service = model.get("service")
+                            if not isinstance(service, dict):
+                                log.warning(
+                                    "create_kernel(kernel:{}, session:{}) skipping model"
+                                    " '{}': no service definition",
+                                    kernel_id,
+                                    session_id,
+                                    model.get("name", "<unknown>"),
+                                )
+                                continue
+                            if not service.get("start_command"):
+                                log.warning(
+                                    "create_kernel(kernel:{}, session:{}) cannot start model"
+                                    " service '{}': no start_command and image {} has no"
+                                    " Config.Cmd",
+                                    kernel_id,
+                                    session_id,
+                                    model.get("name", "<unknown>"),
+                                    ctx.image_ref.canonical,
+                                )
+                                continue
                             asyncio.create_task(
                                 self.start_and_monitor_model_service_health(kernel_obj, model)
                             )
@@ -3283,7 +3332,7 @@ class AbstractAgent[
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> list[str] | None:
         raise NotImplementedError
 
     @abstractmethod

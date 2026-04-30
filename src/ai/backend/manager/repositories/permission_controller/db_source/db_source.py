@@ -90,7 +90,12 @@ from ai.backend.manager.repositories.base.creator import (
     execute_bulk_creator_partial,
     execute_creator,
 )
-from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.purger import (
+    BulkPurgerResultWithFailures,
+    Purger,
+    execute_bulk_purger_partial,
+    execute_purger,
+)
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
@@ -327,10 +332,9 @@ class PermissionDBSource:
     async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
         role_row = await db_session.scalar(stmt)
-        result = role_row
-        if result is None:
-            raise ObjectNotFound(f"Role with ID {role_id} does not exist.")
-        return result
+        if role_row is None:
+            raise RoleNotFound(f"Role with ID {role_id} does not exist.")
+        return role_row
 
     # ============================================================
     # Private Helper Functions (for use within transactions)
@@ -484,7 +488,7 @@ class PermissionDBSource:
             Updated role with refreshed relationships
 
         Raises:
-            ObjectNotFound: If role does not exist
+            RoleNotFound: If role does not exist
         """
         async with self._db.begin_session() as db_session:
             # 0. Verify role exists
@@ -530,11 +534,51 @@ class PermissionDBSource:
             await db_session.refresh(role_row)
             return role_row
 
+    async def bulk_add_role_permissions(
+        self,
+        creator: BulkCreator[PermissionRow],
+    ) -> BulkCreatorResultWithFailures[PermissionRow]:
+        """Bulk-insert permission rows; per-row failures are reported separately."""
+        async with self._db.begin_session_read_committed() as db_session:
+            return await execute_bulk_creator_partial(db_session, creator)
+
+    async def bulk_remove_role_permissions(
+        self,
+        purgers: list[Purger[PermissionRow]],
+    ) -> BulkPurgerResultWithFailures[PermissionRow]:
+        """Bulk-delete permission rows by primary key; per-row failures are reported separately."""
+        async with self._db.begin_session_read_committed() as db_session:
+            return await execute_bulk_purger_partial(db_session, purgers)
+
+    async def replace_role_permissions(
+        self,
+        role_id: uuid.UUID,
+        creator: BulkCreator[PermissionRow],
+    ) -> BulkCreatorResultWithFailures[PermissionRow]:
+        """
+        Replace the role's entire scoped-permission set in a single transaction:
+        delete all existing rows for ``role_id``, then bulk-insert the rows
+        defined by ``creator.specs``. Passing a creator with no specs clears
+        the role's permissions.
+
+        - The role's existence is verified first; raises ``RoleNotFound``
+          if the role does not exist.
+        - Each permission row in ``creator.specs`` is assumed to carry the
+          same ``role_id`` as the one passed to this method; the caller is
+          responsible for keeping them aligned.
+        """
+        async with self._db.begin_session_read_committed() as db_session:
+            await self._get_role(db_session, role_id)
+            await db_session.execute(
+                sa.delete(PermissionRow).where(PermissionRow.role_id == role_id)
+            )
+            return await execute_bulk_creator_partial(db_session, creator)
+
     async def get_role(self, role_id: uuid.UUID) -> RoleRow | None:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             try:
                 result = await self._get_role(db_session, role_id)
-            except ObjectNotFound:
+            except RoleNotFound:
                 return None
             return result
 

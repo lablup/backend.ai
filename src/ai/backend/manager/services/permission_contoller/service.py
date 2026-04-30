@@ -26,9 +26,17 @@ from ai.backend.manager.services.permission_contoller.actions.assign_role import
     AssignRoleAction,
     AssignRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.bulk_add_role_permissions import (
+    BulkAddRolePermissionsAction,
+    BulkAddRolePermissionsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
     BulkAssignRoleAction,
     BulkAssignRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_permissions import (
+    BulkRemoveRolePermissionsAction,
+    BulkRemoveRolePermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
     BulkRevokeRoleAction,
@@ -67,6 +75,10 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.actions.purge_role import (
     PurgeRoleAction,
     PurgeRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
+    ReplaceRolePermissionsAction,
+    ReplaceRolePermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.resolve_effective_permissions import (
     ResolveEffectivePermissionsAction,
@@ -319,6 +331,30 @@ class PermissionControllerService:
             input_data=action.input_data,
         )
         return UpdateRolePermissionsActionResult(role=result)
+
+    async def bulk_add_role_permissions(
+        self, action: BulkAddRolePermissionsAction
+    ) -> BulkAddRolePermissionsActionResult:
+        """Bulk-insert permission rows defined by the action's creator."""
+        result = await self._repository.bulk_add_role_permissions(action.creator)
+        return BulkAddRolePermissionsActionResult(data=result)
+
+    async def bulk_remove_role_permissions(
+        self, action: BulkRemoveRolePermissionsAction
+    ) -> BulkRemoveRolePermissionsActionResult:
+        """Bulk-delete permission rows for the given purgers."""
+        result = await self._repository.bulk_remove_role_permissions(action.purgers)
+        return BulkRemoveRolePermissionsActionResult(data=result)
+
+    async def replace_role_permissions(
+        self, action: ReplaceRolePermissionsAction
+    ) -> ReplaceRolePermissionsActionResult:
+        """Replace the role's entire scoped-permission set."""
+        result = await self._repository.replace_role_permissions(
+            role_id=action.role_id,
+            creator=action.creator,
+        )
+        return ReplaceRolePermissionsActionResult(data=result)
 
     async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
         """Search scopes based on element type."""

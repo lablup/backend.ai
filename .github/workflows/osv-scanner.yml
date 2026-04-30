@@ -48,7 +48,7 @@ jobs:
       id: set-matrix
       run: |
         echo "Scanning all Dockerfiles"
-        DOCKERFILES=$(find docker -type f -name "*.dockerfile")
+        DOCKERFILES=$(find docker -type f -name "*.dockerfile" ! -name "backend.ai-*.dockerfile")
 
         # Build JSON matrix
         MATRIX_JSON=$(echo "$DOCKERFILES" | jq -R -s -c '

@@ -10,8 +10,12 @@ from ai.backend.manager.actions.validators import ActionValidators
 from .actions import (
     AssignRoleAction,
     AssignRoleActionResult,
+    BulkAddRolePermissionsAction,
+    BulkAddRolePermissionsActionResult,
     BulkAssignRoleAction,
     BulkAssignRoleActionResult,
+    BulkRemoveRolePermissionsAction,
+    BulkRemoveRolePermissionsActionResult,
     BulkRevokeRoleAction,
     BulkRevokeRoleActionResult,
     CreateRoleAction,
@@ -21,6 +25,8 @@ from .actions import (
     GetRoleDetailAction,
     GetRoleDetailActionResult,
     PurgeRoleAction,
+    ReplaceRolePermissionsAction,
+    ReplaceRolePermissionsActionResult,
     RevokeRoleAction,
     RevokeRoleActionResult,
     SearchRolesAction,
@@ -118,6 +124,15 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     update_role_permissions: ActionProcessor[
         UpdateRolePermissionsAction, UpdateRolePermissionsActionResult
     ]
+    bulk_add_role_permissions: ActionProcessor[
+        BulkAddRolePermissionsAction, BulkAddRolePermissionsActionResult
+    ]
+    bulk_remove_role_permissions: ActionProcessor[
+        BulkRemoveRolePermissionsAction, BulkRemoveRolePermissionsActionResult
+    ]
+    replace_role_permissions: ActionProcessor[
+        ReplaceRolePermissionsAction, ReplaceRolePermissionsActionResult
+    ]
     search_scopes: ActionProcessor[SearchScopesAction, SearchScopesActionResult]
     get_scope_types: ActionProcessor[GetScopeTypesAction, GetScopeTypesActionResult]
     get_entity_types: ActionProcessor[GetEntityTypesAction, GetEntityTypesActionResult]
@@ -183,6 +198,15 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.update_role_permissions = ActionProcessor(
             service.update_role_permissions, action_monitors
         )
+        self.bulk_add_role_permissions = ActionProcessor(
+            service.bulk_add_role_permissions, action_monitors
+        )
+        self.bulk_remove_role_permissions = ActionProcessor(
+            service.bulk_remove_role_permissions, action_monitors
+        )
+        self.replace_role_permissions = ActionProcessor(
+            service.replace_role_permissions, action_monitors
+        )
         self.search_scopes = ActionProcessor(service.search_scopes, action_monitors)
         self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
         self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
@@ -244,6 +268,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             SearchRolesInScopeAction.spec(),
             SearchUsersAssignedToRoleAction.spec(),
             UpdateRolePermissionsAction.spec(),
+            BulkAddRolePermissionsAction.spec(),
+            BulkRemoveRolePermissionsAction.spec(),
+            ReplaceRolePermissionsAction.spec(),
             SearchScopesAction.spec(),
             GetScopeTypesAction.spec(),
             GetEntityTypesAction.spec(),

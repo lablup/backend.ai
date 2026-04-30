@@ -81,12 +81,12 @@ def search(
     else:
         filter_dto: ModelCardFilter | None = None
         if name_contains is not None or domain_name is not None or project_id is not None:
-            from ai.backend.common.dto.manager.query import StringFilter
+            from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
             filter_dto = ModelCardFilter(
                 name=StringFilter(contains=name_contains) if name_contains is not None else None,
-                domain_name=domain_name,
-                project_id=project_id,
+                domain_name=StringFilter(equals=domain_name) if domain_name is not None else None,
+                project_id=UUIDFilter(equals=project_id) if project_id is not None else None,
             )
         orders = (
             parse_order_options(order_by, ModelCardOrderField, ModelCardOrder) if order_by else None
