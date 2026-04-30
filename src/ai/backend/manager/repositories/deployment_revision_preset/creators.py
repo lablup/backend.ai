@@ -37,11 +37,11 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
     bootstrap_script: str | None
     environ: dict[str, str]
     preset_values: list[PresetValueEntry]
-    replica_count: int
-    deployment_strategy: DeploymentStrategy
-    deployment_strategy_spec: dict[str, Any]
-    open_to_public: bool | None
-    revision_history_limit: int | None
+    open_to_public: bool | None = None
+    replica_count: int | None = None
+    revision_history_limit: int | None = None
+    deployment_strategy: DeploymentStrategy | None = None
+    deployment_strategy_spec: dict[str, Any] | None = None
 
     @property
     @override

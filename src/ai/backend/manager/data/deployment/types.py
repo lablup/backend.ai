@@ -550,22 +550,24 @@ class RevisionDraft:
     def to_model_revision_spec(self, mounts: MountMetadata) -> ModelRevisionSpec:
         """Project the merged draft into a final ``ModelRevisionSpec``.
 
-        Validates that the merge chain produced an ``image_id`` and a
-        ``runtime_variant_id`` — both are required at the persistence
-        boundary. Missing values surface as ``InvalidAPIParameters`` so
-        API callers get a 400 instead of a silent cascade of ``None`` s
-        downstream.
+        Validates that the merge chain produced an ``image_id``, a
+        ``runtime_variant_id``, and a non-empty ``resource_slots`` — all
+        required at the persistence boundary. Missing values surface as
+        ``InvalidAPIParameters`` so API callers get a 400 instead of a
+        silent cascade downstream.
         """
         if self.image_id is None:
             raise InvalidAPIParameters("image_id is required to build a revision")
         if self.runtime_variant_id is None:
             raise InvalidAPIParameters("runtime_variant_id is required to build a revision")
+        if not self.resource_slots:
+            raise InvalidAPIParameters("resource_slots is required to build a revision")
         return ModelRevisionSpec(
             image_id=self.image_id,
             resource_spec=ResourceSpec(
                 cluster_mode=self.cluster_mode or ClusterMode.SINGLE_NODE,
                 cluster_size=self.cluster_size or 1,
-                resource_slots=self.resource_slots or {},
+                resource_slots=self.resource_slots,
                 resource_opts=self.resource_opts,
             ),
             mounts=mounts,
