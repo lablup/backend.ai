@@ -6,7 +6,7 @@ from ai.backend.client.cli.v2.deployment.chat.formatter import (
     DeploymentChatFormatter,
     mask_token,
 )
-from ai.backend.common.data.deployment_chat import DeploymentChatCacheEntry
+from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatCacheEntry
 
 
 def _make_entry(

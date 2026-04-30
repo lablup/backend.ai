@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.data.deployment_chat import (
+from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
