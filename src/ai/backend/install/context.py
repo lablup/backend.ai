@@ -64,6 +64,7 @@ from .types import (
     OSInfo,
     PackageSource,
     Platform,
+    PrerequisiteError,
     ServerAddr,
     ServiceConfig,
 )
@@ -1225,10 +1226,14 @@ class Context(metaclass=ABCMeta):
         # 1) Download the Harbor offline installer archive if not already present.
         if not archive_path.exists():
             self.log_header(f"Downloading Harbor offline installer from {download_uri}")
-            await self.run_exec(
+            exit_code = await self.run_exec(
                 ["curl", "-fL", "--output", str(archive_path), download_uri],
                 cwd=base_path,
             )
+            if exit_code != 0:
+                raise RuntimeError(
+                    f"Harbor download failed (curl exit {exit_code}); URL: {download_uri}"
+                )
         else:
             self.log.write(
                 Text.from_markup(
@@ -1240,10 +1245,14 @@ class Context(metaclass=ABCMeta):
         self.log_header("Extracting Harbor installer archive...")
         with tempfile.TemporaryDirectory(prefix="bai-harbor-") as extract_root:
             extract_path = Path(extract_root)
-            await self.run_exec(
+            exit_code = await self.run_exec(
                 ["tar", "-xzf", str(archive_path), "-C", str(extract_path)],
                 cwd=base_path,
             )
+            if exit_code != 0:
+                raise RuntimeError(
+                    f"Harbor archive extraction failed (tar exit {exit_code}); archive may be corrupt: {archive_path}"
+                )
             # The tarball extracts into a top-level ``harbor/`` directory.
             extracted_harbor_dir = extract_path / "harbor"
             if not extracted_harbor_dir.is_dir():
@@ -1302,14 +1311,22 @@ class Context(metaclass=ABCMeta):
         # step but not the ``docker compose up``; instead of parsing install.sh
         # we run it and then immediately ``docker compose down`` to leave the
         # config on disk without leaving containers running.
-        await self.run_exec(
+        exit_code = await self.run_exec(
             ["bash", "install.sh"],
             cwd=harbor_dir,
         )
-        await self.run_exec(
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Harbor install.sh failed (exit {exit_code}); check the log above for details."
+            )
+        exit_code = await self.run_exec(
             ["docker", "compose", "down", "--remove-orphans"],
             cwd=harbor_dir,
         )
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to stop Harbor containers after install (docker compose down exit {exit_code})."
+            )
 
         self.log.write(
             Text.from_markup(
@@ -1689,6 +1706,11 @@ class PackageContext(Context):
 
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
+        if self.install_variable.with_harbor:
+            raise PrerequisiteError(
+                "--with-harbor is supported only in DEVELOP/SOURCE install modes; "
+                "package mode does not provision a local Harbor registry."
+            )
 
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
