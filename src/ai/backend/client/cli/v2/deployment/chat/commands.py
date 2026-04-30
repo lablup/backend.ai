@@ -254,20 +254,17 @@ def set_(
 @chat_config.command(name="show")
 @click.argument("deployment_id", type=click.UUID)
 def show(deployment_id: UUID) -> None:
-    """Print the chat cache + config entry for a deployment (tokens are masked)."""
-    cache = DeploymentChatCache.load()
-    config = DeploymentChatConfig.load()
+    """Print the user-managed chat config entry for a deployment (tokens are masked).
 
-    entry = cache.get(deployment_id)
-    config_entry = config.get(deployment_id)
-    if entry is None and config_entry is None:
-        raise click.ClickException(f"No chat state for deployment {deployment_id}.")
-    DeploymentChatFormatter.print_summary(
-        deployment_id,
-        entry,
-        config_entry.token if config_entry is not None else None,
-        config_entry.model if config_entry is not None else None,
-    )
+    Only the user-managed fields (``token``, ``model``) are shown; the
+    auto-managed cache (``endpoint_url``, ``default_model``,
+    ``last_synced_at``) is treated as internal CLI state and not part of
+    this view.
+    """
+    config_entry = DeploymentChatConfig.load().get(deployment_id)
+    if config_entry is None:
+        raise click.ClickException(f"No chat config for deployment {deployment_id}.")
+    DeploymentChatFormatter.print_config(deployment_id, config_entry)
 
 
 @chat_config.command(name="clear")

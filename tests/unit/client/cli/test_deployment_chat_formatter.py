@@ -1,43 +1,37 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
 
 from ai.backend.client.cli.v2.deployment.chat.formatter import (
     DeploymentChatFormatter,
     mask_token,
 )
-from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatCacheEntry
+from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatConfigEntry
 
 
-def _make_entry(
-    *,
-    default_model: str | None = None,
-) -> DeploymentChatCacheEntry:
-    return DeploymentChatCacheEntry(
-        endpoint_url="https://infer.example.test/api",
-        default_model=default_model,
-        last_synced_at=datetime(2026, 4, 27, 12, 0, tzinfo=UTC),
-    )
+class TestPrintConfig:
+    def test_prints_token_masked_and_model_when_set(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        DeploymentChatFormatter.print_config(
+            uuid4(),
+            DeploymentChatConfigEntry(token="sk-secret", model="llama-3-8b"),
+        )
+        out = capsys.readouterr().out
+        assert "model         : llama-3-8b" in out
+        assert "token         : ********" in out
+        assert "sk-secret" not in out
 
-
-class TestEntryLines:
-    def test_returns_lines_for_present_entry(self) -> None:
-        lines = DeploymentChatFormatter.entry_lines(_make_entry(default_model="meta/test"))
-        assert any("endpoint_url" in line for line in lines)
-        assert any("meta/test" in line for line in lines)
-        assert any("last_synced_at" in line for line in lines)
-
-    def test_dash_for_missing_default_model(self) -> None:
-        lines = DeploymentChatFormatter.entry_lines(_make_entry(default_model=None))
-        assert any("default_model : -" in line for line in lines)
-
-    def test_all_dashes_when_entry_is_none(self) -> None:
-        lines = DeploymentChatFormatter.entry_lines(None)
-        assert lines == [
-            "endpoint_url  : -",
-            "default_model : -",
-            "last_synced_at: -",
-        ]
+    def test_prints_dashes_when_unset(self, capsys: pytest.CaptureFixture[str]) -> None:
+        DeploymentChatFormatter.print_config(
+            uuid4(),
+            DeploymentChatConfigEntry(token=None, model=None),
+        )
+        out = capsys.readouterr().out
+        assert "model         : -" in out
+        assert "token         : <unset>" in out
 
 
 class TestMaskToken:
