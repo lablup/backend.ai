@@ -1662,8 +1662,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 return None
             if isinstance(command, str):
                 return [command]
-            if isinstance(command, Sequence):
-                return cast(list[str], list(command))
+
+            if isinstance(command, list):
+                return cast(list[str], command)
             return None
 
     @override
