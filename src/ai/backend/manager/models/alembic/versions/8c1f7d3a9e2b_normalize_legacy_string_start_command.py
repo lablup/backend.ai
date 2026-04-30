@@ -1,23 +1,8 @@
 """normalize legacy string start_command in stored model definitions
 
-BA-5891 / PR #11402 narrowed ``ModelServiceConfig.start_command`` from
-``str | list[str]`` to ``list[str] | None``. Existing rows that were
-created when the string form was still accepted now fail Pydantic
-validation when SQLAlchemy materializes the JSONB columns through
-``PydanticColumn(ModelDefinition[Draft])``, which 500s every reader
-(``myDeployments``/``adminDeployments``, scheduler, the
-``admin_refresh_deployment_revisions`` repair path itself, ...).
-
-This migration wraps legacy string values as a one-item list so the
-new schema accepts the rows without otherwise changing the stored
-command value.
-
-Three columns hold ``ModelDefinition``-shaped JSONB and need rewriting:
-
-- ``deployment_revisions.model_definition``
-- ``deployment_revision_presets.model_definition``
-- ``runtime_variants.default_model_definition`` (Draft variant; ``models``
-  may be ``None`` for the empty seed of the ``custom`` runtime variant)
+Wrap legacy string ``start_command`` values as one-item lists so rows
+created before #11402 narrowed the schema to ``list[str] | None`` pass
+Pydantic validation.
 
 Revision ID: 8c1f7d3a9e2b
 Revises: dec0deba5893
@@ -96,8 +81,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Data-only migration: downgrade is intentionally a no-op.
-    # Reverting to the prior string form would be ambiguous for rows that
-    # were already created in the new list form, and the pre-PR runtime
-    # accepted both representations anyway.
+    # No-op: list form is also valid under the pre-#11402 schema.
     pass
