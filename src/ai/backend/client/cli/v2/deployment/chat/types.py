@@ -6,7 +6,6 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Annotated, Self
-from uuid import UUID
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -16,6 +15,7 @@ from ai.backend.client.cli.v2.deployment.chat.utils import (
     read_json_file,
     write_json_file,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
 
 CACHE_ENTRY_TTL = timedelta(hours=24)
 """Endpoint cache entries older than this are treated as a cache miss."""
@@ -36,15 +36,15 @@ class DeploymentChatCacheEntry(BaseModel):
 class DeploymentChatCache(BaseModel):
     """In-memory representation of the chat cache file."""
 
-    deployments: dict[UUID, DeploymentChatCacheEntry] = Field(default_factory=dict)
+    deployments: dict[DeploymentID, DeploymentChatCacheEntry] = Field(default_factory=dict)
 
-    def get(self, deployment_id: UUID) -> DeploymentChatCacheEntry | None:
+    def get(self, deployment_id: DeploymentID) -> DeploymentChatCacheEntry | None:
         return self.deployments.get(deployment_id)
 
-    def set(self, deployment_id: UUID, entry: DeploymentChatCacheEntry) -> None:
+    def set(self, deployment_id: DeploymentID, entry: DeploymentChatCacheEntry) -> None:
         self.deployments[deployment_id] = entry
 
-    def pop(self, deployment_id: UUID) -> bool:
+    def pop(self, deployment_id: DeploymentID) -> bool:
         return self.deployments.pop(deployment_id, None) is not None
 
     @classmethod
@@ -88,27 +88,28 @@ class DeploymentChatConfig(BaseModel):
     """Per-deployment user-managed registry (tokens + chosen model name)."""
 
     deployments: defaultdict[
-        UUID, Annotated[DeploymentChatConfigEntry, Field(default_factory=DeploymentChatConfigEntry)]
+        DeploymentID,
+        Annotated[DeploymentChatConfigEntry, Field(default_factory=DeploymentChatConfigEntry)],
     ] = Field(default_factory=lambda: defaultdict(DeploymentChatConfigEntry))
 
-    def get(self, deployment_id: UUID) -> DeploymentChatConfigEntry | None:
+    def get(self, deployment_id: DeploymentID) -> DeploymentChatConfigEntry | None:
         return self.deployments.get(deployment_id)
 
-    def get_token(self, deployment_id: UUID) -> str | None:
+    def get_token(self, deployment_id: DeploymentID) -> str | None:
         entry = self.deployments.get(deployment_id)
         return entry.token if entry is not None else None
 
-    def get_model(self, deployment_id: UUID) -> str | None:
+    def get_model(self, deployment_id: DeploymentID) -> str | None:
         entry = self.deployments.get(deployment_id)
         return entry.model if entry is not None else None
 
-    def set_token(self, deployment_id: UUID, token: str) -> None:
+    def set_token(self, deployment_id: DeploymentID, token: str) -> None:
         self.deployments[deployment_id].token = token
 
-    def set_model(self, deployment_id: UUID, model: str) -> None:
+    def set_model(self, deployment_id: DeploymentID, model: str) -> None:
         self.deployments[deployment_id].model = model
 
-    def pop_token(self, deployment_id: UUID) -> bool:
+    def pop_token(self, deployment_id: DeploymentID) -> bool:
         entry = self.deployments.get(deployment_id)
         if entry is None or entry.token is None:
             return False
@@ -117,7 +118,7 @@ class DeploymentChatConfig(BaseModel):
             del self.deployments[deployment_id]
         return True
 
-    def pop_model(self, deployment_id: UUID) -> bool:
+    def pop_model(self, deployment_id: DeploymentID) -> bool:
         entry = self.deployments.get(deployment_id)
         if entry is None or entry.model is None:
             return False
@@ -126,7 +127,7 @@ class DeploymentChatConfig(BaseModel):
             del self.deployments[deployment_id]
         return True
 
-    def pop(self, deployment_id: UUID) -> bool:
+    def pop(self, deployment_id: DeploymentID) -> bool:
         return self.deployments.pop(deployment_id, None) is not None
 
     @classmethod

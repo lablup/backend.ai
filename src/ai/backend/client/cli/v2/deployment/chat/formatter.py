@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCacheEntry,
     DeploymentChatConfigEntry,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
 
 
 def mask_token(token: str | None) -> str:
@@ -31,7 +30,7 @@ class DeploymentChatFormatter:
     @classmethod
     def print_config(
         cls,
-        deployment_id: UUID,
+        deployment_id: DeploymentID,
         entry: DeploymentChatConfigEntry,
     ) -> None:
         print(f"deployment_id : {deployment_id}")
@@ -41,7 +40,7 @@ class DeploymentChatFormatter:
     @classmethod
     def print_cache(
         cls,
-        deployment_id: UUID,
+        deployment_id: DeploymentID,
         entry: DeploymentChatCacheEntry,
     ) -> None:
         print(f"deployment_id : {deployment_id}")
