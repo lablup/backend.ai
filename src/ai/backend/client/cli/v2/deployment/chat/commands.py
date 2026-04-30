@@ -274,8 +274,8 @@ def clear(deployment_id: UUID) -> None:
 
     The auto-managed cache entry (``endpoint_url``, ``default_model``,
     ``last_synced_at``) is left alone — it expires on its own 24-hour TTL
-    and gets refreshed by the next ``chat`` call. Use ``clear-cache`` to
-    drop it immediately.
+    and gets refreshed by the next ``chat`` call. Use
+    ``./bai deployment chat-cache clear`` to drop it immediately.
     """
     config = DeploymentChatConfig.load()
     if config.pop(deployment_id):
@@ -285,9 +285,37 @@ def clear(deployment_id: UUID) -> None:
         print(f"No config entry for deployment {deployment_id}.")
 
 
-@chat_config.command(name="clear-cache")
+# ---------------------------------------------------------------------------
+# chat-cache
+# ---------------------------------------------------------------------------
+
+
+@click.group(name="chat-cache")
+def chat_cache() -> None:
+    """Inspect or drop the auto-managed chat cache entry per deployment.
+
+    The cache stores values the CLI derived itself — the deployment's
+    ``endpoint_url`` (resolved from the manager) and the inferred
+    ``default_model`` (from ``GET /v1/models``) — under
+    ``~/.backend.ai/deployment_chat/cache.json`` with a 24-hour TTL.
+    User-supplied state (``token``, ``model``) lives in ``chat-config``
+    and is not touched by this group.
+    """
+
+
+@chat_cache.command(name="show")
 @click.argument("deployment_id", type=click.UUID)
-def clear_cache(deployment_id: UUID) -> None:
+def cache_show(deployment_id: UUID) -> None:
+    """Print the auto-managed chat cache entry for a deployment."""
+    entry = DeploymentChatCache.load().get(deployment_id)
+    if entry is None:
+        raise click.ClickException(f"No chat cache for deployment {deployment_id}.")
+    DeploymentChatFormatter.print_cache(deployment_id, entry)
+
+
+@chat_cache.command(name="clear")
+@click.argument("deployment_id", type=click.UUID)
+def cache_clear(deployment_id: UUID) -> None:
     """Remove the auto-managed cache entry for a deployment.
 
     Forces the next ``chat`` call to re-fetch ``endpoint_url`` from the
@@ -302,4 +330,4 @@ def clear_cache(deployment_id: UUID) -> None:
         print(f"No cache entry for deployment {deployment_id}.")
 
 
-__all__ = ("chat", "chat_config")
+__all__ = ("chat", "chat_cache", "chat_config")
