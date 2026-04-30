@@ -847,7 +847,7 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = cast(
-            Sequence[ContainerStatResult | None | BaseException],
+            list[ContainerStatResult | None | BaseException],
             await asyncio.gather(*tasks, return_exceptions=True),
         )
         for cid, result in zip(container_ids, results, strict=True):
