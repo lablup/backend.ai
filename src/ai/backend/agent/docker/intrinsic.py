@@ -89,6 +89,17 @@ class ContainerNetStat:
     tx_bytes: int
 
 
+@dataclasses.dataclass(frozen=True)
+class ContainerStatResult:
+    mem_cur_bytes: int
+    mem_capacity_bytes: int
+    io_read_bytes: int
+    io_write_bytes: int
+    net_rx_bytes: int
+    net_tx_bytes: int
+    scratch_size: int
+
+
 def _parse_proc_net_dev(content: str) -> ContainerNetStat:
     """Parse /proc/net/dev content and return stats for non-lo interfaces."""
     rx_bytes = 0
@@ -649,7 +660,7 @@ class MemoryPlugin(AbstractComputePlugin):
 
         async def sysfs_impl(
             container_id: str,
-        ) -> tuple[int, int, int, int, int, int, int] | None:
+        ) -> ContainerStatResult | None:
             mem_path = ctx.agent.get_cgroup_path("memory", container_id)
             io_path = ctx.agent.get_cgroup_path("blkio", container_id)
             version = ctx.agent.get_cgroup_version()
@@ -772,19 +783,19 @@ class MemoryPlugin(AbstractComputePlugin):
                     )
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-            return (
-                mem_cur_bytes,
-                mem_max_bytes,
-                io_read_bytes,
-                io_write_bytes,
-                net_stat.rx_bytes,
-                net_stat.tx_bytes,
-                scratch_sz,
+            return ContainerStatResult(
+                mem_cur_bytes=mem_cur_bytes,
+                mem_capacity_bytes=mem_max_bytes,
+                io_read_bytes=io_read_bytes,
+                io_write_bytes=io_write_bytes,
+                net_rx_bytes=net_stat.rx_bytes,
+                net_tx_bytes=net_stat.tx_bytes,
+                scratch_size=scratch_sz,
             )
 
         async def api_impl(
             container_id: str,
-        ) -> tuple[int, int, int, int, int, int, int] | None:
+        ) -> ContainerStatResult | None:
             container = DockerContainer(self._docker, id=container_id)
             try:
                 async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
@@ -794,7 +805,7 @@ class MemoryPlugin(AbstractComputePlugin):
             if ret is None:
                 return None
             mem_cur_bytes = nmget(ret, "memory_stats.usage", 0)
-            mem_total_bytes = nmget(ret, "memory_stats.limit", 0)
+            mem_capacity_bytes = nmget(ret, "memory_stats.limit", 0)
             io_read_bytes = 0
             io_write_bytes = 0
             for item in nmget(ret, "blkio_stats.io_service_bytes_recursive", []):
@@ -809,14 +820,14 @@ class MemoryPlugin(AbstractComputePlugin):
                 net_tx_bytes += stat["tx_bytes"]
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-            return (
-                mem_cur_bytes,
-                mem_total_bytes,
-                io_read_bytes,
-                io_write_bytes,
-                net_rx_bytes,
-                net_tx_bytes,
-                scratch_sz,
+            return ContainerStatResult(
+                mem_cur_bytes=mem_cur_bytes,
+                mem_capacity_bytes=mem_capacity_bytes,
+                io_read_bytes=io_read_bytes,
+                io_write_bytes=io_write_bytes,
+                net_rx_bytes=net_rx_bytes,
+                net_tx_bytes=net_tx_bytes,
+                scratch_size=scratch_sz,
             )
 
         if ctx.mode == StatModes.CGROUP:
@@ -835,7 +846,10 @@ class MemoryPlugin(AbstractComputePlugin):
         tasks = []
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = cast(
+            list[ContainerStatResult | None | BaseException],
+            await asyncio.gather(*tasks, return_exceptions=True),
+        )
         for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
@@ -847,13 +861,13 @@ class MemoryPlugin(AbstractComputePlugin):
             if isinstance(result, BaseException):
                 raise result
             per_container_mem_used_bytes[cid] = Measurement(
-                Decimal(result[0]), capacity=Decimal(result[1])
+                Decimal(result.mem_cur_bytes), capacity=Decimal(result.mem_capacity_bytes)
             )
-            per_container_io_read_bytes[cid] = Measurement(Decimal(result[2]))
-            per_container_io_write_bytes[cid] = Measurement(Decimal(result[3]))
-            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[4]))
-            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[5]))
-            per_container_io_scratch_size[cid] = Measurement(Decimal(result[6]))
+            per_container_io_read_bytes[cid] = Measurement(Decimal(result.io_read_bytes))
+            per_container_io_write_bytes[cid] = Measurement(Decimal(result.io_write_bytes))
+            per_container_net_rx_bytes[cid] = Measurement(Decimal(result.net_rx_bytes))
+            per_container_net_tx_bytes[cid] = Measurement(Decimal(result.net_tx_bytes))
+            per_container_io_scratch_size[cid] = Measurement(Decimal(result.scratch_size))
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
