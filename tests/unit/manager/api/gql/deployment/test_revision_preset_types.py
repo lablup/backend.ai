@@ -24,6 +24,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
+    _model_definition_to_dto,
+)
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetGQL,
     PresetExecutionSpecGQL,
@@ -122,20 +125,12 @@ class TestDeploymentRevisionPresetGQL:
         assert gql.model_definition is None
 
     def test_adapter_converts_config_model_definition_to_dto(self) -> None:
-        """Adapter must bridge ``ModelDefinition`` (config) to ``ModelDefinitionInfoDTO``.
-
-        The data layer holds ``ModelDefinition`` from ``ai.backend.common.config``,
-        but the response DTO is typed as ``ModelDefinitionInfoDTO``. The adapter
-        converts via ``model_validate(model_dump(...))``; this test pins down the
-        round-trip so future regressions (e.g. dropping the conversion) fail loudly.
-        """
+        """Adapter helper must bridge ``ModelDefinition`` (config) to ``ModelDefinitionInfoDTO``."""
         config_model_def = ModelDefinition(
             models=[ModelConfig(name="llama", model_path="/models/llama")],
         )
 
-        info_dto = ModelDefinitionInfoDTO.model_validate(
-            config_model_def.model_dump(by_alias=False)
-        )
+        info_dto = _model_definition_to_dto(config_model_def)
 
         assert len(info_dto.models) == 1
         assert info_dto.models[0].name == "llama"
