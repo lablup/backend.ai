@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -309,7 +309,7 @@ class TestBulkRolePermissions:
     async def test_replace_against_missing_role_raises(
         self, perm_db_source: PermissionDBSource
     ) -> None:
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(RoleNotFound):
             await perm_db_source.replace_role_permissions(
                 role_id=uuid.uuid4(), creator=BulkCreator(specs=[])
             )

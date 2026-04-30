@@ -332,10 +332,9 @@ class PermissionDBSource:
     async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
         role_row = await db_session.scalar(stmt)
-        result = role_row
-        if result is None:
-            raise ObjectNotFound(f"Role with ID {role_id} does not exist.")
-        return result
+        if role_row is None:
+            raise RoleNotFound(f"Role with ID {role_id} does not exist.")
+        return role_row
 
     # ============================================================
     # Private Helper Functions (for use within transactions)
@@ -489,7 +488,7 @@ class PermissionDBSource:
             Updated role with refreshed relationships
 
         Raises:
-            ObjectNotFound: If role does not exist
+            RoleNotFound: If role does not exist
         """
         async with self._db.begin_session() as db_session:
             # 0. Verify role exists
@@ -562,7 +561,7 @@ class PermissionDBSource:
         defined by ``creator.specs``. Passing a creator with no specs clears
         the role's permissions.
 
-        - The role's existence is verified first; raises ``ObjectNotFound``
+        - The role's existence is verified first; raises ``RoleNotFound``
           if the role does not exist.
         - Each permission row in ``creator.specs`` is assumed to carry the
           same ``role_id`` as the one passed to this method; the caller is
@@ -579,7 +578,7 @@ class PermissionDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             try:
                 result = await self._get_role(db_session, role_id)
-            except ObjectNotFound:
+            except RoleNotFound:
                 return None
             return result
 
