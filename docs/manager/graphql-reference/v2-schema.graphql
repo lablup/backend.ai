@@ -1968,7 +1968,7 @@ input CreateDeploymentRevisionPresetInput {
   openToPublic: Boolean = null
 
   """Default replica count for deployments created from this preset."""
-  replicaCount: Int = null
+  replicaCount: Int!
 
   """
   Default revision history limit for deployments created from this preset.
@@ -1976,7 +1976,7 @@ input CreateDeploymentRevisionPresetInput {
   revisionHistoryLimit: Int = null
 
   """Default deployment strategy for deployments created from this preset."""
-  deploymentStrategy: PresetDeploymentStrategyInput = null
+  deploymentStrategy: PresetDeploymentStrategyInput!
 
   """Added in UNRELEASED. Container image to run the inference server."""
   imageId: UUID!
@@ -1994,7 +1994,7 @@ input CreateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Resource slot allocations (e.g. cpu, mem, cuda.device).
   """
-  resourceSlots: [ResourceSlotEntryInput!] = null
+  resourceSlots: [ResourceSlotEntryInput!]!
 
   """
   Added in UNRELEASED. Additional resource options such as shared memory (shmem) size.
