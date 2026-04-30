@@ -181,7 +181,12 @@ from .models.utils import (
     execute_with_retry,
     reenter_txn_session,
 )
-from .models.vfolder import verify_vfolder_name
+from .models.vfolder import (
+    HARD_DELETED_VFOLDER_STATUSES,
+    query_accessible_vfolders,
+    verify_vfolder_name,
+    vfolders,
+)
 from .scheduler.types import KernelAgentBinding
 from .types import UserScope
 
@@ -226,7 +231,10 @@ class AgentRegistry:
         (modern v1 session-service path). String-keyed ``mounts`` entries
         (vfolder names) are skipped here — those only appeared on CLI
         legacy paths and cannot be resolved to ``MountInfoEntry`` without
-        a DB lookup that this builder does not perform.
+        a DB lookup that this builder does not perform. Callers must
+        resolve name-keyed mounts into the UUID-keyed buckets upstream
+        (see :meth:`_resolve_legacy_name_mounts`) before invoking this
+        builder.
         """
         mount_ids = creation_config.get("mount_ids") or []
         mount_id_map: Mapping[Any, str] = creation_config.get("mount_id_map") or {}
@@ -257,6 +265,99 @@ class AgentRegistry:
                 )
             )
         return tuple(entries)
+
+    async def _resolve_legacy_name_mounts(
+        self,
+        creation_config: Mapping[str, Any],
+        user_scope: UserScope,
+    ) -> dict[str, Any]:
+        """Resolve legacy name-keyed ``mounts`` / ``mount_map`` entries
+        into UUID-keyed ``mount_ids`` / ``mount_id_map`` entries via a
+        DB lookup against the user's accessible vfolders.
+
+        Returns a shallow-copied creation_config with the resolved
+        UUIDs merged in. Original UUID-keyed entries are preserved;
+        names that already have a UUID equivalent in ``mount_ids`` are
+        skipped to avoid duplicates.
+
+        ``name/subpath`` syntax is rejected explicitly — :class:`MountInfoEntry`
+        carries no subpath field, so silently dropping the subpath
+        portion would mount the wrong directory. Subpath-mounts must
+        flow through the UUID-keyed surface where the storage proxy
+        handles vfsubpath separately.
+        """
+        legacy_mounts: Sequence[str] = creation_config.get("mounts") or ()
+        if not legacy_mounts:
+            return dict(creation_config)
+
+        subpath_entries = [m for m in legacy_mounts if "/" in str(m)]
+        if subpath_entries:
+            raise InvalidAPIParameters(
+                "Legacy 'mounts' field with subpath syntax "
+                f"({subpath_entries}) is not supported. "
+                "Use UUID-keyed 'mount_ids' / 'mount_id_map' instead."
+            )
+
+        requested_names = [str(m) for m in legacy_mounts]
+        allowed_vfolder_types = list(
+            await self.config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        async with self.db.begin_readonly_session() as db_sess:
+            conn = await db_sess.connection()
+            if conn is None:
+                raise DatabaseConnectionUnavailable("Database connection not available")
+            extra_vf_conds = sa.and_(
+                vfolders.c.name.in_(requested_names),
+                vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES),
+            )
+            accessible = await query_accessible_vfolders(
+                conn,
+                user_scope.user_uuid,
+                user_role=user_scope.user_role,
+                domain_name=user_scope.domain_name,
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=extra_vf_conds,
+            )
+        name_to_id: dict[str, uuid.UUID] = {row["name"]: row["id"] for row in accessible}
+
+        merged_mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
+        existing_uuid_set: set[uuid.UUID] = set()
+        for rid in merged_mount_ids:
+            try:
+                existing_uuid_set.add(uuid.UUID(str(rid)))
+            except (ValueError, TypeError):
+                continue
+        merged_mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
+        merged_mount_options: dict[Any, Mapping[str, Any]] = dict(
+            creation_config.get("mount_options") or {}
+        )
+        legacy_mount_map: Mapping[str, str] = creation_config.get("mount_map") or {}
+        legacy_mount_options: Mapping[str, Mapping[str, Any]] = (
+            creation_config.get("mount_options") or {}
+        )
+
+        for name in requested_names:
+            vfid = name_to_id.get(name)
+            if vfid is None:
+                raise InvalidAPIParameters(
+                    f"VFolder '{name}' not found or not accessible by the current user"
+                )
+            if vfid in existing_uuid_set:
+                # Caller already supplied the UUID — keep its destination/options
+                # and skip the name-side merge to avoid duplicate entries.
+                continue
+            merged_mount_ids.append(vfid)
+            existing_uuid_set.add(vfid)
+            if (dst := legacy_mount_map.get(name)) and vfid not in merged_mount_id_map:
+                merged_mount_id_map[vfid] = dst
+            if (opts := legacy_mount_options.get(name)) and vfid not in merged_mount_options:
+                merged_mount_options[vfid] = opts
+
+        resolved = dict(creation_config)
+        resolved["mount_ids"] = merged_mount_ids
+        resolved["mount_id_map"] = merged_mount_id_map
+        resolved["mount_options"] = merged_mount_options
+        return resolved
 
     @staticmethod
     def _resource_entries_from_legacy_dict(
@@ -1007,6 +1108,11 @@ class AgentRegistry:
         ]
         creation_config: dict[str, Any] = session_enqueue_configs["creation_config"]
 
+        # Legacy v1 CLI sends vfolder names via ``creation_config["mounts"]``.
+        # Resolve them into UUID-keyed buckets here so the pure
+        # ``_mount_entries_from_creation_config`` builder downstream stays
+        # name-agnostic and free of DB I/O.
+        creation_config = await self._resolve_legacy_name_mounts(creation_config, user_scope)
         mount_entries = self._mount_entries_from_creation_config(creation_config)
         resource_entries = self._resource_entries_from_legacy_dict(
             creation_config.get("resources") or {}
