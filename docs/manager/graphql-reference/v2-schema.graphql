@@ -3544,7 +3544,7 @@ input DeploymentRevisionPresetFilter {
   name: StringFilter = null
 
   """Variant ID filter."""
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUIDFilter = null
 }
 
 """Added in 26.4.2. Order specification for deployment revision presets."""
@@ -5871,10 +5871,10 @@ input ModelCardV2Filter {
   name: StringFilter = null
 
   """Domain filter."""
-  domainName: String = null
+  domainName: StringFilter = null
 
   """Project filter."""
-  projectId: UUID = null
+  projectId: UUIDFilter = null
 
   """
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
@@ -10977,7 +10977,7 @@ input RuntimeVariantPresetFilter {
   name: StringFilter = null
 
   """Variant ID filter."""
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUIDFilter = null
 }
 
 """Added in 26.4.2. Order specification."""
