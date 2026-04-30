@@ -6,7 +6,7 @@ Covers batched scope chain traversal returning per-entity operation sets.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass, field
 
 import pytest
@@ -15,7 +15,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.manager.data.permission.role import EffectivePermissionsInput
+from ai.backend.manager.data.permission.role import PermissionResolutionKey
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -421,35 +421,36 @@ class TestResolveEffectivePermissions:
 
     # ── Helpers ──
 
-    def _make_input(
+    def _make_keys(
         self,
         fixture: EffectiveFixture,
-        entity_type: EntityType = EntityType.VFOLDER,
-    ) -> EffectivePermissionsInput:
-        return EffectivePermissionsInput(
-            user_id=fixture.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_entity_ids=fixture.vfolder_ids,
-            permission_entity_type=entity_type,
-        )
+        entity_type: RBACElementType = RBACElementType.VFOLDER,
+    ) -> list[PermissionResolutionKey]:
+        return [
+            PermissionResolutionKey(
+                user_id=fixture.user_id,
+                element_type=RBACElementType.VFOLDER,
+                entity_id=vfolder_id,
+                subject_entity_type=entity_type,
+            )
+            for vfolder_id in fixture.vfolder_ids
+        ]
+
+    @staticmethod
+    def _ops_by_entity_id(
+        result: Mapping[PermissionResolutionKey, frozenset[OperationType]],
+    ) -> dict[str, frozenset[OperationType]]:
+        return {key.entity_id: ops for key, ops in result.items()}
 
     # ── Tests: empty / no permission ──
 
     async def test_empty_input_returns_empty(
         self,
         db_source: PermissionDBSource,
-        user_with_active_role: EffectiveFixture,
     ) -> None:
-        """Empty target_entity_ids returns empty dict."""
-        fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            EffectivePermissionsInput(
-                user_id=fixture.user_id,
-                target_element_type=RBACElementType.VFOLDER,
-                target_entity_ids=[],
-            )
-        )
-        assert result.permissions == {}
+        """Empty key sequence returns empty mapping."""
+        result = await db_source.resolve_effective_permissions([])
+        assert result == {}
 
     async def test_no_permission_returns_empty_sets(
         self,
@@ -459,11 +460,11 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """No permissions assigned -> all entities get empty operation sets."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
         for vfolder_id in fixture.vfolder_ids:
-            assert result.permissions[vfolder_id] == set()
+            assert result[vfolder_id] == set()
 
     # ── Tests: scope chain ──
 
@@ -486,12 +487,12 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """All vfolders in same project with READ -> all get {READ}."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
-        assert len(result.permissions) == 3
+        assert len(result) == 3
         for vfolder_id in fixture.vfolder_ids:
-            assert result.permissions[vfolder_id] == {OperationType.READ}
+            assert result[vfolder_id] == {OperationType.READ}
 
     @pytest.mark.parametrize(
         "permission_setup",
@@ -516,12 +517,12 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """Multiple operations at project scope propagate to all vfolders."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
         expected = {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
         for vfolder_id in fixture.vfolder_ids:
-            assert result.permissions[vfolder_id] == expected
+            assert result[vfolder_id] == expected
 
     @pytest.mark.parametrize(
         "permission_setup",
@@ -543,11 +544,11 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """Permission at DOMAIN scope propagates through chain to all vfolders."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
         for vfolder_id in fixture.vfolder_ids:
-            assert result.permissions[vfolder_id] == {OperationType.UPDATE}
+            assert result[vfolder_id] == {OperationType.UPDATE}
 
     # ── Tests: self-scope ──
 
@@ -569,12 +570,12 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """Self-scope permission on vfolder[0] only; others empty."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
-        assert result.permissions[fixture.vfolder_ids[0]] == {OperationType.READ}
-        assert result.permissions[fixture.vfolder_ids[1]] == set()
-        assert result.permissions[fixture.vfolder_ids[2]] == set()
+        assert result[fixture.vfolder_ids[0]] == {OperationType.READ}
+        assert result[fixture.vfolder_ids[1]] == set()
+        assert result[fixture.vfolder_ids[2]] == set()
 
     # ── Tests: mixed edges ──
 
@@ -597,12 +598,12 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """AUTO edge -> {READ}, REF edge -> empty, no edge -> empty."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
-        assert result.permissions[fixture.vfolder_ids[0]] == {OperationType.READ}
-        assert result.permissions[fixture.vfolder_ids[1]] == set()
-        assert result.permissions[fixture.vfolder_ids[2]] == set()
+        assert result[fixture.vfolder_ids[0]] == {OperationType.READ}
+        assert result[fixture.vfolder_ids[1]] == set()
+        assert result[fixture.vfolder_ids[2]] == set()
 
     # ── Tests: chain + self-scope combined ──
 
@@ -628,12 +629,12 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """vfolder[0] gets READ via chain, vfolder[1] gets UPDATE via self-scope."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
-        assert result.permissions[fixture.vfolder_ids[0]] == {OperationType.READ}
-        assert result.permissions[fixture.vfolder_ids[1]] == {OperationType.UPDATE}
-        assert result.permissions[fixture.vfolder_ids[2]] == set()
+        assert result[fixture.vfolder_ids[0]] == {OperationType.READ}
+        assert result[fixture.vfolder_ids[1]] == {OperationType.UPDATE}
+        assert result[fixture.vfolder_ids[2]] == set()
 
     @pytest.mark.parametrize(
         "permission_setup",
@@ -657,15 +658,15 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """vfolder[0] gets {READ, UPDATE}: READ from chain, UPDATE from self-scope."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
-        assert result.permissions[fixture.vfolder_ids[0]] == {
+        assert result[fixture.vfolder_ids[0]] == {
             OperationType.READ,
             OperationType.UPDATE,
         }
-        assert result.permissions[fixture.vfolder_ids[1]] == {OperationType.READ}
-        assert result.permissions[fixture.vfolder_ids[2]] == {OperationType.READ}
+        assert result[fixture.vfolder_ids[1]] == {OperationType.READ}
+        assert result[fixture.vfolder_ids[2]] == {OperationType.READ}
 
     # ── Tests: multi-domain ──
 
@@ -688,12 +689,12 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """Domain permission grants vfolders in child projects but not in another domain."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
-        assert result.permissions[fixture.vfolder_ids[0]] == {OperationType.READ}
-        assert result.permissions[fixture.vfolder_ids[1]] == {OperationType.READ}
-        assert result.permissions[fixture.vfolder_ids[2]] == set()
+        assert result[fixture.vfolder_ids[0]] == {OperationType.READ}
+        assert result[fixture.vfolder_ids[1]] == {OperationType.READ}
+        assert result[fixture.vfolder_ids[2]] == set()
 
     # ── Tests: inactive role ──
 
@@ -716,11 +717,11 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """Inactive role does not grant any operations."""
         fixture = user_with_inactive_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
         for vfolder_id in fixture.vfolder_ids:
-            assert result.permissions[vfolder_id] == set()
+            assert result[vfolder_id] == set()
 
     # ── Tests: user isolation ──
 
@@ -761,11 +762,11 @@ class TestResolveEffectivePermissions:
             )
             await db_sess.flush()
 
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
         for vfolder_id in fixture.vfolder_ids:
-            assert result.permissions[vfolder_id] == set()
+            assert result[vfolder_id] == set()
 
     # ── Tests: multi-role union ──
 
@@ -801,12 +802,12 @@ class TestResolveEffectivePermissions:
             )
             await db_sess.flush()
 
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
         expected = {OperationType.READ, OperationType.UPDATE}
         for vfolder_id in fixture.vfolder_ids:
-            assert result.permissions[vfolder_id] == expected
+            assert result[vfolder_id] == expected
 
     # ── Tests: cycle detection ──
 
@@ -867,11 +868,11 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """Cyclic scope chain terminates without infinite recursion; permission is found."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
         for vfolder_id in fixture.vfolder_ids:
-            assert OperationType.READ in result.permissions[vfolder_id]
+            assert OperationType.READ in result[vfolder_id]
 
     async def test_scope_chain_cycle_terminates_without_permission(
         self,
@@ -881,8 +882,8 @@ class TestResolveEffectivePermissions:
     ) -> None:
         """Cyclic scope chain terminates without infinite recursion; no operations granted."""
         fixture = user_with_active_role
-        result = await db_source.resolve_effective_permissions(
-            self._make_input(fixture),
+        result = self._ops_by_entity_id(
+            await db_source.resolve_effective_permissions(self._make_keys(fixture)),
         )
         for vfolder_id in fixture.vfolder_ids:
-            assert result.permissions[vfolder_id] == set()
+            assert result[vfolder_id] == set()

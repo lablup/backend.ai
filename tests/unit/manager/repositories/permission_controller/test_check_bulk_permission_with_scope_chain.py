@@ -6,7 +6,7 @@ Covers bulk CTE-based scope chain traversal with per-entity results.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass, field
 
 import pytest
@@ -15,7 +15,10 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.manager.data.permission.role import BulkPermissionCheckInput
+from ai.backend.manager.data.permission.role import (
+    BulkPermissionCheckInput,
+    PermissionResolutionKey,
+)
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -413,34 +416,37 @@ class TestCheckBulkPermissionWithScopeChain:
 
     # ── Helpers ──
 
+    @staticmethod
     def _make_input(
-        self,
         fixture: BatchFixture,
         operation: OperationType,
     ) -> BulkPermissionCheckInput:
-        return BulkPermissionCheckInput(
-            user_id=fixture.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_entity_ids=fixture.vfolder_ids,
-            operation=operation,
-        )
+        keys = [
+            PermissionResolutionKey(
+                user_id=fixture.user_id,
+                element_type=RBACElementType.VFOLDER,
+                entity_id=vfolder_id,
+                subject_entity_type=RBACElementType.VFOLDER,
+            )
+            for vfolder_id in fixture.vfolder_ids
+        ]
+        return BulkPermissionCheckInput(keys=keys, operation=operation)
+
+    @staticmethod
+    def _bool_by_entity_id(
+        result: Mapping[PermissionResolutionKey, bool],
+    ) -> dict[str, bool]:
+        return {key.entity_id: value for key, value in result.items()}
 
     # ── Tests ──
 
     async def test_empty_input_returns_empty(
         self,
         db_source: PermissionDBSource,
-        user_with_active_role: BatchFixture,
     ) -> None:
-        """Empty target_entity_ids returns empty dict."""
-        fixture = user_with_active_role
+        """Empty key sequence returns empty mapping."""
         result = await db_source.check_bulk_permission_with_scope_chain(
-            BulkPermissionCheckInput(
-                user_id=fixture.user_id,
-                target_element_type=RBACElementType.VFOLDER,
-                target_entity_ids=[],
-                operation=OperationType.READ,
-            )
+            BulkPermissionCheckInput(keys=[], operation=OperationType.READ)
         )
         assert result == {}
 
@@ -457,8 +463,10 @@ class TestCheckBulkPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """All vfolders in same project with READ permission -> all True."""
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(user_with_active_role, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(user_with_active_role, OperationType.READ),
+            ),
         )
         assert all(result.values())
         assert len(result) == 3
@@ -477,8 +485,10 @@ class TestCheckBulkPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """Permission at DOMAIN scope propagates through chain to all vfolders."""
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(user_with_active_role, OperationType.UPDATE),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(user_with_active_role, OperationType.UPDATE),
+            ),
         )
         assert all(result.values())
         assert len(result) == 3
@@ -490,8 +500,10 @@ class TestCheckBulkPermissionWithScopeChain:
         all_vfolders_in_project_auto: None,
     ) -> None:
         """No permissions -> all False."""
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(user_with_active_role, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(user_with_active_role, OperationType.READ),
+            ),
         )
         assert not any(result.values())
         assert len(result) == 3
@@ -510,8 +522,10 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """AUTO edge -> granted, REF edge -> denied, no edge -> denied."""
         fixture = user_with_active_role
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(fixture, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(fixture, OperationType.READ),
+            ),
         )
         assert result[fixture.vfolder_ids[0]]  # AUTO
         assert not result[fixture.vfolder_ids[1]]  # REF
@@ -530,8 +544,10 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """Self-scope permission on vfolder[0] only; others denied."""
         fixture = user_with_active_role
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(fixture, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(fixture, OperationType.READ),
+            ),
         )
         assert result[fixture.vfolder_ids[0]]
         assert not result[fixture.vfolder_ids[1]]
@@ -550,8 +566,10 @@ class TestCheckBulkPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """READ permission does not satisfy UPDATE check."""
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(user_with_active_role, OperationType.UPDATE),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(user_with_active_role, OperationType.UPDATE),
+            ),
         )
         assert not any(result.values())
 
@@ -568,8 +586,10 @@ class TestCheckBulkPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """Inactive role does not grant any permission in batch."""
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(user_with_inactive_role, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(user_with_inactive_role, OperationType.READ),
+            ),
         )
         assert not any(result.values())
 
@@ -595,8 +615,10 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """vfolder[0] via chain (AUTO), vfolder[1] via self-scope, vfolder[2] denied."""
         fixture = user_with_active_role
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(fixture, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(fixture, OperationType.READ),
+            ),
         )
         assert result[fixture.vfolder_ids[0]]  # via chain
         assert result[fixture.vfolder_ids[1]]  # via self-scope
@@ -616,8 +638,10 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """Domain permission grants vfolders in child projects but not in another domain."""
         fixture = user_with_active_role
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(fixture, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(fixture, OperationType.READ),
+            ),
         )
         assert result[fixture.vfolder_ids[0]]  # domain_a -> project_a -> vfolder[0]
         assert result[fixture.vfolder_ids[1]]  # domain_a -> project_b -> vfolder[1]
@@ -631,8 +655,10 @@ class TestCheckBulkPermissionWithScopeChain:
         other_user_with_project_permission: None,
     ) -> None:
         """Permission for another user does not leak into batch results."""
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(user_with_active_role, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(user_with_active_role, OperationType.READ),
+            ),
         )
         assert not any(result.values())
 
@@ -692,8 +718,10 @@ class TestCheckBulkPermissionWithScopeChain:
         permission_setup: None,
     ) -> None:
         """Cyclic scope chain terminates without infinite recursion; permission is found."""
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(user_with_active_role, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(user_with_active_role, OperationType.READ),
+            ),
         )
         assert all(result.values())
 
@@ -704,7 +732,9 @@ class TestCheckBulkPermissionWithScopeChain:
         scope_chain_with_cycle: None,
     ) -> None:
         """Cyclic scope chain terminates without infinite recursion; no permission granted."""
-        result = await db_source.check_bulk_permission_with_scope_chain(
-            self._make_input(user_with_active_role, OperationType.READ),
+        result = self._bool_by_entity_id(
+            await db_source.check_bulk_permission_with_scope_chain(
+                self._make_input(user_with_active_role, OperationType.READ),
+            ),
         )
         assert not any(result.values())

@@ -11,7 +11,6 @@ from ai.backend.manager.actions.action.rbac import (
 )
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import (
-    EffectivePermissionsInput,
     UserRoleRevocationData,
 )
 from ai.backend.manager.repositories.group.repository import GroupRepository
@@ -421,20 +420,14 @@ class PermissionControllerService:
     async def resolve_effective_permissions(
         self, action: ResolveEffectivePermissionsAction
     ) -> ResolveEffectivePermissionsActionResult:
-        """Resolve the set of permitted operations per entity for a given user.
+        """Resolve the set of permitted operations across a collection of per-target keys.
 
         Traverses the scope chain and evaluates all role/permission assignments
-        to return all operations the user is authorized to perform on each entity.
+        to return all operations the user is authorized to perform on each
+        target key.
         """
-        result = await self._repository.resolve_effective_permissions(
-            EffectivePermissionsInput(
-                user_id=action.user_id,
-                target_element_type=action.target_element_type,
-                target_entity_ids=action.target_entity_ids,
-                permission_entity_type=action.permission_entity_type,
-            )
-        )
-        return ResolveEffectivePermissionsActionResult(permissions=result.permissions)
+        permissions = await self._repository.resolve_effective_permissions(action.keys)
+        return ResolveEffectivePermissionsActionResult(permissions=permissions)
 
     async def create_role_invitation(
         self, action: CreateRoleInvitationServiceAction
