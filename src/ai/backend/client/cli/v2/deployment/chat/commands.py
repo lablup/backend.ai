@@ -1,4 +1,4 @@
-"""User-facing CLI: ``./bai deployment chat`` and ``chat-config``."""
+"""User-facing CLI: ``./bai deployment chat``, ``chat-config``, ``chat-cache``."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import asyncio
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 import click
 
@@ -22,6 +21,7 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 from ai.backend.common.dto.clients.openai_compat import ChatCompletionRequest
+from ai.backend.common.identifier.deployment import DeploymentID
 
 
 def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
@@ -68,7 +68,7 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
     ),
 )
 def chat(
-    deployment_id: UUID,
+    deployment_id: DeploymentID,
     message: str,
     model: str | None,
     params: Any,
@@ -224,7 +224,7 @@ def chat_config() -> None:
     ),
 )
 def set_(
-    deployment_id: UUID,
+    deployment_id: DeploymentID,
     token: str | None,
     model: str | None,
 ) -> None:
@@ -253,7 +253,7 @@ def set_(
 
 @chat_config.command(name="show")
 @click.argument("deployment_id", type=click.UUID)
-def show(deployment_id: UUID) -> None:
+def show(deployment_id: DeploymentID) -> None:
     """Print the user-managed chat config entry for a deployment (tokens are masked).
 
     Only the user-managed fields (``token``, ``model``) are shown; the
@@ -269,7 +269,7 @@ def show(deployment_id: UUID) -> None:
 
 @chat_config.command(name="clear")
 @click.argument("deployment_id", type=click.UUID)
-def clear(deployment_id: UUID) -> None:
+def clear(deployment_id: DeploymentID) -> None:
     """Remove the user-managed config entry (token + model) for a deployment.
 
     The auto-managed cache entry (``endpoint_url``, ``default_model``,
@@ -305,7 +305,7 @@ def chat_cache() -> None:
 
 @chat_cache.command(name="show")
 @click.argument("deployment_id", type=click.UUID)
-def cache_show(deployment_id: UUID) -> None:
+def cache_show(deployment_id: DeploymentID) -> None:
     """Print the auto-managed chat cache entry for a deployment."""
     entry = DeploymentChatCache.load().get(deployment_id)
     if entry is None:
@@ -315,7 +315,7 @@ def cache_show(deployment_id: UUID) -> None:
 
 @chat_cache.command(name="clear")
 @click.argument("deployment_id", type=click.UUID)
-def cache_clear(deployment_id: UUID) -> None:
+def cache_clear(deployment_id: DeploymentID) -> None:
     """Remove the auto-managed cache entry for a deployment.
 
     Forces the next ``chat`` call to re-fetch ``endpoint_url`` from the
