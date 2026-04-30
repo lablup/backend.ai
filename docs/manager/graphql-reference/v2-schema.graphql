@@ -7806,10 +7806,8 @@ input PresetDeploymentStrategyInput {
 Added in 26.4.2. Container execution configuration for the deployment, including the inference server image, startup commands, and environment variables.
 """
 type PresetExecutionSpec {
-  """
-  Container image to run the inference server (e.g., 'cr.backend.ai/stable/vllm:latest').
-  """
-  image: String
+  """Container image UUID."""
+  imageId: UUID
 
   """Startup command."""
   startupCommand: String

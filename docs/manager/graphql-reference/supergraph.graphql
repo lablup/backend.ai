@@ -12029,10 +12029,8 @@ Added in 26.4.2. Container execution configuration for the deployment, including
 type PresetExecutionSpec
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Container image to run the inference server (e.g., 'cr.backend.ai/stable/vllm:latest').
-  """
-  image: String
+  """Container image UUID."""
+  imageId: UUID
 
   """Startup command."""
   startupCommand: String
