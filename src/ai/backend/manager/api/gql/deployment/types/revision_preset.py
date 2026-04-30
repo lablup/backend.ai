@@ -189,8 +189,8 @@ class PresetResourceAllocationGQL(PydanticOutputMixin[PresetResourceAllocationDT
     name="PresetExecutionSpec",
 )
 class PresetExecutionSpecGQL(PydanticOutputMixin[PresetExecutionSpecDTO]):
-    image: str | None = gql_field(
-        description="Container image to run the inference server (e.g., 'cr.backend.ai/stable/vllm:latest')."
+    image_id: UUID | None = gql_field(
+        description="UUID of the container image used to run the inference server."
     )
     startup_command: str | None = gql_field(
         description="Command to start the inference server process inside the container."

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.config import ModelConfig, ModelDefinition
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
@@ -100,11 +101,16 @@ class TestDeploymentRevisionPresetCRUD:
         admin_v2_registry: V2ClientRegistry,
         runtime_variant_id: RuntimeVariantID,
     ) -> None:
+        image_id = ImageID(uuid.uuid4())
+        model_definition = ModelDefinition(
+            models=[ModelConfig(name="llama", model_path="/models/llama")],
+        )
         create_result = await admin_v2_registry.deployment_revision_preset.create(
             CreateDeploymentRevisionPresetInput(
                 runtime_variant_id=runtime_variant_id,
                 name="search-test-preset",
-                image_id=ImageID(uuid.uuid4()),
+                image_id=image_id,
+                model_definition=model_definition,
             )
         )
         preset_id = create_result.preset.id
@@ -118,8 +124,15 @@ class TestDeploymentRevisionPresetCRUD:
             )
         )
         assert result.total_count >= 1
-        ids = [item.id for item in result.items]
-        assert preset_id in ids
+        matched = [item for item in result.items if item.id == preset_id]
+        assert len(matched) == 1
+        # BA-5931: nested execution.image_id and model_definition must round-trip.
+        preset = matched[0]
+        assert preset.execution.image_id == image_id
+        assert preset.model_definition is not None
+        assert len(preset.model_definition.models) == 1
+        assert preset.model_definition.models[0].name == "llama"
+        assert preset.model_definition.models[0].model_path == "/models/llama"
 
         await admin_v2_registry.deployment_revision_preset.delete(preset_id)
 

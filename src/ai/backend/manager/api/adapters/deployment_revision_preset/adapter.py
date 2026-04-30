@@ -4,9 +4,24 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import (
+    ModelConfig,
+    ModelDefinition,
+    ModelHealthCheck,
+    ModelMetadata,
+    ModelServiceConfig,
+    PreStartAction,
+)
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ModelConfigInfoDTO,
+    ModelDefinitionInfoDTO,
+    ModelHealthCheckInfoDTO,
+    ModelMetadataInfoDTO,
+    ModelServiceConfigInfoDTO,
+    PreStartActionInfoDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
@@ -111,6 +126,74 @@ def _preset_resource_slot_pagination_spec() -> PaginationSpec:
         forward_condition_factory=PresetResourceSlotConditions.by_cursor_forward,
         backward_condition_factory=PresetResourceSlotConditions.by_cursor_backward,
         tiebreaker_order=ALLOCATED_SLOT_PRESET_TIEBREAKER,
+    )
+
+
+def _pre_start_action_to_dto(action: PreStartAction) -> PreStartActionInfoDTO:
+    return PreStartActionInfoDTO(action=action.action, args=action.args)
+
+
+def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoDTO:
+    return ModelHealthCheckInfoDTO(
+        interval=check.interval,
+        path=check.path,
+        max_retries=check.max_retries,
+        max_wait_time=check.max_wait_time,
+        expected_status_code=check.expected_status_code,
+        initial_delay=check.initial_delay,
+    )
+
+
+def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
+    return ModelServiceConfigInfoDTO(
+        pre_start_actions=[_pre_start_action_to_dto(a) for a in service.pre_start_actions],
+        start_command=service.start_command,
+        shell=service.shell,
+        port=service.port,
+        health_check=(
+            _model_health_check_to_dto(service.health_check)
+            if service.health_check is not None
+            else None
+        ),
+    )
+
+
+def _model_metadata_to_dto(metadata: ModelMetadata) -> ModelMetadataInfoDTO:
+    return ModelMetadataInfoDTO(
+        author=metadata.author,
+        title=metadata.title,
+        version=metadata.version,
+        created=metadata.created,
+        last_modified=metadata.last_modified,
+        description=metadata.description,
+        task=metadata.task,
+        category=metadata.category,
+        architecture=metadata.architecture,
+        framework=metadata.framework,
+        label=metadata.label,
+        license=metadata.license,
+        min_resource=metadata.min_resource,
+    )
+
+
+def _model_config_to_dto(config: ModelConfig) -> ModelConfigInfoDTO:
+    return ModelConfigInfoDTO(
+        name=config.name,
+        model_path=config.model_path,
+        service=(
+            _model_service_config_to_dto(config.service) if config.service is not None else None
+        ),
+        metadata=(_model_metadata_to_dto(config.metadata) if config.metadata is not None else None),
+    )
+
+
+def _model_definition_to_dto(
+    definition: ModelDefinition | None,
+) -> ModelDefinitionInfoDTO | None:
+    if definition is None:
+        return None
+    return ModelDefinitionInfoDTO(
+        models=[_model_config_to_dto(m) for m in definition.models],
     )
 
 
@@ -553,7 +636,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 deployment_strategy=data.deployment_strategy,
                 deployment_strategy_spec=data.deployment_strategy_spec,
             ),
-            model_definition=data.model_definition,
+            model_definition=_model_definition_to_dto(data.model_definition),
             preset_values=preset_value_entries,
             created_at=data.created_at,
             updated_at=data.updated_at,

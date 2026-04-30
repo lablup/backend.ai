@@ -7,8 +7,8 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.deployment.types import ModelDefinitionInfoDTO
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
@@ -111,7 +111,7 @@ class DeploymentRevisionPresetNode(BaseResponseModel):
         default_factory=PresetDeploymentDefaults,
         description="Deployment-level default values provided by this preset.",
     )
-    model_definition: ModelDefinition | None = Field(
+    model_definition: ModelDefinitionInfoDTO | None = Field(
         default=None, description="Model definition configuration."
     )
     preset_values: list[PresetValueInfo] = Field(default_factory=list, description="Preset values.")
