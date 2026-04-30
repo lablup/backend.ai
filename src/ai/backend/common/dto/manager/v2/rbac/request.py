@@ -26,7 +26,9 @@ __all__ = (
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
     "AssignRoleInput",
+    "BulkAddRolePermissionsInput",
     "BulkAssignRoleInput",
+    "BulkRemoveRolePermissionsInput",
     "BulkRevokeRoleInput",
     "CreatePermissionInput",
     "CreateRoleInput",
@@ -38,6 +40,7 @@ __all__ = (
     "PermissionNestedFilter",
     "PermissionOrderBy",
     "PurgeRoleInput",
+    "ReplaceRolePermissionsInput",
     "RevokeRoleInput",
     "RoleAssignmentFilter",
     "RoleAssignmentOrderBy",
@@ -160,6 +163,40 @@ class BulkRevokeRoleInput(BaseRequestModel):
 
     role_id: UUID = Field(description="Role ID to revoke")
     user_ids: list[UUID] = Field(description="List of user IDs to revoke the role from")
+
+
+class BulkAddRolePermissionsInput(BaseRequestModel):
+    """Input for bulk-adding scoped permissions across one or more roles."""
+
+    permissions: list[CreatePermissionInput] = Field(
+        description="Permission entries to insert. Duplicates are surfaced as failures.",
+    )
+
+
+class BulkRemoveRolePermissionsInput(BaseRequestModel):
+    """Input for bulk-deleting permission rows by primary key.
+
+    The permission row ID is globally unique, so a single call can remove rows
+    belonging to multiple roles.
+    """
+
+    permission_ids: list[UUID] = Field(
+        description="Permission row IDs to delete. Unknown IDs are silently ignored.",
+    )
+
+
+class ReplaceRolePermissionsInput(BaseRequestModel):
+    """Input for replacing one role's entire scoped-permission set in one call.
+
+    Every entry in ``permissions`` must carry the same ``role_id`` as the
+    top-level field; the server rejects the call otherwise so the operation
+    cannot accidentally span multiple roles.
+    """
+
+    role_id: UUID = Field(description="Role whose permission set is being replaced")
+    permissions: list[CreatePermissionInput] = Field(
+        description="New permission set for the role. An empty list clears all permissions.",
+    )
 
 
 class RoleFilter(BaseRequestModel):

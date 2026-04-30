@@ -9,13 +9,16 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AssignRoleInput,
+    BulkAddRolePermissionsInput,
     BulkAssignRoleInput,
+    BulkRemoveRolePermissionsInput,
     BulkRevokeRoleInput,
     CreatePermissionInput,
     CreateRoleInput,
     DeletePermissionInput,
     DeleteRoleInput,
     PurgeRoleInput,
+    ReplaceRolePermissionsInput,
     RevokeRoleInput,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -26,13 +29,16 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     AdminSearchAssociationsPayload,
     AdminSearchPermissionsPayload,
     AdminSearchRolesPayload,
+    BulkAddRolePermissionsPayload,
     BulkAssignRoleResultPayload,
+    BulkRemoveRolePermissionsPayload,
     BulkRevokeRoleResultPayload,
     CreateRolePayload,
     DeletePermissionPayload,
     DeleteRolePayload,
     PermissionNode,
     PurgeRolePayload,
+    ReplaceRolePermissionsPayload,
     RoleAssignmentNode,
     RoleNode,
     SearchRoleAssignmentsPayload,
@@ -149,6 +155,44 @@ class V2RBACClient(BaseDomainClient):
             f"{_PATH}/permissions/delete",
             request=request,
             response_model=DeletePermissionPayload,
+        )
+
+    # -------------------------------------------------------- Bulk role permissions
+
+    async def bulk_add_role_permissions(
+        self,
+        request: BulkAddRolePermissionsInput,
+    ) -> BulkAddRolePermissionsPayload:
+        """Bulk-insert scoped permission rows. Each entry carries its own role_id."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/permissions/bulk-add",
+            request=request,
+            response_model=BulkAddRolePermissionsPayload,
+        )
+
+    async def bulk_remove_role_permissions(
+        self,
+        request: BulkRemoveRolePermissionsInput,
+    ) -> BulkRemoveRolePermissionsPayload:
+        """Bulk-delete permission rows by primary key (cross-role allowed)."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/permissions/bulk-remove",
+            request=request,
+            response_model=BulkRemoveRolePermissionsPayload,
+        )
+
+    async def replace_role_permissions(
+        self,
+        request: ReplaceRolePermissionsInput,
+    ) -> ReplaceRolePermissionsPayload:
+        """Replace one role's entire scoped-permission set in a single call."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/permissions/replace",
+            request=request,
+            response_model=ReplaceRolePermissionsPayload,
         )
 
     # ------------------------------------------------------------------ Assignments

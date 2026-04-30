@@ -12,13 +12,16 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AssignRoleInput,
+    BulkAddRolePermissionsInput,
     BulkAssignRoleInput,
+    BulkRemoveRolePermissionsInput,
     BulkRevokeRoleInput,
     CreatePermissionInput,
     CreateRoleInput,
     DeletePermissionInput,
     DeleteRoleInput,
     PurgeRoleInput,
+    ReplaceRolePermissionsInput,
     RevokeRoleInput,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -169,6 +172,32 @@ class V2RBACHandler:
     ) -> APIResponse:
         """Hard-delete a scoped permission."""
         result = await self._adapter.delete_permission(body.parsed.id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    # -------------------------------------------------------- Bulk role permissions
+
+    async def bulk_add_role_permissions(
+        self,
+        body: BodyParam[BulkAddRolePermissionsInput],
+    ) -> APIResponse:
+        """Bulk-insert scoped permission rows across one or more roles."""
+        result = await self._adapter.bulk_add_role_permissions(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_remove_role_permissions(
+        self,
+        body: BodyParam[BulkRemoveRolePermissionsInput],
+    ) -> APIResponse:
+        """Bulk-delete permission rows by primary key."""
+        result = await self._adapter.bulk_remove_role_permissions(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def replace_role_permissions(
+        self,
+        body: BodyParam[ReplaceRolePermissionsInput],
+    ) -> APIResponse:
+        """Replace one role's entire scoped-permission set in one call."""
+        result = await self._adapter.replace_role_permissions(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # ------------------------------------------------------------------ Assignments

@@ -10,6 +10,12 @@ from .entity import (
 )
 from .entity_node import EntityNode
 from .permission import (
+    BulkAddRolePermissionFailureInfoGQL,
+    BulkAddRolePermissionsInputGQL,
+    BulkAddRolePermissionsPayloadGQL,
+    BulkRemoveRolePermissionFailureInfoGQL,
+    BulkRemoveRolePermissionsInputGQL,
+    BulkRemoveRolePermissionsPayloadGQL,
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
@@ -24,6 +30,9 @@ from .permission import (
     PermissionNestedFilterGQL,
     PermissionOrderBy,
     PermissionOrderField,
+    ReplaceRolePermissionFailureInfoGQL,
+    ReplaceRolePermissionsInputGQL,
+    ReplaceRolePermissionsPayloadGQL,
     ScopeEntityCombinationGQL,
     ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
@@ -124,6 +133,9 @@ __all__ = [
     "RevokeRoleInput",
     "BulkAssignRoleInputGQL",
     "BulkRevokeRoleInputGQL",
+    "BulkAddRolePermissionsInputGQL",
+    "BulkRemoveRolePermissionsInputGQL",
+    "ReplaceRolePermissionsInputGQL",
     # Payloads
     "DeletePermissionPayload",
     "DeleteRolePayload",
@@ -132,6 +144,12 @@ __all__ = [
     "BulkAssignRolePayloadGQL",
     "BulkRevokeRoleErrorGQL",
     "BulkRevokeRolePayloadGQL",
+    "BulkAddRolePermissionFailureInfoGQL",
+    "BulkAddRolePermissionsPayloadGQL",
+    "BulkRemoveRolePermissionFailureInfoGQL",
+    "BulkRemoveRolePermissionsPayloadGQL",
+    "ReplaceRolePermissionFailureInfoGQL",
+    "ReplaceRolePermissionsPayloadGQL",
     # Connections
     "PermissionConnection",
     "PermissionEdge",

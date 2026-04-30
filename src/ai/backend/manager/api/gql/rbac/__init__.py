@@ -3,7 +3,9 @@ from __future__ import annotations
 from .resolver import (
     accept_role_invitation,
     admin_assign_role,
+    admin_bulk_add_role_permissions,
     admin_bulk_assign_role,
+    admin_bulk_remove_role_permissions,
     admin_bulk_revoke_role,
     admin_cancel_role_invitation,
     admin_create_permission,
@@ -13,6 +15,7 @@ from .resolver import (
     admin_entities,
     admin_permissions,
     admin_purge_role,
+    admin_replace_role_permissions,
     admin_revoke_role,
     admin_role,
     admin_role_assignments,
@@ -142,6 +145,9 @@ __all__ = (
     "admin_revoke_role",
     "admin_bulk_assign_role",
     "admin_bulk_revoke_role",
+    "admin_bulk_add_role_permissions",
+    "admin_bulk_remove_role_permissions",
+    "admin_replace_role_permissions",
     # Role invitation resolvers
     "my_role_invitations",
     "my_sent_role_invitations",
