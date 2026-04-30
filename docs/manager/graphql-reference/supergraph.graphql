@@ -17906,7 +17906,6 @@ input UpdateDeploymentInput
   openToPublic: Boolean
   tags: [String!]
   defaultDeploymentStrategy: DeploymentStrategyInput
-  activeRevisionId: ID
   replicaCount: Int
   name: String
   preferredDomainName: String
