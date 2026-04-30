@@ -264,11 +264,21 @@ def prepare_mount_arg(
     mount_args: Sequence[str] | None = None,
     *,
     escape: bool = True,
-) -> tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
+) -> tuple[
+    list[str],
+    dict[str, str],
+    dict[str, Mapping[str, str]],
+    list[uuid.UUID],
+    dict[uuid.UUID, str],
+]:
     """
-    Parse the list of mount arguments into a list of
-    vfolder name and in-container mount path pairs,
-    followed by extra options.
+    Parse the list of mount arguments and split them into
+    name-keyed and UUID-keyed buckets.
+
+    UUID-shaped sources are routed to ``mount_ids`` /
+    ``mount_id_map`` so they reach the manager's UUID-based
+    mount resolver. Non-UUID sources stay in ``mounts`` /
+    ``mount_map`` for the legacy name-based path.
 
     :param mount_args: A list of mount arguments such as
         [
@@ -276,20 +286,35 @@ def prepare_mount_arg(
             "type=bind,source=/colon:path/abcd,target=/zxcv,readonly",
             # simple formats are still supported
             "vf-abcd:/home/work/zxcv",
+            # UUID-shaped sources are split out into mount_ids
+            "d2b0f974-80d0-4988-8e99-0347c2f45965",
+            "d2b0f974-80d0-4988-8e99-0347c2f45965:/home/work/data",
         ]
     """
-    mounts = set()
-    mount_map = {}
-    mount_options = {}
+    mounts: set[str] = set()
+    mount_map: dict[str, str] = {}
+    mount_options: dict[str, Mapping[str, str]] = {}
+    mount_ids: set[uuid.UUID] = set()
+    mount_id_map: dict[uuid.UUID, str] = {}
     if mount_args is not None:
         for mount_arg in mount_args:
             mountpoint = {**MountExpression(mount_arg).parse(escape=escape)}
-            mount = str(mountpoint.pop("source"))
-            mounts.add(mount)
-            if target := mountpoint.pop("target", None):
-                mount_map[mount] = str(target)
-            mount_options[mount] = mountpoint
-    return list(mounts), mount_map, mount_options
+            source = str(mountpoint.pop("source"))
+            target = mountpoint.pop("target", None)
+            try:
+                vfolder_uuid = uuid.UUID(source)
+            except (ValueError, AttributeError):
+                vfolder_uuid = None
+            if vfolder_uuid is not None:
+                mount_ids.add(vfolder_uuid)
+                if target:
+                    mount_id_map[vfolder_uuid] = str(target)
+            else:
+                mounts.add(source)
+                if target:
+                    mount_map[source] = str(target)
+                mount_options[source] = mountpoint
+    return list(mounts), mount_map, mount_options, list(mount_ids), mount_id_map
 
 
 @main.command()
@@ -474,7 +499,7 @@ def run(
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
-    mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
+    mount, mount_map, mount_options, mount_ids, mount_id_map = prepare_mount_arg(mount, escape=True)
 
     env_ranges: dict[str, Any] = {v: r for v, r in env_range}  # type: ignore[has-type]
     build_ranges: dict[str, Any] = {v: r for v, r in build_range}  # type: ignore[has-type]
@@ -554,6 +579,8 @@ def run(
                 cluster_mode=cluster_mode,
                 mounts=mount,
                 mount_map=mount_map,
+                mount_ids=mount_ids,
+                mount_id_map=mount_id_map,
                 envs=envs,
                 resources=resources,
                 domain_name=domain,
@@ -685,6 +712,8 @@ def run(
                 mounts=mount,
                 mount_map=mount_map,
                 mount_options=mount_options,
+                mount_ids=mount_ids,
+                mount_id_map=mount_id_map,
                 envs=envs,
                 resources=resources,
                 resource_opts=resource_opts,

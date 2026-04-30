@@ -321,7 +321,15 @@ def create(
 
     """
     envs = prepare_env_arg(env)
-    mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
+    mount, mount_map, mount_options, _mount_ids, _mount_id_map = prepare_mount_arg(
+        mount, escape=True
+    )
+    # Service.create handles UUID resolution itself via /folders lookup, so
+    # merge UUID-shaped sources back into the name-keyed list.
+    if _mount_ids:
+        mount = [*mount, *(str(mid) for mid in _mount_ids)]
+        for mid, dst in _mount_id_map.items():
+            mount_map[str(mid)] = dst
     parsed_resources = prepare_resource_arg(resources)
     parsed_resource_opts = prepare_resource_arg(resource_opts)
     body = {

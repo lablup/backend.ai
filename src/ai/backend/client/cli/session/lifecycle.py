@@ -196,7 +196,9 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
         envs = prepare_env_arg(env)
         parsed_resources = prepare_resource_arg(resources)
         parsed_resource_opts = prepare_resource_arg(resource_opts)
-        mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
+        mount, mount_map, mount_options, mount_ids, mount_id_map = prepare_mount_arg(
+            mount, escape=True
+        )
 
         preopen_ports = preopen
         assigned_agent_list = assign_agent
@@ -239,6 +241,8 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
                     mounts=mount,
                     mount_map=mount_map,
                     mount_options=mount_options,
+                    mount_ids=mount_ids,
+                    mount_id_map=mount_id_map,
                     envs=envs,
                     startup_command=startup_command,
                     batch_timeout=timeout,
@@ -490,10 +494,10 @@ def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
             if len(resource_opts) > 0 or no_resource
             else undefined
         )
-        prepared_mount, prepared_mount_map, _ = (
+        prepared_mount, prepared_mount_map, _, prepared_mount_ids, prepared_mount_id_map = (
             prepare_mount_arg(mount)
             if len(mount) > 0 or no_mount
-            else (undefined, undefined, undefined)
+            else (undefined, undefined, undefined, undefined, undefined)
         )
         kwargs = {
             "name": name,
@@ -508,6 +512,8 @@ def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
             "cluster_size": cluster_size,
             "mounts": prepared_mount,
             "mount_map": prepared_mount_map,
+            "mount_ids": prepared_mount_ids,
+            "mount_id_map": prepared_mount_id_map,
             "envs": envs,
             "startup_command": startup_command,
             "batch_timeout": timeout,

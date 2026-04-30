@@ -1,3 +1,5 @@
+import uuid
+
 from ai.backend.client.cli.session.execute import prepare_mount_arg
 from ai.backend.common.types import MountPermission, MountTypes
 
@@ -12,7 +14,7 @@ def test_vfolder_mount() -> None:
     ]
 
     # when
-    mount, mount_map, mount_options = prepare_mount_arg(mount)
+    mount, mount_map, mount_options, mount_ids, mount_id_map = prepare_mount_arg(mount)
 
     # then
     assert set(mount) == {"/colon:path/test", "/usr/abcd", "/usr/lorem", "/src/hello"}
@@ -42,6 +44,35 @@ def test_vfolder_mount() -> None:
     }
 
 
+def test_vfolder_mount_uuid_routes_to_mount_ids() -> None:
+    # given
+    # UUIDs that start with a letter — the MountExpression parser's
+    # underlying lark grammar requires a CNAME (letter/underscore) at the
+    # start of a token, so digit-starting UUIDs fail to parse upstream
+    # regardless of this fix.
+    vfid_a = "d2b0f974-80d0-4988-8e99-0347c2f45965"
+    vfid_b = "abcd1234-2222-3333-4444-555555555555"
+    mount = [
+        # plain UUID (no target)
+        vfid_a,
+        # UUID with target
+        f"{vfid_b}:/home/work/data",
+        # mixed: a name-keyed entry stays in the name bucket
+        "vf-name-only:/home/work/keep",
+    ]
+
+    # when
+    names, name_map, name_opts, ids, id_map = prepare_mount_arg(mount)
+
+    # then
+    assert set(ids) == {uuid.UUID(vfid_a), uuid.UUID(vfid_b)}
+    assert id_map == {uuid.UUID(vfid_b): "/home/work/data"}
+    assert names == ["vf-name-only"]
+    assert name_map == {"vf-name-only": "/home/work/keep"}
+    # UUID entries do not pollute the name-keyed options dict
+    assert set(name_opts) == {"vf-name-only"}
+
+
 def test_vfolder_mount_without_target() -> None:
     # given
     mount = [
@@ -49,7 +80,7 @@ def test_vfolder_mount_without_target() -> None:
     ]
 
     # when
-    mount, mount_map, mount_options = prepare_mount_arg(mount)
+    mount, mount_map, mount_options, mount_ids, mount_id_map = prepare_mount_arg(mount)
 
     # then
     assert set(mount) == {"vf-dd244f7f"}
