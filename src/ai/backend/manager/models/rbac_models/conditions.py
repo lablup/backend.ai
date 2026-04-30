@@ -788,10 +788,11 @@ class EntityScopeConditions:
     @staticmethod
     def by_entity_type_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(AssociationScopesEntitiesRow.entity_type, sa.String)
             if spec.case_insensitive:
-                condition = AssociationScopesEntitiesRow.entity_type.ilike(f"%{spec.value}%")
+                condition = col.ilike(f"%{spec.value}%")
             else:
-                condition = AssociationScopesEntitiesRow.entity_type.like(f"%{spec.value}%")
+                condition = col.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -801,12 +802,11 @@ class EntityScopeConditions:
     @staticmethod
     def by_entity_type_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(AssociationScopesEntitiesRow.entity_type, sa.String)
             if spec.case_insensitive:
-                condition = (
-                    sa.func.lower(AssociationScopesEntitiesRow.entity_type) == spec.value.lower()
-                )
+                condition = sa.func.lower(col) == spec.value.lower()
             else:
-                condition = AssociationScopesEntitiesRow.entity_type == spec.value
+                condition = col == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -816,10 +816,11 @@ class EntityScopeConditions:
     @staticmethod
     def by_entity_type_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(AssociationScopesEntitiesRow.entity_type, sa.String)
             if spec.case_insensitive:
-                condition = AssociationScopesEntitiesRow.entity_type.ilike(f"{spec.value}%")
+                condition = col.ilike(f"{spec.value}%")
             else:
-                condition = AssociationScopesEntitiesRow.entity_type.like(f"{spec.value}%")
+                condition = col.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -829,19 +830,30 @@ class EntityScopeConditions:
     @staticmethod
     def by_entity_type_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(AssociationScopesEntitiesRow.entity_type, sa.String)
             if spec.case_insensitive:
-                condition = AssociationScopesEntitiesRow.entity_type.ilike(f"%{spec.value}")
+                condition = col.ilike(f"%{spec.value}")
             else:
-                condition = AssociationScopesEntitiesRow.entity_type.like(f"%{spec.value}")
+                condition = col.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
 
         return inner
 
-    by_entity_type_in = staticmethod(
-        make_string_in_factory(AssociationScopesEntitiesRow.entity_type)
-    )
+    @staticmethod
+    def by_entity_type_in(spec: StringInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(AssociationScopesEntitiesRow.entity_type, sa.String)
+            if spec.case_insensitive:
+                condition = sa.func.lower(col).in_([v.lower() for v in spec.values])
+            else:
+                condition = col.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
 
     @staticmethod
     def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
@@ -1044,10 +1056,11 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_scope_type_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.scope_type, sa.String)
             if spec.case_insensitive:
-                condition = PermissionRow.scope_type.ilike(f"%{spec.value}%")
+                condition = col.ilike(f"%{spec.value}%")
             else:
-                condition = PermissionRow.scope_type.like(f"%{spec.value}%")
+                condition = col.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -1057,10 +1070,11 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_scope_type_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.scope_type, sa.String)
             if spec.case_insensitive:
-                condition = sa.func.lower(PermissionRow.scope_type) == spec.value.lower()
+                condition = sa.func.lower(col) == spec.value.lower()
             else:
-                condition = PermissionRow.scope_type == spec.value
+                condition = col == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -1070,10 +1084,11 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_scope_type_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.scope_type, sa.String)
             if spec.case_insensitive:
-                condition = PermissionRow.scope_type.ilike(f"{spec.value}%")
+                condition = col.ilike(f"{spec.value}%")
             else:
-                condition = PermissionRow.scope_type.like(f"{spec.value}%")
+                condition = col.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -1083,17 +1098,30 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_scope_type_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.scope_type, sa.String)
             if spec.case_insensitive:
-                condition = PermissionRow.scope_type.ilike(f"%{spec.value}")
+                condition = col.ilike(f"%{spec.value}")
             else:
-                condition = PermissionRow.scope_type.like(f"%{spec.value}")
+                condition = col.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
 
         return inner
 
-    by_scope_type_in = staticmethod(make_string_in_factory(PermissionRow.scope_type))
+    @staticmethod
+    def by_scope_type_in(spec: StringInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.scope_type, sa.String)
+            if spec.case_insensitive:
+                condition = sa.func.lower(col).in_([v.lower() for v in spec.values])
+            else:
+                condition = col.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
 
     @staticmethod
     def by_scope_id_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -1152,10 +1180,11 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_entity_type_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.entity_type, sa.String)
             if spec.case_insensitive:
-                condition = PermissionRow.entity_type.ilike(f"%{spec.value}%")
+                condition = col.ilike(f"%{spec.value}%")
             else:
-                condition = PermissionRow.entity_type.like(f"%{spec.value}%")
+                condition = col.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -1165,10 +1194,11 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_entity_type_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.entity_type, sa.String)
             if spec.case_insensitive:
-                condition = sa.func.lower(PermissionRow.entity_type) == spec.value.lower()
+                condition = sa.func.lower(col) == spec.value.lower()
             else:
-                condition = PermissionRow.entity_type == spec.value
+                condition = col == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -1178,10 +1208,11 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_entity_type_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.entity_type, sa.String)
             if spec.case_insensitive:
-                condition = PermissionRow.entity_type.ilike(f"{spec.value}%")
+                condition = col.ilike(f"{spec.value}%")
             else:
-                condition = PermissionRow.entity_type.like(f"{spec.value}%")
+                condition = col.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -1191,17 +1222,30 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_entity_type_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.entity_type, sa.String)
             if spec.case_insensitive:
-                condition = PermissionRow.entity_type.ilike(f"%{spec.value}")
+                condition = col.ilike(f"%{spec.value}")
             else:
-                condition = PermissionRow.entity_type.like(f"%{spec.value}")
+                condition = col.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
 
         return inner
 
-    by_entity_type_in = staticmethod(make_string_in_factory(PermissionRow.entity_type))
+    @staticmethod
+    def by_entity_type_in(spec: StringInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = sa.cast(PermissionRow.entity_type, sa.String)
+            if spec.case_insensitive:
+                condition = sa.func.lower(col).in_([v.lower() for v in spec.values])
+            else:
+                condition = col.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
 
 
 class ObjectPermissionConditions:

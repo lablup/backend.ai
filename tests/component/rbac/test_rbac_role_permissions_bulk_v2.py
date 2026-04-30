@@ -439,3 +439,34 @@ class TestPermissionFilterScopeIdNarrowing:
         )
         assert any(item.role_id == target_role.role.id for item in result.items)
         assert all(item.role_id == target_role.role.id for item in result.items)
+
+    async def test_entity_type_equals_on_strenum_column(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        target_role: CreateRoleResponse,
+        domain_fixture: str,
+    ) -> None:
+        """``PermissionRow.entity_type`` is a ``StrEnumType``-wrapped column.
+
+        Without the ``sa.cast(..., sa.String)`` bypass in the StringFilter
+        equality factory, the bind processor raises ``AttributeError`` on a
+        plain ``str`` value because it expects a Python enum instance.
+        """
+        await admin_v2_registry.rbac.bulk_add_role_permissions(
+            BulkAddRolePermissionsInput(
+                permissions=[
+                    _entry(target_role.role.id, domain_fixture, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture, "image", "read"),
+                ],
+            ),
+        )
+        result = await admin_v2_registry.rbac.search_permissions(
+            AdminSearchPermissionsGQLInput(
+                filter=PermissionFilter(
+                    role_id=UUIDFilter(equals=target_role.role.id),
+                    entity_type=StringFilter(equals="session"),
+                ),
+                limit=100,
+            ),
+        )
+        assert {item.entity_type.value for item in result.items} == {"session"}
