@@ -249,7 +249,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
         model_def = input.model_definition
-        strategy, strategy_spec = self._convert_strategy_input(input.deployment_strategy)
+        strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
 
         creator = Creator(
             spec=DeploymentRevisionPresetCreatorSpec(
@@ -558,6 +558,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         """Convert DeploymentStrategyInput to (strategy, strategy_spec dict)."""
         if strategy_input is None:
             return None, None
+        return DeploymentRevisionPresetAdapter._convert_required_strategy_input(strategy_input)
+
+    @staticmethod
+    def _convert_required_strategy_input(
+        strategy_input: DeploymentStrategyInput,
+    ) -> tuple[DeploymentStrategy, dict[str, Any]]:
+        """Convert a non-null DeploymentStrategyInput to (strategy, strategy_spec dict)."""
         match strategy_input.type:
             case DeploymentStrategy.ROLLING:
                 rolling = strategy_input.rolling_update

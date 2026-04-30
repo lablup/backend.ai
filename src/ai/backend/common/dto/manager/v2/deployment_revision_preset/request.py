@@ -36,8 +36,8 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     model_definition: ModelDefinition | None = Field(
         default=None, description="Model definition configuration."
     )
-    resource_slots: list[ResourceSlotEntryInput] | None = Field(
-        default=None, description="Resource slot allocations."
+    resource_slots: list[ResourceSlotEntryInput] = Field(
+        min_length=1, description="Resource slot allocations."
     )
     resource_opts: list[ResourceOptsEntryDTO] | None = Field(
         default=None, description="Additional resource options."
@@ -56,8 +56,7 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
         default=None,
         description="Default open_to_public for deployments created from this preset.",
     )
-    replica_count: int | None = Field(
-        default=None,
+    replica_count: int = Field(
         ge=0,
         description="Default replica count for deployments created from this preset.",
     )
@@ -66,8 +65,7 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
         ge=0,
         description="Default revision history limit for deployments created from this preset.",
     )
-    deployment_strategy: DeploymentStrategyInput | None = Field(
-        default=None,
+    deployment_strategy: DeploymentStrategyInput = Field(
         description="Default deployment strategy (rolling or blue-green) for "
         "deployments created from this preset.",
     )
