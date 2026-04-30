@@ -15,14 +15,12 @@ from ai.backend.client.cli.v2.deployment.chat.formatter import (
     DeploymentChatFormatter,
     mask_token,
 )
-from ai.backend.client.cli.v2.deployment.chat.storage import (
-    load_chat_cache,
-    load_chat_config,
-    save_chat_cache,
-    save_chat_config,
+from ai.backend.client.cli.v2.deployment.chat.types import (
+    DeploymentChatCache,
+    DeploymentChatCacheEntry,
+    DeploymentChatConfig,
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
-from ai.backend.common.data.deployment_chat import DeploymentChatCacheEntry
 from ai.backend.common.dto.clients.openai_compat import ChatCompletionRequest
 
 
@@ -91,8 +89,8 @@ def chat(
 
     connection_config = load_v2_config()
 
-    cache = load_chat_cache()
-    chat_config = load_chat_config()
+    cache = DeploymentChatCache.load()
+    chat_config = DeploymentChatConfig.load()
 
     if not isinstance(params, dict):
         raise click.ClickException("--params must be a JSON object.")
@@ -120,7 +118,7 @@ def chat(
                 last_synced_at=datetime.now(UTC),
             )
             cache.set(deployment_id, endpoint_entry)
-            save_chat_cache(cache)
+            cache.save()
 
         token = chat_config.get_token(deployment_id)
         # ``endpoint`` is required on ClientConfig but unused by AppProxyClient
@@ -159,7 +157,7 @@ def chat(
                         last_synced_at=endpoint_entry.last_synced_at,
                     )
                     cache.set(deployment_id, endpoint_entry)
-                    save_chat_cache(cache)
+                    cache.save()
 
                 request = ChatCompletionRequest.model_validate({
                     **extra_body,
@@ -175,7 +173,7 @@ def chat(
                 # BackendAPIErrors fall through to ``_run_async`` which formats
                 # the manager-style status/title/msg payload generically.
                 if token is not None and chat_config.pop_token(deployment_id):
-                    save_chat_config(chat_config)
+                    chat_config.save()
                 raise click.ClickException(
                     f"The inference endpoint rejected the configured token for "
                     f"deployment {deployment_id}. The stored token has been cleared; "
@@ -239,12 +237,12 @@ def set_(
     if token is None and model is None:
         raise click.ClickException("Nothing to set: provide --token and/or --model.")
 
-    config = load_chat_config()
+    config = DeploymentChatConfig.load()
     if token is not None:
         config.set_token(deployment_id, token)
     if model is not None:
         config.set_model(deployment_id, model)
-    save_chat_config(config)
+    config.save()
 
     print(f"Updated chat config for deployment {deployment_id}.")
     if model is not None:
@@ -257,8 +255,8 @@ def set_(
 @click.argument("deployment_id", type=click.UUID)
 def show(deployment_id: UUID) -> None:
     """Print the chat cache + config entry for a deployment (tokens are masked)."""
-    cache = load_chat_cache()
-    config = load_chat_config()
+    cache = DeploymentChatCache.load()
+    config = DeploymentChatConfig.load()
 
     entry = cache.get(deployment_id)
     config_entry = config.get(deployment_id)
@@ -282,9 +280,9 @@ def clear(deployment_id: UUID) -> None:
     and gets refreshed by the next ``chat`` call. Use ``clear-cache`` to
     drop it immediately.
     """
-    config = load_chat_config()
+    config = DeploymentChatConfig.load()
     if config.pop(deployment_id):
-        save_chat_config(config)
+        config.save()
         print(f"Removed config entry for deployment {deployment_id}.")
     else:
         print(f"No config entry for deployment {deployment_id}.")
@@ -299,9 +297,9 @@ def clear_cache(deployment_id: UUID) -> None:
     manager and re-derive ``default_model`` from ``GET /v1/models``. The
     user-managed config entry (token + model) is left alone.
     """
-    cache = load_chat_cache()
+    cache = DeploymentChatCache.load()
     if cache.pop(deployment_id):
-        save_chat_cache(cache)
+        cache.save()
         print(f"Removed cache entry for deployment {deployment_id}.")
     else:
         print(f"No cache entry for deployment {deployment_id}.")
