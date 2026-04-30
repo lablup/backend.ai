@@ -7685,6 +7685,7 @@ type PermissionEdge {
 input PermissionFilter {
   roleId: UUID = null
   scopeType: RBACElementType = null
+  scopeId: String = null
   entityType: RBACElementType = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
