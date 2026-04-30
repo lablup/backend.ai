@@ -1,10 +1,13 @@
-"""Display helpers for ``./bai deployment chat-config show``."""
+"""Display helpers for ``./bai deployment chat-config show`` / ``chat-cache show``."""
 
 from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.client.cli.v2.deployment.chat.types import DeploymentChatConfigEntry
+from ai.backend.client.cli.v2.deployment.chat.types import (
+    DeploymentChatCacheEntry,
+    DeploymentChatConfigEntry,
+)
 
 
 def mask_token(token: str | None) -> str:
@@ -19,11 +22,10 @@ def mask_token(token: str | None) -> str:
 
 
 class DeploymentChatFormatter:
-    """Formatting helpers for the user-managed chat config entry.
+    """Formatting helpers for the chat config and cache entries.
 
-    Formatting and rendering live here rather than on
-    :class:`DeploymentChatConfigEntry` so the data model stays free of
-    presentation concerns.
+    Formatting and rendering live here rather than on the data classes so
+    the data model stays free of presentation concerns.
     """
 
     @classmethod
@@ -35,3 +37,14 @@ class DeploymentChatFormatter:
         print(f"deployment_id : {deployment_id}")
         print(f"model         : {entry.model or '-'}")
         print(f"token         : {mask_token(entry.token)}")
+
+    @classmethod
+    def print_cache(
+        cls,
+        deployment_id: UUID,
+        entry: DeploymentChatCacheEntry,
+    ) -> None:
+        print(f"deployment_id : {deployment_id}")
+        print(f"endpoint_url  : {entry.endpoint_url}")
+        print(f"default_model : {entry.default_model or '-'}")
+        print(f"last_synced_at: {entry.last_synced_at.isoformat()}")

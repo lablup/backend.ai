@@ -1,4 +1,4 @@
-"""``./bai deployment chat`` and ``chat-config`` CLI commands.
+"""``./bai deployment chat``, ``chat-config``, and ``chat-cache`` CLI commands.
 
 Submodules:
 - :mod:`commands` — Click command/group definitions.
@@ -12,6 +12,6 @@ OpenAI-compat wire DTOs live in :mod:`ai.backend.common.dto.clients.openai_compa
 so they can be reused by any backend.ai component.
 """
 
-from .commands import chat, chat_config
+from .commands import chat, chat_cache, chat_config
 
-__all__ = ("chat", "chat_config")
+__all__ = ("chat", "chat_cache", "chat_config")
