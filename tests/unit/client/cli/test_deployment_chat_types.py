@@ -10,6 +10,7 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
     DeploymentChatConfigEntry,
+    DeploymentChatHistory,
 )
 
 
@@ -21,6 +22,16 @@ def cache() -> DeploymentChatCache:
 @pytest.fixture
 def chat_config() -> DeploymentChatConfig:
     return DeploymentChatConfig()
+
+
+@pytest.fixture
+def chat_history() -> DeploymentChatHistory:
+    return DeploymentChatHistory()
+
+
+@pytest.fixture
+def history_now() -> datetime:
+    return datetime(2026, 4, 27, 12, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -158,3 +169,88 @@ class TestConfigPop:
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
         assert chat_config.pop(deployment_id) is False
+
+
+class TestHistoryAppendSlice:
+    def test_slice_returns_empty_when_no_entry(
+        self, chat_history: DeploymentChatHistory, deployment_id: UUID
+    ) -> None:
+        assert chat_history.slice(deployment_id, 5) == []
+
+    def test_slice_zero_limit_returns_empty_even_when_populated(
+        self,
+        chat_history: DeploymentChatHistory,
+        deployment_id: UUID,
+        history_now: datetime,
+    ) -> None:
+        chat_history.append(deployment_id, "user", "hi", created_at=history_now)
+        chat_history.append(deployment_id, "assistant", "hello", created_at=history_now)
+        # Limit 0 lets callers send a turn without context but still record it.
+        assert chat_history.slice(deployment_id, 0) == []
+
+    def test_slice_returns_in_insertion_order(
+        self,
+        chat_history: DeploymentChatHistory,
+        deployment_id: UUID,
+        history_now: datetime,
+    ) -> None:
+        for index in range(6):
+            chat_history.append(
+                deployment_id,
+                "user" if index % 2 == 0 else "assistant",
+                f"msg-{index}",
+                created_at=history_now,
+            )
+        recent = chat_history.slice(deployment_id, 3)
+        assert [m.content for m in recent] == ["msg-3", "msg-4", "msg-5"]
+
+    def test_slice_caps_to_available_length(
+        self,
+        chat_history: DeploymentChatHistory,
+        deployment_id: UUID,
+        history_now: datetime,
+    ) -> None:
+        chat_history.append(deployment_id, "user", "only", created_at=history_now)
+        # Asking for more than exists must not error out and must not pad.
+        assert [m.content for m in chat_history.slice(deployment_id, 10)] == ["only"]
+
+
+class TestHistoryTruncation:
+    def test_append_drops_oldest_when_max_persisted_exceeded(
+        self,
+        chat_history: DeploymentChatHistory,
+        deployment_id: UUID,
+        history_now: datetime,
+    ) -> None:
+        # FIFO truncation: oldest is dropped first so the most recent
+        # context survives across long sessions.
+        for index in range(5):
+            chat_history.append(
+                deployment_id,
+                "user",
+                f"msg-{index}",
+                created_at=history_now,
+                max_persisted=3,
+            )
+        stored = chat_history.get(deployment_id)
+        assert stored is not None
+        assert [m.content for m in stored] == ["msg-2", "msg-3", "msg-4"]
+
+
+class TestHistoryClear:
+    def test_clear_returns_true_when_present(
+        self,
+        chat_history: DeploymentChatHistory,
+        deployment_id: UUID,
+        history_now: datetime,
+    ) -> None:
+        chat_history.append(deployment_id, "user", "hi", created_at=history_now)
+        assert chat_history.clear(deployment_id) is True
+        assert chat_history.get(deployment_id) is None
+
+    def test_clear_returns_false_when_absent(
+        self,
+        chat_history: DeploymentChatHistory,
+        deployment_id: UUID,
+    ) -> None:
+        assert chat_history.clear(deployment_id) is False

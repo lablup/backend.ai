@@ -1,12 +1,13 @@
 """Filesystem helpers for ``./bai deployment chat`` storage.
 
-Two on-disk JSON files live under ``~/.backend.ai/deployment_chat/`` —
-``cache.json`` for the auto-managed endpoint cache and ``config.json``
-for user-supplied tokens. The per-feature subdirectory matches the
-existing ``session/`` layout used by ``./bai login``.
+Three on-disk JSON files live under ``~/.backend.ai/deployment_chat/`` —
+``cache.json`` for the auto-managed endpoint cache, ``config.json`` for
+user-supplied tokens, and ``history.json`` for per-deployment chat
+transcripts. The per-feature subdirectory matches the existing
+``session/`` layout used by ``./bai login``.
 
-Both files are written as plain JSON (no atomic-rename, no special POSIX
-permissions) to stay aligned with the existing CLI credential-storage
+All three files are written as plain JSON (no atomic-rename, no special
+POSIX permissions) to stay aligned with the existing CLI credential-storage
 convention in :mod:`ai.backend.client.cli.v2.config_cmd`.
 """
 
@@ -21,6 +22,7 @@ from ai.backend.common.json import load_json
 CHAT_DIR = CONFIG_DIR / "deployment_chat"
 CHAT_CACHE_FILE = CHAT_DIR / "cache.json"
 CHAT_CONFIG_FILE = CHAT_DIR / "config.json"
+CHAT_HISTORY_FILE = CHAT_DIR / "history.json"
 
 
 def read_json_file(path: Path) -> dict[str, Any] | None:

@@ -1,6 +1,6 @@
 from .access_token import access_token
 from .auto_scaling_rule import auto_scaling_rule
-from .chat import chat, chat_cache, chat_config
+from .chat import chat, chat_cache, chat_config, chat_history
 from .commands import deployment as deployment
 from .options import options
 from .policy import policy
@@ -19,5 +19,6 @@ deployment.add_command(options)
 deployment.add_command(chat)
 deployment.add_command(chat_config)
 deployment.add_command(chat_cache)
+deployment.add_command(chat_history)
 
 __all__ = ("deployment",)

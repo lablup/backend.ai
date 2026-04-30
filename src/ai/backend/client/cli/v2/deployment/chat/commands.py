@@ -1,4 +1,4 @@
-"""User-facing CLI: ``./bai deployment chat``, ``chat-config``, ``chat-cache``."""
+"""User-facing CLI: ``./bai deployment chat``, ``chat-config``, ``chat-cache``, ``chat-history``."""
 
 from __future__ import annotations
 
@@ -15,9 +15,11 @@ from ai.backend.client.cli.v2.deployment.chat.formatter import (
     mask_token,
 )
 from ai.backend.client.cli.v2.deployment.chat.types import (
+    DEFAULT_CHAT_HISTORY_LIMIT,
     DeploymentChatCache,
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
+    DeploymentChatHistory,
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
 from ai.backend.common.dto.clients.openai_compat import ChatCompletionRequest
@@ -67,11 +69,24 @@ def _run_async(coro_fn: Callable[[], Coroutine[Any, Any, None]]) -> None:
         "The 'model' and 'messages' fields are always overridden by --model and MESSAGE."
     ),
 )
+@click.option(
+    "--history-limit",
+    default=DEFAULT_CHAT_HISTORY_LIMIT,
+    type=click.IntRange(min=0),
+    show_default=True,
+    help=(
+        "Maximum number of past messages from this deployment's persisted "
+        "history to replay as context. Set to 0 to skip context for this "
+        "turn (the round is still recorded; use `chat-history clear` to "
+        "wipe the persisted transcript)."
+    ),
+)
 def chat(
     deployment_id: DeploymentID,
     message: str,
     model: str | None,
     params: Any,
+    history_limit: int,
 ) -> None:
     """Send a one-shot chat completion request to a deployed model.
 
@@ -81,8 +96,6 @@ def chat(
     temperature and top_p differ between runtime variants — pass them
     through ``--params``.
     """
-    import json
-
     from ai.backend.client.v2.config import ClientConfig
     from ai.backend.client.v2.deployment_chat import DeploymentChatClient
     from ai.backend.client.v2.exceptions import DeploymentAuthError
@@ -91,6 +104,7 @@ def chat(
 
     cache = DeploymentChatCache.load()
     chat_config = DeploymentChatConfig.load()
+    history = DeploymentChatHistory.load()
 
     if not isinstance(params, dict):
         raise click.ClickException("--params must be a JSON object.")
@@ -159,10 +173,15 @@ def chat(
                     cache.set(deployment_id, endpoint_entry)
                     cache.save()
 
+                past_messages = history.slice(deployment_id, history_limit)
+                request_messages: list[dict[str, str]] = [
+                    *({"role": past.role, "content": past.content} for past in past_messages),
+                    {"role": "user", "content": message},
+                ]
                 request = ChatCompletionRequest.model_validate({
                     **extra_body,
                     "model": request_model,
-                    "messages": [{"role": "user", "content": message}],
+                    "messages": request_messages,
                 })
                 body = request.model_dump(mode="json")
                 response = await client.chat_completion(endpoint_entry.endpoint_url, token, body)
@@ -180,7 +199,15 @@ def chat(
                     f"re-register with:\n"
                     f"  ./bai deployment chat-config set {deployment_id} --token <token>"
                 ) from e
-        print(json.dumps(response, indent=2, ensure_ascii=False, default=str))
+        # Only persist when both sides of the round are present, so the file
+        # never carries half-conversations that would skew future context.
+        assistant_message = response.assistant_message
+        if assistant_message is not None:
+            now = datetime.now(UTC)
+            history.append(deployment_id, "user", message, created_at=now)
+            history.append(deployment_id, "assistant", assistant_message, created_at=now)
+            history.save()
+        print(response.model_dump_json(indent=2))
 
     _run_async(_run)
 
@@ -330,4 +357,58 @@ def cache_clear(deployment_id: DeploymentID) -> None:
         print(f"No cache entry for deployment {deployment_id}.")
 
 
-__all__ = ("chat", "chat_cache", "chat_config")
+# ---------------------------------------------------------------------------
+# chat-history
+# ---------------------------------------------------------------------------
+
+
+@click.group(name="chat-history")
+def chat_history() -> None:
+    """Manage per-deployment chat transcripts.
+
+    The ``chat`` command auto-records each user/assistant round into
+    ``~/.backend.ai/deployment_chat/history.json`` so subsequent calls
+    can replay recent turns as context. Use this group to inspect or
+    wipe what has been persisted.
+    """
+
+
+@chat_history.command(name="show")
+@click.argument("deployment_id", type=click.UUID)
+@click.option(
+    "--limit",
+    default=None,
+    type=click.IntRange(min=1),
+    help="Print only the most recent N messages (default: all persisted).",
+)
+def history_show(deployment_id: DeploymentID, limit: int | None) -> None:
+    """Print the persisted transcript for a deployment."""
+    history = DeploymentChatHistory.load()
+    messages = history.get(deployment_id)
+    if not messages:
+        print(f"No chat history for deployment {deployment_id}.")
+        return
+    visible = messages if limit is None else messages[-limit:]
+    print(f"deployment_id : {deployment_id}")
+    print(f"messages      : {len(messages)} persisted (showing {len(visible)})")
+    for message in visible:
+        print(f"  [{message.created_at.isoformat()}] {message.role}: {message.content}")
+
+
+@chat_history.command(name="clear")
+@click.argument("deployment_id", type=click.UUID)
+def history_clear(deployment_id: DeploymentID) -> None:
+    """Drop the persisted transcript for a deployment.
+
+    The next ``chat`` call starts a fresh context. Cache and config
+    entries are unaffected.
+    """
+    history = DeploymentChatHistory.load()
+    if history.clear(deployment_id):
+        history.save()
+        print(f"Cleared chat history for deployment {deployment_id}.")
+    else:
+        print(f"No chat history for deployment {deployment_id}.")
+
+
+__all__ = ("chat", "chat_cache", "chat_config", "chat_history")

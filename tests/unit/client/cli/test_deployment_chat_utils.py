@@ -13,6 +13,7 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatCache,
     DeploymentChatCacheEntry,
     DeploymentChatConfig,
+    DeploymentChatHistory,
 )
 
 
@@ -33,6 +34,15 @@ def config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(chat_utils, "CHAT_CONFIG_FILE", path)
     monkeypatch.setattr(chat_types, "CHAT_CONFIG_FILE", path)
+    return path
+
+
+@pytest.fixture
+def history_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    path = tmp_path / "deployment_chat" / "history.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(chat_utils, "CHAT_HISTORY_FILE", path)
+    monkeypatch.setattr(chat_types, "CHAT_HISTORY_FILE", path)
     return path
 
 
@@ -131,3 +141,63 @@ class TestConfigLoaderResilience:
             encoding="utf-8",
         )
         assert DeploymentChatConfig.load().deployments == {}
+
+
+class TestHistoryLoadSaveRoundTrip:
+    def test_load_returns_empty_when_file_missing(self, history_path: Path) -> None:
+        assert DeploymentChatHistory.load().deployments == {}
+
+    def test_save_then_load_preserves_messages(self, history_path: Path) -> None:
+        history = DeploymentChatHistory()
+        dep_id = uuid4()
+        now = datetime(2026, 4, 27, 12, 0, tzinfo=UTC)
+        history.append(dep_id, "user", "hello", created_at=now)
+        history.append(dep_id, "assistant", "world", created_at=now)
+        history.save()
+
+        loaded = DeploymentChatHistory.load()
+        messages = loaded.get(dep_id)
+        assert messages is not None
+        assert [(m.role, m.content) for m in messages] == [
+            ("user", "hello"),
+            ("assistant", "world"),
+        ]
+        assert messages[0].created_at == now
+
+
+class TestHistoryLoaderResilience:
+    def test_load_returns_empty_on_corrupt_json(self, history_path: Path) -> None:
+        history_path.write_text("not-json{", encoding="utf-8")
+        assert DeploymentChatHistory.load().deployments == {}
+
+    def test_load_returns_empty_when_top_level_not_object(self, history_path: Path) -> None:
+        history_path.write_text("[]", encoding="utf-8")
+        assert DeploymentChatHistory.load().deployments == {}
+
+    def test_load_returns_empty_on_invalid_uuid_key(self, history_path: Path) -> None:
+        history_path.write_text(
+            json.dumps({
+                "deployments": {
+                    "not-a-uuid": [
+                        {
+                            "role": "user",
+                            "content": "hi",
+                            "created_at": "2026-04-27T12:00:00+00:00",
+                        },
+                    ],
+                },
+            }),
+            encoding="utf-8",
+        )
+        assert DeploymentChatHistory.load().deployments == {}
+
+    def test_load_returns_empty_on_malformed_message_payload(self, history_path: Path) -> None:
+        history_path.write_text(
+            json.dumps({
+                "deployments": {
+                    "12345678-1234-5678-1234-567812345678": [{"role": "user"}],
+                },
+            }),
+            encoding="utf-8",
+        )
+        assert DeploymentChatHistory.load().deployments == {}

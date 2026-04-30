@@ -17,7 +17,10 @@ from __future__ import annotations
 from typing import Any
 
 from ai.backend.client.v2.base_client import BackendAIAppProxyClient
-from ai.backend.common.dto.clients.openai_compat import ListModelsResponse
+from ai.backend.common.dto.clients.openai_compat import (
+    ChatCompletionResponse,
+    ListModelsResponse,
+)
 
 _OPENAI_COMPATIBLE_CHAT_PATH = "/v1/chat/completions"
 _OPENAI_COMPATIBLE_MODELS_PATH = "/v1/models"
@@ -38,10 +41,11 @@ class DeploymentChatClient(BackendAIAppProxyClient):
         endpoint_url: str,
         token: str | None,
         body: dict[str, Any],
-    ) -> dict[str, Any]:
-        return await self._request(
+    ) -> ChatCompletionResponse:
+        payload = await self._request(
             "POST", endpoint_url, _OPENAI_COMPATIBLE_CHAT_PATH, token, body=body
         )
+        return ChatCompletionResponse.model_validate(payload)
 
     async def list_models(
         self,
