@@ -26,7 +26,6 @@ MEMBER_ROLE_SUFFIX = "member"
 ENTITY_TYPE = "vfolder:data"
 USER_SCOPE_TYPE = "user"
 VFOLDER_SCOPE_TYPE = "vfolder"
-REF_RELATION_TYPE = "ref"
 
 # Org-hierarchy scope types. Other scope_type values in `permissions`
 # (e.g. 'vfolder', 'model_deployment') are entity-as-scope grants for
