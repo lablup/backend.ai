@@ -489,8 +489,25 @@ _DEFAULT_ADMIN_OPS: frozenset[OperationType] = _STANDARD_OPS
 _DEFAULT_OWNER_OPS: frozenset[OperationType] = _STANDARD_OPS
 _DEFAULT_MEMBER_OPS: frozenset[OperationType] = _READ_ONLY_OPS
 
-_ADMIN_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {}
-_OWNER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {}
+# vfolder:data CRUD on internal files/directories — soft-delete is intentionally
+# omitted because there is no two-stage delete for vfolder data.
+_VFOLDER_DATA_OWNER_OPS: frozenset[OperationType] = frozenset({
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.HARD_DELETE,
+})
+
+_ADMIN_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    # vfolder:data and session:app are owner-only — admins of the parent scope
+    # have access to listings/metadata but not to internal data or app endpoints.
+    RBACElementType.VFOLDER_DATA: frozenset(),
+    RBACElementType.SESSION_APP: frozenset(),
+}
+_OWNER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    RBACElementType.VFOLDER_DATA: _VFOLDER_DATA_OWNER_OPS,
+    RBACElementType.SESSION_APP: _READ_ONLY_OPS,
+}
 _MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
     # Members of a project may create their own sessions, vfolders,
     # and model deployments (a.k.a. model services).
@@ -500,6 +517,9 @@ _MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
         OperationType.READ,
         OperationType.CREATE,
     }),
+    # Owner-only sub-entities — members of the parent scope have no access.
+    RBACElementType.VFOLDER_DATA: frozenset(),
+    RBACElementType.SESSION_APP: frozenset(),
 }
 
 
