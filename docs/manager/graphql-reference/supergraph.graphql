@@ -14470,6 +14470,9 @@ enum RBACElementType
   DEPLOYMENT_REVISION @join__enumValue(graph: STRAWBERRY)
   IMAGE_ALIAS @join__enumValue(graph: STRAWBERRY)
   ROLE_ASSIGNMENT @join__enumValue(graph: STRAWBERRY)
+  VFOLDER_DATA @join__enumValue(graph: STRAWBERRY)
+  SESSION_APP @join__enumValue(graph: STRAWBERRY)
+  USER_NAME @join__enumValue(graph: STRAWBERRY)
   ARTIFACT_REVISION @join__enumValue(graph: STRAWBERRY)
 }
 
