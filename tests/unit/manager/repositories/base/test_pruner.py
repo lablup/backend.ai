@@ -60,9 +60,9 @@ class PrunerTestChildRow(Base):  # type: ignore[misc]
     name = sa.Column(sa.String(50), nullable=False)
 
 
-class TestChildCascade(CascadeChild):
+class TestChildCascade(CascadeChild[PrunerTestChildRow]):
     @classmethod
-    def row_class(cls) -> type[Base]:
+    def row_class(cls) -> type[PrunerTestChildRow]:
         return PrunerTestChildRow
 
     @classmethod

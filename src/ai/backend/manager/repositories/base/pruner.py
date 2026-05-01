@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 TRow = TypeVar("TRow", bound=Base)
 
 
-class CascadeChild(ABC):
+class CascadeChild[TRow: Base](ABC):
     """A child table whose rows must be deleted before the parent's prune.
 
     Used for simple FK cascades. ``execute_pruner`` first locks and
@@ -36,13 +36,16 @@ class CascadeChild(ABC):
     where ``<target_ids>`` is the list returned from the single
     ``SELECT pk FOR UPDATE`` against the parent table.
 
+    The type parameter ``TRow`` is the cascade table's ORM Row class —
+    e.g., ``CascadeChild[KernelRow]``.
+
     Polymorphic / cross-cutting cleanups (e.g., RBAC associations) are not
     handled here — see :meth:`PrunerSpec.entity_type` for that.
     """
 
     @classmethod
     @abstractmethod
-    def row_class(cls) -> type[Base]:
+    def row_class(cls) -> type[TRow]:
         """ORM Row class for the cascade table.
 
         Example:
@@ -89,7 +92,7 @@ class PrunerSpec[TRow: Base](ABC):
     """
 
     conditions: list[QueryCondition] = field(default_factory=list)
-    cascade: list[CascadeChild] = field(default_factory=list)
+    cascade: list[CascadeChild[Any]] = field(default_factory=list)
     limit: int = DEFAULT_PRUNE_LIMIT
     cascade_rbac: bool = True
 
