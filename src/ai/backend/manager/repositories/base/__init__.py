@@ -38,6 +38,12 @@ from .pagination import (
     PageInfoResult,
     QueryPagination,
 )
+from .pruner import (
+    CascadeChild,
+    PrunerResult,
+    PrunerSpec,
+    execute_pruner,
+)
 from .purger import (
     BatchPurger,
     BatchPurgerResult,
@@ -173,6 +179,11 @@ __all__ = [
     "BatchPurger",
     "BatchPurgerResult",
     "execute_batch_purger",
+    # Pruner
+    "CascadeChild",
+    "PrunerSpec",
+    "PrunerResult",
+    "execute_pruner",
     # Utils
     "combine_conditions_or",
     "negate_conditions",
