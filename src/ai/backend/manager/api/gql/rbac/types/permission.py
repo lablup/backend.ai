@@ -249,6 +249,9 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.PROJECT_ADMIN_PAGE
                 | RBACElementType.DOMAIN_ADMIN_PAGE
                 | RBACElementType.ROLE_ASSIGNMENT
+                | RBACElementType.VFOLDER_DATA
+                | RBACElementType.SESSION_APP
+                | RBACElementType.USER_NAME
             ):
                 return None
 
