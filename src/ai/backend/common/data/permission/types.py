@@ -152,6 +152,7 @@ class EntityType(enum.StrEnum):
     SESSION_KERNEL = "session:kernel"
     SESSION_FILE = "session:file"
     SESSION_DIRECTORY = "session:directory"
+    SESSION_APP = "session:app"
     SESSION_APP_SERVICE = "session:app_service"
     SESSION_COMMIT = "session:commit"
     SESSION_STATUS_HISTORY = "session:status_history"
@@ -193,6 +194,7 @@ class EntityType(enum.StrEnum):
     VFOLDER_FILE = "vfolder:file"
     VFOLDER_DIRECTORY = "vfolder:directory"
     VFOLDER_INVITATION = "vfolder:invitation"
+    VFOLDER_DATA = "vfolder:data"
     # Resource group sub
     RESOURCE_GROUP_DOMAIN = "resource_group:domain"
     RESOURCE_GROUP_KEYPAIR = "resource_group:keypair"
@@ -227,6 +229,7 @@ class EntityType(enum.StrEnum):
     GROUP_USAGE = "group:usage"
     # User sub
     USER_STATS = "user:stats"
+    USER_NAME = "user:name"
     # Agent sub
     AGENT_WATCHER = "agent:watcher"
     AGENT_REGISTRY = "agent:registry"
@@ -416,6 +419,14 @@ class RBACElementType(enum.StrEnum):
     DEPLOYMENT_REVISION = "deployment:revision"
     IMAGE_ALIAS = "image:alias"
     ROLE_ASSIGNMENT = "role:assignment"
+
+    # === Sub-entity permissions split from parent metadata access ===
+    # These split permission control of a parent entity into sub-aspects so that
+    # access to listings/detail (parent) and access to internal data or
+    # sub-operations (child) can be granted independently.
+    VFOLDER_DATA = "vfolder:data"
+    SESSION_APP = "session:app"
+    USER_NAME = "user:name"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"

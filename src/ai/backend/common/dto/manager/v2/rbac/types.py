@@ -119,6 +119,11 @@ class RBACElementTypeDTO(StrEnum):
     IMAGE_ALIAS = "image:alias"
     ROLE_ASSIGNMENT = "role:assignment"
 
+    # Sub-entity permissions split from parent metadata access
+    VFOLDER_DATA = "vfolder:data"
+    SESSION_APP = "session:app"
+    USER_NAME = "user:name"
+
     # Entity-level scopes
     ARTIFACT_REVISION = "artifact_revision"
 
