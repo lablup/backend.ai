@@ -19,74 +19,108 @@ depends_on = None
 # Part of: 26.5.0
 
 # Constants
-MEMBER_ROLE_SUFFIX = "member"
+MEMBER_ROLE_PATTERN = "%member"
 ENTITY_TYPE = "session:app"
+USER_SCOPE_TYPE = "user"
+PROJECT_SCOPE_TYPE = "project"
+SESSION_SCOPE_TYPE = "session"
+READ_OPERATION = "read"
 
-# Org-hierarchy scope types. Other scope_type values in `permissions`
-# (e.g. 'vfolder', 'model_deployment') are entity-as-scope grants for
-# specific entities; they must be excluded from the entity-type seed.
-ORG_SCOPE_TYPES = ["domain", "project", "user"]
-
-# session:app is owner-only and read-only: app endpoints expose live
-# state, so write/delete operations on the sub-entity itself are not
-# meaningful.
-OWNER_OPERATIONS = ["read"]
+# Sessions in these terminal/error states no longer expose a usable app
+# endpoint, so granting `session:app` permissions on them would be wasted
+# rows that never resolve at the runtime.
+DEAD_SESSION_STATUSES = ["TERMINATING", "TERMINATED", "CANCELLED", "ERROR"]
 
 
-def _seed_entity_type_permissions(db_conn: Connection) -> None:
-    """Seed `session:app` entity-type permissions for all non-member roles.
+def _seed_user_session_grants(db_conn: Connection) -> None:
+    """Per-entity grants for the session creator.
 
-    For every distinct (role, scope) tuple already present in `permissions`,
-    insert one `read` row, except for roles whose name ends with `member`
-    (which intentionally have no access to internal session apps).
-
-    Mirrors `30c8308738ee_migrate_session_data_to_rbac` and the
-    accompanying `vfolder:data` migration.
+    For each live session created by user U, grant U's user-scope
+    ("system") role read on that specific `session:app` via the
+    entity-as-scope pattern. Lands in the resolver's self-scope branch
+    only — no leak via scope-walker.
     """
     insert_query = sa.text("""
-        WITH role_scopes AS (
+        WITH user_role_sessions AS (
             SELECT DISTINCT
-                p.role_id,
-                r.name AS role_name,
-                p.scope_type,
-                p.scope_id
-            FROM permissions p
-            JOIN roles r ON p.role_id = r.id
-        ),
-        role_operations AS (
-            SELECT
-                rs.role_id,
-                rs.scope_type,
-                rs.scope_id,
-                unnest(CAST(:owner_ops AS text[])) AS operation
-            FROM role_scopes rs
-            WHERE rs.role_name NOT LIKE :member_pattern
-              AND rs.scope_type = ANY(CAST(:org_scopes AS text[]))
+                ur.role_id,
+                s.id::text AS session_id
+            FROM sessions s
+            JOIN user_roles ur ON ur.user_id = s.user_uuid
+            JOIN permissions p ON p.role_id = ur.role_id
+            WHERE s.status::text <> ALL(CAST(:dead_statuses AS text[]))
+              AND p.scope_type = :user_scope
+              AND p.scope_id = s.user_uuid::text
         )
         INSERT INTO permissions (role_id, scope_type, scope_id, entity_type, operation)
         SELECT
-            role_id,
-            scope_type,
-            scope_id,
+            urs.role_id,
+            :scope_type AS scope_type,
+            urs.session_id AS scope_id,
             :entity_type AS entity_type,
-            operation
-        FROM role_operations
+            :operation AS operation
+        FROM user_role_sessions urs
         ON CONFLICT (role_id, scope_type, scope_id, entity_type, operation) DO NOTHING
     """)
     db_conn.execute(
         insert_query,
         {
-            "owner_ops": OWNER_OPERATIONS,
-            "member_pattern": f"%{MEMBER_ROLE_SUFFIX}",
-            "org_scopes": ORG_SCOPE_TYPES,
+            "dead_statuses": DEAD_SESSION_STATUSES,
+            "user_scope": USER_SCOPE_TYPE,
+            "scope_type": SESSION_SCOPE_TYPE,
             "entity_type": ENTITY_TYPE,
+            "operation": READ_OPERATION,
+        },
+    )
+
+
+def _seed_project_session_grants(db_conn: Connection) -> None:
+    """Per-entity grants for the project's owner/admin roles.
+
+    For each live session in project P (sessions always carry group_id),
+    grant P's non-member roles read on that specific `session:app`.
+    """
+    insert_query = sa.text("""
+        WITH project_role_sessions AS (
+            SELECT DISTINCT
+                p.role_id,
+                s.id::text AS session_id
+            FROM sessions s
+            JOIN permissions p
+              ON p.scope_type = :project_scope
+             AND p.scope_id = s.group_id::text
+            JOIN roles r ON r.id = p.role_id
+            WHERE s.status::text <> ALL(CAST(:dead_statuses AS text[]))
+              AND s.group_id IS NOT NULL
+              AND r.name NOT LIKE :member_pattern
+        )
+        INSERT INTO permissions (role_id, scope_type, scope_id, entity_type, operation)
+        SELECT
+            prs.role_id,
+            :scope_type AS scope_type,
+            prs.session_id AS scope_id,
+            :entity_type AS entity_type,
+            :operation AS operation
+        FROM project_role_sessions prs
+        ON CONFLICT (role_id, scope_type, scope_id, entity_type, operation) DO NOTHING
+    """)
+    db_conn.execute(
+        insert_query,
+        {
+            "dead_statuses": DEAD_SESSION_STATUSES,
+            "project_scope": PROJECT_SCOPE_TYPE,
+            "scope_type": SESSION_SCOPE_TYPE,
+            "entity_type": ENTITY_TYPE,
+            "operation": READ_OPERATION,
+            "member_pattern": MEMBER_ROLE_PATTERN,
         },
     )
 
 
 def upgrade() -> None:
     conn = op.get_bind()
-    _seed_entity_type_permissions(conn)
+    _seed_user_session_grants(conn)
+    _seed_project_session_grants(conn)
 
 
 def downgrade() -> None:
