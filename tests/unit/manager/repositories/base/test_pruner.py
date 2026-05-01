@@ -14,6 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -76,10 +77,6 @@ class TerminatedTestParentPrunerSpec(PrunerSpec[PrunerTestParentRow]):
     @classmethod
     def row_class(cls) -> type[PrunerTestParentRow]:
         return PrunerTestParentRow
-
-    @classmethod
-    def returning_id(cls) -> Any:
-        return PrunerTestParentRow.id
 
     @classmethod
     def prune_condition(cls) -> sa.ColumnElement[bool]:
@@ -325,10 +322,15 @@ class TestPrunerCascade:
     async def test_no_cascade_with_fk_violation_raises(
         self, parent_child_tables: ExtendedAsyncSAEngine
     ) -> None:
-        """Without the cascade, FK constraint blocks the parent DELETE."""
+        """Without the cascade, FK constraint blocks the parent DELETE.
+
+        Also verifies that ``execute_pruner`` translates the SQLAlchemy
+        ``IntegrityError`` into ``ForeignKeyViolationError`` via
+        ``parse_integrity_error``.
+        """
         await self._seed_with_children(parent_child_tables)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ForeignKeyViolationError):
             async with parent_child_tables.begin_session() as db_sess:
                 spec = TerminatedTestParentPrunerSpec()  # no cascade
                 await execute_pruner(db_sess, spec)

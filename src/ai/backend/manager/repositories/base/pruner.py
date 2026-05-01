@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -26,11 +27,14 @@ TRow = TypeVar("TRow", bound=Base)
 class CascadeChild(ABC):
     """A child table whose rows must be deleted before the parent's prune.
 
-    Used for simple FK cascades. Each cascade DELETE runs as::
+    Used for simple FK cascades. ``execute_pruner`` first locks and
+    materializes the parent target IDs once, then issues each cascade
+    DELETE as::
 
-        DELETE FROM <row_class> WHERE <parent_id_column>
-            IN (SELECT <parent pk> FROM <parent>
-                WHERE <prune_condition AND conditions>)
+        DELETE FROM <row_class> WHERE <parent_id_column> IN (<target_ids>)
+
+    where ``<target_ids>`` is the list returned from the single
+    ``SELECT pk FOR UPDATE`` against the parent table.
 
     Polymorphic / cross-cutting cleanups (e.g., RBAC associations) are not
     handled here — see :meth:`PrunerSpec.entity_type` for that.
@@ -94,18 +98,13 @@ class PrunerSpec[TRow: Base](ABC):
     def row_class(cls) -> type[TRow]:
         """ORM Row class for the parent entity table.
 
+        The single-column primary key is derived from
+        ``row_class().__table__.primary_key`` by ``execute_pruner``;
+        composite-PK tables are rejected with
+        :class:`UnsupportedCompositePrimaryKeyError`.
+
         Example:
             return SessionRow
-        """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def returning_id(cls) -> Any:
-        """Primary-key column for the parent's ``DELETE ... RETURNING``.
-
-        Example:
-            return SessionRow.id
         """
         raise NotImplementedError
 
@@ -175,11 +174,19 @@ async def execute_pruner[TRow: Base](
         PrunerResult with the count and PK list of deleted parent rows.
 
     Raises:
-        RepositoryIntegrityError: If any DELETE violates a database constraint.
+        UnsupportedCompositePrimaryKeyError: If the parent table has a
+            composite primary key.
+        RepositoryIntegrityError: If any DELETE (cascade, RBAC, or parent)
+            violates a database constraint.
     """
     cls = type(spec)
     table = cls.row_class().__table__
-    pk_col = cls.returning_id()
+    pk_columns = list(table.primary_key.columns)
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"PrunerSpec only supports single-column primary keys (table: {table.name})",
+        )
+    pk_col = pk_columns[0]
 
     where = cls.prune_condition()
     for f in spec.conditions:
@@ -190,24 +197,24 @@ async def execute_pruner[TRow: Base](
     if not target_ids:
         return PrunerResult(count=0, ids=[])
 
-    for child in spec.cascade:
-        ccls = type(child)
-        cascade_table = ccls.row_class().__table__
-        await db_sess.execute(
-            sa.delete(cascade_table).where(ccls.parent_id_column().in_(target_ids))
-        )
-
     rbac_entity_type = cls.entity_type()
-    if spec.cascade_rbac and rbac_entity_type is not None:
-        await db_sess.execute(
-            sa.delete(AssociationScopesEntitiesRow).where(
-                AssociationScopesEntitiesRow.entity_type == rbac_entity_type,
-                AssociationScopesEntitiesRow.entity_id.in_([str(i) for i in target_ids]),
-            )
-        )
-
-    stmt = sa.delete(table).where(pk_col.in_(target_ids)).returning(pk_col)
     try:
+        for child in spec.cascade:
+            ccls = type(child)
+            cascade_table = ccls.row_class().__table__
+            await db_sess.execute(
+                sa.delete(cascade_table).where(ccls.parent_id_column().in_(target_ids))
+            )
+
+        if spec.cascade_rbac and rbac_entity_type is not None:
+            await db_sess.execute(
+                sa.delete(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.entity_type == rbac_entity_type,
+                    AssociationScopesEntitiesRow.entity_id.in_([str(i) for i in target_ids]),
+                )
+            )
+
+        stmt = sa.delete(table).where(pk_col.in_(target_ids)).returning(pk_col)
         deleted = list((await db_sess.scalars(stmt)).all())
     except sa.exc.IntegrityError as e:
         raise parse_integrity_error(e) from e
