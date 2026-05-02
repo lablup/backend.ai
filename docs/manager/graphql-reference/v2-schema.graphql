@@ -4300,7 +4300,7 @@ type EntityConnection {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: StringFilter = null
+  entityType: RBACElementTypeFilter = null
   entityId: StringFilter = null
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
@@ -7684,9 +7684,9 @@ type PermissionEdge {
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUIDFilter = null
-  scopeType: StringFilter = null
+  scopeType: RBACElementTypeFilter = null
   scopeId: StringFilter = null
-  entityType: StringFilter = null
+  entityType: RBACElementTypeFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
@@ -7698,8 +7698,8 @@ Added in 26.4.0. Nested filter for permissions within a role assignment. Filters
 """
 input PermissionNestedFilter {
   scopeId: String = null
-  scopeType: RBACElementType = null
-  entityType: RBACElementType = null
+  scopeType: RBACElementTypeFilter = null
+  entityType: RBACElementTypeFilter = null
   operation: OperationType = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
@@ -9533,6 +9533,23 @@ enum RBACElementType {
   IMAGE_ALIAS
   ROLE_ASSIGNMENT
   ARTIFACT_REVISION
+}
+
+"""
+Added in UNRELEASED. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
+"""
+input RBACElementTypeFilter {
+  """Matches rows with this exact element type."""
+  equals: RBACElementType = null
+
+  """Matches rows whose element type is in this list."""
+  in: [RBACElementType!] = null
+
+  """Excludes rows with this exact element type."""
+  notEquals: RBACElementType = null
+
+  """Excludes rows whose element type is in this list."""
+  notIn: [RBACElementType!] = null
 }
 
 """
