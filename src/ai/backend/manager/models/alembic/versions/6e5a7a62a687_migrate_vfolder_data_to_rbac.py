@@ -1,7 +1,7 @@
 """migrate_vfolder_data_to_rbac
 
 Revision ID: 6e5a7a62a687
-Revises: 8c1f7d3a9e2b
+Revises: aa596a09c091
 Create Date: 2026-05-01 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "6e5a7a62a687"
-down_revision = "8c1f7d3a9e2b"
+down_revision = "aa596a09c091"
 branch_labels = None
 depends_on = None
 
