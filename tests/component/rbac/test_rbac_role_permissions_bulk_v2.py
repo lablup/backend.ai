@@ -34,6 +34,10 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkRemoveRolePermissionsPayload,
     ReplaceRolePermissionsPayload,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RBACElementTypeDTO,
+    RBACElementTypeFilter,
+)
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -448,9 +452,9 @@ class TestPermissionFilterScopeIdNarrowing:
     ) -> None:
         """``PermissionRow.entity_type`` is a ``StrEnumType``-wrapped column.
 
-        Without the ``sa.cast(..., sa.String)`` bypass in the StringFilter
-        equality factory, the bind processor raises ``AttributeError`` on a
-        plain ``str`` value because it expects a Python enum instance.
+        ``RBACElementTypeFilter.equals`` carries an ``RBACElementTypeDTO`` enum
+        instance, which lets ``StrEnumType.process_bind_param`` accept the value
+        as-is without any column-cast workaround.
         """
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
@@ -464,9 +468,38 @@ class TestPermissionFilterScopeIdNarrowing:
             AdminSearchPermissionsGQLInput(
                 filter=PermissionFilter(
                     role_id=UUIDFilter(equals=target_role.role.id),
-                    entity_type=StringFilter(equals="session"),
+                    entity_type=RBACElementTypeFilter(equals=RBACElementTypeDTO.SESSION),
                 ),
                 limit=100,
             ),
         )
         assert {item.entity_type.value for item in result.items} == {"session"}
+
+    async def test_entity_type_in_filter(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        target_role: CreateRoleResponse,
+        domain_fixture: str,
+    ) -> None:
+        """``RBACElementTypeFilter.in_`` returns rows whose entity_type is in the list."""
+        await admin_v2_registry.rbac.bulk_add_role_permissions(
+            BulkAddRolePermissionsInput(
+                permissions=[
+                    _entry(target_role.role.id, domain_fixture, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture, "image", "read"),
+                    _entry(target_role.role.id, domain_fixture, "vfolder", "read"),
+                ],
+            ),
+        )
+        result = await admin_v2_registry.rbac.search_permissions(
+            AdminSearchPermissionsGQLInput(
+                filter=PermissionFilter(
+                    role_id=UUIDFilter(equals=target_role.role.id),
+                    entity_type=RBACElementTypeFilter(
+                        in_=[RBACElementTypeDTO.SESSION, RBACElementTypeDTO.IMAGE]
+                    ),
+                ),
+                limit=100,
+            ),
+        )
+        assert {item.entity_type.value for item in result.items} == {"session", "image"}

@@ -89,7 +89,10 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import (
+    RBACElementTypeFilterGQL,
+    RBACElementTypeGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -233,8 +236,8 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
 )
 class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
     scope_id: str | None = None
-    scope_type: RBACElementTypeGQL | None = None
-    entity_type: RBACElementTypeGQL | None = None
+    scope_type: RBACElementTypeFilterGQL | None = None
+    entity_type: RBACElementTypeFilterGQL | None = None
     operation: OperationTypeGQL | None = None
 
     AND: list[Self] | None = None
@@ -248,9 +251,9 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
 )
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: UUIDFilter | None = None
-    scope_type: StringFilter | None = None
+    scope_type: RBACElementTypeFilterGQL | None = None
     scope_id: StringFilter | None = None
-    entity_type: StringFilter | None = None
+    entity_type: RBACElementTypeFilterGQL | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
