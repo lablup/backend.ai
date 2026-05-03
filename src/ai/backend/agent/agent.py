@@ -2461,7 +2461,7 @@ class AbstractAgent[
             ),
         )
 
-    async def _populate_missing_model_service_start_commands(
+    async def _apply_image_cmd_fallback(
         self,
         models: list[dict[str, Any]],
         image: str,
@@ -3172,7 +3172,7 @@ class AbstractAgent[
 
                     if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
                         populated_models = (
-                            await self._populate_missing_model_service_start_commands(
+                            await self._apply_image_cmd_fallback(
                                 model_definition["models"],
                                 ctx.image_ref.canonical,
                             )

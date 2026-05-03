@@ -67,13 +67,13 @@ class DeploymentSessionDraftBuilder:
         target_revision: ModelRevisionSpec,
     ) -> SessionSpecDraft:
         environ = cls._resolve_environ(deployment_info, target_revision, context)
-        startup_command = cls._resolve_startup_command(target_revision, context)
+        startup_command = target_revision.execution.startup_command
         mounts = cls._resolve_mounts(target_revision)
         resource_entries = cls._resource_entries(target_revision)
         resource_opts = ResourceOpts.model_validate(
             target_revision.resource_spec.resource_opts or {}
         )
-        model_definition_payload = cls._model_definition_payload(target_revision)
+        model_definition_payload = cls._model_definition_payload(target_revision, context)
 
         return SessionSpecDraft(
             identity=SessionIdentityDraft(
@@ -138,17 +138,6 @@ class DeploymentSessionDraftBuilder:
         return environ
 
     @staticmethod
-    def _resolve_startup_command(
-        target_revision: ModelRevisionSpec,
-        context: DeploymentContext,
-    ) -> str | None:
-        startup_command = target_revision.execution.startup_command
-        if context.resolved_presets and context.resolved_presets.args:
-            args_str = " ".join(context.resolved_presets.args)
-            startup_command = f"{startup_command} {args_str}" if startup_command else args_str
-        return startup_command
-
-    @staticmethod
     def _resolve_mounts(
         target_revision: ModelRevisionSpec,
     ) -> tuple[MountInfoEntry, ...]:
@@ -177,7 +166,24 @@ class DeploymentSessionDraftBuilder:
     @staticmethod
     def _model_definition_payload(
         target_revision: ModelRevisionSpec,
+        context: DeploymentContext,
     ) -> dict[str, Any] | None:
+        """Materialize ``model_definition`` into the kernel payload.
+
+        ``service.start_command`` is taken as-is from the revision snapshot
+        (the controller has already resolved any ``{model_path}`` placeholder
+        against ``models[0].model_path`` at revision creation time). Preset
+        ARGS are appended as separate argv tokens.
+        """
         if target_revision.model_definition is None:
             return None
-        return target_revision.model_definition.model_dump(mode="json")
+        payload = target_revision.model_definition.model_dump(mode="json")
+        args = (context.resolved_presets.args if context.resolved_presets else None) or []
+        if args and payload.get("models"):
+            for model in payload["models"]:
+                service = model.get("service")
+                if service is None:
+                    continue
+                existing = list(service.get("start_command") or [])
+                service["start_command"] = existing + list(args)
+        return payload

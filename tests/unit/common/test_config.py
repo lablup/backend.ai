@@ -241,3 +241,80 @@ class TestModelConfigs:
                     }
                 ]
             })
+
+    def test_to_resolved_substitutes_model_path_placeholder(self) -> None:
+        # The variant baseline keeps ``{model_path}`` so a single fixture
+        # entry covers any mount destination; the placeholder is resolved
+        # once, at the boundary between draft merge and persistence.
+        draft = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "demo",
+                    "model_path": "/custom-mount",
+                    "service": {
+                        "start_command": ["vllm", "serve", "{model_path}"],
+                        "port": 8000,
+                    },
+                }
+            ]
+        })
+
+        resolved = draft.to_resolved()
+
+        service = resolved.models[0].service
+        assert service is not None
+        assert service.start_command == ["vllm", "serve", "/custom-mount"]
+
+    def test_to_resolved_substitutes_placeholder_with_named_flag(self) -> None:
+        # SGLang-style: ``{model_path}`` lands after a flag; the
+        # substitution touches the placeholder token only, not the flag.
+        draft = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "demo",
+                    "model_path": "/data",
+                    "service": {
+                        "start_command": [
+                            "python",
+                            "-m",
+                            "sglang.launch_server",
+                            "--model-path",
+                            "{model_path}",
+                        ],
+                        "port": 9001,
+                    },
+                }
+            ]
+        })
+
+        resolved = draft.to_resolved()
+
+        service = resolved.models[0].service
+        assert service is not None
+        assert service.start_command == [
+            "python",
+            "-m",
+            "sglang.launch_server",
+            "--model-path",
+            "/data",
+        ]
+
+    def test_to_resolved_leaves_start_command_with_no_placeholder_unchanged(self) -> None:
+        draft = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "demo",
+                    "model_path": "/models",
+                    "service": {
+                        "start_command": ["my-server", "--bind", "0.0.0.0"],
+                        "port": 8000,
+                    },
+                }
+            ]
+        })
+
+        resolved = draft.to_resolved()
+
+        service = resolved.models[0].service
+        assert service is not None
+        assert service.start_command == ["my-server", "--bind", "0.0.0.0"]
