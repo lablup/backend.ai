@@ -1279,17 +1279,33 @@ class CommonContainerConfig(BaseConfigSchema):
 class ContainerdNetworkMode(enum.StrEnum):
     """Network policy for the containerd agent backend.
 
-    - ``managed``: Backend.AI generates and owns a CNI conflist
-      (``bridge`` + ``portmap``) inside ``cni_conf_dir``. Suitable for
-      standalone containerd nodes.
-    - ``host``: Operator (or k8s) manages CNI; agent uses an existing
-      conflist named ``network_name`` and only validates that the
-      ``portmap`` plugin is chained.
+    - ``cilium``: K8s-joined node where Cilium is the cluster CNI.
+      Containerd's CRI plugin invokes Cilium CNI normally when the
+      agent calls ``RunPodSandbox``; kernel containers get the full
+      eBPF datapath. The agent populates ``PodSandboxConfig.metadata``
+      with synthetic namespace/name (no backing Pod object), so Cilium
+      assigns ``reserved:init`` identity — datapath performance is
+      identity-independent, only NetworkPolicy / observability are
+      affected. Assumes the deployment invariants (taint isolation,
+      hostNetwork-only system DaemonSets) documented in the project
+      memory.
+    - ``managed``: **Standalone non-k8s nodes only.** Agent generates
+      its own ``bridge`` + ``portmap`` conflist inside ``cni_conf_dir``;
+      operator points containerd's CRI plugin ``cni.conf_dir`` there.
+      Not appropriate for k8s-joined nodes — using a separate bridge
+      bypasses the cluster Cilium and loses the eBPF fast path.
+    - ``host``: Operator-supplied conflist by name. Only viable when
+      the cluster CNI is identity-agnostic (basic Flannel, plain
+      bridge); broken with modern identity-coupled CNIs (Cilium,
+      Calico, Antrea). Rare in production.
     - ``none``: CRI ``PodSandbox`` is launched with ``host_network=true``;
-      CNI is bypassed entirely. Lowest-friction option, but loses port
-      isolation across concurrent sessions.
+      CNI is bypassed entirely. Escape hatch for restricted environments
+      (managed k8s nodepools where containerd config cannot be touched).
+      Loses port isolation — service-port allocator must guard against
+      host-port collisions across concurrent sessions.
     """
 
+    CILIUM = "cilium"
     MANAGED = "managed"
     HOST = "host"
     NONE = "none"
@@ -1304,12 +1320,14 @@ class ContainerdNetworkConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "How the containerd backend obtains a pod-sandbox network. "
-                "'managed' lets the agent generate its own CNI conflist; "
-                "'host' uses an operator-supplied conflist by name; "
-                "'none' bypasses CNI entirely (host network namespace)."
+                "'cilium' delegates to the cluster Cilium CNI on a k8s-joined node "
+                "(primary k8s-coexistence path); 'managed' lets the agent generate "
+                "its own CNI conflist on a standalone node; 'host' uses an "
+                "operator-supplied conflist by name; 'none' bypasses CNI entirely "
+                "(host network namespace)."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="managed", prod="host"),
+            example=ConfigExample(local="managed", prod="cilium"),
         ),
     ]
     cni_conf_dir: Annotated[
@@ -1393,6 +1411,41 @@ class ContainerdNetworkConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="10.42.0.0/24", prod="10.42.0.0/24"),
+        ),
+    ]
+    cilium_pod_namespace: Annotated[
+        str,
+        Field(
+            default="backendai-kernels",
+            validation_alias=AliasChoices("cilium-pod-namespace", "cilium_pod_namespace"),
+            serialization_alias="cilium-pod-namespace",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Synthetic Kubernetes namespace stamped into "
+                "PodSandboxConfig.metadata.namespace when invoking containerd CRI "
+                "in 'cilium' mode. No backing Pod object exists; Cilium falls back "
+                "to 'reserved:init' identity. Only used in 'cilium' mode."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="backendai-kernels", prod="backendai-kernels"),
+        ),
+    ]
+    cilium_pod_name_prefix: Annotated[
+        str,
+        Field(
+            default="kernel",
+            validation_alias=AliasChoices("cilium-pod-name-prefix", "cilium_pod_name_prefix"),
+            serialization_alias="cilium-pod-name-prefix",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Prefix for the synthetic Pod name (combined with the kernel id) "
+                "stamped into PodSandboxConfig.metadata.name when invoking "
+                "containerd CRI in 'cilium' mode. Only used in 'cilium' mode."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="kernel", prod="kernel"),
         ),
     ]
 

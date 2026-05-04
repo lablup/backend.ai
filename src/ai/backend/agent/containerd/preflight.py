@@ -44,6 +44,15 @@ async def run_preflight(config: ContainerdContainerConfig) -> None:
     match network.mode:
         case ContainerdNetworkMode.NONE:
             return
+        case ContainerdNetworkMode.CILIUM:
+            # Containerd's CRI plugin invokes Cilium CNI itself based on the
+            # node-level cni.conf_dir set by the cluster. The agent does not
+            # call CNI binaries directly, so binary / conflist checks here
+            # would only re-verify cluster setup the operator already owns.
+            # Real verification (CRI metadata behavior, IP release on DEL,
+            # cilium-agent socket access for V2) requires runtime probing
+            # against an actual node and lives in PoC, not config preflight.
+            return
         case ContainerdNetworkMode.MANAGED:
             await _check_cni_binaries(network.cni_bin_dir)
             await _check_managed_dir_writable(network.cni_conf_dir)
