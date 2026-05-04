@@ -36,6 +36,7 @@ stays responsive even under bursts of concurrent kernel operations.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from types import TracebackType
 from typing import Self
@@ -51,6 +52,13 @@ from .generated import api_pb2, api_pb2_grpc
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CONTAINERD_SOCKET = "unix:///run/containerd/containerd.sock"
+
+# Default upper bound for waiting on the gRPC channel to become ready.
+# grpc.aio's channel_ready() retries internally with exponential backoff
+# and never gives up on its own — without this guard, an unreachable
+# socket (containerd not running, wrong path, missing permissions) hangs
+# the caller indefinitely instead of producing an actionable error.
+DEFAULT_CONNECT_TIMEOUT_SECS: float = 5.0
 
 # Kubernetes Runtime API version requested in Version() calls. The
 # string is opaque to the runtime but conventionally set to the CRI
@@ -70,12 +78,19 @@ class CriClient:
     """
 
     _target: str
+    _connect_timeout_secs: float
     _channel: grpc.aio.Channel | None
     _runtime_stub: api_pb2_grpc.RuntimeServiceAsyncStub | None
     _image_stub: api_pb2_grpc.ImageServiceAsyncStub | None
 
-    def __init__(self, target: str = DEFAULT_CONTAINERD_SOCKET) -> None:
+    def __init__(
+        self,
+        target: str = DEFAULT_CONTAINERD_SOCKET,
+        *,
+        connect_timeout_secs: float = DEFAULT_CONNECT_TIMEOUT_SECS,
+    ) -> None:
         self._target = target
+        self._connect_timeout_secs = connect_timeout_secs
         self._channel = None
         self._runtime_stub = None
         self._image_stub = None
@@ -96,16 +111,26 @@ class CriClient:
         """Open the gRPC channel to containerd's CRI endpoint.
 
         ``grpc.aio.insecure_channel`` returns immediately and lazy-
-        connects on the first RPC; we still call ``channel_ready()``
-        here so a misconfigured socket path / permission issue surfaces
-        at agent startup rather than at first kernel creation.
+        connects on the first RPC; ``channel_ready()`` actively probes
+        until the channel is usable. We wrap that probe in a timeout
+        because grpc.aio retries forever otherwise — an unreachable
+        socket (containerd not running, wrong path, missing permissions)
+        would hang the caller indefinitely with no log line to diagnose.
         """
         if self._channel is not None:
             return
         log.debug("Opening CRI channel to {}", self._target)
         channel = grpc.aio.insecure_channel(self._target)
         try:
-            await channel.channel_ready()
+            await asyncio.wait_for(channel.channel_ready(), timeout=self._connect_timeout_secs)
+        except TimeoutError as exc:
+            await channel.close()
+            raise CriConnectionError(
+                f"Timed out after {self._connect_timeout_secs:.1f}s waiting for containerd "
+                f"CRI at {self._target}. Check that containerd is running and the socket "
+                f"path / permissions are correct (try `crictl --runtime-endpoint {self._target} "
+                "version`)."
+            ) from exc
         except AioRpcError as exc:
             await channel.close()
             raise CriConnectionError(

@@ -69,6 +69,13 @@ class StepResult:
     help="CRI gRPC target — typically a unix:// socket.",
 )
 @click.option(
+    "--connect-timeout",
+    default=5.0,
+    show_default=True,
+    type=float,
+    help="Seconds to wait for the CRI channel to become ready before bailing out.",
+)
+@click.option(
     "--image",
     default="docker.io/library/busybox:latest",
     show_default=True,
@@ -106,6 +113,7 @@ class StepResult:
 )
 def run(
     target: str,
+    connect_timeout: float,
     image: str,
     pod_namespace: str,
     pod_name: str | None,
@@ -124,6 +132,7 @@ def run(
     results = asyncio.run(
         _run_lifecycle(
             target=target,
+            connect_timeout_secs=connect_timeout,
             image=image,
             pod_namespace=pod_namespace,
             pod_name=effective_pod_name,
@@ -139,6 +148,7 @@ def run(
 async def _run_lifecycle(
     *,
     target: str,
+    connect_timeout_secs: float,
     image: str,
     pod_namespace: str,
     pod_name: str,
@@ -152,7 +162,7 @@ async def _run_lifecycle(
 
     results: list[StepResult] = []
 
-    async with CriClient(target=target) as cri:
+    async with CriClient(target=target, connect_timeout_secs=connect_timeout_secs) as cri:
         results.append(
             await _step(
                 "version",
