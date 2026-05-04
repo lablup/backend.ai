@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PurgeVFolderInput,
     SearchVFoldersInput,
     VFolderFilter,
     VFolderOrder,
@@ -433,9 +434,15 @@ class VFolderAdapter(BaseAdapter):
         await self._processors.vfolder.restore_vfolder_from_trash.wait_for_complete(action)
         return RestoreVFolderPayload(id=vfolder_id)
 
-    async def purge(self, vfolder_id: UUID) -> PurgeVFolderPayload:
+    async def purge(
+        self, vfolder_id: UUID, input: PurgeVFolderInput | None = None
+    ) -> PurgeVFolderPayload:
         """Permanently delete a vfolder. RBAC enforced."""
-        action = PurgeVFolderV2Action(vfolder_id=vfolder_id)
+        cascade_model_card = input.cascade_model_card if input is not None else False
+        action = PurgeVFolderV2Action(
+            vfolder_id=vfolder_id,
+            cascade_model_card=cascade_model_card,
+        )
         await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
 
@@ -528,7 +535,10 @@ class VFolderAdapter(BaseAdapter):
     async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
         """Permanently purge multiple vfolders."""
         for vfolder_id in input.ids:
-            action = PurgeVFolderV2Action(vfolder_id=vfolder_id)
+            action = PurgeVFolderV2Action(
+                vfolder_id=vfolder_id,
+                cascade_model_card=input.cascade_model_card,
+            )
             await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return BulkPurgeVFoldersPayload(purged_count=len(input.ids))
 

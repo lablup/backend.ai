@@ -58,6 +58,7 @@ class PurgeVFolderV2Action(VFolderSingleEntityAction):
     """Permanently purge a vfolder by ID with RBAC enforcement."""
 
     vfolder_id: uuid.UUID
+    cascade_model_card: bool = False
 
     @override
     def entity_id(self) -> str | None:

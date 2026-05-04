@@ -700,7 +700,10 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        await self._vfolder_repository.delete_vfolders_forever(
+            [action.vfolder_uuid],
+            cascade_model_card=action.cascade_model_card,
+        )
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -1833,7 +1836,10 @@ class VFolderService:
             user_uuid=me.user_id,
         )
 
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_id])
+        await self._vfolder_repository.delete_vfolders_forever(
+            [action.vfolder_id],
+            cascade_model_card=action.cascade_model_card,
+        )
         await self._remove_vfolder_from_storage(vfolder_data)
         return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
 

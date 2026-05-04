@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PurgeVFolderInput,
     SearchVFoldersInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
@@ -94,9 +95,10 @@ class V2VFolderHandler:
     async def purge(
         self,
         path: PathParam[VFolderIdPathParam],
+        body: BodyParam[PurgeVFolderInput],
     ) -> APIResponse:
         """Permanently delete a vfolder."""
-        result = await self._adapter.purge(path.parsed.vfolder_id)
+        result = await self._adapter.purge(path.parsed.vfolder_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def restore(

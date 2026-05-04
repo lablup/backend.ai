@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -57,6 +58,7 @@ from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
     VFolderDeletionNotAllowed,
     VFolderFilterStatusFailed,
+    VFolderHasLinkedModelCard,
     VFolderInvalidParameter,
     VFolderNotFound,
     VFolderOperationFailed,
@@ -66,6 +68,7 @@ from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -146,6 +149,14 @@ vfolder_repository_resilience = Resilience(
         ),
     ]
 )
+
+
+@dataclass
+class _VFolderWithLinkedModelCards:
+    """A vfolder row paired with model card rows referencing it."""
+
+    vfolder_row: VFolderRow
+    model_card_rows: list[ModelCardRow]
 
 
 class VfolderRepository:
@@ -628,19 +639,73 @@ class VfolderRepository:
             await session.flush()
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
-    @vfolder_repository_resilience.apply()
-    async def delete_vfolders_forever(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:
+    async def _fetch_vfolders_with_linked_model_cards(
+        self,
+        session: SASession,
+        vfolder_ids: Sequence[uuid.UUID],
+    ) -> list[_VFolderWithLinkedModelCards]:
+        """Fetch vfolder rows together with model card rows that reference them.
+
+        Uses a single LEFT OUTER JOIN. Vfolders with no model card appear
+        once with an empty ``model_card_rows`` list; vfolder IDs not present
+        in the database are skipped.
         """
-        Delete VFolders forever
+        if not vfolder_ids:
+            return []
+
+        stmt = (
+            sa.select(VFolderRow, ModelCardRow)
+            .outerjoin(ModelCardRow, ModelCardRow.vfolder == VFolderRow.id)
+            .where(VFolderRow.id.in_(vfolder_ids))
+        )
+        rows = (await session.execute(stmt)).all()
+
+        grouped: dict[uuid.UUID, _VFolderWithLinkedModelCards] = {}
+        for vfolder_row, card_row in rows:
+            record = grouped.setdefault(
+                vfolder_row.id,
+                _VFolderWithLinkedModelCards(
+                    vfolder_row=vfolder_row,
+                    model_card_rows=[],
+                ),
+            )
+            if card_row is not None:
+                record.model_card_rows.append(card_row)
+        return list(grouped.values())
+
+    @vfolder_repository_resilience.apply()
+    async def delete_vfolders_forever(
+        self,
+        vfolder_ids: list[uuid.UUID],
+        *,
+        cascade_model_card: bool = False,
+    ) -> list[VFolderData]:
+        """
+        Delete VFolders forever.
+
+        If any model card references one of the target vfolders, the call is
+        rejected unless ``cascade_model_card`` is True, in which case those
+        model cards are deleted in the same transaction.
         """
 
         async with self._db.connect() as db_conn:
             async with self._db.begin_session(db_conn) as db_session:
-                vfolder_rows = []
-                for vfolder_id in vfolder_ids:
-                    vfolder_row = await self._get_vfolder_by_id(db_session, vfolder_id)
-                    if vfolder_row:
-                        vfolder_rows.append(vfolder_row)
+                records = await self._fetch_vfolders_with_linked_model_cards(
+                    db_session, vfolder_ids
+                )
+                linked_cards = [card for rec in records for card in rec.model_card_rows]
+                if linked_cards:
+                    if not cascade_model_card:
+                        raise VFolderHasLinkedModelCard(
+                            f"VFolder(s) {vfolder_ids} are referenced by "
+                            f"{len(linked_cards)} model card(s); "
+                            "delete the model card(s) first or set cascade_model_card=True."
+                        )
+                    for card in linked_cards:
+                        await db_session.delete(card)
+                    await db_session.flush()
+
+                vfolder_rows = [rec.vfolder_row for rec in records]
                 delete_stmt = (
                     sa.update(VFolderRow)
                     .where(VFolderRow.id.in_(vfolder_ids))
@@ -662,6 +727,7 @@ class VfolderRepository:
         Raises:
             VFolderNotFound: If the vfolder doesn't exist.
             VFolderFilterStatusFailed: If the vfolder status is not purgable.
+            VFolderHasLinkedModelCard: If a model card still references the vfolder.
         """
         vfolder_uuid = cast(uuid.UUID, purger.pk_value)
         async with self._db.begin_session() as session:
@@ -671,6 +737,16 @@ class VfolderRepository:
                 raise VFolderNotFound(extra_data=str(vfolder_uuid))
             if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
                 raise VFolderFilterStatusFailed
+            linked_card_count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ModelCardRow)
+                .where(ModelCardRow.vfolder == vfolder_uuid)
+            )
+            if linked_card_count:
+                raise VFolderHasLinkedModelCard(
+                    f"VFolder {vfolder_uuid} still has {linked_card_count} linked model card(s); "
+                    "run delete-forever (with cascade if needed) before purge."
+                )
             await execute_rbac_entity_purger(session, purger)
             return vfolder_row.to_data()
 

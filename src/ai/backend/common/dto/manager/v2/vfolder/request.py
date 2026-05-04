@@ -151,6 +151,13 @@ class PurgeVFolderInput(BaseRequestModel):
     """Input for purging a virtual folder."""
 
     id: UUID = Field(description="VFolder ID to purge")
+    cascade_model_card: bool = Field(
+        default=False,
+        description=(
+            "If true, also delete model card record(s) referencing this vfolder. "
+            "If false, the request is rejected when any model card still references it."
+        ),
+    )
 
 
 class BulkDeleteVFoldersInput(BaseRequestModel):
@@ -163,6 +170,13 @@ class BulkPurgeVFoldersInput(BaseRequestModel):
     """Input for permanently purging multiple virtual folders."""
 
     ids: list[UUID] = Field(description="List of VFolder UUIDs to purge.")
+    cascade_model_card: bool = Field(
+        default=False,
+        description=(
+            "If true, also delete model card record(s) referencing the vfolders. "
+            "If false, the request is rejected when any model card still references one."
+        ),
+    )
 
 
 class RestoreVFolderInput(BaseRequestModel):

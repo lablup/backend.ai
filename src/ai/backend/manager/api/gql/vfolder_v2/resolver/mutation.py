@@ -6,6 +6,7 @@ from uuid import UUID
 
 from strawberry import Info
 
+from ai.backend.common.dto.manager.v2.vfolder.request import PurgeVFolderInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -76,8 +77,12 @@ async def delete_vfolder_v2(
 async def purge_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
+    cascade_model_card: bool = False,
 ) -> PurgeVFolderPayloadGQL:
-    payload = await info.context.adapters.vfolder.purge(vfolder_id)
+    payload = await info.context.adapters.vfolder.purge(
+        vfolder_id,
+        PurgeVFolderInput(id=vfolder_id, cascade_model_card=cascade_model_card),
+    )
     return PurgeVFolderPayloadGQL.from_pydantic(payload)
 
 
