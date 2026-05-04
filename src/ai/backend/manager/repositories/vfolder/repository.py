@@ -429,7 +429,7 @@ class VfolderRepository:
         state of the resolved id in their own downstream flow.
         """
         async with self._db.begin_readonly_session() as session:
-            row_id = await session.scalar(sa.select(vfolders.c.id).where(vfolders.c.name == name))
+            row_id = await session.scalar(sa.select(VFolderRow.id).where(VFolderRow.name == name))
         if row_id is None:
             return None
         return cast(uuid.UUID, row_id)
