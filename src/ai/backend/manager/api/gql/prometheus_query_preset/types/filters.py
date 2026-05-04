@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Self
-from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     QueryDefinitionFilter as QueryDefinitionFilterDTO,
@@ -16,6 +15,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
+    UUIDFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -35,7 +35,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 )
 class QueryDefinitionFilter(PydanticInputMixin[QueryDefinitionFilterDTO]):
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
-    category_id: UUID | None = gql_added_field(
+    category_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
             description="Filter by category ID.",
             added_version=NEXT_RELEASE_VERSION,

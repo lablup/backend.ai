@@ -12,7 +12,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
 from .types import OrderDirection, QueryDefinitionOrderField
 
@@ -154,7 +154,7 @@ class QueryDefinitionFilter(BaseRequestModel):
     """Filter for prometheus query definition search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
-    category_id: UUID | None = Field(default=None, description="Filter by category ID")
+    category_id: UUIDFilter | None = Field(default=None, description="Filter by category ID")
     AND: list[QueryDefinitionFilter] | None = Field(
         default=None, description="AND logical combinator."
     )

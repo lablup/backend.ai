@@ -260,7 +260,13 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
                 conditions.append(condition)
 
         if filter.category_id is not None:
-            conditions.append(PrometheusQueryPresetConditions.by_category_id(filter.category_id))
+            condition = self.convert_uuid_filter(
+                filter.category_id,
+                equals_factory=PrometheusQueryPresetConditions.by_category_id_equals,
+                in_factory=PrometheusQueryPresetConditions.by_category_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         if filter.AND:
             for sub_filter in filter.AND:

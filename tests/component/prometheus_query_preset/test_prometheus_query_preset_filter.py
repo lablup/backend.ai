@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     QueryDefinitionFilter,
     SearchQueryDefinitionsInput,
@@ -28,7 +28,9 @@ class TestQueryPresetSearchFilter:
         """Filtering by category_id returns only presets in that category."""
         result = await admin_v2_registry.prometheus_query_preset.search(
             SearchQueryDefinitionsInput(
-                filter=QueryDefinitionFilter(category_id=preset_filter_dataset.category_a_id),
+                filter=QueryDefinitionFilter(
+                    category_id=UUIDFilter(equals=preset_filter_dataset.category_a_id)
+                ),
                 limit=100,
             )
         )
@@ -47,7 +49,9 @@ class TestQueryPresetSearchFilter:
             SearchQueryDefinitionsInput(
                 filter=QueryDefinitionFilter(
                     AND=[
-                        QueryDefinitionFilter(category_id=preset_filter_dataset.category_a_id),
+                        QueryDefinitionFilter(
+                            category_id=UUIDFilter(equals=preset_filter_dataset.category_a_id)
+                        ),
                         QueryDefinitionFilter(
                             name=StringFilter(equals=preset_filter_dataset.cpu_usage_name)
                         ),
@@ -97,7 +101,7 @@ class TestQueryPresetSearchFilter:
         result = await admin_v2_registry.prometheus_query_preset.search(
             SearchQueryDefinitionsInput(
                 filter=QueryDefinitionFilter(
-                    category_id=preset_filter_dataset.category_a_id,
+                    category_id=UUIDFilter(equals=preset_filter_dataset.category_a_id),
                     NOT=[
                         QueryDefinitionFilter(
                             name=StringFilter(equals=preset_filter_dataset.cpu_memory_name)
