@@ -133,6 +133,46 @@ class TestV2AdminSearchImagesByID:
         assert result.total_count == 0
         assert result.items == []
 
+    async def test_filter_id_not_equals_excludes_target(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """``id.not_equals`` returns every image except the excluded one."""
+        image_id, helper = image_fixture
+        other_id = await helper.create(name_suffix="other-image")
+
+        result = await admin_v2_registry.image.admin_search(
+            AdminSearchImagesInput(
+                filter=ImageFilterInputDTO(id=UUIDFilter(not_equals=image_id)),
+            ),
+        )
+        assert isinstance(result, AdminSearchImagesPayload)
+        found_ids = {item.id for item in result.items}
+        assert image_id not in found_ids
+        assert other_id in found_ids
+
+    async def test_filter_id_not_in_excludes_targets(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """``id.not_in`` returns every image whose id is outside the list."""
+        image_id, helper = image_fixture
+        excluded_id = await helper.create(name_suffix="excluded-image")
+        kept_id = await helper.create(name_suffix="kept-image")
+
+        result = await admin_v2_registry.image.admin_search(
+            AdminSearchImagesInput(
+                filter=ImageFilterInputDTO(id=UUIDFilter(not_in=[image_id, excluded_id])),
+            ),
+        )
+        assert isinstance(result, AdminSearchImagesPayload)
+        found_ids = {item.id for item in result.items}
+        assert image_id not in found_ids
+        assert excluded_id not in found_ids
+        assert kept_id in found_ids
+
 
 class TestV2AdminSearchImagesPermissions:
     """Endpoint is mounted under ``superadmin_required`` middleware."""
