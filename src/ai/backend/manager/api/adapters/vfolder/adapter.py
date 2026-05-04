@@ -439,7 +439,7 @@ class VFolderAdapter(BaseAdapter):
         """Permanently delete a vfolder, optionally cascading linked model cards."""
         action = PurgeVFolderV2Action(
             vfolder_id=vfolder_id,
-            cascade_model_card=input.cascade_model_card,
+            cascade_model_card=bool(input.cascade_model_card),
         )
         result = await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
@@ -538,10 +538,11 @@ class VFolderAdapter(BaseAdapter):
         """
         purged: list[VFolderNode] = []
         failed: list[BulkPurgeVFolderError] = []
+        cascade = bool(input.cascade_model_card)
         for vfolder_id in input.ids:
             action = PurgeVFolderV2Action(
                 vfolder_id=vfolder_id,
-                cascade_model_card=input.cascade_model_card,
+                cascade_model_card=cascade,
             )
             try:
                 result = await self._processors.vfolder.purge_v2.wait_for_complete(action)

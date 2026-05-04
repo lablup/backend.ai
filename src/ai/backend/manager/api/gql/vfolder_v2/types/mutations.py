@@ -452,11 +452,12 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
 )
 class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
     ids: list[UUID] = gql_field(description="List of VFolder UUIDs to purge.")
-    cascade_model_card: bool = gql_field(
-        default=False,
+    cascade_model_card: bool | None = gql_field(
+        default=None,
         description=(
             "If true, also delete model card record(s) referencing the vfolders. "
-            "If false, the request is rejected when any model card still references one."
+            "Defaults to false; the request is then rejected per-vfolder when any "
+            "model card still references one."
         ),
     )
 
