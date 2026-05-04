@@ -1,7 +1,7 @@
 """make revision-preset deployment fields not null
 
 Revision ID: ba5923b1f4a7
-Revises: 8c1f7d3a9e2b
+Revises: aa596a09c091
 Create Date: 2026-04-30
 
 Backfill defaults for the deployment-level columns that were previously
@@ -25,7 +25,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 # revision identifiers, used by Alembic.
 # Part of: 26.4.5 (main)
 revision = "ba5923b1f4a7"
-down_revision = "8c1f7d3a9e2b"
+down_revision = "aa596a09c091"
 branch_labels = None
 depends_on = None
 
