@@ -2036,6 +2036,22 @@ type BulkPurgeVFoldersV2Payload
 {
   """The vfolders whose data was permanently purged."""
   vfolders: [VFolder!]!
+
+  """Per-vfolder failure entries for items that did not purge."""
+  failed: [BulkPurgeVFolderV2Error!]!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single vfolder in a bulk purge.
+"""
+type BulkPurgeVFolderV2Error
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the vfolder that failed to purge."""
+  vfolderId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
 }
 
 """
