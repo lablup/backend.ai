@@ -26,12 +26,20 @@ def validate_query_template(template: str) -> None:
 
 
 def _escape_non_placeholders(template: str) -> str:
-    # PromQL label matchers `{key=...}` collide with str.format placeholders;
-    # escape any non-placeholder `{...}` block so .format treats it as literal.
+    # Normalize each `{X}` so str.format produces a single PromQL `{value}`
+    # regardless of how many braces the user wrote.
     def repl(match: re.Match[str]) -> str:
-        if match.group(1) in _PLACEHOLDER_NAMES:
+        name = match.group(1)
+        start, end = match.span()
+        text = match.string
+        already_wrapped = (
+            start > 0 and text[start - 1] == "{" and end < len(text) and text[end] == "}"
+        )
+        if name not in _PLACEHOLDER_NAMES:
+            return match.group(0) if already_wrapped else "{{" + name + "}}"
+        if name != "labels":
             return match.group(0)
-        return "{{" + match.group(1) + "}}"
+        return match.group(0) if already_wrapped else "{{" + match.group(0) + "}}"
 
     return _BRACE_BLOCK_RE.sub(repl, template)
 

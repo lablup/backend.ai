@@ -131,6 +131,40 @@ class TestMetricPresetRender:
                 window="5m",
                 expected='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
             ),
+            # Bare `{labels}` (single-brace) auto-wraps into PromQL `{value}`.
+            RenderTestCase(
+                id="bare_labels_placeholder_auto_wraps",
+                template='sum by ({group_by})(rate(metric{mode!="idle"}{labels}[{window}]))',
+                labels={"job": LabelMatcher.exact("api")},
+                group_by=frozenset({"instance"}),
+                window="5m",
+                expected='sum by (instance)(rate(metric{mode!="idle"}{job="api"}[5m]))',
+            ),
+            RenderTestCase(
+                id="bare_labels_with_empty_labels",
+                template="metric{labels}",
+                labels={},
+                group_by=frozenset(),
+                window="",
+                expected="metric{}",
+            ),
+            # User pre-escaped a raw matcher with `{{...}}` — must not be re-escaped.
+            RenderTestCase(
+                id="user_escaped_double_brace_matcher",
+                template='metric{{job="api"}}',
+                labels={},
+                group_by=frozenset(),
+                window="",
+                expected='metric{job="api"}',
+            ),
+            RenderTestCase(
+                id="user_escaped_empty_braces",
+                template="metric{{}}",
+                labels={},
+                group_by=frozenset(),
+                window="",
+                expected="metric{}",
+            ),
         ],
         ids=lambda c: c.id,
     )
