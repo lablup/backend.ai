@@ -1069,6 +1069,20 @@ class FailedToGetMetric(BackendAIError):
         )
 
 
+class InvalidMetricPresetTemplate(BackendAIError, web.HTTPBadRequest):
+    """Exception raised when a metric preset template cannot be rendered."""
+
+    error_type = "https://api.backend.ai/probs/invalid-metric-preset-template"
+    error_title = "Invalid metric preset template."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.METRIC,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 # JWT Errors
 class JWTError(BackendAIError, web.HTTPUnauthorized):
     """
