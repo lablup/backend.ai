@@ -248,8 +248,12 @@ class ModelServiceConfig(BaseConfigModel):
     )
     start_command: list[str] | None = Field(
         default=None,
-        description="Command to start the model service.",
-        examples=[["python", "service.py"]],
+        description=(
+            "Argv list to start the model service. ``{model_path}`` in any "
+            "token is replaced per-token with the resolved ``model_path`` "
+            "before launch. ``None`` falls back to the image's default CMD."
+        ),
+        examples=[["python", "service.py"], ["vllm", "serve", "{model_path}"]],
     )
     shell: str = Field(
         default="/bin/bash",
@@ -467,6 +471,29 @@ class ModelDefinition(BaseConfigModel):
                     return model.service.health_check
         return None
 
+    def with_args_appended(self, args: list[str]) -> ModelDefinition:
+        """Return a copy with ``args`` appended to each model's
+        ``service.start_command`` as separate argv tokens.
+
+        Models with ``service is None`` are passed through unchanged;
+        a model whose ``start_command`` is ``None`` receives ``args``
+        as its initial ``start_command`` (the agent's image-CMD fallback
+        is responsible for prepending a launcher when this happens).
+        """
+        if not args:
+            return self
+        new_models: list[ModelConfig] = []
+        for model in self.models:
+            if model.service is None:
+                new_models.append(model)
+                continue
+            existing = model.service.start_command or []
+            new_service = model.service.model_copy(
+                update={"start_command": existing + args},
+            )
+            new_models.append(model.model_copy(update={"service": new_service}))
+        return self.model_copy(update={"models": new_models})
+
 
 # ============================================================================
 # ModelDefinition draft types — partial-input variants used by source layers
@@ -531,10 +558,19 @@ class ModelConfigDraft(BaseConfigModel):
             raise ValueError("ModelConfig.name is required")
         if self.model_path is None:
             raise ValueError("ModelConfig.model_path is required")
+        service = self.service.to_resolved() if self.service else None
+        if service is not None and service.start_command:
+            # ``{model_path}`` placeholders in the variant baseline's
+            # ``start_command`` are resolved here, at the same moment the
+            # draft becomes a strict ``ModelConfig`` and ``model_path`` is
+            # finalized. Placeholders therefore never propagate downstream.
+            service.start_command = [
+                token.replace("{model_path}", self.model_path) for token in service.start_command
+            ]
         return ModelConfig(
             name=self.name,
             model_path=self.model_path,
-            service=self.service.to_resolved() if self.service else None,
+            service=service,
             metadata=self.metadata,
         )
 
