@@ -8,21 +8,24 @@ from ai.backend.common.exception import InvalidMetricPresetTemplate
 
 _PLACEHOLDER_NAMES = frozenset({"labels", "window", "group_by"})
 _BRACE_BLOCK_RE = re.compile(r"\{([^{}]*)\}")
-# Matches `$ident` / `${ident}` — foreign template syntax (Grafana, shell, etc.)
-# that Backend.AI does not substitute and Prometheus would reject.
+# `$ident` / `${ident}` — foreign templating syntax (Grafana, shell, etc.)
+# that Backend.AI does not substitute and is almost always unintended in PromQL.
 _UNSUPPORTED_TEMPLATE_VAR_RE = re.compile(r"\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*")
 
 
-def validate_query_template(template: str) -> None:
-    """Reject templates with foreign variables or malformed braces."""
+def validate_query_template(template: str) -> str:
+    """Reject templates with foreign variables or malformed braces.
+
+    Returns the dry-run rendered template (useful for inspection in tests).
+    """
     unsupported_vars = _UNSUPPORTED_TEMPLATE_VAR_RE.findall(template)
     if unsupported_vars:
+        placeholders = ", ".join(f"{{{name}}}" for name in sorted(_PLACEHOLDER_NAMES))
         raise InvalidMetricPresetTemplate(
             f"Unsupported template variables: {unsupported_vars}. "
-            "Use placeholders {labels}, {window}, {group_by} or literal PromQL values."
+            f"Use placeholders {placeholders} or literal PromQL values."
         )
-    # Check for malformed braces by attempting to render with dummy values.
-    MetricPreset(template=template).render()
+    return MetricPreset(template=template).render()
 
 
 def _escape_non_placeholders(template: str) -> str:

@@ -1069,7 +1069,7 @@ class FailedToGetMetric(BackendAIError):
         )
 
 
-class InvalidMetricPresetTemplate(BackendAIError):
+class InvalidMetricPresetTemplate(BackendAIError, web.HTTPBadRequest):
     """Exception raised when a metric preset template cannot be rendered."""
 
     error_type = "https://api.backend.ai/probs/invalid-metric-preset-template"
