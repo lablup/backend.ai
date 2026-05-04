@@ -56,14 +56,23 @@ only the **required** services start. To include optional ones, pass `--profile 
 | `backendai-half-etcd` | etcd v3.5 | Config store | (required) |
 | `backendai-half-apollo-router` | Hive Gateway | GraphQL federation (manager has 2 GQL servers federated through this) | (required) |
 | `backendai-half-prometheus` | Prometheus | Metrics — manager queries it for deployment autoscale rule evaluation | (required) |
+| `backendai-half-otel-collector` | OTel Collector | Trace / metric export | `telemetry`, `observability` |
+| `backendai-half-loki` | Loki | Log aggregation | `telemetry`, `observability` |
 | `backendai-half-grafana` | Grafana | Dashboards | `observability` |
-| `backendai-half-otel-collector` | OTel Collector | Telemetry | `observability` |
-| `backendai-half-loki` | Loki | Log aggregation | `observability` |
 | `backendai-half-tempo` | Tempo | Tracing | `observability` |
 | `backendai-half-pyroscope` | Pyroscope | Profiling | `observability` |
 | `backendai-half-db-exporter` | postgres-exporter | Postgres metrics | `observability` |
 | `backendai-half-redis-exporter` | redis_exporter | Redis metrics | `observability` |
 | `backendai-half-minio` | MinIO | Object storage | `storage` |
+
+**Profile semantics:**
+- `telemetry` — service-level export only (`otel-collector` + `loki`). Visualisation
+  (Grafana) and supporting backends (Tempo, Pyroscope, exporters) are typically managed
+  centrally; this profile is a good default for dev installs that just want their logs
+  and traces forwarded.
+- `observability` — superset of `telemetry`. Brings up the full local stack including
+  Grafana / Tempo / Pyroscope / exporters.
+- `storage` — MinIO only.
 
 ### Enabling optional profiles
 
@@ -71,7 +80,10 @@ only the **required** services start. To include optional ones, pass `--profile 
 # Required only (default)
 docker compose -f docker-compose.halfstack.current.yml up -d --wait
 
-# + observability stack (Grafana / OTel / Loki / Tempo / Pyroscope / exporters; Prometheus is already required)
+# + telemetry export (OTel collector + Loki forwarding logs/traces to a central monitor)
+docker compose -f docker-compose.halfstack.current.yml --profile telemetry up -d --wait
+
+# + full observability stack (Grafana / Tempo / Pyroscope / exporters in addition to telemetry)
 docker compose -f docker-compose.halfstack.current.yml --profile observability up -d --wait
 
 # + object storage (MinIO)

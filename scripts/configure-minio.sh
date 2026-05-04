@@ -2,8 +2,11 @@
 
 # MinIO Configuration Script for Backend.AI Development Environment
 # This script configures MinIO storage for the Backend.AI halfstack setup
-
-set -e
+#
+# Note: do NOT enable `set -e` here. This file is sourced by install-dev.sh,
+# so any shell options set here would also affect the caller, and a non-zero
+# return from configure_minio (e.g. MinIO container missing because the
+# `storage` halfstack profile is not active) would abort the entire install.
 
 # Source utility functions if available
 if [ -f "$(dirname "$0")/utils.sh" ]; then

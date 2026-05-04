@@ -152,7 +152,7 @@ services:
 
   backendai-half-otel-collector:
     image: otel/opentelemetry-collector-contrib:0.126.0
-    profiles: ["observability"]
+    profiles: ["telemetry", "observability"]
     restart: unless-stopped
     networks:
       - half
@@ -166,7 +166,7 @@ services:
 
   backendai-half-loki:
     image: grafana/loki:3.5.0
-    profiles: ["observability"]
+    profiles: ["telemetry", "observability"]
     restart: unless-stopped
     networks:
       - half
