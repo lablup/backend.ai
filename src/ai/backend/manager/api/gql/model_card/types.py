@@ -549,7 +549,7 @@ class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
 class DeleteModelCardOptionsGQL(PydanticInputMixin[DeleteOptionsDTO]):
     """Options for the model card delete operation."""
 
-    delete_associated_folder: bool = gql_field(
+    delete_associated_vfolder: bool = gql_field(
         description=(
             "If true, also soft-delete (move to trash) the model VFolder(s) "
             "associated with the deleted model card(s)."

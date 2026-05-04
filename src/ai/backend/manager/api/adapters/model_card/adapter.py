@@ -379,7 +379,7 @@ class ModelCardAdapter(BaseAdapter):
         result = await self._processors.model_card.delete.wait_for_complete(
             DeleteModelCardAction(id=card_id)
         )
-        if options.delete_associated_folder:
+        if options.delete_associated_vfolder:
             await self._processors.vfolder.delete_v2.wait_for_complete(
                 DeleteVFolderV2Action(vfolder_id=result.model_card.vfolder_id)
             )
@@ -395,7 +395,7 @@ class ModelCardAdapter(BaseAdapter):
             result = await self._processors.model_card.delete.wait_for_complete(
                 DeleteModelCardAction(id=card_id)
             )
-            if options.delete_associated_folder:
+            if options.delete_associated_vfolder:
                 await self._processors.vfolder.delete_v2.wait_for_complete(
                     DeleteVFolderV2Action(vfolder_id=result.model_card.vfolder_id)
                 )

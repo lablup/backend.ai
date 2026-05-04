@@ -108,7 +108,7 @@ class TestModelCardAdapterDelete:
     ) -> None:
         await adapter.delete(
             card_id,
-            options=DeleteModelCardOptions(delete_associated_folder=True),
+            options=DeleteModelCardOptions(delete_associated_vfolder=True),
         )
 
         mock_processors.model_card.delete.wait_for_complete.assert_awaited_once()
@@ -168,7 +168,7 @@ class TestModelCardAdapterBulkDelete:
 
         await adapter.bulk_delete(
             DeleteModelCardsInput(ids=ids),
-            DeleteModelCardOptions(delete_associated_folder=True),
+            DeleteModelCardOptions(delete_associated_vfolder=True),
         )
 
         assert mock_processors.vfolder.delete_v2.wait_for_complete.await_count == len(ids)

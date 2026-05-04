@@ -110,7 +110,7 @@ class SearchModelCardsInput(BaseRequestModel):
 class DeleteModelCardOptions(BaseRequestModel):
     """Options for the model card delete operation."""
 
-    delete_associated_folder: bool = Field(
+    delete_associated_vfolder: bool = Field(
         default=False,
         description=(
             "If true, also soft-delete (move to trash) the model VFolder(s) "
