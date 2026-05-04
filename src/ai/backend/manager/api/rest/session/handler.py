@@ -300,14 +300,17 @@ class SessionHandler:
         self,
         mounts: Sequence[str],
         mount_map: Mapping[str, str],
+        mount_options: Mapping[str, Any],
     ) -> dict[str, UUID]:
         """Resolve legacy v1 CLI name-keyed mount surfaces into a unified
         ``name → UUID`` mapping.
 
-        Both ``mounts`` (list of names) and ``mount_map`` (dict keyed by name)
-        are name-based legacy inputs and must be re-keyed onto UUIDs together;
-        otherwise a name that appears only in ``mount_map`` would slip through
-        the resolution and downstream layers would silently drop it.
+        ``mounts`` (list of names), ``mount_map`` (dict keyed by name), and
+        ``mount_options`` (dict keyed by name) are all name-based legacy
+        inputs populated together by ``-v`` on the v1 CLI; they must be
+        re-keyed onto UUIDs together so a name that appears only in
+        ``mount_map`` or ``mount_options`` is not silently dropped
+        downstream.
 
         Subpath syntax (``name/subdir``) is rejected here because
         :class:`MountInfoEntry` carries no subpath field; silently dropping
@@ -318,7 +321,7 @@ class SessionHandler:
         Merging the resolved ids/maps back into ``creation_config`` is the
         caller's responsibility — see :func:`_merge_resolved_legacy_mounts`.
         """
-        if not mounts and not mount_map:
+        if not mounts and not mount_map and not mount_options:
             return {}
 
         subpath_entries = [m for m in mounts if "/" in str(m)]
@@ -330,10 +333,17 @@ class SessionHandler:
             )
 
         resolved: dict[str, UUID] = {}
-        for raw in list(mounts) + list(mount_map.keys()):
+        for raw in list(mounts) + list(mount_map.keys()) + list(mount_options.keys()):
             name = str(raw)
             if name in resolved:
                 continue
+            try:
+                # Already a UUID-string key — modern callers may pass them
+                # through the same ``mount_options`` field, so skip them.
+                UUID(name)
+                continue
+            except (ValueError, TypeError):
+                pass
             result = await self._vfolder.resolve_vfolder_id_by_name.wait_for_complete(
                 ResolveVFolderIdByNameAction(vfolder_name=name)
             )
@@ -364,8 +374,11 @@ class SessionHandler:
 
         legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
         legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
-        if legacy_mounts or legacy_mount_map:
-            name_to_id = await self._resolve_legacy_name_mounts(legacy_mounts, legacy_mount_map)
+        legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
+        if legacy_mounts or legacy_mount_map or legacy_mount_options:
+            name_to_id = await self._resolve_legacy_name_mounts(
+                legacy_mounts, legacy_mount_map, legacy_mount_options
+            )
             validated_config = _merge_resolved_legacy_mounts(validated_config, name_to_id)
 
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
@@ -472,8 +485,11 @@ class SessionHandler:
 
         legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
         legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
-        if legacy_mounts or legacy_mount_map:
-            name_to_id = await self._resolve_legacy_name_mounts(legacy_mounts, legacy_mount_map)
+        legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
+        if legacy_mounts or legacy_mount_map or legacy_mount_options:
+            name_to_id = await self._resolve_legacy_name_mounts(
+                legacy_mounts, legacy_mount_map, legacy_mount_options
+            )
             validated_config = _merge_resolved_legacy_mounts(validated_config, name_to_id)
 
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
