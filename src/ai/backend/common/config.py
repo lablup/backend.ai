@@ -248,8 +248,12 @@ class ModelServiceConfig(BaseConfigModel):
     )
     start_command: list[str] | None = Field(
         default=None,
-        description="Command to start the model service.",
-        examples=[["python", "service.py"]],
+        description=(
+            "Argv list to start the model service. ``{model_path}`` in any "
+            "token is replaced per-token with the resolved ``model_path`` "
+            "before launch. ``None`` falls back to the image's default CMD."
+        ),
+        examples=[["python", "service.py"], ["vllm", "serve", "{model_path}"]],
     )
     shell: str = Field(
         default="/bin/bash",
