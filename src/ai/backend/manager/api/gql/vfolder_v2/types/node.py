@@ -77,14 +77,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Model cards backed by this vfolder, sorted most-recently-created first. "
-                "A vfolder may back multiple cards because the model_cards uniqueness "
-                "constraint is on (name, domain, project), not on vfolder. "
-                "Resolved through a DataLoader so that listing many vfolders does not "
-                "trigger N+1 fetches; the connection bundles all cards on the vfolder "
-                "without server-side pagination."
-            ),
+            description="Model cards backed by this vfolder, sorted most-recently-created first.",
         )
     )  # type: ignore[misc]
     async def model_cards(

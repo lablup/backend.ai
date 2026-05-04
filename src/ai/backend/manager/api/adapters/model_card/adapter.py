@@ -235,10 +235,8 @@ class ModelCardAdapter(BaseAdapter):
         """
         if not vfolder_ids:
             return []
-        action_result = (
-            await self._processors.model_card.batch_load_by_vfolder_ids.wait_for_complete(
-                BatchLoadModelCardsByVFolderIdsAction(vfolder_ids=list(vfolder_ids))
-            )
+        action_result = await self._processors.model_card.batch_load_model_cards_by_vfolder_ids.wait_for_complete(
+            BatchLoadModelCardsByVFolderIdsAction(vfolder_ids=list(vfolder_ids))
         )
         return [[self._data_to_node(item) for item in cards] for cards in action_result.data]
 

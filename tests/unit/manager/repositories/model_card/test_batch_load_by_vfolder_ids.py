@@ -12,12 +12,13 @@ behavior matrix the test covers:
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
@@ -255,6 +256,19 @@ class TestBatchLoadByVFolderIds:
             ),
         )
 
+    async def _set_created_at(
+        self,
+        db: ExtendedAsyncSAEngine,
+        card_id: uuid.UUID,
+        created_at: datetime,
+    ) -> None:
+        async with db.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(ModelCardRow)
+                .where(ModelCardRow.id == card_id)
+                .values(created_at=created_at)
+            )
+
     async def test_groups_cards_per_vfolder_in_input_order(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -275,7 +289,7 @@ class TestBatchLoadByVFolderIds:
                 vfolder=single_vfolder,
             )
         )
-        first_sibling = await db_source.create(
+        older_sibling = await db_source.create(
             self._build_creator(
                 test_domain=test_domain,
                 test_user=test_user,
@@ -283,19 +297,21 @@ class TestBatchLoadByVFolderIds:
                 vfolder=sibling_vfolder,
             )
         )
-        # Each ``create`` opens its own transaction; Postgres ``now()`` reflects
-        # the transaction start time at microsecond precision, so a brief sleep
-        # is enough to advance the timestamp and make the most-recent-first
-        # assertion deterministic without relying on the ``id`` tiebreaker
-        # (which would resolve to whichever random UUID happens to sort higher).
-        await asyncio.sleep(0.01)
-        second_sibling = await db_source.create(
+        newer_sibling = await db_source.create(
             self._build_creator(
                 test_domain=test_domain,
                 test_user=test_user,
                 test_group=test_group,
                 vfolder=sibling_vfolder,
             )
+        )
+        # Pin ``created_at`` so the most-recent-first order is deterministic
+        # regardless of how close together the rows were inserted.
+        await self._set_created_at(
+            db_with_cleanup, older_sibling.id, datetime(2026, 1, 1, tzinfo=UTC)
+        )
+        await self._set_created_at(
+            db_with_cleanup, newer_sibling.id, datetime(2026, 1, 2, tzinfo=UTC)
         )
 
         result = await db_source.batch_load_by_vfolder_ids([
@@ -307,11 +323,7 @@ class TestBatchLoadByVFolderIds:
         assert len(result) == 3
         assert result[0] == []
         assert [card.id for card in result[1]] == [single_card.id]
-
-        sibling_ids = [card.id for card in result[2]]
-        assert set(sibling_ids) == {first_sibling.id, second_sibling.id}
-        # The newer card appears first.
-        assert sibling_ids[0] == second_sibling.id
+        assert [card.id for card in result[2]] == [newer_sibling.id, older_sibling.id]
 
     async def test_empty_input_returns_empty_list(
         self,

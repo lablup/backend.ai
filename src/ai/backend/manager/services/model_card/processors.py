@@ -55,7 +55,7 @@ class ModelCardProcessors(AbstractProcessorPackage):
     ]
     scan: ActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
     available_presets: ActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
-    batch_load_by_vfolder_ids: ActionProcessor[
+    batch_load_model_cards_by_vfolder_ids: ActionProcessor[
         BatchLoadModelCardsByVFolderIdsAction,
         BatchLoadModelCardsByVFolderIdsActionResult,
     ]
@@ -80,7 +80,7 @@ class ModelCardProcessors(AbstractProcessorPackage):
         )
         self.scan = ActionProcessor(service.scan, action_monitors)
         self.available_presets = ActionProcessor(service.available_presets, action_monitors)
-        self.batch_load_by_vfolder_ids = ActionProcessor(
+        self.batch_load_model_cards_by_vfolder_ids = ActionProcessor(
             service.batch_load_by_vfolder_ids, action_monitors
         )
 
