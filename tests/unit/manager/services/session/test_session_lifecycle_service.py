@@ -1028,6 +1028,173 @@ class TestCreateFromParams:
         with pytest.raises(QuotaExceeded):
             await session_service.create_from_params(action)
 
+    async def test_uuid_keyed_mount_fields_propagate_to_agent_registry(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+    ) -> None:
+        """BA-5916: by the time the action reaches the service, the REST
+        handler has already converted any legacy name-keyed ``mounts`` /
+        ``mount_map`` / ``mount_options`` into UUID-keyed ``mount_ids`` /
+        ``mount_id_map`` / ``mount_options``. The service is name-agnostic
+        and just hands the resolved config to ``agent_registry.create_session``.
+        """
+        new_session_id = str(uuid4())
+        vfid_a = uuid4()
+        vfid_b = uuid4()
+        mock_session_repository.query_userinfo = AsyncMock(
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
+        )
+        mock_image_row = MagicMock()
+        mock_image_row.image_ref = MagicMock()
+        mock_session_repository.resolve_image = AsyncMock(return_value=mock_image_row)
+        mock_agent_registry.create_session = AsyncMock(return_value={"sessionId": new_session_id})
+
+        resolved_config = {
+            "mount_ids": [vfid_a, vfid_b],
+            "mount_id_map": {vfid_a: "/data", vfid_b: "/extra"},
+            "mount_options": {vfid_a: {"permission": "ro"}},
+        }
+        action = CreateFromParamsAction(
+            params=CreateFromParamsActionParams(
+                session_name="mount-session",
+                image="python:latest",
+                architecture="x86_64",
+                session_type=SessionTypes.INTERACTIVE,
+                group_name="default",
+                domain_name="default",
+                cluster_size=1,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                config=resolved_config,
+                tag="",
+                priority=0,
+                is_preemptible=True,
+                owner_access_key=sample_access_key,
+                enqueue_only=False,
+                max_wait_seconds=0,
+                starts_at=None,
+                reuse_if_exists=False,
+                startup_command=None,
+                batch_timeout=None,
+                bootstrap_script=None,
+                dependencies=None,
+                callback_url=None,
+            ),
+            user_id=sample_user_id,
+            user_role=UserRole.USER,
+            sudo_session_enabled=False,
+            requester_access_key=sample_access_key,
+            keypair_resource_policy=None,
+        )
+
+        await session_service.create_from_params(action)
+
+        mock_agent_registry.create_session.assert_called_once()
+        bound = inspect.signature(AgentRegistry.create_session).bind(
+            None,
+            *mock_agent_registry.create_session.call_args.args,
+            **mock_agent_registry.create_session.call_args.kwargs,
+        )
+        passed_config = bound.arguments["config"]
+        assert passed_config["mount_ids"] == [vfid_a, vfid_b]
+        assert passed_config["mount_id_map"] == {vfid_a: "/data", vfid_b: "/extra"}
+        assert passed_config["mount_options"] == {vfid_a: {"permission": "ro"}}
+        # Legacy name-keyed surfaces have already been stripped by the
+        # handler and must not reappear here.
+        assert "mounts" not in passed_config
+        assert "mount_map" not in passed_config
+
+    async def test_legacy_name_keyed_mounts_pass_through_unchanged(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+    ) -> None:
+        """If the action ever reaches the service still carrying legacy
+        name-keyed ``mounts`` / ``mount_map`` / ``mount_options`` (e.g. an
+        internal caller that bypassed the REST handler), the service must
+        not silently rewrite them — name-to-UUID resolution is the
+        handler's responsibility, and the service must remain
+        name-agnostic.
+        """
+        new_session_id = str(uuid4())
+        mock_session_repository.query_userinfo = AsyncMock(
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
+        )
+        mock_image_row = MagicMock()
+        mock_image_row.image_ref = MagicMock()
+        mock_session_repository.resolve_image = AsyncMock(return_value=mock_image_row)
+        mock_agent_registry.create_session = AsyncMock(return_value={"sessionId": new_session_id})
+
+        legacy_config = {
+            "mounts": ["vf-a"],
+            "mount_map": {"vf-a": "/data"},
+            "mount_options": {"vf-a": {"permission": "ro"}},
+        }
+        action = CreateFromParamsAction(
+            params=CreateFromParamsActionParams(
+                session_name="legacy-mount-session",
+                image="python:latest",
+                architecture="x86_64",
+                session_type=SessionTypes.INTERACTIVE,
+                group_name="default",
+                domain_name="default",
+                cluster_size=1,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                config=legacy_config,
+                tag="",
+                priority=0,
+                is_preemptible=True,
+                owner_access_key=sample_access_key,
+                enqueue_only=False,
+                max_wait_seconds=0,
+                starts_at=None,
+                reuse_if_exists=False,
+                startup_command=None,
+                batch_timeout=None,
+                bootstrap_script=None,
+                dependencies=None,
+                callback_url=None,
+            ),
+            user_id=sample_user_id,
+            user_role=UserRole.USER,
+            sudo_session_enabled=False,
+            requester_access_key=sample_access_key,
+            keypair_resource_policy=None,
+        )
+
+        await session_service.create_from_params(action)
+
+        bound = inspect.signature(AgentRegistry.create_session).bind(
+            None,
+            *mock_agent_registry.create_session.call_args.args,
+            **mock_agent_registry.create_session.call_args.kwargs,
+        )
+        passed_config = bound.arguments["config"]
+        # Service did not perform any name resolution.
+        assert passed_config["mounts"] == ["vf-a"]
+        assert passed_config["mount_map"] == {"vf-a": "/data"}
+        assert passed_config["mount_options"] == {"vf-a": {"permission": "ro"}}
+        assert "mount_ids" not in passed_config
+        assert "mount_id_map" not in passed_config
+
     async def test_owner_access_key_uses_owner_user_scope(
         self,
         session_service: SessionService,
