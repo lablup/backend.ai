@@ -77,7 +77,7 @@ async def delete_vfolder_v2(
 async def purge_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
-    cascade_model_card: bool | None = None,
+    cascade_model_card: bool = False,
 ) -> PurgeVFolderPayloadGQL:
     payload = await info.context.adapters.vfolder.purge(
         vfolder_id,

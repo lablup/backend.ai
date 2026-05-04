@@ -305,9 +305,7 @@ class DeleteVFolderPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     name="PurgeVFolderV2Payload",
 )
 class PurgeVFolderPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
-    vfolder: VFolderGQL = gql_field(
-        description="The vfolder whose data was permanently purged.",
-    )
+    id: UUID = gql_field(description="ID of the purged virtual folder.")
 
 
 @gql_pydantic_type(
@@ -449,12 +447,11 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
 )
 class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
     ids: list[UUID] = gql_field(description="List of VFolder UUIDs to purge.")
-    cascade_model_card: bool | None = gql_field(
-        default=None,
+    cascade_model_card: bool = gql_field(
+        default=False,
         description=(
             "If true, also delete model card record(s) referencing the vfolders. "
-            "Defaults to false; the request is then rejected per-vfolder when any "
-            "model card still references one."
+            "If false, the request is rejected per-vfolder when any model card still references one."
         ),
     )
 

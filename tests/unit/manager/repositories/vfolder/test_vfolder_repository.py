@@ -28,7 +28,11 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.errors.storage import VFolderFilterStatusFailed, VFolderNotFound
+from ai.backend.manager.errors.storage import (
+    VFolderFilterStatusFailed,
+    VFolderHasLinkedModelCard,
+    VFolderNotFound,
+)
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -56,6 +60,10 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot.row import (
+    ModelCardResourceRequirementRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
@@ -66,7 +74,11 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder import (
+    VFolderInvitationRow,
+    VFolderPermissionRow,
+    VFolderRow,
+)
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
@@ -842,6 +854,361 @@ class TestVfolderRepositoryPurge:
 
         # Verify vfolder still exists in DB (not deleted)
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
+
+
+class TestVfolderRepositoryDeleteForever:
+    """Tests for VfolderRepository.delete_vfolders_forever() with cascade_model_card."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                VFolderInvitationRow,
+                VFolderPermissionRow,
+                ResourceSlotTypeRow,
+                ModelCardRow,
+                ModelCardResourceRequirementRow,
+                EntityFieldRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+        return domain_name
+
+    @pytest.fixture
+    async def test_user_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+        return policy_name
+
+    @pytest.fixture
+    async def test_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+    ) -> uuid.UUID:
+        user_uuid = uuid.uuid4()
+        password_info = PasswordInfo(
+            password="dummy",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=600_000,
+            salt_size=32,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"testuser-{user_uuid.hex[:8]}",
+                    email=f"test-{user_uuid.hex[:8]}@example.com",
+                    password=password_info,
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name=test_domain_name,
+                    role=UserRole.USER,
+                    resource_policy=test_user_resource_policy_name,
+                )
+            )
+            await db_sess.flush()
+        return user_uuid
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_network_count=3,
+                )
+            )
+            await db_sess.flush()
+        return policy_name
+
+    @pytest.fixture
+    async def test_project_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"test-project-{project_id.hex[:8]}",
+                    domain_name=test_domain_name,
+                    is_active=True,
+                    type=ProjectType.GENERAL,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                )
+            )
+            await db_sess.flush()
+        return project_id
+
+    @pytest.fixture
+    async def vfolder_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> VfolderRepository:
+        return VfolderRepository(db=db_with_cleanup)
+
+    async def _create_vfolder(
+        self,
+        db: ExtendedAsyncSAEngine,
+        *,
+        domain_name: str,
+        user_id: uuid.UUID,
+        status: VFolderOperationStatus = VFolderOperationStatus.DELETE_PENDING,
+    ) -> uuid.UUID:
+        vfolder_id = uuid.uuid4()
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    name=f"test-vfolder-{vfolder_id.hex[:8]}",
+                    host="local:volume1",
+                    domain_name=domain_name,
+                    quota_scope_id=f"user:{user_id}",
+                    usage_mode=VFolderUsageMode.GENERAL,
+                    permission=VFolderMountPermission.READ_WRITE,
+                    max_files=0,
+                    max_size=None,
+                    num_files=0,
+                    cur_size=0,
+                    creator=f"test-{user_id.hex[:8]}@example.com",
+                    unmanaged_path=None,
+                    ownership_type=VFolderOwnershipType.USER,
+                    user=user_id,
+                    group=None,
+                    cloneable=False,
+                    status=status,
+                )
+            )
+            await db_sess.flush()
+        return vfolder_id
+
+    async def _create_model_card(
+        self,
+        db: ExtendedAsyncSAEngine,
+        *,
+        vfolder_id: uuid.UUID,
+        domain_name: str,
+        project_id: uuid.UUID,
+        creator_id: uuid.UUID,
+    ) -> uuid.UUID:
+        card_id = uuid.uuid4()
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                ModelCardRow(
+                    id=card_id,
+                    name=f"mc-{card_id.hex[:8]}",
+                    vfolder=vfolder_id,
+                    domain=domain_name,
+                    project=project_id,
+                    creator=creator_id,
+                )
+            )
+            await db_sess.flush()
+        return card_id
+
+    async def _vfolder_status(
+        self,
+        db: ExtendedAsyncSAEngine,
+        vfolder_id: uuid.UUID,
+    ) -> VFolderOperationStatus | None:
+        async with db.begin_readonly_session() as session:
+            return (
+                await session.execute(
+                    sa.select(VFolderRow.status).where(VFolderRow.id == vfolder_id)
+                )
+            ).scalar_one_or_none()
+
+    async def _model_card_exists(
+        self,
+        db: ExtendedAsyncSAEngine,
+        card_id: uuid.UUID,
+    ) -> bool:
+        async with db.begin_readonly_session() as session:
+            row = (
+                await session.execute(sa.select(ModelCardRow.id).where(ModelCardRow.id == card_id))
+            ).scalar_one_or_none()
+            return row is not None
+
+    async def test_no_linked_card_succeeds(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        assert len(result.succeeded) == 1
+        assert result.succeeded[0].id == vfolder_id
+        assert result.failures == []
+        assert (
+            await self._vfolder_status(db_with_cleanup, vfolder_id)
+            == VFolderOperationStatus.DELETE_ONGOING
+        )
+
+    async def test_linked_card_without_cascade_returns_failure(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_project_id: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+        )
+        card_id = await self._create_model_card(
+            db_with_cleanup,
+            vfolder_id=vfolder_id,
+            domain_name=test_domain_name,
+            project_id=test_project_id,
+            creator_id=test_user,
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        assert result.succeeded == []
+        assert len(result.failures) == 1
+        assert result.failures[0].vfolder_id == vfolder_id
+        assert isinstance(result.failures[0].exception, VFolderHasLinkedModelCard)
+        # vfolder + card both untouched
+        assert (
+            await self._vfolder_status(db_with_cleanup, vfolder_id)
+            == VFolderOperationStatus.DELETE_PENDING
+        )
+        assert await self._model_card_exists(db_with_cleanup, card_id)
+
+    async def test_linked_card_with_cascade_succeeds_and_removes_card(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_project_id: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+        )
+        card_id = await self._create_model_card(
+            db_with_cleanup,
+            vfolder_id=vfolder_id,
+            domain_name=test_domain_name,
+            project_id=test_project_id,
+            creator_id=test_user,
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever(
+            [vfolder_id], cascade_model_card=True
+        )
+
+        assert len(result.succeeded) == 1
+        assert result.succeeded[0].id == vfolder_id
+        assert result.failures == []
+        assert (
+            await self._vfolder_status(db_with_cleanup, vfolder_id)
+            == VFolderOperationStatus.DELETE_ONGOING
+        )
+        assert not await self._model_card_exists(db_with_cleanup, card_id)
+
+    async def test_mixed_batch_partitions_results(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_project_id: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        plain_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+        )
+        carded_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+        )
+        card_id = await self._create_model_card(
+            db_with_cleanup,
+            vfolder_id=carded_id,
+            domain_name=test_domain_name,
+            project_id=test_project_id,
+            creator_id=test_user,
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever([plain_id, carded_id])
+
+        assert [d.id for d in result.succeeded] == [plain_id]
+        assert len(result.failures) == 1
+        assert result.failures[0].vfolder_id == carded_id
+        assert (
+            await self._vfolder_status(db_with_cleanup, plain_id)
+            == VFolderOperationStatus.DELETE_ONGOING
+        )
+        assert (
+            await self._vfolder_status(db_with_cleanup, carded_id)
+            == VFolderOperationStatus.DELETE_PENDING
+        )
+        assert await self._model_card_exists(db_with_cleanup, card_id)
 
 
 class TestVFolderRepositoryTrashAndRestore:

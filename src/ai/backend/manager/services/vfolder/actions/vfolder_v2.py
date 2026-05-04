@@ -7,7 +7,6 @@ from typing import override
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.services.vfolder.actions.base import (
     VFolderSingleEntityAction,
     VFolderSingleEntityActionResult,
@@ -89,12 +88,12 @@ class PurgeVFolderV2Action(VFolderSingleEntityAction):
 
 @dataclass
 class PurgeVFolderV2ActionResult(VFolderSingleEntityActionResult):
-    vfolder: VFolderData
+    vfolder_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.vfolder.id)
+        return str(self.vfolder_id)
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.vfolder.id)
+        return str(self.vfolder_id)

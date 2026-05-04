@@ -438,10 +438,10 @@ class VFolderAdapter(BaseAdapter):
         """Permanently delete a vfolder, optionally cascading linked model cards."""
         action = PurgeVFolderV2Action(
             vfolder_id=vfolder_id,
-            cascade_model_card=bool(input.cascade_model_card),
+            cascade_model_card=input.cascade_model_card,
         )
-        result = await self._processors.vfolder.purge_v2.wait_for_complete(action)
-        return PurgeVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+        await self._processors.vfolder.purge_v2.wait_for_complete(action)
+        return PurgeVFolderPayload(id=vfolder_id)
 
     async def deploy(
         self,
@@ -535,11 +535,10 @@ class VFolderAdapter(BaseAdapter):
         Aborts on the first failure; ``purged_count`` reports the full input size
         only when every vfolder succeeded.
         """
-        cascade = bool(input.cascade_model_card)
         for vfolder_id in input.ids:
             action = PurgeVFolderV2Action(
                 vfolder_id=vfolder_id,
-                cascade_model_card=cascade,
+                cascade_model_card=input.cascade_model_card,
             )
             await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return BulkPurgeVFoldersPayload(purged_count=len(input.ids))

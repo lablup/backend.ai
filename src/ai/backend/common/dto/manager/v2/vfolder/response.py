@@ -132,7 +132,7 @@ class DeleteVFolderPayload(BaseResponseModel):
 class PurgeVFolderPayload(BaseResponseModel):
     """Payload for virtual folder purge mutation result."""
 
-    vfolder: VFolderNode = Field(description="The vfolder whose data was permanently purged.")
+    id: UUID = Field(description="ID of the purged virtual folder.")
 
 
 class BulkDeleteVFoldersPayload(BaseResponseModel):
