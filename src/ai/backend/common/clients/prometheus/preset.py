@@ -1,7 +1,39 @@
+import re
 from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Self
+
+from ai.backend.common.exception import InvalidMetricPresetTemplate
+
+_PLACEHOLDER_NAMES = frozenset({"labels", "window", "group_by"})
+_BRACE_BLOCK_RE = re.compile(r"\{([^{}]*)\}")
+# Matches `$ident` / `${ident}` — foreign template syntax (Grafana, shell, etc.)
+# that Backend.AI does not substitute and Prometheus would reject.
+_UNSUPPORTED_TEMPLATE_VAR_RE = re.compile(r"\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*")
+
+
+def validate_query_template(template: str) -> None:
+    """Reject templates with foreign variables or malformed braces."""
+    unsupported_vars = _UNSUPPORTED_TEMPLATE_VAR_RE.findall(template)
+    if unsupported_vars:
+        raise InvalidMetricPresetTemplate(
+            f"Unsupported template variables: {unsupported_vars}. "
+            "Use placeholders {labels}, {window}, {group_by} or literal PromQL values."
+        )
+    # Check for malformed braces by attempting to render with dummy values.
+    MetricPreset(template=template).render()
+
+
+def _escape_non_placeholders(template: str) -> str:
+    # PromQL label matchers `{key=...}` collide with str.format placeholders;
+    # escape any non-placeholder `{...}` block so .format treats it as literal.
+    def repl(match: re.Match[str]) -> str:
+        if match.group(1) in _PLACEHOLDER_NAMES:
+            return match.group(0)
+        return "{{" + match.group(1) + "}}"
+
+    return _BRACE_BLOCK_RE.sub(repl, template)
 
 
 class LabelOperator(StrEnum):
@@ -34,7 +66,7 @@ def _escape_label_value(value: str) -> str:
 
 @dataclass(frozen=True)
 class MetricPreset:
-    """PromQL query preset with template and injectable values."""
+    """PromQL query preset with template (placeholders: {labels}, {window}, {group_by})."""
 
     # PromQL template (placeholders: {labels}, {window}, {group_by})
     template: str
@@ -54,8 +86,13 @@ class MetricPreset:
             f'{key}{value.operator}"{_escape_label_value(value.value)}"'
             for key, value in self.labels.items()
         )
-        return self.template.format(
-            labels=label_str,
-            window=self.window,
-            group_by=",".join(sorted(self.group_by)),  # sorted for consistency
-        )
+        try:
+            return _escape_non_placeholders(self.template).format(
+                labels=label_str,
+                window=self.window,
+                group_by=",".join(sorted(self.group_by)),
+            )
+        except (ValueError, KeyError, IndexError) as e:
+            raise InvalidMetricPresetTemplate(
+                f"Failed to render PromQL template ({type(e).__name__}: {e}): {self.template!r}"
+            ) from e

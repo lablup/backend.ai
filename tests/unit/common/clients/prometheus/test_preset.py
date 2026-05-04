@@ -2,7 +2,12 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.clients.prometheus import LabelMatcher, MetricPreset
+from ai.backend.common.clients.prometheus import (
+    LabelMatcher,
+    MetricPreset,
+    validate_query_template,
+)
+from ai.backend.common.exception import InvalidMetricPresetTemplate
 
 
 @dataclass
@@ -97,6 +102,35 @@ class TestMetricPresetRender:
                 window="",
                 expected='my_metric{kernel_id=~"kernel-1|kernel-2"}',
             ),
+            # Regression: original bug — `!=` in label matcher was parsed as
+            # str.format conversion specifier and raised ValueError.
+            RenderTestCase(
+                id="raw_label_matcher_passes_through",
+                template='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
+                labels={},
+                group_by=frozenset(),
+                window="",
+                expected='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
+            ),
+            # Raw matcher coexists with all placeholders + label injection.
+            RenderTestCase(
+                id="raw_matcher_with_all_placeholders",
+                template='sum by ({group_by})(rate(metric{mode!="idle"}{{{labels}}}[{window}]))',
+                labels={"job": LabelMatcher.exact("api")},
+                group_by=frozenset({"instance"}),
+                window="5m",
+                expected='sum by (instance)(rate(metric{mode!="idle"}{job="api"}[5m]))',
+            ),
+            # Grafana paste with no {labels} placeholder — provided labels must
+            # be silently ignored, raw matcher must survive.
+            RenderTestCase(
+                id="raw_template_ignores_provided_labels",
+                template='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
+                labels={"job": LabelMatcher.exact("api")},
+                group_by=frozenset({"instance"}),
+                window="5m",
+                expected='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
+            ),
         ],
         ids=lambda c: c.id,
     )
@@ -111,3 +145,58 @@ class TestMetricPresetRender:
         result = preset.render()
 
         assert result == case.expected
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            pytest.param("metric}", id="orphan_close_brace"),
+            pytest.param("metric{", id="orphan_open_brace"),
+            pytest.param("metric{a{b}c}", id="nested_braces"),
+        ],
+    )
+    async def test_render_raises_on_malformed_template(self, template: str) -> None:
+        preset = MetricPreset(template=template)
+
+        with pytest.raises(InvalidMetricPresetTemplate):
+            preset.render()
+
+
+class TestValidateQueryTemplate:
+    """Tests for validate_query_template() called from Pydantic field validators."""
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            pytest.param('rate(node_cpu_seconds_total{mode!="idle"}[5m])', id="raw_promql"),
+            pytest.param(
+                "sum by ({group_by})(metric{{{labels}}}[{window}])", id="with_placeholders"
+            ),
+            pytest.param('count(metric{a="1",b=~"x|y"})', id="multiple_matchers"),
+        ],
+    )
+    def test_accepts_valid_template(self, template: str) -> None:
+        validate_query_template(template)
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            pytest.param('rate(metric{mode!="idle"}[$__rate_interval])', id="grafana_builtin"),
+            pytest.param('metric{job="$service"}', id="dollar_identifier"),
+            pytest.param('metric{region="${region}"}', id="braced_dollar_var"),
+        ],
+    )
+    def test_rejects_unsupported_template_variables(self, template: str) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            validate_query_template(template)
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            pytest.param("metric}", id="orphan_close_brace"),
+            pytest.param("metric{", id="orphan_open_brace"),
+            pytest.param("metric{a{b}c}", id="nested_braces"),
+        ],
+    )
+    def test_rejects_malformed_template(self, template: str) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate):
+            validate_query_template(template)
