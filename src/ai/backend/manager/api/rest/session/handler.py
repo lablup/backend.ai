@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, cast
@@ -170,6 +171,9 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
 )
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesAction,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -229,6 +233,51 @@ def _validate_creation_config(
         ) from e
 
 
+def _merge_resolved_legacy_mounts(
+    creation_config: dict[str, Any],
+    name_to_id: dict[str, UUID],
+) -> dict[str, Any]:
+    """Merge a ``name → UUID`` resolution into the UUID-keyed buckets of
+    ``creation_config`` and drop the now-resolved name-keyed legacy keys.
+
+    The resolved ids are appended to ``mount_ids`` (skipping duplicates),
+    and entries from the name-keyed ``mount_map`` / ``mount_options``
+    dicts are re-keyed onto the resolved UUIDs without overwriting an
+    explicit UUID-keyed entry the caller already supplied.
+    """
+    if not name_to_id:
+        return creation_config
+
+    merged_mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
+    existing_uuid_set: set[UUID] = set()
+    for rid in merged_mount_ids:
+        try:
+            existing_uuid_set.add(UUID(str(rid)))
+        except (ValueError, TypeError):
+            continue
+    merged_mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
+    merged_mount_options: dict[Any, Any] = dict(creation_config.get("mount_options") or {})
+    legacy_mount_map = creation_config.get("mount_map") or {}
+    legacy_mount_options = creation_config.get("mount_options") or {}
+
+    for name, vfid in name_to_id.items():
+        if vfid not in existing_uuid_set:
+            merged_mount_ids.append(vfid)
+            existing_uuid_set.add(vfid)
+        if (dst := legacy_mount_map.get(name)) and vfid not in merged_mount_id_map:
+            merged_mount_id_map[vfid] = dst
+        if (opts := legacy_mount_options.get(name)) and vfid not in merged_mount_options:
+            merged_mount_options[vfid] = opts
+
+    next_config = dict(creation_config)
+    next_config["mount_ids"] = merged_mount_ids
+    next_config["mount_id_map"] = merged_mount_id_map
+    next_config["mount_options"] = merged_mount_options
+    next_config.pop("mounts", None)
+    next_config.pop("mount_map", None)
+    return next_config
+
+
 class SessionHandler:
     """Session API handler with constructor-injected dependencies."""
 
@@ -246,6 +295,78 @@ class SessionHandler:
         self._agent = agent
         self._vfolder = vfolder
         self._config_provider = config_provider
+
+    async def _resolve_legacy_name_mounts(
+        self,
+        mounts: Sequence[str],
+        mount_map: Mapping[str, str],
+        mount_options: Mapping[str, Any],
+    ) -> dict[str, UUID]:
+        """Resolve legacy v1 CLI name-keyed mount surfaces into a unified
+        ``name → UUID`` mapping.
+
+        ``mounts`` (list of names), ``mount_map`` (dict keyed by name), and
+        ``mount_options`` (dict keyed by name) are all name-based legacy
+        inputs populated together by ``-v`` on the v1 CLI; they must be
+        re-keyed onto UUIDs together so a name that appears only in
+        ``mount_map`` or ``mount_options`` is not silently dropped
+        downstream.
+
+        Subpath syntax (``name/subdir``) is rejected here because
+        :class:`MountInfoEntry` carries no subpath field; silently dropping
+        it would mount the wrong directory. Subpath mounts must use the
+        UUID-keyed surface where the storage proxy handles vfsubpath
+        separately.
+
+        Merging the resolved ids/maps back into ``creation_config`` is the
+        caller's responsibility — see :func:`_merge_resolved_legacy_mounts`.
+        """
+        if not mounts and not mount_map and not mount_options:
+            return {}
+
+        subpath_entries = [m for m in mounts if "/" in str(m)]
+        if subpath_entries:
+            raise InvalidAPIParameters(
+                "Legacy 'mounts' field with subpath syntax "
+                f"({subpath_entries}) is not supported. "
+                "Use UUID-keyed 'mount_ids' / 'mount_id_map' instead."
+            )
+
+        names_to_resolve: list[str] = []
+        seen: set[str] = set()
+
+        # ``mounts`` and ``mount_map`` are strictly name-keyed legacy
+        # surfaces — every entry is treated as a vfolder name.
+        for raw in list(mounts) + list(mount_map.keys()):
+            name = str(raw)
+            if name in seen:
+                continue
+            seen.add(name)
+            names_to_resolve.append(name)
+
+        # ``mount_options`` is the single polymorphic field shared by
+        # both legacy (name-keyed) and modern (UUID-string-keyed)
+        # callers; skip keys that already parse as UUID strings since
+        # they are not vfolder names to resolve.
+        for raw in mount_options.keys():
+            name = str(raw)
+            if name in seen:
+                continue
+            try:
+                UUID(name)
+                continue
+            except (ValueError, TypeError):
+                pass
+            seen.add(name)
+            names_to_resolve.append(name)
+
+        if not names_to_resolve:
+            return {}
+
+        result = await self._vfolder.resolve_vfolder_ids_by_names.wait_for_complete(
+            ResolveIdsByNamesAction(vfolder_names=names_to_resolve)
+        )
+        return dict(result.name_to_id)
 
     # ------------------------------------------------------------------
     # create_from_template (POST /_/create-from-template)
@@ -268,6 +389,15 @@ class SessionHandler:
             params.config,
             template=True,
         )
+
+        legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
+        legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
+        legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
+        if legacy_mounts or legacy_mount_map or legacy_mount_options:
+            name_to_id = await self._resolve_legacy_name_mounts(
+                legacy_mounts, legacy_mount_map, legacy_mount_options
+            )
+            validated_config = _merge_resolved_legacy_mounts(validated_config, name_to_id)
 
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
@@ -370,6 +500,15 @@ class SessionHandler:
 
         api_version = request["api_version"]
         validated_config = _validate_creation_config(api_version, params.config)
+
+        legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
+        legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
+        legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
+        if legacy_mounts or legacy_mount_map or legacy_mount_options:
+            name_to_id = await self._resolve_legacy_name_mounts(
+                legacy_mounts, legacy_mount_map, legacy_mount_options
+            )
+            validated_config = _merge_resolved_legacy_mounts(validated_config, name_to_id)
 
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
