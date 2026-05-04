@@ -137,7 +137,11 @@ from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
 
-from .resource_slot import AllocatedResourceSlotGQL
+from .resource_slot import (
+    AllocatedResourceSlotFilterGQL,
+    AllocatedResourceSlotGQL,
+    AllocatedResourceSlotOrderByGQL,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.image.types import ImageV2GQL
@@ -507,6 +511,8 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],
+        filter: AllocatedResourceSlotFilterGQL | None = None,
+        order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
     ) -> list[AllocatedResourceSlotGQL]:
         from ai.backend.common.dto.manager.v2.resource_slot.request import (
             SearchAllocatedResourceSlotsInput,
@@ -514,7 +520,11 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
         payload = await info.context.adapters.deployment.search_revision_resource_slots(
             revision_id=UUID(str(self.id)),
-            input=SearchAllocatedResourceSlotsInput(limit=10000),
+            input=SearchAllocatedResourceSlotsInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                limit=10000,
+            ),
         )
         return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
 

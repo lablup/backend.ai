@@ -87,7 +87,9 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
     RollingUpdateConfigInputGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.resource_slot import (
+    AllocatedResourceSlotFilterGQL,
     AllocatedResourceSlotGQL,
+    AllocatedResourceSlotOrderByGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelDefinitionGQL,
@@ -305,6 +307,8 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],
+        filter: AllocatedResourceSlotFilterGQL | None = None,
+        order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
     ) -> list[AllocatedResourceSlotGQL]:
         from ai.backend.common.dto.manager.v2.resource_slot.request import (
             SearchAllocatedResourceSlotsInput,
@@ -312,7 +316,11 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
 
         payload = await info.context.adapters.deployment_revision_preset.search_resource_slots(
             preset_id=UUID(self.id),
-            input=SearchAllocatedResourceSlotsInput(limit=10000),
+            input=SearchAllocatedResourceSlotsInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                limit=10000,
+            ),
         )
         return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
 
