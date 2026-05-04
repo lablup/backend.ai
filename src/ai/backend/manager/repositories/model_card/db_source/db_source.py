@@ -111,10 +111,14 @@ class ModelCardDBSource:
         if not vfolder_ids:
             return []
         async with self._db.begin_readonly_session() as session:
+            # ``id`` tiebreaks cards that share a ``created_at`` (e.g. siblings
+            # written by ``bulk_upsert_scan`` in one statement) so the per-vfolder
+            # order is stable across requests, matching the tiebreaker used by
+            # ``_model_card_pagination_spec``.
             stmt = (
                 sa.select(ModelCardRow)
                 .where(ModelCardRow.vfolder.in_(list(vfolder_ids)))
-                .order_by(ModelCardRow.created_at.desc())
+                .order_by(ModelCardRow.created_at.desc(), ModelCardRow.id.desc())
             )
             rows = (await session.execute(stmt)).scalars().all()
             cards_by_vfolder: dict[VFolderUUID, list[ModelCardData]] = {}

@@ -283,9 +283,11 @@ class TestBatchLoadByVFolderIds:
                 vfolder=sibling_vfolder,
             )
         )
-        # ``created_at`` is timestamped server-side at second precision in some
-        # environments. Sleep briefly so the second card is unambiguously newer
-        # and the most-recent-first ordering is testable.
+        # Each ``create`` opens its own transaction; Postgres ``now()`` reflects
+        # the transaction start time at microsecond precision, so a brief sleep
+        # is enough to advance the timestamp and make the most-recent-first
+        # assertion deterministic without relying on the ``id`` tiebreaker
+        # (which would resolve to whichever random UUID happens to sort higher).
         await asyncio.sleep(0.01)
         second_sibling = await db_source.create(
             self._build_creator(
