@@ -16,6 +16,10 @@ from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
     AvailablePresetsActionResult,
 )
+from ai.backend.manager.services.model_card.actions.bulk_delete import (
+    BulkDeleteModelCardAction,
+    BulkDeleteModelCardActionResult,
+)
 from ai.backend.manager.services.model_card.actions.create import (
     CreateModelCardAction,
     CreateModelCardActionResult,
@@ -70,8 +74,14 @@ class ModelCardService:
         return UpdateModelCardActionResult(model_card=data)
 
     async def delete(self, action: DeleteModelCardAction) -> DeleteModelCardActionResult:
-        data = await self._repository.delete(action.id, action.options)
-        return DeleteModelCardActionResult(model_card=data)
+        data = await self._repository.delete(action.purger, action.vfolder_trash_spec)
+        return DeleteModelCardActionResult(data=data)
+
+    async def bulk_delete(
+        self, action: BulkDeleteModelCardAction
+    ) -> BulkDeleteModelCardActionResult:
+        data = await self._repository.bulk_delete(action.purgers, action.vfolder_trash_spec)
+        return BulkDeleteModelCardActionResult(data=data)
 
     async def search(self, action: SearchModelCardsAction) -> SearchModelCardsActionResult:
         result = await self._repository.search(action.querier)

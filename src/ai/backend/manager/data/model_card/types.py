@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
@@ -39,6 +39,22 @@ class ModelCardData:
     access_level: str
     created_at: datetime
     updated_at: datetime | None
+
+
+@dataclass(frozen=True)
+class BulkModelCardDeleteFailure:
+    """Error info for a single failed model card delete inside a bulk operation."""
+
+    card_id: UUID
+    exception: Exception
+
+
+@dataclass(frozen=True)
+class BulkModelCardDeleteResultData:
+    """Result of bulk model card delete operation, with partial-failure support."""
+
+    successes: list[ModelCardData] = field(default_factory=list)
+    failures: list[BulkModelCardDeleteFailure] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -7,14 +7,19 @@ from uuid import UUID
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
-from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.model_card.types import ModelCardData, VFolderScanData
+from ai.backend.manager.data.model_card.types import (
+    BulkModelCardDeleteResultData,
+    ModelCardData,
+    VFolderScanData,
+)
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.base.updater import Updater, UpdaterSpec
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
     ModelCardSearchResult,
@@ -44,10 +49,17 @@ class ModelCardRepository:
 
     async def delete(
         self,
-        card_id: UUID,
-        options: DeleteModelCardOptions,
+        purger: Purger[ModelCardRow],
+        vfolder_trash_spec: UpdaterSpec[VFolderRow] | None,
     ) -> ModelCardData:
-        return await self._db_source.delete(card_id, options)
+        return await self._db_source.delete(purger, vfolder_trash_spec)
+
+    async def bulk_delete(
+        self,
+        purgers: list[Purger[ModelCardRow]],
+        vfolder_trash_spec: UpdaterSpec[VFolderRow] | None,
+    ) -> BulkModelCardDeleteResultData:
+        return await self._db_source.bulk_delete(purgers, vfolder_trash_spec)
 
     async def search(
         self,
