@@ -238,9 +238,16 @@ class TestPayloadModels:
         assert payload.id == vid
 
     def test_purge_payload(self) -> None:
-        vid = uuid.uuid4()
-        payload = PurgeVFolderPayload(id=vid)
-        assert payload.id == vid
+        node = VFolderNode(
+            id=uuid.uuid4(),
+            status=VFolderOperationStatusField.READY,
+            host="nfs01",
+            metadata=_make_metadata_info(),
+            access_control=_make_access_control_info(),
+            ownership=_make_owner_info(),
+        )
+        payload = PurgeVFolderPayload(vfolder=node)
+        assert payload.vfolder.id == node.id
 
     def test_restore_payload(self) -> None:
         vid = uuid.uuid4()
