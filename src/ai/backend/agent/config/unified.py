@@ -1276,6 +1276,147 @@ class CommonContainerConfig(BaseConfigSchema):
     )
 
 
+class ContainerdNetworkMode(enum.StrEnum):
+    """Network policy for the containerd agent backend.
+
+    - ``managed``: Backend.AI generates and owns a CNI conflist
+      (``bridge`` + ``portmap``) inside ``cni_conf_dir``. Suitable for
+      standalone containerd nodes.
+    - ``host``: Operator (or k8s) manages CNI; agent uses an existing
+      conflist named ``network_name`` and only validates that the
+      ``portmap`` plugin is chained.
+    - ``none``: CRI ``PodSandbox`` is launched with ``host_network=true``;
+      CNI is bypassed entirely. Lowest-friction option, but loses port
+      isolation across concurrent sessions.
+    """
+
+    MANAGED = "managed"
+    HOST = "host"
+    NONE = "none"
+
+
+class ContainerdNetworkConfig(BaseConfigSchema):
+    """Network settings consumed by the containerd agent backend."""
+
+    mode: Annotated[
+        ContainerdNetworkMode,
+        Field(default=ContainerdNetworkMode.MANAGED),
+        BackendAIConfigMeta(
+            description=(
+                "How the containerd backend obtains a pod-sandbox network. "
+                "'managed' lets the agent generate its own CNI conflist; "
+                "'host' uses an operator-supplied conflist by name; "
+                "'none' bypasses CNI entirely (host network namespace)."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="managed", prod="host"),
+        ),
+    ]
+    cni_conf_dir: Annotated[
+        Path,
+        Field(
+            default=Path("/var/lib/backend.ai/agent/cni"),
+            validation_alias=AliasChoices("cni-conf-dir", "cni_conf_dir"),
+            serialization_alias="cni-conf-dir",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Directory holding CNI conflist files used by the agent. "
+                "In 'managed' mode the agent writes its conflist here; the operator must "
+                'configure containerd\'s [plugins."io.backendai.grpc.v1.cri".cni].conf_dir '
+                "to point at the same directory. Ignored when mode='none'."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(
+                local="/var/lib/backend.ai/agent/cni",
+                prod="/var/lib/backend.ai/agent/cni",
+            ),
+        ),
+    ]
+    cni_bin_dir: Annotated[
+        Path,
+        Field(
+            default=Path("/opt/cni/bin"),
+            validation_alias=AliasChoices("cni-bin-dir", "cni_bin_dir"),
+            serialization_alias="cni-bin-dir",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Directory holding CNI plugin binaries (bridge, portmap, host-local, "
+                "loopback). Provided by the host's containernetworking-plugins package. "
+                "Ignored when mode='none'."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="/opt/cni/bin", prod="/opt/cni/bin"),
+        ),
+    ]
+    network_name: Annotated[
+        str,
+        Field(
+            default="backendai",
+            validation_alias=AliasChoices("network-name", "network_name"),
+            serialization_alias="network-name",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "CNI network name. In 'managed' mode this becomes the 'name' field of the "
+                "generated conflist; in 'host' mode it must match the 'name' of an existing "
+                "conflist file in cni_conf_dir. Ignored when mode='none'."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="backendai", prod="cilium"),
+        ),
+    ]
+    bridge_name: Annotated[
+        str,
+        Field(
+            default="backendai-br0",
+            validation_alias=AliasChoices("bridge-name", "bridge_name"),
+            serialization_alias="bridge-name",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Linux bridge interface name created by the bridge CNI plugin. "
+                "Only used in 'managed' mode; ignored otherwise."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="backendai-br0", prod="backendai-br0"),
+        ),
+    ]
+    subnet: Annotated[
+        str,
+        Field(default="10.42.0.0/24"),
+        BackendAIConfigMeta(
+            description=(
+                "IPv4 CIDR allocated to containers on the managed bridge. "
+                "Only used in 'managed' mode; ignored otherwise."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="10.42.0.0/24", prod="10.42.0.0/24"),
+        ),
+    ]
+
+    @field_validator("subnet", mode="after")
+    @classmethod
+    def _validate_subnet_cidr(cls, subnet: str) -> str:
+        ipaddress.IPv4Network(subnet, strict=False)
+        return subnet
+
+
+class ContainerdContainerConfig(BaseConfigSchema):
+    """Container-level settings specific to the containerd agent backend."""
+
+    network: Annotated[
+        ContainerdNetworkConfig,
+        Field(default_factory=ContainerdNetworkConfig),
+        BackendAIConfigMeta(
+            description="CNI / network policy for the containerd backend.",
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+
 class OverridableContainerConfig(BaseConfigSchema):
     """
     Container settings that can be overridden per-agent in multi-agent mode.
@@ -1525,6 +1666,18 @@ class OverridableContainerConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    containerd: Annotated[
+        ContainerdContainerConfig | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Containerd-backend-specific container settings. Required when "
+                "agent.backend = 'containerd'; ignored otherwise."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1976,6 +2129,23 @@ class DockerExtraConfig(BaseConfigSchema):
     ]
 
 
+class ContainerdExtraConfig(BaseConfigSchema):
+    """
+    Validates that the container config is well-formed for the containerd backend.
+
+    The containerd backend requires the nested ``[container.containerd]`` section
+    to be present. Pydantic raises if it is missing or null when this validator
+    runs (i.e. when ``agent.backend == 'containerd'``).
+    """
+
+    containerd: ContainerdContainerConfig
+
+    model_config = ConfigDict(
+        extra="ignore",
+        arbitrary_types_allowed=True,
+    )
+
+
 class AgentGlobalConfig(BaseConfigSchema):
     """
     Configuration shared across all agents (logging, etcd, API, etc.).
@@ -2200,7 +2370,7 @@ class AgentSpecificConfig(BaseConfigSchema):
             case AgentBackend.DOCKER:
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.CONTAINERD:
-                pass
+                ContainerdExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
                 pass
 

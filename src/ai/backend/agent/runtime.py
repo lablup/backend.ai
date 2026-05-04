@@ -54,6 +54,23 @@ class AgentRuntime:
         else:
             metadata_server = None
 
+        if local_config.agent_common.backend == AgentBackend.CONTAINERD:
+            from ai.backend.agent.containerd.preflight import run_preflight
+            from ai.backend.agent.errors import InvalidAgentConfigError
+
+            # validate_agent_specific_config (a model_validator on
+            # AgentUnifiedConfig) guarantees this is non-None when the
+            # containerd backend is selected; the explicit raise documents
+            # the contract for the type checker and guards against any
+            # future reordering of validation.
+            containerd_config = local_config.container.containerd
+            if containerd_config is None:
+                raise InvalidAgentConfigError(
+                    "agent.backend = 'containerd' requires the [container.containerd] "
+                    "config section to be present."
+                )
+            await run_preflight(containerd_config)
+
         agent_configs = local_config.get_agent_configs()
         etcd_views: dict[AgentId, AgentEtcdClientView] = {}
         create_agent_tasks: list[asyncio.Task[Any]] = []

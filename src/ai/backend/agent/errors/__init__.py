@@ -25,6 +25,13 @@ from .agent import (
     PortConflictError,
     ReservedPortError,
 )
+from .containerd import (
+    CniBinaryMissingError,
+    CniConfDirNotWritableError,
+    CniConflistInvalidError,
+    CniConflistMissingError,
+    CniPortmapMissingError,
+)
 from .kernel import (
     AsyncioContextError,
     KernelRunnerNotInitializedError,
@@ -68,6 +75,12 @@ __all__ = [
     "ModelFolderNotSpecifiedError",
     "PortConflictError",
     "ReservedPortError",
+    # containerd
+    "CniBinaryMissingError",
+    "CniConfDirNotWritableError",
+    "CniConflistInvalidError",
+    "CniConflistMissingError",
+    "CniPortmapMissingError",
     # kernel
     "AsyncioContextError",
     "KernelRunnerNotInitializedError",
