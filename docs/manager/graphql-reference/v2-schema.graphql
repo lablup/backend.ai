@@ -9305,6 +9305,24 @@ type QueryDefinitionExecuteResult {
 input QueryDefinitionFilter {
   """Filter by name."""
   name: StringFilter = null
+
+  """Added in UNRELEASED. Filter by category ID."""
+  categoryId: UUIDFilter = null
+
+  """
+  Added in UNRELEASED. Combine multiple filters with AND logic. All conditions must match.
+  """
+  AND: [QueryDefinitionFilter!] = null
+
+  """
+  Added in UNRELEASED. Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [QueryDefinitionFilter!] = null
+
+  """
+  Added in UNRELEASED. Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [QueryDefinitionFilter!] = null
 }
 
 """Added in 26.3.0. Single metric result from Prometheus query."""
