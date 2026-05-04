@@ -44,9 +44,6 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
-    BulkPurgeVFolderError as BulkPurgeErrorDTO,
-)
-from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkPurgeVFoldersPayload as BulkPurgePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
@@ -464,19 +461,6 @@ class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Failure detail for a single vfolder in a bulk purge.",
-    ),
-    model=BulkPurgeErrorDTO,
-    name="BulkPurgeVFolderV2Error",
-)
-class BulkPurgeVFolderErrorGQL(PydanticOutputMixin[BulkPurgeErrorDTO]):
-    vfolder_id: UUID = gql_field(description="UUID of the vfolder that failed to purge.")
-    message: str = gql_field(description="Error message describing the failure.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Payload for bulk virtual folder purge.",
     ),
@@ -484,12 +468,7 @@ class BulkPurgeVFolderErrorGQL(PydanticOutputMixin[BulkPurgeErrorDTO]):
     name="BulkPurgeVFoldersV2Payload",
 )
 class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
-    vfolders: list[VFolderGQL] = gql_field(
-        description="The vfolders whose data was permanently purged.",
-    )
-    failed: list[BulkPurgeVFolderErrorGQL] = gql_field(
-        description="Per-vfolder failure entries for items that did not purge.",
-    )
+    purged_count: int = gql_field(description="Number of virtual folders successfully purged.")
 
 
 @gql_pydantic_input(

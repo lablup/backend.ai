@@ -24,7 +24,6 @@ from .types import (
 
 __all__ = (
     "BulkDeleteVFoldersPayload",
-    "BulkPurgeVFolderError",
     "BulkPurgeVFoldersPayload",
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",
@@ -142,22 +141,10 @@ class BulkDeleteVFoldersPayload(BaseResponseModel):
     deleted_count: int = Field(description="Number of virtual folders successfully soft-deleted.")
 
 
-class BulkPurgeVFolderError(BaseResponseModel):
-    """Failure detail for a single vfolder in a bulk purge."""
-
-    vfolder_id: UUID = Field(description="UUID of the vfolder that failed to purge.")
-    message: str = Field(description="Error message describing the failure.")
-
-
 class BulkPurgeVFoldersPayload(BaseResponseModel):
-    """Payload for bulk virtual folder purge with partial-success semantics."""
+    """Payload for bulk virtual folder purge."""
 
-    vfolders: list[VFolderNode] = Field(
-        description="The vfolders whose data was permanently purged.",
-    )
-    failed: list[BulkPurgeVFolderError] = Field(
-        description="Per-vfolder failure entries for items that did not purge.",
-    )
+    purged_count: int = Field(description="Number of virtual folders successfully purged.")
 
 
 class RestoreVFolderPayload(BaseResponseModel):
