@@ -210,7 +210,7 @@ class ModelCardDBSource:
                         )
                     successes.append(data)
                 except Exception as exc:
-                    failures.append(BulkModelCardDeleteFailure(card_id=card_id, exception=exc))
+                    failures.append(BulkModelCardDeleteFailure(card_id=card_id, message=str(exc)))
         return BulkModelCardDeleteResultData(successes=successes, failures=failures)
 
     async def _delete_card_in_session(

@@ -46,7 +46,7 @@ class BulkModelCardDeleteFailure:
     """Error info for a single failed model card delete inside a bulk operation."""
 
     card_id: UUID
-    exception: Exception
+    message: str
 
 
 @dataclass(frozen=True)
