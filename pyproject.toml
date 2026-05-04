@@ -80,6 +80,11 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 src = ["src"]
+extend-exclude = [
+    # Auto-generated CRI gRPC stubs — regenerated from proto, see
+    # src/ai/backend/agent/containerd/cri/proto/README.md.
+    "src/ai/backend/agent/containerd/cri/generated/**",
+]
 
 [tool.ruff.lint]
 extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
@@ -371,6 +376,16 @@ module = [
     "ai.backend.accelerator.*",
     "tools.build-macros",
 ]
+ignore_errors = true
+
+# Auto-generated CRI gRPC stubs. The protobuf message stub (api_pb2.pyi)
+# is generated and gives mypy proper types for our hand-written client;
+# the gRPC service stub (api_pb2_grpc.py) ships untyped without a
+# .pyi (standard protoc + grpc_tools does not emit one — would require
+# mypy-protobuf as an additional codegen tool). Treat the whole
+# generated subpackage as opaque to mypy.
+[[tool.mypy.overrides]]
+module = ["ai.backend.agent.containerd.cri.generated.*"]
 ignore_errors = true
 
 [tool.pyright]
