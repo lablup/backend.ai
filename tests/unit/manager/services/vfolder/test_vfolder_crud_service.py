@@ -42,6 +42,7 @@ from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.repositories.vfolder.types import BulkVFolderPurgeResult
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
@@ -851,7 +852,9 @@ class TestDeleteForeverVFolderAction:
             vfolder_uuid, user_uuid, status=VFolderOperationStatus.DELETE_PENDING
         )
         mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
-        mock_vfolder_repository.delete_vfolders_forever = AsyncMock()
+        mock_vfolder_repository.delete_vfolders_forever = AsyncMock(
+            return_value=BulkVFolderPurgeResult(succeeded=[vfolder_data], failures=[])
+        )
 
         action = DeleteForeverVFolderAction(
             user_uuid=user_uuid,
@@ -877,7 +880,9 @@ class TestDeleteForeverVFolderAction:
     ) -> None:
         vfolder_data = _make_vfolder_data(vfolder_uuid, user_uuid)
         mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
-        mock_vfolder_repository.delete_vfolders_forever = AsyncMock()
+        mock_vfolder_repository.delete_vfolders_forever = AsyncMock(
+            return_value=BulkVFolderPurgeResult(succeeded=[vfolder_data], failures=[])
+        )
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
         mock_client.delete_folder = AsyncMock(side_effect=VFolderGone())
 
@@ -901,7 +906,9 @@ class TestDeleteForeverVFolderAction:
     ) -> None:
         vfolder_data = _make_vfolder_data(vfolder_uuid, user_uuid)
         mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
-        mock_vfolder_repository.delete_vfolders_forever = AsyncMock()
+        mock_vfolder_repository.delete_vfolders_forever = AsyncMock(
+            return_value=BulkVFolderPurgeResult(succeeded=[vfolder_data], failures=[])
+        )
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
         mock_client.delete_folder = AsyncMock(side_effect=VFolderNotFound())
 
@@ -929,7 +936,9 @@ class TestForceDeleteVFolderAction:
             vfolder_uuid, user_uuid, status=VFolderOperationStatus.READY
         )
         mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
-        mock_vfolder_repository.delete_vfolders_forever = AsyncMock()
+        mock_vfolder_repository.delete_vfolders_forever = AsyncMock(
+            return_value=BulkVFolderPurgeResult(succeeded=[vfolder_data], failures=[])
+        )
 
         action = ForceDeleteVFolderAction(
             user_uuid=user_uuid,
