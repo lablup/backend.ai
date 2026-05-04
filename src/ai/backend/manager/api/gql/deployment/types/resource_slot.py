@@ -26,6 +26,12 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
+# A resource slot row is bound to a single revision/preset and the slot count
+# per parent is bounded by the number of declared resource slot types
+# (CPU, MEM, GPU SKUs, …), which is small in practice. This limit effectively
+# returns all rows without exposing cursor pagination on the field.
+RESOURCE_SLOTS_FETCH_LIMIT = 10000
+
 
 @gql_pydantic_type(
     BackendAIGQLMeta(

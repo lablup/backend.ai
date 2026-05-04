@@ -87,6 +87,7 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
     RollingUpdateConfigInputGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.resource_slot import (
+    RESOURCE_SLOTS_FETCH_LIMIT,
     AllocatedResourceSlotFilterGQL,
     AllocatedResourceSlotGQL,
     AllocatedResourceSlotOrderByGQL,
@@ -319,7 +320,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
             input=SearchAllocatedResourceSlotsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
-                limit=10000,
+                limit=RESOURCE_SLOTS_FETCH_LIMIT,
             ),
         )
         return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
