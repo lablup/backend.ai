@@ -421,18 +421,27 @@ class VfolderRepository:
             return VFolderListResult(vfolders=vfolder_access_infos)
 
     @vfolder_repository_resilience.apply()
-    async def resolve_vfolder_id_by_name(self, name: str) -> uuid.UUID | None:
-        """Look up the UUID of a vfolder by name.
+    async def resolve_vfolder_ids_by_names(self, names: Sequence[str]) -> dict[str, uuid.UUID]:
+        """Look up vfolder UUIDs for a batch of names in a single query.
+
+        Returns only the names that match an existing row; the caller
+        decides what to do with any missing names (typically raise).
 
         No access scoping or status filtering — callers (e.g. session-create
         paths) are responsible for validating both user access and lifecycle
-        state of the resolved id in their own downstream flow.
+        state of the resolved ids in their own downstream flow.
         """
+        if not names:
+            return {}
         async with self._db.begin_readonly_session() as session:
-            row_id = await session.scalar(sa.select(VFolderRow.id).where(VFolderRow.name == name))
-        if row_id is None:
-            return None
-        return cast(uuid.UUID, row_id)
+            rows = (
+                await session.execute(
+                    sa.select(VFolderRow.name, VFolderRow.id).where(
+                        VFolderRow.name.in_(list(names))
+                    )
+                )
+            ).all()
+        return {row.name: cast(uuid.UUID, row.id) for row in rows}
 
     @vfolder_repository_resilience.apply()
     async def create_vfolder_with_permission(

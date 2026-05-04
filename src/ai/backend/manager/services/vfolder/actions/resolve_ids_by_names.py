@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.manager.actions.action.base import BaseActionResult
@@ -10,8 +11,9 @@ from ai.backend.manager.services.vfolder.actions.base import VFolderAction
 
 
 @dataclass
-class ResolveIdByNameAction(VFolderAction):
-    """Resolve a single vfolder name into its UUID.
+class ResolveIdsByNamesAction(VFolderAction):
+    """Resolve multiple vfolder names into their UUIDs in a single
+    bulk lookup.
 
     Legacy-only: this action exists solely to support the v1 CLI's
     name-keyed ``-v <vfolder-name>`` flag, which the modern UUID-keyed
@@ -20,14 +22,14 @@ class ResolveIdByNameAction(VFolderAction):
 
     No access scoping is performed inside the service — the caller is
     responsible for validating user access (and lifecycle state) of the
-    resolved id in its own downstream flow.
+    resolved ids in its own downstream flow.
     """
 
-    vfolder_name: str
+    vfolder_names: Sequence[str]
 
     @override
     def entity_id(self) -> str | None:
-        return self.vfolder_name
+        return None
 
     @override
     @classmethod
@@ -36,11 +38,13 @@ class ResolveIdByNameAction(VFolderAction):
 
 
 @dataclass
-class ResolveIdByNameActionResult(BaseActionResult):
-    """Result of :class:`ResolveIdByNameAction`."""
+class ResolveIdsByNamesActionResult(BaseActionResult):
+    """Result of :class:`ResolveIdsByNamesAction` — a ``name → UUID`` map
+    covering every requested name.
+    """
 
-    vfolder_id: uuid.UUID
+    name_to_id: dict[str, uuid.UUID] = field(default_factory=dict)
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
+        return None

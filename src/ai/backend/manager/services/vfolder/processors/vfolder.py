@@ -56,9 +56,9 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.resolve_id_by_name import (
-    ResolveIdByNameAction,
-    ResolveIdByNameActionResult,
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesAction,
+    ResolveIdsByNamesActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
@@ -168,9 +168,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     batch_load_vfolders_by_ids: ActionProcessor[
         BatchLoadVFoldersByIdsAction, BatchLoadVFoldersByIdsActionResult
     ]
-    resolve_vfolder_id_by_name: ActionProcessor[
-        ResolveIdByNameAction,
-        ResolveIdByNameActionResult,
+    resolve_vfolder_ids_by_names: ActionProcessor[
+        ResolveIdsByNamesAction,
+        ResolveIdsByNamesActionResult,
     ]
     get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
     create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
@@ -266,8 +266,8 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.batch_load_vfolders_by_ids = ActionProcessor(
             service.batch_load_by_ids, action_monitors
         )
-        self.resolve_vfolder_id_by_name = ActionProcessor(
-            service.resolve_vfolder_id_by_name, action_monitors
+        self.resolve_vfolder_ids_by_names = ActionProcessor(
+            service.resolve_vfolder_ids_by_names, action_monitors
         )
 
         # V2 actions
@@ -324,7 +324,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             GetAccessibleVFolderAction.spec(),
             GetVFolderLegacyRowAction.spec(),
             BatchLoadVFoldersByIdsAction.spec(),
-            ResolveIdByNameAction.spec(),
+            ResolveIdsByNamesAction.spec(),
             CreateVFolderV2Action.spec(),
             CreateUploadSessionV2Action.spec(),
             GetVFolderV2Action.spec(),

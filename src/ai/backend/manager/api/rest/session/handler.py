@@ -171,8 +171,8 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
 )
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
-from ai.backend.manager.services.vfolder.actions.resolve_id_by_name import (
-    ResolveIdByNameAction,
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesAction,
 )
 
 if TYPE_CHECKING:
@@ -332,11 +332,13 @@ class SessionHandler:
                 "Use UUID-keyed 'mount_ids' / 'mount_id_map' instead."
             )
 
-        resolved: dict[str, UUID] = {}
+        names_to_resolve: list[str] = []
+        seen: set[str] = set()
         for raw in list(mounts) + list(mount_map.keys()) + list(mount_options.keys()):
             name = str(raw)
-            if name in resolved:
+            if name in seen:
                 continue
+            seen.add(name)
             try:
                 # Already a UUID-string key — modern callers may pass them
                 # through the same ``mount_options`` field, so skip them.
@@ -344,11 +346,15 @@ class SessionHandler:
                 continue
             except (ValueError, TypeError):
                 pass
-            result = await self._vfolder.resolve_vfolder_id_by_name.wait_for_complete(
-                ResolveIdByNameAction(vfolder_name=name)
-            )
-            resolved[name] = result.vfolder_id
-        return resolved
+            names_to_resolve.append(name)
+
+        if not names_to_resolve:
+            return {}
+
+        result = await self._vfolder.resolve_vfolder_ids_by_names.wait_for_complete(
+            ResolveIdsByNamesAction(vfolder_names=names_to_resolve)
+        )
+        return dict(result.name_to_id)
 
     # ------------------------------------------------------------------
     # create_from_template (POST /_/create-from-template)
