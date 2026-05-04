@@ -421,6 +421,27 @@ class VfolderRepository:
             return VFolderListResult(vfolders=vfolder_access_infos)
 
     @vfolder_repository_resilience.apply()
+    async def resolve_vfolder_id_by_name(self, name: str) -> uuid.UUID | None:
+        """Look up the UUID of a non-hard-deleted vfolder by name.
+
+        No access scoping — callers (e.g. session-create paths) are
+        responsible for validating user access against the resolved id
+        in their own action flow.
+        """
+        async with self._db.begin_readonly_session() as session:
+            row_id = await session.scalar(
+                sa.select(vfolders.c.id).where(
+                    sa.and_(
+                        vfolders.c.name == name,
+                        vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES),
+                    )
+                )
+            )
+        if row_id is None:
+            return None
+        return cast(uuid.UUID, row_id)
+
+    @vfolder_repository_resilience.apply()
     async def create_vfolder_with_permission(
         self, params: VFolderCreateParams, create_owner_permission: bool = False
     ) -> VFolderData:
