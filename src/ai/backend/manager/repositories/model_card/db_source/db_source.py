@@ -18,7 +18,8 @@ from ai.backend.common.data.permission.types import RBACElementType, RelationTyp
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
+from ai.backend.common.types import VFolderID, VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_card.types import (
@@ -26,12 +27,14 @@ from ai.backend.manager.data.model_card.types import (
     ResourceRequirementEntry,
     VFolderScanData,
 )
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
     ModelCardNotFound,
     ProjectNotFound,
 )
+from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -43,7 +46,11 @@ from ai.backend.manager.models.resource_slot.row import (
     PresetResourceSlotRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, VFolderRow
+from ai.backend.manager.models.vfolder.row import (
+    DEAD_VFOLDER_STATUSES,
+    VFolderRow,
+    get_sessions_by_mounted_folder,
+)
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
@@ -163,7 +170,11 @@ class ModelCardDBSource:
         if rows:
             await session.execute(sa.insert(ModelCardResourceRequirementRow).values(rows))
 
-    async def delete(self, card_id: UUID) -> ModelCardData:
+    async def delete(
+        self,
+        card_id: UUID,
+        options: DeleteModelCardOptions,
+    ) -> ModelCardData:
         async with self._db.begin_session() as session:
             stmt = sa.select(ModelCardRow).where(ModelCardRow.id == card_id)
             row = (await session.execute(stmt)).scalar_one_or_none()
@@ -171,7 +182,45 @@ class ModelCardDBSource:
                 raise ModelCardNotFound()
             data = row.to_data()
             await session.delete(row)
+            if options.delete_associated_vfolder:
+                # The VFolder is going to trash, so any sibling model card
+                # pointing at it would be orphaned. Hard-delete the siblings
+                # first inside the same transaction, then flip the VFolder
+                # status atomically.
+                await session.execute(
+                    sa.delete(ModelCardRow).where(ModelCardRow.vfolder == data.vfolder_id)
+                )
+                await self._move_vfolder_to_trash(session, data.vfolder_id)
         return data
+
+    async def _move_vfolder_to_trash(
+        self,
+        session: SASession,
+        vfolder_id: UUID,
+    ) -> None:
+        """Mark the given VFolder as DELETE_PENDING within the caller's session.
+
+        Mirrors :meth:`VFolderRepository.move_vfolders_to_trash` for the single
+        record case so the model card delete + vfolder trash can share one
+        transaction. Does not perform host-permission checks because the only
+        caller (model card delete) is already gated by superadmin auth.
+        """
+        vfolder_row = (
+            await session.execute(sa.select(VFolderRow).where(VFolderRow.id == vfolder_id))
+        ).scalar_one_or_none()
+        if vfolder_row is None:
+            # The card pointed at a vfolder that no longer exists; nothing to trash.
+            return
+        mount_sessions = await get_sessions_by_mounted_folder(
+            session, VFolderID.from_row(vfolder_row)
+        )
+        if mount_sessions:
+            session_ids = [str(session_id) for session_id in mount_sessions]
+            raise VFolderDeletionNotAllowed(
+                "Cannot delete the vfolder. "
+                f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
+            )
+        vfolder_row.status = VFolderOperationStatus.DELETE_PENDING
 
     async def search(
         self,

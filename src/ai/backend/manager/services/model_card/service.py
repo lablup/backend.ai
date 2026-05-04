@@ -70,7 +70,7 @@ class ModelCardService:
         return UpdateModelCardActionResult(model_card=data)
 
     async def delete(self, action: DeleteModelCardAction) -> DeleteModelCardActionResult:
-        data = await self._repository.delete(action.id)
+        data = await self._repository.delete(action.id, action.options)
         return DeleteModelCardActionResult(model_card=data)
 
     async def search(self, action: SearchModelCardsAction) -> SearchModelCardsActionResult:

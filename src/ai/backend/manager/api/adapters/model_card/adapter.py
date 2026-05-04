@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
+    DeleteModelCardOptions,
     DeleteModelCardsInput,
     DeployModelCardInput,
     ModelCardFilter,
@@ -369,17 +370,25 @@ class ModelCardAdapter(BaseAdapter):
         )
         return UpdateModelCardPayload(model_card=self._data_to_node(result.model_card))
 
-    async def delete(self, card_id: UUID) -> DeleteModelCardPayload:
+    async def delete(
+        self,
+        card_id: UUID,
+        options: DeleteModelCardOptions,
+    ) -> DeleteModelCardPayload:
         result = await self._processors.model_card.delete.wait_for_complete(
-            DeleteModelCardAction(id=card_id)
+            DeleteModelCardAction(id=card_id, options=options)
         )
         return DeleteModelCardPayload(id=result.model_card.id)
 
-    async def bulk_delete(self, input: DeleteModelCardsInput) -> DeleteModelCardsPayload:
+    async def bulk_delete(
+        self,
+        input: DeleteModelCardsInput,
+        options: DeleteModelCardOptions,
+    ) -> DeleteModelCardsPayload:
         """Delete multiple model cards by ID."""
         for card_id in input.ids:
             await self._processors.model_card.delete.wait_for_complete(
-                DeleteModelCardAction(id=card_id)
+                DeleteModelCardAction(id=card_id, options=options)
             )
         return DeleteModelCardsPayload(deleted_count=len(input.ids))
 

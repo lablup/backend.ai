@@ -107,10 +107,26 @@ class SearchModelCardsInput(BaseRequestModel):
     offset: int | None = Field(default=None, ge=0)
 
 
+class DeleteModelCardOptions(BaseRequestModel):
+    """Options for the model card delete operation."""
+
+    delete_associated_vfolder: bool = Field(
+        default=False,
+        description=(
+            "If true, also soft-delete (move to trash) the model VFolder(s) "
+            "associated with the deleted model card(s)."
+        ),
+    )
+
+
 class DeleteModelCardsInput(BaseRequestModel):
     """Input for deleting multiple model cards."""
 
     ids: list[UUID] = Field(description="List of model card UUIDs to delete.")
+    options: DeleteModelCardOptions | None = Field(
+        default=None,
+        description="Options for the delete operation.",
+    )
 
 
 class DeployModelCardInput(BaseRequestModel):

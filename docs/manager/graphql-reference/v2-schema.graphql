@@ -3014,10 +3014,21 @@ type DeleteModelCardPayloadGQL {
   id: UUID!
 }
 
+"""Added in UNRELEASED. Options for the model card delete operation."""
+input DeleteModelCardV2Options {
+  """
+  If true, also soft-delete (move to trash) the model VFolder(s) associated with the deleted model card(s).
+  """
+  deleteAssociatedVfolder: Boolean! = false
+}
+
 """Added in 26.4.2. Input for deleting multiple model cards."""
 input DeleteModelCardsV2Input {
   """List of model card UUIDs to delete."""
   ids: [UUID!]!
+
+  """Added in UNRELEASED. Options for the delete operation."""
+  options: DeleteModelCardV2Options = null
 }
 
 """Added in 26.4.2. Payload for bulk model card deletion."""
@@ -7208,7 +7219,7 @@ type Mutation {
   adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL!
 
   """Added in 26.4.2. Delete a model card (admin only)."""
-  adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL!
+  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL!
 
   """Added in 26.4.2. Delete multiple model cards (admin only)."""
   adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload!
