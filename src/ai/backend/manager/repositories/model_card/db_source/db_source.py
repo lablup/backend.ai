@@ -183,8 +183,13 @@ class ModelCardDBSource:
             data = row.to_data()
             await session.delete(row)
             if options.delete_associated_vfolder:
-                # Trash the model VFolder in the same transaction so the card's
-                # disappearance and the folder's DELETE_PENDING flip atomically.
+                # The VFolder is going to trash, so any sibling model card
+                # pointing at it would be orphaned. Hard-delete the siblings
+                # first inside the same transaction, then flip the VFolder
+                # status atomically.
+                await session.execute(
+                    sa.delete(ModelCardRow).where(ModelCardRow.vfolder == data.vfolder_id)
+                )
                 await self._move_vfolder_to_trash(session, data.vfolder_id)
         return data
 
