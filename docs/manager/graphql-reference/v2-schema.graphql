@@ -1344,6 +1344,27 @@ type BulkCreateUsersV2Payload {
   failed: [BulkCreateUserV2Error!]!
 }
 
+"""
+Added in UNRELEASED. Input for permanently deleting (data wipe) multiple virtual folders.
+"""
+input BulkDeleteForeverVFoldersV2Input {
+  """List of VFolder UUIDs to delete forever."""
+  ids: [UUID!]!
+
+  """
+  If true, also delete model card record(s) referencing the vfolders. If false, the request is rejected when any model card still references one.
+  """
+  cascadeModelCard: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload for bulk permanent virtual folder deletion.
+"""
+type BulkDeleteForeverVFoldersV2Payload {
+  """Number of virtual folders whose data was permanently deleted."""
+  deletedCount: Int!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input {
   """List of VFolder UUIDs to soft-delete."""
@@ -1402,11 +1423,6 @@ Added in 26.4.2. Input for permanently purging multiple virtual folders.
 input BulkPurgeVFoldersV2Input {
   """List of VFolder UUIDs to purge."""
   ids: [UUID!]!
-
-  """
-  If true, also delete model card record(s) referencing the vfolders. If false, the request is rejected when any model card still references one.
-  """
-  cascadeModelCard: Boolean! = false
 }
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
@@ -2988,6 +3004,14 @@ Added in 26.4.2. Payload returned after deleting files in a virtual folder.
 type DeleteFilesV2Payload {
   """Background task ID for the deletion operation"""
   bgtaskId: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after permanently deleting a virtual folder's data.
+"""
+type DeleteForeverVFolderV2Payload {
+  """ID of the deleted-forever virtual folder"""
+  id: UUID!
 }
 
 """Added in 25.14.0. """
@@ -7264,7 +7288,12 @@ type Mutation {
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
-  purgeVfolderV2(vfolderId: UUID!, cascadeModelCard: Boolean! = false): PurgeVFolderV2Payload!
+  purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload!
+
+  """
+  Added in UNRELEASED. Permanently delete a virtual folder's data, optionally cascading linked model card records.
+  """
+  deleteForeverVfolderV2(vfolderId: UUID!, cascadeModelCard: Boolean! = false): DeleteForeverVFolderV2Payload!
 
   """
   Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
@@ -7279,6 +7308,11 @@ type Mutation {
 
   """Added in 26.4.2. Permanently purge multiple virtual folders."""
   bulkPurgeVfoldersV2(input: BulkPurgeVFoldersV2Input!): BulkPurgeVFoldersV2Payload!
+
+  """
+  Added in UNRELEASED. Permanently delete data of multiple virtual folders, optionally cascading linked model card records.
+  """
+  bulkDeleteForeverVfoldersV2(input: BulkDeleteForeverVFoldersV2Input!): BulkDeleteForeverVFoldersV2Payload!
 
   """Added in 26.4.2. Clone a virtual folder."""
   cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload!

@@ -1951,6 +1951,31 @@ input BulkCreateUserV2Input
   users: [CreateUserV2Input!]!
 }
 
+"""
+Added in UNRELEASED. Input for permanently deleting (data wipe) multiple virtual folders.
+"""
+input BulkDeleteForeverVFoldersV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """List of VFolder UUIDs to delete forever."""
+  ids: [UUID!]!
+
+  """
+  If true, also delete model card record(s) referencing the vfolders. If false, the request is rejected when any model card still references one.
+  """
+  cascadeModelCard: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload for bulk permanent virtual folder deletion.
+"""
+type BulkDeleteForeverVFoldersV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of virtual folders whose data was permanently deleted."""
+  deletedCount: Int!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input
   @join__type(graph: STRAWBERRY)
@@ -2023,11 +2048,6 @@ input BulkPurgeVFoldersV2Input
 {
   """List of VFolder UUIDs to purge."""
   ids: [UUID!]!
-
-  """
-  If true, also delete model card record(s) referencing the vfolders. If false, the request is rejected when any model card still references one.
-  """
-  cascadeModelCard: Boolean! = false
 }
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
@@ -4631,6 +4651,16 @@ type DeleteFilesV2Payload
 {
   """Background task ID for the deletion operation"""
   bgtaskId: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after permanently deleting a virtual folder's data.
+"""
+type DeleteForeverVFolderV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted-forever virtual folder"""
+  id: UUID!
 }
 
 """Instead of deleting the group, just mark it as inactive."""
@@ -11337,7 +11367,12 @@ type Mutation
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
-  purgeVfolderV2(vfolderId: UUID!, cascadeModelCard: Boolean! = false): PurgeVFolderV2Payload! @join__field(graph: STRAWBERRY)
+  purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Permanently delete a virtual folder's data, optionally cascading linked model card records.
+  """
+  deleteForeverVfolderV2(vfolderId: UUID!, cascadeModelCard: Boolean! = false): DeleteForeverVFolderV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
@@ -11352,6 +11387,11 @@ type Mutation
 
   """Added in 26.4.2. Permanently purge multiple virtual folders."""
   bulkPurgeVfoldersV2(input: BulkPurgeVFoldersV2Input!): BulkPurgeVFoldersV2Payload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Permanently delete data of multiple virtual folders, optionally cascading linked model card records.
+  """
+  bulkDeleteForeverVfoldersV2(input: BulkDeleteForeverVFoldersV2Input!): BulkDeleteForeverVFoldersV2Payload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Clone a virtual folder."""
   cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload! @join__field(graph: STRAWBERRY)
