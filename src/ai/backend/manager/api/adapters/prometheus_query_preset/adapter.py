@@ -53,6 +53,8 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     Updater,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreatorSpec,
@@ -259,6 +261,24 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
         if filter.category_id is not None:
             conditions.append(PrometheusQueryPresetConditions.by_category_id(filter.category_id))
+
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+
+        if filter.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_sub_conditions.extend(self._convert_filter(sub_filter))
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        if filter.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_sub_conditions.extend(self._convert_filter(sub_filter))
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 
