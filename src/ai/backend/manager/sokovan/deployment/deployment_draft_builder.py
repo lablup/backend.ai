@@ -173,17 +173,14 @@ class DeploymentSessionDraftBuilder:
         ``service.start_command`` is taken as-is from the revision snapshot
         (the controller has already resolved any ``{model_path}`` placeholder
         against ``models[0].model_path`` at revision creation time). Preset
-        ARGS are appended as separate argv tokens.
+        ARGS are appended as separate argv tokens via
+        :meth:`ModelDefinition.with_args_appended` so the merge stays on
+        typed objects up to the final ``model_dump``.
         """
-        if target_revision.model_definition is None:
+        model_definition = target_revision.model_definition
+        if model_definition is None:
             return None
-        payload = target_revision.model_definition.model_dump(mode="json")
         args = (context.resolved_presets.args if context.resolved_presets else None) or []
-        if args and payload.get("models"):
-            for model in payload["models"]:
-                service = model.get("service")
-                if service is None:
-                    continue
-                existing = list(service.get("start_command") or [])
-                service["start_command"] = existing + list(args)
-        return payload
+        if args:
+            model_definition = model_definition.with_args_appended(args)
+        return model_definition.model_dump(mode="json")

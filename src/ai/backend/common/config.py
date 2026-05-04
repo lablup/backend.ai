@@ -467,6 +467,29 @@ class ModelDefinition(BaseConfigModel):
                     return model.service.health_check
         return None
 
+    def with_args_appended(self, args: list[str]) -> ModelDefinition:
+        """Return a copy with ``args`` appended to each model's
+        ``service.start_command`` as separate argv tokens.
+
+        Models with ``service is None`` are passed through unchanged;
+        a model whose ``start_command`` is ``None`` receives ``args``
+        as its initial ``start_command`` (the agent's image-CMD fallback
+        is responsible for prepending a launcher when this happens).
+        """
+        if not args:
+            return self
+        new_models: list[ModelConfig] = []
+        for model in self.models:
+            if model.service is None:
+                new_models.append(model)
+                continue
+            existing = model.service.start_command or []
+            new_service = model.service.model_copy(
+                update={"start_command": existing + args},
+            )
+            new_models.append(model.model_copy(update={"service": new_service}))
+        return self.model_copy(update={"models": new_models})
+
 
 # ============================================================================
 # ModelDefinition draft types — partial-input variants used by source layers
