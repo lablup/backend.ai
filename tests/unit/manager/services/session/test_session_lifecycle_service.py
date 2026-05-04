@@ -1044,17 +1044,8 @@ class TestCreateFromParams:
         sample_user_id: UUID,
         sample_group_id: UUID,
     ) -> None:
-        """BA-5916: a v1-CLI ``-v "type=bind,source=vf-a,target=/data,readonly"``
-        request lands on the REST handler with all three legacy name-keyed
-        surfaces — ``mounts`` list, ``mount_map`` dict, ``mount_options``
-        dict — set together inside ``creation_config``. The handler
-        resolves them via ``_resolve_legacy_name_mounts`` +
-        ``_merge_resolved_legacy_mounts``, dispatches the action carrying
-        the resulting UUID-keyed config, and the service then forwards
-        that resolved config into ``AgentRegistry.create_session``. End to
-        end: legacy in → ``mount_ids`` / ``mount_id_map`` /
-        ``mount_options[uuid]`` arrive at the registry with the legacy
-        keys stripped.
+        """BA-5916: legacy ``mounts`` / ``mount_map`` / ``mount_options``
+        get resolved to UUID-keyed buckets and reach ``AgentRegistry.create_session``.
         """
         vfid = UUID("11111111-1111-1111-1111-111111111111")
 
