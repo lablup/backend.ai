@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
@@ -48,10 +49,42 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class TestModelCardDeleteCascadesSiblings:
-    """When ``delete_associated_vfolder`` is set, every model card pointing at
-    the same VFolder must be hard-deleted alongside the targeted card so no
-    orphans linger after the VFolder flips to ``DELETE_PENDING``.
+@dataclass(frozen=True)
+class DeleteCase:
+    """Parameter set for delete option-on/off coverage."""
+
+    options: DeleteModelCardOptions
+    expects_sibling_deleted: bool
+    expects_vfolder_status: VFolderOperationStatus
+
+
+_DELETE_CASES = [
+    pytest.param(
+        DeleteCase(
+            options=DeleteModelCardOptions(),
+            expects_sibling_deleted=False,
+            expects_vfolder_status=VFolderOperationStatus.READY,
+        ),
+        id="option_off",
+    ),
+    pytest.param(
+        DeleteCase(
+            options=DeleteModelCardOptions(delete_associated_vfolder=True),
+            expects_sibling_deleted=True,
+            expects_vfolder_status=VFolderOperationStatus.DELETE_PENDING,
+        ),
+        id="option_on",
+    ),
+]
+
+
+class TestModelCardDelete:
+    """Behavioral coverage for ``ModelCardDBSource.delete``.
+
+    With ``delete_associated_vfolder`` off the linked VFolder and any sibling
+    card pointing at it must stay untouched. With the option on, every model
+    card on the VFolder is hard-deleted in the same transaction and the
+    VFolder flips to ``DELETE_PENDING`` so no orphan card lingers.
     """
 
     @pytest.fixture
@@ -252,8 +285,10 @@ class TestModelCardDeleteCascadesSiblings:
             ),
         )
 
-    async def test_delete_with_vfolder_option_cascades_sibling_cards(
+    @pytest.mark.parametrize("case", _DELETE_CASES)
+    async def test_delete_against_two_cards_on_one_vfolder(
         self,
+        case: DeleteCase,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
@@ -279,13 +314,10 @@ class TestModelCardDeleteCascadesSiblings:
         )
         assert target.vfolder_id == sibling.vfolder_id
 
-        await db_source.delete(
-            target.id,
-            DeleteModelCardOptions(delete_associated_vfolder=True),
-        )
+        await db_source.delete(target.id, case.options)
 
         async with db_with_cleanup.begin_readonly_session() as session:
-            remaining_card_ids = (
+            remaining_card_ids = set(
                 (
                     await session.execute(
                         sa.select(ModelCardRow.id).where(
@@ -302,8 +334,6 @@ class TestModelCardDeleteCascadesSiblings:
                 )
             ).scalar_one()
 
-        assert remaining_card_ids == [], (
-            "Both the target and the sibling card sharing the trashed VFolder must be"
-            " deleted, but rows still remain."
-        )
-        assert vfolder_status == VFolderOperationStatus.DELETE_PENDING
+        expected_remaining = set() if case.expects_sibling_deleted else {sibling.id}
+        assert remaining_card_ids == expected_remaining
+        assert vfolder_status == case.expects_vfolder_status
