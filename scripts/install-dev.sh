@@ -1071,9 +1071,13 @@ configure_backendai() {
   # Install rover cli for Supergraph generation
   install_rover_cli
 
-  # Configure MinIO using separate configuration script
-  source "$(dirname "$0")/configure-minio.sh"
-  configure_minio "docker-compose.halfstack.current.yml"
+  # Configure MinIO only when the storage halfstack profile is active.
+  # The MinIO container is otherwise not running, so configure_minio would
+  # fall back to default credentials and emit a warning.
+  if [ $ENABLE_STORAGE -eq 1 ]; then
+    source "$(dirname "$0")/configure-minio.sh"
+    configure_minio "docker-compose.halfstack.current.yml"
+  fi
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
@@ -1199,8 +1203,11 @@ configure_backendai() {
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
-  # Configure storage-proxy MinIO settings using separate configuration script
-  configure_storage_proxy_minio "./storage-proxy.toml"
+  # Configure storage-proxy MinIO settings only when the storage profile is
+  # active; otherwise the [[artifact-storages]] placeholders stay in place.
+  if [ $ENABLE_STORAGE -eq 1 ]; then
+    configure_storage_proxy_minio "./storage-proxy.toml"
+  fi
 
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
@@ -1261,13 +1268,17 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-preset-categories.json
   ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-presets.json
 
-  # Populate artifact registries with substituted MinIO credentials
-  TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"
-  cp fixtures/manager/example-artifact-registries.json "$TMP_ARTIFACT_REGISTRIES_JSON"
-  sed_inplace "s/<access_key>/${MINIO_ACCESS_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
-  sed_inplace "s/<secret_key>/${MINIO_SECRET_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
-  ./backend.ai mgr fixture populate "$TMP_ARTIFACT_REGISTRIES_JSON"
-  rm -f "$TMP_ARTIFACT_REGISTRIES_JSON"
+  # Populate artifact registries only when the storage halfstack profile is
+  # active; the example registry points at the local MinIO and depends on
+  # the credentials produced by configure_minio.
+  if [ $ENABLE_STORAGE -eq 1 ]; then
+    TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"
+    cp fixtures/manager/example-artifact-registries.json "$TMP_ARTIFACT_REGISTRIES_JSON"
+    sed_inplace "s/<access_key>/${MINIO_ACCESS_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+    sed_inplace "s/<secret_key>/${MINIO_SECRET_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+    ./backend.ai mgr fixture populate "$TMP_ARTIFACT_REGISTRIES_JSON"
+    rm -f "$TMP_ARTIFACT_REGISTRIES_JSON"
+  fi
 
   show_info "Setting up databases... (account-manager)"
   # TODO: add "schema oneshot" command for account-manager
