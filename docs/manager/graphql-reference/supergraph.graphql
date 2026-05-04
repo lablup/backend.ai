@@ -2025,9 +2025,9 @@ input BulkPurgeVFoldersV2Input
   ids: [UUID!]!
 
   """
-  If true, also delete model card record(s) referencing the vfolders. Defaults to false; the request is then rejected per-vfolder when any model card still references one.
+  If true, also delete model card record(s) referencing the vfolders. If false, the request is rejected per-vfolder when any model card still references one.
   """
-  cascadeModelCard: Boolean = null
+  cascadeModelCard: Boolean! = false
 }
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
@@ -11337,7 +11337,7 @@ type Mutation
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
-  purgeVfolderV2(vfolderId: UUID!, cascadeModelCard: Boolean = null): PurgeVFolderV2Payload! @join__field(graph: STRAWBERRY)
+  purgeVfolderV2(vfolderId: UUID!, cascadeModelCard: Boolean! = false): PurgeVFolderV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
@@ -13068,8 +13068,8 @@ Added in 26.4.2. Payload returned after permanently purging a virtual folder.
 type PurgeVFolderV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """The vfolder whose data was permanently purged."""
-  vfolder: VFolder!
+  """ID of the purged virtual folder."""
+  id: UUID!
 }
 
 type Query
