@@ -31,6 +31,7 @@ from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_c
 from ai.backend.manager.api.gql.model_card.types import (
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
+    DeleteModelCardOptionsGQL,
     DeleteModelCardPayloadGQL,
     DeleteModelCardsInputGQL,
     DeleteModelCardsPayloadGQL,
@@ -152,9 +153,11 @@ async def admin_update_model_card_v2(
 async def admin_delete_model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
+    options: DeleteModelCardOptionsGQL | None = None,
 ) -> DeleteModelCardPayloadGQL:
     check_admin_only()
-    payload = await info.context.adapters.model_card.delete(id)
+    options_dto = options.to_pydantic() if options is not None else None
+    payload = await info.context.adapters.model_card.delete(id, options=options_dto)
     return DeleteModelCardPayloadGQL.from_pydantic(payload)
 
 

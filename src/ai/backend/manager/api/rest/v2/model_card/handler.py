@@ -5,12 +5,19 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BaseRequestModel,
+    BodyParam,
+    PathParam,
+    QueryParam,
+)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
+    DeleteModelCardOptions,
     DeleteModelCardsInput,
     DeployModelCardInput,
     SearchModelCardsInput,
@@ -69,8 +76,9 @@ class V2ModelCardHandler:
     async def delete(
         self,
         path: PathParam[CardIdPathParam],
+        query: QueryParam[DeleteModelCardOptions],
     ) -> APIResponse:
-        result = await self._adapter.delete(path.parsed.card_id)
+        result = await self._adapter.delete(path.parsed.card_id, options=query.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def bulk_delete(

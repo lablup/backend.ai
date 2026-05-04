@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
+    DeleteModelCardOptions,
     DeleteModelCardsInput,
     DeployModelCardInput,
     ModelCardFilter,
@@ -87,6 +88,7 @@ from ai.backend.manager.services.model_card.actions.search_in_project import (
     SearchModelCardsInProjectAction,
 )
 from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
+from ai.backend.manager.services.vfolder.actions.vfolder_v2 import DeleteVFolderV2Action
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -369,18 +371,33 @@ class ModelCardAdapter(BaseAdapter):
         )
         return UpdateModelCardPayload(model_card=self._data_to_node(result.model_card))
 
-    async def delete(self, card_id: UUID) -> DeleteModelCardPayload:
+    async def delete(
+        self,
+        card_id: UUID,
+        options: DeleteModelCardOptions | None = None,
+    ) -> DeleteModelCardPayload:
         result = await self._processors.model_card.delete.wait_for_complete(
             DeleteModelCardAction(id=card_id)
         )
+        if options is not None and options.delete_associated_folder:
+            await self._processors.vfolder.delete_v2.wait_for_complete(
+                DeleteVFolderV2Action(vfolder_id=result.model_card.vfolder_id)
+            )
         return DeleteModelCardPayload(id=result.model_card.id)
 
     async def bulk_delete(self, input: DeleteModelCardsInput) -> DeleteModelCardsPayload:
         """Delete multiple model cards by ID."""
+        delete_associated_folder = (
+            input.options.delete_associated_folder if input.options is not None else False
+        )
         for card_id in input.ids:
-            await self._processors.model_card.delete.wait_for_complete(
+            result = await self._processors.model_card.delete.wait_for_complete(
                 DeleteModelCardAction(id=card_id)
             )
+            if delete_associated_folder:
+                await self._processors.vfolder.delete_v2.wait_for_complete(
+                    DeleteVFolderV2Action(vfolder_id=result.model_card.vfolder_id)
+                )
         return DeleteModelCardsPayload(deleted_count=len(input.ids))
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:
