@@ -6,7 +6,11 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.manager.models.condition_utils import (
     make_nested_string_in_factory,
     make_string_in_factory,
@@ -30,6 +34,26 @@ class ModelCardConditions:
     def by_project(project_id: UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ModelCardRow.project == project_id
+
+        return inner
+
+    @staticmethod
+    def by_project_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ModelCardRow.project == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_project_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ModelCardRow.project.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -93,6 +117,60 @@ class ModelCardConditions:
         return inner
 
     by_name_in = staticmethod(make_string_in_factory(ModelCardRow.name))
+
+    @staticmethod
+    def by_domain_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ModelCardRow.domain.ilike(f"%{spec.value}%")
+            else:
+                condition = ModelCardRow.domain.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ModelCardRow.domain) == spec.value.lower()
+            else:
+                condition = ModelCardRow.domain == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ModelCardRow.domain.ilike(f"{spec.value}%")
+            else:
+                condition = ModelCardRow.domain.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ModelCardRow.domain.ilike(f"%{spec.value}")
+            else:
+                condition = ModelCardRow.domain.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_domain_in = staticmethod(make_string_in_factory(ModelCardRow.domain))
 
     # ==================== Storage Host Nested Filters ====================
 

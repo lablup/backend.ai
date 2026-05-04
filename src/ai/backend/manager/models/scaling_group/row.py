@@ -30,6 +30,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     PreemptionMode,
@@ -467,7 +468,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: uuid.UUID,
+    group: ProjectID,
     access_key: str,
 ) -> Sequence[Row[Any]]: ...
 
@@ -476,7 +477,7 @@ async def query_allowed_sgroups(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: Iterable[uuid.UUID],
+    group: Iterable[ProjectID],
     access_key: str,
 ) -> Sequence[Row[Any]]: ...
 
@@ -502,7 +503,7 @@ async def query_allowed_sgroups(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
+    group: ProjectID | Iterable[ProjectID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row[Any]]:
     query = sa.select(sgroups_for_domains).where(sgroups_for_domains.c.domain == domain_name)

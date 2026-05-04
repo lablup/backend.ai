@@ -28,6 +28,7 @@ from ai.backend.common.exception import (
     ErrorCode,
     PermissionDeniedError,
 )
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -2276,7 +2277,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         domain_name = domain_name or ctx.user["domain_name"]
         async with ctx.db.begin() as db_conn:
-            sgroup_rows = await query_allowed_sgroups(db_conn, domain_name, project_id, access_key)
+            sgroup_rows = await query_allowed_sgroups(
+                db_conn, domain_name, ProjectID(project_id), access_key
+            )
         conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
         sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
         return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]

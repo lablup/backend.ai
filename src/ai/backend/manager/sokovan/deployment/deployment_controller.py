@@ -372,11 +372,12 @@ class DeploymentController:
         merged RevisionDraft — mount identity is not a merge candidate.
 
         Merge order (low → high) is assembled by ``RevisionDraftReader``:
-            1. runtime-variant baseline model definition
-            2. revision preset (if ``preset_id`` is supplied)
-            3. deployment-config.yaml   (only when the variant reads vfolder files)
-            4. model-definition.yaml    (only when the variant reads vfolder files)
-            5. overrides (highest — explicit user input)
+            1. model mount destination as the ``model_path`` default
+            2. runtime-variant baseline model definition
+            3. revision preset (if ``preset_id`` is supplied)
+            4. deployment-config.yaml   (only when the variant reads vfolder files)
+            5. model-definition.yaml    (only when the variant reads vfolder files)
+            6. overrides (highest — explicit user input)
 
         ``runtime_variant_id`` is resolved before the draft chain runs because
         the runtime variant's baseline model definition is the first merge
@@ -702,7 +703,7 @@ class DeploymentController:
         if resolved_replica_spec is None:
             preset_replica = (
                 preset_data.replica_count
-                if preset_data is not None and preset_data.replica_count is not None
+                if preset_data is not None
                 else self._DEFAULT_REPLICA_COUNT
             )
             resolved_replica_spec = ReplicaSpec(replica_count=preset_replica)
@@ -731,11 +732,9 @@ class DeploymentController:
     @staticmethod
     def _build_policy_from_preset(
         preset_data: DeploymentRevisionPresetData,
-    ) -> DeploymentPolicyConfig | None:
+    ) -> DeploymentPolicyConfig:
         """Reconstruct a DeploymentPolicyConfig from preset-stored strategy fields."""
-        if preset_data.deployment_strategy is None:
-            return None
-        spec_dict = preset_data.deployment_strategy_spec or {}
+        spec_dict = preset_data.deployment_strategy_spec
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
         match preset_data.deployment_strategy:
             case DeploymentStrategy.ROLLING:

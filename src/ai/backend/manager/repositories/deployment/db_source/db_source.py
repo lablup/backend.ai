@@ -2047,7 +2047,8 @@ class DeploymentDBSource:
                             if (pv.value or "").strip().lower() in ("true", "1"):
                                 resolved_args.append(vp.key)
                         else:
-                            resolved_args.append(f"{vp.key} {pv.value}")
+                            resolved_args.append(vp.key)
+                            resolved_args.append(pv.value)
                 resolved_presets = ResolvedPresetValues(
                     environ=resolved_environ, args=resolved_args
                 )

@@ -52,6 +52,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption as UIOptionDTO,
 )
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
+from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -244,7 +245,9 @@ class RuntimeVariantPresetConnection(Connection[RuntimeVariantPresetGQL]):
 )
 class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
-    runtime_variant_id: UUID | None = gql_field(default=None, description="Variant ID filter.")
+    runtime_variant_id: UUIDFilterGQL | None = gql_field(
+        default=None, description="Variant ID filter."
+    )
 
 
 @gql_pydantic_input(

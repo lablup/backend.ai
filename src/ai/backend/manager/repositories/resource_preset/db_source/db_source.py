@@ -11,6 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
@@ -593,7 +594,9 @@ class ResourcePresetDBSource:
         # Get scaling groups
         # query_allowed_sgroups expects AsyncConnection, get it from session
         db_conn = await conn.connection()
-        sgroups = await query_allowed_sgroups(db_conn, domain_name, group_id, str(access_key))
+        sgroups = await query_allowed_sgroups(
+            db_conn, domain_name, ProjectID(group_id), str(access_key)
+        )
         sgroup_names = [sg.name for sg in sgroups]
         if scaling_group is not None:
             if scaling_group not in sgroup_names:

@@ -10,7 +10,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.config import (
@@ -138,10 +138,9 @@ from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
 
 from .resource_slot import (
-    AllocatedResourceSlotConnection,
-    AllocatedResourceSlotEdge,
+    RESOURCE_SLOTS_FETCH_LIMIT,
     AllocatedResourceSlotFilterGQL,
-    AllocatedResourceSlotNodeGQL,
+    AllocatedResourceSlotGQL,
     AllocatedResourceSlotOrderByGQL,
 )
 
@@ -515,44 +514,20 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         info: Info[StrawberryGQLContext],
         filter: AllocatedResourceSlotFilterGQL | None = None,
         order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> AllocatedResourceSlotConnection:
+    ) -> list[AllocatedResourceSlotGQL]:
         from ai.backend.common.dto.manager.v2.resource_slot.request import (
             SearchAllocatedResourceSlotsInput,
         )
 
-        pydantic_filter = filter.to_pydantic() if filter else None
-        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revision_resource_slots(
             revision_id=UUID(str(self.id)),
             input=SearchAllocatedResourceSlotsInput(
-                filter=pydantic_filter,
-                order=pydantic_order,
-                first=first,
-                after=after,
-                last=last,
-                before=before,
-                limit=limit,
-                offset=offset,
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                limit=RESOURCE_SLOTS_FETCH_LIMIT,
             ),
         )
-        nodes = [AllocatedResourceSlotNodeGQL.from_pydantic(item) for item in payload.items]
-        edges = [AllocatedResourceSlotEdge(node=node, cursor=node.slot_name) for node in nodes]
-        return AllocatedResourceSlotConnection(
-            count=payload.total_count,
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=payload.has_next_page,
-                has_previous_page=payload.has_previous_page,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-        )
+        return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

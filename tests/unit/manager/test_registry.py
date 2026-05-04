@@ -130,6 +130,7 @@ async def registry_ctx() -> AsyncGenerator[
         hook_plugin_ctx=hook_plugin_ctx,
         network_plugin_ctx=network_plugin_ctx,
         scheduling_controller=mock_scheduling_controller,
+        scheduler_repository=MagicMock(),
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
     )

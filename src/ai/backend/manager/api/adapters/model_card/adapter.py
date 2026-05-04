@@ -515,9 +515,24 @@ class ModelCardAdapter(BaseAdapter):
     def _convert_filter(self, filter_: ModelCardFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter_.domain_name is not None:
-            conditions.append(ModelCardConditions.by_domain(filter_.domain_name))
+            cond = self.convert_string_filter(
+                filter_.domain_name,
+                contains_factory=ModelCardConditions.by_domain_contains,
+                equals_factory=ModelCardConditions.by_domain_equals,
+                starts_with_factory=ModelCardConditions.by_domain_starts_with,
+                ends_with_factory=ModelCardConditions.by_domain_ends_with,
+                in_factory=ModelCardConditions.by_domain_in,
+            )
+            if cond:
+                conditions.append(cond)
         if filter_.project_id is not None:
-            conditions.append(ModelCardConditions.by_project(filter_.project_id))
+            cond = self.convert_uuid_filter(
+                filter_.project_id,
+                equals_factory=ModelCardConditions.by_project_equals,
+                in_factory=ModelCardConditions.by_project_in,
+            )
+            if cond:
+                conditions.append(cond)
         if filter_.name:
             cond = self.convert_string_filter(
                 filter_.name,

@@ -24,6 +24,7 @@ class PermissionRow(Base):  # type: ignore[misc]
     __tablename__ = "permissions"
     __table_args__ = (
         sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),
+        sa.Index("ix_permissions_scope_entity", "scope_type", "scope_id", "entity_type"),
         sa.UniqueConstraint(
             "role_id",
             "scope_type",

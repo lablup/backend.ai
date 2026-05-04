@@ -123,6 +123,10 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesAction,
+    ResolveIdsByNamesActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -234,6 +238,28 @@ class VFolderService:
         """
         data = await self._vfolder_repository.batch_load_by_ids(action.ids)
         return BatchLoadVFoldersByIdsActionResult(data=data)
+
+    async def resolve_vfolder_ids_by_names(
+        self, action: ResolveIdsByNamesAction
+    ) -> ResolveIdsByNamesActionResult:
+        """Resolve a batch of vfolder names into their UUIDs in one query.
+
+        No access checking — used by session-creation paths that still
+        accept vfolder names in ``creation_config["mounts"]`` to convert
+        them into ids before the real session-create action runs. The
+        downstream action validates the user's access against the
+        resolved ids.
+
+        Raises ``VFolderNotFound`` if any requested name has no matching
+        row, with the missing names attached as ``extra_data``.
+        """
+        name_to_id = await self._vfolder_repository.resolve_vfolder_ids_by_names(
+            action.vfolder_names
+        )
+        missing = [name for name in action.vfolder_names if name not in name_to_id]
+        if missing:
+            raise VFolderNotFound(extra_data=missing)
+        return ResolveIdsByNamesActionResult(name_to_id=name_to_id)
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role

@@ -36,6 +36,7 @@ from sqlalchemy.orm import (
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AccessKey,
@@ -1123,7 +1124,7 @@ class ModelServiceHelper:
         scaling_group: str,
         owner_access_key: AccessKey,
         target_domain: str,
-        target_project: str | UUID,
+        target_project: str | ProjectID,
     ) -> str:
         """
         Wrapper of `registry.check_scaling_group()` with additional guards flavored for
