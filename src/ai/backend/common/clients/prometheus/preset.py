@@ -18,7 +18,7 @@ def validate_query_template(template: str) -> str:
 
     Returns the dry-run rendered template (useful for inspection in tests).
     """
-    if not template:
+    if not template or not template.strip():
         raise InvalidMetricPresetTemplate("Template must not be empty.")
     unsupported_vars = _UNSUPPORTED_TEMPLATE_VAR_RE.findall(template)
     if unsupported_vars:

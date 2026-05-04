@@ -7,6 +7,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
@@ -170,21 +171,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
                 PreviewPresetAction(query_template=input.query_template)
             )
         )
-        response = action_result.response
-        return QueryDefinitionResultInfo(
-            status=response.status,
-            result_type=response.data.result_type,
-            result=[
-                QueryDefinitionMetricResultInfo(
-                    metric=[
-                        MetricLabelEntryInfo(key=k, value=v)
-                        for k, v in mr.metric.model_dump(exclude_none=True).items()
-                    ],
-                    values=[MetricValueInfo(timestamp=ts, value=val) for ts, val in mr.values],
-                )
-                for mr in response.data.result
-            ],
-        )
+        return self._prometheus_response_to_result_info(action_result.response)
 
     async def execute_preset(
         self,
@@ -219,7 +206,13 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
                 )
             )
         )
-        response = action_result.response
+        return self._prometheus_response_to_result_info(action_result.response)
+
+    def _prometheus_response_to_result_info(
+        self,
+        response: PrometheusResponse,
+    ) -> QueryDefinitionResultInfo:
+        """Convert a raw Prometheus response into the manager-layer DTO."""
         return QueryDefinitionResultInfo(
             status=response.status,
             result_type=response.data.result_type,

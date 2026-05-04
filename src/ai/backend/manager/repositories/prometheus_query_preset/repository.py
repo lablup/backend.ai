@@ -6,6 +6,7 @@ from uuid import UUID
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import MetricPreset
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -46,6 +47,7 @@ prometheus_query_preset_repository_resilience = Resilience(
                 max_retries=10,
                 retry_delay=0.1,
                 backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
             )
         ),
     ]
@@ -100,6 +102,7 @@ class PrometheusQueryPresetRepository:
         """Searches prometheus query presets with total count."""
         return await self._db_source.search(querier=querier)
 
+    @prometheus_query_preset_repository_resilience.apply()
     async def preview_query_template(
         self,
         query_template: str,
