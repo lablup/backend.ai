@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from ai.backend.common.clients.http_client import ClientPool, tcp_client_session_factory
 from ai.backend.common.clients.prometheus.client import PrometheusClient
+from ai.backend.common.clients.prometheus.fixed_query_builder import FixedQueryBuilder
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
@@ -24,6 +25,7 @@ class PrometheusClientDependency(
         client = PrometheusClient(
             endpoint=f"http://{setup_input.metric.address.to_legacy()}/api/v1/",
             client_pool=client_pool,
+            fixed_query_builder=FixedQueryBuilder(setup_input.metric.timewindow),
         )
         try:
             yield client

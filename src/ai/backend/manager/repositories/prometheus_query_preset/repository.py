@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.preset import MetricPreset
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.exception import (
     BackendAIError,
@@ -107,19 +106,16 @@ class PrometheusQueryPresetRepository:
         return await self._db_source.search(querier=querier)
 
     @prometheus_query_preset_repository_resilience.apply()
-    async def preview_query_template(
+    async def preview_template(
         self,
         query_template: str,
         default_window: str,
     ) -> PrometheusResponse:
         """Render the template with empty matchers and run an instant query."""
-        metric_preset = MetricPreset(
-            template=query_template,
-            labels={},
-            group_by=frozenset(),
-            window=default_window,
-        )
         try:
-            return await self._prometheus_client.query_instant(preset=metric_preset)
+            return await self._prometheus_client.preview_query_template(
+                query_template=query_template,
+                default_window=default_window,
+            )
         except FailedToGetMetric as e:
             raise PrometheusQueryEvaluationFailed(str(e)) from e

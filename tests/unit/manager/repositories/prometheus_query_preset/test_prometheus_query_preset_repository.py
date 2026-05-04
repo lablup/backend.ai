@@ -302,7 +302,7 @@ class TestPrometheusQueryPresetRepositoryPreview:
         prometheus_client: MagicMock,
         canned_response: PrometheusResponse,
     ) -> None:
-        result = await repository.preview_query_template(
+        result = await repository.preview_template(
             query_template="sum(rate(metric{{{labels}}}[{window}]))",
             default_window="5m",
         )
@@ -325,7 +325,7 @@ class TestPrometheusQueryPresetRepositoryPreview:
         )
 
         with pytest.raises(PrometheusQueryEvaluationFailed):
-            await repository.preview_query_template(
+            await repository.preview_template(
                 query_template="sum({invalid",
                 default_window="5m",
             )

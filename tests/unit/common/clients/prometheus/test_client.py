@@ -5,6 +5,7 @@ import aiohttp
 import pytest
 
 from ai.backend.common.clients.prometheus import (
+    FixedQueryBuilder,
     LabelMatcher,
     MetricPreset,
     PrometheusClient,
@@ -57,11 +58,12 @@ def prometheus_client(mock_pool: Mock) -> PrometheusClient:
     return PrometheusClient(
         endpoint="http://localhost:9090/api/v1",
         client_pool=mock_pool,
+        fixed_query_builder=FixedQueryBuilder("1m"),
     )
 
 
 class TestQueryRange:
-    """Tests for PrometheusClient.query_range() method."""
+    """Tests for PrometheusClient._query_range() method."""
 
     @pytest.fixture
     def sample_preset(self) -> MetricPreset:
@@ -110,7 +112,7 @@ class TestQueryRange:
         sample_time_range: QueryTimeRange,
         success_response: AsyncMock,
     ) -> None:
-        result = await prometheus_client.query_range(sample_preset, sample_time_range)
+        result = await prometheus_client._query_range(sample_preset, sample_time_range)
 
         assert isinstance(result, PrometheusResponse)
         assert result.status == "success"
@@ -134,7 +136,7 @@ class TestQueryRange:
         error_4xx_response: AsyncMock,
     ) -> None:
         with pytest.raises(FailedToGetMetric, match="Bad Request: Invalid query"):
-            await prometheus_client.query_range(sample_preset, sample_time_range)
+            await prometheus_client._query_range(sample_preset, sample_time_range)
 
     @pytest.fixture
     def error_5xx_response(self, mock_session: Mock) -> AsyncMock:
@@ -153,7 +155,7 @@ class TestQueryRange:
         error_5xx_response: AsyncMock,
     ) -> None:
         with pytest.raises(FailedToGetMetric):
-            await prometheus_client.query_range(sample_preset, sample_time_range)
+            await prometheus_client._query_range(sample_preset, sample_time_range)
 
     @pytest.fixture
     def connection_error_response(self, mock_session: Mock) -> AsyncMock:
@@ -169,11 +171,11 @@ class TestQueryRange:
         connection_error_response: AsyncMock,
     ) -> None:
         with pytest.raises(PrometheusConnectionError):
-            await prometheus_client.query_range(sample_preset, sample_time_range)
+            await prometheus_client._query_range(sample_preset, sample_time_range)
 
 
 class TestQueryInstant:
-    """Tests for PrometheusClient.query_instant() method."""
+    """Tests for PrometheusClient._query_instant() method."""
 
     @pytest.fixture
     def sample_preset(self) -> MetricPreset:
@@ -213,7 +215,7 @@ class TestQueryInstant:
         sample_preset: MetricPreset,
         success_response: AsyncMock,
     ) -> None:
-        result = await prometheus_client.query_instant(sample_preset)
+        result = await prometheus_client._query_instant(sample_preset)
 
         assert isinstance(result, PrometheusResponse)
         assert result.status == "success"
@@ -228,7 +230,7 @@ class TestQueryInstant:
         sample_preset: MetricPreset,
         success_response: AsyncMock,
     ) -> None:
-        result = await prometheus_client.query_instant(sample_preset, time="1704067200.123")
+        result = await prometheus_client._query_instant(sample_preset, time="1704067200.123")
 
         assert isinstance(result, PrometheusResponse)
         mock_session.post.assert_called_once()
@@ -252,7 +254,7 @@ class TestQueryInstant:
         error_4xx_response: AsyncMock,
     ) -> None:
         with pytest.raises(FailedToGetMetric, match="Bad Request: Invalid query"):
-            await prometheus_client.query_instant(sample_preset)
+            await prometheus_client._query_instant(sample_preset)
 
     @pytest.fixture
     def error_5xx_response(self, mock_session: Mock) -> AsyncMock:
@@ -270,7 +272,7 @@ class TestQueryInstant:
         error_5xx_response: AsyncMock,
     ) -> None:
         with pytest.raises(FailedToGetMetric):
-            await prometheus_client.query_instant(sample_preset)
+            await prometheus_client._query_instant(sample_preset)
 
     @pytest.fixture
     def connection_error_response(self, mock_session: Mock) -> AsyncMock:
@@ -285,7 +287,99 @@ class TestQueryInstant:
         connection_error_response: AsyncMock,
     ) -> None:
         with pytest.raises(PrometheusConnectionError):
-            await prometheus_client.query_instant(sample_preset)
+            await prometheus_client._query_instant(sample_preset)
+
+
+class TestExecutePreset:
+    @pytest.fixture
+    def range_response(self, mock_session: Mock) -> AsyncMock:
+        response = create_mock_response(
+            status=200,
+            json_data={
+                "status": "success",
+                "data": {
+                    "resultType": "matrix",
+                    "result": [
+                        {
+                            "metric": {"kernel_id": "kernel-1"},
+                            "values": [[1704067200.0, "10.5"]],
+                        }
+                    ],
+                },
+            },
+        )
+        mock_session.post.return_value = response
+        return response
+
+    async def test_with_time_range_executes_range_query(
+        self,
+        prometheus_client: PrometheusClient,
+        mock_session: Mock,
+        range_response: AsyncMock,
+    ) -> None:
+        time_range = QueryTimeRange(
+            start="2024-01-01T00:00:00Z",
+            end="2024-01-01T01:00:00Z",
+            step="60s",
+        )
+
+        result = await prometheus_client.execute_preset(
+            query_template="sum(my_metric{{{labels}}}) by ({group_by})",
+            filter_labels={"kernel_id": "kernel-1"},
+            group_labels=["kernel_id"],
+            time_window="5m",
+            time_range=time_range,
+        )
+
+        assert isinstance(result, PrometheusResponse)
+        assert result.data.result_type == "matrix"
+        mock_session.post.assert_called_once()
+        assert mock_session.post.call_args.args[0] == "query_range"
+        form_data = mock_session.post.call_args.kwargs["data"]
+        field_values = {field[0]["name"]: field[2] for field in form_data._fields}
+        assert field_values["query"] == 'sum(my_metric{kernel_id="kernel-1"}) by (kernel_id)'
+        assert field_values["start"] == time_range.start
+        assert field_values["end"] == time_range.end
+        assert field_values["step"] == time_range.step
+
+    @pytest.fixture
+    def instant_response(self, mock_session: Mock) -> AsyncMock:
+        response = create_mock_response(
+            status=200,
+            json_data={
+                "status": "success",
+                "data": {
+                    "resultType": "vector",
+                    "result": [
+                        {
+                            "metric": {"kernel_id": "kernel-1"},
+                            "value": [1704067200.0, "10.5"],
+                        }
+                    ],
+                },
+            },
+        )
+        mock_session.post.return_value = response
+        return response
+
+    async def test_without_time_range_executes_instant_query(
+        self,
+        prometheus_client: PrometheusClient,
+        mock_session: Mock,
+        instant_response: AsyncMock,
+    ) -> None:
+        result = await prometheus_client.execute_preset(
+            query_template="sum(my_metric{{{labels}}}) by ({group_by})",
+            filter_labels={"kernel_id": "kernel-1"},
+            group_labels=["kernel_id"],
+            time_window="5m",
+            time_range=None,
+        )
+
+        assert isinstance(result, PrometheusResponse)
+        assert result.data.result_type == "vector"
+        mock_session.post.assert_called_once()
+        assert mock_session.post.call_args.args[0] == "query"
 
 
 class TestTimeout:
@@ -306,6 +400,7 @@ class TestTimeout:
         return PrometheusClient(
             endpoint="http://localhost:9090/api/v1",
             client_pool=mock_pool,
+            fixed_query_builder=FixedQueryBuilder("1m"),
             timeout=5.0,
         )
 
@@ -344,11 +439,11 @@ class TestTimeout:
         timeout_response: AsyncMock,
     ) -> None:
         with pytest.raises(PrometheusConnectionError):
-            await client_with_custom_timeout.query_range(sample_preset, sample_time_range)
+            await client_with_custom_timeout._query_range(sample_preset, sample_time_range)
 
 
 class TestQueryLabelValues:
-    """Tests for PrometheusClient.query_label_values() method."""
+    """Tests for PrometheusClient._query_label_values() method."""
 
     @pytest.fixture
     def success_response(self, mock_session: Mock) -> AsyncMock:
@@ -367,7 +462,7 @@ class TestQueryLabelValues:
         prometheus_client: PrometheusClient,
         success_response: AsyncMock,
     ) -> None:
-        result = await prometheus_client.query_label_values(
+        result = await prometheus_client._query_label_values(
             label_name="container_metric_name",
             metric_match="backendai_container_utilization",
         )
@@ -391,7 +486,7 @@ class TestQueryLabelValues:
         error_4xx_response: AsyncMock,
     ) -> None:
         with pytest.raises(FailedToGetMetric):
-            await prometheus_client.query_label_values(
+            await prometheus_client._query_label_values(
                 label_name="container_metric_name",
                 metric_match="backendai_container_utilization",
             )
@@ -408,7 +503,7 @@ class TestQueryLabelValues:
         connection_error_response: AsyncMock,
     ) -> None:
         with pytest.raises(PrometheusConnectionError):
-            await prometheus_client.query_label_values(
+            await prometheus_client._query_label_values(
                 label_name="container_metric_name",
                 metric_match="backendai_container_utilization",
             )
