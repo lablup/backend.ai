@@ -37,6 +37,7 @@ class AgentBackend(enum.StrEnum):
     # The list of importable backend names under "ai.backend.agent" pkg namespace.
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
+    CONTAINERD = "containerd"
     DUMMY = "dummy"
 
 

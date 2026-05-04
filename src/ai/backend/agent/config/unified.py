@@ -2199,6 +2199,8 @@ class AgentSpecificConfig(BaseConfigSchema):
                 self.container.validate_kubernetes_nfs()
             case AgentBackend.DOCKER:
                 DockerExtraConfig.model_validate(self.container.model_dump())
+            case AgentBackend.CONTAINERD:
+                pass
             case AgentBackend.DUMMY:
                 pass
 
