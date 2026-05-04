@@ -37,6 +37,10 @@ from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateArchiveDownloadSessionActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.resolve_by_name import (
+    ResolveVFolderIdByNameAction,
+    ResolveVFolderIdByNameActionResult,
+)
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
@@ -308,3 +312,74 @@ class TestVFolderFileServiceCreateArchiveDownload:
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
         call_kwargs = mock_client.create_archive_download_token.call_args.kwargs
         assert call_kwargs["filename"] is None
+
+
+class TestVFolderServiceResolveByName:
+    """Tests for ``VFolderService.resolve_vfolder_id_by_name``.
+
+    The service triggers a name → UUID lookup against the repository and
+    wraps the result in a :class:`ResolveVFolderIdByNameActionResult`,
+    or raises :class:`VFolderNotFound` when the repository returns ``None``.
+    """
+
+    @pytest.fixture
+    def vfolder_service(self, mock_vfolder_repository: MagicMock) -> VFolderService:
+        return VFolderService(
+            config_provider=MagicMock(),
+            etcd=MagicMock(),
+            storage_manager=MagicMock(),
+            background_task_manager=MagicMock(),
+            vfolder_repository=mock_vfolder_repository,
+            user_repository=MagicMock(),
+            valkey_stat_client=MagicMock(),
+        )
+
+    async def test_resolve_returns_uuid_in_action_result(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        sample_vfolder_uuid: uuid.UUID,
+    ) -> None:
+        """Repository hit → ActionResult carries the resolved UUID."""
+        mock_vfolder_repository.resolve_vfolder_id_by_name = AsyncMock(
+            return_value=sample_vfolder_uuid
+        )
+        action = ResolveVFolderIdByNameAction(vfolder_name="test-vfolder")
+
+        result = await vfolder_service.resolve_vfolder_id_by_name(action)
+
+        assert isinstance(result, ResolveVFolderIdByNameActionResult)
+        assert result.vfolder_id == sample_vfolder_uuid
+        mock_vfolder_repository.resolve_vfolder_id_by_name.assert_called_once_with("test-vfolder")
+
+    async def test_resolve_missing_name_raises_not_found(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+    ) -> None:
+        """Repository miss (None) → service raises VFolderNotFound carrying
+        the requested name in extra_data."""
+        mock_vfolder_repository.resolve_vfolder_id_by_name = AsyncMock(return_value=None)
+        action = ResolveVFolderIdByNameAction(vfolder_name="missing-vfolder")
+
+        with pytest.raises(VFolderNotFound) as exc_info:
+            await vfolder_service.resolve_vfolder_id_by_name(action)
+
+        assert exc_info.value.extra_data == "missing-vfolder"
+        mock_vfolder_repository.resolve_vfolder_id_by_name.assert_called_once_with(
+            "missing-vfolder"
+        )
+
+    async def test_action_entity_id_is_vfolder_name(self) -> None:
+        """The Action exposes the vfolder name via ``entity_id`` for
+        action-monitor logging — verifies the dataclass contract used by
+        the action processor."""
+        action = ResolveVFolderIdByNameAction(vfolder_name="my-folder")
+        assert action.entity_id() == "my-folder"
+
+    async def test_action_result_entity_id_is_uuid_string(
+        self, sample_vfolder_uuid: uuid.UUID
+    ) -> None:
+        """ActionResult exposes the resolved id as a string for logging."""
+        result = ResolveVFolderIdByNameActionResult(vfolder_id=sample_vfolder_uuid)
+        assert result.entity_id() == str(sample_vfolder_uuid)
