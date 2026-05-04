@@ -12,7 +12,6 @@ import pytest
 from ai.backend.common.dto.manager.v2.model_card.request import (
     DeleteModelCardOptions,
     DeleteModelCardsInput,
-    DeleteModelCardsOptions,
 )
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
@@ -86,31 +85,18 @@ class TestModelCardAdapterDelete:
     def adapter(self, mock_processors: MagicMock) -> ModelCardAdapter:
         return ModelCardAdapter(mock_processors)
 
-    async def test_delete_without_options_skips_vfolder(
-        self,
-        adapter: ModelCardAdapter,
-        mock_processors: MagicMock,
-        card_id: uuid.UUID,
-    ) -> None:
-        payload = await adapter.delete(card_id)
-
-        assert payload.id == card_id
-        mock_processors.model_card.delete.wait_for_complete.assert_awaited_once_with(
-            DeleteModelCardAction(id=card_id)
-        )
-        mock_processors.vfolder.delete_v2.wait_for_complete.assert_not_called()
-
     async def test_delete_with_option_off_skips_vfolder(
         self,
         adapter: ModelCardAdapter,
         mock_processors: MagicMock,
         card_id: uuid.UUID,
     ) -> None:
-        await adapter.delete(
-            card_id,
-            options=DeleteModelCardOptions(delete_associated_folder=False),
-        )
+        payload = await adapter.delete(card_id, options=DeleteModelCardOptions())
 
+        assert payload.id == card_id
+        mock_processors.model_card.delete.wait_for_complete.assert_awaited_once_with(
+            DeleteModelCardAction(id=card_id)
+        )
         mock_processors.vfolder.delete_v2.wait_for_complete.assert_not_called()
 
     async def test_delete_with_option_on_calls_vfolder_delete(
@@ -156,7 +142,7 @@ class TestModelCardAdapterBulkDelete:
     def adapter(self, mock_processors: MagicMock) -> ModelCardAdapter:
         return ModelCardAdapter(mock_processors)
 
-    async def test_bulk_delete_without_options_skips_vfolder(
+    async def test_bulk_delete_with_option_off_skips_vfolder(
         self,
         adapter: ModelCardAdapter,
         mock_processors: MagicMock,
@@ -164,7 +150,9 @@ class TestModelCardAdapterBulkDelete:
     ) -> None:
         ids = [card_id for card_id, _ in card_pairs]
 
-        payload = await adapter.bulk_delete(DeleteModelCardsInput(ids=ids))
+        payload = await adapter.bulk_delete(
+            DeleteModelCardsInput(ids=ids), DeleteModelCardOptions()
+        )
 
         assert payload.deleted_count == len(ids)
         assert mock_processors.model_card.delete.wait_for_complete.await_count == len(ids)
@@ -179,10 +167,8 @@ class TestModelCardAdapterBulkDelete:
         ids = [card_id for card_id, _ in card_pairs]
 
         await adapter.bulk_delete(
-            DeleteModelCardsInput(
-                ids=ids,
-                options=DeleteModelCardsOptions(delete_associated_folder=True),
-            )
+            DeleteModelCardsInput(ids=ids),
+            DeleteModelCardOptions(delete_associated_folder=True),
         )
 
         assert mock_processors.vfolder.delete_v2.wait_for_complete.await_count == len(ids)

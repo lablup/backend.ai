@@ -374,27 +374,28 @@ class ModelCardAdapter(BaseAdapter):
     async def delete(
         self,
         card_id: UUID,
-        options: DeleteModelCardOptions | None = None,
+        options: DeleteModelCardOptions,
     ) -> DeleteModelCardPayload:
         result = await self._processors.model_card.delete.wait_for_complete(
             DeleteModelCardAction(id=card_id)
         )
-        if options is not None and options.delete_associated_folder:
+        if options.delete_associated_folder:
             await self._processors.vfolder.delete_v2.wait_for_complete(
                 DeleteVFolderV2Action(vfolder_id=result.model_card.vfolder_id)
             )
         return DeleteModelCardPayload(id=result.model_card.id)
 
-    async def bulk_delete(self, input: DeleteModelCardsInput) -> DeleteModelCardsPayload:
+    async def bulk_delete(
+        self,
+        input: DeleteModelCardsInput,
+        options: DeleteModelCardOptions,
+    ) -> DeleteModelCardsPayload:
         """Delete multiple model cards by ID."""
-        delete_associated_folder = (
-            input.options.delete_associated_folder if input.options is not None else False
-        )
         for card_id in input.ids:
             result = await self._processors.model_card.delete.wait_for_complete(
                 DeleteModelCardAction(id=card_id)
             )
-            if delete_associated_folder:
+            if options.delete_associated_folder:
                 await self._processors.vfolder.delete_v2.wait_for_complete(
                     DeleteVFolderV2Action(vfolder_id=result.model_card.vfolder_id)
                 )

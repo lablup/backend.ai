@@ -28,9 +28,6 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     DeleteModelCardsInput as DeleteCardsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
-    DeleteModelCardsOptions as DeleteCardsOptionsDTO,
-)
-from ai.backend.common.dto.manager.v2.model_card.request import (
     DeployModelCardInput as DeployInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
@@ -545,36 +542,17 @@ class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Options for single model card delete operation.",
+        description="Options for the model card delete operation.",
     ),
     name="DeleteModelCardV2Options",
 )
 class DeleteModelCardOptionsGQL(PydanticInputMixin[DeleteOptionsDTO]):
-    """Options for single model card delete operation."""
+    """Options for the model card delete operation."""
 
     delete_associated_folder: bool = gql_field(
         description=(
-            "If true, also soft-delete (move to trash) the model VFolder "
-            "associated with the deleted model card."
-        ),
-        default=False,
-    )
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Options for bulk model card delete operation.",
-    ),
-    name="DeleteModelCardsV2Options",
-)
-class DeleteModelCardsOptionsGQL(PydanticInputMixin[DeleteCardsOptionsDTO]):
-    """Options for bulk model card delete operation."""
-
-    delete_associated_folder: bool = gql_field(
-        description=(
-            "If true, also soft-delete (move to trash) the model VFolders "
-            "associated with the deleted model cards."
+            "If true, also soft-delete (move to trash) the model VFolder(s) "
+            "associated with the deleted model card(s)."
         ),
         default=False,
     )
@@ -589,10 +567,10 @@ class DeleteModelCardsOptionsGQL(PydanticInputMixin[DeleteCardsOptionsDTO]):
 )
 class DeleteModelCardsInputGQL(PydanticInputMixin[DeleteCardsInputDTO]):
     ids: list[UUID] = gql_field(description="List of model card UUIDs to delete.")
-    options: DeleteModelCardsOptionsGQL | None = gql_added_field(
+    options: DeleteModelCardOptionsGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Options for the bulk delete operation.",
+            description="Options for the delete operation.",
         ),
         default=None,
     )

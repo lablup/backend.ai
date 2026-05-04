@@ -85,7 +85,9 @@ class V2ModelCardHandler:
         self,
         body: BodyParam[DeleteModelCardsInput],
     ) -> APIResponse:
-        result = await self._adapter.bulk_delete(body.parsed)
+        result = await self._adapter.bulk_delete(
+            body.parsed, body.parsed.options or DeleteModelCardOptions()
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scan_project(

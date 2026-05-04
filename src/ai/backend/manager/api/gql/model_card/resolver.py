@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    DeleteModelCardOptions,
     ModelCardFilter,
     ModelCardOrder,
     SearchModelCardsInput,
@@ -156,7 +157,7 @@ async def admin_delete_model_card_v2(
     options: DeleteModelCardOptionsGQL | None = None,
 ) -> DeleteModelCardPayloadGQL:
     check_admin_only()
-    options_dto = options.to_pydantic() if options is not None else None
+    options_dto = options.to_pydantic() if options is not None else DeleteModelCardOptions()
     payload = await info.context.adapters.model_card.delete(id, options=options_dto)
     return DeleteModelCardPayloadGQL.from_pydantic(payload)
 
@@ -183,7 +184,9 @@ async def admin_delete_model_cards_v2(
     check_admin_only()
     ctx = info.context
     dto = input.to_pydantic()
-    payload = await ctx.adapters.model_card.bulk_delete(dto)
+    payload = await ctx.adapters.model_card.bulk_delete(
+        dto, dto.options or DeleteModelCardOptions()
+    )
     return DeleteModelCardsPayloadGQL.from_pydantic(payload)
 
 
