@@ -63,6 +63,7 @@ class CliArgs:
     non_interactive: bool
     public_facing_address: str
     accelerator: str | None = None
+    editable_webui: bool | None = None
     fqdn_prefix: str | None = None
     tls_advertised: bool = False
     advertised_port: int = 443
@@ -205,6 +206,7 @@ class ServiceConfig:
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
     accelerator: Accelerator | None = None
+    editable_webui: bool | None = None  # None: auto (True on main branch)
     fqdn_prefix: str | None = None
     tls_advertised: bool = False
     advertised_port: int = 443
