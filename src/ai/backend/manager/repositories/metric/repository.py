@@ -51,7 +51,7 @@ class MetricRepository:
         self._prometheus_client = prometheus_client
 
     async def query_container_metric_metadata(self) -> list[str]:
-        return await self._prometheus_client.fetch_container_metric_metadata()
+        return await self._prometheus_client.fetch_available_container_metric_names()
 
     async def query_container_metric(
         self,

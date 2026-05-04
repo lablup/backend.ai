@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Mapping, Sequence
 from http import HTTPMethod
 from typing import Any, cast
@@ -56,7 +55,7 @@ class PrometheusClient:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._fixed_query_builder = fixed_query_builder
 
-    async def fetch_container_metric_metadata(self) -> list[str]:
+    async def fetch_available_container_metric_names(self) -> list[str]:
         query = self._fixed_query_builder.get_container_metric_metadata_query()
         result = await self._query_label_values(
             label_name=query.label_name,
@@ -85,9 +84,9 @@ class PrometheusClient:
         kernel_ids: Sequence[KernelId],
     ) -> dict[KernelId, list[MetricValue]]:
         queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
-        gauge_response, diff_response, rate_response = await asyncio.gather(
-            *(self._query_instant(preset) for preset in queries.to_list())
-        )
+        gauge_response = await self._query_instant(queries.gauge)
+        diff_response = await self._query_instant(queries.diff)
+        rate_response = await self._query_instant(queries.rate)
         gauge = KernelMetricValuesByKernel.from_prometheus_response(gauge_response)
         diff = KernelMetricValuesByKernel.from_prometheus_response(diff_response)
         rate = KernelMetricValuesByKernel.from_prometheus_response(rate_response)
