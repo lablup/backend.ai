@@ -413,6 +413,16 @@ def _build_sandbox_config(
     name: str,
     uid: str,
 ) -> Any:
+    # cgroup_parent must be passed in systemd 'slice:prefix:name' format
+    # when the runtime (runc) is configured with the systemd cgroup
+    # driver. If left empty, containerd's CRI plugin synthesises a
+    # cgroupfs-style '/k8s.io/<sandbox_id>' path that runc rejects on
+    # systemd hosts. Using 'system.slice' as the parent because it
+    # always exists on systemd systems, unlike 'kubepods.slice' which
+    # only kubelet creates. The {uid} suffix keeps concurrent PoC runs
+    # from clashing on the same scope unit.
+    cgroup_parent = f"system.slice:cri-poc:{uid[:8]}"
+
     return api_pb2.PodSandboxConfig(
         metadata=api_pb2.PodSandboxMetadata(
             name=name,
@@ -429,6 +439,7 @@ def _build_sandbox_config(
             "io.backend.ai/poc": "v1-cilium-validation",
         },
         linux=api_pb2.LinuxPodSandboxConfig(
+            cgroup_parent=cgroup_parent,
             security_context=api_pb2.LinuxSandboxSecurityContext(
                 namespace_options=api_pb2.NamespaceOption(
                     network=api_pb2.POD,
