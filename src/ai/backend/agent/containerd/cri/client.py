@@ -2,10 +2,20 @@
 
 This module wraps the auto-generated stubs in ``cri.generated`` with a
 small high-level surface that the agent uses. Currently exposed:
-``Version()`` plus the PodSandbox lifecycle (``RunPodSandbox`` /
-``StopPodSandbox`` / ``RemovePodSandbox`` / ``PodSandboxStatus`` /
-``ListPodSandbox``). Container and image operations land in follow-up
-commits.
+
+- ``Version()`` — runtime health probe.
+- PodSandbox lifecycle: ``RunPodSandbox`` / ``StopPodSandbox`` /
+  ``RemovePodSandbox`` / ``PodSandboxStatus`` / ``ListPodSandbox``.
+- Container lifecycle: ``CreateContainer`` / ``StartContainer`` /
+  ``StopContainer`` / ``RemoveContainer`` / ``ListContainers`` /
+  ``ContainerStatus``.
+- Image management: ``PullImage`` / ``ImageStatus`` / ``ListImages`` /
+  ``RemoveImage``.
+
+Streaming RPCs (``Exec`` / ``Attach`` / ``ContainerStats``) and the
+filesystem / runtime-config endpoints are not yet exposed; they land
+when the agent layer needs them (code-runner integration, stats
+collection).
 
 Methods take and return raw proto objects rather than wrapping them in
 domain dataclasses — the agent layer owns the translation between
@@ -227,9 +237,208 @@ class CriClient:
             raise CriRpcError(f"CRI ListPodSandbox failed: {exc.details()}") from exc
         return list(response.items)
 
+    # ------------------------------------------------------------------ #
+    # Container lifecycle
+    # ------------------------------------------------------------------ #
+    #
+    # Once a sandbox exists (with its netns + CNI-assigned interface),
+    # workload containers are created inside it. They join the sandbox's
+    # network namespace, so all containers in a sandbox share the IP that
+    # CNI assigned at RunPodSandbox time. For Backend.AI's "1 kernel = 1
+    # workload container in its own sandbox" model, this is a 1:1 wrapping
+    # — no sidecar pattern.
+    #
+    # CreateContainer must be passed the same PodSandboxConfig that was
+    # used for RunPodSandbox (the proto demands it for cross-validation,
+    # even though the runtime already has the sandbox state).
+
+    async def create_container(
+        self,
+        *,
+        sandbox_id: str,
+        config: api_pb2.ContainerConfig,
+        sandbox_config: api_pb2.PodSandboxConfig,
+    ) -> str:
+        """Create a workload container inside an existing sandbox; return container ID."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.CreateContainerRequest(
+            pod_sandbox_id=sandbox_id,
+            config=config,
+            sandbox_config=sandbox_config,
+        )
+        try:
+            response: api_pb2.CreateContainerResponse = await stub.CreateContainer(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI CreateContainer failed in sandbox {sandbox_id} "
+                f"for container '{config.metadata.name}': {exc.details()}"
+            ) from exc
+        return response.container_id
+
+    async def start_container(self, container_id: str) -> None:
+        """Start a previously created container."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.StartContainerRequest(container_id=container_id)
+        try:
+            await stub.StartContainer(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI StartContainer failed for container {container_id}: {exc.details()}"
+            ) from exc
+
+    async def stop_container(self, container_id: str, *, grace_period_secs: int = 0) -> None:
+        """Stop a running container.
+
+        ``grace_period_secs`` maps to CRI's ``StopContainerRequest.timeout``
+        — the grace period before forced termination (SIGTERM → wait →
+        SIGKILL). Default 0 mirrors CRI's "kill immediately" behaviour;
+        callers wanting a graceful shutdown should pass an explicit
+        non-zero value. Renamed from the proto's ``timeout`` so it cannot
+        be confused with an asyncio call timeout.
+        """
+        stub = self._require_runtime_stub()
+        request = api_pb2.StopContainerRequest(container_id=container_id, timeout=grace_period_secs)
+        try:
+            await stub.StopContainer(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI StopContainer failed for container {container_id}: {exc.details()}"
+            ) from exc
+
+    async def remove_container(self, container_id: str) -> None:
+        """Remove a stopped container (frees rootfs + container metadata)."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.RemoveContainerRequest(container_id=container_id)
+        try:
+            await stub.RemoveContainer(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI RemoveContainer failed for container {container_id}: {exc.details()}"
+            ) from exc
+
+    async def list_containers(
+        self,
+        *,
+        container_filter: api_pb2.ContainerFilter | None = None,
+    ) -> list[api_pb2.Container]:
+        """List containers matching the optional filter."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.ListContainersRequest(filter=container_filter)
+        try:
+            response: api_pb2.ListContainersResponse = await stub.ListContainers(request)
+        except AioRpcError as exc:
+            raise CriRpcError(f"CRI ListContainers failed: {exc.details()}") from exc
+        return list(response.containers)
+
+    async def container_status(
+        self,
+        container_id: str,
+        *,
+        verbose: bool = False,
+    ) -> api_pb2.ContainerStatusResponse:
+        """Return the container's runtime state."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.ContainerStatusRequest(
+            container_id=container_id,
+            verbose=verbose,
+        )
+        try:
+            response: api_pb2.ContainerStatusResponse = await stub.ContainerStatus(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI ContainerStatus failed for container {container_id}: {exc.details()}"
+            ) from exc
+        return response
+
+    # ------------------------------------------------------------------ #
+    # Image management
+    # ------------------------------------------------------------------ #
+    #
+    # CRI separates image management onto its own service (ImageService)
+    # because it has different concurrency / progress-reporting characteristics
+    # than the runtime service (image pulls can take minutes; runtime ops
+    # are typically sub-second).
+    #
+    # PullImage is intentionally exposed as a single awaitable rather than a
+    # streaming progress channel — CRI's PullImage is a unary RPC that
+    # blocks until the pull finishes (or fails). For long pulls the agent
+    # already wraps these calls in BackgroundTask handlers; per-byte
+    # progress is not exposed by CRI.
+
+    async def pull_image(
+        self,
+        image: api_pb2.ImageSpec,
+        *,
+        auth: api_pb2.AuthConfig | None = None,
+        sandbox_config: api_pb2.PodSandboxConfig | None = None,
+    ) -> str:
+        """Pull an image; return the runtime's image reference (id or digest)."""
+        stub = self._require_image_stub()
+        request = api_pb2.PullImageRequest(
+            image=image,
+            auth=auth,
+            sandbox_config=sandbox_config,
+        )
+        try:
+            response: api_pb2.PullImageResponse = await stub.PullImage(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI PullImage failed for image '{image.image}': {exc.details()}"
+            ) from exc
+        return response.image_ref
+
+    async def image_status(
+        self,
+        image: api_pb2.ImageSpec,
+        *,
+        verbose: bool = False,
+    ) -> api_pb2.ImageStatusResponse:
+        """Return image metadata; ``image.image`` may be missing if not present."""
+        stub = self._require_image_stub()
+        request = api_pb2.ImageStatusRequest(image=image, verbose=verbose)
+        try:
+            response: api_pb2.ImageStatusResponse = await stub.ImageStatus(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI ImageStatus failed for image '{image.image}': {exc.details()}"
+            ) from exc
+        return response
+
+    async def list_images(
+        self,
+        *,
+        image_filter: api_pb2.ImageFilter | None = None,
+    ) -> list[api_pb2.Image]:
+        """List images known to the runtime."""
+        stub = self._require_image_stub()
+        request = api_pb2.ListImagesRequest(filter=image_filter)
+        try:
+            response: api_pb2.ListImagesResponse = await stub.ListImages(request)
+        except AioRpcError as exc:
+            raise CriRpcError(f"CRI ListImages failed: {exc.details()}") from exc
+        return list(response.images)
+
+    async def remove_image(self, image: api_pb2.ImageSpec) -> None:
+        """Remove an image from the runtime's image store."""
+        stub = self._require_image_stub()
+        request = api_pb2.RemoveImageRequest(image=image)
+        try:
+            await stub.RemoveImage(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI RemoveImage failed for image '{image.image}': {exc.details()}"
+            ) from exc
+
     def _require_runtime_stub(self) -> api_pb2_grpc.RuntimeServiceAsyncStub:
         if self._runtime_stub is None:
             raise CriConnectionError(
                 "CRI client is not connected; call connect() or use it as an async context manager."
             )
         return self._runtime_stub
+
+    def _require_image_stub(self) -> api_pb2_grpc.ImageServiceAsyncStub:
+        if self._image_stub is None:
+            raise CriConnectionError(
+                "CRI client is not connected; call connect() or use it as an async context manager."
+            )
+        return self._image_stub
