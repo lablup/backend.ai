@@ -286,7 +286,7 @@ class TestModelCardDelete:
         )
 
     @pytest.mark.parametrize("case", _DELETE_CASES)
-    async def test_delete_against_two_cards_on_one_vfolder(
+    async def test_delete(
         self,
         case: DeleteCase,
         db_with_cleanup: ExtendedAsyncSAEngine,
