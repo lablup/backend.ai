@@ -551,17 +551,17 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             return TriState.nullify()
         return TriState.update(value)
 
-    @staticmethod
     def _convert_strategy_input(
+        self,
         strategy_input: DeploymentStrategyInput | None,
     ) -> tuple[DeploymentStrategy | None, dict[str, Any] | None]:
         """Convert DeploymentStrategyInput to (strategy, strategy_spec dict)."""
         if strategy_input is None:
             return None, None
-        return DeploymentRevisionPresetAdapter._convert_required_strategy_input(strategy_input)
+        return self._convert_required_strategy_input(strategy_input)
 
-    @staticmethod
     def _convert_required_strategy_input(
+        self,
         strategy_input: DeploymentStrategyInput,
     ) -> tuple[DeploymentStrategy, dict[str, Any]]:
         """Convert a non-null DeploymentStrategyInput to (strategy, strategy_spec dict)."""
@@ -577,30 +577,28 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 spec_dict = bg.model_dump(mode="json") if bg is not None else {}
                 return DeploymentStrategy.BLUE_GREEN, spec_dict
 
-    @classmethod
     def _convert_strategy_update_state(
-        cls,
+        self,
         strategy_input: Any,
     ) -> TriState[DeploymentStrategy]:
         if strategy_input is SENTINEL:
             return TriState.nop()
         if strategy_input is None:
             return TriState.nullify()
-        strategy, _ = cls._convert_strategy_input(strategy_input)
+        strategy, _ = self._convert_strategy_input(strategy_input)
         if strategy is None:
             return TriState.nullify()
         return TriState.update(strategy)
 
-    @classmethod
     def _convert_strategy_spec_update_state(
-        cls,
+        self,
         strategy_input: Any,
     ) -> TriState[dict[str, Any]]:
         if strategy_input is SENTINEL:
             return TriState.nop()
         if strategy_input is None:
             return TriState.nullify()
-        _, spec = cls._convert_strategy_input(strategy_input)
+        _, spec = self._convert_strategy_input(strategy_input)
         if spec is None:
             return TriState.nullify()
         return TriState.update(spec)
