@@ -1397,17 +1397,6 @@ type BulkPurgeUsersV2Payload {
 }
 
 """
-Added in UNRELEASED. Failure detail for a single vfolder in a bulk purge.
-"""
-type BulkPurgeVFolderV2Error {
-  """UUID of the vfolder that failed to purge."""
-  vfolderId: UUID!
-
-  """Error message describing the failure."""
-  message: String!
-}
-
-"""
 Added in 26.4.2. Input for permanently purging multiple virtual folders.
 """
 input BulkPurgeVFoldersV2Input {
@@ -1422,11 +1411,8 @@ input BulkPurgeVFoldersV2Input {
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
 type BulkPurgeVFoldersV2Payload {
-  """The vfolders whose data was permanently purged."""
-  vfolders: [VFolder!]!
-
-  """Per-vfolder failure entries for items that did not purge."""
-  failed: [BulkPurgeVFolderV2Error!]!
+  """Number of virtual folders successfully purged."""
+  purgedCount: Int!
 }
 
 """
