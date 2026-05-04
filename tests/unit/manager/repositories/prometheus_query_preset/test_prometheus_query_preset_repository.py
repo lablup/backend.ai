@@ -5,9 +5,16 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.clients.prometheus.client import PrometheusClient
+from ai.backend.common.clients.prometheus.preset import MetricPreset
+from ai.backend.common.dto.clients.prometheus.response import (
+    PrometheusQueryData,
+    PrometheusResponse,
+)
 from ai.backend.common.exception import PrometheusQueryPresetNotFound
 from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
@@ -54,7 +61,10 @@ class TestPrometheusQueryPresetRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> PrometheusQueryPresetRepository:
-        return PrometheusQueryPresetRepository(db=db_with_cleanup)
+        return PrometheusQueryPresetRepository(
+            db=db_with_cleanup,
+            prometheus_client=MagicMock(spec=PrometheusClient),
+        )
 
     @pytest.fixture
     async def sample_preset_id(
@@ -254,3 +264,49 @@ class TestPrometheusQueryPresetRepository:
     ) -> None:
         with pytest.raises(PrometheusQueryPresetNotFound):
             await preset_repository.delete(uuid.uuid4())
+
+
+class TestPrometheusQueryPresetRepositoryPreview:
+    """Tests for preview_query_template — does not touch DB."""
+
+    @pytest.fixture
+    def canned_response(self) -> PrometheusResponse:
+        return PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(result_type="vector", result=[]),
+        )
+
+    @pytest.fixture
+    def prometheus_client(self, canned_response: PrometheusResponse) -> MagicMock:
+        client = MagicMock(spec=PrometheusClient)
+        client.query_instant = AsyncMock(return_value=canned_response)
+        return client
+
+    @pytest.fixture
+    def repository(
+        self,
+        prometheus_client: MagicMock,
+    ) -> PrometheusQueryPresetRepository:
+        return PrometheusQueryPresetRepository(
+            db=MagicMock(),
+            prometheus_client=prometheus_client,
+        )
+
+    async def test_renders_empty_matchers_and_default_window(
+        self,
+        repository: PrometheusQueryPresetRepository,
+        prometheus_client: MagicMock,
+        canned_response: PrometheusResponse,
+    ) -> None:
+        result = await repository.preview_query_template(
+            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            default_window="5m",
+        )
+
+        passed_preset = prometheus_client.query_instant.call_args.kwargs["preset"]
+        assert isinstance(passed_preset, MetricPreset)
+        assert passed_preset.template == "sum(rate(metric{{{labels}}}[{window}]))"
+        assert passed_preset.labels == {}
+        assert passed_preset.group_by == frozenset()
+        assert passed_preset.window == "5m"
+        assert result is canned_response

@@ -1041,7 +1041,7 @@ class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class PrometheusConnectionError(BackendAIError):
+class PrometheusConnectionError(BackendAIError, web.HTTPServiceUnavailable):
     """Exception raised when a connection to Prometheus fails."""
 
     error_type = "https://api.backend.ai/probs/prometheus-connection-error"
@@ -1055,7 +1055,7 @@ class PrometheusConnectionError(BackendAIError):
         )
 
 
-class FailedToGetMetric(BackendAIError):
+class FailedToGetMetric(BackendAIError, web.HTTPBadGateway):
     """Exception raised when a metric cannot be retrieved."""
 
     error_type = "https://api.backend.ai/probs/failed-to-get-metric"

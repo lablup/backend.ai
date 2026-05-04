@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
     QueryTimeRangeInputDTO,
@@ -68,6 +69,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     ExecutePresetAction,
     GetPresetAction,
     ModifyPresetAction,
+    PreviewPresetAction,
     SearchPresetsAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -160,6 +162,29 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         )
 
         return ModifyQueryDefinitionPayload(item=self._data_to_dto(action_result.preset))
+
+    async def preview(self, input: PreviewQueryDefinitionInput) -> QueryDefinitionResultInfo:
+        """Preview a prometheus query template (admin only)."""
+        action_result = (
+            await self._processors.prometheus_query_preset.preview_preset.wait_for_complete(
+                PreviewPresetAction(query_template=input.query_template)
+            )
+        )
+        response = action_result.response
+        return QueryDefinitionResultInfo(
+            status=response.status,
+            result_type=response.data.result_type,
+            result=[
+                QueryDefinitionMetricResultInfo(
+                    metric=[
+                        MetricLabelEntryInfo(key=k, value=v)
+                        for k, v in mr.metric.model_dump(exclude_none=True).items()
+                    ],
+                    values=[MetricValueInfo(timestamp=ts, value=val) for ts, val in mr.values],
+                )
+                for mr in response.data.result
+            ],
+        )
 
     async def execute_preset(
         self,

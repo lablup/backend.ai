@@ -15,6 +15,8 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     GetPresetActionResult,
     ModifyPresetAction,
     ModifyPresetActionResult,
+    PreviewPresetAction,
+    PreviewPresetActionResult,
     SearchPresetsAction,
     SearchPresetsActionResult,
 )
@@ -30,6 +32,7 @@ class PrometheusQueryPresetProcessors(AbstractProcessorPackage):
     modify_preset: ActionProcessor[ModifyPresetAction, ModifyPresetActionResult]
     delete_preset: ActionProcessor[DeletePresetAction, DeletePresetActionResult]
     execute_preset: ActionProcessor[ExecutePresetAction, ExecutePresetActionResult]
+    preview_preset: ActionProcessor[PreviewPresetAction, PreviewPresetActionResult]
 
     def __init__(
         self,
@@ -43,6 +46,7 @@ class PrometheusQueryPresetProcessors(AbstractProcessorPackage):
         self.modify_preset = ActionProcessor(service.modify_preset, action_monitors)
         self.delete_preset = ActionProcessor(service.delete_preset, action_monitors)
         self.execute_preset = ActionProcessor(service.execute_preset, action_monitors)
+        self.preview_preset = ActionProcessor(service.preview_preset, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -53,4 +57,5 @@ class PrometheusQueryPresetProcessors(AbstractProcessorPackage):
             ModifyPresetAction.spec(),
             DeletePresetAction.spec(),
             ExecutePresetAction.spec(),
+            PreviewPresetAction.spec(),
         ]

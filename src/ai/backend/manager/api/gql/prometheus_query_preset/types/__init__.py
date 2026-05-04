@@ -19,6 +19,7 @@ from .inputs import (
     ExecuteQueryDefinitionOptionsInput,
     MetricLabelEntryInput,
     ModifyQueryDefinitionInput,
+    PreviewQueryDefinitionInput,
     QueryTimeRangeInput,
 )
 from .node import (
@@ -60,6 +61,7 @@ __all__ = [
     "QueryTimeRangeInput",
     "MetricLabelEntryInput",
     "ExecuteQueryDefinitionOptionsInput",
+    "PreviewQueryDefinitionInput",
     # Payload and result types
     "QueryDefinitionOptionsGQL",
     "MetricLabelEntryGQL",

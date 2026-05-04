@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     MetricLabelEntry,
     ModifyQueryDefinitionInput,
     ModifyQueryDefinitionOptionsInput,
+    PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
     SearchQueryDefinitionsInput,
@@ -57,6 +58,8 @@ __all__ = (
     # Request (execute supporting)
     "MetricLabelEntry",
     "ExecuteQueryDefinitionInput",
+    # Request (preview)
+    "PreviewQueryDefinitionInput",
     # Response (node)
     "QueryDefinitionNode",
     # Response (CRUD payloads)
