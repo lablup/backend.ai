@@ -422,21 +422,14 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def resolve_vfolder_id_by_name(self, name: str) -> uuid.UUID | None:
-        """Look up the UUID of a non-hard-deleted vfolder by name.
+        """Look up the UUID of a vfolder by name.
 
-        No access scoping — callers (e.g. session-create paths) are
-        responsible for validating user access against the resolved id
-        in their own action flow.
+        No access scoping or status filtering — callers (e.g. session-create
+        paths) are responsible for validating both user access and lifecycle
+        state of the resolved id in their own downstream flow.
         """
         async with self._db.begin_readonly_session() as session:
-            row_id = await session.scalar(
-                sa.select(vfolders.c.id).where(
-                    sa.and_(
-                        vfolders.c.name == name,
-                        vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES),
-                    )
-                )
-            )
+            row_id = await session.scalar(sa.select(vfolders.c.id).where(vfolders.c.name == name))
         if row_id is None:
             return None
         return cast(uuid.UUID, row_id)

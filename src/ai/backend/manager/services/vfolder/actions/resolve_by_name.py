@@ -11,12 +11,16 @@ from ai.backend.manager.services.vfolder.actions.base import VFolderAction
 
 @dataclass
 class ResolveVFolderIdByNameAction(VFolderAction):
-    """Resolve a single vfolder name into its UUID, scoped to the
-    authenticated user.
+    """Resolve a single vfolder name into its UUID.
 
-    User context (``user_id`` / ``role`` / ``domain_name``) is read from
-    :func:`current_user` inside the service, so the caller only needs to
-    pass the name.
+    Legacy-only: this action exists solely to support the v1 CLI's
+    name-keyed ``-v <vfolder-name>`` flag, which the modern UUID-keyed
+    ``mount_ids`` surface bypasses entirely. Remove once the legacy
+    name-keyed mount API is deprecated.
+
+    No access scoping is performed inside the service — the caller is
+    responsible for validating user access (and lifecycle state) of the
+    resolved id in its own downstream flow.
     """
 
     vfolder_name: str
