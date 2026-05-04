@@ -334,18 +334,30 @@ class SessionHandler:
 
         names_to_resolve: list[str] = []
         seen: set[str] = set()
-        for raw in list(mounts) + list(mount_map.keys()) + list(mount_options.keys()):
+
+        # ``mounts`` and ``mount_map`` are strictly name-keyed legacy
+        # surfaces — every entry is treated as a vfolder name.
+        for raw in list(mounts) + list(mount_map.keys()):
             name = str(raw)
             if name in seen:
                 continue
             seen.add(name)
+            names_to_resolve.append(name)
+
+        # ``mount_options`` is the single polymorphic field shared by
+        # both legacy (name-keyed) and modern (UUID-string-keyed)
+        # callers; skip keys that already parse as UUID strings since
+        # they are not vfolder names to resolve.
+        for raw in mount_options.keys():
+            name = str(raw)
+            if name in seen:
+                continue
             try:
-                # Already a UUID-string key — modern callers may pass them
-                # through the same ``mount_options`` field, so skip them.
                 UUID(name)
                 continue
             except (ValueError, TypeError):
                 pass
+            seen.add(name)
             names_to_resolve.append(name)
 
         if not names_to_resolve:
