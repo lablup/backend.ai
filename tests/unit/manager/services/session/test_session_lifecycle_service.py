@@ -88,8 +88,8 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
-from ai.backend.manager.services.vfolder.actions.resolve_by_name import (
-    ResolveVFolderIdByNameActionResult,
+from ai.backend.manager.services.vfolder.actions.resolve_id_by_name import (
+    ResolveIdByNameActionResult,
 )
 from ai.backend.manager.types import UserScope
 
@@ -1049,9 +1049,9 @@ class TestCreateFromParams:
         """
         vfid = UUID("11111111-1111-1111-1111-111111111111")
 
-        async def _wait_for_complete(action: Any) -> ResolveVFolderIdByNameActionResult:
+        async def _wait_for_complete(action: Any) -> ResolveIdByNameActionResult:
             assert action.vfolder_name == "vf-a"
-            return ResolveVFolderIdByNameActionResult(vfolder_id=vfid)
+            return ResolveIdByNameActionResult(vfolder_id=vfid)
 
         resolver = MagicMock()
         resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)

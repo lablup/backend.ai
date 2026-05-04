@@ -123,9 +123,9 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.resolve_by_name import (
-    ResolveVFolderIdByNameAction,
-    ResolveVFolderIdByNameActionResult,
+from ai.backend.manager.services.vfolder.actions.resolve_id_by_name import (
+    ResolveIdByNameAction,
+    ResolveIdByNameActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
@@ -240,8 +240,8 @@ class VFolderService:
         return BatchLoadVFoldersByIdsActionResult(data=data)
 
     async def resolve_vfolder_id_by_name(
-        self, action: ResolveVFolderIdByNameAction
-    ) -> ResolveVFolderIdByNameActionResult:
+        self, action: ResolveIdByNameAction
+    ) -> ResolveIdByNameActionResult:
         """Resolve a single vfolder name into its UUID.
 
         No access checking — used by session-creation paths that still
@@ -253,7 +253,7 @@ class VFolderService:
         vfolder_id = await self._vfolder_repository.resolve_vfolder_id_by_name(action.vfolder_name)
         if vfolder_id is None:
             raise VFolderNotFound(extra_data=action.vfolder_name)
-        return ResolveVFolderIdByNameActionResult(vfolder_id=vfolder_id)
+        return ResolveIdByNameActionResult(vfolder_id=vfolder_id)
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role

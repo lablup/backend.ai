@@ -56,9 +56,9 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.resolve_by_name import (
-    ResolveVFolderIdByNameAction,
-    ResolveVFolderIdByNameActionResult,
+from ai.backend.manager.services.vfolder.actions.resolve_id_by_name import (
+    ResolveIdByNameAction,
+    ResolveIdByNameActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
@@ -169,8 +169,8 @@ class VFolderProcessors(AbstractProcessorPackage):
         BatchLoadVFoldersByIdsAction, BatchLoadVFoldersByIdsActionResult
     ]
     resolve_vfolder_id_by_name: ActionProcessor[
-        ResolveVFolderIdByNameAction,
-        ResolveVFolderIdByNameActionResult,
+        ResolveIdByNameAction,
+        ResolveIdByNameActionResult,
     ]
     get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
     create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
@@ -324,7 +324,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             GetAccessibleVFolderAction.spec(),
             GetVFolderLegacyRowAction.spec(),
             BatchLoadVFoldersByIdsAction.spec(),
-            ResolveVFolderIdByNameAction.spec(),
+            ResolveIdByNameAction.spec(),
             CreateVFolderV2Action.spec(),
             CreateUploadSessionV2Action.spec(),
             GetVFolderV2Action.spec(),

@@ -171,8 +171,8 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
 )
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
-from ai.backend.manager.services.vfolder.actions.resolve_by_name import (
-    ResolveVFolderIdByNameAction,
+from ai.backend.manager.services.vfolder.actions.resolve_id_by_name import (
+    ResolveIdByNameAction,
 )
 
 if TYPE_CHECKING:
@@ -345,7 +345,7 @@ class SessionHandler:
             except (ValueError, TypeError):
                 pass
             result = await self._vfolder.resolve_vfolder_id_by_name.wait_for_complete(
-                ResolveVFolderIdByNameAction(vfolder_name=name)
+                ResolveIdByNameAction(vfolder_name=name)
             )
             resolved[name] = result.vfolder_id
         return resolved

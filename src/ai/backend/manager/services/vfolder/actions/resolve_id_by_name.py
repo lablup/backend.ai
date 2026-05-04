@@ -10,7 +10,7 @@ from ai.backend.manager.services.vfolder.actions.base import VFolderAction
 
 
 @dataclass
-class ResolveVFolderIdByNameAction(VFolderAction):
+class ResolveIdByNameAction(VFolderAction):
     """Resolve a single vfolder name into its UUID.
 
     Legacy-only: this action exists solely to support the v1 CLI's
@@ -36,8 +36,8 @@ class ResolveVFolderIdByNameAction(VFolderAction):
 
 
 @dataclass
-class ResolveVFolderIdByNameActionResult(BaseActionResult):
-    """Result of :class:`ResolveVFolderIdByNameAction`."""
+class ResolveIdByNameActionResult(BaseActionResult):
+    """Result of :class:`ResolveIdByNameAction`."""
 
     vfolder_id: uuid.UUID
 
