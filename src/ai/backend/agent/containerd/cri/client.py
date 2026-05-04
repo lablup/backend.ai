@@ -1,10 +1,16 @@
 """Async CRI gRPC client for the containerd backend.
 
 This module wraps the auto-generated stubs in ``cri.generated`` with a
-small high-level surface that the agent uses. Only the bare minimum
-needed to validate end-to-end gRPC plumbing (``Version()``) is exposed
-in this commit; image, sandbox, and container operations land in
-follow-ups.
+small high-level surface that the agent uses. Currently exposed:
+``Version()`` plus the PodSandbox lifecycle (``RunPodSandbox`` /
+``StopPodSandbox`` / ``RemovePodSandbox`` / ``PodSandboxStatus`` /
+``ListPodSandbox``). Container and image operations land in follow-up
+commits.
+
+Methods take and return raw proto objects rather than wrapping them in
+domain dataclasses — the agent layer owns the translation between
+kernel-domain concepts (``KernelCreationConfig``, scratch dirs, etc.)
+and CRI proto, so this module stays a thin runtime-shaped surface.
 
 Connection model
 ----------------
@@ -27,7 +33,7 @@ from typing import Self
 import grpc
 from grpc.aio import AioRpcError
 
-from ai.backend.agent.errors.containerd import CriConnectionError
+from ai.backend.agent.errors.containerd import CriConnectionError, CriRpcError
 from ai.backend.logging import BraceStyleAdapter
 
 from .generated import api_pb2, api_pb2_grpc
@@ -126,6 +132,100 @@ class CriClient:
                 f"CRI Version() call against {self._target} failed: {exc.details()}"
             ) from exc
         return response
+
+    # ------------------------------------------------------------------ #
+    # PodSandbox lifecycle
+    # ------------------------------------------------------------------ #
+    #
+    # Every CRI workload is anchored to a "pod sandbox" — a pause-image
+    # container that owns the network (and optionally IPC/PID) namespace
+    # the actual workload containers join. CNI ADD fires once at sandbox
+    # creation, not per workload container; everything we care about for
+    # the cilium-mode V1 PoC (eBPF datapath attach, IP assignment,
+    # reserved:init identity, IP release on DEL) happens at this layer.
+    #
+    # Methods take and return raw proto objects so the caller controls the
+    # full PodSandboxConfig surface (metadata, namespace_options, labels,
+    # annotations, dns_config, …). High-level builders that translate from
+    # KernelCreationConfig into a PodSandboxConfig live in the agent layer
+    # once we wire ContainerdAgent — keeping them out of this module
+    # avoids leaking kernel-domain concepts into the CRI wrapper.
+
+    async def run_pod_sandbox(
+        self,
+        config: api_pb2.PodSandboxConfig,
+        runtime_handler: str = "",
+    ) -> str:
+        """Create + start a pod sandbox; return the sandbox ID."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.RunPodSandboxRequest(
+            config=config,
+            runtime_handler=runtime_handler,
+        )
+        try:
+            response: api_pb2.RunPodSandboxResponse = await stub.RunPodSandbox(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI RunPodSandbox failed for sandbox '{config.metadata.name}' "
+                f"in synthetic namespace '{config.metadata.namespace}': {exc.details()}"
+            ) from exc
+        return response.pod_sandbox_id
+
+    async def stop_pod_sandbox(self, sandbox_id: str) -> None:
+        """Stop a pod sandbox (triggers CNI DEL — IP returns to the pool)."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.StopPodSandboxRequest(pod_sandbox_id=sandbox_id)
+        try:
+            await stub.StopPodSandbox(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI StopPodSandbox failed for sandbox {sandbox_id}: {exc.details()}"
+            ) from exc
+
+    async def remove_pod_sandbox(self, sandbox_id: str) -> None:
+        """Remove a stopped pod sandbox (frees the pause container + netns)."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.RemovePodSandboxRequest(pod_sandbox_id=sandbox_id)
+        try:
+            await stub.RemovePodSandbox(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI RemovePodSandbox failed for sandbox {sandbox_id}: {exc.details()}"
+            ) from exc
+
+    async def pod_sandbox_status(
+        self,
+        sandbox_id: str,
+        *,
+        verbose: bool = False,
+    ) -> api_pb2.PodSandboxStatusResponse:
+        """Return the sandbox's runtime state, including network info."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.PodSandboxStatusRequest(
+            pod_sandbox_id=sandbox_id,
+            verbose=verbose,
+        )
+        try:
+            response: api_pb2.PodSandboxStatusResponse = await stub.PodSandboxStatus(request)
+        except AioRpcError as exc:
+            raise CriRpcError(
+                f"CRI PodSandboxStatus failed for sandbox {sandbox_id}: {exc.details()}"
+            ) from exc
+        return response
+
+    async def list_pod_sandbox(
+        self,
+        *,
+        sandbox_filter: api_pb2.PodSandboxFilter | None = None,
+    ) -> list[api_pb2.PodSandbox]:
+        """List sandboxes matching the optional filter (used for reconciliation)."""
+        stub = self._require_runtime_stub()
+        request = api_pb2.ListPodSandboxRequest(filter=sandbox_filter)
+        try:
+            response: api_pb2.ListPodSandboxResponse = await stub.ListPodSandbox(request)
+        except AioRpcError as exc:
+            raise CriRpcError(f"CRI ListPodSandbox failed: {exc.details()}") from exc
+        return list(response.items)
 
     def _require_runtime_stub(self) -> api_pb2_grpc.RuntimeServiceAsyncStub:
         if self._runtime_stub is None:
