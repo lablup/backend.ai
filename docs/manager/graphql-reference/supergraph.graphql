@@ -7328,6 +7328,9 @@ input ImageV2Filter
   name: StringFilter = null
   architecture: StringFilter = null
 
+  """Added in UNRELEASED. Filter by image UUID."""
+  id: UUIDFilter = null
+
   """Added in 26.4.0. Filter by container registry ID."""
   registryId: UUIDFilter = null
 

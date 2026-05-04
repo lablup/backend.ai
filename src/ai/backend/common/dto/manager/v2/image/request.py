@@ -76,6 +76,7 @@ class ImageAliasNestedFilterInputDTO(BaseRequestModel):
 class ImageFilterInputDTO(BaseRequestModel):
     """Filter options for images."""
 
+    id: UUIDFilter | None = Field(default=None, description="Filter by image UUID.")
     status: ImageStatusFilterInputDTO | None = Field(default=None, description="Filter by status.")
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     architecture: StringFilter | None = Field(default=None, description="Filter by architecture.")
