@@ -69,3 +69,8 @@ def dependencies() -> None:
 @main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.health:cli")
 def health() -> None:
     """Command set for health checking."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.cri_poc:cli")
+def cri_poc() -> None:
+    """Containerd backend CRI lifecycle PoC harness (V1 cilium-mode validation)."""
