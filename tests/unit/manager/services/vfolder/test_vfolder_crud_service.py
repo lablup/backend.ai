@@ -861,7 +861,9 @@ class TestDeleteForeverVFolderAction:
         result = await vfolder_service.delete_forever(action)
 
         assert isinstance(result, DeleteForeverVFolderActionResult)
-        mock_vfolder_repository.delete_vfolders_forever.assert_called_once_with([vfolder_uuid])
+        mock_vfolder_repository.delete_vfolders_forever.assert_called_once_with(
+            [vfolder_uuid], cascade_model_card=False
+        )
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
         mock_client.delete_folder.assert_called_once()
 

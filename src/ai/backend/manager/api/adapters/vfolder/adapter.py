@@ -10,6 +10,7 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    BulkDeleteForeverVFoldersInput,
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
     CloneVFolderInput,
@@ -18,16 +19,17 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
     CreateVFolderInScopeInput,
     DeleteFilesInput,
+    DeleteForeverVFolderInput,
     DeployVFolderInput,
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
-    PurgeVFolderInput,
     SearchVFoldersInput,
     VFolderFilter,
     VFolderOrder,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
+    BulkDeleteForeverVFoldersPayload,
     BulkDeleteVFoldersPayload,
     BulkPurgeVFoldersPayload,
     CloneVFolderPayload,
@@ -35,6 +37,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     CreateUploadSessionPayload,
     CreateVFolderPayload,
     DeleteFilesPayload,
+    DeleteForeverVFolderPayload,
     DeleteVFolderPayload,
     DeployVFolderPayload,
     FileEntryNode,
@@ -434,17 +437,26 @@ class VFolderAdapter(BaseAdapter):
         await self._processors.vfolder.restore_vfolder_from_trash.wait_for_complete(action)
         return RestoreVFolderPayload(id=vfolder_id)
 
-    async def purge(
-        self, vfolder_id: UUID, input: PurgeVFolderInput | None = None
-    ) -> PurgeVFolderPayload:
-        """Permanently delete a vfolder. RBAC enforced."""
-        cascade_model_card = input.cascade_model_card if input is not None else False
-        action = PurgeVFolderV2Action(
-            vfolder_id=vfolder_id,
-            cascade_model_card=cascade_model_card,
-        )
+    async def purge(self, vfolder_id: UUID) -> PurgeVFolderPayload:
+        """Permanently delete a vfolder. RBAC enforced.
+
+        Rejects the request if any model card references the vfolder.
+        Use ``delete_forever_v2`` for cascade behavior.
+        """
+        action = PurgeVFolderV2Action(vfolder_id=vfolder_id)
         await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
+
+    async def delete_forever_v2(
+        self, vfolder_id: UUID, input: DeleteForeverVFolderInput
+    ) -> DeleteForeverVFolderPayload:
+        """Permanently delete a vfolder, optionally cascading linked model cards."""
+        action = PurgeVFolderV2Action(
+            vfolder_id=vfolder_id,
+            cascade_model_card=input.cascade_model_card,
+        )
+        await self._processors.vfolder.purge_v2.wait_for_complete(action)
+        return DeleteForeverVFolderPayload(id=vfolder_id)
 
     async def deploy(
         self,
@@ -533,14 +545,23 @@ class VFolderAdapter(BaseAdapter):
         return BulkDeleteVFoldersPayload(deleted_count=len(input.ids))
 
     async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
-        """Permanently purge multiple vfolders."""
+        """Permanently purge multiple vfolders. Use ``bulk_delete_forever`` for cascade."""
+        for vfolder_id in input.ids:
+            action = PurgeVFolderV2Action(vfolder_id=vfolder_id)
+            await self._processors.vfolder.purge_v2.wait_for_complete(action)
+        return BulkPurgeVFoldersPayload(purged_count=len(input.ids))
+
+    async def bulk_delete_forever(
+        self, input: BulkDeleteForeverVFoldersInput
+    ) -> BulkDeleteForeverVFoldersPayload:
+        """Permanently delete multiple vfolders, optionally cascading linked model cards."""
         for vfolder_id in input.ids:
             action = PurgeVFolderV2Action(
                 vfolder_id=vfolder_id,
                 cascade_model_card=input.cascade_model_card,
             )
             await self._processors.vfolder.purge_v2.wait_for_complete(action)
-        return BulkPurgeVFoldersPayload(purged_count=len(input.ids))
+        return BulkDeleteForeverVFoldersPayload(deleted_count=len(input.ids))
 
     async def list_files(self, vfolder_id: UUID, input: ListFilesInput) -> ListFilesPayload:
         """List files in a vfolder."""

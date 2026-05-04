@@ -23,6 +23,7 @@ from .types import (
 )
 
 __all__ = (
+    "BulkDeleteForeverVFoldersPayload",
     "BulkDeleteVFoldersPayload",
     "BulkPurgeVFoldersPayload",
     "CloneVFolderPayload",
@@ -30,6 +31,7 @@ __all__ = (
     "CreateUploadSessionPayload",
     "CreateVFolderPayload",
     "DeleteFilesPayload",
+    "DeleteForeverVFolderPayload",
     "DeleteVFolderPayload",
     "DeployVFolderPayload",
     "FileEntryNode",
@@ -145,6 +147,20 @@ class BulkPurgeVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder purge."""
 
     purged_count: int = Field(description="Number of virtual folders successfully purged.")
+
+
+class DeleteForeverVFolderPayload(BaseResponseModel):
+    """Payload for permanent (data-wipe) deletion of a single virtual folder."""
+
+    id: UUID = Field(description="ID of the deleted-forever virtual folder")
+
+
+class BulkDeleteForeverVFoldersPayload(BaseResponseModel):
+    """Payload for bulk permanent (data-wipe) deletion of virtual folders."""
+
+    deleted_count: int = Field(
+        description="Number of virtual folders whose data was permanently deleted."
+    )
 
 
 class RestoreVFolderPayload(BaseResponseModel):
