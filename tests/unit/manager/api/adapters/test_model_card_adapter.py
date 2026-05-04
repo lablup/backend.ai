@@ -1,4 +1,4 @@
-"""Unit tests for v2 ModelCardAdapter delete orchestration."""
+"""Unit tests for v2 ModelCardAdapter delete option propagation."""
 
 from __future__ import annotations
 
@@ -21,27 +21,19 @@ from ai.backend.manager.services.model_card.actions.delete import (
     DeleteModelCardAction,
     DeleteModelCardActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.vfolder_v2 import DeleteVFolderV2Action
 
 
 @dataclass(frozen=True)
 class DeleteCase:
-    """Parameter set for delete-with-vfolder orchestration tests."""
+    """Parameter set for delete-options propagation tests."""
 
     options: DeleteModelCardOptions
-    expects_vfolder_delete: bool
 
 
 _DELETE_CASES = [
+    pytest.param(DeleteCase(options=DeleteModelCardOptions()), id="option_off"),
     pytest.param(
-        DeleteCase(options=DeleteModelCardOptions(), expects_vfolder_delete=False),
-        id="option_off",
-    ),
-    pytest.param(
-        DeleteCase(
-            options=DeleteModelCardOptions(delete_associated_vfolder=True),
-            expects_vfolder_delete=True,
-        ),
+        DeleteCase(options=DeleteModelCardOptions(delete_associated_vfolder=True)),
         id="option_on",
     ),
 ]
@@ -78,7 +70,13 @@ def _create_model_card_data(
 
 
 class TestModelCardAdapterDelete:
-    """Tests for ModelCardAdapter.delete() option orchestration."""
+    """Tests for ModelCardAdapter.delete() option propagation.
+
+    The adapter no longer orchestrates vfolder deletion itself — the option
+    is forwarded to the service/repository layer which handles the model card
+    delete and the vfolder trash in a single DB transaction. These tests
+    verify that the option lands on ``DeleteModelCardAction`` unchanged.
+    """
 
     @pytest.fixture
     def card_id(self) -> uuid.UUID:
@@ -100,7 +98,6 @@ class TestModelCardAdapterDelete:
                 model_card=_create_model_card_data(card_id, vfolder_id)
             ),
         )
-        processors.vfolder.delete_v2.wait_for_complete = AsyncMock(return_value=None)
         return processors
 
     @pytest.fixture
@@ -108,30 +105,23 @@ class TestModelCardAdapterDelete:
         return ModelCardAdapter(mock_processors)
 
     @pytest.mark.parametrize("case", _DELETE_CASES)
-    async def test_delete_orchestrates_vfolder_per_option(
+    async def test_delete_forwards_options_on_action(
         self,
         adapter: ModelCardAdapter,
         mock_processors: MagicMock,
         card_id: uuid.UUID,
-        vfolder_id: VFolderUUID,
         case: DeleteCase,
     ) -> None:
         payload = await adapter.delete(card_id, options=case.options)
 
         assert payload.id == card_id
         mock_processors.model_card.delete.wait_for_complete.assert_awaited_once_with(
-            DeleteModelCardAction(id=card_id)
+            DeleteModelCardAction(id=card_id, options=case.options)
         )
-        if case.expects_vfolder_delete:
-            mock_processors.vfolder.delete_v2.wait_for_complete.assert_awaited_once_with(
-                DeleteVFolderV2Action(vfolder_id=vfolder_id)
-            )
-        else:
-            mock_processors.vfolder.delete_v2.wait_for_complete.assert_not_called()
 
 
 class TestModelCardAdapterBulkDelete:
-    """Tests for ModelCardAdapter.bulk_delete() option orchestration."""
+    """Tests for ModelCardAdapter.bulk_delete() option propagation."""
 
     @pytest.fixture
     def card_pairs(self) -> list[tuple[uuid.UUID, VFolderUUID]]:
@@ -148,7 +138,6 @@ class TestModelCardAdapterBulkDelete:
         ]
         processors = MagicMock()
         processors.model_card.delete.wait_for_complete = AsyncMock(side_effect=results)
-        processors.vfolder.delete_v2.wait_for_complete = AsyncMock(return_value=None)
         return processors
 
     @pytest.fixture
@@ -156,7 +145,7 @@ class TestModelCardAdapterBulkDelete:
         return ModelCardAdapter(mock_processors)
 
     @pytest.mark.parametrize("case", _DELETE_CASES)
-    async def test_bulk_delete_orchestrates_vfolder_per_option(
+    async def test_bulk_delete_forwards_options_per_action(
         self,
         adapter: ModelCardAdapter,
         mock_processors: MagicMock,
@@ -169,11 +158,10 @@ class TestModelCardAdapterBulkDelete:
 
         assert payload.deleted_count == len(ids)
         assert mock_processors.model_card.delete.wait_for_complete.await_count == len(ids)
-        if case.expects_vfolder_delete:
-            called_vfolder_ids = [
-                call.args[0].vfolder_id
-                for call in mock_processors.vfolder.delete_v2.wait_for_complete.await_args_list
-            ]
-            assert called_vfolder_ids == [vfolder_id for _, vfolder_id in card_pairs]
-        else:
-            mock_processors.vfolder.delete_v2.wait_for_complete.assert_not_called()
+        called_actions = [
+            call.args[0]
+            for call in mock_processors.model_card.delete.wait_for_complete.await_args_list
+        ]
+        assert called_actions == [
+            DeleteModelCardAction(id=card_id, options=case.options) for card_id in ids
+        ]

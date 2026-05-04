@@ -7,6 +7,7 @@ from uuid import UUID
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
+from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.model_card.types import ModelCardData, VFolderScanData
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -41,8 +42,12 @@ class ModelCardRepository:
     async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
         return await self._db_source.update(updater)
 
-    async def delete(self, card_id: UUID) -> ModelCardData:
-        return await self._db_source.delete(card_id)
+    async def delete(
+        self,
+        card_id: UUID,
+        options: DeleteModelCardOptions,
+    ) -> ModelCardData:
+        return await self._db_source.delete(card_id, options)
 
     async def search(
         self,

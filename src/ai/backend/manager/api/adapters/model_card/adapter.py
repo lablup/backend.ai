@@ -88,7 +88,6 @@ from ai.backend.manager.services.model_card.actions.search_in_project import (
     SearchModelCardsInProjectAction,
 )
 from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
-from ai.backend.manager.services.vfolder.actions.vfolder_v2 import DeleteVFolderV2Action
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -377,12 +376,8 @@ class ModelCardAdapter(BaseAdapter):
         options: DeleteModelCardOptions,
     ) -> DeleteModelCardPayload:
         result = await self._processors.model_card.delete.wait_for_complete(
-            DeleteModelCardAction(id=card_id)
+            DeleteModelCardAction(id=card_id, options=options)
         )
-        if options.delete_associated_vfolder:
-            await self._processors.vfolder.delete_v2.wait_for_complete(
-                DeleteVFolderV2Action(vfolder_id=result.model_card.vfolder_id)
-            )
         return DeleteModelCardPayload(id=result.model_card.id)
 
     async def bulk_delete(
@@ -392,13 +387,9 @@ class ModelCardAdapter(BaseAdapter):
     ) -> DeleteModelCardsPayload:
         """Delete multiple model cards by ID."""
         for card_id in input.ids:
-            result = await self._processors.model_card.delete.wait_for_complete(
-                DeleteModelCardAction(id=card_id)
+            await self._processors.model_card.delete.wait_for_complete(
+                DeleteModelCardAction(id=card_id, options=options)
             )
-            if options.delete_associated_vfolder:
-                await self._processors.vfolder.delete_v2.wait_for_complete(
-                    DeleteVFolderV2Action(vfolder_id=result.model_card.vfolder_id)
-                )
         return DeleteModelCardsPayload(deleted_count=len(input.ids))
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:
