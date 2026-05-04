@@ -137,6 +137,7 @@ from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
     CreateVFolderInProjectAction,
 )
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
+    DeleteForeverVFolderV2Action,
     DeleteVFolderV2Action,
     PurgeVFolderV2Action,
 )
@@ -451,12 +452,12 @@ class VFolderAdapter(BaseAdapter):
         self, vfolder_id: UUID, input: DeleteForeverVFolderInput
     ) -> DeleteForeverVFolderPayload:
         """Permanently delete a vfolder, optionally cascading linked model cards."""
-        action = PurgeVFolderV2Action(
+        action = DeleteForeverVFolderV2Action(
             vfolder_id=vfolder_id,
             cascade_model_card=input.cascade_model_card,
         )
-        await self._processors.vfolder.purge_v2.wait_for_complete(action)
-        return DeleteForeverVFolderPayload(id=vfolder_id)
+        result = await self._processors.vfolder.delete_forever_v2.wait_for_complete(action)
+        return DeleteForeverVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
 
     async def deploy(
         self,
@@ -555,13 +556,15 @@ class VFolderAdapter(BaseAdapter):
         self, input: BulkDeleteForeverVFoldersInput
     ) -> BulkDeleteForeverVFoldersPayload:
         """Permanently delete multiple vfolders, optionally cascading linked model cards."""
+        deleted: list[VFolderNode] = []
         for vfolder_id in input.ids:
-            action = PurgeVFolderV2Action(
+            action = DeleteForeverVFolderV2Action(
                 vfolder_id=vfolder_id,
                 cascade_model_card=input.cascade_model_card,
             )
-            await self._processors.vfolder.purge_v2.wait_for_complete(action)
-        return BulkDeleteForeverVFoldersPayload(deleted_count=len(input.ids))
+            result = await self._processors.vfolder.delete_forever_v2.wait_for_complete(action)
+            deleted.append(self._vfolder_data_to_node(result.vfolder))
+        return BulkDeleteForeverVFoldersPayload(vfolders=deleted)
 
     async def list_files(self, vfolder_id: UUID, input: ListFilesInput) -> ListFilesPayload:
         """List files in a vfolder."""

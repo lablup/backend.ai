@@ -173,6 +173,8 @@ from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
     CreateVFolderInProjectActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
+    DeleteForeverVFolderV2Action,
+    DeleteForeverVFolderV2ActionResult,
     DeleteVFolderV2Action,
     DeleteVFolderV2ActionResult,
     PurgeVFolderV2Action,
@@ -1823,7 +1825,11 @@ class VFolderService:
         return DeleteVFolderV2ActionResult(vfolder_id=action.vfolder_id)
 
     async def purge_v2(self, action: PurgeVFolderV2Action) -> PurgeVFolderV2ActionResult:
-        """Permanently purge a vfolder by ID. RBAC enforced at processor level."""
+        """Permanently purge a vfolder by ID. RBAC enforced at processor level.
+
+        Rejects the request when any model card still references the vfolder.
+        Use :meth:`delete_forever_v2` to cascade linked model cards.
+        """
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
@@ -1836,12 +1842,31 @@ class VFolderService:
             user_uuid=me.user_id,
         )
 
-        await self._vfolder_repository.delete_vfolders_forever(
+        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_id])
+        await self._remove_vfolder_from_storage(vfolder_data)
+        return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
+
+    async def delete_forever_v2(
+        self, action: DeleteForeverVFolderV2Action
+    ) -> DeleteForeverVFolderV2ActionResult:
+        """Permanently delete a vfolder's data with optional model card cascade."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
+
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            vfolder_data.host,
+            permission=VFolderHostPermission.DELETE,
+            user_uuid=me.user_id,
+        )
+
+        deleted = await self._vfolder_repository.delete_vfolders_forever(
             [action.vfolder_id],
             cascade_model_card=action.cascade_model_card,
         )
         await self._remove_vfolder_from_storage(vfolder_data)
-        return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
+        return DeleteForeverVFolderV2ActionResult(vfolder=deleted[0])
 
     async def clone_v2(self, action: CloneVFolderV2Action) -> CloneVFolderV2ActionResult:
         """Clone a vfolder (v2). Resolves policy internally from user_id."""

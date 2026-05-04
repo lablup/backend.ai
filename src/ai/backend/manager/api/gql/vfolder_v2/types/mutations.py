@@ -479,7 +479,9 @@ class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
     name="DeleteForeverVFolderV2Payload",
 )
 class DeleteForeverVFolderPayloadGQL(PydanticOutputMixin[DeleteForeverPayloadDTO]):
-    id: UUID = gql_field(description="ID of the deleted-forever virtual folder.")
+    vfolder: VFolderGQL = gql_field(
+        description="The vfolder whose data was permanently deleted.",
+    )
 
 
 @gql_pydantic_input(
@@ -509,8 +511,8 @@ class BulkDeleteForeverVFoldersInputGQL(PydanticInputMixin[BulkDeleteForeverInpu
     name="BulkDeleteForeverVFoldersV2Payload",
 )
 class BulkDeleteForeverVFoldersPayloadGQL(PydanticOutputMixin[BulkDeleteForeverPayloadDTO]):
-    deleted_count: int = gql_field(
-        description="Number of virtual folders whose data was permanently deleted."
+    vfolders: list[VFolderGQL] = gql_field(
+        description="The vfolders whose data was permanently deleted.",
     )
 
 
