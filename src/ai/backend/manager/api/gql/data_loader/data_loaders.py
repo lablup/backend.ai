@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from strawberry.dataloader import DataLoader
 
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -55,6 +56,9 @@ if TYPE_CHECKING:
         ImageV2GQL,
     )
     from ai.backend.manager.api.gql.kernel.types import KernelV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.model_card.types import (  # pants: no-infer-dep
+        ModelCardGQL,
+    )
     from ai.backend.manager.api.gql.notification.types import (  # pants: no-infer-dep
         NotificationChannel,
         NotificationRule,
@@ -161,6 +165,22 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [VF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def model_cards_by_vfolder_loader(
+        self,
+    ) -> DataLoader[VFolderUUID, list[ModelCardGQL]]:
+        adapter = self._adapters.model_card
+
+        async def load_fn(vfolder_ids: list[VFolderUUID]) -> list[list[ModelCardGQL]]:
+            from ai.backend.manager.api.gql.model_card.types import (  # pants: no-infer-dep
+                ModelCardGQL as MC,
+            )
+
+            grouped_dtos = await adapter.batch_load_by_vfolder_ids(vfolder_ids)
+            return [[MC.from_pydantic(dto) for dto in group] for group in grouped_dtos]
 
         return DataLoader(load_fn=load_fn)
 

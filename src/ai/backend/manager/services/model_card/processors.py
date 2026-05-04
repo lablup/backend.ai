@@ -9,6 +9,10 @@ from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
     AvailablePresetsActionResult,
 )
+from ai.backend.manager.services.model_card.actions.batch_load_by_vfolder_ids import (
+    BatchLoadModelCardsByVFolderIdsAction,
+    BatchLoadModelCardsByVFolderIdsActionResult,
+)
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
     BulkDeleteModelCardActionResult,
@@ -51,6 +55,10 @@ class ModelCardProcessors(AbstractProcessorPackage):
     ]
     scan: ActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
     available_presets: ActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
+    batch_load_by_vfolder_ids: ActionProcessor[
+        BatchLoadModelCardsByVFolderIdsAction,
+        BatchLoadModelCardsByVFolderIdsActionResult,
+    ]
 
     def __init__(
         self,
@@ -72,6 +80,9 @@ class ModelCardProcessors(AbstractProcessorPackage):
         )
         self.scan = ActionProcessor(service.scan, action_monitors)
         self.available_presets = ActionProcessor(service.available_presets, action_monitors)
+        self.batch_load_by_vfolder_ids = ActionProcessor(
+            service.batch_load_by_vfolder_ids, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -84,4 +95,5 @@ class ModelCardProcessors(AbstractProcessorPackage):
             SearchModelCardsInProjectAction.spec(),
             ScanProjectModelCardsAction.spec(),
             AvailablePresetsAction.spec(),
+            BatchLoadModelCardsByVFolderIdsAction.spec(),
         ]

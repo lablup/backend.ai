@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
@@ -43,6 +44,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardOrderField,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
@@ -81,6 +83,9 @@ from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
+)
+from ai.backend.manager.services.model_card.actions.batch_load_by_vfolder_ids import (
+    BatchLoadModelCardsByVFolderIdsAction,
 )
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
@@ -217,6 +222,25 @@ class ModelCardAdapter(BaseAdapter):
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def batch_load_by_vfolder_ids(
+        self,
+        vfolder_ids: Sequence[VFolderUUID],
+    ) -> list[list[ModelCardNode]]:
+        """Batch fetch model cards grouped by vfolder ID for the GraphQL DataLoader.
+
+        Returns one list of nodes per input vfolder (same order); each inner
+        list is sorted most-recently-created first. A vfolder with no model
+        cards yields an empty list.
+        """
+        if not vfolder_ids:
+            return []
+        action_result = (
+            await self._processors.model_card.batch_load_by_vfolder_ids.wait_for_complete(
+                BatchLoadModelCardsByVFolderIdsAction(vfolder_ids=list(vfolder_ids))
+            )
+        )
+        return [[self._data_to_node(item) for item in cards] for cards in action_result.data]
 
     async def get(self, card_id: UUID) -> ModelCardNode:
         conditions: list[QueryCondition] = [lambda: ModelCardRow.id == card_id]

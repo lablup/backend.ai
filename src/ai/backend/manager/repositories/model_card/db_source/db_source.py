@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import VFolderID, VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.group.types import ProjectType
@@ -95,6 +96,31 @@ class ModelCardDBSource:
             if row is None:
                 raise ModelCardNotFound()
             return row.to_data()
+
+    async def batch_load_by_vfolder_ids(
+        self,
+        vfolder_ids: Sequence[VFolderUUID],
+    ) -> list[list[ModelCardData]]:
+        """Group all model cards backed by each requested vfolder.
+
+        Returns one inner list per input vfolder (same order); each inner list
+        is sorted by ``created_at`` descending so the most recent card appears
+        first. The (name, domain, project) unique constraint does not extend
+        to ``vfolder``, so a vfolder may legitimately back multiple cards.
+        """
+        if not vfolder_ids:
+            return []
+        async with self._db.begin_readonly_session() as session:
+            stmt = (
+                sa.select(ModelCardRow)
+                .where(ModelCardRow.vfolder.in_(list(vfolder_ids)))
+                .order_by(ModelCardRow.created_at.desc())
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+            cards_by_vfolder: dict[VFolderUUID, list[ModelCardData]] = {}
+            for row in rows:
+                cards_by_vfolder.setdefault(row.vfolder, []).append(row.to_data())
+            return [cards_by_vfolder.get(vfolder_id, []) for vfolder_id in vfolder_ids]
 
     async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
         async with self._db.begin_session() as session:
