@@ -1972,8 +1972,8 @@ Added in UNRELEASED. Payload for bulk permanent virtual folder deletion.
 type BulkDeleteForeverVFoldersV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Number of virtual folders whose data was permanently deleted."""
-  deletedCount: Int!
+  """The vfolders whose data was permanently deleted."""
+  vfolders: [VFolder!]!
 }
 
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
@@ -4659,8 +4659,8 @@ Added in UNRELEASED. Payload returned after permanently deleting a virtual folde
 type DeleteForeverVFolderV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted-forever virtual folder"""
-  id: UUID!
+  """The vfolder whose data was permanently deleted."""
+  vfolder: VFolder!
 }
 
 """Instead of deleting the group, just mark it as inactive."""
