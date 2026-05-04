@@ -92,12 +92,6 @@ def downgrade() -> None:
         "deployment_revision_presets",
         "replica_count",
         existing_type=sa.Integer(),
-        nullable=False,
-        server_default=None,
-    )
-    op.alter_column(
-        "deployment_revision_presets",
-        "replica_count",
-        existing_type=sa.Integer(),
         nullable=True,
+        server_default=None,
     )
