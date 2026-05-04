@@ -1,13 +1,11 @@
 """VFolder GraphQL resolver package."""
 
 from .mutation import (
-    bulk_delete_forever_vfolders_v2,
     bulk_delete_vfolders_v2,
     bulk_purge_vfolders_v2,
     clone_vfolder_v2,
     create_vfolder_in_project,
     create_vfolder_v2,
-    delete_forever_vfolder_v2,
     delete_vfolder_v2,
     deploy_vfolder_v2,
     purge_vfolder_v2,
@@ -28,12 +26,10 @@ __all__ = [
     "project_vfolders",
     "vfolder_v2",
     # Mutations
-    "bulk_delete_forever_vfolders_v2",
     "bulk_delete_vfolders_v2",
     "bulk_purge_vfolders_v2",
     "create_vfolder_in_project",
     "create_vfolder_v2",
-    "delete_forever_vfolder_v2",
     "delete_vfolder_v2",
     "deploy_vfolder_v2",
     "purge_vfolder_v2",

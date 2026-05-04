@@ -58,50 +58,10 @@ class DeleteVFolderV2ActionResult(VFolderSingleEntityActionResult):
 class PurgeVFolderV2Action(VFolderSingleEntityAction):
     """Permanently purge a vfolder by ID with RBAC enforcement.
 
-    This action does not cascade linked model cards; the call fails when
-    any model card still references the vfolder. Use
-    :class:`DeleteForeverVFolderV2Action` for cascade behavior.
+    By default the call is rejected when any model card references the
+    vfolder. Set ``cascade_model_card=True`` to also remove the linked
+    model card row(s) atomically.
     """
-
-    vfolder_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.vfolder_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.VFOLDER,
-            element_id=str(self.vfolder_id),
-        )
-
-
-@dataclass
-class PurgeVFolderV2ActionResult(VFolderSingleEntityActionResult):
-    vfolder_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.vfolder_id)
-
-
-@dataclass
-class DeleteForeverVFolderV2Action(VFolderSingleEntityAction):
-    """Permanently delete a vfolder's data, optionally cascading model cards."""
 
     vfolder_id: uuid.UUID
     cascade_model_card: bool = False
@@ -128,7 +88,7 @@ class DeleteForeverVFolderV2Action(VFolderSingleEntityAction):
 
 
 @dataclass
-class DeleteForeverVFolderV2ActionResult(VFolderSingleEntityActionResult):
+class PurgeVFolderV2ActionResult(VFolderSingleEntityActionResult):
     vfolder: VFolderData
 
     @override

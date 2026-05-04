@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.vfolder.request import (
-    BulkDeleteForeverVFoldersInput,
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
     CloneVFolderInput,
@@ -16,11 +15,11 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
     CreateVFolderInScopeInput,
     DeleteFilesInput,
-    DeleteForeverVFolderInput,
     DeployVFolderInput,
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PurgeVFolderInput,
     SearchVFoldersInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
@@ -96,22 +95,10 @@ class V2VFolderHandler:
     async def purge(
         self,
         path: PathParam[VFolderIdPathParam],
-    ) -> APIResponse:
-        """Permanently delete a vfolder.
-
-        Rejects the request when any model card references the vfolder.
-        Use ``delete_forever`` for cascade behavior.
-        """
-        result = await self._adapter.purge(path.parsed.vfolder_id)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
-
-    async def delete_forever(
-        self,
-        path: PathParam[VFolderIdPathParam],
-        body: BodyParam[DeleteForeverVFolderInput],
+        body: BodyParam[PurgeVFolderInput],
     ) -> APIResponse:
         """Permanently delete a vfolder, optionally cascading linked model cards."""
-        result = await self._adapter.delete_forever_v2(path.parsed.vfolder_id, body.parsed)
+        result = await self._adapter.purge(path.parsed.vfolder_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def restore(
@@ -206,14 +193,6 @@ class V2VFolderHandler:
         self,
         body: BodyParam[BulkPurgeVFoldersInput],
     ) -> APIResponse:
-        """Permanently purge multiple vfolders."""
+        """Permanently purge multiple vfolders, optionally cascading linked model cards."""
         result = await self._adapter.bulk_purge(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
-
-    async def bulk_delete_forever(
-        self,
-        body: BodyParam[BulkDeleteForeverVFoldersInput],
-    ) -> APIResponse:
-        """Permanently delete multiple vfolders, optionally cascading linked model cards."""
-        result = await self._adapter.bulk_delete_forever(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

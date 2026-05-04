@@ -70,12 +70,6 @@ def register_v2_vfolder_routes(
     )
     registry.add(
         "POST",
-        "/{vfolder_id}/delete-forever",
-        handler.delete_forever,
-        middlewares=[auth_required],
-    )
-    registry.add(
-        "POST",
         "/{vfolder_id}/restore",
         handler.restore,
         middlewares=[auth_required],
@@ -138,12 +132,6 @@ def register_v2_vfolder_routes(
         "POST",
         "/purge",
         handler.bulk_purge,
-        middlewares=[auth_required],
-    )
-    registry.add(
-        "POST",
-        "/delete-forever",
-        handler.bulk_delete_forever,
         middlewares=[auth_required],
     )
 

@@ -105,8 +105,6 @@ from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
     CreateVFolderInProjectActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
-    DeleteForeverVFolderV2Action,
-    DeleteForeverVFolderV2ActionResult,
     DeleteVFolderV2Action,
     DeleteVFolderV2ActionResult,
     PurgeVFolderV2Action,
@@ -181,9 +179,6 @@ class VFolderProcessors(AbstractProcessorPackage):
     ]
     delete_v2: SingleEntityActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
     purge_v2: SingleEntityActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
-    delete_forever_v2: SingleEntityActionProcessor[
-        DeleteForeverVFolderV2Action, DeleteForeverVFolderV2ActionResult
-    ]
     clone_v2: ActionProcessor[CloneVFolderV2Action, CloneVFolderV2ActionResult]
     create_vfolder_in_project: ScopeActionProcessor[
         CreateVFolderInProjectAction, CreateVFolderInProjectActionResult
@@ -289,11 +284,6 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.purge_v2 = SingleEntityActionProcessor(
             service.purge_v2, action_monitors, validators=single_entity_rbac_validators
         )
-        self.delete_forever_v2 = SingleEntityActionProcessor(
-            service.delete_forever_v2,
-            action_monitors,
-            validators=single_entity_rbac_validators,
-        )
         self.clone_v2 = ActionProcessor(service.clone_v2, action_monitors)
         self.create_vfolder_in_project = ScopeActionProcessor(
             service.create_in_project,
@@ -340,7 +330,6 @@ class VFolderProcessors(AbstractProcessorPackage):
             GetVFolderV2Action.spec(),
             DeleteVFolderV2Action.spec(),
             PurgeVFolderV2Action.spec(),
-            DeleteForeverVFolderV2Action.spec(),
             CloneVFolderV2Action.spec(),
             CreateVFolderInProjectAction.spec(),
         ]

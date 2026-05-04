@@ -5,9 +5,6 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.vfolder.request import (
-    BulkDeleteForeverVFoldersInput as BulkDeleteForeverInputDTO,
-)
-from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput as BulkDeleteInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -44,9 +41,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     MoveFileInput as MoveFileInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
-    BulkDeleteForeverVFoldersPayload as BulkDeleteForeverPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
@@ -66,9 +60,6 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     DeleteFilesPayload as DeleteFilesPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.vfolder.response import (
-    DeleteForeverVFolderPayload as DeleteForeverPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     DeleteVFolderPayload as DeletePayloadDTO,
@@ -314,7 +305,9 @@ class DeleteVFolderPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     name="PurgeVFolderV2Payload",
 )
 class PurgeVFolderPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged virtual folder.")
+    vfolder: VFolderGQL = gql_field(
+        description="The vfolder whose data was permanently purged.",
+    )
 
 
 @gql_pydantic_type(
@@ -456,43 +449,6 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
 )
 class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
     ids: list[UUID] = gql_field(description="List of VFolder UUIDs to purge.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Payload for bulk virtual folder purge.",
-    ),
-    model=BulkPurgePayloadDTO,
-    name="BulkPurgeVFoldersV2Payload",
-)
-class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
-    purged_count: int = gql_field(description="Number of virtual folders successfully purged.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Payload returned after permanently deleting a virtual folder's data.",
-    ),
-    model=DeleteForeverPayloadDTO,
-    name="DeleteForeverVFolderV2Payload",
-)
-class DeleteForeverVFolderPayloadGQL(PydanticOutputMixin[DeleteForeverPayloadDTO]):
-    vfolder: VFolderGQL = gql_field(
-        description="The vfolder whose data was permanently deleted.",
-    )
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Input for permanently deleting (data wipe) multiple virtual folders.",
-    ),
-    name="BulkDeleteForeverVFoldersV2Input",
-)
-class BulkDeleteForeverVFoldersInputGQL(PydanticInputMixin[BulkDeleteForeverInputDTO]):
-    ids: list[UUID] = gql_field(description="List of VFolder UUIDs to delete forever.")
     cascade_model_card: bool = gql_field(
         default=False,
         description=(
@@ -504,13 +460,13 @@ class BulkDeleteForeverVFoldersInputGQL(PydanticInputMixin[BulkDeleteForeverInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Payload for bulk permanent virtual folder deletion.",
+        added_version="26.4.2",
+        description="Payload for bulk virtual folder purge.",
     ),
-    model=BulkDeleteForeverPayloadDTO,
-    name="BulkDeleteForeverVFoldersV2Payload",
+    model=BulkPurgePayloadDTO,
+    name="BulkPurgeVFoldersV2Payload",
 )
-class BulkDeleteForeverVFoldersPayloadGQL(PydanticOutputMixin[BulkDeleteForeverPayloadDTO]):
+class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
     vfolders: list[VFolderGQL] = gql_field(
         description="The vfolders whose data was permanently deleted.",
     )

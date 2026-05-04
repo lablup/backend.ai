@@ -23,7 +23,6 @@ from .types import (
 )
 
 __all__ = (
-    "BulkDeleteForeverVFoldersPayload",
     "BulkDeleteVFoldersPayload",
     "BulkPurgeVFoldersPayload",
     "CloneVFolderPayload",
@@ -31,7 +30,6 @@ __all__ = (
     "CreateUploadSessionPayload",
     "CreateVFolderPayload",
     "DeleteFilesPayload",
-    "DeleteForeverVFolderPayload",
     "DeleteVFolderPayload",
     "DeployVFolderPayload",
     "FileEntryNode",
@@ -134,7 +132,7 @@ class DeleteVFolderPayload(BaseResponseModel):
 class PurgeVFolderPayload(BaseResponseModel):
     """Payload for virtual folder purge mutation result."""
 
-    id: UUID = Field(description="ID of the purged virtual folder")
+    vfolder: VFolderNode = Field(description="The vfolder whose data was permanently purged.")
 
 
 class BulkDeleteVFoldersPayload(BaseResponseModel):
@@ -146,20 +144,8 @@ class BulkDeleteVFoldersPayload(BaseResponseModel):
 class BulkPurgeVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder purge."""
 
-    purged_count: int = Field(description="Number of virtual folders successfully purged.")
-
-
-class DeleteForeverVFolderPayload(BaseResponseModel):
-    """Payload for permanent (data-wipe) deletion of a single virtual folder."""
-
-    vfolder: VFolderNode = Field(description="The vfolder whose data was permanently deleted.")
-
-
-class BulkDeleteForeverVFoldersPayload(BaseResponseModel):
-    """Payload for bulk permanent (data-wipe) deletion of virtual folders."""
-
     vfolders: list[VFolderNode] = Field(
-        description="The vfolders whose data was permanently deleted.",
+        description="The vfolders whose data was permanently purged.",
     )
 
 
