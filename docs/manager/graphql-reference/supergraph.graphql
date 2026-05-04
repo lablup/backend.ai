@@ -4716,6 +4716,19 @@ input DeleteModelCardsV2Input
 {
   """List of model card UUIDs to delete."""
   ids: [UUID!]!
+
+  """Added in UNRELEASED. Options for the bulk delete operation."""
+  options: DeleteModelCardsV2Options = null
+}
+
+"""Added in UNRELEASED. Options for bulk model card delete operation."""
+input DeleteModelCardsV2Options
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  If true, also soft-delete (move to trash) the model VFolders associated with the deleted model cards.
+  """
+  deleteAssociatedFolder: Boolean! = false
 }
 
 """Added in 26.4.2. Payload for bulk model card deletion."""
@@ -4724,6 +4737,16 @@ type DeleteModelCardsV2Payload
 {
   """Number of model cards successfully deleted."""
   deletedCount: Int!
+}
+
+"""Added in UNRELEASED. Options for single model card delete operation."""
+input DeleteModelCardV2Options
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  If true, also soft-delete (move to trash) the model VFolder associated with the deleted model card.
+  """
+  deleteAssociatedFolder: Boolean! = false
 }
 
 """Added in 24.12.0."""
@@ -11297,7 +11320,7 @@ type Mutation
   adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a model card (admin only)."""
-  adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
+  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete multiple model cards (admin only)."""
   adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload! @join__field(graph: STRAWBERRY)
