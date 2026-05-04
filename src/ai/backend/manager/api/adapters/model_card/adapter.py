@@ -69,11 +69,13 @@ from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -83,9 +85,6 @@ from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
-)
-from ai.backend.manager.services.model_card.actions.batch_load_by_vfolder_ids import (
-    BatchLoadModelCardsByVFolderIdsAction,
 )
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
@@ -235,10 +234,23 @@ class ModelCardAdapter(BaseAdapter):
         """
         if not vfolder_ids:
             return []
-        action_result = await self._processors.model_card.batch_load_model_cards_by_vfolder_ids.wait_for_complete(
-            BatchLoadModelCardsByVFolderIdsAction(vfolder_ids=list(vfolder_ids))
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ModelCardConditions.by_vfolder_ids(list(vfolder_ids))],
+            orders=[
+                ModelCardOrders.created_at(ascending=False),
+                ModelCardOrders.id(ascending=False),
+            ],
         )
-        return [[self._data_to_node(item) for item in cards] for cards in action_result.data]
+        result = await self._processors.model_card.search.wait_for_complete(
+            SearchModelCardsAction(querier=querier)
+        )
+        cards_by_vfolder: dict[VFolderUUID, list[ModelCardNode]] = {}
+        for data in result.items:
+            cards_by_vfolder.setdefault(VFolderUUID(data.vfolder_id), []).append(
+                self._data_to_node(data)
+            )
+        return [cards_by_vfolder.get(vfolder_id, []) for vfolder_id in vfolder_ids]
 
     async def get(self, card_id: UUID) -> ModelCardNode:
         conditions: list[QueryCondition] = [lambda: ModelCardRow.id == card_id]

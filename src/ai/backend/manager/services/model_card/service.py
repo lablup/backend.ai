@@ -16,10 +16,6 @@ from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
     AvailablePresetsActionResult,
 )
-from ai.backend.manager.services.model_card.actions.batch_load_by_vfolder_ids import (
-    BatchLoadModelCardsByVFolderIdsAction,
-    BatchLoadModelCardsByVFolderIdsActionResult,
-)
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
     BulkDeleteModelCardActionResult,
@@ -86,12 +82,6 @@ class ModelCardService:
     ) -> BulkDeleteModelCardActionResult:
         data = await self._repository.bulk_delete(action.purgers, action.options)
         return BulkDeleteModelCardActionResult(data=data)
-
-    async def batch_load_by_vfolder_ids(
-        self, action: BatchLoadModelCardsByVFolderIdsAction
-    ) -> BatchLoadModelCardsByVFolderIdsActionResult:
-        data = await self._repository.batch_load_by_vfolder_ids(action.vfolder_ids)
-        return BatchLoadModelCardsByVFolderIdsActionResult(data=data)
 
     async def search(self, action: SearchModelCardsAction) -> SearchModelCardsActionResult:
         result = await self._repository.search(action.querier)

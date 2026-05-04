@@ -8,7 +8,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.model_card.types import (
     BulkModelCardDeleteResultData,
@@ -44,12 +43,6 @@ class ModelCardRepository:
 
     async def get_by_id(self, card_id: UUID) -> ModelCardData:
         return await self._db_source.get_by_id(card_id)
-
-    async def batch_load_by_vfolder_ids(
-        self,
-        vfolder_ids: Sequence[VFolderUUID],
-    ) -> list[list[ModelCardData]]:
-        return await self._db_source.batch_load_by_vfolder_ids(vfolder_ids)
 
     async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
         return await self._db_source.update(updater)
