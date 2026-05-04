@@ -348,6 +348,13 @@ class ImageAdapter(BaseAdapter):
     ) -> list[QueryCondition]:
         conditions: list[QueryCondition] = list(base_conditions) if base_conditions else []
 
+        if filter.id is not None:
+            iid = filter.id
+            if iid.equals is not None:
+                conditions.append(ImageConditions.by_ids([ImageID(iid.equals)]))
+            elif iid.in_ is not None:
+                conditions.append(ImageConditions.by_ids([ImageID(uid) for uid in iid.in_]))
+
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
