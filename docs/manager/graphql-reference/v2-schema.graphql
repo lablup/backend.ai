@@ -1968,7 +1968,7 @@ input CreateDeploymentRevisionPresetInput {
   openToPublic: Boolean = null
 
   """Default replica count for deployments created from this preset."""
-  replicaCount: Int = null
+  replicaCount: Int!
 
   """
   Default revision history limit for deployments created from this preset.
@@ -1976,7 +1976,7 @@ input CreateDeploymentRevisionPresetInput {
   revisionHistoryLimit: Int = null
 
   """Default deployment strategy for deployments created from this preset."""
-  deploymentStrategy: PresetDeploymentStrategyInput = null
+  deploymentStrategy: PresetDeploymentStrategyInput!
 
   """Added in UNRELEASED. Container image to run the inference server."""
   imageId: UUID!
@@ -2004,10 +2004,10 @@ input CreateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Deployment topology mode (single-node or multi-node).
   """
-  clusterMode: ClusterMode = null
+  clusterMode: ClusterMode!
 
   """Added in UNRELEASED. Number of worker nodes in the cluster."""
-  clusterSize: Int = null
+  clusterSize: Int!
 
   """
   Added in UNRELEASED. Command to start the inference server process inside the container.

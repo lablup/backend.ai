@@ -249,7 +249,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
         model_def = input.model_definition
-        strategy, strategy_spec = self._convert_strategy_input(input.deployment_strategy)
+        strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
 
         creator = Creator(
             spec=DeploymentRevisionPresetCreatorSpec(
@@ -261,8 +261,8 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 model_definition=model_def,
                 resource_slots=resource_slots,
                 resource_opts=resource_opts,
-                cluster_mode=input.cluster_mode or "single-node",
-                cluster_size=input.cluster_size or 1,
+                cluster_mode=input.cluster_mode,
+                cluster_size=input.cluster_size,
                 startup_command=input.startup_command,
                 bootstrap_script=input.bootstrap_script,
                 environ=environ,
@@ -558,6 +558,23 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         """Convert DeploymentStrategyInput to (strategy, strategy_spec dict)."""
         if strategy_input is None:
             return None, None
+        match strategy_input.type:
+            case DeploymentStrategy.ROLLING:
+                rolling = strategy_input.rolling_update
+                spec_dict: dict[str, Any] = (
+                    rolling.model_dump(mode="json") if rolling is not None else {}
+                )
+                return DeploymentStrategy.ROLLING, spec_dict
+            case DeploymentStrategy.BLUE_GREEN:
+                bg = strategy_input.blue_green
+                spec_dict = bg.model_dump(mode="json") if bg is not None else {}
+                return DeploymentStrategy.BLUE_GREEN, spec_dict
+
+    def _convert_required_strategy_input(
+        self,
+        strategy_input: DeploymentStrategyInput,
+    ) -> tuple[DeploymentStrategy, dict[str, Any]]:
+        """Convert a non-null DeploymentStrategyInput to (strategy, strategy_spec dict)."""
         match strategy_input.type:
             case DeploymentStrategy.ROLLING:
                 rolling = strategy_input.rolling_update

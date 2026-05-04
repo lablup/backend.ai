@@ -79,24 +79,32 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         "preset_values", PydanticListColumn(PresetValueEntry), nullable=False, server_default="[]"
     )
 
-    # Deployment-level preset fields (nullable: None means "preset does not specify,
-    # fall back to user input or system default").
+    # Deployment-level preset fields. ``open_to_public`` and
+    # ``revision_history_limit`` stay nullable: deployment creation has
+    # safe system defaults for them. ``replica_count`` /
+    # ``deployment_strategy`` / ``deployment_strategy_spec`` are
+    # ``nullable=False`` because deployment creation requires concrete
+    # values for all three.
     open_to_public: Mapped[bool | None] = mapped_column(
         "open_to_public", sa.Boolean(), nullable=True
     )
-    replica_count: Mapped[int | None] = mapped_column("replica_count", sa.Integer(), nullable=True)
+    replica_count: Mapped[int] = mapped_column(
+        "replica_count", sa.Integer(), nullable=False, server_default="1"
+    )
     revision_history_limit: Mapped[int | None] = mapped_column(
         "revision_history_limit", sa.Integer(), nullable=True
     )
-    deployment_strategy: Mapped[DeploymentStrategy | None] = mapped_column(
+    deployment_strategy: Mapped[DeploymentStrategy] = mapped_column(
         "deployment_strategy",
         StrEnumType(DeploymentStrategy, use_name=False),
-        nullable=True,
+        nullable=False,
+        server_default="ROLLING",
     )
-    deployment_strategy_spec: Mapped[dict[str, object] | None] = mapped_column(
+    deployment_strategy_spec: Mapped[dict[str, object]] = mapped_column(
         "deployment_strategy_spec",
         pgsql.JSONB(),
-        nullable=True,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -144,7 +152,7 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
             replica_count=self.replica_count,
             revision_history_limit=self.revision_history_limit,
             deployment_strategy=self.deployment_strategy,
-            deployment_strategy_spec=self.deployment_strategy_spec,
+            deployment_strategy_spec=dict(self.deployment_strategy_spec),
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
