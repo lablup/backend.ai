@@ -23,6 +23,8 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     GetPresetActionResult,
     ModifyPresetAction,
     ModifyPresetActionResult,
+    PreviewPresetAction,
+    PreviewPresetActionResult,
     SearchPresetsAction,
     SearchPresetsActionResult,
 )
@@ -95,6 +97,13 @@ class PrometheusQueryPresetService:
         filter_labels: dict[str, str],
     ) -> dict[str, LabelMatcher]:
         return {key: LabelMatcher.exact(value) for key, value in filter_labels.items()}
+
+    async def preview_preset(self, action: PreviewPresetAction) -> PreviewPresetActionResult:
+        response = await self._repository.preview_query_template(
+            query_template=action.query_template,
+            default_window=self._default_timewindow,
+        )
+        return PreviewPresetActionResult(response=response)
 
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)

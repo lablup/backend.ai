@@ -33,6 +33,8 @@ __all__ = (
     # Execute supporting
     "MetricLabelEntry",
     "ExecuteQueryDefinitionInput",
+    # Preview
+    "PreviewQueryDefinitionInput",
     # Query time range
     "QueryTimeRangeInputDTO",
 )
@@ -230,6 +232,18 @@ class ExecuteQueryDefinitionOptionsInput(BaseRequestModel):
         default_factory=list,
         description="Group-by labels",
     )
+
+
+class PreviewQueryDefinitionInput(BaseRequestModel):
+    """Input for previewing a prometheus query template before saving (admin only)."""
+
+    query_template: str = Field(description="PromQL template to validate")
+
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str) -> str:
+        validate_query_template(v)
+        return v
 
 
 class ExecuteQueryDefinitionInput(BaseRequestModel):

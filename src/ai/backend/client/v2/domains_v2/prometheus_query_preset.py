@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     DeleteQueryDefinitionInput,
     ExecuteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    PreviewQueryDefinitionInput,
     SearchQueryDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -80,6 +81,17 @@ class V2PrometheusQueryPresetClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/{preset_id}/execute",
+            request=request,
+            response_model=ExecuteQueryDefinitionPayload,
+        )
+
+    async def admin_preview(
+        self, request: PreviewQueryDefinitionInput
+    ) -> ExecuteQueryDefinitionPayload:
+        """Preview a prometheus query template (superadmin only)."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/preview",
             request=request,
             response_model=ExecuteQueryDefinitionPayload,
         )

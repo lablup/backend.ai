@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     MetricLabelEntry,
     ModifyQueryDefinitionInput,
     ModifyQueryDefinitionOptionsInput,
+    PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
     SearchQueryDefinitionsInput,
@@ -440,3 +441,15 @@ class TestExecuteQueryDefinitionInput:
         json_str = inp.model_dump_json()
         restored = ExecuteQueryDefinitionInput.model_validate_json(json_str)
         assert restored.time_window == "1h"
+
+
+class TestPreviewQueryDefinitionInput:
+    """Tests for PreviewQueryDefinitionInput field validation."""
+
+    def test_rejects_empty_template(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="empty"):
+            PreviewQueryDefinitionInput(query_template="")
+
+    def test_rejects_foreign_var(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            PreviewQueryDefinitionInput(query_template="rate(metric[$range])")

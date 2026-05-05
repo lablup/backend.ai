@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     DeleteQueryDefinitionInput,
     ExecuteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    PreviewQueryDefinitionInput,
     SearchQueryDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -100,3 +101,18 @@ class V2PrometheusQueryPresetHandler:
         """Delete a query definition by ID."""
         result = await self._adapter.delete(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_preview(
+        self,
+        body: BodyParam[PreviewQueryDefinitionInput],
+    ) -> APIResponse:
+        """Preview a prometheus query template before saving (superadmin only)."""
+        result = await self._adapter.admin_preview(body.parsed)
+        payload = ExecuteQueryDefinitionPayload(
+            status=result.status,
+            data=QueryDefinitionExecuteDataInfo(
+                result_type=result.result_type,
+                result=result.result,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)

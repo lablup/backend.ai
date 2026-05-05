@@ -14,6 +14,7 @@ from .mutation import (
     admin_modify_prometheus_query_preset,
 )
 from .query import (
+    admin_preview_prometheus_query_preset,
     prometheus_query_preset,
     prometheus_query_preset_result,
     prometheus_query_presets,
@@ -24,6 +25,7 @@ __all__ = [
     "prometheus_query_preset",
     "prometheus_query_presets",
     "prometheus_query_preset_result",
+    "admin_preview_prometheus_query_preset",
     # Category Queries
     "prometheus_query_preset_category",
     "prometheus_query_preset_categories",

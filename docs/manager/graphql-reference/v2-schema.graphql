@@ -7860,6 +7860,14 @@ enum PresetValueType {
 }
 
 """
+Added in UNRELEASED. Input for previewing a prometheus query template (admin only).
+"""
+input PreviewQueryDefinitionInput {
+  """PromQL template to validate."""
+  queryTemplate: String!
+}
+
+"""
 Added in 26.2.0. Basic project information. Contains identity and descriptive fields for the project.
 """
 type ProjectBasicInfo {
@@ -8830,6 +8838,11 @@ type Query {
   Added in 26.4.2. Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.
   """
   prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
+
+  """
+  Added in UNRELEASED. Preview a prometheus query template before saving it as a preset (admin only).
+  """
+  adminPreviewPrometheusQueryPreset(input: PreviewQueryDefinitionInput!): QueryDefinitionExecuteResult!
 
   """
   Added in 26.4.2. Get a single query preset category by ID. Available to any authenticated user.

@@ -26,8 +26,12 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ModifyQueryDefinitionOptionsInput as ModifyQueryDefinitionOptionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    PreviewQueryDefinitionInput as PreviewQueryDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     QueryTimeRangeInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -134,3 +138,14 @@ class ExecuteQueryDefinitionOptionsInput(PydanticInputMixin[ExecuteQueryDefiniti
     group_labels: list[str] | None = gql_field(
         description="Label keys to group results by.", default=None
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for previewing a prometheus query template (admin only).",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="PreviewQueryDefinitionInput",
+)
+class PreviewQueryDefinitionInputGQL(PydanticInputMixin[PreviewQueryDefinitionInputDTO]):
+    query_template: str = gql_field(description="PromQL template to validate.")

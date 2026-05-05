@@ -39,6 +39,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     ExecutePresetAction,
     GetPresetAction,
     ModifyPresetAction,
+    PreviewPresetAction,
     SearchPresetsAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.service import (
@@ -465,3 +466,25 @@ class TestPrometheusQueryPresetService:
         assert result.response == prometheus_response
         mock_prometheus_client.query_range.assert_called_once()
         mock_prometheus_client.query_instant.assert_not_called()
+
+    async def test_preview_uses_server_default_window(
+        self,
+        service: PrometheusQueryPresetService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """preview_preset must pass the service's default window to the repository."""
+        mock_repository.preview_query_template = AsyncMock(
+            return_value=PrometheusResponse(
+                status="success",
+                data=PrometheusQueryData(result_type="vector", result=[]),
+            )
+        )
+
+        await service.preview_preset(
+            PreviewPresetAction(query_template="sum(rate(metric{{{labels}}}[{window}]))")
+        )
+
+        mock_repository.preview_query_template.assert_called_once_with(
+            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            default_window="1m",
+        )
