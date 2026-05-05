@@ -164,7 +164,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
         return ModifyQueryDefinitionPayload(item=self._data_to_dto(action_result.preset))
 
-    async def preview(self, input: PreviewQueryDefinitionInput) -> QueryDefinitionResultInfo:
+    async def admin_preview(self, input: PreviewQueryDefinitionInput) -> QueryDefinitionResultInfo:
         """Preview a prometheus query template (admin only)."""
         action_result = (
             await self._processors.prometheus_query_preset.preview_preset.wait_for_complete(

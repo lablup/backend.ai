@@ -147,5 +147,5 @@ class ExecuteQueryDefinitionOptionsInput(PydanticInputMixin[ExecuteQueryDefiniti
     ),
     name="PreviewQueryDefinitionInput",
 )
-class PreviewQueryDefinitionInput(PydanticInputMixin[PreviewQueryDefinitionInputDTO]):
+class PreviewQueryDefinitionInputGQL(PydanticInputMixin[PreviewQueryDefinitionInputDTO]):
     query_template: str = gql_field(description="PromQL template to validate.")

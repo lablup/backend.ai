@@ -1083,6 +1083,25 @@ class InvalidMetricPresetTemplate(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class PrometheusQueryEvaluationFailed(BackendAIError, web.HTTPBadRequest):
+    """Raised when Prometheus rejects a rendered PromQL query.
+
+    Used by user-facing flows (e.g., preset preview) to attribute query
+    rejection to the caller's input rather than treating it as a downstream
+    gateway failure (502).
+    """
+
+    error_type = "https://api.backend.ai/probs/prometheus-query-evaluation-failed"
+    error_title = "Prometheus rejected the query."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.METRIC,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 # JWT Errors
 class JWTError(BackendAIError, web.HTTPUnauthorized):
     """

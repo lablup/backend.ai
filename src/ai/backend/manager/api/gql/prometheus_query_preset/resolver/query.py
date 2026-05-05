@@ -18,7 +18,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     ExecuteQueryDefinitionOptionsInput,
-    PreviewQueryDefinitionInput,
+    PreviewQueryDefinitionInputGQL,
     QueryDefinitionConnection,
     QueryDefinitionEdge,
     QueryDefinitionFilter,
@@ -116,10 +116,10 @@ async def prometheus_query_preset_result(
         description="Preview a prometheus query template before saving it as a preset (admin only).",
     )
 )  # type: ignore[misc]
-async def admin_prometheus_query_preset_preview(
+async def admin_preview_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
-    input: PreviewQueryDefinitionInput,
+    input: PreviewQueryDefinitionInputGQL,
 ) -> QueryDefinitionResultGQL:
     check_admin_only()
-    dto = await info.context.adapters.prometheus_query_preset.preview(input.to_pydantic())
+    dto = await info.context.adapters.prometheus_query_preset.admin_preview(input.to_pydantic())
     return QueryDefinitionResultGQL.from_pydantic(dto)

@@ -15,7 +15,7 @@ from ai.backend.common.dto.clients.prometheus.response import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     PreviewQueryDefinitionInput,
 )
-from ai.backend.common.exception import FailedToGetMetric
+from ai.backend.common.exception import FailedToGetMetric, PrometheusQueryEvaluationFailed
 
 
 class TestPrometheusQueryPresetPreview:
@@ -65,4 +65,4 @@ class TestPrometheusQueryPresetPreview:
             await admin_v2_registry.prometheus_query_preset.admin_preview(
                 PreviewQueryDefinitionInput(query_template="sum({invalid_placeholder})"),
             )
-        assert exc_info.value.data["type"] == FailedToGetMetric.error_type
+        assert exc_info.value.data["type"] == PrometheusQueryEvaluationFailed.error_type

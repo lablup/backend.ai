@@ -6,7 +6,11 @@ from uuid import UUID
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import MetricPreset
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import (
+    BackendAIError,
+    FailedToGetMetric,
+    PrometheusQueryEvaluationFailed,
+)
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -115,4 +119,7 @@ class PrometheusQueryPresetRepository:
             group_by=frozenset(),
             window=default_window,
         )
-        return await self._prometheus_client.query_instant(preset=metric_preset)
+        try:
+            return await self._prometheus_client.query_instant(preset=metric_preset)
+        except FailedToGetMetric as e:
+            raise PrometheusQueryEvaluationFailed(str(e)) from e

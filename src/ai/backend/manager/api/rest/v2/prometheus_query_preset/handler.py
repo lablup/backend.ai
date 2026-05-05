@@ -107,7 +107,7 @@ class V2PrometheusQueryPresetHandler:
         body: BodyParam[PreviewQueryDefinitionInput],
     ) -> APIResponse:
         """Preview a prometheus query template before saving (superadmin only)."""
-        result = await self._adapter.preview(body.parsed)
+        result = await self._adapter.admin_preview(body.parsed)
         payload = ExecuteQueryDefinitionPayload(
             status=result.status,
             data=QueryDefinitionExecuteDataInfo(

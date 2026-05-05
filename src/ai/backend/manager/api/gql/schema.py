@@ -251,7 +251,7 @@ from .prometheus_query_preset import (
     admin_delete_prometheus_query_preset,
     admin_delete_prometheus_query_preset_category,
     admin_modify_prometheus_query_preset,
-    admin_prometheus_query_preset_preview,
+    admin_preview_prometheus_query_preset,
     prometheus_query_preset,
     prometheus_query_preset_categories,
     prometheus_query_preset_category,
@@ -529,7 +529,7 @@ class Query:
     prometheus_query_preset = prometheus_query_preset
     prometheus_query_presets = prometheus_query_presets
     prometheus_query_preset_result = prometheus_query_preset_result
-    admin_prometheus_query_preset_preview = admin_prometheus_query_preset_preview
+    admin_preview_prometheus_query_preset = admin_preview_prometheus_query_preset
     # Prometheus Query Preset Category APIs (read available to any authenticated user)
     prometheus_query_preset_category = prometheus_query_preset_category
     prometheus_query_preset_categories = prometheus_query_preset_categories

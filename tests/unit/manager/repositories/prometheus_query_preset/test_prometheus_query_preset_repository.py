@@ -15,7 +15,11 @@ from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusResponse,
 )
-from ai.backend.common.exception import PrometheusQueryPresetNotFound
+from ai.backend.common.exception import (
+    FailedToGetMetric,
+    PrometheusQueryEvaluationFailed,
+    PrometheusQueryPresetNotFound,
+)
 from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
@@ -310,3 +314,18 @@ class TestPrometheusQueryPresetRepositoryPreview:
         assert passed_preset.group_by == frozenset()
         assert passed_preset.window == "5m"
         assert result is canned_response
+
+    async def test_converts_failed_to_get_metric_to_evaluation_failed(
+        self,
+        repository: PrometheusQueryPresetRepository,
+        prometheus_client: MagicMock,
+    ) -> None:
+        prometheus_client.query_instant = AsyncMock(
+            side_effect=FailedToGetMetric('parse error: unexpected "}" (status=400, path=query)'),
+        )
+
+        with pytest.raises(PrometheusQueryEvaluationFailed):
+            await repository.preview_query_template(
+                query_template="sum({invalid",
+                default_window="5m",
+            )
