@@ -93,6 +93,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
 
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):
+    id: UUIDFilter | None = Field(default=None, description="Filter by preset ID.")
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

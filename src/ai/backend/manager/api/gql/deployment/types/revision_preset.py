@@ -367,6 +367,10 @@ class PresetValueEntryInputGQL(PydanticInputMixin[PresetValueInputDTO]):
     name="DeploymentRevisionPresetFilter",
 )
 class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
+    id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by preset ID."),
+        default=None,
+    )
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."

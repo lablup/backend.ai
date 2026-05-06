@@ -150,6 +150,7 @@ if TYPE_CHECKING:
 
     from .deployment import ModelDeployment
     from .policy import DeploymentPolicyGQL
+    from .revision_preset import DeploymentRevisionPresetGQL
 
 MountPermission: type[CommonMountPermission] = gql_enum(
     BackendAIGQLMeta(
@@ -515,6 +516,31 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         from ai.backend.common.types import ImageID
 
         return await info.context.data_loaders.image_loader.load(ImageID(UUID(str(self.image_id))))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The deployment-level preset that produced this revision, "
+                "resolved via DataLoader. ``None`` when the revision was "
+                "created without a preset, when the originating preset row "
+                "has since been deleted (SET NULL FK), or for legacy rows "
+                "that predate this field."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def revision_preset(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            DeploymentRevisionPresetGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.revision_preset"),
+        ]
+        | None
+    ):
+        if self.revision_preset_id is None:
+            return None
+        return await info.context.data_loaders.revision_preset_loader.load(self.revision_preset_id)
 
     @gql_added_field(
         BackendAIGQLMeta(
