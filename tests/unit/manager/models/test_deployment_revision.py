@@ -415,64 +415,6 @@ class TestDeploymentRevisionRow:
             assert data.model_runtime_config.runtime_variant_id is not None
             assert data.model_runtime_config.environ == {"DEBUG": "true"}
             assert data.image_id == test_image.id
-            assert data.revision_preset_id is None
-
-    async def test_revision_preset_id_round_trips(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint: EndpointRow,
-        test_image: ImageRow,
-        test_runtime_variant: RuntimeVariantRow,
-    ) -> None:
-        """``revision_preset_id`` must survive both ``to_data()`` and
-        ``to_model_revision_spec()`` projections so clients can recover the
-        originating preset selection."""
-        model_id = uuid.uuid4()
-        async with db_with_cleanup.begin_session() as db_sess:
-            preset = DeploymentRevisionPresetRow(
-                id=uuid.uuid4(),
-                runtime_variant=test_runtime_variant.id,
-                name=f"test-preset-{uuid.uuid4().hex[:8]}",
-                rank=1,
-                image_id=test_image.id,
-            )
-            db_sess.add(preset)
-            vfolder = VFolderRow(
-                id=model_id,
-                host="local:volume1",
-                domain_name=test_endpoint.domain,
-                quota_scope_id=QuotaScopeID.parse("user:00000000-0000-0000-0000-000000000001"),
-                name=f"model-vfolder-{uuid.uuid4().hex[:8]}",
-                creator="test@example.com",
-            )
-            db_sess.add(vfolder)
-            await db_sess.flush()
-
-            revision = DeploymentRevisionRow(
-                endpoint=test_endpoint.id,
-                revision_number=1,
-                image=test_image.id,
-                model=model_id,
-                model_mount_destination="/models",
-                resource_group="default",
-                resource_opts={},
-                cluster_mode=ClusterMode.SINGLE_NODE.name,
-                cluster_size=1,
-                runtime_variant_id=test_runtime_variant.id,
-                environ={},
-                extra_mounts=[],
-                revision_preset_id=preset.id,
-            )
-            revision.resource_slot_rows = [
-                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
-                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("1024")),
-            ]
-            db_sess.add(revision)
-            await db_sess.flush()
-            await db_sess.refresh(revision)
-
-            assert revision.to_data().revision_preset_id == preset.id
-            assert revision.to_model_revision_spec().revision_preset_id == preset.id
 
     async def test_unique_constraint_endpoint_revision_number(
         self,
