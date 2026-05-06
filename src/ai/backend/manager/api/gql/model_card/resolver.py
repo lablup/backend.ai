@@ -31,8 +31,8 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
 )
 from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_connection
 from ai.backend.manager.api.gql.model_card.types import (
-    BulkDeleteModelCardsInputGQL,
-    BulkDeleteModelCardsPayloadGQL,
+    BulkDeleteModelCardsV2InputGQL,
+    BulkDeleteModelCardsV2PayloadGQL,
     BulkDeleteModelCardV2ErrorGQL,
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
@@ -197,15 +197,15 @@ async def admin_delete_model_cards_v2(
 )
 async def admin_bulk_delete_model_cards_v2(
     info: Info[StrawberryGQLContext],
-    input: BulkDeleteModelCardsInputGQL,
-) -> BulkDeleteModelCardsPayloadGQL:
+    input: BulkDeleteModelCardsV2InputGQL,
+) -> BulkDeleteModelCardsV2PayloadGQL:
     check_admin_only()
     ctx = info.context
     dto = input.to_pydantic()
     payload = await ctx.adapters.model_card.admin_bulk_delete(
         dto, dto.options or DeleteModelCardOptions()
     )
-    return BulkDeleteModelCardsPayloadGQL(
+    return BulkDeleteModelCardsV2PayloadGQL(
         successes=list(payload.successes),
         failed=[
             BulkDeleteModelCardV2ErrorGQL(card_id=error.card_id, message=error.message)

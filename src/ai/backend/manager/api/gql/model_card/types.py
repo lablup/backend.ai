@@ -604,7 +604,7 @@ class DeleteModelCardsPayloadGQL(PydanticOutputMixin[DeleteCardsPayloadDTO]):
     ),
     name="BulkDeleteModelCardsV2Input",
 )
-class BulkDeleteModelCardsInputGQL(PydanticInputMixin[BulkDeleteCardsInputDTO]):
+class BulkDeleteModelCardsV2InputGQL(PydanticInputMixin[BulkDeleteCardsInputDTO]):
     ids: list[UUID] = gql_field(description="List of model card UUIDs to delete.")
     options: DeleteModelCardOptionsGQL | None = gql_field(
         description="Options for the delete operation.",
@@ -633,7 +633,7 @@ class BulkDeleteModelCardV2ErrorGQL:
     model=BulkDeleteCardsPayloadDTO,
     name="BulkDeleteModelCardsV2Payload",
 )
-class BulkDeleteModelCardsPayloadGQL:
+class BulkDeleteModelCardsV2PayloadGQL:
     successes: list[UUID] = gql_field(
         description="UUIDs of model cards that were successfully deleted.",
     )
