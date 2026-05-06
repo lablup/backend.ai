@@ -1397,6 +1397,17 @@ type BulkPurgeUsersV2Payload {
 }
 
 """
+Added in UNRELEASED. Failure detail for a single vfolder in a bulk purge.
+"""
+type BulkPurgeVFolderV2Error {
+  """UUID of the vfolder that failed to purge."""
+  vfolderId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
 Added in 26.4.2. Input for permanently purging multiple virtual folders.
 """
 input BulkPurgeVFoldersV2Input {
@@ -1404,7 +1415,7 @@ input BulkPurgeVFoldersV2Input {
   ids: [UUID!]!
 
   """
-  Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
+  Added in UNRELEASED. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
   """
   options: PurgeVFolderOptionsInput!
 }
@@ -1413,6 +1424,9 @@ input BulkPurgeVFoldersV2Input {
 type BulkPurgeVFoldersV2Payload {
   """Number of virtual folders successfully purged."""
   purgedCount: Int!
+
+  """List of errors for vfolders that failed to purge."""
+  failed: [BulkPurgeVFolderV2Error!]!
 }
 
 """
@@ -8574,7 +8588,9 @@ type PurgeUserV2Payload {
   success: Boolean!
 }
 
-"""Added in 26.4.2. Optional behavior flags for vfolder purge operations."""
+"""
+Added in UNRELEASED. Optional behavior flags for vfolder purge operations.
+"""
 input PurgeVFolderOptionsInput {
   """
   If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.
