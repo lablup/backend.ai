@@ -2,268 +2,422 @@
 
 ## 1. 배경
 
-Backend.AI containerd 기반 agent에서 컨테이너는 **K8s Pod가 아닌 containerd 워크로드로 직접 생성**된다. 이로 인해 표준 K8s 네트워킹(NetworkPolicy 등) 위에 자동으로 얹어지지 않는다.
+Backend.AI containerd 기반 agent에서 컨테이너는 **K8s Pod가 아닌 containerd 워크로드로 직접 생성**된다. 이 문서는 K8s 정책 enforcement가 아니라 **통신 편의성, 성능, 격리**를 만족하는 네트워킹 구조를 정리한다.
 
-이 문서의 목표는 **K8s 정책 enforcement가 아니라 통신 편의성과 성능**을 만족하는 네트워킹 구조를 정리하는 것이다.
+### 1.1. baseline
+
+기존 BAI 다중 노드 통신은 Docker Swarm overlay (vxlan + libnetwork) 기반이었고, 10G NIC 환경에서 측정 시 **line rate의 30-40% (약 3-4 Gbps)** 만 나온다. 학습 시 모델/그래디언트 복사가 병목이 되어 CNI 기반으로 전환하려는 것이 출발점.
+
+### 1.2. "CNI를 쓴다"의 의미
+
+CNI는 **컨테이너 네트워크 셋업 plugin 인터페이스**이지 dataplane이 아니다. 실제 패킷 흐름의 속도/격리는 그 위에 깔린 **dataplane(vxlan, native routing, eBPF, macvlan, RDMA 등)** 과 **정책 엔진**이 결정한다.
+
+따라서 "CNI를 쓴다"는 결정만으론 부족하고, **어떤 CNI plugin이 어떤 dataplane을 사용할지**까지 정해야 한다.
 
 ## 2. 요구사항
 
 | # | 요구사항 | 용도 |
 |---|---|---|
-| R1 | containerd로 뜬 BAI 컨테이너끼리 overlay 통신이 가능해야 함 | 다중 노드 학습 |
-| R2 | K8s Pod에서 BAI 컨테이너로 접속할 때 hop 최소, 대역폭 최대 | 추론 |
+| R1 | BAI 컨테이너끼리 cross-host 통신 가능 | 다중 노드 학습 (모델/그래디언트 복사) |
+| R2 | K8s Pod → BAI 컨테이너 접근 시 hop 최소, 대역폭 최대 | 추론 |
+| R3 | 같은 세션 그룹 멤버끼리만 통신, 외부 컨테이너 차단 | 사용자/세션 격리 |
 
-## 3. 핵심 원칙
+R3는 단순 차단이 아니라 **"그룹 단위 멤버십에 따라 자동 격리"** 를 의미한다.
 
-> **양쪽 워크로드(BAI 컨테이너, K8s Pod)가 동일한 네트워크 fabric 또는 직접 라우팅 가능한 fabric에 있어야 R2의 "hop 없이"가 성립한다.**
+## 3. 핵심 원칙: 단일 CNI fabric
 
-서로 다른 fabric에 있으면 둘 사이를 잇는 gateway/proxy가 끼게 되어 hop이 늘어나고 대역폭이 깎인다.
+> **K8s Pod와 BAI 컨테이너를 동일한 CNI fabric에 둔다. 운영 대상은 1개의 CNI.**
 
-## 4. 추천 구조: Dual-attach (Multus 스타일)
+학습용/추론용 fabric을 분리하지 않는다. 단일 fabric만으로 R1/R2/R3 모두 충족 가능하다. 분리는 RDMA/SR-IOV 같은 특수 HW가 필요한 예외 상황에서만 도입한다 (섹션 6).
 
-학습용과 추론용은 트래픽 특성이 다르다. 단일 인터페이스로 묶지 말고 **컨테이너에 두 개의 네트워크 인터페이스**를 부여한다.
+## 4. 두 가지 디폴트 옵션
+
+R3까지 디폴트 안에서 풀어내는 두 후보를 제시한다.
+
+- **Option 1: Cilium 단일 fabric** — 정책 엔진 내장, 표현력 강함
+- **Option 2: Flannel 단일 fabric + nftables 자체 격리** — 가벼움 우선, BAI agent가 정책 책임
+
+### 4.1. Option 1: Cilium 단일 fabric
 
 ```
-[BAI agent host]
- │
- ├─ eth0 (관리/제어)
- │
- ├─ [BAI 학습 컨테이너]
- │    └─ eth0 (Net A: 학습 overlay)
- │
- ├─ [BAI 추론 endpoint 컨테이너]
- │    └─ eth0 (Net B: K8s 공유 fabric)
- │
- └─ [BAI 학습+서빙 동시 컨테이너]
-      ├─ eth0 (Net A)
-      └─ eth1 (Net B)
+[K8s 컨트롤 플레인]
+   apiserver, cilium-operator
+        ▲
+        │ watch (Pod, CiliumNetworkPolicy, CiliumIdentity)
+        │
+[모든 노드 (K8s 노드 + BAI agent 호스트)]
+   ├─ cilium-agent
+   ├─ kernel eBPF programs
+   ├─ K8s Pod        ─── cilium endpoint
+   └─ BAI 컨테이너    ─── cilium endpoint
 ```
 
-- **Net A**: BAI 컨테이너끼리만 참여하는 학습 전용 네트워크
-- **Net B**: K8s Pod와 같은 fabric에 들어가는 서빙용 네트워크
+#### R1 분석 (BAI ↔ BAI cross-host)
 
-다중 인터페이스 부여는 CRI 단계에서 직접 CNI 호출을 두 번 하거나, Multus-CNI를 도입하거나, 자체 CNI chaining으로 구현 가능.
+- **메커니즘**: BAI 호스트에 cilium-agent 배치, BAI 컨테이너 sandbox 생성 시 cilium-cni 호출 → cilium-agent에 endpoint 등록 → 다른 호스트의 cilium-agent들과 자동 라우팅 합의
+- **dataplane 두 모드**
+  - **native routing (BGP)**: encap 0, 10G에서 9.4 Gbps near line rate
+  - **vxlan/geneve**: encap 있음, 튜닝(NIC offload + jumbo MTU) 시 7-9 Gbps
+- **결과**: Swarm 대비 2-3x
 
-## 5. Net A (학습 overlay) 옵션
+#### R2 분석 (K8s Pod → BAI)
 
-### A-1. 자체 vxlan 또는 Flannel vxlan
+- **메커니즘**: K8s Pod도 같은 cilium fabric의 endpoint이므로 Pod ↔ BAI는 같은 dataplane을 공유
+- **hop**: 0 추가 hop. NAT 없음. eBPF가 라우팅 + 정책 평가를 한 번에 처리
+- **결과**: R1과 동일한 dataplane 성능 (native routing이면 line rate)
 
-학습 호스트들끼리 가벼운 L3 overlay를 만든다.
+#### R3 분석 (세션 그룹 격리)
 
-**필요한 것:**
-- vxlan 인터페이스 관리 도구 (택 1)
-  - `flanneld` + etcd 백엔드
-  - 자체 스크립트로 `ip link add type vxlan`
-- CNI plugin: `flannel` 또는 `bridge` plugin + 사전 셋업한 vxlan
-- IPAM: 호스트별 서브넷 분배 정책 (ex: 호스트 N → `10.244.N.0/24`)
-- BAI agent가 컨테이너 생성 시 CNI 호출 코드
+- **메커니즘**: CiliumNetworkPolicy + identity 라벨
+- **BAI agent 책임**: 컨테이너에 `session_group=<id>`, `user=<name>` 등 라벨 부여
+- **정책 표현**: 라벨 셀렉터 한 개로 멤버십 격리
+  ```yaml
+  apiVersion: cilium.io/v2
+  kind: CiliumNetworkPolicy
+  spec:
+    endpointSelector:
+      matchLabels: {session_group: G123}
+    ingress:
+    - fromEndpoints:
+      - matchLabels: {session_group: G123}
+  ```
+- **enforcement**: 커널 eBPF, 정책 룰 수에 거의 영향 없음
+- **결과**: 같은 그룹끼리만 자동 통신, 다른 그룹은 차단, K8s Pod에서의 추론 접근은 별도 정책 한 줄로 허용
 
-**특성:**
-- 운영 부담: 작음
-- 성능: 중간 (vxlan encap ~5% 손실, MTU 50바이트 차감)
-- 다중 노드 GPU 학습 NCCL 트래픽엔 적합하지 않을 수 있음
+#### 필요한 것
 
-### A-2. RDMA (RoCE v2 / InfiniBand) + SR-IOV
+- **BAI 호스트**
+  - cilium-agent 실행
+  - cilium-cni binary 배치 (`/opt/cni/bin/cilium-cni`)
+  - 호스트를 K8s 노드로 등록하거나, Cilium ClusterMesh의 external workload로 편입
+- **K8s 측**
+  - 클러스터에 Cilium 설치 (이미 깔려 있다면 재사용)
+  - 모드 선택: native routing(BGP 가능 시) 또는 vxlan
+- **BAI agent 측**
+  - sandbox 생성 시 cilium-cni 호출 또는 cilium-agent endpoint API (`PUT /v1/endpoint/`) 사용
+  - 컨테이너에 식별 라벨 부여 규칙
+  - 세션 그룹 lifecycle에 맞춰 CiliumNetworkPolicy CRD 생성/삭제
 
-GPU production 학습 수준의 대역폭/지연이 필요할 때.
+#### 특성
 
-**필요한 것:**
-- 하드웨어
-  - RDMA NIC (Mellanox ConnectX 등)
-  - RoCE라면 lossless ethernet (PFC/ECN 활성화된 스위치)
-  - InfiniBand라면 IB 스위치
-- 호스트 소프트웨어
-  - 커널 RDMA stack (`rdma-core`, `MLNX_OFED`)
-  - SR-IOV VF pre-create
-  - IOMMU on, 적절한 BIOS 설정
-- CNI plugin
-  - `sriov-cni` (VF 할당)
-  - `rdma-cni` (RDMA device 컨테이너 노출)
-  - 보통 Multus chained
-- 컨테이너
-  - `/dev/infiniband/*` 노출
-  - `IPC_LOCK` capability
-  - GPUDirect RDMA 사용 시 GPU 드라이버 + nv_peer_mem 모듈
+- 운영 부담: 중 (Cilium 운영 + BAI 통합)
+- 성능: native routing이면 최상, vxlan이어도 Swarm 대비 2x+
+- 정책 표현력: 강함 (identity, 라벨 셀렉터)
+- 외부 의존: K8s 컨트롤 플레인 (apiserver) 필요
 
-**특성:**
-- 운영 부담: 큼
-- 성능: 최상 (line rate, GPUDirect로 GPU memory ↔ NIC 직접)
-- VF 수 한계 존재 (NIC당 보통 64개 정도)
+### 4.2. Option 2: Flannel 단일 fabric + nftables 자체 격리
 
-## 6. Net B (K8s와 공유 fabric) 옵션
+```
+[모든 노드 (K8s 노드 + BAI agent 호스트)]
+   ├─ flanneld           (etcd 또는 K8s API 백엔드)
+   ├─ flannel CNI plugin
+   ├─ K8s Pod        ─── Flannel 네트워크
+   ├─ BAI 컨테이너    ─── Flannel 네트워크
+   └─ nftables 룰셋 (BAI agent가 관리, R3 전용)
+```
 
-K8s 측이 어떤 CNI를 쓰는지가 절반을 결정한다.
+#### R1 분석 (BAI ↔ BAI cross-host)
 
-### B-1. Cilium native routing + BGP (encap 없음)
+- **메커니즘**: Flannel이 호스트별 subnet 분배 + cross-host 연결
+- **dataplane backend 두 모드**
+  - **vxlan**: 표준, 튜닝 시 7-9 Gbps
+  - **host-gw**: encap 0, line rate 9.4 Gbps (단, 모든 호스트가 같은 L2)
+- **결과**: Swarm 대비 2-2.5x (vxlan), 2.7x (host-gw)
 
-**전제:** K8s가 Cilium을 native routing 모드로 운영하고 BGP로 Pod CIDR을 announce.
+#### R2 분석 (K8s Pod → BAI)
 
-**필요한 것:**
-- K8s 측
-  - Cilium 설정: `routing-mode: native`, `ipam: cluster-pool` 또는 동등
-  - Cilium BGP control plane 또는 외부 BGP daemon (FRR, MetalLB BGP)
-- BAI 호스트 측
-  - BGP daemon (FRR, GoBGP, BIRD)
-  - 호스트별 컨테이너 CIDR 할당
-  - CNI plugin: `bridge` + `host-local` IPAM (단순)
-  - 호스트 라우팅 테이블 정리 + 컨테이너 CIDR을 BGP로 announce
-- 네트워크 인프라
-  - BGP-aware ToR/Leaf 스위치, 또는 Linux router와 peering
-  - 동일 AS 내 iBGP 또는 eBGP 설계
+- **메커니즘**: K8s Pod와 BAI 컨테이너가 같은 Flannel 네트워크에 속하면 직접 라우팅
+- **hop**: 0 (Flannel 라우팅이 호스트 간 직결)
+- **결과**: dataplane 한도
 
-**특성:**
-- 성능: 최상 (encap 0, 순수 L3 라우팅, ECMP 가능)
-- 운영: 네트워크팀 협조 필수
-- 정책: 별도 (Cilium policy는 BAI 컨테이너에 자동 적용 안 됨)
+#### R3 분석 (세션 그룹 격리)
 
-### B-2. Cilium vxlan/geneve fabric에 BAI 호스트 join
+- **메커니즘**: Flannel은 NetworkPolicy 미지원 → **BAI agent가 호스트 nftables 룰을 직접 관리**
+- **BAI agent 책임**
+  - 세션 그룹별 IP set 유지: `nft add set inet bai grp123 { type ipv4_addr; }`
+  - 세션 시작 시 멤버 컨테이너 IP를 set에 추가
+  - 기본 정책: 그룹 IP set 외부에서 들어오는 트래픽 DROP
+  - K8s Pod에서의 정상 접근은 명시 allow 룰 (Pod CIDR 또는 라벨 매칭 어려우니 IP 기반)
+  - 종료 시 set/룰 정리
+- **enforcement**: 호스트 nftables, 룰 수가 수천을 넘으면 성능 측정 필요
+- **한계**
+  - 라벨/identity 표현 불가, IP 기반만
+  - 호스트 단위 룰셋 — 컨테이너 이동 시 reconcile 필요
+  - 정책 권한 모델은 BAI agent가 책임짐
 
-**전제:** K8s가 Cilium을 overlay 모드로 운영. BAI 호스트도 같은 overlay에 끼워 넣는다.
+#### 필요한 것
 
-**필요한 것:**
-- BAI 호스트에 cilium-agent 실행
-  - 옵션 a) 호스트를 K8s 노드로 등록(가벼운 kubelet 또는 슬림 VK) 후 cilium DaemonSet
-  - 옵션 b) `CiliumExternalWorkload` CRD로 외부 워크로드로 참여
-- BAI 컨테이너의 endpoint 등록
-  - `cilium-cni`를 직접 호출하거나
-  - cilium-agent의 endpoint API (`PUT /v1/endpoint/`)에 직접 등록
-- Identity 메타데이터
-  - BAI agent가 컨테이너에 부여할 라벨(session_id, user, kernel_type 등) 정의
-  - cilium-agent가 라벨 → identity 매핑하도록 K8s 측에 CRD 또는 외부 라벨 source 구성
-- 키/암호화
-  - vxlan tunnel key, IPSec/WireGuard 사용 시 키 공유
+- **BAI 호스트**
+  - flanneld 실행
+  - flannel CNI plugin + bridge plugin (`/opt/cni/bin/flannel`, `bridge`)
+  - nftables (커널 4.x+ 권장)
+- **K8s 측**
+  - Flannel CNI 사용 (BAI 호스트와 같은 backend, 같은 etcd 또는 같은 K8s API)
+  - 신규 환경이면 K8s에 Flannel 설치
+- **BAI agent 측**
+  - flannel CNI 호출 통합
+  - nftables 관리 모듈 (세션 그룹 ↔ IP set ↔ 룰 매핑)
+  - 그룹 lifecycle hook: 시작/종료 시 룰 add/del
+  - reconcile 로직: agent 재시작 후 기존 룰 vs 실제 컨테이너 정합성
 
-**특성:**
-- 성능: 중상 (vxlan encap)
-- 운영: 큼 (Cilium 자체 운영 부담 + 외부 워크로드 통합 부담)
-- 정책: Cilium NetworkPolicy를 그대로 활용 가능 (덤)
+#### 특성
 
-### B-3. Flannel vxlan 공유 (가장 가벼움)
+- 운영 부담: 작음 (Flannel 자체) + BAI agent 코드 추가
+- 성능: vxlan 한도 또는 host-gw 시 line rate
+- 정책 표현력: 제한적 (IP set 기반)
+- 외부 의존: etcd 또는 K8s API (Flannel backend)
 
-**전제:** K8s가 Flannel vxlan을 사용하거나, 신규 환경에서 단순함을 우선시.
+## 5. 두 디폴트 비교
 
-**필요한 것:**
-- BAI 호스트에 `flanneld` 실행
-- K8s와 동일한 backend
-  - etcd backend면 같은 etcd 클러스터
-  - Kubernetes API backend면 같은 클러스터에 ServiceAccount로 접근
-- 호스트별 subnet 할당 정책 (Flannel이 자동으로 처리)
-- CNI plugin: `flannel` (`/opt/cni/bin/flannel`) + `bridge`
-- BAI agent의 CNI 호출 시 flannel conflist 사용
+| 항목 | Option 1: Cilium | Option 2: Flannel + nftables |
+|---|---|---|
+| R1 cross-host throughput (10G) | 7-9 Gbps (vxlan) / 9.4 Gbps (native) | 7-9 Gbps (vxlan) / 9.4 Gbps (host-gw) |
+| R2 Pod → BAI hop | 0 | 0 |
+| R2 throughput | R1과 동일 | R1과 동일 |
+| R3 enforcement | CiliumNetworkPolicy (라벨/identity) | BAI agent 관리 nftables (IP 기반) |
+| R3 표현력 | 강함 | 제한적 |
+| R3 성능 영향 | eBPF, 거의 free | nftables 룰 수에 비례 |
+| K8s 통합 | 필수 (apiserver 의존) | 약함 (Flannel backend만 공유) |
+| BAI agent 코드 변경량 | 작음 (CNI + 라벨) | 중간 (CNI + nftables 모듈) |
+| 운영 도구 | cilium CLI, Hubble | flanneld, BAI agent 자체 |
+| 적합한 상황 | K8s가 이미 Cilium / 정책 풍부히 / 대규모 | 단순함 / 외부 의존 최소 / 소~중규모 |
 
-**특성:**
-- 성능: 중간 (vxlan encap)
-- 운영: 작음
-- 정책: 없음 (Flannel은 정책 미지원, L3 연결만)
+## 6. 디폴트가 부족할 때 (특수 케이스)
 
-### B-4. Macvlan / IPvlan (LAN 직결)
+단일 fabric으로 부족한 케이스에서만 **보조 fabric을 추가** (컨테이너에 두 번째 인터페이스 attach).
 
-**전제:** BAI 호스트와 K8s 노드가 동일 L2 또는 L3 라우팅 가능한 LAN에 있고, IP 대역 여유가 있음.
+### 6.1. Production 다중 노드 GPU 학습 (NCCL line rate)
 
-**필요한 것:**
-- 네트워크 인프라
-  - BAI/K8s 노드들이 같은 L2 segment (또는 L3 routable한 동일 sub-pool)
-  - 스위치에서 promisc 허용 (macvlan) 또는 IPvlan L3 모드 사용
-- IPAM
-  - 충돌 없는 컨테이너 IP 풀
-  - DHCP 사용 시 DHCP 서버 + `dhcp` IPAM plugin
-  - host-local 분리 시 호스트별 sub-pool 사전 분배
-- CNI plugin
-  - `macvlan` 또는 `ipvlan`
-  - K8s 측: Multus로 macvlan/ipvlan attachment 추가 (`NetworkAttachmentDefinition`)
-- 양쪽이 동일한 macvlan/ipvlan 네트워크에 attach
+- 보조 fabric: **RDMA (RoCE/InfiniBand) + SR-IOV**
+- CNI: `sriov-cni` + `rdma-cni` (Multus chained)
+- 격리: **P_Key (IB)** 또는 **VLAN (RoCE)** — HW 레벨, 성능 손해 0
+- 디폴트 fabric은 제어/일반 통신용으로 유지
 
-**특성:**
-- 성능: 최상 (NIC 직결, 호스트 bridge 거의 안 거침)
-- 운영: 작음
-- 한계: IP 관리 부담, L2 제약, 호스트 ↔ 자기 macvlan 컨테이너 간 통신은 별도 트릭 필요
+### 6.2. LLM 추론 line rate (페이로드 큰 스트리밍)
 
-### B-5. SR-IOV (전용 NIC VF)
+- 보조 fabric: **SR-IOV** (NIC VF 직접 부여)
+- CNI: `sriov-cni`
+- 격리: VF별 VLAN
+- 추론 endpoint 컨테이너만 dual-attach
 
-**전제:** 추론 페이로드가 매우 크거나(LLM streaming 등) 추론 컨테이너 수가 NIC VF 한계 안에 들어옴.
+### 6.3. cross-L2 환경에서 line rate
 
-**필요한 것:**
-- 하드웨어: SR-IOV 지원 NIC, 충분한 VF 수
-- 호스트: BIOS에서 SR-IOV/VT-d 활성화, VF pre-create
-- CNI plugin
-  - `sriov-cni`
-  - `sriov-network-device-plugin` (K8s 노드 자원 광고용)
-- K8s 측: Multus + `SriovNetwork` CRD
-- BAI 측: 같은 VF 풀에서 할당받도록 device-plugin 또는 직접 할당 로직
+- Option 1: native routing 모드 + BGP 도입
+- Option 2: host-gw는 같은 L2 필요 → vxlan으로 후퇴 (line rate 포기) 또는 별도 BGP 셋업
 
-**특성:**
-- 성능: 최상 (PF 우회, 거의 line rate, kernel bypass with DPDK 가능)
-- 운영: 큼 (HW 종속, capacity planning 필요)
-- VF 수 한계로 컨테이너 수 제한
+## 7. 결정 가이드
 
-## 7. 옵션 비교 요약
+> **단일 질문: "K8s 측 CNI가 무엇인가?"**
 
-### Net A (학습)
+| K8s CNI | 권장 |
+|---|---|
+| Cilium | Option 1 (그대로 통합) |
+| Calico | Option 1과 유사한 통합 가능 (Calico 정책 + WorkloadEndpoint), 또는 Cilium으로 마이그레이션 |
+| Flannel | Option 2 (그대로 통합) |
+| 미정 / 신규 | **Option 1 권장** (정책 표현력 + 모던 stack) |
+| 없음 (BAI 단독 운영) | **Option 2 권장** (가장 가벼움, 외부 의존 최소) |
 
-| 옵션 | 성능 | HW 요구 | 운영 부담 | 추천 상황 |
-|---|---|---|---|---|
-| A-1 vxlan | 중 | 일반 NIC | 작음 | 학생/연구실, 소규모 |
-| A-2 RDMA+SR-IOV | 최상 | RDMA NIC | 큼 | Production GPU 학습 |
+## 8. BAI agent 구현 포인트
 
-### Net B (K8s 공유)
-
-| 옵션 | 성능 | 전제 | 운영 부담 |
-|---|---|---|---|
-| B-1 Cilium native + BGP | 최상 | K8s가 Cilium native routing, BGP 환경 | 중-큼 |
-| B-2 Cilium overlay join | 중상 | K8s가 Cilium overlay | 큼 |
-| B-3 Flannel 공유 | 중 | K8s가 Flannel 또는 신규 환경 | 작음 |
-| B-4 Macvlan | 최상 | 동일 LAN, IP 여유 | 작음 |
-| B-5 SR-IOV | 최상 | SR-IOV NIC | 큼 |
-
-## 8. 결정에 필요한 입력
-
-다음 항목이 정해지면 구체 조합을 확정할 수 있다.
-
-1. **K8s 측 현재 CNI**: Cilium / Calico / Flannel / 기타
-2. **K8s가 overlay 모드인지 native routing 모드인지**
-3. **학습 워크로드 규모**: 단일 노드인지 다중 노드 GPU인지, NCCL/MPI 사용 여부
-4. **추론 트래픽 특성**: 응답 페이로드 크기, 동시 연결 수, 지연 요구
-5. **BAI 호스트와 K8s 노드의 네트워크 위치**: 동일 L2인지, 라우팅 hop이 있는지
-6. **하드웨어 가용성**: RDMA NIC, SR-IOV 가능 NIC 보유 여부
-7. **네트워크팀 협조 여부**: BGP/스위치 설정 변경 가능 여부
-
-## 9. 일반적인 조합별 권장
-
-### 9-1. 학생/연구실, K8s Cilium 환경, 일반 GPU
-- Net A: A-1 (자체 vxlan)
-- Net B: B-2 또는 B-3
-- Multus로 dual-attach
-
-### 9-2. Production 학습 + 추론 혼재, 충분한 인프라
-- Net A: A-2 (RDMA+SR-IOV)
-- Net B: B-1 (Cilium native + BGP) 또는 B-5 (SR-IOV)
-- 인터페이스 분리, 학습 NIC와 서빙 NIC를 물리적으로 다른 NIC에 둠
-
-### 9-3. 단순함 우선, 정책 enforcement 불필요
-- Net A: A-1 (Flannel vxlan)
-- Net B: B-3 (같은 Flannel) 또는 B-4 (macvlan)
-- 사실상 단일 fabric로 통합 가능
-
-### 9-4. 추론 대역폭이 critical (LLM 서빙 등)
-- Net A: 별도 (학습 워크로드 분리)
-- Net B: B-4 (macvlan) 또는 B-5 (SR-IOV)
-- 호스트 커널 스택을 가능한 한 우회
-
-## 10. 구현 시 BAI agent 변경 포인트
-
-선택한 조합과 무관하게 BAI containerd agent에 공통적으로 필요한 작업:
+선택한 옵션과 무관하게 공통적으로 필요한 작업:
 
 1. **CNI 호출 통합**
-   - PodSandboxConfig 생성 시 CRI runtime이 자동 호출하는 CNI conflist 준비
-   - 또는 sandbox 생성 후 agent가 직접 CNI plugin 호출
-2. **다중 인터페이스 지원**
-   - Multus 채택 또는 자체 CNI chaining
-   - 컨테이너 spec에서 어떤 net에 attach할지 선언적으로 표현
-3. **IPAM 정책**
-   - 호스트별 subnet 분배 또는 외부 IPAM(DHCP, Calico IPAM 등) 연동
-4. **메타데이터 라벨링**
-   - Cilium 등 정책 fabric을 쓸 경우 식별 라벨(session_id, user, image, kernel_type) 부여 규칙
-5. **lifecycle 정리**
-   - 컨테이너 종료 시 CNI DEL, IP 반환, endpoint 등록 해제 보장
-6. **장애/재시작 처리**
-   - agent 재시작 후 기존 컨테이너의 네트워크 상태 reconcile
+   - containerd CRI plugin이 PodSandbox 생성 시 conflist 기반으로 CNI 자동 호출
+   - 또는 BAI agent가 sandbox 생성 후 직접 CNI binary 호출
+   - 옵션별 conflist 사전 배치 (`/etc/cni/net.d/`)
+2. **메타데이터/라벨 부여**
+   - 컨테이너에 `session_group`, `user`, `kernel` 등 식별 라벨/주석
+   - Option 1: cilium identity 매핑 키
+   - Option 2: nftables set 매핑 키 (IP 추적용)
+3. **격리 자원 lifecycle**
+   - 그룹 생성 시
+     - Option 1: CiliumNetworkPolicy CRD apply
+     - Option 2: nftables set 생성 + 기본 DROP 룰
+   - 멤버 추가/삭제 시 set/policy 갱신
+   - 그룹 종료 시 회수
+4. **IPAM**
+   - Option 1: Cilium IPAM (cluster-pool 또는 custom)
+   - Option 2: Flannel host subnet (자동) + 컨테이너에 host-local 분배
+5. **장애/재시작 reconcile**
+   - agent 재시작 후 기존 컨테이너의 endpoint/IP/룰 정합성 검증
+   - K8s 측 객체와 호스트 상태 mismatch 감지/복구
+
+## 9. 현재 prototype 구현 상태
+
+`feat/containerd-agent-prototype` 브랜치에 14개 커밋으로 추가된 코드의 구조와 진행도. 모든 신규 코드는 `src/ai/backend/agent/containerd/` 하위에 격리되어 있고, 기존 코드 수정은 최소(`types.py`, `runtime.py`, `cli/__main__.py`, `config/unified.py`, `errors/__init__.py`).
+
+### 9.1. 패키지 구조
+
+```
+src/ai/backend/agent/
+├── containerd/                       # 신규 패키지
+│   ├── __init__.py                   # ContainerdAgentDiscovery
+│   ├── agent.py                      # ContainerdAgent (스캐폴드)
+│   ├── kernel.py                     # ContainerdKernel (스캐폴드)
+│   ├── intrinsic.py                  # placeholder
+│   ├── resources.py                  # 빈 mapping 리턴
+│   ├── preflight.py                  # 시작 시 CNI/binary 검증
+│   └── cri/
+│       ├── client.py                 # async CriClient
+│       ├── proto/api.proto           # k8s cri-api v1.30
+│       └── generated/                # protoc 산출물 (sync stubs + .pyi)
+├── cli/cri_poc.py                    # PoC 검증 CLI
+├── errors/containerd.py              # Cni*/Cri* 예외
+├── config/unified.py                 # ContainerdNetworkMode + Config
+├── runtime.py                        # backend=containerd 시 preflight hook
+└── types.py                          # AgentBackend.CONTAINERD 추가
+```
+
+### 9.2. 레이어별 상태
+
+#### L1. CRI gRPC 클라이언트 — 완성
+
+- `containerd/cri/generated/`: k8s cri-api v1.30 `api.proto`에서 protoc로 생성. mypy-protobuf의 `*AsyncStub` 타입 stub(.pyi) 동봉
+- `containerd/cri/client.py` `CriClient`: `grpc.aio` 기반 async wrapper
+  - 노출 RPC: `Version`, PodSandbox lifecycle (Run/Stop/Remove/Status/List), Container lifecycle (Create/Start/Stop/Remove/List/Status), Image (Pull/Status/List/Remove)
+  - 미노출: 스트리밍 RPC (`Exec`/`Attach`/`ContainerStats`), filesystem/runtime-config endpoints — agent 통합 시점에 추가
+- 타입 트릭: protoc는 sync stub만 생성 → 런타임은 sync stub 인스턴스화 후 **TYPE_CHECKING 블록의 forward-ref로 AsyncStub 이름 빌려와 `cast()`** (커밋 005bb9fa7, 2ed3cd87a)
+- 안전장치: 채널 connect timeout 5s 디폴트 — 무한 hang 방지 (커밋 ac7d7279d)
+
+#### L2. Backend 스캐폴드 — 의도적으로 비어 있음
+
+- `agent.py` `ContainerdAgent`: `AbstractAgent` 추상 메서드 미override → 인스턴스화 불가. docstring에 "package wiring과 discovery 검증용"만 명시
+- `kernel.py` `ContainerdKernel`, `ContainerdKernelCreationContext`: 동일
+- `resources.py` `load_resources`/`scan_available_resources`: 빈 mapping 리턴
+- `intrinsic.py`: CPU/Memory plugin placeholder
+- `__init__.py` `ContainerdAgentDiscovery`: `AbstractAgentDiscovery` 구현으로 `AgentBackend.CONTAINERD` 선택 시 wiring 작동
+
+#### L3. Config 스키마 — 완성 (4 모드)
+
+`config/unified.py`에 `ContainerdNetworkMode` enum + `ContainerdNetworkConfig` 추가. **본 문서의 Option 1/2와의 매핑:**
+
+| `mode` enum | 본 문서 매핑 | 의도 |
+|---|---|---|
+| `cilium` | **Option 1 (Cilium 단일 fabric)** | K8s 노드, 클러스터 Cilium CNI에 위임. 합성 namespace/name으로 PodSandboxConfig.metadata 채워서 RunPodSandbox 호출 → Cilium이 `reserved:init` identity 부여 + cluster pod CIDR에서 IP 할당 |
+| `managed` | (단일 호스트 dev) | standalone 노드, agent가 bridge+portmap conflist 직접 생성/배치. cross-host overlay 없음 — 개발/테스트 또는 단일 호스트용 |
+| `host` | **Option 2 (Flannel 등) 진입점** | operator 제공 conflist 사용. Flannel을 클러스터에 깔고 그 conflist 이름을 BAI agent가 참조하면 Option 2 통합 |
+| `none` | escape hatch | CNI 우회, host network namespace. 포트 충돌 위험 — service-port allocator가 host-port 충돌 회피 책임 |
+
+설정 필드:
+- `cni_conf_dir`, `cni_bin_dir`: CNI conflist/binary 위치
+- `network_name`: managed에선 생성될 conflist의 name, host에선 참조할 기존 conflist의 name
+- `bridge_name`, `subnet`: managed mode 전용
+- `cilium_pod_namespace`, `cilium_pod_name_prefix`: cilium mode에서 합성 metadata 채울 때 사용
+
+`OverridableContainerConfig.containerd`로 Optional 등록, `ContainerdExtraConfig`가 `agent.backend == 'containerd'`일 때 존재 강제.
+
+#### L4. Startup preflight — 완성
+
+`preflight.py` `run_preflight()` — agent 시작 시 mode별로 분기:
+
+- `none`: no-op
+- `cilium`: no-op. 클러스터 CNI 설정은 운영자 영역, 런타임 검증(IP 할당/회수, cilium-agent 소켓)은 PoC CLI로 분리
+- `managed`: 필수 binary(`bridge`/`portmap`/`host-local`/`loopback`) 존재 + `cni_conf_dir` 쓰기 가능 검증
+- `host`: 필수 binary + 이름 매칭되는 conflist 로드 + plugin chain에 `portmap` 포함 검증
+
+I/O는 모두 `asyncio.to_thread`로 dispatch — event loop 블록 방지. 예외는 모두 `BackendAIError` 상속 (`errors/containerd.py`):
+- `CniBinaryMissingError`, `CniConfDirNotWritableError`, `CniConflistMissingError`, `CniConflistInvalidError`, `CniPortmapMissingError`
+- `CriConnectionError`, `CriRpcError`
+
+`runtime.py`에서 backend가 CONTAINERD면 시작 시 `run_preflight()` 호출.
+
+#### L5. PoC 검증 CLI — 완성 (현재 테스트 surface)
+
+**`bai ag cri-poc run`** — manager/full agent lifecycle 없이 **agent 단독으로 CRI 전체 lifecycle을 한 번 walk**해서 단계별 결과 리포트.
+
+호출 순서:
+```
+Version → ImageStatus → (Pull) → RunPodSandbox → PodSandboxStatus
+   → CreateContainer → StartContainer → ContainerStatus
+   → (--pause: ENTER 대기) → StopContainer → RemoveContainer
+   → StopPodSandbox → RemovePodSandbox
+```
+
+각 step `StepResult(name, ok, duration_ms, detail)` 누적, 마지막에 사람용/JSON 출력.
+
+플래그:
+- `--pause`: Start 후 ENTER 대기 — 다른 셸에서 `cilium endpoint list`, `crictl pods`, `nsenter` 등으로 인스펙션
+- `--keep`: 정리 스킵 (post-mortem)
+- `--json-output`: 기계 파싱
+
+**docstring에 명시된 V1 cilium-mode 검증 목표 3가지:**
+
+1. 합성 `PodSandboxConfig.metadata` (apiserver에 backing Pod 객체 없음) 로도 Cilium CNI가 sandbox를 거부하지 않는지 — `reserved:init` identity로 떨어지면서 cluster pod CIDR에서 IP 할당받는지
+2. `RemovePodSandbox`가 CNI DEL을 깔끔하게 트리거해서 IP가 풀로 회수되는지 (leak 없음)
+3. agent 프로세스가 containerd CRI 소켓에 적합한 권한으로 도달 가능한지
+
+### 9.3. 진행도 표
+
+| 영역 | 상태 |
+|---|---|
+| CRI gRPC 클라이언트 | ✅ 완성 (lifecycle/image, 스트리밍 미노출) |
+| Network 모드 4종 config 스키마 | ✅ 완성 |
+| Preflight 검증 (managed/host/cilium/none) | ✅ 완성 |
+| Backend wiring (Discovery, AgentBackend enum) | ✅ 완성 |
+| **PoC 검증 CLI (`bai ag cri-poc run`)** | ✅ **완성 — 현재 테스트 surface** |
+| 예외 계층 (BackendAIError 준수) | ✅ 완성 |
+| `ContainerdAgent` / `ContainerdKernel` | ⚠ 스캐폴드만 (인스턴스화 불가) |
+| 리소스 plugin (CPU/Memory/accelerator) | ⏳ 미작업 (빈 mapping) |
+| krunner 이미지 prepare | ⏳ 미작업 (빈 dict) |
+| Exec/Attach/Stats 스트리밍 | ⏳ 미작업 |
+| 세션 lifecycle 통합 (kernel 생성/실행) | ⏳ 미작업 |
+| AppProxy 포트 wiring | ⏳ 미작업 |
+| vfolder/storage 마운트 | ⏳ 미작업 |
+
+### 9.4. 코드 품질/컨벤션 준수
+
+- **async-first**: `grpc.aio`, 파일시스템 I/O는 `asyncio.to_thread`
+- **모든 예외 `BackendAIError` 상속**: `errors/containerd.py`에 위치 (legacy `exception.py` 회피)
+- **절대 import** 일관됨
+- **`# noqa` / `# type: ignore` 미사용** — TYPE_CHECKING+cast로 우회
+- 의도적 미구현은 명시적: docstring "scaffold", 주석 `TODO(containerd-prototype)`
+
+### 9.5. 다음 단계 후보
+
+PoC가 V1 cilium-mode 검증을 통과한다는 가정하에, 영향 큰 순서:
+
+1. **`ContainerdKernelCreationContext` 채우기** — Docker backend 패턴 참조해서 `KernelCreationConfig` → CRI `ContainerConfig` 변환 (마운트, 포트, env, resources). 이게 들어가야 ContainerdAgent가 인스턴스화 가능
+2. **인트린식 plugin (CPU/Memory)** — Docker `intrinsic.py` 패턴, 메트릭은 CRI `ContainerStats`로
+3. **포트 매핑 정책 결정** — `cilium` mode는 portmap을 chain하지 않으므로 service 포트 노출 방식이 docker backend와 다름. App Proxy 통합 시점에 설계 필요
+4. **Exec 스트리밍** — code-runner 통합 전제
+5. **krunner 이미지 prepare** — `ImageService.PullImage`로 부트스트랩
+6. **세션 그룹 격리 자원 관리** (섹션 8 항목 3) — Option 1 채택 시 CiliumNetworkPolicy CRD lifecycle, Option 2 채택 시 nftables 모듈
+
+문서화 측면: `cri_poc.py`/`unified.py`/`preflight.py` docstring에 의도/제약/미구현 사유가 잘 적혀 있어 사실상 설계 문서 역할 수행 중.
+
+## 10. 부록 A: dataplane별 10G 실측 참고
+
+| Dataplane | 10G NIC 실측 | line rate 대비 | Swarm 대비 |
+|---|---|---|---|
+| Docker Swarm overlay | 3-4 Gbps | 30-40% | 1x baseline |
+| Flannel vxlan (튜닝) | 7-9 Gbps | 70-90% | 2-2.5x |
+| Cilium vxlan (eBPF) | 7-9 Gbps | 70-90% | 2-2.5x |
+| Flannel host-gw | 9.4 Gbps | 94% | 2.7x |
+| Cilium native routing (BGP) | 9.4 Gbps | 94% | 2.7x |
+| Macvlan / IPvlan | 9.4 Gbps | 94% | 2.7x |
+| SR-IOV | 9.9 Gbps | 99% | 3x |
+| RDMA + GPUDirect | line rate, 낮은 지연 | 100% | 3x+ |
+
+## 11. 부록 B: vxlan 사용 시 필수 튜닝
+
+Option 1/2 모두 vxlan dataplane을 선택할 경우 적용:
+
+- **NIC vxlan offload 활성화**
+  ```
+  ethtool -K <iface> tx-udp_tnl-segmentation on tx-udp_tnl-csum on
+  ```
+- **MTU 9000 (jumbo frame)**
+  - 호스트 NIC, vxlan device, 컨테이너 인터페이스 모두 정합 필요
+  - vxlan inner MTU = outer MTU - 50
+- **TCP buffer 증대**
+  ```
+  sysctl -w net.core.rmem_max=134217728
+  sysctl -w net.core.wmem_max=134217728
+  sysctl -w net.ipv4.tcp_rmem="4096 87380 134217728"
+  sysctl -w net.ipv4.tcp_wmem="4096 65536 134217728"
+  ```
+- **NIC multi-queue**
+  - `ethtool -L <iface> combined <#cores>` 또는 자동
+  - IRQ affinity 분산
+
+이 튜닝만으로도 같은 vxlan에서 Swarm 대비 2배 이상 차이 남.
