@@ -225,9 +225,12 @@ class ModelCardDBSource:
         deleted_row = result.row
         if options.delete_associated_vfolder:
             # The VFolder is going to trash, so any sibling model card pointing
-            # at it would be orphaned. Hard-delete the siblings first inside the
-            # same transaction, then flip the VFolder status atomically.
+            # at it would be orphaned. Reject up front if the vfolder is still
+            # mounted, then hard-delete the siblings and flip the VFolder
+            # status atomically — this avoids wasted sibling deletions that
+            # would only get rolled back on a mount-check failure.
             vfolder_id = cast(UUID, deleted_row.vfolder)
+            await self._reject_if_vfolders_mounted(session, [vfolder_id])
             sibling_result = await session.execute(
                 sa.delete(ModelCardRow).where(ModelCardRow.vfolder == vfolder_id)
             )
@@ -243,7 +246,6 @@ class ModelCardDBSource:
                     vfolder_id,
                     deleted_row.id,
                 )
-            await self._reject_if_vfolders_mounted(session, [vfolder_id])
             await execute_updater(
                 session, Updater(spec=VFolderTrashUpdaterSpec(), pk_value=vfolder_id)
             )
