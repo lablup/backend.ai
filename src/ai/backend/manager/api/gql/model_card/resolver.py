@@ -206,7 +206,7 @@ async def admin_bulk_delete_model_cards_v2(
         dto, dto.options or DeleteModelCardOptions()
     )
     return BulkDeleteModelCardsPayloadGQL(
-        deleted_count=payload.deleted_count,
+        successes=list(payload.successes),
         failed=[
             BulkDeleteModelCardV2ErrorGQL(card_id=error.card_id, message=error.message)
             for error in payload.failed

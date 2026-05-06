@@ -1966,8 +1966,8 @@ input BulkDeleteModelCardsV2Input
 type BulkDeleteModelCardsV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Number of model cards successfully deleted."""
-  deletedCount: Int!
+  """UUIDs of model cards that were successfully deleted."""
+  successes: [UUID!]!
 
   """List of errors for model cards that failed to delete."""
   failed: [BulkDeleteModelCardV2Error!]!

@@ -1366,8 +1366,8 @@ input BulkDeleteModelCardsV2Input {
 
 """Added in UNRELEASED. Payload for bulk model card deletion."""
 type BulkDeleteModelCardsV2Payload {
-  """Number of model cards successfully deleted."""
-  deletedCount: Int!
+  """UUIDs of model cards that were successfully deleted."""
+  successes: [UUID!]!
 
   """List of errors for model cards that failed to delete."""
   failed: [BulkDeleteModelCardV2Error!]!

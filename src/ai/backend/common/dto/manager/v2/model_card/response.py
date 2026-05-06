@@ -78,7 +78,9 @@ class BulkDeleteModelCardV2Error(BaseResponseModel):
 class BulkDeleteModelCardsPayload(BaseResponseModel):
     """Payload for bulk model card deletion mutation."""
 
-    deleted_count: int = Field(description="Number of model cards successfully deleted.")
+    successes: list[UUID] = Field(
+        description="UUIDs of model cards that were successfully deleted.",
+    )
     failed: list[BulkDeleteModelCardV2Error] = Field(
         description="List of errors for model cards that failed to delete.",
     )

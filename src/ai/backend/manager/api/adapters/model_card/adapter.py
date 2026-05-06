@@ -408,7 +408,7 @@ class ModelCardAdapter(BaseAdapter):
         """Bulk-delete model cards and surface per-card success/failure breakdown."""
         result = await self._run_bulk_delete(input.ids, options)
         return BulkDeleteModelCardsPayload(
-            deleted_count=len(result.data.successes),
+            successes=list(result.data.successes),
             failed=[
                 BulkDeleteModelCardV2Error(card_id=failure.card_id, message=failure.message)
                 for failure in result.data.failures

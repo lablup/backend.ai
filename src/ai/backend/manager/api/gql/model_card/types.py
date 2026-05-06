@@ -634,7 +634,9 @@ class BulkDeleteModelCardV2ErrorGQL:
     name="BulkDeleteModelCardsV2Payload",
 )
 class BulkDeleteModelCardsPayloadGQL:
-    deleted_count: int = gql_field(description="Number of model cards successfully deleted.")
+    successes: list[UUID] = gql_field(
+        description="UUIDs of model cards that were successfully deleted.",
+    )
     failed: list[BulkDeleteModelCardV2ErrorGQL] = gql_field(
         description="List of errors for model cards that failed to delete.",
     )
