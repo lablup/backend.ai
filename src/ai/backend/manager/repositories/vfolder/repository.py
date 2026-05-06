@@ -53,6 +53,10 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.repository import (
+    ForeignKeyViolationError,
+    RepositoryIntegrityError,
+)
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
@@ -112,7 +116,12 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    IntegrityErrorCheck,
+    execute_batch_querier,
+)
+from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
@@ -745,6 +754,14 @@ class VfolderRepository:
         Permanently delete a VFolder from DB.
         Only VFolders with purgable status (DELETE_PENDING, DELETE_COMPLETE) can be purged.
 
+        A vfolder still referenced by a ``model_cards.vfolder`` row is rejected
+        atomically by the FK constraint (``ondelete='RESTRICT'``); the
+        ``execute_rbac_entity_purger`` layer parses the underlying integrity
+        error into a structured ``RepositoryIntegrityError``, which is then
+        matched on type + constraint name and translated into
+        ``VFolderHasLinkedModelCard``. Other integrity violations propagate
+        unchanged so future constraints are not silently misclassified.
+
         Raises:
             VFolderNotFound: If the vfolder doesn't exist.
             VFolderFilterStatusFailed: If the vfolder status is not purgable.
@@ -758,17 +775,24 @@ class VfolderRepository:
                 raise VFolderNotFound(extra_data=str(vfolder_uuid))
             if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
                 raise VFolderFilterStatusFailed
-            linked_card_count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(ModelCardRow)
-                .where(ModelCardRow.vfolder == vfolder_uuid)
-            )
-            if linked_card_count:
-                raise VFolderHasLinkedModelCard(
-                    f"VFolder {vfolder_uuid} still has {linked_card_count} linked model card(s); "
-                    "run delete-forever (with cascade if needed) before purge."
+            try:
+                await execute_rbac_entity_purger(session, purger)
+            except RepositoryIntegrityError as e:
+                match_integrity_error(
+                    e,
+                    [
+                        IntegrityErrorCheck(
+                            violation_type=ForeignKeyViolationError,
+                            constraint_name="fk_model_cards_vfolder_vfolders",
+                            error=VFolderHasLinkedModelCard(
+                                f"VFolder {vfolder_uuid} cannot be purged: it is "
+                                "still referenced by one or more model card(s). "
+                                "Run delete-forever (with cascade if needed) "
+                                "before purge."
+                            ),
+                        ),
+                    ],
                 )
-            await execute_rbac_entity_purger(session, purger)
             return vfolder_row.to_data()
 
     @vfolder_repository_resilience.apply()

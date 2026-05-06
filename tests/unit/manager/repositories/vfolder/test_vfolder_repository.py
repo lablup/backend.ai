@@ -615,6 +615,7 @@ class TestVfolderRepositoryPurge:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -622,6 +623,9 @@ class TestVfolderRepositoryPurge:
                 VFolderRow,
                 ModelCardRow,
                 EntityFieldRow,
+                AssociationScopesEntitiesRow,
+                ObjectPermissionRow,
+                PermissionRow,
             ],
         ):
             yield database_connection
@@ -855,6 +859,116 @@ class TestVfolderRepositoryPurge:
         # Verify vfolder still exists in DB (not deleted)
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
 
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_network_count=3,
+                )
+            )
+            await db_sess.flush()
+        return policy_name
+
+    @pytest.fixture
+    async def test_project_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"test-project-{project_id.hex[:8]}",
+                    domain_name=test_domain_name,
+                    is_active=True,
+                    type=ProjectType.GENERAL,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                )
+            )
+            await db_sess.flush()
+        return project_id
+
+    @pytest.fixture
+    async def linked_model_card_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_in_db: uuid.UUID,
+        test_domain_name: str,
+        test_project_id: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> uuid.UUID:
+        """Create a ModelCardRow that references ``vfolder_in_db``.
+
+        The FK on ``model_cards.vfolder`` is ``ondelete='RESTRICT'``, so the
+        presence of this row is what triggers the integrity violation under
+        test.
+        """
+        card_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ModelCardRow(
+                    id=card_id,
+                    name=f"mc-{card_id.hex[:8]}",
+                    vfolder=vfolder_in_db,
+                    domain=test_domain_name,
+                    project=test_project_id,
+                    creator=test_user,
+                )
+            )
+            await db_sess.flush()
+        return card_id
+
+    @pytest.mark.parametrize(
+        "vfolder_in_db",
+        [VFolderOperationStatus.DELETE_PENDING],
+        ids=["delete_pending"],
+        indirect=True,
+    )
+    async def test_purge_vfolder_with_linked_model_card_raises(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        vfolder_in_db: uuid.UUID,
+        linked_model_card_id: uuid.UUID,
+    ) -> None:
+        """The ``ondelete='RESTRICT'`` FK on ``model_cards.vfolder`` blocks the
+        underlying DELETE; the repository must surface that as a domain-level
+        ``VFolderHasLinkedModelCard`` (translated from the parsed integrity
+        error by SQLSTATE + constraint name) without leaking the raw
+        ``IntegrityError`` to callers, and without modifying either row.
+        """
+        vfolder_id = vfolder_in_db
+
+        purger = RBACEntityPurger(
+            row_class=VFolderRow,
+            pk_value=vfolder_id,
+            spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
+        )
+
+        with pytest.raises(VFolderHasLinkedModelCard):
+            await vfolder_repository.purge_vfolder(purger)
+
+        assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
+        async with db_with_cleanup.begin_readonly_session() as session:
+            assert (
+                await session.execute(
+                    sa.select(ModelCardRow.id).where(ModelCardRow.id == linked_model_card_id)
+                )
+            ).scalar_one_or_none() is not None
+
 
 class TestVfolderRepositoryDeleteForever:
     """Tests for VfolderRepository.delete_vfolders_forever() with cascade_model_card."""
@@ -871,6 +985,7 @@ class TestVfolderRepositoryDeleteForever:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
