@@ -37,7 +37,7 @@ class TestPrometheusQueryPresetPreview:
         query_template: str,
         result_type: str,
     ) -> None:
-        prometheus_client_mock.query_instant = AsyncMock(
+        prometheus_client_mock.preview_query_template = AsyncMock(
             return_value=PrometheusResponse(
                 status="success",
                 data=PrometheusQueryData(result_type=result_type, result=[]),
@@ -50,14 +50,14 @@ class TestPrometheusQueryPresetPreview:
 
         assert result.status == "success"
         assert result.data.result_type == result_type
-        prometheus_client_mock.query_instant.assert_called_once()
+        prometheus_client_mock.preview_query_template.assert_called_once()
 
     async def test_propagates_prometheus_error(
         self,
         admin_v2_registry: V2ClientRegistry,
         prometheus_client_mock: MagicMock,
     ) -> None:
-        prometheus_client_mock.query_instant = AsyncMock(
+        prometheus_client_mock.preview_query_template = AsyncMock(
             side_effect=FailedToGetMetric('parse error: unexpected "}" (status=400, path=query)'),
         )
 
