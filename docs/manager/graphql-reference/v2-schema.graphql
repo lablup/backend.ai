@@ -13944,7 +13944,7 @@ type VFolder implements Node {
   """
   Added in UNRELEASED. Model cards backed by this vfolder, sorted most-recently-created first.
   """
-  modelCards: ModelCardV2Connection!
+  modelCards: ModelCardV2Connection
 }
 
 """
