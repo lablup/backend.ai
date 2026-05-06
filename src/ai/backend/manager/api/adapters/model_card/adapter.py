@@ -77,7 +77,6 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
-from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
@@ -381,9 +380,7 @@ class ModelCardAdapter(BaseAdapter):
         result = await self._processors.model_card.delete.wait_for_complete(
             DeleteModelCardAction(
                 purger=Purger(row_class=ModelCardRow, pk_value=card_id),
-                vfolder_trash_spec=(
-                    VFolderTrashUpdaterSpec() if options.delete_associated_vfolder else None
-                ),
+                options=options,
             )
         )
         return DeleteModelCardPayload(id=result.id)
@@ -397,9 +394,7 @@ class ModelCardAdapter(BaseAdapter):
         result = await self._processors.model_card.bulk_delete.wait_for_complete(
             BulkDeleteModelCardAction(
                 purgers=[Purger(row_class=ModelCardRow, pk_value=card_id) for card_id in input.ids],
-                vfolder_trash_spec=(
-                    VFolderTrashUpdaterSpec() if options.delete_associated_vfolder else None
-                ),
+                options=options,
             )
         )
         return DeleteModelCardsPayload(deleted_count=len(result.data.successes))

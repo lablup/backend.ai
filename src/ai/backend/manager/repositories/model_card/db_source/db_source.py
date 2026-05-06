@@ -18,6 +18,7 @@ from ai.backend.common.data.permission.types import RBACElementType, RelationTyp
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
+from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import VFolderID, VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.group.types import ProjectType
@@ -59,7 +60,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
 )
 from ai.backend.manager.repositories.base.updater import (
     Updater,
-    UpdaterSpec,
     execute_updater,
 )
 from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
@@ -70,6 +70,7 @@ from ai.backend.manager.repositories.model_card.types import (
 )
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
+from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.manager.types import TriState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -178,15 +179,15 @@ class ModelCardDBSource:
     async def delete(
         self,
         purger: Purger[ModelCardRow],
-        vfolder_trash_spec: UpdaterSpec[VFolderRow] | None,
+        options: DeleteModelCardOptions,
     ) -> UUID:
         async with self._db.begin_session() as session:
-            return await self._delete_card_in_session(session, purger, vfolder_trash_spec)
+            return await self._delete_card_in_session(session, purger, options)
 
     async def bulk_delete(
         self,
         purgers: list[Purger[ModelCardRow]],
-        vfolder_trash_spec: UpdaterSpec[VFolderRow] | None,
+        options: DeleteModelCardOptions,
     ) -> BulkModelCardDeleteResultData:
         """Hard-delete every card behind ``purgers`` with partial-failure semantics.
 
@@ -205,9 +206,7 @@ class ModelCardDBSource:
                 card_id = cast(UUID, purger.pk_value)
                 try:
                     async with session.begin_nested():
-                        deleted_id = await self._delete_card_in_session(
-                            session, purger, vfolder_trash_spec
-                        )
+                        deleted_id = await self._delete_card_in_session(session, purger, options)
                     successes.append(deleted_id)
                 except Exception as exc:
                     failures.append(BulkModelCardDeleteFailure(card_id=card_id, message=str(exc)))
@@ -217,20 +216,22 @@ class ModelCardDBSource:
         self,
         session: SASession,
         purger: Purger[ModelCardRow],
-        vfolder_trash_spec: UpdaterSpec[VFolderRow] | None,
+        options: DeleteModelCardOptions,
     ) -> UUID:
         result = await execute_purger(session, purger)
         if result is None:
             raise ModelCardNotFound()
         deleted_row = result.row
-        if vfolder_trash_spec is not None:
+        if options.delete_associated_vfolder:
             # The VFolder is going to trash, so any sibling model card pointing
             # at it would be orphaned. Hard-delete the siblings first inside the
             # same transaction, then flip the VFolder status atomically.
             vfolder_id = cast(UUID, deleted_row.vfolder)
             await session.execute(sa.delete(ModelCardRow).where(ModelCardRow.vfolder == vfolder_id))
             await self._reject_if_vfolders_mounted(session, [vfolder_id])
-            await execute_updater(session, Updater(spec=vfolder_trash_spec, pk_value=vfolder_id))
+            await execute_updater(
+                session, Updater(spec=VFolderTrashUpdaterSpec(), pk_value=vfolder_id)
+            )
         return deleted_row.id
 
     async def _reject_if_vfolders_mounted(

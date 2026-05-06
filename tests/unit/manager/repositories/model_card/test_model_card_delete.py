@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RBACElementRef, RBACElementType
@@ -41,10 +42,8 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
-from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -55,7 +54,7 @@ if TYPE_CHECKING:
 class DeleteCase:
     """Parameter set for delete option-on/off coverage."""
 
-    vfolder_trash_spec: UpdaterSpec[VFolderRow] | None
+    delete_associated_vfolder: bool
     expects_sibling_deleted: bool
     expects_vfolder_status: VFolderOperationStatus
 
@@ -63,7 +62,7 @@ class DeleteCase:
 _DELETE_CASES = [
     pytest.param(
         DeleteCase(
-            vfolder_trash_spec=None,
+            delete_associated_vfolder=False,
             expects_sibling_deleted=False,
             expects_vfolder_status=VFolderOperationStatus.READY,
         ),
@@ -71,7 +70,7 @@ _DELETE_CASES = [
     ),
     pytest.param(
         DeleteCase(
-            vfolder_trash_spec=VFolderTrashUpdaterSpec(),
+            delete_associated_vfolder=True,
             expects_sibling_deleted=True,
             expects_vfolder_status=VFolderOperationStatus.DELETE_PENDING,
         ),
@@ -318,7 +317,7 @@ class TestModelCardDelete:
 
         await db_source.delete(
             Purger(row_class=ModelCardRow, pk_value=target.id),
-            case.vfolder_trash_spec,
+            DeleteModelCardOptions(delete_associated_vfolder=case.delete_associated_vfolder),
         )
 
         async with db_with_cleanup.begin_readonly_session() as session:

@@ -74,13 +74,13 @@ class ModelCardService:
         return UpdateModelCardActionResult(model_card=data)
 
     async def delete(self, action: DeleteModelCardAction) -> DeleteModelCardActionResult:
-        deleted_id = await self._repository.delete(action.purger, action.vfolder_trash_spec)
+        deleted_id = await self._repository.delete(action.purger, action.options)
         return DeleteModelCardActionResult(id=deleted_id)
 
     async def bulk_delete(
         self, action: BulkDeleteModelCardAction
     ) -> BulkDeleteModelCardActionResult:
-        data = await self._repository.bulk_delete(action.purgers, action.vfolder_trash_spec)
+        data = await self._repository.bulk_delete(action.purgers, action.options)
         return BulkDeleteModelCardActionResult(data=data)
 
     async def search(self, action: SearchModelCardsAction) -> SearchModelCardsActionResult:
