@@ -750,23 +750,8 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def purge_vfolder(self, purger: RBACEntityPurger[VFolderRow]) -> VFolderData:
-        """
-        Permanently delete a VFolder from DB.
-        Only VFolders with purgable status (DELETE_PENDING, DELETE_COMPLETE) can be purged.
-
-        A vfolder still referenced by a ``model_cards.vfolder`` row is rejected
-        atomically by the FK constraint (``ondelete='RESTRICT'``); the
-        ``execute_rbac_entity_purger`` layer parses the underlying integrity
-        error into a structured ``RepositoryIntegrityError``, which is then
-        matched on type + constraint name and translated into
-        ``VFolderHasLinkedModelCard``. Other integrity violations propagate
-        unchanged so future constraints are not silently misclassified.
-
-        Raises:
-            VFolderNotFound: If the vfolder doesn't exist.
-            VFolderFilterStatusFailed: If the vfolder status is not purgable.
-            VFolderHasLinkedModelCard: If a model card still references the vfolder.
-        """
+        """Permanently delete a vfolder. Raises VFolderHasLinkedModelCard if a
+        model_card still references it."""
         vfolder_uuid = cast(uuid.UUID, purger.pk_value)
         async with self._db.begin_session() as session:
             # Fetch vfolder first to validate status before purging.
