@@ -2191,7 +2191,7 @@ class DeploymentAdapter(BaseAdapter):
             created_user_id=data.created_user_id,
             options=deployment_options_to_info(data.options),
             scaling_state=data.scaling_state,
-            current_revision_id=data.revision.id if data.revision is not None else None,
+            current_revision_id=data.current_revision_id,
             deploying_revision_id=data.deploying_revision_id,
             policy=policy_info,
         )

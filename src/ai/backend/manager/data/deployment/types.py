@@ -959,6 +959,11 @@ class ModelDeploymentData:
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkSpec
     revision: ModelRevisionData | None
+    # Identity of the active revision, mirrored directly from
+    # ``endpoints.current_revision``. Decoupled from ``revision`` so the API
+    # can surface the DB-truth ID even if the matching ``ModelRevisionSpec``
+    # is missing (e.g. dangling reference after a revision row was removed).
+    current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None
     revision_history_ids: list[DeploymentRevisionID]
     scaling_rule_ids: list[UUID]
