@@ -119,7 +119,7 @@ async def prometheus_query_preset_result(
 async def admin_preview_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     input: PreviewQueryDefinitionInputGQL,
-) -> QueryDefinitionResultGQL:
+) -> QueryDefinitionResultGQL | None:
     check_admin_only()
     dto = await info.context.adapters.prometheus_query_preset.admin_preview(input.to_pydantic())
     return QueryDefinitionResultGQL.from_pydantic(dto)
