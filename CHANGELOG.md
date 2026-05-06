@@ -47,7 +47,6 @@ Changes
 * Add B-tree indexes on `association_scopes_entities (entity_type, entity_id)` and `permissions (scope_type, scope_id, entity_type)` to accelerate scope-walk and scope-first permission lookups. ([#11455](https://github.com/lablup/backend.ai/issues/11455))
 
 ### Fixes
-* Renormalize legacy hyphenated `start-command` keys in stored deployment model definitions to the canonical `start_command` form, splitting string values into argv tokens. ([#11497](https://github.com/lablup/backend.ai/issues/11497))
 * Send `Accept: application/json` from the manager's AppProxy client so endpoint create/delete failures return parseable JSON instead of HTML error pages. ([#11328](https://github.com/lablup/backend.ai/issues/11328))
 * Default the AppProxy coordinator's error responses to JSON so clients that omit the `Accept` header receive a structured `BackendAIError` body instead of an HTML page. ([#11329](https://github.com/lablup/backend.ai/issues/11329))
 * Keep CLI table column widths consistent when paginated list output spans multiple chunks. ([#11334](https://github.com/lablup/backend.ai/issues/11334))
@@ -74,6 +73,7 @@ Changes
 * Require every value needed to create a deployment when creating a `DeploymentRevisionPreset` (`cluster_mode`, `cluster_size`, `replica_count`, `deployment_strategy`). Existing rows are migrated with safe defaults (`replica_count=1`, `deployment_strategy=ROLLING`). ([#11444](https://github.com/lablup/backend.ai/issues/11444))
 * Remove `active_revision_id` from the `updateDeployment` mutation; use the dedicated revision mutation to activate a revision. ([#11445](https://github.com/lablup/backend.ai/issues/11445))
 * Normalize legacy string `start_command` values into one-item lists in stored model definitions (deployment revisions, presets, runtime variants) so existing rows pass the `list[str] | None` schema introduced in #11402 ([#11446](https://github.com/lablup/backend.ai/issues/11446))
+* Renormalize legacy hyphenated `start-command` keys in stored deployment model definitions to the canonical `start_command` form, splitting string values into argv tokens. ([#11497](https://github.com/lablup/backend.ai/issues/11497))
 * Fix the legacy `CreateNetwork` GraphQL mutation so it no longer rejects requests when inter-container networking is enabled (the `enabled` flag was being checked with an inverted condition). ([#11448](https://github.com/lablup/backend.ai/issues/11448))
 * Fix `deploymentRevisionPreset` GraphQL query returning null for `execution.image` and `modelDefinition` by aligning GQL field name with the DTO `image_id` and converting the model definition type at the adapter boundary. ([#11451](https://github.com/lablup/backend.ai/issues/11451))
 * Add a UUID filter (`id`) to `ImageV2Filter` so callers can locate a specific image by UUID via the v2 image search APIs. ([#11469](https://github.com/lablup/backend.ai/issues/11469))
