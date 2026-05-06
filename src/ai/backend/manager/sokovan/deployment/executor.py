@@ -11,7 +11,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
 )
 from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
@@ -782,23 +781,19 @@ class DeploymentExecutor:
             "project": str(deployment.metadata.project),
             "session_owner": str(deployment.metadata.session_owner),
         }
-        labels = {
-            k: LabelMatcher.exact(v)
-            for k, v in available_labels.items()
-            if k in preset_data.filter_labels
-        }
+        labels = {k: v for k, v in available_labels.items() if k in preset_data.filter_labels}
 
         # time_window: preset default → fallback to "5m"
         time_window = preset_data.time_window or "5m"
 
-        metric_preset = MetricPreset(
-            template=preset_data.query_template,
-            labels=labels,
-            window=time_window,
-        )
-
         try:
-            response = await self._prometheus_client.query_instant(preset=metric_preset)
+            response = await self._prometheus_client.execute_preset(
+                query_template=preset_data.query_template,
+                filter_labels=labels,
+                group_labels=[],
+                time_window=time_window,
+                time_range=None,
+            )
         except (PrometheusConnectionError, FailedToGetMetric) as e:
             log.warning(
                 "AUTOSCALE(e:{}, rule:{}): prometheus query failed: {}",
