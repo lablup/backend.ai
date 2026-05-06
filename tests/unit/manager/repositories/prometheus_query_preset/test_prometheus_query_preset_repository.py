@@ -10,7 +10,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.preset import MetricPreset
 from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusResponse,
@@ -283,7 +282,7 @@ class TestPrometheusQueryPresetRepositoryPreview:
     @pytest.fixture
     def prometheus_client(self, canned_response: PrometheusResponse) -> MagicMock:
         client = MagicMock(spec=PrometheusClient)
-        client.query_instant = AsyncMock(return_value=canned_response)
+        client.preview_query_template = AsyncMock(return_value=canned_response)
         return client
 
     @pytest.fixture
@@ -296,7 +295,7 @@ class TestPrometheusQueryPresetRepositoryPreview:
             prometheus_client=prometheus_client,
         )
 
-    async def test_renders_empty_matchers_and_default_window(
+    async def test_delegates_to_client_with_template_and_window(
         self,
         repository: PrometheusQueryPresetRepository,
         prometheus_client: MagicMock,
@@ -307,12 +306,10 @@ class TestPrometheusQueryPresetRepositoryPreview:
             default_window="5m",
         )
 
-        passed_preset = prometheus_client.query_instant.call_args.kwargs["preset"]
-        assert isinstance(passed_preset, MetricPreset)
-        assert passed_preset.template == "sum(rate(metric{{{labels}}}[{window}]))"
-        assert passed_preset.labels == {}
-        assert passed_preset.group_by == frozenset()
-        assert passed_preset.window == "5m"
+        prometheus_client.preview_query_template.assert_called_once_with(
+            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            default_window="5m",
+        )
         assert result is canned_response
 
     async def test_converts_failed_to_get_metric_to_evaluation_failed(
@@ -320,7 +317,7 @@ class TestPrometheusQueryPresetRepositoryPreview:
         repository: PrometheusQueryPresetRepository,
         prometheus_client: MagicMock,
     ) -> None:
-        prometheus_client.query_instant = AsyncMock(
+        prometheus_client.preview_query_template = AsyncMock(
             side_effect=FailedToGetMetric('parse error: unexpected "}" (status=400, path=query)'),
         )
 

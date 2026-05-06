@@ -482,7 +482,7 @@ class TestPrometheusQueryPresetService:
         mock_repository: MagicMock,
     ) -> None:
         """preview_preset must pass the service's default window to the repository."""
-        mock_repository.preview_query_template = AsyncMock(
+        mock_repository.preview_template = AsyncMock(
             return_value=PrometheusResponse(
                 status="success",
                 data=PrometheusQueryData(result_type="vector", result=[]),
@@ -493,7 +493,7 @@ class TestPrometheusQueryPresetService:
             PreviewPresetAction(query_template="sum(rate(metric{{{labels}}}[{window}]))")
         )
 
-        mock_repository.preview_query_template.assert_called_once_with(
+        mock_repository.preview_template.assert_called_once_with(
             query_template="sum(rate(metric{{{labels}}}[{window}]))",
             default_window="1m",
         )
