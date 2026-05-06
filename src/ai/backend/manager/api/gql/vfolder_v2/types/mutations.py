@@ -92,6 +92,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -443,7 +444,7 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.2",
+        added_version=NEXT_RELEASE_VERSION,
         description="Optional behavior flags for vfolder purge operations.",
     ),
     name="PurgeVFolderOptionsInput",
@@ -467,10 +468,13 @@ class PurgeVFolderOptionsInputGQL(PydanticInputMixin[PurgeVFolderOptionsDTO]):
 )
 class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
     ids: list[UUID] = gql_field(description="List of VFolder UUIDs to purge.")
-    options: PurgeVFolderOptionsInputGQL = gql_field(
-        description=(
-            "Optional behavior flags applied to every vfolder in the batch. "
-            "Defaults to all-false when omitted."
+    options: PurgeVFolderOptionsInputGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Optional behavior flags applied to every vfolder in the batch. "
+                "Defaults to all-false when omitted."
+            ),
         ),
     )
 
