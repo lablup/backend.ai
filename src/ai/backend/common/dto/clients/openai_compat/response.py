@@ -5,45 +5,47 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 
-class ModelEntry(BaseModel):
-    """One entry in an OpenAI-compat ``GET /v1/models`` response.
+class _OpenAICompatModel(BaseModel):
+    """Base for OpenAI-compat response DTOs.
 
-    Runtimes (vLLM, SGLang, NIM) typically include extra fields such as
-    ``created`` or ``owned_by``; ``extra="allow"`` keeps them on the
-    model so future additions don't break parsing.
+    Runtimes (vLLM, SGLang, NIM, TGI) ship runtime-specific extras
+    (``usage``, ``system_fingerprint``, ``tool_calls``,
+    ``reasoning_content``, ``prompt_logprobs``, ``owned_by``, ...).
+    ``extra="allow"`` keeps them on the model so ``model_dump_json``
+    round-trips faithfully back to the CLI's stdout pretty-print.
     """
 
     model_config = ConfigDict(extra="allow")
+
+
+class ModelEntry(_OpenAICompatModel):
+    """One entry in an OpenAI-compat ``GET /v1/models`` response."""
 
     id: str
     object: str = "model"
 
 
-class ListModelsResponse(BaseModel):
+class ListModelsResponse(_OpenAICompatModel):
     """Body of ``GET /v1/models`` on an OpenAI-compat endpoint."""
-
-    model_config = ConfigDict(extra="allow")
 
     object: str = "list"
     data: list[ModelEntry]
 
 
-class ChatCompletionResponseMessage(BaseModel):
+class ChatCompletionResponseMessage(_OpenAICompatModel):
     """The ``message`` payload inside one OpenAI-compat choice.
 
     Only ``content`` is consumed by the CLI (for chat-history persistence);
-    ``extra="allow"`` keeps runtime-specific fields like ``tool_calls`` or
-    ``reasoning_content`` (DeepSeek-R1, Qwen-QwQ) on the model so they pass
-    through to the JSON pretty-printed output.
+    runtime-specific fields like ``tool_calls`` or ``reasoning_content``
+    (DeepSeek-R1, Qwen-QwQ) pass through to the JSON pretty-printed output
+    via the inherited ``extra="allow"``.
     """
-
-    model_config = ConfigDict(extra="allow")
 
     role: str | None = None
     content: str | None = None
 
 
-class ChatCompletionResponseChoice(BaseModel):
+class ChatCompletionResponseChoice(_OpenAICompatModel):
     """One entry in ``choices[]`` on a non-streaming chat-completion response.
 
     Streaming responses use ``delta`` instead of ``message``; this model
@@ -52,23 +54,19 @@ class ChatCompletionResponseChoice(BaseModel):
     ``ValidationError`` rather than corrupting persisted history.
     """
 
-    model_config = ConfigDict(extra="allow")
-
     message: ChatCompletionResponseMessage
 
 
-class ChatCompletionResponse(BaseModel):
+class ChatCompletionResponse(_OpenAICompatModel):
     """Body of ``POST /v1/chat/completions`` (OpenAI-compatible).
 
     Only the path used by chat-history bookkeeping
-    (``choices[0].message.content``) is typed here. The remaining
-    top-level fields (``id``, ``object``, ``created``, ``model``,
-    ``usage``, ``system_fingerprint``, runtime-specific extras) ride
-    through via ``extra="allow"`` so they survive the round-trip back
+    (``choices[0].message.content``) is typed here. Top-level extras
+    (``id``, ``object``, ``created``, ``model``, ``usage``,
+    ``system_fingerprint``, runtime-specific fields) ride through via
+    the inherited ``extra="allow"`` so they survive the round-trip back
     to the user's stdout when the CLI pretty-prints the response.
     """
-
-    model_config = ConfigDict(extra="allow")
 
     choices: list[ChatCompletionResponseChoice]
 

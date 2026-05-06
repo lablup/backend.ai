@@ -385,8 +385,11 @@ def history_show(deployment_id: DeploymentID, limit: int | None) -> None:
     """Print the persisted transcript for a deployment."""
     history = DeploymentChatHistory.load()
     messages = history.get(deployment_id)
-    if not messages:
+    if messages is None:
         print(f"No chat history for deployment {deployment_id}.")
+        return
+    if not messages:
+        print(f"Chat history for deployment {deployment_id} is empty.")
         return
     visible = messages if limit is None else messages[-limit:]
     print(f"deployment_id : {deployment_id}")
