@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     SearchDeploymentRevisionPresetsPayload,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    BulkDeleteModelCardsInput,
     CreateModelCardInput,
     DeleteModelCardsInput,
     DeployModelCardInput,
@@ -17,6 +18,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
+    BulkDeleteModelCardsPayload,
     CreateModelCardPayload,
     DeleteModelCardPayload,
     DeleteModelCardsPayload,
@@ -80,11 +82,22 @@ class V2ModelCardClient(BaseDomainClient):
         )
 
     async def bulk_delete(self, request: DeleteModelCardsInput) -> DeleteModelCardsPayload:
+        """Deprecated: use :meth:`admin_bulk_delete` for per-card failure details."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",
             request=request,
             response_model=DeleteModelCardsPayload,
+        )
+
+    async def admin_bulk_delete(
+        self, request: BulkDeleteModelCardsInput
+    ) -> BulkDeleteModelCardsPayload:
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/bulk-delete",
+            request=request,
+            response_model=BulkDeleteModelCardsPayload,
         )
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:

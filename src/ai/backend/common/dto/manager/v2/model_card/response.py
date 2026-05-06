@@ -62,6 +62,12 @@ class SearchModelCardsPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there are more items before.")
 
 
+class DeleteModelCardsPayload(BaseResponseModel):
+    """Payload for bulk model card deletion (deprecated). Use BulkDeleteModelCardsPayload."""
+
+    deleted_count: int = Field(description="Number of model cards successfully deleted.")
+
+
 class BulkDeleteModelCardV2Error(BaseResponseModel):
     """Error information for a single model card that failed during bulk deletion."""
 
@@ -69,8 +75,8 @@ class BulkDeleteModelCardV2Error(BaseResponseModel):
     message: str = Field(description="Error message describing the failure.")
 
 
-class DeleteModelCardsPayload(BaseResponseModel):
-    """Payload for bulk model card deletion."""
+class BulkDeleteModelCardsPayload(BaseResponseModel):
+    """Payload for bulk model card deletion mutation."""
 
     deleted_count: int = Field(description="Number of model cards successfully deleted.")
     failed: list[BulkDeleteModelCardV2Error] = Field(

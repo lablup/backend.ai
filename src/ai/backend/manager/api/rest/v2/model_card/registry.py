@@ -33,6 +33,12 @@ def register_v2_model_card_routes(
     registry.add("POST", "/delete", handler.bulk_delete, middlewares=[superadmin_required])
     registry.add(
         "POST",
+        "/bulk-delete",
+        handler.admin_bulk_delete,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
         "/projects/{project_id}/scan",
         handler.scan_project,
         middlewares=[auth_required],

@@ -120,7 +120,17 @@ class DeleteModelCardOptions(BaseRequestModel):
 
 
 class DeleteModelCardsInput(BaseRequestModel):
-    """Input for deleting multiple model cards."""
+    """Input for deleting multiple model cards (deprecated). Use BulkDeleteModelCardsInput."""
+
+    ids: list[UUID] = Field(description="List of model card UUIDs to delete.")
+    options: DeleteModelCardOptions | None = Field(
+        default=None,
+        description="Options for the delete operation.",
+    )
+
+
+class BulkDeleteModelCardsInput(BaseRequestModel):
+    """Input for bulk-deleting multiple model cards."""
 
     ids: list[UUID] = Field(description="List of model card UUIDs to delete.")
     options: DeleteModelCardOptions | None = Field(

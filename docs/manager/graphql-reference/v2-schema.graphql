@@ -1355,6 +1355,24 @@ type BulkDeleteModelCardV2Error {
   message: String!
 }
 
+"""Added in UNRELEASED. Input for bulk-deleting multiple model cards."""
+input BulkDeleteModelCardsV2Input {
+  """List of model card UUIDs to delete."""
+  ids: [UUID!]!
+
+  """Options for the delete operation."""
+  options: DeleteModelCardV2Options = null
+}
+
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
+type BulkDeleteModelCardsV2Payload {
+  """Number of model cards successfully deleted."""
+  deletedCount: Int!
+
+  """List of errors for model cards that failed to delete."""
+  failed: [BulkDeleteModelCardV2Error!]!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input {
   """List of VFolder UUIDs to soft-delete."""
@@ -3042,13 +3060,10 @@ input DeleteModelCardsV2Input {
   options: DeleteModelCardV2Options = null
 }
 
-"""Added in 26.4.2. Payload for bulk model card deletion."""
+"""Added in 26.4.2. Payload for bulk model card deletion (deprecated)."""
 type DeleteModelCardsV2Payload {
   """Number of model cards successfully deleted."""
   deletedCount: Int!
-
-  """List of errors for model cards that failed to delete."""
-  failed: [BulkDeleteModelCardV2Error!]!
 }
 
 """Added in 24.09.0. Input for deleting a notification channel"""
@@ -7236,7 +7251,12 @@ type Mutation {
   adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL!
 
   """Added in 26.4.2. Delete multiple model cards (admin only)."""
-  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload!
+  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload! @deprecated(reason: "Use admin_bulk_delete_model_cards_v2 instead, which surfaces per-card success/failure breakdown.")
+
+  """
+  Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
+  """
+  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload!
 
   """
   Added in 26.4.2. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.

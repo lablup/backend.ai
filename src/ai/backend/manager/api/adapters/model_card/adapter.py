@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     SearchDeploymentRevisionPresetsPayload,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    BulkDeleteModelCardsInput,
     CreateModelCardInput,
     DeleteModelCardOptions,
     DeleteModelCardsInput,
@@ -26,6 +27,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
+    BulkDeleteModelCardsPayload,
     BulkDeleteModelCardV2Error,
     CreateModelCardPayload,
     DeleteModelCardPayload,
@@ -82,7 +84,10 @@ from ai.backend.manager.services.deployment.actions.create_deployment import Cre
 from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
 )
-from ai.backend.manager.services.model_card.actions.bulk_delete import BulkDeleteModelCardAction
+from ai.backend.manager.services.model_card.actions.bulk_delete import (
+    BulkDeleteModelCardAction,
+    BulkDeleteModelCardActionResult,
+)
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
@@ -391,19 +396,35 @@ class ModelCardAdapter(BaseAdapter):
         input: DeleteModelCardsInput,
         options: DeleteModelCardOptions,
     ) -> DeleteModelCardsPayload:
-        """Delete multiple model cards with per-card partial-failure semantics."""
-        result = await self._processors.model_card.bulk_delete.wait_for_complete(
-            BulkDeleteModelCardAction(
-                purgers=[Purger(row_class=ModelCardRow, pk_value=card_id) for card_id in input.ids],
-                options=options,
-            )
-        )
-        return DeleteModelCardsPayload(
+        """Deprecated: use :meth:`admin_bulk_delete` for partial-failure reporting."""
+        result = await self._run_bulk_delete(input.ids, options)
+        return DeleteModelCardsPayload(deleted_count=len(result.data.successes))
+
+    async def admin_bulk_delete(
+        self,
+        input: BulkDeleteModelCardsInput,
+        options: DeleteModelCardOptions,
+    ) -> BulkDeleteModelCardsPayload:
+        """Bulk-delete model cards and surface per-card success/failure breakdown."""
+        result = await self._run_bulk_delete(input.ids, options)
+        return BulkDeleteModelCardsPayload(
             deleted_count=len(result.data.successes),
             failed=[
                 BulkDeleteModelCardV2Error(card_id=failure.card_id, message=failure.message)
                 for failure in result.data.failures
             ],
+        )
+
+    async def _run_bulk_delete(
+        self,
+        card_ids: list[UUID],
+        options: DeleteModelCardOptions,
+    ) -> BulkDeleteModelCardActionResult:
+        return await self._processors.model_card.bulk_delete.wait_for_complete(
+            BulkDeleteModelCardAction(
+                purgers=[Purger(row_class=ModelCardRow, pk_value=card_id) for card_id in card_ids],
+                options=options,
+            )
         )
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:

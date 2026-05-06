@@ -186,6 +186,7 @@ from .login_session import (
     my_revoke_login_session,
 )
 from .model_card import (
+    admin_bulk_delete_model_cards_v2,
     admin_create_model_card_v2,
     admin_delete_model_card_v2,
     admin_delete_model_cards_v2,
@@ -874,6 +875,7 @@ class Mutation:
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
     admin_delete_model_cards_v2 = admin_delete_model_cards_v2
+    admin_bulk_delete_model_cards_v2 = admin_bulk_delete_model_cards_v2
     scan_project_model_cards_v2 = scan_project_model_cards_v2
     deploy_model_card_v2 = deploy_model_card_v2
     # VFolder V2 mutations

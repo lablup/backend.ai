@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    BulkDeleteModelCardsInput,
     CreateModelCardInput,
     DeleteModelCardOptions,
     DeleteModelCardsInput,
@@ -85,7 +86,17 @@ class V2ModelCardHandler:
         self,
         body: BodyParam[DeleteModelCardsInput],
     ) -> APIResponse:
+        """Deprecated: use :meth:`admin_bulk_delete` to receive per-card failure details."""
         result = await self._adapter.bulk_delete(
+            body.parsed, body.parsed.options or DeleteModelCardOptions()
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_bulk_delete(
+        self,
+        body: BodyParam[BulkDeleteModelCardsInput],
+    ) -> APIResponse:
+        result = await self._adapter.admin_bulk_delete(
             body.parsed, body.parsed.options or DeleteModelCardOptions()
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
