@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.v2.base_client import BackendAIAppProxyClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.deployment_chat import DeploymentChatClient
 from ai.backend.client.v2.exceptions import DeploymentAuthError
@@ -23,11 +24,11 @@ CHAT_URL = f"{BASE_URL}/v1/chat/completions"
 async def chat_client() -> AsyncIterator[DeploymentChatClient]:
     # ``endpoint`` is required on ClientConfig but unused by AppProxyClient.
     config = ClientConfig(endpoint=URL("http://manager.unused"))
-    client = DeploymentChatClient(config)
+    appproxy_client = BackendAIAppProxyClient(config)
     try:
-        yield client
+        yield DeploymentChatClient(appproxy_client)
     finally:
-        await client.close()
+        await appproxy_client.close()
 
 
 def _make_body() -> dict[str, Any]:

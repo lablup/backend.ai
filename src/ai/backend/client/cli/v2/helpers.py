@@ -13,6 +13,7 @@ import aiohttp
 from yarl import URL
 
 if TYPE_CHECKING:
+    from ai.backend.client.v2.approxy_registry import AppProxyClientRegistry
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 CONFIG_DIR = Path.home() / ".backend.ai"
@@ -124,6 +125,26 @@ async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
         )
 
     return await V2ClientRegistry.create(client_config, auth)
+
+
+async def create_appproxy_registry(config: V2ConnectionConfig) -> AppProxyClientRegistry:
+    """Build an ``AppProxyClientRegistry`` from a ``V2ConnectionConfig``.
+
+    The app-proxy registry talks to deployment runtimes (vLLM / SGLang /
+    NIM / TGI), not the manager API, so HMAC credentials and the cookie
+    jar are intentionally ignored — only TLS / timeout knobs from the
+    manager-side config are reused.
+    """
+    from ai.backend.client.v2.approxy_registry import AppProxyClientRegistry
+    from ai.backend.client.v2.config import ClientConfig
+
+    client_config = ClientConfig(
+        endpoint=config.endpoint,
+        endpoint_type=config.endpoint_type,
+        api_version=config.api_version,
+        skip_ssl_verification=config.skip_ssl_verification,
+    )
+    return await AppProxyClientRegistry.create(client_config)
 
 
 def parse_order_options(

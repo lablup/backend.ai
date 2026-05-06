@@ -464,7 +464,7 @@ class BackendAIAnonymousClient:
 
 
 class BackendAIAppProxyClient:
-    """HTTP client base for direct-to-deployment endpoints fronted by Backend.AI's app-proxy.
+    """HTTP client for direct-to-deployment endpoints fronted by Backend.AI's app-proxy.
 
     Unlike :class:`BackendAIAuthClient` (which signs requests with HMAC against
     the Backend.AI manager API), this client targets the runtime's own HTTP
@@ -472,8 +472,10 @@ class BackendAIAppProxyClient:
     ``Authorization: Bearer <token>`` header. The deployment endpoint URL is
     supplied per-request, not via :attr:`ClientConfig.endpoint`.
 
-    Subclasses add the contract-specific request methods (e.g. chat-completions,
-    /generate, etc.).
+    Owns the aiohttp session. Domain clients (e.g.
+    :class:`ai.backend.client.v2.deployment_chat.DeploymentChatClient`) take an
+    instance of this class via :class:`BaseAppProxyDomainClient` and add the
+    contract-specific request methods (e.g. chat-completions, /generate, etc.).
     """
 
     _config: ClientConfig

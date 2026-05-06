@@ -21,7 +21,11 @@ from ai.backend.client.cli.v2.deployment.chat.types import (
     DeploymentChatConfig,
     DeploymentChatHistory,
 )
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config
+from ai.backend.client.cli.v2.helpers import (
+    create_appproxy_registry,
+    create_v2_registry,
+    load_v2_config,
+)
 from ai.backend.common.dto.clients.openai_compat import ChatCompletionRequest
 from ai.backend.common.identifier.deployment import DeploymentID
 
@@ -96,8 +100,6 @@ def chat(
     temperature and top_p differ between runtime variants — pass them
     through ``--params``.
     """
-    from ai.backend.client.v2.config import ClientConfig
-    from ai.backend.client.v2.deployment_chat import DeploymentChatClient
     from ai.backend.client.v2.exceptions import DeploymentAuthError
 
     connection_config = load_v2_config()
@@ -135,22 +137,15 @@ def chat(
             cache.save()
 
         token = chat_config.get_token(deployment_id)
-        # ``endpoint`` is required on ClientConfig but unused by AppProxyClient
-        # (deployment URLs are passed per-request); pass through the manager
-        # endpoint so the rest of the connection knobs (TLS, timeouts) match.
-        client_config = ClientConfig(
-            endpoint=connection_config.endpoint,
-            endpoint_type=connection_config.endpoint_type,
-            api_version=connection_config.api_version,
-            skip_ssl_verification=connection_config.skip_ssl_verification,
-        )
-        async with DeploymentChatClient(client_config) as client:
+        appproxy_registry = await create_appproxy_registry(connection_config)
+        try:
+            client = appproxy_registry.deployment_chat
+            # Resolution: --model > config.model (user-set) >
+            # cache.default_model (auto) > GET /v1/models (auto, cached).
+            request_model = (
+                model or chat_config.get_model(deployment_id) or endpoint_entry.default_model
+            )
             try:
-                # Resolution: --model > config.model (user-set) >
-                # cache.default_model (auto) > GET /v1/models (auto, cached).
-                request_model = (
-                    model or chat_config.get_model(deployment_id) or endpoint_entry.default_model
-                )
                 if request_model is None:
                     # No explicit --model, no user-set config, no cached
                     # default — ask the OpenAI-compat endpoint itself which
@@ -199,6 +194,8 @@ def chat(
                     f"re-register with:\n"
                     f"  ./bai deployment chat-config set {deployment_id} --token <token>"
                 ) from e
+        finally:
+            await appproxy_registry.close()
         # Only persist when both sides of the round are present, so the file
         # never carries half-conversations that would skew future context.
         assistant_message = response.assistant_message

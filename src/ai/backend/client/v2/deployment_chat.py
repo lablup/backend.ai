@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.client.v2.base_client import BackendAIAppProxyClient
+from ai.backend.client.v2.base_appproxy_domain import BaseAppProxyDomainClient
 from ai.backend.common.dto.clients.openai_compat import (
     ChatCompletionResponse,
     ListModelsResponse,
@@ -26,14 +26,14 @@ _OPENAI_COMPATIBLE_CHAT_PATH = "/v1/chat/completions"
 _OPENAI_COMPATIBLE_MODELS_PATH = "/v1/models"
 
 
-class DeploymentChatClient(BackendAIAppProxyClient):
+class DeploymentChatClient(BaseAppProxyDomainClient):
     """OpenAI Chat Completions client for direct-to-deployment inference traffic.
 
     Sends ``POST /v1/chat/completions`` with an OpenAI-shaped
     ``{model, messages, ...}`` JSON body. Compatible runtimes: vLLM,
     SGLang, NVIDIA NIM, and TGI in Messages API mode. Vanilla TGI
     (``/generate``) and arbitrary custom containers need a different
-    :class:`BackendAIAppProxyClient` subclass.
+    :class:`BaseAppProxyDomainClient` subclass.
     """
 
     async def chat_completion(
@@ -42,7 +42,7 @@ class DeploymentChatClient(BackendAIAppProxyClient):
         token: str | None,
         body: dict[str, Any],
     ) -> ChatCompletionResponse:
-        payload = await self._request(
+        payload = await self._client._request(
             "POST", endpoint_url, _OPENAI_COMPATIBLE_CHAT_PATH, token, body=body
         )
         return ChatCompletionResponse.model_validate(payload)
@@ -57,5 +57,7 @@ class DeploymentChatClient(BackendAIAppProxyClient):
         Used to auto-derive a default model name when the caller did not
         pass ``--model`` and no cached default is known.
         """
-        payload = await self._request("GET", endpoint_url, _OPENAI_COMPATIBLE_MODELS_PATH, token)
+        payload = await self._client._request(
+            "GET", endpoint_url, _OPENAI_COMPATIBLE_MODELS_PATH, token
+        )
         return ListModelsResponse.model_validate(payload)
