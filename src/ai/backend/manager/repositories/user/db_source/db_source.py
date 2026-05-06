@@ -102,6 +102,10 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityBatchPurger,
+    execute_rbac_entity_batch_purger,
+)
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
@@ -119,10 +123,10 @@ from ai.backend.manager.repositories.permission_controller.creators import UserR
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.purgers import (
+    UserBatchPurgerSpec,
     create_user_error_log_purger,
     create_user_group_association_purger,
     create_user_keypair_purger,
-    create_user_purger,
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.user.types import (
@@ -632,8 +636,12 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
 
-            # Finally delete the user
-            await execute_batch_purger(session, create_user_purger(user_uuid))
+            # Finally delete the user itself with RBAC scope/permission cleanup
+            # to avoid dangling association_scopes_entities and permission rows.
+            await execute_rbac_entity_batch_purger(
+                session,
+                RBACEntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1),
+            )
 
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
         """Completely purge user and all associated data by UUID."""
@@ -644,8 +652,12 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
 
-            # Finally delete the user
-            await execute_batch_purger(session, create_user_purger(user_uuid))
+            # Finally delete the user itself with RBAC scope/permission cleanup
+            # to avoid dangling association_scopes_entities and permission rows.
+            await execute_rbac_entity_batch_purger(
+                session,
+                RBACEntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1),
+            )
 
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
         """Check if user's vfolders are mounted to active kernels."""
