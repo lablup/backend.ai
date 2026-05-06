@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING
 import pytest
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
-from ai.backend.common.clients.prometheus import LabelMatcher, MetricPreset, PrometheusClient
+from ai.backend.common.clients.prometheus import (
+    FixedQueryBuilder,
+    LabelMatcher,
+    MetricPreset,
+    PrometheusClient,
+)
 from ai.backend.common.dto.clients.prometheus import PrometheusResponse, QueryTimeRange
 from ai.backend.common.exception import FailedToGetMetric
 
@@ -26,6 +31,7 @@ async def prometheus_client(
     client = PrometheusClient(
         endpoint=f"http://{hostport.host}:{hostport.port}/api/v1/",
         client_pool=pool,
+        fixed_query_builder=FixedQueryBuilder("1m"),
     )
     try:
         yield client
@@ -57,7 +63,7 @@ class TestQueryRangeTimestampFormats:
             step="15s",
         )
 
-        result = await prometheus_client.query_range(up_metric_preset, time_range)
+        result = await prometheus_client._query_range(up_metric_preset, time_range)
 
         assert isinstance(result, PrometheusResponse)
         assert result.status == "success"
@@ -77,7 +83,7 @@ class TestQueryRangeTimestampFormats:
         )
 
         with pytest.raises(FailedToGetMetric, match="cannot parse"):
-            await prometheus_client.query_range(up_metric_preset, time_range)
+            await prometheus_client._query_range(up_metric_preset, time_range)
 
     async def test_timezone_aware_datetime_isoformat_succeeds(
         self,
@@ -95,7 +101,7 @@ class TestQueryRangeTimestampFormats:
             step="15s",
         )
 
-        result = await prometheus_client.query_range(up_metric_preset, time_range)
+        result = await prometheus_client._query_range(up_metric_preset, time_range)
 
         assert isinstance(result, PrometheusResponse)
         assert result.status == "success"

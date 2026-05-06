@@ -66,13 +66,20 @@ class PresetFilterDataset:
 
 
 @pytest.fixture()
+def prometheus_client_mock() -> MagicMock:
+    """Shared MagicMock(spec=PrometheusClient) — tests can stub query methods on it."""
+    return MagicMock(spec=PrometheusClient)
+
+
+@pytest.fixture()
 def prometheus_query_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
+    prometheus_client_mock: MagicMock,
 ) -> PrometheusQueryPresetProcessors:
-    repo = PrometheusQueryPresetRepository(database_engine)
+    repo = PrometheusQueryPresetRepository(database_engine, prometheus_client_mock)
     service = PrometheusQueryPresetService(
         repository=repo,
-        prometheus_client=MagicMock(spec=PrometheusClient),
+        prometheus_client=prometheus_client_mock,
         default_timewindow="5m",
     )
     return PrometheusQueryPresetProcessors(

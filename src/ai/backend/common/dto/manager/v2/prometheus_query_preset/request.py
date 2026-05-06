@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.clients.prometheus.preset import validate_query_template
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
@@ -32,6 +33,8 @@ __all__ = (
     # Execute supporting
     "MetricLabelEntry",
     "ExecuteQueryDefinitionInput",
+    # Preview
+    "PreviewQueryDefinitionInput",
     # Query time range
     "QueryTimeRangeInputDTO",
 )
@@ -77,6 +80,12 @@ class CreateQueryDefinitionInput(BaseRequestModel):
         if not stripped:
             raise ValueError("name must not be blank or whitespace-only")
         return stripped
+
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str) -> str:
+        validate_query_template(v)
+        return v
 
 
 class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
@@ -141,6 +150,13 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
     def _validate_time_window(cls, v: str | Sentinel | None) -> str | Sentinel | None:
         if isinstance(v, str) and not re.match(PROMETHEUS_DURATION_PATTERN, v):
             raise ValueError(f"Invalid Prometheus duration format: {v!r}")
+        return v
+
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str | None) -> str | None:
+        if v is not None:
+            validate_query_template(v)
         return v
 
 
@@ -216,6 +232,18 @@ class ExecuteQueryDefinitionOptionsInput(BaseRequestModel):
         default_factory=list,
         description="Group-by labels",
     )
+
+
+class PreviewQueryDefinitionInput(BaseRequestModel):
+    """Input for previewing a prometheus query template before saving (admin only)."""
+
+    query_template: str = Field(description="PromQL template to validate")
+
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str) -> str:
+        validate_query_template(v)
+        return v
 
 
 class ExecuteQueryDefinitionInput(BaseRequestModel):

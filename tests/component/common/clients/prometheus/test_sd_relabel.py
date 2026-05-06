@@ -18,7 +18,12 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
-from ai.backend.common.clients.prometheus import LabelMatcher, MetricPreset, PrometheusClient
+from ai.backend.common.clients.prometheus import (
+    FixedQueryBuilder,
+    LabelMatcher,
+    MetricPreset,
+    PrometheusClient,
+)
 from ai.backend.common.dto.clients.prometheus import PrometheusResponse
 from ai.backend.common.service_discovery.service_discovery import MODEL_SERVICE_GROUP
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -171,6 +176,7 @@ async def prometheus_client_with_relabel(
     client = PrometheusClient(
         endpoint=f"http://{prometheus_with_relabel.host}:{prometheus_with_relabel.port}/api/v1/",
         client_pool=pool,
+        fixed_query_builder=FixedQueryBuilder("1m"),
     )
     try:
         yield client
@@ -207,7 +213,7 @@ class TestLoopbackRelabelScrape:
 
         for _ in range(max_attempts):
             await asyncio.sleep(2)
-            result = await prometheus_client_with_relabel.query_instant(up_model_service_preset)
+            result = await prometheus_client_with_relabel._query_instant(up_model_service_preset)
             if result.data.result and result.data.result[0].values[-1][1] == "1":
                 break
 

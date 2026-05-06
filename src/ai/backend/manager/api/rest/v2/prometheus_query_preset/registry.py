@@ -28,6 +28,7 @@ def register_v2_prometheus_query_preset_routes(
 
     reg.add("POST", "", handler.create, middlewares=[superadmin_required])
     reg.add("POST", "/search", handler.search, middlewares=[auth_required])
+    reg.add("POST", "/preview", handler.admin_preview, middlewares=[superadmin_required])
     reg.add("GET", "/{preset_id}", handler.get, middlewares=[auth_required])
     reg.add("PATCH", "/{preset_id}", handler.update, middlewares=[superadmin_required])
     reg.add("POST", "/{preset_id}/execute", handler.execute, middlewares=[auth_required])
