@@ -1951,6 +1951,19 @@ input BulkCreateUserV2Input
   users: [CreateUserV2Input!]!
 }
 
+"""
+Added in UNRELEASED. Error information for a model card that failed during bulk deletion.
+"""
+type BulkDeleteModelCardV2Error
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the model card that failed to delete."""
+  cardId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input
   @join__type(graph: STRAWBERRY)
@@ -4706,6 +4719,9 @@ type DeleteModelCardsV2Payload
 {
   """Number of model cards successfully deleted."""
   deletedCount: Int!
+
+  """List of errors for model cards that failed to delete."""
+  failed: [BulkDeleteModelCardV2Error!]!
 }
 
 """Added in UNRELEASED. Options for the model card delete operation."""
