@@ -68,6 +68,19 @@ class TestMonitoringValkeyClient:
             result = await conn.ping()
             assert result == b"PONG"
 
+    async def test_ping_operation_client(self, monitoring_client: MonitoringValkeyClient) -> None:
+        """Test that ping_operation_client() pings the operation client directly."""
+        # Should succeed when operation client is healthy
+        await monitoring_client.ping_operation_client()
+
+        # Break operation client — ping_operation_client should fail
+        await monitoring_client._operation_client.disconnect()
+        with pytest.raises(Exception):
+            await monitoring_client.ping_operation_client()
+
+        # Monitor ping should still succeed
+        await monitoring_client.ping()
+
     async def test_reconnect_on_connection_error(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
@@ -299,49 +312,99 @@ class TestMonitoringValkeyClientContextManager:
             result = await conn.ping()
             assert result == b"PONG"
 
-    async def test_operation_client_recovery_while_monitor_healthy(
+    async def test_selective_reconnection_operation_only_when_monitor_healthy(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
-        """Test that operation client recovers via client() even when monitor client is healthy.
+        """When operation client is broken but monitor is healthy,
+        only the operation client should be reconnected.
 
-        This is the core scenario where the monitor loop alone cannot detect the problem:
-        the monitor client pings successfully, but the operation client is broken.
-        The client() failure tracking sets _reconnect_event, and the monitor loop
-        performs the actual reconnection.
+        This is the core BA-5577 scenario: the monitor loop detects the
+        reconnect request from operation failure tracking, checks monitor
+        health, and selectively reconnects only the operation client.
         """
         threshold = monitoring_client._operation_failure_threshold
 
         # 1. Verify both clients are initially healthy
-        await monitoring_client.ping()  # monitor client ping
+        await monitoring_client.ping()
         async with monitoring_client.client() as conn:
-            assert await conn.ping() == b"PONG"  # operation client works
+            assert await conn.ping() == b"PONG"
 
-        # 2. Break ONLY the operation client — monitor client stays healthy
+        # 2. Break ONLY the operation client
         await monitoring_client._operation_client.disconnect()
 
-        # 3. Verify monitor client is still healthy (this is the key distinction)
+        # 3. Verify monitor client is still healthy
         await monitoring_client._monitor_client.ping()
 
-        # 4. Operation requests fail, client() tracks failures
+        # 4. Operation failures trigger reconnect event
         for i in range(threshold):
             with pytest.raises(_VALKEY_CONNECTION_ERRORS):
                 async with monitoring_client.client() as conn:
                     await conn.ping()
 
-        # 5. Counter should be reset and reconnect event should be set
         assert monitoring_client._operation_failure_count == 0
         assert monitoring_client._reconnect_event.is_set()
 
-        # 6. Simulate monitor loop picking up the reconnect request
+        # 5. Simulate monitor loop: since monitor is healthy, only operation reconnects
         monitoring_client._reconnect_event.clear()
+        assert await monitoring_client._is_monitor_healthy()
+        await monitoring_client._reconnect_operation_only()
+
+        # 6. Operation client should be restored
+        async with monitoring_client.client() as conn:
+            assert await conn.ping() == b"PONG"
+
+        # 7. Monitor client should remain healthy (was never disconnected)
+        await monitoring_client._monitor_client.ping()
+
+    async def test_full_reconnect_when_both_unhealthy(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        """When both operation and monitor clients are broken,
+        both should be reconnected via full _reconnect().
+        """
+        # 1. Break both clients
+        await monitoring_client._operation_client.disconnect()
+        await monitoring_client._monitor_client.disconnect()
+
+        # 2. Monitor should be unhealthy
+        assert not await monitoring_client._is_monitor_healthy()
+
+        # 3. Full reconnect restores both
         await monitoring_client._reconnect()
 
-        # 7. Operation client should be restored
+        # 4. Both should be operational again
+        await monitoring_client._monitor_client.ping()
         async with monitoring_client.client() as conn:
-            result = await conn.ping()
-            assert result == b"PONG"
+            assert await conn.ping() == b"PONG"
 
-        # 8. Monitor client should also still be healthy after reconnect
+    async def test_monitor_loop_selective_reconnect_integration(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        """Integration test: the monitor loop performs selective reconnection
+        when operation failures reach the threshold while monitor stays healthy.
+        """
+        threshold = monitoring_client._operation_failure_threshold
+
+        # 1. Break only the operation client
+        await monitoring_client._operation_client.disconnect()
+
+        # 2. Trigger operation failure threshold
+        for i in range(threshold):
+            with pytest.raises(_VALKEY_CONNECTION_ERRORS):
+                async with monitoring_client.client() as conn:
+                    await conn.ping()
+
+        # 3. The reconnect event is set — let the running monitor loop handle it
+        assert monitoring_client._reconnect_event.is_set()
+
+        # 4. Wait for monitor loop to pick up the event and reconnect
+        await asyncio.sleep(monitoring_client._monitor_interval + 1.0)
+
+        # 5. Operation client should be restored by the monitor loop
+        async with monitoring_client.client() as conn:
+            assert await conn.ping() == b"PONG"
+
+        # 6. Monitor client should still be healthy
         await monitoring_client._monitor_client.ping()
 
     async def test_client_tracks_each_connection_error_type(

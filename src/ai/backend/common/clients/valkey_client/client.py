@@ -523,6 +523,20 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         """
         await self._monitor_client.ping()
 
+    async def ping_operation_client(self) -> None:
+        """
+        Ping the operation client directly to check its health.
+
+        Unlike ping(), which uses the monitor client, this method pings
+        the operation client to verify it can handle requests.
+        Used by health checkers to report operation vs monitor client status separately.
+
+        Raises:
+            ClientNotConnectedError: If the operation client is not connected
+            Exception: If the ping fails
+        """
+        await self._operation_client.ping()
+
     async def need_reconnect(self) -> bool:
         return await self._monitor_client.need_reconnect()
 
@@ -622,7 +636,17 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                         pass
                     reconnect_requested = self._reconnect_event.is_set()
                     self._reconnect_event.clear()
-                    if reconnect_requested or await self._check_connection():
+                    if reconnect_requested:
+                        # Operation failure threshold reached — check if monitor is healthy
+                        if await self._is_monitor_healthy():
+                            log.info(
+                                "Monitor client healthy, reconnecting operation client only..."
+                            )
+                            await self._reconnect_operation_only()
+                        else:
+                            log.info("Both clients unhealthy, reconnecting all clients...")
+                            await self._reconnect()
+                    elif await self._check_connection():
                         log.info("Reconnecting Valkey clients...")
                         await self._reconnect()
                 except asyncio.CancelledError:
@@ -635,6 +659,23 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                     raise
         finally:
             log.info("Valkey connection monitor task stopped. Client closed: {}", self._closed)
+
+    async def _is_monitor_healthy(self) -> bool:
+        """Check if the monitor client is responsive."""
+        try:
+            await self._monitor_client.ping()
+            return True
+        except Exception:
+            return False
+
+    async def _reconnect_operation_only(self) -> None:
+        """Reconnect only the operation client, leaving the monitor client intact."""
+        try:
+            await self._operation_client.disconnect()
+        except Exception as e:
+            log.warning("Error disconnecting operation client: {}", e)
+
+        await self._operation_client.connect()
 
     async def _reconnect(self) -> None:
         # Disconnect both clients

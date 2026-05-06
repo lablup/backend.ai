@@ -63,6 +63,20 @@ class HealthCheckKey:
 
 
 @dataclass
+class SubComponentHealthStatus:
+    """
+    Health status for a sub-component (e.g., operation or monitor client).
+
+    Used when a component has internal sub-components with independent health,
+    such as MonitoringValkeyClient's operation and monitor clients.
+    """
+
+    is_healthy: bool
+    last_checked_at: datetime
+    error_message: str | None = None
+
+
+@dataclass
 class ComponentHealthStatus:
     """
     Health status for a single component.
@@ -73,6 +87,7 @@ class ComponentHealthStatus:
     is_healthy: bool
     last_checked_at: datetime
     error_message: str | None = None
+    sub_components: dict[str, SubComponentHealthStatus] | None = None
 
 
 @dataclass
