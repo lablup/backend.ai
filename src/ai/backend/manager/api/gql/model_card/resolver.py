@@ -30,6 +30,7 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
 )
 from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_connection
 from ai.backend.manager.api.gql.model_card.types import (
+    BulkDeleteModelCardV2ErrorGQL,
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
     DeleteModelCardOptionsGQL,
@@ -187,7 +188,13 @@ async def admin_delete_model_cards_v2(
     payload = await ctx.adapters.model_card.bulk_delete(
         dto, dto.options or DeleteModelCardOptions()
     )
-    return DeleteModelCardsPayloadGQL.from_pydantic(payload)
+    return DeleteModelCardsPayloadGQL(
+        deleted_count=payload.deleted_count,
+        failed=[
+            BulkDeleteModelCardV2ErrorGQL(card_id=error.card_id, message=error.message)
+            for error in payload.failed
+        ],
+    )
 
 
 @gql_mutation(

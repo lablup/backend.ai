@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
+    BulkDeleteModelCardV2Error,
     CreateModelCardPayload,
     DeleteModelCardPayload,
     DeleteModelCardsPayload,
@@ -397,7 +398,13 @@ class ModelCardAdapter(BaseAdapter):
                 options=options,
             )
         )
-        return DeleteModelCardsPayload(deleted_count=len(result.data.successes))
+        return DeleteModelCardsPayload(
+            deleted_count=len(result.data.successes),
+            failed=[
+                BulkDeleteModelCardV2Error(card_id=failure.card_id, message=failure.message)
+                for failure in result.data.failures
+            ],
+        )
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:
         me = current_user()
