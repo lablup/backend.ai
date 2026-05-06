@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -227,7 +228,21 @@ class ModelCardDBSource:
             # at it would be orphaned. Hard-delete the siblings first inside the
             # same transaction, then flip the VFolder status atomically.
             vfolder_id = cast(UUID, deleted_row.vfolder)
-            await session.execute(sa.delete(ModelCardRow).where(ModelCardRow.vfolder == vfolder_id))
+            sibling_result = await session.execute(
+                sa.delete(ModelCardRow).where(ModelCardRow.vfolder == vfolder_id)
+            )
+            sibling_count = cast(CursorResult[Any], sibling_result).rowcount
+            if sibling_count:
+                # Deleting one card can fan out to N when the vfolder is shared
+                # — surface that for ops/debugging since the caller only asked
+                # for a single id.
+                log.debug(
+                    "model card delete: cascaded {} sibling card(s) on vfolder {} "
+                    "alongside target {}",
+                    sibling_count,
+                    vfolder_id,
+                    deleted_row.id,
+                )
             await self._reject_if_vfolders_mounted(session, [vfolder_id])
             await execute_updater(
                 session, Updater(spec=VFolderTrashUpdaterSpec(), pk_value=vfolder_id)
