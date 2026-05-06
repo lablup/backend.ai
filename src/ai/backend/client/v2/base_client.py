@@ -515,32 +515,36 @@ class BackendAIAppProxyClient:
             headers["Authorization"] = f"Bearer {token}"
         try:
             async with self._session.request(method, target, headers=headers, json=body) as resp:
-                # Backend.AI's app-proxy fronts every deployment endpoint, and on
-                # 5xx it can emit HTML / plain-text bodies (e.g. cloud LB error
-                # pages) instead of JSON. Read text up front so the raw body is
-                # available either as the JSON-parse input or as context in the
-                # raised error.
-                raw = await resp.text()
-                try:
-                    payload = json.loads(raw) if raw else None
-                except json.JSONDecodeError as e:
-                    if resp.status >= 400:
-                        raise BackendAPIError(
-                            resp.status, resp.reason or "HTTP error", {"detail": raw}
-                        ) from e
-                    raise BackendClientError(
-                        f"deployment endpoint returned non-JSON response "
-                        f"(status={resp.status}): {raw!r}"
-                    ) from e
-                if not isinstance(payload, dict):
-                    raise BackendClientError(
-                        f"deployment endpoint returned non-object payload "
-                        f"(type={type(payload).__name__}, status={resp.status}): {payload!r}"
-                    )
+                payload = await self._parse_response(resp)
                 self._raise_for_status(resp, payload)
                 return payload
         except aiohttp.ClientConnectionError as e:
             raise BackendClientError(f"failed to reach deployment endpoint: {e!r}") from e
+
+    @staticmethod
+    async def _parse_response(resp: aiohttp.ClientResponse) -> dict[str, Any]:
+        # Backend.AI's app-proxy fronts every deployment endpoint, and on
+        # 5xx it can emit HTML / plain-text bodies (e.g. cloud LB error
+        # pages) instead of JSON. Read text up front so the raw body is
+        # available either as the JSON-parse input or as context in the
+        # raised error.
+        raw = await resp.text()
+        try:
+            payload = json.loads(raw) if raw else None
+        except json.JSONDecodeError as e:
+            if resp.status >= 400:
+                raise BackendAPIError(
+                    resp.status, resp.reason or "HTTP error", {"detail": raw}
+                ) from e
+            raise BackendClientError(
+                f"deployment endpoint returned non-JSON response (status={resp.status}): {raw!r}"
+            ) from e
+        if not isinstance(payload, dict):
+            raise BackendClientError(
+                f"deployment endpoint returned non-object payload "
+                f"(type={type(payload).__name__}, status={resp.status}): {payload!r}"
+            )
+        return payload
 
     @staticmethod
     def _build_url(endpoint_url: str, path: str) -> str:
