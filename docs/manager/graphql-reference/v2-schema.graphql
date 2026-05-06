@@ -1404,9 +1404,9 @@ input BulkPurgeVFoldersV2Input {
   ids: [UUID!]!
 
   """
-  If true, also delete model card record(s) referencing the vfolders. If false, the request is rejected per-vfolder when any model card still references one.
+  Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
   """
-  cascadeModelCard: Boolean! = false
+  options: PurgeVFolderOptionsInput!
 }
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
@@ -7264,7 +7264,7 @@ type Mutation {
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
-  purgeVfolderV2(vfolderId: UUID!, cascadeModelCard: Boolean! = false): PurgeVFolderV2Payload!
+  purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null): PurgeVFolderV2Payload!
 
   """
   Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
@@ -8572,6 +8572,14 @@ input PurgeUserV2Options {
 type PurgeUserV2Payload {
   """Whether the purge was successful."""
   success: Boolean!
+}
+
+"""Added in 26.4.2. Optional behavior flags for vfolder purge operations."""
+input PurgeVFolderOptionsInput {
+  """
+  If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.
+  """
+  cascadeModelCard: Boolean! = false
 }
 
 """
