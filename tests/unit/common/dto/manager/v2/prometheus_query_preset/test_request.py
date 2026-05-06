@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     MetricLabelEntry,
     ModifyQueryDefinitionInput,
     ModifyQueryDefinitionOptionsInput,
+    PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
     SearchQueryDefinitionsInput,
@@ -25,6 +26,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     OrderDirection,
     QueryDefinitionOrderField,
 )
+from ai.backend.common.exception import InvalidMetricPresetTemplate
 
 _SAMPLE_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
@@ -164,6 +166,24 @@ class TestCreateQueryDefinitionInput:
         assert restored.name == "cpu_usage"
         assert restored.time_window == "5m"
 
+    def test_unsupported_template_var_in_query_template_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            CreateQueryDefinitionInput(
+                name="test",
+                metric_name="metric",
+                query_template='rate(metric{mode!="idle"}[$__rate_interval])',
+                options=_make_create_options(),
+            )
+
+    def test_malformed_query_template_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate):
+            CreateQueryDefinitionInput(
+                name="test",
+                metric_name="metric",
+                query_template="metric{",
+                options=_make_create_options(),
+            )
+
 
 class TestModifyQueryDefinitionOptionsInput:
     """Tests for ModifyQueryDefinitionOptionsInput model."""
@@ -237,6 +257,20 @@ class TestModifyQueryDefinitionInput:
         assert inp.name == "new_name"
         assert inp.metric_name == "new_metric"
         assert inp.query_template is None
+
+    def test_query_template_none_skips_validation(self) -> None:
+        inp = ModifyQueryDefinitionInput(query_template=None)
+        assert inp.query_template is None
+
+    def test_unsupported_template_var_in_query_template_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            ModifyQueryDefinitionInput(
+                query_template='rate(metric{mode!="idle"}[$__rate_interval])',
+            )
+
+    def test_malformed_query_template_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate):
+            ModifyQueryDefinitionInput(query_template="metric{")
 
     def test_round_trip_serialization(self) -> None:
         inp = ModifyQueryDefinitionInput(
@@ -407,3 +441,15 @@ class TestExecuteQueryDefinitionInput:
         json_str = inp.model_dump_json()
         restored = ExecuteQueryDefinitionInput.model_validate_json(json_str)
         assert restored.time_window == "1h"
+
+
+class TestPreviewQueryDefinitionInput:
+    """Tests for PreviewQueryDefinitionInput field validation."""
+
+    def test_rejects_empty_template(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="empty"):
+            PreviewQueryDefinitionInput(query_template="")
+
+    def test_rejects_foreign_var(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            PreviewQueryDefinitionInput(query_template="rate(metric[$range])")

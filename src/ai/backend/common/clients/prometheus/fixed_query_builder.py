@@ -3,6 +3,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from ai.backend.common.clients.prometheus.metric_types import (
+    DIFF_METRICS,
+    RATE_METRICS,
+    ContainerLiveStatQueries,
+    ContainerMetricOptionalLabel,
+    MetricType,
+)
 from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.clients.prometheus.querier import ContainerMetricQuerier
 from ai.backend.common.clients.prometheus.types import ValueType
@@ -13,13 +20,6 @@ from ai.backend.common.metrics.types import (
     UTILIZATION_METRIC_INTERVAL,
 )
 from ai.backend.common.types import KernelId
-from ai.backend.manager.data.metric.types import (
-    DIFF_METRICS,
-    RATE_METRICS,
-    ContainerLiveStatQueries,
-    ContainerMetricOptionalLabel,
-    MetricType,
-)
 
 _LIVE_STAT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "kernel_id",

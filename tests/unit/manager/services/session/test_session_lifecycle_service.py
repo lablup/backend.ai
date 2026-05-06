@@ -26,6 +26,10 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.api.rest.session.handler import (
+    SessionHandler,
+    _merge_resolved_legacy_mounts,
+)
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.data.user.types import SessionOwnerContext
@@ -84,6 +88,9 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesActionResult,
+)
 from ai.backend.manager.types import UserScope
 
 # ==================== Shared Fixtures ====================
@@ -1027,6 +1034,108 @@ class TestCreateFromParams:
 
         with pytest.raises(QuotaExceeded):
             await session_service.create_from_params(action)
+
+    async def test_legacy_mount_surfaces_resolve_then_reach_agent_registry(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+    ) -> None:
+        """BA-5916: legacy ``mounts`` / ``mount_map`` / ``mount_options``
+        get resolved to UUID-keyed buckets and reach ``AgentRegistry.create_session``.
+        """
+        vfid = UUID("11111111-1111-1111-1111-111111111111")
+
+        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
+            assert list(action.vfolder_names) == ["vf-a"]
+            return ResolveIdsByNamesActionResult(name_to_id={"vf-a": vfid})
+
+        resolver = MagicMock()
+        resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
+        vfolder_pkg = MagicMock()
+        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
+        handler = SessionHandler.__new__(SessionHandler)
+        handler._vfolder = vfolder_pkg
+
+        # Step 1: handler-side resolution & merge of legacy surfaces.
+        legacy_config: dict[str, Any] = {
+            "mounts": ["vf-a"],
+            "mount_map": {"vf-a": "/data"},
+            "mount_options": {"vf-a": {"permission": "ro", "type": "bind"}},
+        }
+        name_to_id = await handler._resolve_legacy_name_mounts(
+            legacy_config["mounts"],
+            legacy_config["mount_map"],
+            legacy_config["mount_options"],
+        )
+        resolved_config = _merge_resolved_legacy_mounts(legacy_config, name_to_id)
+
+        # Step 2: feed the resolved config to the service and verify it
+        # arrives at AgentRegistry.create_session intact.
+        new_session_id = str(uuid4())
+        mock_session_repository.query_userinfo = AsyncMock(
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
+        )
+        mock_image_row = MagicMock()
+        mock_image_row.image_ref = MagicMock()
+        mock_session_repository.resolve_image = AsyncMock(return_value=mock_image_row)
+        mock_agent_registry.create_session = AsyncMock(return_value={"sessionId": new_session_id})
+
+        action = CreateFromParamsAction(
+            params=CreateFromParamsActionParams(
+                session_name="legacy-mount-session",
+                image="python:latest",
+                architecture="x86_64",
+                session_type=SessionTypes.INTERACTIVE,
+                group_name="default",
+                domain_name="default",
+                cluster_size=1,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                config=resolved_config,
+                tag="",
+                priority=0,
+                is_preemptible=True,
+                owner_access_key=sample_access_key,
+                enqueue_only=False,
+                max_wait_seconds=0,
+                starts_at=None,
+                reuse_if_exists=False,
+                startup_command=None,
+                batch_timeout=None,
+                bootstrap_script=None,
+                dependencies=None,
+                callback_url=None,
+            ),
+            user_id=sample_user_id,
+            user_role=UserRole.USER,
+            sudo_session_enabled=False,
+            requester_access_key=sample_access_key,
+            keypair_resource_policy=None,
+        )
+        await session_service.create_from_params(action)
+
+        bound = inspect.signature(AgentRegistry.create_session).bind(
+            None,
+            *mock_agent_registry.create_session.call_args.args,
+            **mock_agent_registry.create_session.call_args.kwargs,
+        )
+        passed_config = bound.arguments["config"]
+        assert passed_config["mount_ids"] == [vfid]
+        assert passed_config["mount_id_map"] == {vfid: "/data"}
+        assert passed_config["mount_options"][vfid] == {
+            "permission": "ro",
+            "type": "bind",
+        }
+        assert "mounts" not in passed_config
+        assert "mount_map" not in passed_config
 
     async def test_owner_access_key_uses_owner_user_scope(
         self,

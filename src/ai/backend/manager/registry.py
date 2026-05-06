@@ -181,7 +181,9 @@ from .models.utils import (
     execute_with_retry,
     reenter_txn_session,
 )
-from .models.vfolder import verify_vfolder_name
+from .models.vfolder import (
+    verify_vfolder_name,
+)
 from .scheduler.types import KernelAgentBinding
 from .types import UserScope
 
@@ -223,10 +225,10 @@ class AgentRegistry:
         :class:`MountInfoEntry` tuples.
 
         Reads UUID-keyed ``mount_ids`` / ``mount_id_map`` / ``mount_options``
-        (modern v1 session-service path). String-keyed ``mounts`` entries
-        (vfolder names) are skipped here — those only appeared on CLI
-        legacy paths and cannot be resolved to ``MountInfoEntry`` without
-        a DB lookup that this builder does not perform.
+        (modern v1 session-service path). Name-keyed ``mounts`` entries
+        are not handled here — :class:`SessionService` resolves those into
+        the UUID-keyed buckets upstream before any code in this module
+        runs.
         """
         mount_ids = creation_config.get("mount_ids") or []
         mount_id_map: Mapping[Any, str] = creation_config.get("mount_id_map") or {}
@@ -1007,6 +1009,10 @@ class AgentRegistry:
         ]
         creation_config: dict[str, Any] = session_enqueue_configs["creation_config"]
 
+        # Legacy name-keyed ``mounts`` are resolved into UUID-keyed buckets
+        # upstream in ``SessionService`` (via ``VFolderProcessors``), so by
+        # the time control reaches here the config carries only ``mount_ids``
+        # / ``mount_id_map`` / ``mount_options``.
         mount_entries = self._mount_entries_from_creation_config(creation_config)
         resource_entries = self._resource_entries_from_legacy_dict(
             creation_config.get("resources") or {}

@@ -1041,7 +1041,7 @@ class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class PrometheusConnectionError(BackendAIError):
+class PrometheusConnectionError(BackendAIError, web.HTTPServiceUnavailable):
     """Exception raised when a connection to Prometheus fails."""
 
     error_type = "https://api.backend.ai/probs/prometheus-connection-error"
@@ -1055,7 +1055,7 @@ class PrometheusConnectionError(BackendAIError):
         )
 
 
-class FailedToGetMetric(BackendAIError):
+class FailedToGetMetric(BackendAIError, web.HTTPBadGateway):
     """Exception raised when a metric cannot be retrieved."""
 
     error_type = "https://api.backend.ai/probs/failed-to-get-metric"
@@ -1066,6 +1066,39 @@ class FailedToGetMetric(BackendAIError):
             domain=ErrorDomain.METRIC,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class InvalidMetricPresetTemplate(BackendAIError, web.HTTPBadRequest):
+    """Exception raised when a metric preset template cannot be rendered."""
+
+    error_type = "https://api.backend.ai/probs/invalid-metric-preset-template"
+    error_title = "Invalid metric preset template."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.METRIC,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class PrometheusQueryEvaluationFailed(BackendAIError, web.HTTPBadRequest):
+    """Raised when Prometheus rejects a rendered PromQL query.
+
+    Used by user-facing flows (e.g., preset preview) to attribute query
+    rejection to the caller's input rather than treating it as a downstream
+    gateway failure (502).
+    """
+
+    error_type = "https://api.backend.ai/probs/prometheus-query-evaluation-failed"
+    error_title = "Prometheus rejected the query."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.METRIC,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 

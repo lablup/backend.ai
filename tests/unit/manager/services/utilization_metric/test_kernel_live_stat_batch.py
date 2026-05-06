@@ -3,9 +3,9 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.clients.prometheus.metric_types import KernelLiveStatBatchResult
 from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
 from ai.backend.common.types import KernelId
-from ai.backend.manager.data.metric.types import KernelLiveStatBatchResult
 from ai.backend.manager.services.metric.actions.live_stat import ContainerLiveStatAction
 from ai.backend.manager.services.metric.service import MetricService
 

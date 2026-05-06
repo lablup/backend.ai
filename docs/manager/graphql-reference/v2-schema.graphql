@@ -537,12 +537,9 @@ type AgentV2Edge {
 }
 
 """
-Added in 26.4.2. Represents a single allocated resource slot entry for a deployment revision or preset.
+Added in 26.4.2. An allocated resource slot entry on a deployment revision or preset.
 """
-type AllocatedResourceSlot implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
+type AllocatedResourceSlot {
   """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
   slotName: String!
 
@@ -550,40 +547,27 @@ type AllocatedResourceSlot implements Node {
   quantity: Decimal!
 }
 
-"""
-Added in 26.4.2. Connection type for paginated allocated resource slot results.
-"""
-type AllocatedResourceSlotConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [AllocatedResourceSlotEdge!]!
-
-  """Total number of allocated resource slots matching the filter criteria."""
-  count: Int!
-}
-
-"""An edge in a connection."""
-type AllocatedResourceSlotEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: AllocatedResourceSlot!
-}
-
 """Added in 26.4.2. Filter for allocated resource slots."""
 input AllocatedResourceSlotFilter {
+  """Filter by slot name."""
   slotName: StringFilter = null
+
+  """Logical AND of multiple filter conditions."""
   AND: [AllocatedResourceSlotFilter!] = null
+
+  """Logical OR of multiple filter conditions."""
   OR: [AllocatedResourceSlotFilter!] = null
+
+  """Logical NOT of filter conditions."""
   NOT: [AllocatedResourceSlotFilter!] = null
 }
 
 """Added in 26.4.2. Order by specification for allocated resource slots."""
 input AllocatedResourceSlotOrderBy {
+  """Field to order by."""
   field: AllocatedResourceSlotOrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -1968,7 +1952,7 @@ input CreateDeploymentRevisionPresetInput {
   openToPublic: Boolean = null
 
   """Default replica count for deployments created from this preset."""
-  replicaCount: Int = null
+  replicaCount: Int!
 
   """
   Default revision history limit for deployments created from this preset.
@@ -1976,7 +1960,7 @@ input CreateDeploymentRevisionPresetInput {
   revisionHistoryLimit: Int = null
 
   """Default deployment strategy for deployments created from this preset."""
-  deploymentStrategy: PresetDeploymentStrategyInput = null
+  deploymentStrategy: PresetDeploymentStrategyInput!
 
   """Added in UNRELEASED. Container image to run the inference server."""
   imageId: UUID!
@@ -2004,10 +1988,10 @@ input CreateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Deployment topology mode (single-node or multi-node).
   """
-  clusterMode: ClusterMode = null
+  clusterMode: ClusterMode!
 
   """Added in UNRELEASED. Number of worker nodes in the cluster."""
-  clusterSize: Int = null
+  clusterSize: Int!
 
   """
   Added in UNRELEASED. Command to start the inference server process inside the container.
@@ -3030,10 +3014,21 @@ type DeleteModelCardPayloadGQL {
   id: UUID!
 }
 
+"""Added in UNRELEASED. Options for the model card delete operation."""
+input DeleteModelCardV2Options {
+  """
+  If true, also soft-delete (move to trash) the model VFolder(s) associated with the deleted model card(s).
+  """
+  deleteAssociatedVfolder: Boolean! = false
+}
+
 """Added in 26.4.2. Input for deleting multiple model cards."""
 input DeleteModelCardsV2Input {
   """List of model card UUIDs to delete."""
   ids: [UUID!]!
+
+  """Added in UNRELEASED. Options for the delete operation."""
+  options: DeleteModelCardV2Options = null
 }
 
 """Added in 26.4.2. Payload for bulk model card deletion."""
@@ -3505,7 +3500,7 @@ type DeploymentRevisionPreset implements Node {
   runtimeVariant: RuntimeVariant
 
   """Added in 26.4.2. Resource slot allocations for this preset."""
-  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
+  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]!
 }
 
 """Added in 26.4.2. Paginated list of deployment revision presets."""
@@ -4709,6 +4704,9 @@ input ImageV2Filter {
   status: ImageV2StatusFilter = null
   name: StringFilter = null
   architecture: StringFilter = null
+
+  """Added in UNRELEASED. Filter by image UUID."""
+  id: UUIDFilter = null
 
   """Added in 26.4.0. Filter by container registry ID."""
   registryId: UUIDFilter = null
@@ -6347,7 +6345,7 @@ type ModelRevision implements Node {
   imageV2: ImageV2
 
   """Added in 26.4.2. Resource slot allocations for this revision."""
-  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
+  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]!
 }
 
 """Added in 25.19.0. Connection for model revisions."""
@@ -7221,7 +7219,7 @@ type Mutation {
   adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL!
 
   """Added in 26.4.2. Delete a model card (admin only)."""
-  adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL!
+  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL!
 
   """Added in 26.4.2. Delete multiple model cards (admin only)."""
   adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload!
@@ -7859,6 +7857,14 @@ enum PresetValueType {
   FLOAT
   BOOL
   FLAG
+}
+
+"""
+Added in UNRELEASED. Input for previewing a prometheus query template (admin only).
+"""
+input PreviewQueryDefinitionInput {
+  """PromQL template to validate."""
+  queryTemplate: String!
 }
 
 """
@@ -8834,6 +8840,11 @@ type Query {
   prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
 
   """
+  Added in UNRELEASED. Preview a prometheus query template before saving it as a preset (admin only).
+  """
+  adminPreviewPrometheusQueryPreset(input: PreviewQueryDefinitionInput!): QueryDefinitionExecuteResult
+
+  """
   Added in 26.4.2. Get a single query preset category by ID. Available to any authenticated user.
   """
   prometheusQueryPresetCategory(id: ID!): QueryPresetCategory
@@ -9318,6 +9329,24 @@ type QueryDefinitionExecuteResult {
 input QueryDefinitionFilter {
   """Filter by name."""
   name: StringFilter = null
+
+  """Added in UNRELEASED. Filter by category ID."""
+  categoryId: UUIDFilter = null
+
+  """
+  Added in UNRELEASED. Combine multiple filters with AND logic. All conditions must match.
+  """
+  AND: [QueryDefinitionFilter!] = null
+
+  """
+  Added in UNRELEASED. Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [QueryDefinitionFilter!] = null
+
+  """
+  Added in UNRELEASED. Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [QueryDefinitionFilter!] = null
 }
 
 """Added in 26.3.0. Single metric result from Prometheus query."""

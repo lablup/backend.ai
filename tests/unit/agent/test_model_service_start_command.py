@@ -122,7 +122,7 @@ class TestPopulateMissingModelServiceStartCommands:
         models: list[dict[str, Any]],
         image: str,
     ) -> None:
-        populated_models = await AbstractAgent._populate_missing_model_service_start_commands(
+        populated_models = await AbstractAgent._apply_image_cmd_fallback(
             cast(AbstractAgent[Any, Any], agent),
             models,
             image,
@@ -150,7 +150,7 @@ class TestPopulateMissingModelServiceStartCommands:
         models = [_model("vllm", 8000)]
 
         with pytest.raises(NotImplementedError):
-            await AbstractAgent._populate_missing_model_service_start_commands(
+            await AbstractAgent._apply_image_cmd_fallback(
                 cast(AbstractAgent[Any, Any], raise_not_implemented_agent),
                 models,
                 image,

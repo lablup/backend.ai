@@ -71,6 +71,9 @@ class CliArgs:
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
+    enable_observability: bool = False
+    enable_storage: bool = False
+    enable_telemetry: bool | None = None  # None = auto (ON in DEVELOP, OFF in PACKAGE)
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -213,6 +216,9 @@ class InstallVariable:
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
+    enable_observability: bool = False
+    enable_storage: bool = False
+    enable_telemetry: bool | None = None
 
     @property
     def apphub_address(self) -> str:

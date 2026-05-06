@@ -1,15 +1,19 @@
 from .client import PrometheusClient
-from .preset import LabelMatcher, LabelOperator, MetricPreset
+from .fixed_query_builder import FixedQueryBuilder, LabelValuesQuery
+from .preset import LabelMatcher, LabelOperator, MetricPreset, validate_query_template
 from .querier import ContainerMetricQuerier, MetricQuerier
 from .types import MetricValue, ValueType
 
 __all__ = [
+    "FixedQueryBuilder",
     "LabelMatcher",
     "LabelOperator",
+    "LabelValuesQuery",
     "MetricValue",
     "PrometheusClient",
     "MetricPreset",
     "MetricQuerier",
     "ContainerMetricQuerier",
     "ValueType",
+    "validate_query_template",
 ]

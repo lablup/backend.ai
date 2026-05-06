@@ -9,7 +9,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import UNSET, Info
-from strawberry.relay import Connection, Edge, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -87,10 +87,9 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
     RollingUpdateConfigInputGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.resource_slot import (
-    AllocatedResourceSlotConnection,
-    AllocatedResourceSlotEdge,
+    RESOURCE_SLOTS_FETCH_LIMIT,
     AllocatedResourceSlotFilterGQL,
-    AllocatedResourceSlotNodeGQL,
+    AllocatedResourceSlotGQL,
     AllocatedResourceSlotOrderByGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import (
@@ -311,44 +310,20 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         info: Info[StrawberryGQLContext],
         filter: AllocatedResourceSlotFilterGQL | None = None,
         order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> AllocatedResourceSlotConnection:
+    ) -> list[AllocatedResourceSlotGQL]:
         from ai.backend.common.dto.manager.v2.resource_slot.request import (
             SearchAllocatedResourceSlotsInput,
         )
 
-        pydantic_filter = filter.to_pydantic() if filter else None
-        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment_revision_preset.search_resource_slots(
             preset_id=UUID(self.id),
             input=SearchAllocatedResourceSlotsInput(
-                filter=pydantic_filter,
-                order=pydantic_order,
-                first=first,
-                after=after,
-                last=last,
-                before=before,
-                limit=limit,
-                offset=offset,
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                limit=RESOURCE_SLOTS_FETCH_LIMIT,
             ),
         )
-        nodes = [AllocatedResourceSlotNodeGQL.from_pydantic(item) for item in payload.items]
-        edges = [AllocatedResourceSlotEdge(node=node, cursor=node.slot_name) for node in nodes]
-        return AllocatedResourceSlotConnection(
-            count=payload.total_count,
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=payload.has_next_page,
-                has_previous_page=payload.has_previous_page,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-        )
+        return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
 
 
 DeploymentRevisionPresetEdge = Edge[DeploymentRevisionPresetGQL]
@@ -445,16 +420,14 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         default=None,
         description="Default open_to_public for deployments created from this preset.",
     )
-    replica_count: int | None = gql_field(
-        default=None,
+    replica_count: int = gql_field(
         description="Default replica count for deployments created from this preset.",
     )
     revision_history_limit: int | None = gql_field(
         default=None,
         description="Default revision history limit for deployments created from this preset.",
     )
-    deployment_strategy: PresetDeploymentStrategyInputGQL | None = gql_field(
-        default=None,
+    deployment_strategy: PresetDeploymentStrategyInputGQL = gql_field(
         description="Default deployment strategy for deployments created from this preset.",
     )
     image_id: UUID = gql_added_field(
@@ -491,19 +464,17 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         ),
         default=None,
     )
-    cluster_mode: ClusterModeGQL | None = gql_added_field(
+    cluster_mode: ClusterModeGQL = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Deployment topology mode (single-node or multi-node).",
         ),
-        default=None,
     )
-    cluster_size: int | None = gql_added_field(
+    cluster_size: int = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Number of worker nodes in the cluster.",
         ),
-        default=None,
     )
     startup_command: str | None = gql_added_field(
         BackendAIGQLMeta(

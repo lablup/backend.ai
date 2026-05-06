@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from http import HTTPMethod
 from typing import Any, cast
 
@@ -7,14 +8,28 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
 )
+from ai.backend.common.clients.prometheus.fixed_query_builder import FixedQueryBuilder
+from ai.backend.common.clients.prometheus.metric_types import (
+    ContainerMetricOptionalLabel,
+    ContainerMetricResponseInfo,
+    ContainerMetricResult,
+    KernelMetricValuesByKernel,
+    MetricResultValue,
+)
+from ai.backend.common.clients.prometheus.preset import LabelMatcher
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
     PrometheusResponse,
 )
-from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
+from ai.backend.common.exception import (
+    FailedToGetMetric,
+    PrometheusConnectionError,
+)
+from ai.backend.common.types import KernelId
 
 from .preset import MetricPreset
+from .types import MetricValue
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 
@@ -25,19 +40,98 @@ class PrometheusClient:
     _client_pool: ClientPool
     _client_key: ClientKey
     _timeout: aiohttp.ClientTimeout
+    _fixed_query_builder: FixedQueryBuilder
 
     def __init__(
         self,
         endpoint: str,
         client_pool: ClientPool,
         *,
+        fixed_query_builder: FixedQueryBuilder,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         self._client_pool = client_pool
         self._client_key = ClientKey(endpoint=endpoint, domain="prometheus")
         self._timeout = aiohttp.ClientTimeout(total=timeout)
+        self._fixed_query_builder = fixed_query_builder
 
-    async def query_range(
+    async def fetch_available_container_metric_names(self) -> list[str]:
+        query = self._fixed_query_builder.get_container_metric_metadata_query()
+        result = await self._query_label_values(
+            label_name=query.label_name,
+            metric_match=query.metric_match,
+        )
+        return result.data
+
+    async def fetch_container_metric(
+        self,
+        metric_name: str,
+        label: ContainerMetricOptionalLabel,
+        time_range: QueryTimeRange,
+    ) -> list[ContainerMetricResult]:
+        query = self._fixed_query_builder.get_container_metric_query(metric_name, label)
+        response = await self._query_range(query, time_range)
+        return [
+            ContainerMetricResult(
+                metric=ContainerMetricResponseInfo.from_metric_response_info(m.metric),
+                values=[MetricResultValue(*value) for value in m.values],
+            )
+            for m in response.data.result
+        ]
+
+    async def fetch_container_live_stats(
+        self,
+        kernel_ids: Sequence[KernelId],
+    ) -> dict[KernelId, list[MetricValue]]:
+        queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
+        gauge_response = await self._query_instant(queries.gauge)
+        diff_response = await self._query_instant(queries.diff)
+        rate_response = await self._query_instant(queries.rate)
+        gauge = KernelMetricValuesByKernel.from_prometheus_response(gauge_response)
+        diff = KernelMetricValuesByKernel.from_prometheus_response(diff_response)
+        rate = KernelMetricValuesByKernel.from_prometheus_response(rate_response)
+        merged = gauge.merged_with(diff).merged_with(rate)
+        return merged.values_by_kernel
+
+    async def execute_preset(
+        self,
+        *,
+        query_template: str,
+        filter_labels: Mapping[str, str],
+        group_labels: Sequence[str],
+        time_window: str,
+        time_range: QueryTimeRange | None,
+    ) -> PrometheusResponse:
+        metric_preset = MetricPreset(
+            template=query_template,
+            labels={
+                label_name: LabelMatcher.exact(label_value)
+                for label_name, label_value in filter_labels.items()
+            },
+            group_by=set(group_labels),
+            window=time_window,
+        )
+        if time_range is None:
+            return await self._query_instant(preset=metric_preset)
+        return await self._query_range(
+            preset=metric_preset,
+            time_range=time_range,
+        )
+
+    async def preview_query_template(
+        self,
+        query_template: str,
+        default_window: str,
+    ) -> PrometheusResponse:
+        metric_preset = MetricPreset(
+            template=query_template,
+            labels={},
+            group_by=frozenset(),
+            window=default_window,
+        )
+        return await self._query_instant(preset=metric_preset)
+
+    async def _query_range(
         self,
         preset: MetricPreset,
         time_range: QueryTimeRange,
@@ -61,7 +155,7 @@ class PrometheusClient:
         result = await self._execute_request(HTTPMethod.POST, "query_range", data=form_data)
         return PrometheusResponse.model_validate(result)
 
-    async def query_instant(
+    async def _query_instant(
         self,
         preset: MetricPreset,
         *,
@@ -84,7 +178,7 @@ class PrometheusClient:
         result = await self._execute_request(HTTPMethod.POST, "query", data=form_data)
         return PrometheusResponse.model_validate(result)
 
-    async def query_label_values(
+    async def _query_label_values(
         self,
         label_name: str,
         metric_match: str,

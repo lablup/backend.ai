@@ -703,7 +703,7 @@ class DeploymentController:
         if resolved_replica_spec is None:
             preset_replica = (
                 preset_data.replica_count
-                if preset_data is not None and preset_data.replica_count is not None
+                if preset_data is not None
                 else self._DEFAULT_REPLICA_COUNT
             )
             resolved_replica_spec = ReplicaSpec(replica_count=preset_replica)
@@ -732,11 +732,9 @@ class DeploymentController:
     @staticmethod
     def _build_policy_from_preset(
         preset_data: DeploymentRevisionPresetData,
-    ) -> DeploymentPolicyConfig | None:
+    ) -> DeploymentPolicyConfig:
         """Reconstruct a DeploymentPolicyConfig from preset-stored strategy fields."""
-        if preset_data.deployment_strategy is None:
-            return None
-        spec_dict = preset_data.deployment_strategy_spec or {}
+        spec_dict = preset_data.deployment_strategy_spec
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
         match preset_data.deployment_strategy:
             case DeploymentStrategy.ROLLING:

@@ -21,8 +21,10 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.config import ModelConfig, ModelDefinition
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
@@ -83,6 +85,8 @@ class TestDeploymentRevisionPresetCRUD:
                 resource_opts=[ResourceOptsEntryDTO(name="shmem", value="1g")],
                 cluster_mode="single-node",
                 cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
             )
         )
         preset = create_result.preset
@@ -111,6 +115,11 @@ class TestDeploymentRevisionPresetCRUD:
                 name="search-test-preset",
                 image_id=image_id,
                 model_definition=model_definition,
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
             )
         )
         preset_id = create_result.preset.id
@@ -147,6 +156,11 @@ class TestDeploymentRevisionPresetCRUD:
                 name="update-test-preset",
                 description="Before",
                 image_id=ImageID(uuid.uuid4()),
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
             )
         )
         preset_id = create_result.preset.id
@@ -174,6 +188,11 @@ class TestDeploymentRevisionPresetCRUD:
                 runtime_variant_id=runtime_variant_id,
                 name="delete-test-preset",
                 image_id=ImageID(uuid.uuid4()),
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
             )
         )
         preset_id = create_result.preset.id
@@ -191,6 +210,11 @@ class TestDeploymentRevisionPresetCRUD:
                 runtime_variant_id=runtime_variant_id,
                 name="dup-test-preset",
                 image_id=ImageID(uuid.uuid4()),
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
             )
         )
         preset_id = create_result.preset.id
@@ -202,6 +226,13 @@ class TestDeploymentRevisionPresetCRUD:
                         runtime_variant_id=runtime_variant_id,
                         name="dup-test-preset",
                         image_id=ImageID(uuid.uuid4()),
+                        resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                        cluster_mode="single-node",
+                        cluster_size=1,
+                        replica_count=1,
+                        deployment_strategy=DeploymentStrategyInput(
+                            type=DeploymentStrategy.ROLLING
+                        ),
                     )
                 )
             assert exc_info.value.args[0] == 409
@@ -218,6 +249,11 @@ class TestDeploymentRevisionPresetCRUD:
                 runtime_variant_id=runtime_variant_id,
                 name="rank-test-1",
                 image_id=ImageID(uuid.uuid4()),
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
             )
         )
         r2 = await admin_v2_registry.deployment_revision_preset.create(
@@ -225,6 +261,11 @@ class TestDeploymentRevisionPresetCRUD:
                 runtime_variant_id=runtime_variant_id,
                 name="rank-test-2",
                 image_id=ImageID(uuid.uuid4()),
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
             )
         )
         assert r1.preset.rank == 100

@@ -22,6 +22,9 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    DeleteModelCardOptions as DeleteOptionsDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
     DeleteModelCardsInput as DeleteCardsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
@@ -69,6 +72,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -537,6 +541,25 @@ class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Options for the model card delete operation.",
+    ),
+    name="DeleteModelCardV2Options",
+)
+class DeleteModelCardOptionsGQL(PydanticInputMixin[DeleteOptionsDTO]):
+    """Options for the model card delete operation."""
+
+    delete_associated_vfolder: bool = gql_field(
+        description=(
+            "If true, also soft-delete (move to trash) the model VFolder(s) "
+            "associated with the deleted model card(s)."
+        ),
+        default=False,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for deleting multiple model cards.",
     ),
@@ -544,6 +567,13 @@ class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
 )
 class DeleteModelCardsInputGQL(PydanticInputMixin[DeleteCardsInputDTO]):
     ids: list[UUID] = gql_field(description="List of model card UUIDs to delete.")
+    options: DeleteModelCardOptionsGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Options for the delete operation.",
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_type(
