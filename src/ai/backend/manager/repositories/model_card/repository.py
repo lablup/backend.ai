@@ -51,7 +51,7 @@ class ModelCardRepository:
         self,
         purger: Purger[ModelCardRow],
         vfolder_trash_spec: UpdaterSpec[VFolderRow] | None,
-    ) -> ModelCardData:
+    ) -> UUID:
         return await self._db_source.delete(purger, vfolder_trash_spec)
 
     async def bulk_delete(

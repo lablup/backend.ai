@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base.purger import Purger
@@ -34,8 +34,8 @@ class DeleteModelCardAction(ModelCardAction):
 
 @dataclass
 class DeleteModelCardActionResult(BaseActionResult):
-    data: ModelCardData
+    id: UUID
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.data.id)
+        return str(self.id)

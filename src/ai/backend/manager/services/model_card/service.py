@@ -74,8 +74,8 @@ class ModelCardService:
         return UpdateModelCardActionResult(model_card=data)
 
     async def delete(self, action: DeleteModelCardAction) -> DeleteModelCardActionResult:
-        data = await self._repository.delete(action.purger, action.vfolder_trash_spec)
-        return DeleteModelCardActionResult(data=data)
+        deleted_id = await self._repository.delete(action.purger, action.vfolder_trash_spec)
+        return DeleteModelCardActionResult(id=deleted_id)
 
     async def bulk_delete(
         self, action: BulkDeleteModelCardAction

@@ -179,7 +179,7 @@ class ModelCardDBSource:
         self,
         purger: Purger[ModelCardRow],
         vfolder_trash_spec: UpdaterSpec[VFolderRow] | None,
-    ) -> ModelCardData:
+    ) -> UUID:
         async with self._db.begin_session() as session:
             return await self._delete_card_in_session(session, purger, vfolder_trash_spec)
 
@@ -194,10 +194,10 @@ class ModelCardDBSource:
         card, mounted VFolder, ...) does not abort the rest of the batch. The
         outer transaction commits the union of every successful savepoint.
         """
-        if not purgers:
-            return BulkModelCardDeleteResultData()
-        successes: list[ModelCardData] = []
+        successes: list[UUID] = []
         failures: list[BulkModelCardDeleteFailure] = []
+        if not purgers:
+            return BulkModelCardDeleteResultData(successes=successes, failures=failures)
         async with self._db.begin_session() as session:
             for purger in purgers:
                 # ModelCardRow uses a UUID primary key; the Purger generic type permits
@@ -205,10 +205,10 @@ class ModelCardDBSource:
                 card_id = cast(UUID, purger.pk_value)
                 try:
                     async with session.begin_nested():
-                        data = await self._delete_card_in_session(
+                        deleted_id = await self._delete_card_in_session(
                             session, purger, vfolder_trash_spec
                         )
-                    successes.append(data)
+                    successes.append(deleted_id)
                 except Exception as exc:
                     failures.append(BulkModelCardDeleteFailure(card_id=card_id, message=str(exc)))
         return BulkModelCardDeleteResultData(successes=successes, failures=failures)
@@ -218,26 +218,20 @@ class ModelCardDBSource:
         session: SASession,
         purger: Purger[ModelCardRow],
         vfolder_trash_spec: UpdaterSpec[VFolderRow] | None,
-    ) -> ModelCardData:
-        row = (
-            await session.execute(sa.select(ModelCardRow).where(ModelCardRow.id == purger.pk_value))
-        ).scalar_one_or_none()
-        if row is None:
+    ) -> UUID:
+        result = await execute_purger(session, purger)
+        if result is None:
             raise ModelCardNotFound()
-        data = row.to_data()
-        await execute_purger(session, purger)
+        deleted_row = result.row
         if vfolder_trash_spec is not None:
             # The VFolder is going to trash, so any sibling model card pointing
             # at it would be orphaned. Hard-delete the siblings first inside the
             # same transaction, then flip the VFolder status atomically.
-            await session.execute(
-                sa.delete(ModelCardRow).where(ModelCardRow.vfolder == data.vfolder_id)
-            )
-            await self._reject_if_vfolders_mounted(session, [data.vfolder_id])
-            await execute_updater(
-                session, Updater(spec=vfolder_trash_spec, pk_value=data.vfolder_id)
-            )
-        return data
+            vfolder_id = cast(UUID, deleted_row.vfolder)
+            await session.execute(sa.delete(ModelCardRow).where(ModelCardRow.vfolder == vfolder_id))
+            await self._reject_if_vfolders_mounted(session, [vfolder_id])
+            await execute_updater(session, Updater(spec=vfolder_trash_spec, pk_value=vfolder_id))
+        return deleted_row.id
 
     async def _reject_if_vfolders_mounted(
         self,

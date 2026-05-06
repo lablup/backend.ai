@@ -386,7 +386,7 @@ class ModelCardAdapter(BaseAdapter):
                 ),
             )
         )
-        return DeleteModelCardPayload(id=result.data.id)
+        return DeleteModelCardPayload(id=result.id)
 
     async def bulk_delete(
         self,
