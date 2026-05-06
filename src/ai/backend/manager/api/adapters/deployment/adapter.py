@@ -2370,6 +2370,7 @@ class DeploymentAdapter(BaseAdapter):
                 )
                 for m in data.extra_vfolder_mounts
             ],
+            revision_preset_id=data.revision_preset_id,
         )
 
     @staticmethod

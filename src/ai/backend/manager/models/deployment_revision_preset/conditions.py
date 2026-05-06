@@ -101,6 +101,26 @@ class DeploymentRevisionPresetConditions:
     by_name_in = staticmethod(make_string_in_factory(DeploymentRevisionPresetRow.name))
 
     @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = DeploymentRevisionPresetRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = DeploymentRevisionPresetRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DeploymentRevisionPresetRow.id < sa.text(f"'{cursor_id}'::uuid")

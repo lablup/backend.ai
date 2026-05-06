@@ -266,6 +266,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             image_id=rev.image_id,
             created_at=info.metadata.created_at or datetime.now(UTC),
             model_definition=rev.model_definition,
+            revision_preset_id=rev.revision_preset_id,
         )
 
     desired_count = info.replica_spec.desired_replica_count
@@ -358,11 +359,12 @@ def _build_creator_from_revision_spec(spec: ModelRevisionSpec) -> ModelRevisionC
     """Rebuild a ``ModelRevisionCreator`` from an existing revision's spec.
 
     ``model_definition`` is reset to ``None`` so ``DeploymentController.add_revision``
-    re-resolves it from the vfolder. ``revision_preset_id`` is left ``None`` since
-    it is not persisted on the revision row; the materialized ``preset_values``
-    carry forward the preset effect without requiring re-application.
-    ``extra_mounts`` is left empty because ``add_revision`` does not propagate
-    this field to the new revision spec (see ``DeploymentController.add_revision``).
+    re-resolves it from the vfolder. ``revision_preset_id`` is carried over from the
+    persisted spec so the new revision keeps the same preset attribution; the
+    materialised ``preset_values`` are also propagated to preserve the preset
+    effect without requiring re-application. ``extra_mounts`` is left empty
+    because ``add_revision`` does not propagate this field to the new revision
+    spec (see ``DeploymentController.add_revision``).
     """
     return ModelRevisionCreator(
         image_id=spec.image_id,
@@ -375,7 +377,7 @@ def _build_creator_from_revision_spec(spec: ModelRevisionSpec) -> ModelRevisionC
         ),
         execution=spec.execution,
         model_definition=None,
-        revision_preset_id=None,
+        revision_preset_id=spec.revision_preset_id,
         preset_values=[
             PresetValueData(preset_id=pv.preset_id, value=pv.value) for pv in spec.preset_values
         ],
