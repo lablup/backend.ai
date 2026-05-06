@@ -267,6 +267,53 @@ class TestModelCardDelete:
         return ModelCardDBSource(db_with_cleanup)
 
     @pytest.fixture
+    async def mounted_vfolder(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_user: UserRow,
+        test_group: GroupRow,
+    ) -> VFolderRow:
+        """A model VFolder pinned by a RUNNING session — bulk delete must refuse to touch it."""
+        quota_scope_id = QuotaScopeID(QuotaScopeType.USER, test_user.uuid)
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            vfolder = VFolderRow(
+                id=vfolder_id,
+                host="local",
+                name=f"test-vfolder-mounted-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain.name,
+                usage_mode=VFolderUsageMode.MODEL,
+                quota_scope_id=quota_scope_id,
+                user=test_user.uuid,
+            )
+            db_sess.add(vfolder)
+            await db_sess.flush()
+            mount_holder = SessionRow(
+                id=uuid.uuid4(),
+                domain_name=test_domain.name,
+                group_id=test_group.id,
+                user_uuid=test_user.uuid,
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+                status=SessionStatus.RUNNING,
+                vfolder_mounts=[
+                    VFolderMount(
+                        name="test-mount",
+                        vfid=VFolderID(quota_scope_id=quota_scope_id, folder_id=vfolder_id),
+                        vfsubpath=PurePosixPath("/"),
+                        host_path=PurePosixPath("/host/test"),
+                        kernel_path=PurePosixPath("/work"),
+                        mount_perm=MountPermission.READ_WRITE,
+                        usage_mode=VFolderUsageMode.MODEL,
+                    ),
+                ],
+            )
+            db_sess.add(mount_holder)
+            await db_sess.flush()
+        return vfolder
+
+    @pytest.fixture
     def make_card(
         self,
         db_source: ModelCardDBSource,
@@ -391,51 +438,12 @@ class TestModelCardDelete:
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
         make_card: _MakeCardFn,
-        test_domain: DomainRow,
-        test_user: UserRow,
-        test_group: GroupRow,
         test_vfolder: VFolderRow,
+        mounted_vfolder: VFolderRow,
     ) -> None:
         """A vfolder mounted on a live session rejects only the affected card."""
-        quota_scope_id = QuotaScopeID(QuotaScopeType.USER, test_user.uuid)
-        mounted_vfolder_id = VFolderUUID(uuid.uuid4())
-        async with db_with_cleanup.begin_session() as db_sess:
-            mounted_vfolder = VFolderRow(
-                id=mounted_vfolder_id,
-                host="local",
-                name=f"test-vfolder-mounted-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain.name,
-                usage_mode=VFolderUsageMode.MODEL,
-                quota_scope_id=quota_scope_id,
-                user=test_user.uuid,
-            )
-            db_sess.add(mounted_vfolder)
-            await db_sess.flush()
-            mount_holder = SessionRow(
-                id=uuid.uuid4(),
-                domain_name=test_domain.name,
-                group_id=test_group.id,
-                user_uuid=test_user.uuid,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
-                status=SessionStatus.RUNNING,
-                vfolder_mounts=[
-                    VFolderMount(
-                        name="test-mount",
-                        vfid=VFolderID(quota_scope_id=quota_scope_id, folder_id=mounted_vfolder_id),
-                        vfsubpath=PurePosixPath("/"),
-                        host_path=PurePosixPath("/host/test"),
-                        kernel_path=PurePosixPath("/work"),
-                        mount_perm=MountPermission.READ_WRITE,
-                        usage_mode=VFolderUsageMode.MODEL,
-                    ),
-                ],
-            )
-            db_sess.add(mount_holder)
-            await db_sess.flush()
-
         free_card = await make_card()
-        mounted_card = await make_card(vfolder_id=mounted_vfolder_id)
+        mounted_card = await make_card(vfolder_id=VFolderUUID(mounted_vfolder.id))
 
         result = await db_source.bulk_delete(
             [
@@ -467,7 +475,7 @@ class TestModelCardDelete:
             ).scalar_one()
             mounted_vfolder_status = (
                 await session.execute(
-                    sa.select(VFolderRow.status).where(VFolderRow.id == mounted_vfolder_id)
+                    sa.select(VFolderRow.status).where(VFolderRow.id == mounted_vfolder.id)
                 )
             ).scalar_one()
         assert remaining_card_ids == {mounted_card.id}
