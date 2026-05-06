@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow
@@ -16,9 +18,27 @@ from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
+    "BulkVFolderPurgeResult",
     "ProjectVFolderSearchScope",
     "UserVFolderSearchScope",
+    "VFolderPurgeFailure",
 )
+
+
+@dataclass(frozen=True)
+class VFolderPurgeFailure:
+    """A single vfolder that failed to purge in a bulk repository call."""
+
+    vfolder_id: UUID
+    exception: BackendAIError
+
+
+@dataclass
+class BulkVFolderPurgeResult:
+    """Partial-success result of ``delete_vfolders_forever``."""
+
+    succeeded: list[VFolderData] = field(default_factory=list)
+    failures: list[VFolderPurgeFailure] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -1397,17 +1397,36 @@ type BulkPurgeUsersV2Payload {
 }
 
 """
+Added in UNRELEASED. Failure detail for a single vfolder in a bulk purge.
+"""
+type BulkPurgeVFolderV2Error {
+  """UUID of the vfolder that failed to purge."""
+  vfolderId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
 Added in 26.4.2. Input for permanently purging multiple virtual folders.
 """
 input BulkPurgeVFoldersV2Input {
   """List of VFolder UUIDs to purge."""
   ids: [UUID!]!
+
+  """
+  Added in UNRELEASED. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
+  """
+  options: PurgeVFolderOptionsInput!
 }
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
 type BulkPurgeVFoldersV2Payload {
   """Number of virtual folders successfully purged."""
   purgedCount: Int!
+
+  """List of errors for vfolders that failed to purge."""
+  failed: [BulkPurgeVFolderV2Error!]!
 }
 
 """
@@ -7259,7 +7278,7 @@ type Mutation {
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
-  purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload!
+  purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null): PurgeVFolderV2Payload!
 
   """
   Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
@@ -8570,10 +8589,20 @@ type PurgeUserV2Payload {
 }
 
 """
+Added in UNRELEASED. Optional behavior flags for vfolder purge operations.
+"""
+input PurgeVFolderOptionsInput {
+  """
+  If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.
+  """
+  cascadeModelCard: Boolean! = false
+}
+
+"""
 Added in 26.4.2. Payload returned after permanently purging a virtual folder.
 """
 type PurgeVFolderV2Payload {
-  """ID of the purged virtual folder"""
+  """ID of the purged virtual folder."""
   id: UUID!
 }
 

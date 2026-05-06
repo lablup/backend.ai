@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     MkdirInput,
     MoveFileInput,
     PurgeVFolderInput,
+    PurgeVFolderOptions,
     RenameFileInput,
     RestoreVFolderInput,
     ShareVFolderInput,
@@ -115,10 +116,13 @@ class TestDeleteAndRestoreInputs:
         req = DeleteVFolderInput(id=vid)
         assert req.id == vid
 
-    def test_purge_valid(self) -> None:
-        vid = uuid.uuid4()
-        req = PurgeVFolderInput(id=vid)
-        assert req.id == vid
+    def test_purge_default(self) -> None:
+        req = PurgeVFolderInput()
+        assert req.options.cascade_model_card is False
+
+    def test_purge_with_cascade_option(self) -> None:
+        req = PurgeVFolderInput(options=PurgeVFolderOptions(cascade_model_card=True))
+        assert req.options.cascade_model_card is True
 
     def test_restore_valid(self) -> None:
         vid = uuid.uuid4()

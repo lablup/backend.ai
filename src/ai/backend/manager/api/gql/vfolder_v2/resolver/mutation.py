@@ -6,6 +6,10 @@ from uuid import UUID
 
 from strawberry import Info
 
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PurgeVFolderInput,
+    PurgeVFolderOptions,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -32,6 +36,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
     MkdirPayloadGQL,
     MoveFileInputGQL,
     MoveFilePayloadGQL,
+    PurgeVFolderOptionsInputGQL,
     PurgeVFolderPayloadGQL,
     RestoreVFolderPayloadGQL,
     UploadSessionInputGQL,
@@ -76,8 +81,13 @@ async def delete_vfolder_v2(
 async def purge_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
+    options: PurgeVFolderOptionsInputGQL | None = None,
 ) -> PurgeVFolderPayloadGQL:
-    payload = await info.context.adapters.vfolder.purge(vfolder_id)
+    options_dto = options.to_pydantic() if options is not None else PurgeVFolderOptions()
+    payload = await info.context.adapters.vfolder.purge(
+        vfolder_id,
+        PurgeVFolderInput(options=options_dto),
+    )
     return PurgeVFolderPayloadGQL.from_pydantic(payload)
 
 
@@ -276,15 +286,7 @@ async def bulk_purge_vfolders_v2(
     info: Info[StrawberryGQLContext],
     input: BulkPurgeVFoldersInputGQL,
 ) -> BulkPurgeVFoldersPayloadGQL:
-    """Permanently purge multiple virtual folders.
-
-    Args:
-        info: Strawberry GraphQL context.
-        input: Input containing list of VFolder UUIDs to purge.
-
-    Returns:
-        BulkPurgeVFoldersPayloadGQL with count of purged vfolders.
-    """
+    """Permanently purge multiple virtual folders, optionally cascading linked model cards."""
     ctx = info.context
     dto = input.to_pydantic()
     payload = await ctx.adapters.vfolder.bulk_purge(dto)

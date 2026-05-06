@@ -55,9 +55,15 @@ class DeleteVFolderV2ActionResult(VFolderSingleEntityActionResult):
 
 @dataclass
 class PurgeVFolderV2Action(VFolderSingleEntityAction):
-    """Permanently purge a vfolder by ID with RBAC enforcement."""
+    """Permanently purge a vfolder by ID with RBAC enforcement.
+
+    By default the call is rejected when any model card references the
+    vfolder. Set ``cascade_model_card=True`` to also remove the linked
+    model card row(s) atomically.
+    """
 
     vfolder_id: uuid.UUID
+    cascade_model_card: bool = False
 
     @override
     def entity_id(self) -> str | None:
