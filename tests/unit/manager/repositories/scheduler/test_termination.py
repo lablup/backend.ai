@@ -33,6 +33,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
 )
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -84,6 +85,7 @@ class TestKernelTermination:
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,

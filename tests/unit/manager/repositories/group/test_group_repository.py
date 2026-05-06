@@ -42,6 +42,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -49,7 +50,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -252,6 +253,7 @@ class TestGroupRepository:
                 KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
+                PermissionRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -262,6 +264,7 @@ class TestGroupRepository:
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
