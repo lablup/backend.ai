@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 class DeleteCase:
     """Parameter set for delete option-on/off coverage."""
 
-    delete_associated_vfolder: bool
+    options: DeleteModelCardOptions
     expects_sibling_deleted: bool
     expects_vfolder_status: VFolderOperationStatus
 
@@ -62,7 +62,7 @@ class DeleteCase:
 _DELETE_CASES = [
     pytest.param(
         DeleteCase(
-            delete_associated_vfolder=False,
+            options=DeleteModelCardOptions(delete_associated_vfolder=False),
             expects_sibling_deleted=False,
             expects_vfolder_status=VFolderOperationStatus.READY,
         ),
@@ -70,7 +70,7 @@ _DELETE_CASES = [
     ),
     pytest.param(
         DeleteCase(
-            delete_associated_vfolder=True,
+            options=DeleteModelCardOptions(delete_associated_vfolder=True),
             expects_sibling_deleted=True,
             expects_vfolder_status=VFolderOperationStatus.DELETE_PENDING,
         ),
@@ -317,7 +317,7 @@ class TestModelCardDelete:
 
         await db_source.delete(
             Purger(row_class=ModelCardRow, pk_value=target.id),
-            DeleteModelCardOptions(delete_associated_vfolder=case.delete_associated_vfolder),
+            case.options,
         )
 
         async with db_with_cleanup.begin_readonly_session() as session:
