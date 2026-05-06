@@ -83,7 +83,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     async def model_cards(
         self,
         info: Info[StrawberryGQLContext],
-    ) -> ModelCardV2Connection:
+    ) -> ModelCardV2Connection | None:
         nodes = await info.context.data_loaders.model_cards_by_vfolder_loader.load(
             VFolderUUID(UUID(self.id))
         )
