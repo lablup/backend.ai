@@ -233,10 +233,28 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
 
     Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
     """
-    # Map revision if available
+    # Resolve the revision spec for the *current* revision specifically.
+    # ``info.model_revisions`` may also contain the deploying revision during a
+    # rolling update, and PostgreSQL returns those rows in undefined order, so
+    # picking ``model_revisions[0]`` would non-deterministically expose the
+    # deploying revision under ``current_revision_id``.
     revision: ModelRevisionData | None = None
-    if info.model_revisions:
-        rev = info.model_revisions[0]
+    rev: ModelRevisionSpec | None = None
+    if info.current_revision_id is not None:
+        rev = next(
+            (r for r in info.model_revisions if r.revision_id == info.current_revision_id),
+            None,
+        )
+        if rev is None:
+            log.warning(
+                "Deployment {} has current_revision_id {} but no matching "
+                "ModelRevisionSpec was found in DeploymentInfo.model_revisions; "
+                "current_revision will be reported as null. This usually means "
+                "EndpointRow.revisions was not eagerly loaded by the caller.",
+                info.id,
+                info.current_revision_id,
+            )
+    if rev is not None:
         if rev.revision_id is None:
             raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
         revision = ModelRevisionData(
