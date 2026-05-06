@@ -14,6 +14,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    field_validator,
 )
 
 from . import validators as tx
@@ -269,6 +270,14 @@ class ModelServiceConfig(BaseConfigModel):
         default=None,
         description="Health check configuration for the model service.",
     )
+
+    @field_validator("start_command", mode="before")
+    @classmethod
+    def _normalize_start_command(cls, value: Any) -> Any:
+        """Accept legacy string values by splitting."""
+        if isinstance(value, str):
+            return value.split()
+        return value
 
 
 class ModelMetadata(BaseConfigModel):
