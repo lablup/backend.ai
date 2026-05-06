@@ -79,8 +79,9 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
         draft: KernelExecutionSpecDraft,
         image_info: ImageInfo,
     ) -> KernelExecutionSpecDraft:
-        min_slots = image_min_slots(image_info)
+        raw_min_slots = image_min_slots(image_info)
         resolved_opts = cls._resolve_resource_opts(draft.resource_opts, image_info.labels)
+        min_slots = cls._apply_shmem_to_mem_min(raw_min_slots, resolved_opts.shmem)
         resolved_resources = cls._fill_intrinsic_slots(draft.resources, min_slots)
         return draft.model_copy(
             update={
@@ -88,6 +89,23 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
                 "resource_opts": resolved_opts,
             }
         )
+
+    @staticmethod
+    def _apply_shmem_to_mem_min(
+        min_slots: Mapping[str, Decimal],
+        shmem: BinarySize | None,
+    ) -> dict[str, Decimal]:
+        """Inflate ``mem`` minimum by ``shmem``.
+
+        Mirrors ``ResourceLimitRule._validate_kernel`` which adds shmem to
+        ``min_slots["mem"]`` before comparing against the requested memory.
+        Without this adjustment, defaults filled from the raw image minimum
+        would be rejected by the validator.
+        """
+        adjusted: dict[str, Decimal] = dict(min_slots)
+        if shmem is not None:
+            adjusted["mem"] = adjusted.get("mem", Decimal(0)) + Decimal(int(shmem))
+        return adjusted
 
     @classmethod
     def _resolve_resource_opts(
