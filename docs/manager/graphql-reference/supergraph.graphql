@@ -11808,6 +11808,25 @@ enum OperationType
   GRANT_HARD_DELETE @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in UNRELEASED. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
+"""
+input OperationTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Matches rows with this exact operation."""
+  equals: OperationType = null
+
+  """Matches rows whose operation is in this list."""
+  in: [OperationType!] = null
+
+  """Excludes rows with this exact operation."""
+  notEquals: OperationType = null
+
+  """Excludes rows whose operation is in this list."""
+  notIn: [OperationType!] = null
+}
+
 """Added in 24.09.0. Sort direction for ordering"""
 enum OrderDirection
   @join__type(graph: STRAWBERRY)
@@ -11907,10 +11926,10 @@ Added in 26.4.0. Nested filter for permissions within a role assignment. Filters
 input PermissionNestedFilter
   @join__type(graph: STRAWBERRY)
 {
-  scopeId: String = null
+  scopeId: StringFilter = null
   scopeType: RBACElementTypeFilter = null
   entityType: RBACElementTypeFilter = null
-  operation: OperationType = null
+  operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
   NOT: [PermissionNestedFilter!] = null
