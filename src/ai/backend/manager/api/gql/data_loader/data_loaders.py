@@ -396,8 +396,8 @@ class DataLoaders:
                 DeploymentRevisionPresetFilter,
                 SearchDeploymentRevisionPresetsInput,
             )
-            from ai.backend.common.identifier.deployment_preset import (  # pants: no-infer-dep
-                DeploymentPresetID,
+            from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (  # pants: no-infer-dep
+                DeploymentRevisionPresetNode,
             )
             from ai.backend.manager.api.gql.deployment.types.revision_preset import (  # pants: no-infer-dep
                 DeploymentRevisionPresetGQL as DRP,
@@ -409,11 +409,10 @@ class DataLoaders:
                     limit=len(ids),
                 )
             )
-            node_map = {item.id: item for item in payload.items}
-            return [
-                DRP.from_pydantic(node) if (node := node_map.get(DeploymentPresetID(pid))) else None
-                for pid in ids
-            ]
+            node_map: dict[uuid.UUID, DeploymentRevisionPresetNode] = {
+                item.id: item for item in payload.items
+            }
+            return [DRP.from_pydantic(node) if (node := node_map.get(pid)) else None for pid in ids]
 
         return DataLoader(load_fn=load_fn)
 
