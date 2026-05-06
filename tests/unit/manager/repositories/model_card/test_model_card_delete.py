@@ -5,15 +5,26 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import (
+    MountPermission,
+    QuotaScopeID,
+    QuotaScopeType,
+    ResourceSlot,
+    VFolderID,
+    VFolderMount,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RBACElementRef, RBACElementType
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
@@ -257,11 +268,12 @@ class TestModelCardDelete:
         test_user: UserRow,
         test_group: GroupRow,
         test_vfolder: VFolderRow,
+        vfolder_id: VFolderUUID | None = None,
     ) -> RBACEntityCreator[ModelCardRow]:
         return RBACEntityCreator(
             spec=ModelCardCreatorSpec(
                 name=f"test-model-{uuid.uuid4().hex[:8]}",
-                vfolder_id=test_vfolder.id,
+                vfolder_id=vfolder_id if vfolder_id is not None else test_vfolder.id,
                 domain=test_domain.name,
                 project_id=test_group.id,
                 creator_id=test_user.uuid,
@@ -341,3 +353,159 @@ class TestModelCardDelete:
         expected_remaining = set() if case.expects_sibling_deleted else {sibling.id}
         assert remaining_card_ids == expected_remaining
         assert vfolder_status == case.expects_vfolder_status
+
+    async def test_bulk_delete_partial_failure_with_missing_card(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ModelCardDBSource,
+        test_domain: DomainRow,
+        test_user: UserRow,
+        test_group: GroupRow,
+        test_vfolder: VFolderRow,
+    ) -> None:
+        """A nonexistent ID must surface as a single failure without aborting the rest."""
+        valid_a = await db_source.create(
+            self._build_creator(
+                test_domain=test_domain,
+                test_user=test_user,
+                test_group=test_group,
+                test_vfolder=test_vfolder,
+            )
+        )
+        valid_b = await db_source.create(
+            self._build_creator(
+                test_domain=test_domain,
+                test_user=test_user,
+                test_group=test_group,
+                test_vfolder=test_vfolder,
+            )
+        )
+        missing_id = uuid.uuid4()
+
+        result = await db_source.bulk_delete(
+            [
+                Purger(row_class=ModelCardRow, pk_value=valid_a.id),
+                Purger(row_class=ModelCardRow, pk_value=missing_id),
+                Purger(row_class=ModelCardRow, pk_value=valid_b.id),
+            ],
+            DeleteModelCardOptions(delete_associated_vfolder=False),
+        )
+
+        assert set(result.successes) == {valid_a.id, valid_b.id}
+        assert [failure.card_id for failure in result.failures] == [missing_id]
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            remaining_card_ids = (
+                (
+                    await session.execute(
+                        sa.select(ModelCardRow.id).where(
+                            ModelCardRow.id.in_([valid_a.id, valid_b.id])
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert list(remaining_card_ids) == []
+
+    async def test_bulk_delete_partial_failure_with_mounted_vfolder(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ModelCardDBSource,
+        test_domain: DomainRow,
+        test_user: UserRow,
+        test_group: GroupRow,
+        test_vfolder: VFolderRow,
+    ) -> None:
+        """A vfolder mounted on a live session rejects only the affected card."""
+        quota_scope_id = QuotaScopeID(QuotaScopeType.USER, test_user.uuid)
+        mounted_vfolder_id = VFolderUUID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            mounted_vfolder = VFolderRow(
+                id=mounted_vfolder_id,
+                host="local",
+                name=f"test-vfolder-mounted-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain.name,
+                usage_mode=VFolderUsageMode.MODEL,
+                quota_scope_id=quota_scope_id,
+                user=test_user.uuid,
+            )
+            db_sess.add(mounted_vfolder)
+            await db_sess.flush()
+            mount_holder = SessionRow(
+                id=uuid.uuid4(),
+                domain_name=test_domain.name,
+                group_id=test_group.id,
+                user_uuid=test_user.uuid,
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+                status=SessionStatus.RUNNING,
+                vfolder_mounts=[
+                    VFolderMount(
+                        name="test-mount",
+                        vfid=VFolderID(quota_scope_id=quota_scope_id, folder_id=mounted_vfolder_id),
+                        vfsubpath=PurePosixPath("/"),
+                        host_path=PurePosixPath("/host/test"),
+                        kernel_path=PurePosixPath("/work"),
+                        mount_perm=MountPermission.READ_WRITE,
+                        usage_mode=VFolderUsageMode.MODEL,
+                    ),
+                ],
+            )
+            db_sess.add(mount_holder)
+            await db_sess.flush()
+
+        free_card = await db_source.create(
+            self._build_creator(
+                test_domain=test_domain,
+                test_user=test_user,
+                test_group=test_group,
+                test_vfolder=test_vfolder,
+            )
+        )
+        mounted_card = await db_source.create(
+            self._build_creator(
+                test_domain=test_domain,
+                test_user=test_user,
+                test_group=test_group,
+                test_vfolder=test_vfolder,
+                vfolder_id=mounted_vfolder_id,
+            )
+        )
+
+        result = await db_source.bulk_delete(
+            [
+                Purger(row_class=ModelCardRow, pk_value=free_card.id),
+                Purger(row_class=ModelCardRow, pk_value=mounted_card.id),
+            ],
+            DeleteModelCardOptions(delete_associated_vfolder=True),
+        )
+
+        assert set(result.successes) == {free_card.id}
+        assert [failure.card_id for failure in result.failures] == [mounted_card.id]
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            remaining_card_ids = set(
+                (
+                    await session.execute(
+                        sa.select(ModelCardRow.id).where(
+                            ModelCardRow.id.in_([free_card.id, mounted_card.id])
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            free_vfolder_status = (
+                await session.execute(
+                    sa.select(VFolderRow.status).where(VFolderRow.id == test_vfolder.id)
+                )
+            ).scalar_one()
+            mounted_vfolder_status = (
+                await session.execute(
+                    sa.select(VFolderRow.status).where(VFolderRow.id == mounted_vfolder_id)
+                )
+            ).scalar_one()
+        assert remaining_card_ids == {mounted_card.id}
+        assert free_vfolder_status == VFolderOperationStatus.DELETE_PENDING
+        assert mounted_vfolder_status == VFolderOperationStatus.READY
