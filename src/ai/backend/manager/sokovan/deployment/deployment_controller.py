@@ -442,6 +442,7 @@ class DeploymentController:
                 PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
                 for pv in (merged.preset_values or [])
             ],
+            revision_preset_id=preset_id,
         )
         rbac_creator = RBACEntityCreator(
             spec=spec,

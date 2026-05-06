@@ -472,6 +472,19 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     extra_mounts: list[ExtraVFolderMountInfoGQL] = gql_field(
         description="Additional volume folder mounts."
     )
+    revision_preset_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "ID of the deployment-level preset that produced this "
+                "revision. ``None`` when the revision was created without a "
+                "preset, when the originating preset row has since been "
+                "deleted (SET NULL FK), or for legacy rows that predate "
+                "this field."
+            ),
+        ),
+        default=None,
+    )
     created_at: datetime = gql_field(description="Timestamp when the revision was created.")
 
     @gql_field(

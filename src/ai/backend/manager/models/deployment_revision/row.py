@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -203,6 +204,19 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         server_default="[]",
     )
 
+    # Deployment-level preset reference. ``NULL`` after the referenced
+    # preset row is deleted (SET NULL FK), and on legacy rows that
+    # predate this column. The materialised effects of the preset live
+    # on ``preset_values`` and the resolved configuration columns; this
+    # field exists so the original preset selection can be recovered
+    # when the client edits the revision.
+    revision_preset_id: Mapped[DeploymentPresetID | None] = mapped_column(
+        "revision_preset_id",
+        GUID(DeploymentPresetID),
+        sa.ForeignKey("deployment_revision_presets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     # Metadata
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -286,6 +300,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 PresetValueSpec(preset_id=pv.preset_id, value=pv.value)
                 for pv in (self.preset_values or [])
             ],
+            revision_preset_id=self.revision_preset_id,
         )
 
     def to_data(self) -> ModelRevisionData:
@@ -317,4 +332,5 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             image_id=self.image,
             model_definition=self.model_definition,
             extra_vfolder_mounts=list(self.extra_mounts),
+            revision_preset_id=self.revision_preset_id,
         )
