@@ -1121,6 +1121,34 @@ class ScopedPermissionConditions:
 
         return inner
 
+    @staticmethod
+    def by_operation_equals(operation: OperationType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation == operation
+
+        return inner
+
+    @staticmethod
+    def by_operation_not_equals(operation: OperationType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation != operation
+
+        return inner
+
+    @staticmethod
+    def by_operation_in(operations: Collection[OperationType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation.in_(list(operations))
+
+        return inner
+
+    @staticmethod
+    def by_operation_not_in(operations: Collection[OperationType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation.not_in(list(operations))
+
+        return inner
+
 
 class ObjectPermissionConditions:
     """Query conditions for object permissions."""

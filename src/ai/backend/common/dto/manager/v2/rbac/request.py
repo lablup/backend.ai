@@ -12,6 +12,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import (
+    OperationTypeFilter,
     OrderDirection,
     RBACElementTypeFilter,
     RoleSource,
@@ -231,10 +232,10 @@ RoleNestedFilter.model_rebuild()
 class PermissionNestedFilter(BaseRequestModel):
     """Nested filter for permissions within a role assignment."""
 
-    scope_id: str | None = None
+    scope_id: StringFilter | None = None
     scope_type: RBACElementTypeFilter | None = None
     entity_type: RBACElementTypeFilter | None = None
-    operation: str | None = None
+    operation: OperationTypeFilter | None = None
     AND: list[PermissionNestedFilter] | None = None
     OR: list[PermissionNestedFilter] | None = None
     NOT: list[PermissionNestedFilter] | None = None

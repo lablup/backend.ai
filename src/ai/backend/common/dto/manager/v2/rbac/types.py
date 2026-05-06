@@ -20,6 +20,7 @@ __all__ = (
     "EntityType",
     "OperationType",
     "OperationTypeDTO",
+    "OperationTypeFilter",
     "OrderDirection",
     "PermissionOrderField",
     "PermissionSummary",
@@ -182,6 +183,15 @@ class RBACElementTypeFilter(BaseRequestModel):
     in_: list[RBACElementTypeDTO] | None = None
     not_equals: RBACElementTypeDTO | None = None
     not_in: list[RBACElementTypeDTO] | None = None
+
+
+class OperationTypeFilter(BaseRequestModel):
+    """Filter for permission operation columns over ``OperationTypeDTO``."""
+
+    equals: OperationTypeDTO | None = None
+    in_: list[OperationTypeDTO] | None = None
+    not_equals: OperationTypeDTO | None = None
+    not_in: list[OperationTypeDTO] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):

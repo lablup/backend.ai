@@ -120,6 +120,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
+    OperationTypeFilter,
     RBACElementTypeDTO,
     RBACElementTypeFilter,
     RoleSourceDTO,
@@ -193,7 +194,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     EntityScopeConditions,
-    PermissionConditions,
     RoleConditions,
     ScopedPermissionConditions,
 )
@@ -1249,6 +1249,32 @@ class RBACAdapter(BaseAdapter):
             conditions.append(not_in_factory([RBACElementType(v.value) for v in f.not_in]))
         return conditions
 
+    @staticmethod
+    def _convert_operation_type_filter(
+        f: OperationTypeFilter,
+        *,
+        equals_factory: Callable[[InternalOperationType], QueryCondition],
+        not_equals_factory: Callable[[InternalOperationType], QueryCondition],
+        in_factory: Callable[[Collection[InternalOperationType]], QueryCondition],
+        not_in_factory: Callable[[Collection[InternalOperationType]], QueryCondition],
+    ) -> list[QueryCondition]:
+        """Translate an ``OperationTypeFilter`` (equals / in / not_equals / not_in)
+        into ``QueryCondition`` instances using factory callables.
+
+        DTO values are converted to the internal ``OperationType`` enum before
+        being passed to the factories.
+        """
+        conditions: list[QueryCondition] = []
+        if f.equals is not None:
+            conditions.append(equals_factory(InternalOperationType(f.equals.value)))
+        if f.not_equals is not None:
+            conditions.append(not_equals_factory(InternalOperationType(f.not_equals.value)))
+        if f.in_:
+            conditions.append(in_factory([InternalOperationType(v.value) for v in f.in_]))
+        if f.not_in:
+            conditions.append(not_in_factory([InternalOperationType(v.value) for v in f.not_in]))
+        return conditions
+
     def _convert_permission_filter(self, f: PermissionFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.role_id is not None:
@@ -1477,7 +1503,16 @@ class RBACAdapter(BaseAdapter):
     ) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
         if f.scope_id is not None:
-            raw_conditions.append(PermissionConditions.by_scope_id(f.scope_id))
+            condition = self.convert_string_filter(
+                f.scope_id,
+                contains_factory=ScopedPermissionConditions.by_scope_id_contains,
+                equals_factory=ScopedPermissionConditions.by_scope_id_equals,
+                starts_with_factory=ScopedPermissionConditions.by_scope_id_starts_with,
+                ends_with_factory=ScopedPermissionConditions.by_scope_id_ends_with,
+                in_factory=ScopedPermissionConditions.by_scope_id_in,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
         if f.scope_type is not None:
             raw_conditions.extend(
                 self._convert_rbac_element_type_filter(
@@ -1499,8 +1534,15 @@ class RBACAdapter(BaseAdapter):
                 )
             )
         if f.operation is not None:
-            operation = InternalOperationType(f.operation)
-            raw_conditions.append(PermissionConditions.by_operations([operation]))
+            raw_conditions.extend(
+                self._convert_operation_type_filter(
+                    f.operation,
+                    equals_factory=ScopedPermissionConditions.by_operation_equals,
+                    not_equals_factory=ScopedPermissionConditions.by_operation_not_equals,
+                    in_factory=ScopedPermissionConditions.by_operation_in,
+                    not_in_factory=ScopedPermissionConditions.by_operation_not_in,
+                )
+            )
         conditions: list[QueryCondition] = []
         if raw_conditions:
             conditions.append(AssignedUserConditions.exists_permission_combined(raw_conditions))

@@ -22,6 +22,7 @@ from .permission import (
     EntityActionInfoGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
+    OperationTypeFilterGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionEdge,
@@ -94,6 +95,7 @@ __all__ = [
     "RBACElementTypeGQL",
     "RBACElementTypeFilterGQL",
     "OperationTypeGQL",
+    "OperationTypeFilterGQL",
     "PermissionOrderField",
     # Role enums
     "RoleSourceGQL",
