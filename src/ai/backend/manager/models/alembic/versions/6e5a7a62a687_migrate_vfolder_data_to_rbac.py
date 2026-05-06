@@ -1,11 +1,12 @@
 """migrate_vfolder_data_to_rbac
 
 Revision ID: 6e5a7a62a687
-Revises: ba5923b1f4a7
+Revises: 46e007d9b237
 Create Date: 2026-05-01 00:00:00.000000
 
 """
 
+import logging
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -14,9 +15,11 @@ from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "6e5a7a62a687"
-down_revision = "ba5923b1f4a7"
+down_revision = "46e007d9b237"
 branch_labels = None
 depends_on = None
+
+logger = logging.getLogger("alembic.runtime.migration")
 
 # Part of: 26.5.0
 
@@ -172,8 +175,14 @@ def _seed_invitation_grants(db_conn: Connection) -> None:
         for row in rows:
             ops = MOUNT_PERMISSION_TO_OPERATIONS.get(row.mount_permission)
             if not ops:
-                # Unknown mount permission value — skip silently rather than
-                # fail the migration.
+                logger.warning(
+                    "Skipping vfolder_permissions row %s: unknown mount permission %r"
+                    " (vfolder=%s, role=%s)",
+                    row.row_id,
+                    row.mount_permission,
+                    row.vfolder_id,
+                    row.role_id,
+                )
                 continue
             for operation in ops:
                 values_list.append({
