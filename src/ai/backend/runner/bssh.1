@@ -1,6 +1,6 @@
 .\" Manpage for bssh
 .\" Contact the maintainers to correct errors or typos.
-.TH BSSH 1 "April 2026" "v2.1.2" "bssh Manual"
+.TH BSSH 1 "April 2026" "v2.1.3" "bssh Manual"
 
 .SH NAME
 bssh \- Broadcast SSH - SSH-compatible client with parallel execution capabilities
@@ -1844,26 +1844,6 @@ Backend.AI node role (main/sub)
 SSH agent socket path. When set, bssh can automatically detect and use
 the SSH agent for authentication without specifying the -A flag
 
-.SH AUTHOR
-Written by Jeongkyu Shin and the Lablup team.
-.br
-Developed and maintained as part of the Backend.AI project.
-
-.SH REPORTING BUGS
-Report bugs to: https://github.com/lablup/bssh/issues
-
-.SH COPYRIGHT
-Copyright � 2025 Lablup Inc. and Jeongkyu Shin
-.br
-Licensed under the Apache License, Version 2.0
-
-.SH SEE ALSO
-.BR ssh (1),
-.BR scp (1),
-.BR sftp (1),
-.BR ssh-agent (1),
-.BR ssh-keygen (1)
-
 .SH NOTES
 .SS Breaking Changes (v0.5.3+)
 .TP
@@ -1928,6 +1908,29 @@ File transfers use SFTP protocol which provides secure and reliable transfers.
 The parallel transfer capability allows simultaneous uploads/downloads to multiple nodes,
 significantly reducing total transfer time for cluster-wide file distribution or collection.
 
-For more information and documentation, visit:
+.SH REPORTING BUGS
+Report bugs to: https://github.com/lablup/bssh/issues
+
+.SH AUTHORS
+Written by Jeongkyu Shin <inureyes@gmail.com> and the Lablup team.
 .br
-https://github.com/lablup/bssh
+Developed and maintained as part of the Backend.AI project.
+
+.SH COPYRIGHT
+Copyright (C) 2025 Lablup Inc. and Jeongkyu Shin.
+.br
+License: Apache-2.0
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+.SH SEE ALSO
+.BR ssh (1),
+.BR scp (1),
+.BR sftp (1),
+.BR ssh-agent (1),
+.BR ssh-keygen (1),
+.BR bssh-keygen (1),
+.BR bssh-server (8)
+
+Project homepage: https://github.com/lablup/bssh
