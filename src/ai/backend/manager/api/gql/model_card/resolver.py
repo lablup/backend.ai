@@ -38,8 +38,6 @@ from ai.backend.manager.api.gql.model_card.types import (
     CreateModelCardPayloadGQL,
     DeleteModelCardOptionsGQL,
     DeleteModelCardPayloadGQL,
-    DeleteModelCardsInputGQL,
-    DeleteModelCardsPayloadGQL,
     DeployModelCardInputGQL,
     DeployModelCardPayloadGQL,
     ModelCardAvailablePresetsScopeGQL,
@@ -164,29 +162,6 @@ async def admin_delete_model_card_v2(
     options_dto = options.to_pydantic() if options is not None else DeleteModelCardOptions()
     payload = await info.context.adapters.model_card.delete(id, options=options_dto)
     return DeleteModelCardPayloadGQL.from_pydantic(payload)
-
-
-@gql_mutation(
-    BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Delete multiple model cards (admin only).",
-    ),
-    deprecation_reason=(
-        "Use admin_bulk_delete_model_cards_v2 instead, which surfaces per-card "
-        "success/failure breakdown."
-    ),
-)
-async def admin_delete_model_cards_v2(
-    info: Info[StrawberryGQLContext],
-    input: DeleteModelCardsInputGQL,
-) -> DeleteModelCardsPayloadGQL:
-    check_admin_only()
-    ctx = info.context
-    dto = input.to_pydantic()
-    payload = await ctx.adapters.model_card.delete_many(
-        dto, dto.options or DeleteModelCardOptions()
-    )
-    return DeleteModelCardsPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(

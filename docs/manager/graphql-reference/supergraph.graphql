@@ -4724,25 +4724,6 @@ type DeleteModelCardPayloadGQL
   id: UUID!
 }
 
-"""Added in 26.4.2. Input for deleting multiple model cards."""
-input DeleteModelCardsV2Input
-  @join__type(graph: STRAWBERRY)
-{
-  """List of model card UUIDs to delete."""
-  ids: [UUID!]!
-
-  """Added in UNRELEASED. Options for the delete operation."""
-  options: DeleteModelCardV2Options = null
-}
-
-"""Added in 26.4.2. Payload for bulk model card deletion (deprecated)."""
-type DeleteModelCardsV2Payload
-  @join__type(graph: STRAWBERRY)
-{
-  """Number of model cards successfully deleted."""
-  deletedCount: Int!
-}
-
 """Added in UNRELEASED. Options for the model card delete operation."""
 input DeleteModelCardV2Options
   @join__type(graph: STRAWBERRY)
@@ -11328,9 +11309,6 @@ type Mutation
 
   """Added in 26.4.2. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.4.2. Delete multiple model cards (admin only)."""
-  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_bulk_delete_model_cards_v2 instead, which surfaces per-card success/failure breakdown.")
 
   """
   Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.

@@ -3051,21 +3051,6 @@ input DeleteModelCardV2Options {
   deleteAssociatedVfolder: Boolean! = false
 }
 
-"""Added in 26.4.2. Input for deleting multiple model cards."""
-input DeleteModelCardsV2Input {
-  """List of model card UUIDs to delete."""
-  ids: [UUID!]!
-
-  """Added in UNRELEASED. Options for the delete operation."""
-  options: DeleteModelCardV2Options = null
-}
-
-"""Added in 26.4.2. Payload for bulk model card deletion (deprecated)."""
-type DeleteModelCardsV2Payload {
-  """Number of model cards successfully deleted."""
-  deletedCount: Int!
-}
-
 """Added in 24.09.0. Input for deleting a notification channel"""
 input DeleteNotificationChannelInput {
   id: ID!
@@ -7249,9 +7234,6 @@ type Mutation {
 
   """Added in 26.4.2. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL!
-
-  """Added in 26.4.2. Delete multiple model cards (admin only)."""
-  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload! @deprecated(reason: "Use admin_bulk_delete_model_cards_v2 instead, which surfaces per-card success/failure breakdown.")
 
   """
   Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.

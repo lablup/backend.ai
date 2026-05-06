@@ -28,9 +28,6 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     DeleteModelCardOptions as DeleteOptionsDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
-    DeleteModelCardsInput as DeleteCardsInputDTO,
-)
-from ai.backend.common.dto.manager.v2.model_card.request import (
     DeployModelCardInput as DeployInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
@@ -53,9 +50,6 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeleteModelCardPayload as DeletePayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.model_card.response import (
-    DeleteModelCardsPayload as DeleteCardsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeployModelCardPayload as DeployPayloadDTO,
@@ -565,36 +559,6 @@ class DeleteModelCardOptionsGQL(PydanticInputMixin[DeleteOptionsDTO]):
         ),
         default=False,
     )
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Input for deleting multiple model cards.",
-    ),
-    name="DeleteModelCardsV2Input",
-)
-class DeleteModelCardsInputGQL(PydanticInputMixin[DeleteCardsInputDTO]):
-    ids: list[UUID] = gql_field(description="List of model card UUIDs to delete.")
-    options: DeleteModelCardOptionsGQL | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Options for the delete operation.",
-        ),
-        default=None,
-    )
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Payload for bulk model card deletion (deprecated).",
-    ),
-    model=DeleteCardsPayloadDTO,
-    name="DeleteModelCardsV2Payload",
-)
-class DeleteModelCardsPayloadGQL(PydanticOutputMixin[DeleteCardsPayloadDTO]):
-    deleted_count: int = gql_field(description="Number of model cards successfully deleted.")
 
 
 @gql_pydantic_input(
