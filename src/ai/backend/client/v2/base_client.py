@@ -464,11 +464,10 @@ class BackendAIAnonymousClient:
 
 
 class BackendAIAppProxyClient:
-    """HTTP client for direct-to-deployment endpoints fronted by Backend.AI's app-proxy.
+    """HTTP client for endpoints fronted by Backend.AI's app-proxy.
 
-    Targets the deployment runtime's own HTTP surface with an optional
-    ``Authorization: Bearer <token>`` header; the endpoint URL is supplied
-    per-request, not via :attr:`ClientConfig.endpoint`.
+    Uses an optional ``Authorization: Bearer <token>`` header; the target
+    URL is supplied per-request, not via :attr:`ClientConfig.endpoint`.
     """
 
     _config: ClientConfig
