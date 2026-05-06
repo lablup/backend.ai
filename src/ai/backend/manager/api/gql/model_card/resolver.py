@@ -173,7 +173,7 @@ async def admin_delete_model_card_v2(
 async def admin_bulk_delete_model_cards_v2(
     info: Info[StrawberryGQLContext],
     input: BulkDeleteModelCardsV2InputGQL,
-) -> BulkDeleteModelCardsV2PayloadGQL:
+) -> BulkDeleteModelCardsV2PayloadGQL | None:
     check_admin_only()
     ctx = info.context
     dto = input.to_pydantic()

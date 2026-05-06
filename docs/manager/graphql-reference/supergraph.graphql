@@ -11313,7 +11313,7 @@ type Mutation
   """
   Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
   """
-  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload! @join__field(graph: STRAWBERRY)
+  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
