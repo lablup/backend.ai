@@ -141,7 +141,7 @@ class V2VFolderClient(BaseDomainClient):
     ) -> PurgeVFolderPayload:
         """Permanently delete a vfolder, optionally cascading linked model cards."""
         if request is None:
-            request = PurgeVFolderInput(id=vfolder_id)
+            request = PurgeVFolderInput()
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/{vfolder_id}/purge",

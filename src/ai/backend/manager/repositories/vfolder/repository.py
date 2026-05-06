@@ -132,10 +132,10 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
 from ai.backend.manager.repositories.vfolder.types import (
-    BulkVFolderPurgeFailure,
     BulkVFolderPurgeResult,
     ProjectVFolderSearchScope,
     UserVFolderSearchScope,
+    VFolderPurgeFailure,
 )
 
 vfolder_repository_resilience = Resilience(
@@ -704,7 +704,7 @@ class VfolderRepository:
                 for rec in records:
                     if rec.model_card_rows and not cascade_model_card:
                         result.failures.append(
-                            BulkVFolderPurgeFailure(
+                            VFolderPurgeFailure(
                                 vfolder_id=rec.vfolder_row.id,
                                 exception=VFolderHasLinkedModelCard(
                                     f"VFolder {rec.vfolder_row.id} is referenced by "

@@ -40,6 +40,9 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     MoveFileInput as MoveFileInputDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PurgeVFolderOptions as PurgeVFolderOptionsDTO,
+)
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
 )
@@ -441,17 +444,33 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version="26.4.2",
+        description="Optional behavior flags for vfolder purge operations.",
+    ),
+    name="PurgeVFolderOptionsInput",
+)
+class PurgeVFolderOptionsInputGQL(PydanticInputMixin[PurgeVFolderOptionsDTO]):
+    cascade_model_card: bool = gql_field(
+        default=False,
+        description=(
+            "If true, also delete model card record(s) referencing the vfolder. "
+            "If false, the request is rejected when any model card still references it."
+        ),
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.4.2",
         description="Input for permanently purging multiple virtual folders.",
     ),
     name="BulkPurgeVFoldersV2Input",
 )
 class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
     ids: list[UUID] = gql_field(description="List of VFolder UUIDs to purge.")
-    cascade_model_card: bool = gql_field(
-        default=False,
+    options: PurgeVFolderOptionsInputGQL = gql_field(
         description=(
-            "If true, also delete model card record(s) referencing the vfolders. "
-            "If false, the request is rejected per-vfolder when any model card still references one."
+            "Optional behavior flags applied to every vfolder in the batch. "
+            "Defaults to all-false when omitted."
         ),
     )
 

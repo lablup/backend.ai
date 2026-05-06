@@ -18,15 +18,15 @@ from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
-    "BulkVFolderPurgeFailure",
     "BulkVFolderPurgeResult",
     "ProjectVFolderSearchScope",
     "UserVFolderSearchScope",
+    "VFolderPurgeFailure",
 )
 
 
 @dataclass(frozen=True)
-class BulkVFolderPurgeFailure:
+class VFolderPurgeFailure:
     """A single vfolder that failed to purge in a bulk repository call."""
 
     vfolder_id: UUID
@@ -38,7 +38,7 @@ class BulkVFolderPurgeResult:
     """Partial-success result of ``delete_vfolders_forever``."""
 
     succeeded: list[VFolderData] = field(default_factory=list)
-    failures: list[BulkVFolderPurgeFailure] = field(default_factory=list)
+    failures: list[VFolderPurgeFailure] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
