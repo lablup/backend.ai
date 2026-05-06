@@ -38,6 +38,4 @@ class BulkDeleteModelCardActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> str | None:
-        for card_id in self.data.successes:
-            return str(card_id)
         return None
