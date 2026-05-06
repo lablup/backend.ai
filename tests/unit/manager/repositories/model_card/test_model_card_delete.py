@@ -6,7 +6,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 import pytest
 import sqlalchemy as sa
@@ -23,6 +23,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.data.permission.types import RBACElementRef, RBACElementType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
@@ -68,6 +69,10 @@ class DeleteCase:
     options: DeleteModelCardOptions
     expects_sibling_deleted: bool
     expects_vfolder_status: VFolderOperationStatus
+
+
+class _MakeCardFn(Protocol):
+    async def __call__(self, *, vfolder_id: VFolderUUID | None = None) -> ModelCardData: ...
 
 
 _DELETE_CASES = [
@@ -261,42 +266,48 @@ class TestModelCardDelete:
     ) -> ModelCardDBSource:
         return ModelCardDBSource(db_with_cleanup)
 
-    def _build_creator(
+    @pytest.fixture
+    def make_card(
         self,
-        *,
+        db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
         test_group: GroupRow,
         test_vfolder: VFolderRow,
-        vfolder_id: VFolderUUID | None = None,
-    ) -> RBACEntityCreator[ModelCardRow]:
-        return RBACEntityCreator(
-            spec=ModelCardCreatorSpec(
-                name=f"test-model-{uuid.uuid4().hex[:8]}",
-                vfolder_id=vfolder_id if vfolder_id is not None else test_vfolder.id,
-                domain=test_domain.name,
-                project_id=test_group.id,
-                creator_id=test_user.uuid,
-                author=None,
-                title=None,
-                model_version=None,
-                description=None,
-                task=None,
-                category=None,
-                architecture=None,
-                framework=[],
-                label=[],
-                license=None,
-                min_resource=[],
-                readme=None,
-                access_level="internal",
-            ),
-            element_type=RBACElementType.MODEL_CARD,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.PROJECT,
-                element_id=str(test_group.id),
-            ),
-        )
+    ) -> _MakeCardFn:
+        """Factory that creates a model card on ``test_vfolder`` (or an override vfolder)."""
+
+        async def _make(*, vfolder_id: VFolderUUID | None = None) -> ModelCardData:
+            creator: RBACEntityCreator[ModelCardRow] = RBACEntityCreator(
+                spec=ModelCardCreatorSpec(
+                    name=f"test-model-{uuid.uuid4().hex[:8]}",
+                    vfolder_id=vfolder_id if vfolder_id is not None else test_vfolder.id,
+                    domain=test_domain.name,
+                    project_id=test_group.id,
+                    creator_id=test_user.uuid,
+                    author=None,
+                    title=None,
+                    model_version=None,
+                    description=None,
+                    task=None,
+                    category=None,
+                    architecture=None,
+                    framework=[],
+                    label=[],
+                    license=None,
+                    min_resource=[],
+                    readme=None,
+                    access_level="internal",
+                ),
+                element_type=RBACElementType.MODEL_CARD,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.PROJECT,
+                    element_id=str(test_group.id),
+                ),
+            )
+            return await db_source.create(creator)
+
+        return _make
 
     @pytest.mark.parametrize("case", _DELETE_CASES)
     async def test_delete(
@@ -304,27 +315,11 @@ class TestModelCardDelete:
         case: DeleteCase,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
-        test_domain: DomainRow,
-        test_user: UserRow,
-        test_group: GroupRow,
+        make_card: _MakeCardFn,
         test_vfolder: VFolderRow,
     ) -> None:
-        target = await db_source.create(
-            self._build_creator(
-                test_domain=test_domain,
-                test_user=test_user,
-                test_group=test_group,
-                test_vfolder=test_vfolder,
-            )
-        )
-        sibling = await db_source.create(
-            self._build_creator(
-                test_domain=test_domain,
-                test_user=test_user,
-                test_group=test_group,
-                test_vfolder=test_vfolder,
-            )
-        )
+        target = await make_card()
+        sibling = await make_card()
         assert target.vfolder_id == sibling.vfolder_id
 
         await db_source.delete(
@@ -358,28 +353,11 @@ class TestModelCardDelete:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
-        test_domain: DomainRow,
-        test_user: UserRow,
-        test_group: GroupRow,
-        test_vfolder: VFolderRow,
+        make_card: _MakeCardFn,
     ) -> None:
         """A nonexistent ID must surface as a single failure without aborting the rest."""
-        valid_a = await db_source.create(
-            self._build_creator(
-                test_domain=test_domain,
-                test_user=test_user,
-                test_group=test_group,
-                test_vfolder=test_vfolder,
-            )
-        )
-        valid_b = await db_source.create(
-            self._build_creator(
-                test_domain=test_domain,
-                test_user=test_user,
-                test_group=test_group,
-                test_vfolder=test_vfolder,
-            )
-        )
+        valid_a = await make_card()
+        valid_b = await make_card()
         missing_id = uuid.uuid4()
 
         result = await db_source.bulk_delete(
@@ -412,6 +390,7 @@ class TestModelCardDelete:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
+        make_card: _MakeCardFn,
         test_domain: DomainRow,
         test_user: UserRow,
         test_group: GroupRow,
@@ -455,23 +434,8 @@ class TestModelCardDelete:
             db_sess.add(mount_holder)
             await db_sess.flush()
 
-        free_card = await db_source.create(
-            self._build_creator(
-                test_domain=test_domain,
-                test_user=test_user,
-                test_group=test_group,
-                test_vfolder=test_vfolder,
-            )
-        )
-        mounted_card = await db_source.create(
-            self._build_creator(
-                test_domain=test_domain,
-                test_user=test_user,
-                test_group=test_group,
-                test_vfolder=test_vfolder,
-                vfolder_id=mounted_vfolder_id,
-            )
-        )
+        free_card = await make_card()
+        mounted_card = await make_card(vfolder_id=mounted_vfolder_id)
 
         result = await db_source.bulk_delete(
             [
