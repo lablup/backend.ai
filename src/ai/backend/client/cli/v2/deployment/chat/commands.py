@@ -191,7 +191,7 @@ def chat(
                 # hint instead of silently re-sending a stale key. Other
                 # BackendAPIErrors fall through to ``_run_async`` which formats
                 # the manager-style status/title/msg payload generically.
-                if token is not None and chat_config.pop_token(deployment_id):
+                if token is not None and chat_config.clear_token(deployment_id):
                     chat_config.save()
                 raise click.ClickException(
                     f"The inference endpoint rejected the configured token for "
@@ -305,7 +305,7 @@ def clear(deployment_id: DeploymentID) -> None:
     ``./bai deployment chat-cache clear`` to drop it immediately.
     """
     config = DeploymentChatConfig.load()
-    if config.pop(deployment_id):
+    if config.delete(deployment_id):
         config.save()
         print(f"Removed config entry for deployment {deployment_id}.")
     else:
@@ -350,7 +350,7 @@ def cache_clear(deployment_id: DeploymentID) -> None:
     user-managed config entry (token + model) is left alone.
     """
     cache = DeploymentChatCache.load()
-    if cache.pop(deployment_id):
+    if cache.delete(deployment_id):
         cache.save()
         print(f"Removed cache entry for deployment {deployment_id}.")
     else:

@@ -66,20 +66,20 @@ class TestCacheMutations:
         assert stored is not None
         assert stored.default_model == "m2"
 
-    def test_pop_returns_true_when_present(
+    def test_delete_returns_true_when_present(
         self,
         cache: DeploymentChatCache,
         cache_entry: DeploymentChatCacheEntry,
         deployment_id: UUID,
     ) -> None:
         cache.set(deployment_id, cache_entry)
-        assert cache.pop(deployment_id) is True
+        assert cache.delete(deployment_id) is True
         assert cache.get(deployment_id) is None
 
-    def test_pop_returns_false_when_absent(
+    def test_delete_returns_false_when_absent(
         self, cache: DeploymentChatCache, deployment_id: UUID
     ) -> None:
-        assert cache.pop(deployment_id) is False
+        assert cache.delete(deployment_id) is False
 
 
 class TestConfigTokenStore:
@@ -96,24 +96,24 @@ class TestConfigTokenStore:
         chat_config.set_token(deployment_id, "sk-new")
         assert chat_config.get_token(deployment_id) == "sk-new"
 
-    def test_pop_token_returns_true_when_present(
+    def test_clear_token_returns_true_when_present(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
         chat_config.set_token(deployment_id, "sk-x")
-        assert chat_config.pop_token(deployment_id) is True
+        assert chat_config.clear_token(deployment_id) is True
         assert chat_config.get_token(deployment_id) is None
 
-    def test_pop_token_returns_false_when_absent(
+    def test_clear_token_returns_false_when_absent(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
-        assert chat_config.pop_token(deployment_id) is False
+        assert chat_config.clear_token(deployment_id) is False
 
-    def test_pop_token_keeps_entry_when_model_remains(
+    def test_clear_token_keeps_entry_when_model_remains(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
         chat_config.set_token(deployment_id, "sk-x")
         chat_config.set_model(deployment_id, "llama-3-8b")
-        assert chat_config.pop_token(deployment_id) is True
+        assert chat_config.clear_token(deployment_id) is True
         # Model side of the entry survives token removal.
         entry = chat_config.get(deployment_id)
         assert entry is not None
@@ -135,17 +135,17 @@ class TestConfigModelStore:
         chat_config.set_model(deployment_id, "new-model")
         assert chat_config.get_model(deployment_id) == "new-model"
 
-    def test_pop_model_returns_true_when_present(
+    def test_clear_model_returns_true_when_present(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
         chat_config.set_model(deployment_id, "llama-3-8b")
-        assert chat_config.pop_model(deployment_id) is True
+        assert chat_config.clear_model(deployment_id) is True
         assert chat_config.get_model(deployment_id) is None
 
-    def test_pop_model_returns_false_when_absent(
+    def test_clear_model_returns_false_when_absent(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
-        assert chat_config.pop_model(deployment_id) is False
+        assert chat_config.clear_model(deployment_id) is False
 
     def test_token_and_model_share_one_entry(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
@@ -156,19 +156,19 @@ class TestConfigModelStore:
         assert entry == DeploymentChatConfigEntry(token="sk-x", model="llama-3-8b")
 
 
-class TestConfigPop:
-    def test_pop_removes_whole_entry(
+class TestConfigDelete:
+    def test_delete_removes_whole_entry(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
         chat_config.set_token(deployment_id, "sk-x")
         chat_config.set_model(deployment_id, "llama-3-8b")
-        assert chat_config.pop(deployment_id) is True
+        assert chat_config.delete(deployment_id) is True
         assert chat_config.get(deployment_id) is None
 
-    def test_pop_returns_false_when_absent(
+    def test_delete_returns_false_when_absent(
         self, chat_config: DeploymentChatConfig, deployment_id: UUID
     ) -> None:
-        assert chat_config.pop(deployment_id) is False
+        assert chat_config.delete(deployment_id) is False
 
 
 class TestHistoryAppendSlice:

@@ -59,7 +59,8 @@ class DeploymentChatCache(BaseModel):
     def set(self, deployment_id: DeploymentID, entry: DeploymentChatCacheEntry) -> None:
         self.deployments[deployment_id] = entry
 
-    def pop(self, deployment_id: DeploymentID) -> bool:
+    def delete(self, deployment_id: DeploymentID) -> bool:
+        """Remove the cache entry for ``deployment_id``; return True when an entry was removed."""
         return self.deployments.pop(deployment_id, None) is not None
 
     @classmethod
@@ -124,7 +125,11 @@ class DeploymentChatConfig(BaseModel):
     def set_model(self, deployment_id: DeploymentID, model: str) -> None:
         self.deployments[deployment_id].model = model
 
-    def pop_token(self, deployment_id: DeploymentID) -> bool:
+    def clear_token(self, deployment_id: DeploymentID) -> bool:
+        """Null the token field for ``deployment_id``; return True when a token was cleared.
+
+        Drops the entry entirely if both ``token`` and ``model`` end up unset.
+        """
         entry = self.deployments.get(deployment_id)
         if entry is None or entry.token is None:
             return False
@@ -133,7 +138,11 @@ class DeploymentChatConfig(BaseModel):
             del self.deployments[deployment_id]
         return True
 
-    def pop_model(self, deployment_id: DeploymentID) -> bool:
+    def clear_model(self, deployment_id: DeploymentID) -> bool:
+        """Null the model field for ``deployment_id``; return True when a model was cleared.
+
+        Drops the entry entirely if both ``token`` and ``model`` end up unset.
+        """
         entry = self.deployments.get(deployment_id)
         if entry is None or entry.model is None:
             return False
@@ -142,7 +151,8 @@ class DeploymentChatConfig(BaseModel):
             del self.deployments[deployment_id]
         return True
 
-    def pop(self, deployment_id: DeploymentID) -> bool:
+    def delete(self, deployment_id: DeploymentID) -> bool:
+        """Remove the config entry for ``deployment_id``; return True when an entry was removed."""
         return self.deployments.pop(deployment_id, None) is not None
 
     @classmethod
