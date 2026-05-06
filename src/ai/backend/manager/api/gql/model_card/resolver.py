@@ -183,7 +183,7 @@ async def admin_delete_model_cards_v2(
     check_admin_only()
     ctx = info.context
     dto = input.to_pydantic()
-    payload = await ctx.adapters.model_card.bulk_delete(
+    payload = await ctx.adapters.model_card.delete_many(
         dto, dto.options or DeleteModelCardOptions()
     )
     return DeleteModelCardsPayloadGQL.from_pydantic(payload)

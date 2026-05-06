@@ -81,7 +81,7 @@ class V2ModelCardClient(BaseDomainClient):
             response_model=DeleteModelCardPayload,
         )
 
-    async def bulk_delete(self, request: DeleteModelCardsInput) -> DeleteModelCardsPayload:
+    async def delete_many(self, request: DeleteModelCardsInput) -> DeleteModelCardsPayload:
         """Deprecated: use :meth:`admin_bulk_delete` for per-card failure details."""
         return await self._client.typed_request(
             "POST",

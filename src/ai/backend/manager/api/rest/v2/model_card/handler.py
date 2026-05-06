@@ -82,12 +82,12 @@ class V2ModelCardHandler:
         result = await self._adapter.delete(path.parsed.card_id, options=query.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def bulk_delete(
+    async def delete_many(
         self,
         body: BodyParam[DeleteModelCardsInput],
     ) -> APIResponse:
         """Deprecated: use :meth:`admin_bulk_delete` to receive per-card failure details."""
-        result = await self._adapter.bulk_delete(
+        result = await self._adapter.delete_many(
             body.parsed, body.parsed.options or DeleteModelCardOptions()
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
