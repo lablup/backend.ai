@@ -1344,6 +1344,35 @@ type BulkCreateUsersV2Payload {
   failed: [BulkCreateUserV2Error!]!
 }
 
+"""
+Added in UNRELEASED. Error information for a model card that failed during bulk deletion.
+"""
+type BulkDeleteModelCardV2Error {
+  """UUID of the model card that failed to delete."""
+  cardId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in UNRELEASED. Input for bulk-deleting multiple model cards."""
+input BulkDeleteModelCardsV2Input {
+  """List of model card UUIDs to delete."""
+  ids: [UUID!]!
+
+  """Options for the delete operation."""
+  options: DeleteModelCardV2Options = null
+}
+
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
+type BulkDeleteModelCardsV2Payload {
+  """UUIDs of model cards that were successfully deleted."""
+  successes: [UUID!]!
+
+  """List of errors for model cards that failed to delete."""
+  failed: [BulkDeleteModelCardV2Error!]!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input {
   """List of VFolder UUIDs to soft-delete."""
@@ -3039,21 +3068,6 @@ input DeleteModelCardV2Options {
   If true, also soft-delete (move to trash) the model VFolder(s) associated with the deleted model card(s).
   """
   deleteAssociatedVfolder: Boolean! = false
-}
-
-"""Added in 26.4.2. Input for deleting multiple model cards."""
-input DeleteModelCardsV2Input {
-  """List of model card UUIDs to delete."""
-  ids: [UUID!]!
-
-  """Added in UNRELEASED. Options for the delete operation."""
-  options: DeleteModelCardV2Options = null
-}
-
-"""Added in 26.4.2. Payload for bulk model card deletion."""
-type DeleteModelCardsV2Payload {
-  """Number of model cards successfully deleted."""
-  deletedCount: Int!
 }
 
 """Added in 24.09.0. Input for deleting a notification channel"""
@@ -7253,8 +7267,10 @@ type Mutation {
   """Added in 26.4.2. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL!
 
-  """Added in 26.4.2. Delete multiple model cards (admin only)."""
-  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload!
+  """
+  Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
+  """
+  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload
 
   """
   Added in 26.4.2. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.

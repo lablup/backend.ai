@@ -1,7 +1,7 @@
 from .resolver import (
+    admin_bulk_delete_model_cards_v2,
     admin_create_model_card_v2,
     admin_delete_model_card_v2,
-    admin_delete_model_cards_v2,
     admin_model_cards_v2,
     admin_update_model_card_v2,
     deploy_model_card_v2,
@@ -12,9 +12,9 @@ from .resolver import (
 )
 
 __all__ = (
+    "admin_bulk_delete_model_cards_v2",
     "admin_create_model_card_v2",
     "admin_delete_model_card_v2",
-    "admin_delete_model_cards_v2",
     "admin_model_cards_v2",
     "admin_update_model_card_v2",
     "deploy_model_card_v2",

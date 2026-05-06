@@ -1951,6 +1951,41 @@ input BulkCreateUserV2Input
   users: [CreateUserV2Input!]!
 }
 
+"""Added in UNRELEASED. Input for bulk-deleting multiple model cards."""
+input BulkDeleteModelCardsV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """List of model card UUIDs to delete."""
+  ids: [UUID!]!
+
+  """Options for the delete operation."""
+  options: DeleteModelCardV2Options = null
+}
+
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
+type BulkDeleteModelCardsV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """UUIDs of model cards that were successfully deleted."""
+  successes: [UUID!]!
+
+  """List of errors for model cards that failed to delete."""
+  failed: [BulkDeleteModelCardV2Error!]!
+}
+
+"""
+Added in UNRELEASED. Error information for a model card that failed during bulk deletion.
+"""
+type BulkDeleteModelCardV2Error
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the model card that failed to delete."""
+  cardId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input
   @join__type(graph: STRAWBERRY)
@@ -4708,25 +4743,6 @@ type DeleteModelCardPayloadGQL
 {
   """ID of the deleted model card."""
   id: UUID!
-}
-
-"""Added in 26.4.2. Input for deleting multiple model cards."""
-input DeleteModelCardsV2Input
-  @join__type(graph: STRAWBERRY)
-{
-  """List of model card UUIDs to delete."""
-  ids: [UUID!]!
-
-  """Added in UNRELEASED. Options for the delete operation."""
-  options: DeleteModelCardV2Options = null
-}
-
-"""Added in 26.4.2. Payload for bulk model card deletion."""
-type DeleteModelCardsV2Payload
-  @join__type(graph: STRAWBERRY)
-{
-  """Number of model cards successfully deleted."""
-  deletedCount: Int!
 }
 
 """Added in UNRELEASED. Options for the model card delete operation."""
@@ -11328,8 +11344,10 @@ type Mutation
   """Added in 26.4.2. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.2. Delete multiple model cards (admin only)."""
-  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload! @join__field(graph: STRAWBERRY)
+  """
+  Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
+  """
+  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.

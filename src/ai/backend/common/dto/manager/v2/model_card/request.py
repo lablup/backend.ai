@@ -119,8 +119,8 @@ class DeleteModelCardOptions(BaseRequestModel):
     )
 
 
-class DeleteModelCardsInput(BaseRequestModel):
-    """Input for deleting multiple model cards."""
+class BulkDeleteModelCardsInput(BaseRequestModel):
+    """Input for bulk-deleting multiple model cards."""
 
     ids: list[UUID] = Field(description="List of model card UUIDs to delete.")
     options: DeleteModelCardOptions | None = Field(

@@ -199,15 +199,15 @@ def delete(card_id: uuid.UUID) -> None:
 @model_card.command(name="bulk-delete")
 @click.argument("ids", nargs=-1, required=True, type=click.UUID)
 def bulk_delete(ids: tuple[uuid.UUID, ...]) -> None:
-    """Delete multiple model cards by ID."""
-    from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardsInput
+    """Delete multiple model cards by ID, returning per-card success/failure details."""
+    from ai.backend.common.dto.manager.v2.model_card.request import BulkDeleteModelCardsInput
 
-    input_dto = DeleteModelCardsInput(ids=list(ids))
+    input_dto = BulkDeleteModelCardsInput(ids=list(ids))
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.model_card.bulk_delete(input_dto)
+            result = await registry.model_card.admin_bulk_delete(input_dto)
             print_result(result)
         finally:
             await registry.close()
