@@ -16,11 +16,6 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 26.4.4rc3 (2026-05-06)
-
-### Fixes
-* Renormalize legacy hyphenated `start-command` keys in stored deployment model definitions to the canonical `start_command` form, splitting string values into argv tokens. ([#11497](https://github.com/lablup/backend.ai/issues/11497))
-
 
 ## 26.4.4rc3 (2026-05-06)
 
@@ -53,6 +48,7 @@ Changes
 * Add B-tree indexes on `association_scopes_entities (entity_type, entity_id)` and `permissions (scope_type, scope_id, entity_type)` to accelerate scope-walk and scope-first permission lookups. ([#11455](https://github.com/lablup/backend.ai/issues/11455))
 
 ### Fixes
+* Renormalize legacy hyphenated `start-command` keys in stored deployment model definitions to the canonical `start_command` form, splitting string values into argv tokens. ([#11497](https://github.com/lablup/backend.ai/issues/11497))
 * Send `Accept: application/json` from the manager's AppProxy client so endpoint create/delete failures return parseable JSON instead of HTML error pages. ([#11328](https://github.com/lablup/backend.ai/issues/11328))
 * Default the AppProxy coordinator's error responses to JSON so clients that omit the `Accept` header receive a structured `BackendAIError` body instead of an HTML page. ([#11329](https://github.com/lablup/backend.ai/issues/11329))
 * Keep CLI table column widths consistent when paginated list output spans multiple chunks. ([#11334](https://github.com/lablup/backend.ai/issues/11334))
