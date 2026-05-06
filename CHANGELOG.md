@@ -18,6 +18,12 @@ Changes
 
 ## 26.4.4rc3 (2026-05-06)
 
+### Fixes
+* Renormalize legacy hyphenated `start-command` keys in stored deployment model definitions to the canonical `start_command` form, splitting string values into argv tokens. ([#11497](https://github.com/lablup/backend.ai/issues/11497))
+
+
+## 26.4.4rc3 (2026-05-06)
+
 ### Breaking Changes
 * Drop the valkey-based deployment live_stat path; Endpoint.live_stat and Routing.live_stat GraphQL fields now raise DeprecatedAPI and clients must migrate to the new metric query path ([#11245](https://github.com/lablup/backend.ai/issues/11245))
 * Remove the `rowId` field from the Strawberry GQL Node types `RuntimeVariant`, `RuntimeVariantPreset`, and `DeploymentRevisionPreset`. Relay Node types now expose only the global `id` field; clients must derive the raw UUID by decoding `id` instead of selecting `rowId`. ([#11411](https://github.com/lablup/backend.ai/issues/11411))
