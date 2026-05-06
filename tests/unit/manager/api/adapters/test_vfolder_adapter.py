@@ -69,6 +69,7 @@ class TestVFolderAdapterMySearch:
             status=VFolderOperationStatus.READY,
             created_at=datetime.now(tz=UTC),
             last_used=None,
+            updated_at=datetime.now(tz=UTC),
             domain_name="default",
         )
 
@@ -162,6 +163,7 @@ class TestVFolderAdapterProjectSearch:
             status=VFolderOperationStatus.READY,
             created_at=datetime.now(tz=UTC),
             last_used=None,
+            updated_at=datetime.now(tz=UTC),
             domain_name="default",
         )
 

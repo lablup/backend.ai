@@ -609,6 +609,8 @@ class VfolderRepository:
                 vfolder_row.status = VFolderOperationStatus.DELETE_PENDING
 
             await session.flush()
+            for row in vfolder_rows:
+                await session.refresh(row, attribute_names=["updated_at"])
 
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
@@ -626,6 +628,8 @@ class VfolderRepository:
                     vfolder_rows.append(vfolder_row)
 
             await session.flush()
+            for row in vfolder_rows:
+                await session.refresh(row, attribute_names=["updated_at"])
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
     @vfolder_repository_resilience.apply()
@@ -1069,6 +1073,7 @@ class VfolderRepository:
             cur_size=row.cur_size or 0,
             created_at=row.created_at or datetime.now(UTC),
             last_used=row.last_used,
+            updated_at=row.updated_at,
             creator=row.creator,
             creator_id=row.creator_id,
             unmanaged_path=row.unmanaged_path,
@@ -1476,6 +1481,7 @@ class VfolderRepository:
             cur_size=vfolder_dict["cur_size"],
             created_at=vfolder_dict["created_at"],
             last_used=vfolder_dict["last_used"],
+            updated_at=vfolder_dict["updated_at"],
             creator=vfolder_dict["creator"],
             creator_id=vfolder_dict.get("creator_id"),
             unmanaged_path=vfolder_dict["unmanaged_path"],
