@@ -20,15 +20,15 @@ depends_on = None
 
 # Constants
 MEMBER_ROLE_PATTERN = "%member"
-ENTITY_TYPE = "session:app"
+ENTITY_TYPE = "session:app_service"
 USER_SCOPE_TYPE = "user"
 PROJECT_SCOPE_TYPE = "project"
 SESSION_SCOPE_TYPE = "session"
 READ_OPERATION = "read"
 
 # Sessions in these terminal/error states no longer expose a usable app
-# endpoint, so granting `session:app` permissions on them would be wasted
-# rows that never resolve at the runtime.
+# endpoint, so granting `session:app_service` permissions on them would be
+# wasted rows that never resolve at the runtime.
 DEAD_SESSION_STATUSES = ["TERMINATING", "TERMINATED", "CANCELLED", "ERROR"]
 
 
@@ -36,7 +36,7 @@ def _seed_user_session_grants(db_conn: Connection) -> None:
     """Per-entity grants for the session creator.
 
     For each live session created by user U, grant U's user-scope
-    ("system") role read on that specific `session:app` via the
+    ("system") role read on that specific `session:app_service` via the
     entity-as-scope pattern. Lands in the resolver's self-scope branch
     only — no leak via scope-walker.
     """
@@ -78,7 +78,7 @@ def _seed_project_session_grants(db_conn: Connection) -> None:
     """Per-entity grants for the project's owner/admin roles.
 
     For each live session in project P (sessions always carry group_id),
-    grant P's non-member roles read on that specific `session:app`.
+    grant P's non-member roles read on that specific `session:app_service`.
     """
     insert_query = sa.text("""
         WITH project_role_sessions AS (
@@ -124,9 +124,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Intentionally a no-op. Once the runtime starts using `session:app`,
+    # Intentionally a no-op. Once the runtime starts using `session:app_service`,
     # operators may grant/revoke additional permissions on this entity type.
-    # A blanket DELETE WHERE entity_type='session:app' would erase those
+    # A blanket DELETE WHERE entity_type='session:app_service' would erase those
     # operator-managed rows together with the seed, so this migration is
     # forward-only by design.
     pass
