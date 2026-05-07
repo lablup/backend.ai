@@ -449,6 +449,10 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             conditions.extend(
                 self.convert_or([self._convert_allocated_slot_filter(sub) for sub in filter_.OR])
             )
+        if filter_.NOT:
+            conditions.extend(
+                self.convert_not([self._convert_allocated_slot_filter(sub) for sub in filter_.NOT])
+            )
         return conditions
 
     def _convert_filter(self, filter_: DeploymentRevisionPresetFilter) -> list[QueryCondition]:
@@ -484,6 +488,8 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             conditions.extend(self.convert_and([self._convert_filter(sub) for sub in filter_.AND]))
         if filter_.OR:
             conditions.extend(self.convert_or([self._convert_filter(sub) for sub in filter_.OR]))
+        if filter_.NOT:
+            conditions.extend(self.convert_not([self._convert_filter(sub) for sub in filter_.NOT]))
         return conditions
 
     def _convert_orders(self, orders: list[DeploymentRevisionPresetOrder]) -> list[QueryOrder]:
