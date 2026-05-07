@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateRangeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import (
     DomainFairShareOrderField,
@@ -97,7 +98,7 @@ class UserFairShareUserNestedFilter(BaseRequestModel):
 # Filter models
 
 
-class DomainFairShareFilter(BaseRequestModel):
+class DomainFairShareFilter(BaseFilter):
     """Filter for domain fair share queries."""
 
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
@@ -105,16 +106,9 @@ class DomainFairShareFilter(BaseRequestModel):
     domain: DomainFairShareDomainNestedFilter | None = Field(
         default=None, description="Filter by domain entity properties"
     )
-    AND: list[DomainFairShareFilter] | None = Field(
-        default=None, description="Combine with AND logic"
-    )
-    OR: list[DomainFairShareFilter] | None = Field(
-        default=None, description="Combine with OR logic"
-    )
-    NOT: list[DomainFairShareFilter] | None = Field(default=None, description="Negate filters")
 
 
-class ProjectFairShareFilter(BaseRequestModel):
+class ProjectFairShareFilter(BaseFilter):
     """Filter for project fair share queries."""
 
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
@@ -123,16 +117,9 @@ class ProjectFairShareFilter(BaseRequestModel):
     project: ProjectFairShareProjectNestedFilter | None = Field(
         default=None, description="Filter by project entity properties"
     )
-    AND: list[ProjectFairShareFilter] | None = Field(
-        default=None, description="Combine with AND logic"
-    )
-    OR: list[ProjectFairShareFilter] | None = Field(
-        default=None, description="Combine with OR logic"
-    )
-    NOT: list[ProjectFairShareFilter] | None = Field(default=None, description="Negate filters")
 
 
-class UserFairShareFilter(BaseRequestModel):
+class UserFairShareFilter(BaseFilter):
     """Filter for user fair share queries."""
 
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
@@ -142,17 +129,6 @@ class UserFairShareFilter(BaseRequestModel):
     user: UserFairShareUserNestedFilter | None = Field(
         default=None, description="Filter by user entity properties"
     )
-    AND: list[UserFairShareFilter] | None = Field(
-        default=None, description="Combine with AND logic"
-    )
-    OR: list[UserFairShareFilter] | None = Field(default=None, description="Combine with OR logic")
-    NOT: list[UserFairShareFilter] | None = Field(default=None, description="Negate filters")
-
-
-# model_rebuild() required for self-referential fields
-DomainFairShareFilter.model_rebuild()
-ProjectFairShareFilter.model_rebuild()
-UserFairShareFilter.model_rebuild()
 
 
 class DomainUsageBucketFilter(BaseRequestModel):

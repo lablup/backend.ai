@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.typed_validators import VFolderName
@@ -332,7 +333,7 @@ class DeleteInvitationInput(BaseRequestModel):
 # ============================================================
 
 
-class VFolderFilter(BaseRequestModel):
+class VFolderFilter(BaseFilter):
     """Filter criteria for searching virtual folders."""
 
     name: StringFilter | None = Field(default=None, description="Filter by vfolder name.")
@@ -345,12 +346,6 @@ class VFolderFilter(BaseRequestModel):
     )
     cloneable: bool | None = Field(default=None, description="Filter by cloneable flag.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
-    AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
-    OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
-    NOT: list[VFolderFilter] | None = Field(default=None, description="NOT logical combinator.")
-
-
-VFolderFilter.model_rebuild()
 
 
 class VFolderOrder(BaseRequestModel):

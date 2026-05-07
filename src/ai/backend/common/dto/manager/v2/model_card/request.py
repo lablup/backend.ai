@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import BaseFilter, OrderDirection
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
@@ -72,7 +72,7 @@ class UpdateModelCardInput(BaseRequestModel):
     access_level: ModelCardAccessLevel | Sentinel | None = Field(default=SENTINEL)
 
 
-class ModelCardFilter(BaseRequestModel):
+class ModelCardFilter(BaseFilter):
     name: StringFilter | None = Field(default=None)
     domain_name: StringFilter | None = Field(default=None)
     project_id: UUIDFilter | None = Field(default=None)
@@ -83,12 +83,6 @@ class ModelCardFilter(BaseRequestModel):
             "Evaluated as an EXISTS subquery joining the model VFolder's host column."
         ),
     )
-    AND: list[ModelCardFilter] | None = Field(default=None)
-    OR: list[ModelCardFilter] | None = Field(default=None)
-    NOT: list[ModelCardFilter] | None = Field(default=None)
-
-
-ModelCardFilter.model_rebuild()
 
 
 class ModelCardOrder(BaseRequestModel):

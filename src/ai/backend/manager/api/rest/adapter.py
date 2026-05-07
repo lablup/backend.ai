@@ -14,8 +14,17 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
-from ai.backend.common.dto.manager.query import IntFilter, StringFilter, UUIDFilter
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.common.dto.manager.query import (
+    IntFilter,
+    StringFilter,
+    UUIDFilter,
+)
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 
 
 class BaseFilterAdapter:
@@ -202,3 +211,49 @@ class BaseFilterAdapter:
             less_than_factory=int_conditions.lt,
             less_than_or_equal_factory=int_conditions.lte,
         )
+
+    @final
+    def convert_and(
+        self,
+        sub_condition_lists: list[list[QueryCondition]],
+    ) -> list[QueryCondition]:
+        """Flatten sub-filter conditions for ``AND`` combination.
+
+        Callers ``extend()`` the result into the parent's conditions list.
+        """
+        conditions: list[QueryCondition] = []
+        for sub_conditions in sub_condition_lists:
+            conditions.extend(sub_conditions)
+        return conditions
+
+    @final
+    def convert_or(
+        self,
+        sub_condition_lists: list[list[QueryCondition]],
+    ) -> list[QueryCondition]:
+        """OR-combine sub-filters, preserving each sub's internal AND grouping (``(A AND B) OR (C AND D)``).
+
+        Callers ``extend()`` the result into the parent's conditions list.
+        """
+        or_groups: list[QueryCondition] = []
+        for sub_conditions in sub_condition_lists:
+            if sub_conditions:
+                or_groups.append(combine_conditions_and(sub_conditions))
+        if not or_groups:
+            return []
+        return [combine_conditions_or(or_groups)]
+
+    @final
+    def convert_not(
+        self,
+        sub_condition_lists: list[list[QueryCondition]],
+    ) -> list[QueryCondition]:
+        """Negate each sub-filter independently (``NOT (A AND B) AND NOT (C AND D)``).
+
+        Callers ``extend()`` the result into the parent's conditions list.
+        """
+        conditions: list[QueryCondition] = []
+        for sub_conditions in sub_condition_lists:
+            if sub_conditions:
+                conditions.append(negate_conditions(sub_conditions))
+        return conditions

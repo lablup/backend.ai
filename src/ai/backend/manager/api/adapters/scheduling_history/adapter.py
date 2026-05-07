@@ -57,8 +57,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
@@ -328,20 +326,17 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if filter.AND:
-            for sub in filter.AND:
-                conditions.extend(self._convert_session_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_session_filter(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter.OR:
-                or_conds.extend(self._convert_session_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
+            conditions.extend(
+                self.convert_or([self._convert_session_filter(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
-            for sub in filter.NOT:
-                not_conds.extend(self._convert_session_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+            conditions.extend(
+                self.convert_not([self._convert_session_filter(sub) for sub in filter.NOT])
+            )
         return conditions
 
     @staticmethod
@@ -491,20 +486,17 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if filter.AND:
-            for sub in filter.AND:
-                conditions.extend(self._convert_deployment_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_deployment_filter(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter.OR:
-                or_conds.extend(self._convert_deployment_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
+            conditions.extend(
+                self.convert_or([self._convert_deployment_filter(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
-            for sub in filter.NOT:
-                not_conds.extend(self._convert_deployment_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+            conditions.extend(
+                self.convert_not([self._convert_deployment_filter(sub) for sub in filter.NOT])
+            )
         return conditions
 
     @staticmethod
@@ -662,20 +654,17 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if filter.AND:
-            for sub in filter.AND:
-                conditions.extend(self._convert_route_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_route_filter(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter.OR:
-                or_conds.extend(self._convert_route_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
+            conditions.extend(
+                self.convert_or([self._convert_route_filter(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
-            for sub in filter.NOT:
-                not_conds.extend(self._convert_route_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+            conditions.extend(
+                self.convert_not([self._convert_route_filter(sub) for sub in filter.NOT])
+            )
         return conditions
 
     @staticmethod

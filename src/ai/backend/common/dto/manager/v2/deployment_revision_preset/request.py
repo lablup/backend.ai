@@ -8,6 +8,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
+    BaseFilter,
     EnvironmentVariableEntryInput,
     OrderDirection,
     ResourceSlotEntryInput,
@@ -92,16 +93,10 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     deployment_strategy: DeploymentStrategyInput | Sentinel | None = Field(default=SENTINEL)
 
 
-class DeploymentRevisionPresetFilter(BaseRequestModel):
+class DeploymentRevisionPresetFilter(BaseFilter):
     id: UUIDFilter | None = Field(default=None, description="Filter by preset ID.")
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
-    AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
-    OR: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
-    NOT: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
-
-
-DeploymentRevisionPresetFilter.model_rebuild()
 
 
 class DeploymentRevisionPresetOrder(BaseRequestModel):

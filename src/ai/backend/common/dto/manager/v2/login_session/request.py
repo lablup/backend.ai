@@ -8,6 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import LoginSessionOrderField, LoginSessionStatus, OrderDirection
 
@@ -38,7 +39,7 @@ class LoginSessionStatusFilter(BaseRequestModel):
     )
 
 
-class LoginSessionFilter(BaseRequestModel):
+class LoginSessionFilter(BaseFilter):
     """Filter for login sessions."""
 
     user_id: UUIDFilter | None = Field(default=None, description="User ID filter")
@@ -50,18 +51,6 @@ class LoginSessionFilter(BaseRequestModel):
     last_accessed_at: DateTimeFilter | None = Field(
         default=None, description="Filter sessions by last_accessed_at datetime"
     )
-    AND: list[LoginSessionFilter] | None = Field(
-        default=None, description="All conditions must match"
-    )
-    OR: list[LoginSessionFilter] | None = Field(
-        default=None, description="At least one condition must match"
-    )
-    NOT: list[LoginSessionFilter] | None = Field(
-        default=None, description="None of the conditions must match"
-    )
-
-
-LoginSessionFilter.model_rebuild()
 
 
 class LoginSessionOrder(BaseRequestModel):

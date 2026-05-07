@@ -219,8 +219,6 @@ from ai.backend.manager.repositories.base import (
     Purger,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -1325,20 +1323,17 @@ class RBACAdapter(BaseAdapter):
             if cond is not None:
                 conditions.append(cond)
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_permission_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_permission_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(self._convert_permission_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_permission_filter(sub) for sub in f.OR])
+            )
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_permission_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_permission_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     @staticmethod
@@ -1400,20 +1395,15 @@ class RBACAdapter(BaseAdapter):
                     RoleConditions.by_status_not_in([InternalRoleStatus(s) for s in st.not_in])
                 )
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_role_filter_gql(sub))
+            conditions.extend(
+                self.convert_and([self._convert_role_filter_gql(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(self._convert_role_filter_gql(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(self.convert_or([self._convert_role_filter_gql(sub) for sub in f.OR]))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_role_filter_gql(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_role_filter_gql(sub) for sub in f.NOT])
+            )
         return conditions
 
     @staticmethod
@@ -1482,20 +1472,17 @@ class RBACAdapter(BaseAdapter):
         if raw_conditions:
             conditions.append(AssignedUserConditions.exists_role_combined(raw_conditions))
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_role_nested_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_role_nested_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(self._convert_role_nested_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_role_nested_filter(sub) for sub in f.OR])
+            )
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_role_nested_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_role_nested_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     def _convert_permission_nested_filter(
@@ -1547,20 +1534,17 @@ class RBACAdapter(BaseAdapter):
         if raw_conditions:
             conditions.append(AssignedUserConditions.exists_permission_combined(raw_conditions))
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_permission_nested_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_permission_nested_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(self._convert_permission_nested_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_permission_nested_filter(sub) for sub in f.OR])
+            )
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_permission_nested_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_permission_nested_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     def _convert_assignment_filter(self, f: RoleAssignmentFilterDTO) -> list[QueryCondition]:
@@ -1600,20 +1584,17 @@ class RBACAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_assignment_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_assignment_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(self._convert_assignment_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_assignment_filter(sub) for sub in f.OR])
+            )
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_assignment_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_assignment_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     @staticmethod
@@ -1653,20 +1634,11 @@ class RBACAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_entity_filter(sub))
+            conditions.extend(self.convert_and([self._convert_entity_filter(sub) for sub in f.AND]))
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(self._convert_entity_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(self.convert_or([self._convert_entity_filter(sub) for sub in f.OR]))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_entity_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(self.convert_not([self._convert_entity_filter(sub) for sub in f.NOT]))
         return conditions
 
     @staticmethod
@@ -1887,20 +1859,17 @@ class RBACAdapter(BaseAdapter):
         if f.invitee is not None:
             conditions.extend(self._convert_invitation_user_nested_filter(f.invitee, "invitee"))
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_invitation_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_invitation_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(self._convert_invitation_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_invitation_filter(sub) for sub in f.OR])
+            )
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_invitation_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_invitation_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     @staticmethod

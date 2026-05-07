@@ -27,7 +27,7 @@ from ai.backend.common.dto.manager.query import (
     StringFilter,
     UUIDFilter,
 )
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import BaseFilter, ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
@@ -542,7 +542,7 @@ class ReplicaTrafficStatusFilter(BaseRequestModel):
     )
 
 
-class DeploymentFilter(BaseRequestModel):
+class DeploymentFilter(BaseFilter):
     """Filter for deployments."""
 
     name: StringFilter | None = Field(default=None, description="Name filter")
@@ -562,15 +562,9 @@ class DeploymentFilter(BaseRequestModel):
     destroyed_at: NullableDateTimeFilter | None = Field(
         default=None, description="Destruction datetime filter (supports is_null)"
     )
-    AND: list[DeploymentFilter] | None = Field(default=None, description="AND conjunction")
-    OR: list[DeploymentFilter] | None = Field(default=None, description="OR conjunction")
-    NOT: list[DeploymentFilter] | None = Field(default=None, description="NOT negation")
 
 
-DeploymentFilter.model_rebuild()
-
-
-class RevisionFilter(BaseRequestModel):
+class RevisionFilter(BaseFilter):
     """Filter for deployment revisions."""
 
     revision_number: IntFilter | None = Field(default=None, description="Filter by revision number")
@@ -584,15 +578,9 @@ class RevisionFilter(BaseRequestModel):
     )
     cluster_mode: StringFilter | None = Field(default=None, description="Cluster mode filter")
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
-    AND: list[RevisionFilter] | None = Field(default=None, description="AND conjunction")
-    OR: list[RevisionFilter] | None = Field(default=None, description="OR conjunction")
-    NOT: list[RevisionFilter] | None = Field(default=None, description="NOT negation")
 
 
-RevisionFilter.model_rebuild()
-
-
-class RouteFilter(BaseRequestModel):
+class RouteFilter(BaseFilter):
     """Filter for deployment routes."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
@@ -605,15 +593,9 @@ class RouteFilter(BaseRequestModel):
     traffic_status: list[RouteTrafficStatus] | None = Field(
         default=None, description="Traffic status filter"
     )
-    AND: list[RouteFilter] | None = Field(default=None, description="AND conjunction")
-    OR: list[RouteFilter] | None = Field(default=None, description="OR conjunction")
-    NOT: list[RouteFilter] | None = Field(default=None, description="NOT negation")
 
 
-RouteFilter.model_rebuild()
-
-
-class AccessTokenFilter(BaseRequestModel):
+class AccessTokenFilter(BaseFilter):
     """Filter for access tokens."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
@@ -622,15 +604,9 @@ class AccessTokenFilter(BaseRequestModel):
         default=None, description="Expiration datetime filter"
     )
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
-    AND: list[AccessTokenFilter] | None = Field(default=None, description="AND conjunction")
-    OR: list[AccessTokenFilter] | None = Field(default=None, description="OR conjunction")
-    NOT: list[AccessTokenFilter] | None = Field(default=None, description="NOT negation")
 
 
-AccessTokenFilter.model_rebuild()
-
-
-class AutoScalingRuleFilter(BaseRequestModel):
+class AutoScalingRuleFilter(BaseFilter):
     """Filter for auto-scaling rules."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
@@ -638,15 +614,9 @@ class AutoScalingRuleFilter(BaseRequestModel):
     last_triggered_at: NullableDateTimeFilter | None = Field(
         default=None, description="Last triggered datetime filter"
     )
-    AND: list[AutoScalingRuleFilter] | None = Field(default=None, description="AND conjunction")
-    OR: list[AutoScalingRuleFilter] | None = Field(default=None, description="OR conjunction")
-    NOT: list[AutoScalingRuleFilter] | None = Field(default=None, description="NOT negation")
 
 
-AutoScalingRuleFilter.model_rebuild()
-
-
-class ReplicaFilter(BaseRequestModel):
+class ReplicaFilter(BaseFilter):
     """Filter for deployment replicas."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
@@ -654,12 +624,6 @@ class ReplicaFilter(BaseRequestModel):
     traffic_status: ReplicaTrafficStatusFilter | None = Field(
         default=None, description="Replica traffic status filter"
     )
-    AND: list[ReplicaFilter] | None = Field(default=None, description="AND conjunction")
-    OR: list[ReplicaFilter] | None = Field(default=None, description="OR conjunction")
-    NOT: list[ReplicaFilter] | None = Field(default=None, description="NOT negation")
-
-
-ReplicaFilter.model_rebuild()
 
 
 class DeploymentPolicyFilter(BaseRequestModel):

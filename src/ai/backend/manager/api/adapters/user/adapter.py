@@ -107,8 +107,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -918,22 +916,19 @@ class UserAdapter(BaseAdapter):
                 conditions.append(condition)
 
         if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_keypair_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_keypair_filter(sub) for sub in filter_req.AND])
+            )
 
         if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_keypair_filter(sub) for sub in filter_req.OR])
+            )
 
         if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_keypair_filter(sub) for sub in filter_req.NOT])
+            )
 
         return conditions
 
@@ -1039,27 +1034,23 @@ class UserAdapter(BaseAdapter):
             conditions.extend(self._convert_project_nested_filter(filter_req.project))
 
         if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_gql_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_gql_filter(sub) for sub in filter_req.AND])
+            )
 
         if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_gql_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_gql_filter(sub) for sub in filter_req.OR])
+            )
 
         if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_gql_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_gql_filter(sub) for sub in filter_req.NOT])
+            )
 
         return conditions
 
-    @staticmethod
-    def _convert_status_filter(sf: UserStatusFilter) -> list[QueryCondition]:
+    def _convert_status_filter(self, sf: UserStatusFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if sf.equals is not None:
             conditions.append(UserConditions.by_status_equals(DataUserStatus(sf.equals.value)))
@@ -1068,36 +1059,35 @@ class UserAdapter(BaseAdapter):
                 UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.in_])
             )
         if sf.not_equals is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_status_equals(DataUserStatus(sf.not_equals.value))
+            conditions.extend(
+                self.convert_not([
+                    [UserConditions.by_status_equals(DataUserStatus(sf.not_equals.value))]
                 ])
             )
         if sf.not_in is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.not_in])
+            conditions.extend(
+                self.convert_not([
+                    [UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.not_in])]
                 ])
             )
         return conditions
 
-    @staticmethod
-    def _convert_role_filter(rf: UserRoleFilter) -> list[QueryCondition]:
+    def _convert_role_filter(self, rf: UserRoleFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if rf.equals is not None:
             conditions.append(UserConditions.by_role_equals(DataUserRole(rf.equals.value)))
         if rf.in_ is not None:
             conditions.append(UserConditions.by_role_in([DataUserRole(r.value) for r in rf.in_]))
         if rf.not_equals is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_role_equals(DataUserRole(rf.not_equals.value))
+            conditions.extend(
+                self.convert_not([
+                    [UserConditions.by_role_equals(DataUserRole(rf.not_equals.value))]
                 ])
             )
         if rf.not_in is not None and len(rf.not_in) > 0:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_role_in([DataUserRole(r.value) for r in rf.not_in])
+            conditions.extend(
+                self.convert_not([
+                    [UserConditions.by_role_in([DataUserRole(r.value) for r in rf.not_in])]
                 ])
             )
         return conditions
@@ -1248,15 +1238,19 @@ class UserAdapter(BaseAdapter):
                     UserConditions.by_status_in([UserStatus(s.value) for s in status_f.in_])
                 )
             if status_f.not_equals is not None:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_status_equals(UserStatus(status_f.not_equals.value))
+                conditions.extend(
+                    self.convert_not([
+                        [UserConditions.by_status_equals(UserStatus(status_f.not_equals.value))]
                     ])
                 )
             if status_f.not_in is not None and len(status_f.not_in) > 0:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_status_in([UserStatus(s.value) for s in status_f.not_in])
+                conditions.extend(
+                    self.convert_not([
+                        [
+                            UserConditions.by_status_in([
+                                UserStatus(s.value) for s in status_f.not_in
+                            ])
+                        ]
                     ])
                 )
 
@@ -1269,15 +1263,15 @@ class UserAdapter(BaseAdapter):
                     UserConditions.by_role_in([UserRole(r.value) for r in role_f.in_])
                 )
             if role_f.not_equals is not None:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_role_equals(UserRole(role_f.not_equals.value))
+                conditions.extend(
+                    self.convert_not([
+                        [UserConditions.by_role_equals(UserRole(role_f.not_equals.value))]
                     ])
                 )
             if role_f.not_in is not None and len(role_f.not_in) > 0:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_role_in([UserRole(r.value) for r in role_f.not_in])
+                conditions.extend(
+                    self.convert_not([
+                        [UserConditions.by_role_in([UserRole(r.value) for r in role_f.not_in])]
                     ])
                 )
 
@@ -1297,20 +1291,15 @@ class UserAdapter(BaseAdapter):
             conditions.extend(self._convert_project_nested_filter(filter_req.project))
 
         if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_filter(sub) for sub in filter_req.AND])
+            )
         if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
+            conditions.extend(self.convert_or([self._convert_filter(sub) for sub in filter_req.OR]))
         if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_filter(sub) for sub in filter_req.NOT])
+            )
 
         return conditions
 

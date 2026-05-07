@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
     UserDomainFilter,
@@ -293,7 +294,7 @@ class UpdateMyAllowedClientIPInput(BaseRequestModel):
     )
 
 
-class UserFilter(BaseRequestModel):
+class UserFilter(BaseFilter):
     """Filter criteria for searching users."""
 
     uuid: UUIDFilter | None = Field(default=None, description="Filter by user UUID.")
@@ -314,16 +315,6 @@ class UserFilter(BaseRequestModel):
     project: UserProjectFilter | None = Field(
         default=None, description="Nested filter for projects a user belongs to."
     )
-    AND: list[UserFilter] | None = Field(
-        default=None, description="Combine multiple filters with AND logic."
-    )
-    OR: list[UserFilter] | None = Field(
-        default=None, description="Combine multiple filters with OR logic."
-    )
-    NOT: list[UserFilter] | None = Field(default=None, description="Negate the specified filters.")
-
-
-UserFilter.model_rebuild()
 
 
 class UserOrder(BaseRequestModel):

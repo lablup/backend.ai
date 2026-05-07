@@ -12,6 +12,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 from ai.backend.common.dto.manager.v2.group.types import (
     OrderDirection,
     ProjectDomainFilter,
@@ -101,7 +102,7 @@ class PurgeProjectInput(BaseRequestModel):
     group_id: UUID = Field(description="UUID of the group to permanently purge.")
 
 
-class ProjectFilter(BaseRequestModel):
+class ProjectFilter(BaseFilter):
     """Filter criteria for searching groups."""
 
     id: UUIDFilter | None = Field(default=None, description="Filter by project ID (UUID).")
@@ -121,18 +122,6 @@ class ProjectFilter(BaseRequestModel):
     user: ProjectUserFilter | None = Field(
         default=None, description="Nested filter for user conditions."
     )
-    AND: list[ProjectFilter] | None = Field(
-        default=None, description="Combine filters with AND logic."
-    )
-    OR: list[ProjectFilter] | None = Field(
-        default=None, description="Combine filters with OR logic."
-    )
-    NOT: list[ProjectFilter] | None = Field(
-        default=None, description="Negate the specified filters."
-    )
-
-
-ProjectFilter.model_rebuild()
 
 
 class ProjectOrder(BaseRequestModel):

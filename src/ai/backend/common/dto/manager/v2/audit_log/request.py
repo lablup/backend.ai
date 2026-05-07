@@ -6,6 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import AuditLogOrderField, AuditLogStatus, OrderDirection
 
@@ -30,7 +31,7 @@ class AuditLogStatusFilter(BaseRequestModel):
     not_in: list[AuditLogStatus] | None = Field(default=None, description="Status is not in list")
 
 
-class AuditLogFilter(BaseRequestModel):
+class AuditLogFilter(BaseFilter):
     """Filter for audit logs."""
 
     entity_type: StringFilter | None = Field(default=None, description="Entity type filter")
@@ -40,16 +41,6 @@ class AuditLogFilter(BaseRequestModel):
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter logs by created_at datetime"
     )
-    AND: list[AuditLogFilter] | None = Field(default=None, description="All conditions must match")
-    OR: list[AuditLogFilter] | None = Field(
-        default=None, description="At least one condition must match"
-    )
-    NOT: list[AuditLogFilter] | None = Field(
-        default=None, description="None of the conditions must match"
-    )
-
-
-AuditLogFilter.model_rebuild()
 
 
 class AuditLogOrder(BaseRequestModel):

@@ -6,6 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import LoginAttemptResult, LoginHistoryOrderField, OrderDirection
 
@@ -33,7 +34,7 @@ class LoginHistoryResultFilter(BaseRequestModel):
     )
 
 
-class LoginHistoryFilter(BaseRequestModel):
+class LoginHistoryFilter(BaseFilter):
     """Filter for login history."""
 
     domain_name: StringFilter | None = Field(default=None, description="Domain name filter")
@@ -43,18 +44,6 @@ class LoginHistoryFilter(BaseRequestModel):
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter history by created_at datetime"
     )
-    AND: list[LoginHistoryFilter] | None = Field(
-        default=None, description="All conditions must match"
-    )
-    OR: list[LoginHistoryFilter] | None = Field(
-        default=None, description="At least one condition must match"
-    )
-    NOT: list[LoginHistoryFilter] | None = Field(
-        default=None, description="None of the conditions must match"
-    )
-
-
-LoginHistoryFilter.model_rebuild()
 
 
 class LoginHistoryOrder(BaseRequestModel):

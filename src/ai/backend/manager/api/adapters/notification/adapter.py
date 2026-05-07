@@ -83,8 +83,6 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     Updater,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.notification.creators import (
@@ -527,8 +525,7 @@ class NotificationAdapter(BaseAdapter):
             ),
         )
 
-    @staticmethod
-    def _convert_channel_filter(f: NotificationChannelFilter) -> list[QueryCondition]:
+    def _convert_channel_filter(self, f: NotificationChannelFilter) -> list[QueryCondition]:
         """Convert NotificationChannelFilter DTO to QueryCondition list."""
         conditions: list[QueryCondition] = []
 
@@ -574,22 +571,17 @@ class NotificationAdapter(BaseAdapter):
             conditions.append(NotificationChannelConditions.by_enabled(f.enabled))
 
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(NotificationAdapter._convert_channel_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_channel_filter(sub) for sub in f.AND])
+            )
 
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(NotificationAdapter._convert_channel_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(self.convert_or([self._convert_channel_filter(sub) for sub in f.OR]))
 
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(NotificationAdapter._convert_channel_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_channel_filter(sub) for sub in f.NOT])
+            )
 
         return conditions
 
@@ -608,8 +600,7 @@ class NotificationAdapter(BaseAdapter):
                     result.append(NotificationChannelOrders.updated_at(ascending))
         return result
 
-    @staticmethod
-    def _convert_rule_filter(f: NotificationRuleFilter) -> list[QueryCondition]:
+    def _convert_rule_filter(self, f: NotificationRuleFilter) -> list[QueryCondition]:
         """Convert NotificationRuleFilter DTO to QueryCondition list."""
         conditions: list[QueryCondition] = []
 
@@ -655,22 +646,13 @@ class NotificationAdapter(BaseAdapter):
             conditions.append(NotificationRuleConditions.by_enabled(f.enabled))
 
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(NotificationAdapter._convert_rule_filter(sub))
+            conditions.extend(self.convert_and([self._convert_rule_filter(sub) for sub in f.AND]))
 
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                or_conditions.extend(NotificationAdapter._convert_rule_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(self.convert_or([self._convert_rule_filter(sub) for sub in f.OR]))
 
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(NotificationAdapter._convert_rule_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(self.convert_not([self._convert_rule_filter(sub) for sub in f.NOT]))
 
         return conditions
 

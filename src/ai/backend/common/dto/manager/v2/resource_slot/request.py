@@ -6,6 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import (
     AgentResourceOrderField,
@@ -34,24 +35,12 @@ __all__ = (
 # ========== ResourceSlotType ==========
 
 
-class ResourceSlotTypeFilter(BaseRequestModel):
+class ResourceSlotTypeFilter(BaseFilter):
     """Filter conditions for resource slot type search."""
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     slot_type: StringFilter | None = Field(default=None, description="Filter by slot type.")
     display_name: StringFilter | None = Field(default=None, description="Filter by display name.")
-    AND: list[ResourceSlotTypeFilter] | None = Field(
-        default=None, description="Logical AND of multiple filter conditions."
-    )
-    OR: list[ResourceSlotTypeFilter] | None = Field(
-        default=None, description="Logical OR of multiple filter conditions."
-    )
-    NOT: list[ResourceSlotTypeFilter] | None = Field(
-        default=None, description="Logical NOT of filter conditions."
-    )
-
-
-ResourceSlotTypeFilter.model_rebuild()
 
 
 class ResourceSlotTypeOrder(BaseRequestModel):
@@ -86,23 +75,11 @@ class AdminSearchResourceSlotTypesInput(BaseRequestModel):
 # ========== AgentResource ==========
 
 
-class AgentResourceFilter(BaseRequestModel):
+class AgentResourceFilter(BaseFilter):
     """Filter conditions for agent resource search."""
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     agent_id: StringFilter | None = Field(default=None, description="Filter by agent ID.")
-    AND: list[AgentResourceFilter] | None = Field(
-        default=None, description="Logical AND of multiple filter conditions."
-    )
-    OR: list[AgentResourceFilter] | None = Field(
-        default=None, description="Logical OR of multiple filter conditions."
-    )
-    NOT: list[AgentResourceFilter] | None = Field(
-        default=None, description="Logical NOT of filter conditions."
-    )
-
-
-AgentResourceFilter.model_rebuild()
 
 
 class AgentResourceOrder(BaseRequestModel):
@@ -137,23 +114,11 @@ class AdminSearchAgentResourcesInput(BaseRequestModel):
 # ========== ResourceAllocation ==========
 
 
-class ResourceAllocationFilter(BaseRequestModel):
+class ResourceAllocationFilter(BaseFilter):
     """Filter conditions for resource allocation search."""
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     kernel_id: UUIDFilter | None = Field(default=None, description="Filter by kernel ID.")
-    AND: list[ResourceAllocationFilter] | None = Field(
-        default=None, description="Logical AND of multiple filter conditions."
-    )
-    OR: list[ResourceAllocationFilter] | None = Field(
-        default=None, description="Logical OR of multiple filter conditions."
-    )
-    NOT: list[ResourceAllocationFilter] | None = Field(
-        default=None, description="Logical NOT of filter conditions."
-    )
-
-
-ResourceAllocationFilter.model_rebuild()
 
 
 class ResourceAllocationOrder(BaseRequestModel):
@@ -181,22 +146,10 @@ class AdminSearchResourceAllocationsInput(BaseRequestModel):
 # ========== AllocatedResourceSlot (revision/preset shared) ==========
 
 
-class AllocatedResourceSlotFilter(BaseRequestModel):
+class AllocatedResourceSlotFilter(BaseFilter):
     """Filter conditions for allocated resource slot search."""
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
-    AND: list[AllocatedResourceSlotFilter] | None = Field(
-        default=None, description="Logical AND of multiple filter conditions."
-    )
-    OR: list[AllocatedResourceSlotFilter] | None = Field(
-        default=None, description="Logical OR of multiple filter conditions."
-    )
-    NOT: list[AllocatedResourceSlotFilter] | None = Field(
-        default=None, description="Logical NOT of filter conditions."
-    )
-
-
-AllocatedResourceSlotFilter.model_rebuild()
 
 
 class AllocatedResourceSlotOrder(BaseRequestModel):

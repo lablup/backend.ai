@@ -6,6 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import KernelOrderField, KernelStatusFilter, OrderDirection
 
@@ -16,18 +17,12 @@ __all__ = (
 )
 
 
-class KernelFilter(BaseRequestModel):
+class KernelFilter(BaseFilter):
     """Filter conditions for kernel search."""
 
     id: UUIDFilter | None = Field(default=None, description="Filter by kernel ID")
     session_id: UUIDFilter | None = Field(default=None, description="Filter by session ID")
     status: KernelStatusFilter | None = Field(default=None, description="Filter by status")
-    AND: list[KernelFilter] | None = Field(default=None, description="AND logical operator")
-    OR: list[KernelFilter] | None = Field(default=None, description="OR logical operator")
-    NOT: list[KernelFilter] | None = Field(default=None, description="NOT logical operator")
-
-
-KernelFilter.model_rebuild()
 
 
 class KernelOrder(BaseRequestModel):

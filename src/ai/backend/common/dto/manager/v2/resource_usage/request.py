@@ -8,6 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import OrderDirection, UsageBucketOrderField
 
@@ -90,7 +91,7 @@ class DomainSearchUserUsageBucketsInput(BaseRequestModel):
 # GQL Filter/Order DTOs for usage bucket queries
 
 
-class DomainUsageBucketFilter(BaseRequestModel):
+class DomainUsageBucketFilter(BaseFilter):
     """Filter for domain usage bucket queries."""
 
     resource_group: StringFilter | None = Field(
@@ -99,16 +100,6 @@ class DomainUsageBucketFilter(BaseRequestModel):
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     period_start: DateFilter | None = Field(default=None, description="Filter by period start date")
     period_end: DateFilter | None = Field(default=None, description="Filter by period end date")
-    AND: list[DomainUsageBucketFilter] | None = Field(
-        default=None, description="Combine with AND logic"
-    )
-    OR: list[DomainUsageBucketFilter] | None = Field(
-        default=None, description="Combine with OR logic"
-    )
-    NOT: list[DomainUsageBucketFilter] | None = Field(default=None, description="Negate filters")
-
-
-DomainUsageBucketFilter.model_rebuild()
 
 
 class DomainUsageBucketOrderBy(BaseRequestModel):
@@ -118,7 +109,7 @@ class DomainUsageBucketOrderBy(BaseRequestModel):
     direction: OrderDirection = Field(default=OrderDirection.DESC, description="Order direction")
 
 
-class ProjectUsageBucketFilter(BaseRequestModel):
+class ProjectUsageBucketFilter(BaseFilter):
     """Filter for project usage bucket queries."""
 
     resource_group: StringFilter | None = Field(
@@ -128,16 +119,6 @@ class ProjectUsageBucketFilter(BaseRequestModel):
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     period_start: DateFilter | None = Field(default=None, description="Filter by period start date")
     period_end: DateFilter | None = Field(default=None, description="Filter by period end date")
-    AND: list[ProjectUsageBucketFilter] | None = Field(
-        default=None, description="Combine with AND logic"
-    )
-    OR: list[ProjectUsageBucketFilter] | None = Field(
-        default=None, description="Combine with OR logic"
-    )
-    NOT: list[ProjectUsageBucketFilter] | None = Field(default=None, description="Negate filters")
-
-
-ProjectUsageBucketFilter.model_rebuild()
 
 
 class ProjectUsageBucketOrderBy(BaseRequestModel):
@@ -147,7 +128,7 @@ class ProjectUsageBucketOrderBy(BaseRequestModel):
     direction: OrderDirection = Field(default=OrderDirection.DESC, description="Order direction")
 
 
-class UserUsageBucketFilter(BaseRequestModel):
+class UserUsageBucketFilter(BaseFilter):
     """Filter for user usage bucket queries."""
 
     resource_group: StringFilter | None = Field(
@@ -158,16 +139,6 @@ class UserUsageBucketFilter(BaseRequestModel):
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     period_start: DateFilter | None = Field(default=None, description="Filter by period start date")
     period_end: DateFilter | None = Field(default=None, description="Filter by period end date")
-    AND: list[UserUsageBucketFilter] | None = Field(
-        default=None, description="Combine with AND logic"
-    )
-    OR: list[UserUsageBucketFilter] | None = Field(
-        default=None, description="Combine with OR logic"
-    )
-    NOT: list[UserUsageBucketFilter] | None = Field(default=None, description="Negate filters")
-
-
-UserUsageBucketFilter.model_rebuild()
 
 
 class UserUsageBucketOrderBy(BaseRequestModel):

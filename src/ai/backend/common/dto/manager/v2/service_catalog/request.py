@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 from ai.backend.common.types import ServiceCatalogStatus
 
 from .types import OrderDirection, ServiceCatalogOrderField, ServiceCatalogStatusFilter
@@ -123,7 +124,7 @@ class HeartbeatInput(BaseRequestModel):
     id: UUID = Field(description="Service catalog entry ID to heartbeat")
 
 
-class ServiceCatalogFilter(BaseRequestModel):
+class ServiceCatalogFilter(BaseFilter):
     """Filter conditions for service catalog search."""
 
     service_group: StringFilter | None = Field(
@@ -132,18 +133,6 @@ class ServiceCatalogFilter(BaseRequestModel):
     status: ServiceCatalogStatusFilter | None = Field(
         default=None, description="Filter by health status."
     )
-    AND: list[ServiceCatalogFilter] | None = Field(
-        default=None, description="Logical AND of multiple filter conditions."
-    )
-    OR: list[ServiceCatalogFilter] | None = Field(
-        default=None, description="Logical OR of multiple filter conditions."
-    )
-    NOT: list[ServiceCatalogFilter] | None = Field(
-        default=None, description="Logical NOT of filter conditions."
-    )
-
-
-ServiceCatalogFilter.model_rebuild()
 
 
 class ServiceCatalogOrder(BaseRequestModel):
@@ -173,6 +162,3 @@ class AdminSearchServiceCatalogsInput(BaseRequestModel):
     # Offset-based pagination
     limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
     offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
-
-
-ServiceCatalogFilter.model_rebuild()

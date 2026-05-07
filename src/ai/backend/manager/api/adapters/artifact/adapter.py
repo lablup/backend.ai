@@ -80,8 +80,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
@@ -518,20 +516,15 @@ class ArtifactAdapter(BaseAdapter):
             )
 
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_gql_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_gql_filter(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_gql_filter(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(self.convert_or([self._convert_gql_filter(sub) for sub in filter.OR]))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_gql_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_gql_filter(sub) for sub in filter.NOT])
+            )
 
         return conditions
 
@@ -615,20 +608,17 @@ class ArtifactAdapter(BaseAdapter):
                 )
 
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_gql_revision_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_gql_revision_filter(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_gql_revision_filter(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_gql_revision_filter(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_gql_revision_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_gql_revision_filter(sub) for sub in filter.NOT])
+            )
 
         return conditions
 

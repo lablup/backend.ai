@@ -5,12 +5,14 @@ from __future__ import annotations
 from decimal import Decimal
 from enum import StrEnum
 from functools import cached_property
+from typing import Self
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 
 __all__ = (
+    "BaseFilter",
     "BinarySizeInfo",
     "BinarySizeInput",
     "EnvironmentVariableEntryInfo",
@@ -25,6 +27,21 @@ __all__ = (
     "VFolderHostPermissionEntryInfo",
     "VFolderHostPermissionEntryInput",
 )
+
+
+class BaseFilter(BaseRequestModel):
+    """Base class for v2 entity filter DTOs.
+
+    Provides the recursive ``AND`` / ``OR`` / ``NOT`` boolean clause fields shared
+    by every filter so subclasses only declare their typed leaf fields. The
+    clauses are typed as ``list[Self] | None``: each subclass automatically
+    references its own concrete type without requiring ``model_rebuild()``
+    or repeating the three fields.
+    """
+
+    AND: list[Self] | None = Field(default=None, description="AND conjunction of sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="OR conjunction of sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="NOT negation of sub-filters.")
 
 
 class BinarySizeInput(BaseRequestModel):

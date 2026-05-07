@@ -81,7 +81,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -443,14 +442,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if cond is not None:
                 conditions.append(cond)
         if filter_.AND:
-            for sub in filter_.AND:
-                conditions.extend(self._convert_allocated_slot_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_allocated_slot_filter(sub) for sub in filter_.AND])
+            )
         if filter_.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter_.OR:
-                or_conds.extend(self._convert_allocated_slot_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
+            conditions.extend(
+                self.convert_or([self._convert_allocated_slot_filter(sub) for sub in filter_.OR])
+            )
         return conditions
 
     def _convert_filter(self, filter_: DeploymentRevisionPresetFilter) -> list[QueryCondition]:
@@ -483,14 +481,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if cond:
                 conditions.append(cond)
         if filter_.AND:
-            for sub in filter_.AND:
-                conditions.extend(self._convert_filter(sub))
+            conditions.extend(self.convert_and([self._convert_filter(sub) for sub in filter_.AND]))
         if filter_.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
+            conditions.extend(self.convert_or([self._convert_filter(sub) for sub in filter_.OR]))
         return conditions
 
     def _convert_orders(self, orders: list[DeploymentRevisionPresetOrder]) -> list[QueryOrder]:

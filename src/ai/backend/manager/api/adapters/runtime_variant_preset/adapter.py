@@ -43,8 +43,6 @@ from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantP
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -256,20 +254,11 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             if cond:
                 conditions.append(cond)
         if filter_.AND:
-            for sub in filter_.AND:
-                conditions.extend(self._convert_filter(sub))
+            conditions.extend(self.convert_and([self._convert_filter(sub) for sub in filter_.AND]))
         if filter_.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
+            conditions.extend(self.convert_or([self._convert_filter(sub) for sub in filter_.OR]))
         if filter_.NOT:
-            not_conds: list[QueryCondition] = []
-            for sub in filter_.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+            conditions.extend(self.convert_not([self._convert_filter(sub) for sub in filter_.NOT]))
         return conditions
 
     def _convert_orders(self, orders: list[RuntimeVariantPresetOrder]) -> list[QueryOrder]:

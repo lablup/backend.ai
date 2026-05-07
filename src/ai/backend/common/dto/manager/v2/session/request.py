@@ -14,7 +14,11 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import (
+    BaseFilter,
+    BinarySizeInput,
+    ResourceSlotEntryInput,
+)
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
@@ -77,7 +81,7 @@ class SessionIdPathParam(BaseRequestModel):
 # ---------------------------------------------------------------------------
 
 
-class SessionFilter(BaseRequestModel):
+class SessionFilter(BaseFilter):
     """Filter criteria for session listing."""
 
     id: UUIDFilter | None = None
@@ -87,12 +91,6 @@ class SessionFilter(BaseRequestModel):
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
     created_at: DateTimeFilter | None = None
-    AND: list[SessionFilter] | None = None
-    OR: list[SessionFilter] | None = None
-    NOT: list[SessionFilter] | None = None
-
-
-SessionFilter.model_rebuild()
 
 
 class SessionOrder(BaseRequestModel):

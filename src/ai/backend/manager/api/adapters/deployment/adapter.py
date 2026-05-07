@@ -223,9 +223,6 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     Updater,
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
@@ -1548,21 +1545,17 @@ class DeploymentAdapter(BaseAdapter):
             if dt_condition is not None:
                 conditions.append(dt_condition)
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_deployment_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_deployment_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_groups: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_deployment_filter(sub)
-                if sub_conditions:
-                    or_groups.append(combine_conditions_and(sub_conditions))
-            if or_groups:
-                conditions.append(combine_conditions_or(or_groups))
+            conditions.extend(
+                self.convert_or([self._convert_deployment_filter(sub) for sub in f.OR])
+            )
         if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_deployment_filter(sub)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_deployment_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     def _build_deployment_querier(self, input: AdminSearchDeploymentsInput) -> BatchQuerier:
@@ -1640,21 +1633,15 @@ class DeploymentAdapter(BaseAdapter):
             if dt_condition is not None:
                 conditions.append(dt_condition)
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_revision_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_revision_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_groups: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_revision_filter(sub)
-                if sub_conditions:
-                    or_groups.append(combine_conditions_and(sub_conditions))
-            if or_groups:
-                conditions.append(combine_conditions_or(or_groups))
+            conditions.extend(self.convert_or([self._convert_revision_filter(sub) for sub in f.OR]))
         if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_revision_filter(sub)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_revision_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     def _build_revision_querier(
@@ -1702,21 +1689,11 @@ class DeploymentAdapter(BaseAdapter):
                 ])
             )
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_route_filter(sub))
+            conditions.extend(self.convert_and([self._convert_route_filter(sub) for sub in f.AND]))
         if f.OR:
-            or_groups: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_route_filter(sub)
-                if sub_conditions:
-                    or_groups.append(combine_conditions_and(sub_conditions))
-            if or_groups:
-                conditions.append(combine_conditions_or(or_groups))
+            conditions.extend(self.convert_or([self._convert_route_filter(sub) for sub in f.OR]))
         if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_route_filter(sub)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
+            conditions.extend(self.convert_not([self._convert_route_filter(sub) for sub in f.NOT]))
         return conditions
 
     def _build_route_querier(
@@ -1775,21 +1752,17 @@ class DeploymentAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_access_token_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_access_token_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_groups: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_access_token_filter(sub)
-                if sub_conditions:
-                    or_groups.append(combine_conditions_and(sub_conditions))
-            if or_groups:
-                conditions.append(combine_conditions_or(or_groups))
+            conditions.extend(
+                self.convert_or([self._convert_access_token_filter(sub) for sub in f.OR])
+            )
         if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_access_token_filter(sub)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_access_token_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     def _build_access_token_querier(
@@ -1845,21 +1818,17 @@ class DeploymentAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_auto_scaling_rule_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_auto_scaling_rule_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_groups: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_auto_scaling_rule_filter(sub)
-                if sub_conditions:
-                    or_groups.append(combine_conditions_and(sub_conditions))
-            if or_groups:
-                conditions.append(combine_conditions_or(or_groups))
+            conditions.extend(
+                self.convert_or([self._convert_auto_scaling_rule_filter(sub) for sub in f.OR])
+            )
         if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_auto_scaling_rule_filter(sub)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_auto_scaling_rule_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     def _build_auto_scaling_rule_querier(
@@ -1959,21 +1928,15 @@ class DeploymentAdapter(BaseAdapter):
                     ])
                 )
         if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_replica_filter(sub))
+            conditions.extend(
+                self.convert_and([self._convert_replica_filter(sub) for sub in f.AND])
+            )
         if f.OR:
-            or_groups: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_replica_filter(sub)
-                if sub_conditions:
-                    or_groups.append(combine_conditions_and(sub_conditions))
-            if or_groups:
-                conditions.append(combine_conditions_or(or_groups))
+            conditions.extend(self.convert_or([self._convert_replica_filter(sub) for sub in f.OR]))
         if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_replica_filter(sub)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_replica_filter(sub) for sub in f.NOT])
+            )
         return conditions
 
     def _build_replica_querier(
@@ -2052,21 +2015,23 @@ class DeploymentAdapter(BaseAdapter):
             if cond is not None:
                 conditions.append(cond)
         if filter_.AND:
-            for sub in filter_.AND:
-                conditions.extend(self._convert_allocated_slot_filter(sub, conditions_cls))
+            conditions.extend(
+                self.convert_and([
+                    self._convert_allocated_slot_filter(sub, conditions_cls) for sub in filter_.AND
+                ])
+            )
         if filter_.OR:
-            or_groups: list[QueryCondition] = []
-            for sub in filter_.OR:
-                sub_conditions = self._convert_allocated_slot_filter(sub, conditions_cls)
-                if sub_conditions:
-                    or_groups.append(combine_conditions_and(sub_conditions))
-            if or_groups:
-                conditions.append(combine_conditions_or(or_groups))
+            conditions.extend(
+                self.convert_or([
+                    self._convert_allocated_slot_filter(sub, conditions_cls) for sub in filter_.OR
+                ])
+            )
         if filter_.NOT:
-            for sub in filter_.NOT:
-                sub_conditions = self._convert_allocated_slot_filter(sub, conditions_cls)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
+            conditions.extend(
+                self.convert_not([
+                    self._convert_allocated_slot_filter(sub, conditions_cls) for sub in filter_.NOT
+                ])
+            )
         return conditions
 
     # ------------------------------------------------------------------

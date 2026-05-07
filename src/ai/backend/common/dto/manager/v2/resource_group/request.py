@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
@@ -134,19 +135,13 @@ class DeleteResourceGroupInput(BaseRequestModel):
     )
 
 
-class ResourceGroupFilter(BaseRequestModel):
+class ResourceGroupFilter(BaseFilter):
     """Filter criteria for searching resource groups."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     is_public: bool | None = Field(default=None, description="Filter by public status.")
-    AND: list[ResourceGroupFilter] | None = Field(default=None, description="AND conjunction.")
-    OR: list[ResourceGroupFilter] | None = Field(default=None, description="OR conjunction.")
-    NOT: list[ResourceGroupFilter] | None = Field(default=None, description="NOT negation.")
-
-
-ResourceGroupFilter.model_rebuild()
 
 
 class ResourceGroupOrder(BaseRequestModel):

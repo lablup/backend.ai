@@ -60,8 +60,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
@@ -429,22 +427,13 @@ class ImageAdapter(BaseAdapter):
                 conditions.append(ImageConditions.by_last_used_after(lu.after))
 
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_filter(sub_filter))
+            conditions.extend(self.convert_and([self._convert_filter(sub) for sub in filter.AND]))
 
         if filter.OR:
-            or_sub: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_sub.extend(self._convert_filter(sub_filter))
-            if or_sub:
-                conditions.append(combine_conditions_or(or_sub))
+            conditions.extend(self.convert_or([self._convert_filter(sub) for sub in filter.OR]))
 
         if filter.NOT:
-            not_sub: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_sub.extend(self._convert_filter(sub_filter))
-            if not_sub:
-                conditions.append(negate_conditions(not_sub))
+            conditions.extend(self.convert_not([self._convert_filter(sub) for sub in filter.NOT]))
 
         return conditions
 
@@ -474,22 +463,19 @@ class ImageAdapter(BaseAdapter):
                 conditions.append(ImageAliasConditions.by_image_ids([ImageID(i) for i in iid.in_]))
 
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_alias_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_alias_filter(sub) for sub in filter.AND])
+            )
 
         if filter.OR:
-            or_sub: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_sub.extend(self._convert_alias_filter(sub_filter))
-            if or_sub:
-                conditions.append(combine_conditions_or(or_sub))
+            conditions.extend(
+                self.convert_or([self._convert_alias_filter(sub) for sub in filter.OR])
+            )
 
         if filter.NOT:
-            not_sub: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_sub.extend(self._convert_alias_filter(sub_filter))
-            if not_sub:
-                conditions.append(negate_conditions(not_sub))
+            conditions.extend(
+                self.convert_not([self._convert_alias_filter(sub) for sub in filter.NOT])
+            )
 
         return conditions
 

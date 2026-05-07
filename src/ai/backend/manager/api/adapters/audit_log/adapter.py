@@ -30,8 +30,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 
@@ -135,20 +133,11 @@ class AuditLogAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
         if f.AND:
-            for sub_filter in f.AND:
-                conditions.extend(self._convert_filter(sub_filter))
+            conditions.extend(self.convert_and([self._convert_filter(sub) for sub in f.AND]))
         if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in f.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(self.convert_or([self._convert_filter(sub) for sub in f.OR]))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in f.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(self.convert_not([self._convert_filter(sub) for sub in f.NOT]))
         return conditions
 
     @staticmethod

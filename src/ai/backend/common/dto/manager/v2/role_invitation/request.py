@@ -11,7 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import BaseFilter, OrderDirection
 from ai.backend.common.dto.manager.v2.role_invitation.types import RoleInvitationStateDTO
 
 
@@ -83,19 +83,13 @@ class RoleNestedFilter(BaseRequestModel):
     name: StringFilter | None = None
 
 
-RoleNestedFilter.model_rebuild()
-
-
 class UserNestedFilter(BaseRequestModel):
     """Nested filter for a user (inviter or invitee) of an invitation."""
 
     email: StringFilter | None = None
 
 
-UserNestedFilter.model_rebuild()
-
-
-class RoleInvitationFilter(BaseRequestModel):
+class RoleInvitationFilter(BaseFilter):
     """Filter for role invitations."""
 
     state: RoleInvitationStateFilter | None = None
@@ -103,12 +97,6 @@ class RoleInvitationFilter(BaseRequestModel):
     role: RoleNestedFilter | None = None
     inviter: UserNestedFilter | None = None
     invitee: UserNestedFilter | None = None
-    AND: list[RoleInvitationFilter] | None = None
-    OR: list[RoleInvitationFilter] | None = None
-    NOT: list[RoleInvitationFilter] | None = None
-
-
-RoleInvitationFilter.model_rebuild()
 
 
 class SearchRoleInvitationsInput(BaseRequestModel):

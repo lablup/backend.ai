@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusFilter,
     OrderDirection,
 )
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 __all__ = (
     "AdminSearchAgentsInput",
@@ -42,7 +43,7 @@ class AgentPathParam(BaseRequestModel):
 # ---------------------------------------------------------------------------
 
 
-class AgentFilter(BaseRequestModel):
+class AgentFilter(BaseFilter):
     """Filter conditions for agent search."""
 
     id: StringFilter | None = Field(
@@ -65,18 +66,6 @@ class AgentFilter(BaseRequestModel):
             "and their case-insensitive and negated variants."
         ),
     )
-    AND: list[AgentFilter] | None = Field(
-        default=None, description="All sub-conditions must match."
-    )
-    OR: list[AgentFilter] | None = Field(
-        default=None, description="At least one sub-condition must match."
-    )
-    NOT: list[AgentFilter] | None = Field(
-        default=None, description="None of the sub-conditions must match."
-    )
-
-
-AgentFilter.model_rebuild()
 
 
 class AgentOrder(BaseRequestModel):

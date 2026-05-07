@@ -11,6 +11,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import ArtifactRegistryType
 
@@ -98,7 +99,7 @@ class ArtifactOrderingInput(BaseRequestModel):
     )
 
 
-class ArtifactFilterInput(BaseRequestModel):
+class ArtifactFilterInput(BaseFilter):
     """Filtering options for artifacts, supporting recursive AND/OR/NOT composition."""
 
     artifact_type: list[str] | None = Field(default=None, description="Filter by artifact type(s)")
@@ -120,9 +121,6 @@ class ArtifactFilterInput(BaseRequestModel):
     availability: list[str] | None = Field(
         default=None, description="Filter by availability status"
     )
-    AND: list[ArtifactFilterInput] | None = Field(default=None, description="AND filter group")
-    OR: list[ArtifactFilterInput] | None = Field(default=None, description="OR filter group")
-    NOT: list[ArtifactFilterInput] | None = Field(default=None, description="NOT filter group")
 
 
 # ---------------------------------------------------------------------------

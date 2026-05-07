@@ -31,8 +31,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
@@ -89,20 +87,11 @@ class ServiceCatalogAdapter(BaseAdapter):
         if filter.status is not None:
             conditions.extend(self._convert_status_filter(filter.status))
         if filter.AND:
-            for sub in filter.AND:
-                conditions.extend(self._convert_filter(sub))
+            conditions.extend(self.convert_and([self._convert_filter(sub) for sub in filter.AND]))
         if filter.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter.OR:
-                or_conds.extend(self._convert_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
+            conditions.extend(self.convert_or([self._convert_filter(sub) for sub in filter.OR]))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
-            for sub in filter.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+            conditions.extend(self.convert_not([self._convert_filter(sub) for sub in filter.NOT]))
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:

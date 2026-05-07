@@ -37,8 +37,6 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -313,22 +311,19 @@ class DomainAdapter(BaseAdapter):
                 conditions.append(DomainConditions.by_user_is_active(filter.user.is_active))
 
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_domain_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_domain_filter(sub) for sub in filter.AND])
+            )
 
         if filter.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_sub_conditions.extend(self._convert_domain_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_domain_filter(sub) for sub in filter.OR])
+            )
 
         if filter.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_sub_conditions.extend(self._convert_domain_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_domain_filter(sub) for sub in filter.NOT])
+            )
 
         return conditions
 

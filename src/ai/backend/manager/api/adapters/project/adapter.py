@@ -56,8 +56,6 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -374,22 +372,19 @@ class ProjectAdapter(BaseAdapter):
             conditions.extend(self._convert_user_nested_filter(filter.user))
 
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_group_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_group_filter(sub) for sub in filter.AND])
+            )
 
         if filter.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_sub_conditions.extend(self._convert_group_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_group_filter(sub) for sub in filter.OR])
+            )
 
         if filter.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_sub_conditions.extend(self._convert_group_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_group_filter(sub) for sub in filter.NOT])
+            )
 
         return conditions
 
@@ -420,8 +415,7 @@ class ProjectAdapter(BaseAdapter):
             in_factory=GroupConditions.by_domain_name_in,
         )
 
-    @staticmethod
-    def _convert_type_filter(type_filter: ProjectTypeFilter) -> list[QueryCondition]:
+    def _convert_type_filter(self, type_filter: ProjectTypeFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if type_filter.equals is not None:
             conditions.append(
@@ -432,17 +426,19 @@ class ProjectAdapter(BaseAdapter):
                 GroupConditions.by_type_in([DataProjectType(t.value) for t in type_filter.in_])
             )
         if type_filter.not_equals is not None:
-            conditions.append(
-                negate_conditions([
-                    GroupConditions.by_type_equals(DataProjectType(type_filter.not_equals.value))
+            conditions.extend(
+                self.convert_not([
+                    [GroupConditions.by_type_equals(DataProjectType(type_filter.not_equals.value))]
                 ])
             )
         if type_filter.not_in is not None:
-            conditions.append(
-                negate_conditions([
-                    GroupConditions.by_type_in([
-                        DataProjectType(t.value) for t in type_filter.not_in
-                    ])
+            conditions.extend(
+                self.convert_not([
+                    [
+                        GroupConditions.by_type_in([
+                            DataProjectType(t.value) for t in type_filter.not_in
+                        ])
+                    ]
                 ])
             )
         return conditions

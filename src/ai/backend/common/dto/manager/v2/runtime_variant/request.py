@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import BaseFilter, OrderDirection
 from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
 
 
@@ -29,14 +29,8 @@ class DeleteRuntimeVariantsInput(BaseRequestModel):
     ids: list[UUID] = Field(description="List of runtime variant UUIDs to delete.")
 
 
-class RuntimeVariantFilter(BaseRequestModel):
+class RuntimeVariantFilter(BaseFilter):
     name: StringFilter | None = Field(default=None)
-    AND: list[RuntimeVariantFilter] | None = Field(default=None)
-    OR: list[RuntimeVariantFilter] | None = Field(default=None)
-    NOT: list[RuntimeVariantFilter] | None = Field(default=None)
-
-
-RuntimeVariantFilter.model_rebuild()
 
 
 class RuntimeVariantOrder(BaseRequestModel):

@@ -11,6 +11,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import ImageOrderField, ImageStatusType, OrderDirection
 
@@ -73,7 +74,7 @@ class ImageAliasNestedFilterInputDTO(BaseRequestModel):
     alias: StringFilter | None = Field(default=None, description="Filter by alias string.")
 
 
-class ImageFilterInputDTO(BaseRequestModel):
+class ImageFilterInputDTO(BaseFilter):
     """Filter options for images."""
 
     id: UUIDFilter | None = Field(default=None, description="Filter by image UUID.")
@@ -89,14 +90,6 @@ class ImageFilterInputDTO(BaseRequestModel):
     last_used: DateTimeFilter | None = Field(
         default=None, description="Filter by last used datetime (before/after)."
     )
-    AND: list[ImageFilterInputDTO] | None = Field(
-        default=None, description="Combine with AND logic."
-    )
-    OR: list[ImageFilterInputDTO] | None = Field(default=None, description="Combine with OR logic.")
-    NOT: list[ImageFilterInputDTO] | None = Field(default=None, description="Negate filters.")
-
-
-ImageFilterInputDTO.model_rebuild()
 
 
 class ImageOrderByInputDTO(BaseRequestModel):
@@ -106,21 +99,11 @@ class ImageOrderByInputDTO(BaseRequestModel):
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
 
 
-class ImageAliasFilterInputDTO(BaseRequestModel):
+class ImageAliasFilterInputDTO(BaseFilter):
     """Filter options for image aliases."""
 
     alias: StringFilter | None = Field(default=None, description="Filter by alias string.")
     image_id: UUIDFilter | None = Field(default=None, description="Filter by image ID.")
-    AND: list[ImageAliasFilterInputDTO] | None = Field(
-        default=None, description="Combine with AND logic."
-    )
-    OR: list[ImageAliasFilterInputDTO] | None = Field(
-        default=None, description="Combine with OR logic."
-    )
-    NOT: list[ImageAliasFilterInputDTO] | None = Field(default=None, description="Negate filters.")
-
-
-ImageAliasFilterInputDTO.model_rebuild()
 
 
 class ImageAliasOrderByInputDTO(BaseRequestModel):

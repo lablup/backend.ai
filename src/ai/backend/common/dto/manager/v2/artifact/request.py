@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import (
     ArtifactAvailability,
@@ -291,7 +292,7 @@ class ArtifactStatusChangedInputDTO(BaseRequestModel):
     artifact_revision_ids: list[UUID] = Field(description="List of artifact revision IDs to watch.")
 
 
-class ArtifactGQLFilterInputDTO(BaseRequestModel):
+class ArtifactGQLFilterInputDTO(BaseFilter):
     """GQL-facing filter for artifacts."""
 
     type: list[ArtifactType] | None = Field(default=None)
@@ -299,12 +300,6 @@ class ArtifactGQLFilterInputDTO(BaseRequestModel):
     registry: StringFilter | None = Field(default=None)
     source: StringFilter | None = Field(default=None)
     availability: list[ArtifactAvailability] | None = Field(default=None)
-    AND: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
-    OR: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
-    NOT: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
-
-
-ArtifactGQLFilterInputDTO.model_rebuild()
 
 
 class ArtifactGQLOrderByInputDTO(BaseRequestModel):
@@ -328,7 +323,7 @@ class ArtifactRevisionRemoteStatusFilterDTO(BaseRequestModel):
     equals: ArtifactRemoteStatus | None = Field(default=None)
 
 
-class ArtifactRevisionGQLFilterInputDTO(BaseRequestModel):
+class ArtifactRevisionGQLFilterInputDTO(BaseFilter):
     """GQL-facing filter for artifact revisions."""
 
     status: ArtifactRevisionStatusFilterDTO | None = Field(default=None)
@@ -336,12 +331,6 @@ class ArtifactRevisionGQLFilterInputDTO(BaseRequestModel):
     version: StringFilter | None = Field(default=None)
     artifact_id: UUIDFilter | None = Field(default=None)
     size: IntFilter | None = Field(default=None)
-    AND: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
-    OR: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
-    NOT: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
-
-
-ArtifactRevisionGQLFilterInputDTO.model_rebuild()
 
 
 class ArtifactRevisionGQLOrderByInputDTO(BaseRequestModel):

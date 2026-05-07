@@ -8,6 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import (
     DeploymentHistoryOrderField,
@@ -45,7 +46,7 @@ class SchedulingResultFilter(BaseRequestModel):
     model_config = {"populate_by_name": True}
 
 
-class SessionHistoryFilter(BaseRequestModel):
+class SessionHistoryFilter(BaseFilter):
     """Filter conditions for session scheduling history search."""
 
     id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
@@ -60,12 +61,6 @@ class SessionHistoryFilter(BaseRequestModel):
     message: StringFilter | None = Field(default=None, description="Filter by message")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by created_at")
     updated_at: DateTimeFilter | None = Field(default=None, description="Filter by updated_at")
-    AND: list[SessionHistoryFilter] | None = Field(default=None, description="AND conjunction.")
-    OR: list[SessionHistoryFilter] | None = Field(default=None, description="OR conjunction.")
-    NOT: list[SessionHistoryFilter] | None = Field(default=None, description="NOT negation.")
-
-
-SessionHistoryFilter.model_rebuild()
 
 
 class SessionHistoryOrder(BaseRequestModel):
@@ -86,7 +81,7 @@ class SearchSessionHistoryInput(BaseRequestModel):
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
-class DeploymentHistoryFilter(BaseRequestModel):
+class DeploymentHistoryFilter(BaseFilter):
     """Filter conditions for deployment scheduling history search."""
 
     id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
@@ -101,12 +96,6 @@ class DeploymentHistoryFilter(BaseRequestModel):
     message: StringFilter | None = Field(default=None, description="Filter by message")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by created_at")
     updated_at: DateTimeFilter | None = Field(default=None, description="Filter by updated_at")
-    AND: list[DeploymentHistoryFilter] | None = Field(default=None, description="AND conjunction.")
-    OR: list[DeploymentHistoryFilter] | None = Field(default=None, description="OR conjunction.")
-    NOT: list[DeploymentHistoryFilter] | None = Field(default=None, description="NOT negation.")
-
-
-DeploymentHistoryFilter.model_rebuild()
 
 
 class DeploymentHistoryOrder(BaseRequestModel):
@@ -127,7 +116,7 @@ class SearchDeploymentHistoryInput(BaseRequestModel):
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
-class RouteHistoryFilter(BaseRequestModel):
+class RouteHistoryFilter(BaseFilter):
     """Filter conditions for route scheduling history search."""
 
     id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
@@ -143,12 +132,6 @@ class RouteHistoryFilter(BaseRequestModel):
     message: StringFilter | None = Field(default=None, description="Filter by message")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by created_at")
     updated_at: DateTimeFilter | None = Field(default=None, description="Filter by updated_at")
-    AND: list[RouteHistoryFilter] | None = Field(default=None, description="AND conjunction.")
-    OR: list[RouteHistoryFilter] | None = Field(default=None, description="OR conjunction.")
-    NOT: list[RouteHistoryFilter] | None = Field(default=None, description="NOT negation.")
-
-
-RouteHistoryFilter.model_rebuild()
 
 
 class RouteHistoryOrder(BaseRequestModel):

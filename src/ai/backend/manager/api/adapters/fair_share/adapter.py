@@ -87,8 +87,6 @@ from ai.backend.manager.models.fair_share.row import (
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,
@@ -494,8 +492,7 @@ class FairShareAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ filter helpers (domain)
 
-    @staticmethod
-    def _convert_domain_filter(filter: DomainFairShareFilter) -> list[QueryCondition]:
+    def _convert_domain_filter(self, filter: DomainFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -522,24 +519,20 @@ class FairShareAdapter(BaseAdapter):
                 DomainFairShareConditions.by_domain_is_active(filter.domain.is_active)
             )
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_domain_filter(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_domain_filter(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_domain_filter(sub) for sub in filter.NOT])
+            )
         return conditions
 
-    @staticmethod
-    def _convert_domain_filter_rg(filter: DomainFairShareFilter) -> list[QueryCondition]:
+    def _convert_domain_filter_rg(self, filter: DomainFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -566,20 +559,17 @@ class FairShareAdapter(BaseAdapter):
                 DomainFairShareConditions.by_domain_is_active(filter.domain.is_active)
             )
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_domain_filter_rg(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_domain_filter_rg(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_domain_filter_rg(sub) for sub in filter.NOT])
+            )
         return conditions
 
     @staticmethod
@@ -616,8 +606,7 @@ class FairShareAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ filter helpers (project)
 
-    @staticmethod
-    def _convert_project_filter(filter: ProjectFairShareFilter) -> list[QueryCondition]:
+    def _convert_project_filter(self, filter: ProjectFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -651,24 +640,20 @@ class FairShareAdapter(BaseAdapter):
                 ProjectFairShareConditions.by_project_is_active(filter.project.is_active)
             )
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_project_filter(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_project_filter(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_project_filter(sub) for sub in filter.NOT])
+            )
         return conditions
 
-    @staticmethod
-    def _convert_project_filter_rg(filter: ProjectFairShareFilter) -> list[QueryCondition]:
+    def _convert_project_filter_rg(self, filter: ProjectFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -702,20 +687,17 @@ class FairShareAdapter(BaseAdapter):
                 ProjectFairShareConditions.by_project_is_active(filter.project.is_active)
             )
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_project_filter_rg(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_project_filter_rg(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_project_filter_rg(sub) for sub in filter.NOT])
+            )
         return conditions
 
     @staticmethod
@@ -746,8 +728,7 @@ class FairShareAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ filter helpers (user)
 
-    @staticmethod
-    def _convert_user_filter(filter: UserFairShareFilter) -> list[QueryCondition]:
+    def _convert_user_filter(self, filter: UserFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -786,24 +767,20 @@ class FairShareAdapter(BaseAdapter):
         if filter.user is not None and filter.user.is_active is not None:
             conditions.append(UserFairShareConditions.by_user_is_active(filter.user.is_active))
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_user_filter(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_user_filter(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_user_filter(sub) for sub in filter.NOT])
+            )
         return conditions
 
-    @staticmethod
-    def _convert_user_filter_rg(filter: UserFairShareFilter) -> list[QueryCondition]:
+    def _convert_user_filter_rg(self, filter: UserFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -842,20 +819,17 @@ class FairShareAdapter(BaseAdapter):
         if filter.user is not None and filter.user.is_active is not None:
             conditions.append(UserFairShareConditions.by_user_is_active(filter.user.is_active))
         if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_user_filter_rg(sub) for sub in filter.AND])
+            )
         if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_user_filter_rg(sub) for sub in filter.OR])
+            )
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_user_filter_rg(sub) for sub in filter.NOT])
+            )
         return conditions
 
     @staticmethod

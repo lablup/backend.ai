@@ -8,7 +8,11 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import (
+    BaseFilter,
+    BinarySizeInput,
+    ResourceSlotEntryInput,
+)
 from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
@@ -58,19 +62,13 @@ class UpdateResourcePresetInput(BaseRequestModel):
     )
 
 
-class ResourcePresetFilter(BaseRequestModel):
+class ResourcePresetFilter(BaseFilter):
     """Filter criteria for searching resource presets."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     resource_group_name: StringFilter | None = Field(
         default=None, description="Filter by resource group name."
     )
-    AND: list[ResourcePresetFilter] | None = Field(default=None, description="AND conjunction.")
-    OR: list[ResourcePresetFilter] | None = Field(default=None, description="OR conjunction.")
-    NOT: list[ResourcePresetFilter] | None = Field(default=None, description="NOT negation.")
-
-
-ResourcePresetFilter.model_rebuild()
 
 
 class ResourcePresetOrder(BaseRequestModel):

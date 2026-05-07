@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import (
     OperationTypeFilter,
@@ -201,50 +202,32 @@ class ReplaceRolePermissionsInput(BaseRequestModel):
     )
 
 
-class RoleFilter(BaseRequestModel):
+class RoleFilter(BaseFilter):
     """Filter for roles."""
 
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
-    AND: list[RoleFilter] | None = None
-    OR: list[RoleFilter] | None = None
-    NOT: list[RoleFilter] | None = None
 
 
-RoleFilter.model_rebuild()
-
-
-class RoleNestedFilter(BaseRequestModel):
+class RoleNestedFilter(BaseFilter):
     """Nested filter for roles within a role assignment."""
 
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
-    AND: list[RoleNestedFilter] | None = None
-    OR: list[RoleNestedFilter] | None = None
-    NOT: list[RoleNestedFilter] | None = None
 
 
-RoleNestedFilter.model_rebuild()
-
-
-class PermissionNestedFilter(BaseRequestModel):
+class PermissionNestedFilter(BaseFilter):
     """Nested filter for permissions within a role assignment."""
 
     scope_id: StringFilter | None = None
     scope_type: RBACElementTypeFilter | None = None
     entity_type: RBACElementTypeFilter | None = None
     operation: OperationTypeFilter | None = None
-    AND: list[PermissionNestedFilter] | None = None
-    OR: list[PermissionNestedFilter] | None = None
-    NOT: list[PermissionNestedFilter] | None = None
 
 
-PermissionNestedFilter.model_rebuild()
-
-
-class RoleAssignmentFilter(BaseRequestModel):
+class RoleAssignmentFilter(BaseFilter):
     """Filter for role assignments."""
 
     role_id: UUIDFilter | None = None
@@ -252,28 +235,16 @@ class RoleAssignmentFilter(BaseRequestModel):
     permission: PermissionNestedFilter | None = None
     username: StringFilter | None = None
     email: StringFilter | None = None
-    AND: list[RoleAssignmentFilter] | None = None
-    OR: list[RoleAssignmentFilter] | None = None
-    NOT: list[RoleAssignmentFilter] | None = None
 
 
-RoleAssignmentFilter.model_rebuild()
-
-
-class EntityFilter(BaseRequestModel):
+class EntityFilter(BaseFilter):
     """Filter for entity associations."""
 
     entity_type: RBACElementTypeFilter | None = None
     entity_id: StringFilter | None = None
-    AND: list[EntityFilter] | None = None
-    OR: list[EntityFilter] | None = None
-    NOT: list[EntityFilter] | None = None
 
 
-EntityFilter.model_rebuild()
-
-
-class PermissionFilter(BaseRequestModel):
+class PermissionFilter(BaseFilter):
     """Filter for scoped permissions."""
 
     role_id: UUIDFilter | None = None
@@ -281,12 +252,6 @@ class PermissionFilter(BaseRequestModel):
     scope_id: StringFilter | None = None
     entity_type: RBACElementTypeFilter | None = None
     created_at: DateTimeFilter | None = None
-    AND: list[PermissionFilter] | None = None
-    OR: list[PermissionFilter] | None = None
-    NOT: list[PermissionFilter] | None = None
-
-
-PermissionFilter.model_rebuild()
 
 
 class RoleOrderBy(BaseRequestModel):

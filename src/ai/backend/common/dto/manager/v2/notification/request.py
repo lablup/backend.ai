@@ -11,6 +11,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 
 from .types import (
     NotificationChannelOrderField,
@@ -233,7 +234,7 @@ class NotificationChannelTypeFilter(BaseRequestModel):
     )
 
 
-class NotificationChannelFilter(BaseRequestModel):
+class NotificationChannelFilter(BaseFilter):
     """Filter for notification channel search queries."""
 
     name: StringFilter | None = Field(default=None, description="Filter by channel name")
@@ -241,16 +242,6 @@ class NotificationChannelFilter(BaseRequestModel):
         default=None, description="Filter by channel type"
     )
     enabled: bool | None = Field(default=None, description="Filter by enabled status")
-    AND: list[NotificationChannelFilter] | None = Field(
-        default=None, description="Combine with AND logic"
-    )
-    OR: list[NotificationChannelFilter] | None = Field(
-        default=None, description="Combine with OR logic"
-    )
-    NOT: list[NotificationChannelFilter] | None = Field(default=None, description="Negate filters")
-
-
-NotificationChannelFilter.model_rebuild()
 
 
 class NotificationChannelOrder(BaseRequestModel):
@@ -290,7 +281,7 @@ class NotificationRuleTypeFilter(BaseRequestModel):
     )
 
 
-class NotificationRuleFilter(BaseRequestModel):
+class NotificationRuleFilter(BaseFilter):
     """Filter for notification rule search queries."""
 
     name: StringFilter | None = Field(default=None, description="Filter by rule name")
@@ -298,16 +289,6 @@ class NotificationRuleFilter(BaseRequestModel):
         default=None, description="Filter by rule type"
     )
     enabled: bool | None = Field(default=None, description="Filter by enabled status")
-    AND: list[NotificationRuleFilter] | None = Field(
-        default=None, description="Combine with AND logic"
-    )
-    OR: list[NotificationRuleFilter] | None = Field(
-        default=None, description="Combine with OR logic"
-    )
-    NOT: list[NotificationRuleFilter] | None = Field(default=None, description="Negate filters")
-
-
-NotificationRuleFilter.model_rebuild()
 
 
 class NotificationRuleOrder(BaseRequestModel):

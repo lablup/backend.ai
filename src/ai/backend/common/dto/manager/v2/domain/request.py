@@ -10,6 +10,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.common import BaseFilter
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
     DomainProjectFilter,
@@ -92,7 +93,7 @@ class PurgeDomainInput(BaseRequestModel):
     name: str = Field(description="Name of the domain to permanently purge.")
 
 
-class DomainFilter(BaseRequestModel):
+class DomainFilter(BaseFilter):
     """Filter criteria for searching domains."""
 
     name: StringFilter | None = Field(default=None, description="Filter by domain name.")
@@ -108,12 +109,6 @@ class DomainFilter(BaseRequestModel):
     user: DomainUserFilter | None = Field(
         default=None, description="Filter by nested user conditions."
     )
-    AND: list[DomainFilter] | None = Field(default=None, description="AND logical combinator.")
-    OR: list[DomainFilter] | None = Field(default=None, description="OR logical combinator.")
-    NOT: list[DomainFilter] | None = Field(default=None, description="NOT logical combinator.")
-
-
-DomainFilter.model_rebuild()
 
 
 class DomainOrder(BaseRequestModel):

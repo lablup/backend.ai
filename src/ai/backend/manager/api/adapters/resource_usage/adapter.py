@@ -54,8 +54,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketConditions,
@@ -702,22 +700,19 @@ class ResourceUsageAdapter(BaseAdapter):
                 conditions.append(pe_condition)
 
         if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_domain_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_domain_filter(sub) for sub in filter_req.AND])
+            )
 
         if filter_req.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_conditions.extend(self._convert_domain_filter(sub_filter))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+            conditions.extend(
+                self.convert_or([self._convert_domain_filter(sub) for sub in filter_req.OR])
+            )
 
         if filter_req.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_conditions.extend(self._convert_domain_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+            conditions.extend(
+                self.convert_not([self._convert_domain_filter(sub) for sub in filter_req.NOT])
+            )
 
         return conditions
 
@@ -794,22 +789,19 @@ class ResourceUsageAdapter(BaseAdapter):
                 conditions.append(pe_condition)
 
         if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_project_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_project_filter(sub) for sub in filter_req.AND])
+            )
 
         if filter_req.OR:
-            or_conditions_p: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_conditions_p.extend(self._convert_project_filter(sub_filter))
-            if or_conditions_p:
-                conditions.append(combine_conditions_or(or_conditions_p))
+            conditions.extend(
+                self.convert_or([self._convert_project_filter(sub) for sub in filter_req.OR])
+            )
 
         if filter_req.NOT:
-            not_conditions_p: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_conditions_p.extend(self._convert_project_filter(sub_filter))
-            if not_conditions_p:
-                conditions.append(negate_conditions(not_conditions_p))
+            conditions.extend(
+                self.convert_not([self._convert_project_filter(sub) for sub in filter_req.NOT])
+            )
 
         return conditions
 
@@ -895,22 +887,19 @@ class ResourceUsageAdapter(BaseAdapter):
                 conditions.append(pe_condition)
 
         if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_user_filter(sub_filter))
+            conditions.extend(
+                self.convert_and([self._convert_user_filter(sub) for sub in filter_req.AND])
+            )
 
         if filter_req.OR:
-            or_conditions_u: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_conditions_u.extend(self._convert_user_filter(sub_filter))
-            if or_conditions_u:
-                conditions.append(combine_conditions_or(or_conditions_u))
+            conditions.extend(
+                self.convert_or([self._convert_user_filter(sub) for sub in filter_req.OR])
+            )
 
         if filter_req.NOT:
-            not_conditions_u: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_conditions_u.extend(self._convert_user_filter(sub_filter))
-            if not_conditions_u:
-                conditions.append(negate_conditions(not_conditions_u))
+            conditions.extend(
+                self.convert_not([self._convert_user_filter(sub) for sub in filter_req.NOT])
+            )
 
         return conditions
 
