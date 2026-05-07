@@ -6,7 +6,10 @@ from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.role import ScopeChainPermissionCheckInput
+from ai.backend.manager.data.permission.role import (
+    PermissionResolutionKey,
+    ScopeChainPermissionCheckInput,
+)
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -33,12 +36,16 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
         if user.is_superadmin:
             return
 
+        target = action.target_element()
         allowed = await self._repository.check_permission_with_scope_chain(
             ScopeChainPermissionCheckInput(
-                user_id=user.user_id,
-                target_element_ref=action.target_element(),
+                key=PermissionResolutionKey(
+                    user_id=user.user_id,
+                    element_type=target.element_type,
+                    entity_id=target.element_id,
+                    subject_entity_type=target.element_type,
+                ),
                 operation=action.operation_type().to_permission_operation(),
-                permission_entity_type=None,
             )
         )
         if not allowed:
