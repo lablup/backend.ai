@@ -6,9 +6,11 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.common.data.permission.types import OperationType
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.data.permission.role import PermissionResolutionKey
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.rbac.response import EntityNode  # pants: no-infer-dep
@@ -681,6 +683,20 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_roles_by_ids(ids)
             return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def effective_permissions_loader(
+        self,
+    ) -> DataLoader[PermissionResolutionKey, frozenset[OperationType]]:
+        adapter = self._adapters.rbac
+
+        async def load_fn(
+            keys: list[PermissionResolutionKey],
+        ) -> list[frozenset[OperationType]]:
+            result = await adapter.batch_resolve_effective_permissions(keys)
+            return [result.get(key, frozenset()) for key in keys]
 
         return DataLoader(load_fn=load_fn)
 

@@ -27,6 +27,8 @@ from .actions import (
     PurgeRoleAction,
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
+    ResolveEffectivePermissionsAction,
+    ResolveEffectivePermissionsActionResult,
     RevokeRoleAction,
     RevokeRoleActionResult,
     SearchRolesAction,
@@ -139,6 +141,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     get_permission_matrix: ActionProcessor[
         GetPermissionMatrixAction, GetPermissionMatrixActionResult
     ]
+    resolve_effective_permissions: ActionProcessor[
+        ResolveEffectivePermissionsAction, ResolveEffectivePermissionsActionResult
+    ]
     search_entities: ActionProcessor[SearchEntitiesAction, SearchEntitiesActionResult]
     search_element_associations: ActionProcessor[
         SearchElementAssociationsAction, SearchElementAssociationsActionResult
@@ -211,6 +216,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
         self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
         self.get_permission_matrix = ActionProcessor(service.get_permission_matrix, action_monitors)
+        self.resolve_effective_permissions = ActionProcessor(
+            service.resolve_effective_permissions, action_monitors
+        )
         self.search_entities = ActionProcessor(service.search_entities, action_monitors)
         self.search_element_associations = ActionProcessor(
             service.search_element_associations, action_monitors
@@ -275,6 +283,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             GetScopeTypesAction.spec(),
             GetEntityTypesAction.spec(),
             GetPermissionMatrixAction.spec(),
+            ResolveEffectivePermissionsAction.spec(),
             SearchEntitiesAction.spec(),
             SearchElementAssociationsAction.spec(),
             SearchPermissionsAction.spec(),

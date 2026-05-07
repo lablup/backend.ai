@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
@@ -175,6 +175,7 @@ from ai.backend.manager.data.permission.role import (
     BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
+    PermissionResolutionKey,
     RoleData,
     RoleDetailData,
     UserRoleAssignmentData,
@@ -267,6 +268,9 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.resolve_effective_permissions import (
+    ResolveEffectivePermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
@@ -634,6 +638,18 @@ class RBACAdapter(BaseAdapter):
             )
             for scope, entity_map in sorted(matrix.items(), key=lambda e: e[0].value)
         ]
+
+    # ------------------------------------------------------------------ effective permissions
+
+    async def batch_resolve_effective_permissions(
+        self,
+        keys: Sequence[PermissionResolutionKey],
+    ) -> Mapping[PermissionResolutionKey, frozenset[InternalOperationType]]:
+        """Resolve granted operations for each input key; missing keys map to an empty frozenset."""
+        action_result = await self._processors.permission_controller.resolve_effective_permissions.wait_for_complete(
+            ResolveEffectivePermissionsAction(keys=list(keys))
+        )
+        return action_result.permissions
 
     # ------------------------------------------------------------------ create
 
