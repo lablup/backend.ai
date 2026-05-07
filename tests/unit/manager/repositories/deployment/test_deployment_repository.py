@@ -18,7 +18,6 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
-from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -3651,37 +3650,6 @@ class TestDeploymentRepositoryDuplicateName:
                 element_type=RBACElementType.PROJECT, element_id=str(group.id)
             ),
         )
-
-    async def test_create_endpoint_raises_when_duplicate_name(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
-        test_image_id: uuid.UUID,
-    ) -> None:
-        """Test that create_endpoint raises DeploymentNameAlreadyExists for duplicate name."""
-        # Create first endpoint with specific name
-        first_creator = self._create_endpoint_creator(
-            name="duplicate-test-endpoint",
-            domain=test_domain,
-            group=test_group,
-            scaling_group=test_scaling_group,
-            image_id=test_image_id,
-        )
-        await deployment_repository.create_endpoint(first_creator)
-
-        # Attempt to create second endpoint with same name should fail
-        second_creator = self._create_endpoint_creator(
-            name="duplicate-test-endpoint",
-            domain=test_domain,
-            group=test_group,
-            scaling_group=test_scaling_group,
-            image_id=test_image_id,
-        )
-
-        with pytest.raises(DeploymentNameAlreadyExists):
-            await deployment_repository.create_endpoint(second_creator)
 
     async def test_create_endpoint_succeeds_with_different_name(
         self,

@@ -25,7 +25,6 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
 )
-from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
@@ -301,9 +300,6 @@ class DeploymentDBSource:
         spec = cast(DeploymentCreatorSpec, creator.spec)
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, spec.metadata.domain, spec.metadata.project_id)
-            await self._check_endpoint_name_exists(
-                db_sess, spec.metadata.domain, spec.metadata.project_id, spec.metadata.name
-            )
 
             # Create endpoint with RBAC scope association
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
@@ -366,36 +362,6 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         if result.first() is None:
             raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
-
-    async def _check_endpoint_name_exists(
-        self,
-        db_sess: SASession,
-        domain_name: str,
-        project_id: uuid.UUID,
-        name: str,
-    ) -> None:
-        """Check if endpoint name already exists in the project.
-
-        Raises:
-            DeploymentNameAlreadyExists: If an endpoint with the same name exists.
-        """
-        query = (
-            sa.select(EndpointRow.id)
-            .where(
-                sa.and_(
-                    EndpointRow.domain == domain_name,
-                    EndpointRow.project == project_id,
-                    EndpointRow.name == name,
-                    EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED,
-                )
-            )
-            .limit(1)
-        )
-        result = await db_sess.execute(query)
-        if result.first() is not None:
-            raise DeploymentNameAlreadyExists(
-                f"Deployment with name '{name}' already exists in this project"
-            )
 
     async def get_image_id(self, image: ImageIdentifier) -> ImageID:
         """Get image ID from ImageIdentifier.
