@@ -368,13 +368,14 @@ class TestDeploymentAdapterFilter:
         scaling_group: str,
         seed_data: tuple[ImageID, VFolderUUID],
         tags: list[str],
+        name: str | None = None,
     ) -> uuid.UUID:
         image_id, vfolder_id = seed_data
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=project_id,
                 domain_name=domain,
-                name=f"test-deployment-{secrets.token_hex(4)}",
+                name=name or f"test-deployment-{secrets.token_hex(4)}",
                 tags=tags,
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -501,6 +502,81 @@ class TestDeploymentAdapterFilter:
 
         assert payload.total_count == 2
         assert {item.id for item in payload.items} == {alpha_id, beta_id}
+
+    async def test_my_search_or_filter_groups_multi_field_subfilters(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        admin_user_fixture: UserFixtureData,
+        deployment_adapter: DeploymentAdapter,
+        group_fixture: uuid.UUID,
+        domain_fixture: str,
+        scaling_group_fixture: str,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
+    ) -> None:
+        """OR with multi-field sub-filters must AND fields within each branch.
+
+        Pins ``(A AND B) OR (C AND D)`` semantics: each OR sub-filter is an AND
+        of its own fields, then the sub-filters are OR'd. A regression that
+        flattens sub-conditions would degenerate into ``A OR B OR C OR D`` and
+        return rows that match neither full branch.
+        """
+        suffix = secrets.token_hex(4)
+        branch1_id = await self._create_deployment_with_tags(
+            admin_registry,
+            group_fixture,
+            domain_fixture,
+            scaling_group_fixture,
+            deployment_seed_data,
+            ["alpha"],
+            name=f"bar-x-{suffix}",
+        )
+        branch2_id = await self._create_deployment_with_tags(
+            admin_registry,
+            group_fixture,
+            domain_fixture,
+            scaling_group_fixture,
+            deployment_seed_data,
+            ["beta"],
+            name=f"foo-x-{suffix}",
+        )
+        await self._create_deployment_with_tags(
+            admin_registry,
+            group_fixture,
+            domain_fixture,
+            scaling_group_fixture,
+            deployment_seed_data,
+            ["beta"],
+            name=f"bar-y-{suffix}",
+        )
+        await self._create_deployment_with_tags(
+            admin_registry,
+            group_fixture,
+            domain_fixture,
+            scaling_group_fixture,
+            deployment_seed_data,
+            ["alpha"],
+            name=f"foo-y-{suffix}",
+        )
+
+        filter_input = DeploymentFilterV2(
+            OR=[
+                DeploymentFilterV2(
+                    name=StringFilter(i_contains="bar"),
+                    tags=StringFilter(i_contains="alpha"),
+                ),
+                DeploymentFilterV2(
+                    name=StringFilter(i_contains="foo"),
+                    tags=StringFilter(i_contains="beta"),
+                ),
+            ],
+        )
+        with with_user(self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture)):
+            payload = await deployment_adapter.my_search(
+                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+            )
+
+        assert payload.total_count == 2
+        assert {item.id for item in payload.items} == {branch1_id, branch2_id}
 
     async def test_project_search_and_filter_returns_intersection(
         self,

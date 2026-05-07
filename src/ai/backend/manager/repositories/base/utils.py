@@ -24,6 +24,23 @@ def combine_conditions_or(conditions: list[QueryCondition]) -> QueryCondition:
     return inner
 
 
+def combine_conditions_and(conditions: list[QueryCondition]) -> QueryCondition:
+    """Combine multiple QueryConditions with AND logic.
+
+    Args:
+        conditions: List of QueryCondition callables to combine
+
+    Returns:
+        A single QueryCondition that applies all conditions with AND logic
+    """
+
+    def inner() -> sa.sql.expression.ColumnElement[bool]:
+        clauses = [cond() for cond in conditions]
+        return sa.and_(*clauses)
+
+    return inner
+
+
 def negate_conditions(conditions: list[QueryCondition]) -> QueryCondition:
     """Negate multiple QueryConditions with NOT logic.
 
