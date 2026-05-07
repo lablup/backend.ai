@@ -152,7 +152,6 @@ class EntityType(enum.StrEnum):
     SESSION_KERNEL = "session:kernel"
     SESSION_FILE = "session:file"
     SESSION_DIRECTORY = "session:directory"
-    SESSION_APP = "session:app"
     SESSION_APP_SERVICE = "session:app_service"
     SESSION_COMMIT = "session:commit"
     SESSION_STATUS_HISTORY = "session:status_history"
@@ -229,7 +228,7 @@ class EntityType(enum.StrEnum):
     GROUP_USAGE = "group:usage"
     # User sub
     USER_STATS = "user:stats"
-    USER_NAME = "user:name"
+    USER_EMAIL = "user:email"
     # Agent sub
     AGENT_WATCHER = "agent:watcher"
     AGENT_REGISTRY = "agent:registry"
@@ -425,8 +424,8 @@ class RBACElementType(enum.StrEnum):
     # access to listings/detail (parent) and access to internal data or
     # sub-operations (child) can be granted independently.
     VFOLDER_DATA = "vfolder:data"
-    SESSION_APP = "session:app"
-    USER_NAME = "user:name"
+    SESSION_APP_SERVICE = "session:app_service"
+    USER_EMAIL = "user:email"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"
@@ -499,14 +498,14 @@ _VFOLDER_DATA_OWNER_OPS: frozenset[OperationType] = frozenset({
 })
 
 _ADMIN_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
-    # vfolder:data and session:app are owner-only — admins of the parent scope
+    # vfolder:data and session:app_service are owner-only — admins of the parent scope
     # have access to listings/metadata but not to internal data or app endpoints.
     RBACElementType.VFOLDER_DATA: frozenset(),
-    RBACElementType.SESSION_APP: frozenset(),
+    RBACElementType.SESSION_APP_SERVICE: frozenset(),
 }
 _OWNER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
     RBACElementType.VFOLDER_DATA: _VFOLDER_DATA_OWNER_OPS,
-    RBACElementType.SESSION_APP: _READ_ONLY_OPS,
+    RBACElementType.SESSION_APP_SERVICE: _READ_ONLY_OPS,
 }
 _MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
     # Members of a project may create their own sessions, vfolders,
@@ -519,7 +518,7 @@ _MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
     }),
     # Owner-only sub-entities — members of the parent scope have no access.
     RBACElementType.VFOLDER_DATA: frozenset(),
-    RBACElementType.SESSION_APP: frozenset(),
+    RBACElementType.SESSION_APP_SERVICE: frozenset(),
 }
 
 

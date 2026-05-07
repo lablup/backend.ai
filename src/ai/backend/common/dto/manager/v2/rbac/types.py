@@ -121,8 +121,8 @@ class RBACElementTypeDTO(StrEnum):
 
     # Sub-entity permissions split from parent metadata access
     VFOLDER_DATA = "vfolder:data"
-    SESSION_APP = "session:app"
-    USER_NAME = "user:name"
+    SESSION_APP_SERVICE = "session:app_service"
+    USER_EMAIL = "user:email"
 
     # Entity-level scopes
     ARTIFACT_REVISION = "artifact_revision"

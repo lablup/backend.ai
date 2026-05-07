@@ -37,11 +37,11 @@ _MEMBER_CREATE_ENTITIES: frozenset[RBACElementType] = frozenset({
     RBACElementType.MODEL_DEPLOYMENT,
 })
 
-# vfolder:data and session:app are owner-only — admin and member
+# vfolder:data and session:app_service are owner-only — admin and member
 # operation sets are explicitly empty for these types.
 _OWNER_ONLY_ENTITIES: frozenset[RBACElementType] = frozenset({
     RBACElementType.VFOLDER_DATA,
-    RBACElementType.SESSION_APP,
+    RBACElementType.SESSION_APP_SERVICE,
 })
 
 
@@ -83,7 +83,7 @@ class TestMemberCreateOverrides:
 
 
 class TestOwnerOnlyOverrides:
-    """vfolder:data and session:app are accessible only to the resource owner."""
+    """vfolder:data and session:app_service are accessible only to the resource owner."""
 
     @pytest.mark.parametrize("entity_type", sorted(_OWNER_ONLY_ENTITIES, key=str))
     def test_admin_has_no_ops(self, entity_type: RBACElementType) -> None:
@@ -98,8 +98,8 @@ class TestOwnerOnlyOverrides:
         assert owner_operations(RBACElementType.VFOLDER_DATA) == _VFOLDER_DATA_OWNER_OPS
         assert OperationType.SOFT_DELETE not in owner_operations(RBACElementType.VFOLDER_DATA)
 
-    def test_session_app_owner_is_read_only(self) -> None:
-        assert owner_operations(RBACElementType.SESSION_APP) == _READ_ONLY_OPS
+    def test_session_app_service_owner_is_read_only(self) -> None:
+        assert owner_operations(RBACElementType.SESSION_APP_SERVICE) == _READ_ONLY_OPS
 
 
 class TestPurity:
