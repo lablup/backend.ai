@@ -1223,14 +1223,17 @@ class ResourceSlot(UserDict[str, Decimal]):
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping[str, Any]) -> Mapping[str, str]:
-        try:
-            return {
-                k: type(self)._humanize_value(Decimal(v), slot_types[k])
-                for k, v in self.data.items()
-                if v is not None
-            }
-        except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
+        def _resolve_unit(key: str) -> Any:
+            try:
+                return slot_types[key]
+            except KeyError:
+                return type(self)._guess_slot_type(key)
+
+        return {
+            k: type(self)._humanize_value(Decimal(v), _resolve_unit(k))
+            for k, v in self.data.items()
+            if v is not None
+        }
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> ResourceSlot:

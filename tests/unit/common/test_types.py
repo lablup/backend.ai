@@ -257,6 +257,30 @@ def test_resource_slot_serialization() -> None:
     assert r2["b"] == Decimal(0)
 
 
+def test_resource_slot_to_humanized_falls_back_for_unknown_slot() -> None:
+    # Missing keys fall back to the guessed unit instead of raising.
+    r = ResourceSlot({
+        "cpu": "1",
+        "mem": str(Decimal(2 * (2**30))),
+        "cuda.device": "1",
+        "cuda.mem": str(Decimal(1 * (2**30))),
+    })
+    slot_types: dict[str, str] = {"cpu": "count", "mem": "bytes"}
+    humanized = r.to_humanized(slot_types)
+    assert humanized == {
+        "cpu": "1",
+        "mem": "2g",
+        "cuda.device": "1",
+        "cuda.mem": "1g",
+    }
+
+
+def test_resource_slot_to_humanized_with_empty_slot_types() -> None:
+    r = ResourceSlot({"cuda.device": "2", "cuda.mem": str(Decimal(2**30))})
+    humanized = r.to_humanized({})
+    assert humanized == {"cuda.device": "2", "cuda.mem": "1g"}
+
+
 def test_resource_slot_serialization_prevent_scientific_notation() -> None:
     r1 = ResourceSlot({"a": "2E+1", "b": "200"})
     assert r1.to_json()["a"] == "20"
