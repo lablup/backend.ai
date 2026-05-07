@@ -700,7 +700,12 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        result = await self._vfolder_repository.delete_vfolders_forever(
+            [action.vfolder_uuid],
+            cascade_model_card=action.cascade_model_card,
+        )
+        if result.failures:
+            raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -720,7 +725,9 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        result = await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        if result.failures:
+            raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -1820,7 +1827,12 @@ class VFolderService:
         return DeleteVFolderV2ActionResult(vfolder_id=action.vfolder_id)
 
     async def purge_v2(self, action: PurgeVFolderV2Action) -> PurgeVFolderV2ActionResult:
-        """Permanently purge a vfolder by ID. RBAC enforced at processor level."""
+        """Permanently purge a vfolder by ID. RBAC enforced at processor level.
+
+        Rejects the request when any model card still references the vfolder
+        unless ``action.cascade_model_card`` is True, in which case the linked
+        model card row(s) are removed atomically alongside the vfolder data.
+        """
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
@@ -1833,7 +1845,12 @@ class VFolderService:
             user_uuid=me.user_id,
         )
 
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_id])
+        result = await self._vfolder_repository.delete_vfolders_forever(
+            [action.vfolder_id],
+            cascade_model_card=action.cascade_model_card,
+        )
+        if result.failures:
+            raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
         return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
 

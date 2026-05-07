@@ -19,13 +19,13 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    BulkDeleteModelCardsInput as BulkDeleteCardsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     DeleteModelCardOptions as DeleteOptionsDTO,
-)
-from ai.backend.common.dto.manager.v2.model_card.request import (
-    DeleteModelCardsInput as DeleteCardsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     DeployModelCardInput as DeployInputDTO,
@@ -40,13 +40,16 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput as UpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
+    BulkDeleteModelCardsPayload as BulkDeleteCardsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.response import (
+    BulkDeleteModelCardV2Error as BulkDeleteModelCardV2ErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.response import (
     CreateModelCardPayload as CreatePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeleteModelCardPayload as DeletePayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.model_card.response import (
-    DeleteModelCardsPayload as DeleteCardsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeployModelCardPayload as DeployPayloadDTO,
@@ -560,29 +563,44 @@ class DeleteModelCardOptionsGQL(PydanticInputMixin[DeleteOptionsDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Input for deleting multiple model cards.",
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for bulk-deleting multiple model cards.",
     ),
-    name="DeleteModelCardsV2Input",
+    name="BulkDeleteModelCardsV2Input",
 )
-class DeleteModelCardsInputGQL(PydanticInputMixin[DeleteCardsInputDTO]):
+class BulkDeleteModelCardsV2InputGQL(PydanticInputMixin[BulkDeleteCardsInputDTO]):
     ids: list[UUID] = gql_field(description="List of model card UUIDs to delete.")
-    options: DeleteModelCardOptionsGQL | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Options for the delete operation.",
-        ),
+    options: DeleteModelCardOptionsGQL | None = gql_field(
+        description="Options for the delete operation.",
         default=None,
     )
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.2",
+        added_version=NEXT_RELEASE_VERSION,
+        description="Error information for a model card that failed during bulk deletion.",
+    ),
+    model=BulkDeleteModelCardV2ErrorDTO,
+    name="BulkDeleteModelCardV2Error",
+)
+class BulkDeleteModelCardV2ErrorGQL:
+    card_id: UUID = gql_field(description="UUID of the model card that failed to delete.")
+    message: str = gql_field(description="Error message describing the failure.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="Payload for bulk model card deletion.",
     ),
-    model=DeleteCardsPayloadDTO,
-    name="DeleteModelCardsV2Payload",
+    model=BulkDeleteCardsPayloadDTO,
+    name="BulkDeleteModelCardsV2Payload",
 )
-class DeleteModelCardsPayloadGQL(PydanticOutputMixin[DeleteCardsPayloadDTO]):
-    deleted_count: int = gql_field(description="Number of model cards successfully deleted.")
+class BulkDeleteModelCardsV2PayloadGQL:
+    successes: list[UUID] = gql_field(
+        description="UUIDs of model cards that were successfully deleted.",
+    )
+    failed: list[BulkDeleteModelCardV2ErrorGQL] = gql_field(
+        description="List of errors for model cards that failed to delete.",
+    )

@@ -10,7 +10,10 @@ from ai.backend.manager.actions.validator.bulk import (
     DeniedEntity,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.role import BulkPermissionCheckInput
+from ai.backend.manager.data.permission.role import (
+    BulkPermissionCheckInput,
+    PermissionResolutionKey,
+)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -51,21 +54,31 @@ class BulkActionRBACValidator(BulkActionValidator):
                 allowed_entity_ids=entity_ids,
                 denied_entities=[],
             )
+        element_type = action.entity_type().to_element()
+        keys = [
+            PermissionResolutionKey(
+                user_id=user.user_id,
+                element_type=element_type,
+                entity_id=eid,
+                subject_entity_type=element_type,
+            )
+            for eid in entity_ids
+        ]
         permission_map = await self._repository.check_bulk_permission_with_scope_chain(
             BulkPermissionCheckInput(
-                user_id=user.user_id,
-                target_element_type=action.entity_type().to_element(),
-                target_entity_ids=entity_ids,
+                keys=keys,
                 operation=action.operation_type().to_permission_operation(),
             )
         )
         allowed_entity_ids: list[str] = []
         denied_entities: list[DeniedEntity] = []
-        for eid in entity_ids:
-            if permission_map.get(eid, False):
-                allowed_entity_ids.append(eid)
+        for key in keys:
+            if permission_map.get(key, False):
+                allowed_entity_ids.append(key.entity_id)
             else:
-                denied_entities.append(DeniedEntity(entity_id=eid, deny_reason=_DENY_REASON))
+                denied_entities.append(
+                    DeniedEntity(entity_id=key.entity_id, deny_reason=_DENY_REASON)
+                )
         return BulkValidationResult(
             allowed_entity_ids=allowed_entity_ids,
             denied_entities=denied_entities,

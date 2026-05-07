@@ -118,6 +118,15 @@ class RevisionNode(BaseResponseModel):
     extra_mounts: list[ExtraVFolderMountGQLDTO] = Field(
         default_factory=list, description="Extra vfolder mounts"
     )
+    revision_preset_id: UUID | None = Field(
+        default=None,
+        description=(
+            "ID of the deployment-level preset that produced this revision. "
+            "``None`` when the revision was created without a preset, when "
+            "the originating preset row has since been deleted (SET NULL FK), "
+            "or for legacy rows that predate this field."
+        ),
+    )
 
 
 class DeploymentNode(BaseResponseModel):

@@ -8,6 +8,7 @@ from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -53,6 +54,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     runtime_variant_id: RuntimeVariantID
     extra_mounts: Sequence[MountInfoEntry]
     preset_values: Sequence[PresetValueEntry] = field(default_factory=list)
+    revision_preset_id: DeploymentPresetID | None = None
     revision_number: int | None = None
 
     def with_revision_number(self, revision_number: int) -> DeploymentRevisionCreatorSpec:
@@ -82,6 +84,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             runtime_variant_id=self.runtime_variant_id,
             extra_mounts=list(self.extra_mounts),
             preset_values=list(self.preset_values),
+            revision_preset_id=self.revision_preset_id,
         )
         row.resource_slot_rows = [
             DeploymentRevisionResourceSlotRow(

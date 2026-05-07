@@ -432,6 +432,11 @@ class ModelRevisionSpec(ConfiguredModel):
     execution: ExecutionSpec
     model_definition: ModelDefinition | None = None
     preset_values: list[PresetValueSpec] = Field(default_factory=list)
+    # Original deployment-level preset selection used to build this revision.
+    # ``None`` for legacy rows and revisions created without a preset; the
+    # materialised effects still live on ``preset_values`` and the resolved
+    # configuration columns.
+    revision_preset_id: DeploymentPresetID | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -913,6 +918,10 @@ class ModelRevisionData:
     # this data-layer projection — keeps ``mount_perm`` visible end-to-end
     # so modify flows can carry it over without information loss.
     extra_vfolder_mounts: list[MountInfoEntry] = field(default_factory=list)
+    # Original deployment-level preset selection used to build this
+    # revision; ``None`` for legacy rows and revisions created without a
+    # preset.
+    revision_preset_id: DeploymentPresetID | None = None
 
     def to_draft(self) -> RevisionDraft:
         """Project this persisted revision onto a ``RevisionDraft`` layer.

@@ -7,7 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -16,6 +16,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityBatchPurgerSpec
 
 
 @dataclass
@@ -63,14 +64,18 @@ class GroupEndpointBatchPurgerSpec(BatchPurgerSpec[EndpointRow]):
 
 
 @dataclass
-class GroupBatchPurgerSpec(BatchPurgerSpec[GroupRow]):
-    """PurgerSpec for deleting a group."""
+class GroupBatchPurgerSpec(RBACEntityBatchPurgerSpec[GroupRow]):
+    """PurgerSpec for deleting a group with RBAC scope/permission cleanup."""
 
     group_id: UUID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[GroupRow]]:
         return sa.select(GroupRow).where(GroupRow.id == self.group_id)
+
+    @override
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.PROJECT
 
 
 @dataclass

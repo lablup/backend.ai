@@ -41,6 +41,11 @@ STATUS_CODE_EXCEPTION_MAP: dict[int, type[BackendAPIError]] = {
 }
 
 
+class DeploymentAuthError(BackendAPIError):
+    """Raised when a deployment's inference endpoint (fronted by app-proxy)
+    rejects the configured token with HTTP 401/403."""
+
+
 class WebSocketError(BackendClientError):
     """Error during WebSocket connection or communication."""
 

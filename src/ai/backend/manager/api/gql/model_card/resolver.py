@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 )
 from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -30,12 +31,13 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
 )
 from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_connection
 from ai.backend.manager.api.gql.model_card.types import (
+    BulkDeleteModelCardsV2InputGQL,
+    BulkDeleteModelCardsV2PayloadGQL,
+    BulkDeleteModelCardV2ErrorGQL,
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
     DeleteModelCardOptionsGQL,
     DeleteModelCardPayloadGQL,
-    DeleteModelCardsInputGQL,
-    DeleteModelCardsPayloadGQL,
     DeployModelCardInputGQL,
     DeployModelCardPayloadGQL,
     ModelCardAvailablePresetsScopeGQL,
@@ -164,30 +166,27 @@ async def admin_delete_model_card_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Delete multiple model cards (admin only).",
-    )
+        added_version=NEXT_RELEASE_VERSION,
+        description="Bulk-delete model cards (admin only) with per-card partial-failure reporting.",
+    ),
 )
-async def admin_delete_model_cards_v2(
+async def admin_bulk_delete_model_cards_v2(
     info: Info[StrawberryGQLContext],
-    input: DeleteModelCardsInputGQL,
-) -> DeleteModelCardsPayloadGQL:
-    """Delete multiple model cards.
-
-    Args:
-        info: Strawberry GraphQL context.
-        input: Input containing list of model card UUIDs to delete.
-
-    Returns:
-        DeleteModelCardsPayloadGQL with count of deleted model cards.
-    """
+    input: BulkDeleteModelCardsV2InputGQL,
+) -> BulkDeleteModelCardsV2PayloadGQL | None:
     check_admin_only()
     ctx = info.context
     dto = input.to_pydantic()
-    payload = await ctx.adapters.model_card.bulk_delete(
+    payload = await ctx.adapters.model_card.admin_bulk_delete(
         dto, dto.options or DeleteModelCardOptions()
     )
-    return DeleteModelCardsPayloadGQL.from_pydantic(payload)
+    return BulkDeleteModelCardsV2PayloadGQL(
+        successes=list(payload.successes),
+        failed=[
+            BulkDeleteModelCardV2ErrorGQL(card_id=error.card_id, message=error.message)
+            for error in payload.failed
+        ],
+    )
 
 
 @gql_mutation(

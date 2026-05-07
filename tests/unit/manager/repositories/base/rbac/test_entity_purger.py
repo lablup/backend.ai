@@ -19,7 +19,10 @@ from ai.backend.manager.data.permission.types import (
     RBACElementRef,
     RoleSource,
 )
-from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+from ai.backend.manager.errors.repository import (
+    ForeignKeyViolationError,
+    UnsupportedCompositePrimaryKeyError,
+)
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -67,6 +70,28 @@ class RBACEntityPurgerTestRow(Base):  # type: ignore[misc]
         return ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(self.id))
 
 
+class RBACEntityPurgerRestrictReferrer(Base):  # type: ignore[misc]
+    """Downstream row that pins ``RBACEntityPurgerTestRow`` via FK RESTRICT.
+
+    Mirrors the ``model_cards.vfolder → vfolders.id`` relationship used in
+    production: as long as a referrer row exists, the upstream row cannot be
+    deleted, which lets us provoke a deterministic ``IntegrityError`` mid-way
+    through ``execute_rbac_entity_purger`` to verify transactional rollback.
+    """
+
+    __tablename__ = "test_rbac_purger_restrict_referrer"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    target_id: Mapped[UUID] = mapped_column(
+        GUID,
+        sa.ForeignKey("test_rbac_purger.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+
+
 # =============================================================================
 # Purger Spec Implementations
 # =============================================================================
@@ -94,6 +119,7 @@ class SimpleRBACEntityPurgerSpec(RBACEntityPurgerSpec):
 
 ENTITY_PURGER_TABLES = [
     RBACEntityPurgerTestRow,
+    RBACEntityPurgerRestrictReferrer,
     RoleRow,
     PermissionRow,
     AssociationScopesEntitiesRow,
@@ -165,6 +191,22 @@ class BatchEntitiesWithPermissionsContext:
     entity_uuids: list[UUID]
     user_id: str
     role_id: UUID
+
+
+@dataclass
+class EntityPinnedByReferrerContext:
+    """Context where the main row cannot be deleted due to a downstream FK.
+
+    Holds the IDs of every row that ``execute_rbac_entity_purger`` would touch
+    in this scenario, so a test can assert each one survives the rollback.
+    """
+
+    entity_uuid: UUID
+    referrer_id: UUID
+    user_id: str
+    role_id: UUID
+    permission_id: UUID
+    association_id: UUID
 
 
 # =============================================================================
@@ -941,3 +983,139 @@ class TestRBACEntityPurgerCompositePK:
                 await conn.run_sync(
                     lambda c: CompositePKPurgerTestRow.__table__.drop(c, checkfirst=True)
                 )
+
+
+class TestRBACEntityPurgerTransactionRollback:
+    """Verify that ``execute_rbac_entity_purger`` is transactionally atomic.
+
+    The purger runs ``_delete_rbac_for_entity`` (Permissions + Associations)
+    BEFORE ``_delete_row_by_pk_returning``. If a downstream FK constraint
+    blocks the main DELETE, the prior RBAC deletes must roll back so callers
+    never observe a half-purged entity (main row intact, RBAC metadata gone).
+    """
+
+    @pytest.fixture
+    async def entity_pinned_by_referrer(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> AsyncGenerator[EntityPinnedByReferrerContext, None]:
+        """Set up an entity that cannot be hard-deleted (FK RESTRICT pin).
+
+        Creates the full set of rows that ``execute_rbac_entity_purger`` would
+        touch in one call:
+          - main entity row
+          - referrer row pinning it via FK RESTRICT (provokes the failure)
+          - role + scope-permission on the entity (would be deleted in step 1)
+          - scope-entity association (would be deleted in step 1)
+        """
+        user_id = str(uuid.uuid4())
+        entity_uuid = uuid.uuid4()
+        referrer_id = uuid.uuid4()
+        role_id = uuid.uuid4()
+        permission_id = uuid.uuid4()
+        association_id = uuid.uuid4()
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            db_sess.add(
+                RBACEntityPurgerTestRow(
+                    id=entity_uuid,
+                    name="pinned-entity",
+                    owner_scope_type=ScopeType.USER.value,
+                    owner_scope_id=user_id,
+                )
+            )
+            db_sess.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"role-{role_id.hex[:8]}",
+                    source=RoleSource.SYSTEM,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                RBACEntityPurgerRestrictReferrer(
+                    id=referrer_id,
+                    target_id=entity_uuid,
+                )
+            )
+            db_sess.add(
+                PermissionRow(
+                    id=permission_id,
+                    role_id=role_id,
+                    scope_type=ScopeType.VFOLDER,
+                    scope_id=str(entity_uuid),
+                    entity_type=EntityType.VFOLDER,
+                    operation=OperationType.READ,
+                )
+            )
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    id=association_id,
+                    scope_type=ScopeType.USER,
+                    scope_id=user_id,
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=str(entity_uuid),
+                )
+            )
+            await db_sess.flush()
+
+        yield EntityPinnedByReferrerContext(
+            entity_uuid=entity_uuid,
+            referrer_id=referrer_id,
+            user_id=user_id,
+            role_id=role_id,
+            permission_id=permission_id,
+            association_id=association_id,
+        )
+
+    async def test_failed_main_delete_rolls_back_rbac_deletes(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        entity_pinned_by_referrer: EntityPinnedByReferrerContext,
+    ) -> None:
+        """A FK RESTRICT violation on the main DELETE must roll back the
+        Permission and Association deletes that ran earlier in the same
+        transaction — leaving every row in its pre-purge state."""
+        ctx = entity_pinned_by_referrer
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
+            purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
+                row_class=RBACEntityPurgerTestRow,
+                pk_value=ctx.entity_uuid,
+                spec=spec,
+            )
+            with pytest.raises(ForeignKeyViolationError):
+                await execute_rbac_entity_purger(db_sess, purger)
+
+        # Open a fresh session to check the post-rollback state — the failed
+        # transaction above is unusable for further reads.
+        async with database_connection.begin_readonly_session() as db_sess:
+            assert (
+                await db_sess.execute(
+                    sa.select(RBACEntityPurgerTestRow.id).where(
+                        RBACEntityPurgerTestRow.id == ctx.entity_uuid
+                    )
+                )
+            ).scalar_one_or_none() == ctx.entity_uuid
+            assert (
+                await db_sess.execute(
+                    sa.select(RBACEntityPurgerRestrictReferrer.id).where(
+                        RBACEntityPurgerRestrictReferrer.id == ctx.referrer_id
+                    )
+                )
+            ).scalar_one_or_none() == ctx.referrer_id
+            assert (
+                await db_sess.execute(
+                    sa.select(PermissionRow.id).where(PermissionRow.id == ctx.permission_id)
+                )
+            ).scalar_one_or_none() == ctx.permission_id
+            assert (
+                await db_sess.execute(
+                    sa.select(AssociationScopesEntitiesRow.id).where(
+                        AssociationScopesEntitiesRow.id == ctx.association_id
+                    )
+                )
+            ).scalar_one_or_none() == ctx.association_id

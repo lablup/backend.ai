@@ -1344,6 +1344,35 @@ type BulkCreateUsersV2Payload {
   failed: [BulkCreateUserV2Error!]!
 }
 
+"""
+Added in UNRELEASED. Error information for a model card that failed during bulk deletion.
+"""
+type BulkDeleteModelCardV2Error {
+  """UUID of the model card that failed to delete."""
+  cardId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in UNRELEASED. Input for bulk-deleting multiple model cards."""
+input BulkDeleteModelCardsV2Input {
+  """List of model card UUIDs to delete."""
+  ids: [UUID!]!
+
+  """Options for the delete operation."""
+  options: DeleteModelCardV2Options = null
+}
+
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
+type BulkDeleteModelCardsV2Payload {
+  """UUIDs of model cards that were successfully deleted."""
+  successes: [UUID!]!
+
+  """List of errors for model cards that failed to delete."""
+  failed: [BulkDeleteModelCardV2Error!]!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input {
   """List of VFolder UUIDs to soft-delete."""
@@ -1397,17 +1426,36 @@ type BulkPurgeUsersV2Payload {
 }
 
 """
+Added in UNRELEASED. Failure detail for a single vfolder in a bulk purge.
+"""
+type BulkPurgeVFolderV2Error {
+  """UUID of the vfolder that failed to purge."""
+  vfolderId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
 Added in 26.4.2. Input for permanently purging multiple virtual folders.
 """
 input BulkPurgeVFoldersV2Input {
   """List of VFolder UUIDs to purge."""
   ids: [UUID!]!
+
+  """
+  Added in UNRELEASED. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
+  """
+  options: PurgeVFolderOptionsInput!
 }
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
 type BulkPurgeVFoldersV2Payload {
   """Number of virtual folders successfully purged."""
   purgedCount: Int!
+
+  """List of errors for vfolders that failed to purge."""
+  failed: [BulkPurgeVFolderV2Error!]!
 }
 
 """
@@ -3022,21 +3070,6 @@ input DeleteModelCardV2Options {
   deleteAssociatedVfolder: Boolean! = false
 }
 
-"""Added in 26.4.2. Input for deleting multiple model cards."""
-input DeleteModelCardsV2Input {
-  """List of model card UUIDs to delete."""
-  ids: [UUID!]!
-
-  """Added in UNRELEASED. Options for the delete operation."""
-  options: DeleteModelCardV2Options = null
-}
-
-"""Added in 26.4.2. Payload for bulk model card deletion."""
-type DeleteModelCardsV2Payload {
-  """Number of model cards successfully deleted."""
-  deletedCount: Int!
-}
-
 """Added in 24.09.0. Input for deleting a notification channel"""
 input DeleteNotificationChannelInput {
   id: ID!
@@ -3535,6 +3568,9 @@ type DeploymentRevisionPresetEnvironEntry {
 
 """Added in 26.4.2. Filter for deployment revision presets."""
 input DeploymentRevisionPresetFilter {
+  """Added in UNRELEASED. Filter by preset ID."""
+  id: UUIDFilter = null
+
   """Name filter."""
   name: StringFilter = null
 
@@ -4264,7 +4300,7 @@ type EntityConnection {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: RBACElementType = null
+  entityType: RBACElementTypeFilter = null
   entityId: StringFilter = null
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
@@ -6333,6 +6369,11 @@ type ModelRevision implements Node {
   """Additional volume folder mounts."""
   extraMounts: [ExtraVFolderMountInfoGQL!]!
 
+  """
+  Added in UNRELEASED. ID of the deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  """
+  revisionPresetId: UUID
+
   """Timestamp when the revision was created."""
   createdAt: DateTime!
 
@@ -6343,6 +6384,11 @@ type ModelRevision implements Node {
   Added in 26.4.3. The container image used by this revision, resolved via DataLoader.
   """
   imageV2: ImageV2
+
+  """
+  Added in UNRELEASED. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  """
+  revisionPreset: DeploymentRevisionPreset
 
   """Added in 26.4.2. Resource slot allocations for this revision."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]!
@@ -7221,8 +7267,10 @@ type Mutation {
   """Added in 26.4.2. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL!
 
-  """Added in 26.4.2. Delete multiple model cards (admin only)."""
-  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload!
+  """
+  Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
+  """
+  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload
 
   """
   Added in 26.4.2. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
@@ -7246,7 +7294,7 @@ type Mutation {
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
-  purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload!
+  purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null): PurgeVFolderV2Payload!
 
   """
   Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
@@ -7575,6 +7623,23 @@ enum OperationType {
   GRANT_HARD_DELETE
 }
 
+"""
+Added in UNRELEASED. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
+"""
+input OperationTypeFilter {
+  """Matches rows with this exact operation."""
+  equals: OperationType = null
+
+  """Matches rows whose operation is in this list."""
+  in: [OperationType!] = null
+
+  """Excludes rows with this exact operation."""
+  notEquals: OperationType = null
+
+  """Excludes rows whose operation is in this list."""
+  notIn: [OperationType!] = null
+}
+
 """Added in 24.09.0. Sort direction for ordering"""
 enum OrderDirection {
   ASC
@@ -7635,9 +7700,10 @@ type PermissionEdge {
 
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
-  roleId: UUID = null
-  scopeType: RBACElementType = null
-  entityType: RBACElementType = null
+  roleId: UUIDFilter = null
+  scopeType: RBACElementTypeFilter = null
+  scopeId: StringFilter = null
+  entityType: RBACElementTypeFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
@@ -7648,10 +7714,10 @@ input PermissionFilter {
 Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
 """
 input PermissionNestedFilter {
-  scopeId: String = null
-  scopeType: RBACElementType = null
-  entityType: RBACElementType = null
-  operation: OperationType = null
+  scopeId: StringFilter = null
+  scopeType: RBACElementTypeFilter = null
+  entityType: RBACElementTypeFilter = null
+  operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
   NOT: [PermissionNestedFilter!] = null
@@ -8557,10 +8623,20 @@ type PurgeUserV2Payload {
 }
 
 """
+Added in UNRELEASED. Optional behavior flags for vfolder purge operations.
+"""
+input PurgeVFolderOptionsInput {
+  """
+  If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.
+  """
+  cascadeModelCard: Boolean! = false
+}
+
+"""
 Added in 26.4.2. Payload returned after permanently purging a virtual folder.
 """
 type PurgeVFolderV2Payload {
-  """ID of the purged virtual folder"""
+  """ID of the purged virtual folder."""
   id: UUID!
 }
 
@@ -9474,6 +9550,23 @@ enum RBACElementType {
   IMAGE_ALIAS
   ROLE_ASSIGNMENT
   ARTIFACT_REVISION
+}
+
+"""
+Added in UNRELEASED. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
+"""
+input RBACElementTypeFilter {
+  """Matches rows with this exact element type."""
+  equals: RBACElementType = null
+
+  """Matches rows whose element type is in this list."""
+  in: [RBACElementType!] = null
+
+  """Excludes rows with this exact element type."""
+  notEquals: RBACElementType = null
+
+  """Excludes rows whose element type is in this list."""
+  notIn: [RBACElementType!] = null
 }
 
 """

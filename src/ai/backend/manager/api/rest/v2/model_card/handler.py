@@ -16,9 +16,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    BulkDeleteModelCardsInput,
     CreateModelCardInput,
     DeleteModelCardOptions,
-    DeleteModelCardsInput,
     DeployModelCardInput,
     SearchModelCardsInput,
     UpdateModelCardInput,
@@ -81,11 +81,11 @@ class V2ModelCardHandler:
         result = await self._adapter.delete(path.parsed.card_id, options=query.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def bulk_delete(
+    async def admin_bulk_delete(
         self,
-        body: BodyParam[DeleteModelCardsInput],
+        body: BodyParam[BulkDeleteModelCardsInput],
     ) -> APIResponse:
-        result = await self._adapter.bulk_delete(
+        result = await self._adapter.admin_bulk_delete(
             body.parsed, body.parsed.options or DeleteModelCardOptions()
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

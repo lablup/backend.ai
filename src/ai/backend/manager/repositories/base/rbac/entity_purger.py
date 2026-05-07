@@ -19,6 +19,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.repositories.base.integrity import parse_integrity_error
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, Purger, PurgerResult, TRow
 
 # =============================================================================
@@ -282,7 +283,15 @@ async def _delete_row_by_pk_returning(
     db_sess: SASession,
     purger: RBACEntityPurger[TRow],
 ) -> TRow | None:
-    """Delete a row by primary key and return the deleted row data."""
+    """Delete a row by primary key and return the deleted row data.
+
+    Raises:
+        RepositoryIntegrityError: If the DELETE violates a database constraint
+            (e.g., a referencing FK with ``ondelete='RESTRICT'``). Mirrors the
+            behavior of ``execute_purger`` so callers can match on the parsed
+            error type and constraint name instead of inspecting raw
+            ``sqlalchemy.exc.IntegrityError``.
+    """
     row_class = purger.row_class
     table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
@@ -293,7 +302,10 @@ async def _delete_row_by_pk_returning(
         )
 
     stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
-    result = await db_sess.execute(stmt)
+    try:
+        result = await db_sess.execute(stmt)
+    except sa.exc.IntegrityError as e:
+        raise parse_integrity_error(e) from e
     row_data = result.fetchone()
 
     if row_data is None:
@@ -325,6 +337,12 @@ async def execute_rbac_entity_purger(
 
     Returns:
         RBACEntityPurgerResult containing the deleted row, or None if no row matched
+
+    Raises:
+        RepositoryIntegrityError: If the main row DELETE violates a database
+            constraint. The raw ``sqlalchemy.exc.IntegrityError`` is parsed via
+            ``parse_integrity_error`` so callers can dispatch on the structured
+            subclass (e.g. ``ForeignKeyViolationError``) and constraint name.
     """
     # 1. Get entity info from spec
     entity_ref = purger.spec.entity_ref()

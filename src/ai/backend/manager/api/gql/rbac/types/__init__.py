@@ -22,6 +22,7 @@ from .permission import (
     EntityActionInfoGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
+    OperationTypeFilterGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionEdge,
@@ -87,12 +88,14 @@ from .role_invitation import (
     RoleInvitationStateGQL,
     RoleInvitationUserNestedFilterGQL,
 )
-from .scope import RBACElementTypeGQL, ScopeInputGQL
+from .scope import RBACElementTypeFilterGQL, RBACElementTypeGQL, ScopeInputGQL
 
 __all__ = [
     # Permission enums
     "RBACElementTypeGQL",
+    "RBACElementTypeFilterGQL",
     "OperationTypeGQL",
+    "OperationTypeFilterGQL",
     "PermissionOrderField",
     # Role enums
     "RoleSourceGQL",
