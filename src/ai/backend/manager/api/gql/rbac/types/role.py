@@ -206,7 +206,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         )
 
         # Add role_id filter to scope permissions to this role
-        role_filter = PermissionFilter(role_id=UUID(self.id))
+        role_filter = PermissionFilter(role_id=UUIDFilter(equals=UUID(self.id)))
         if filter is not None:
             # Merge with user-provided filter
             combined_filter = PermissionFilter(

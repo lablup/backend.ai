@@ -18,13 +18,14 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "EntityOrderField",
     "EntityType",
-    "EntityTypeFilter",
     "OperationType",
     "OperationTypeDTO",
+    "OperationTypeFilter",
     "OrderDirection",
     "PermissionOrderField",
     "PermissionSummary",
     "RBACElementTypeDTO",
+    "RBACElementTypeFilter",
     "RoleAssignmentOrderField",
     "RoleOrderField",
     "RoleSource",
@@ -170,13 +171,27 @@ class RoleStatusFilter(BaseRequestModel):
     not_in: list[str] | None = None
 
 
-class EntityTypeFilter(BaseRequestModel):
-    """Filter for entity type with equality and membership operators."""
+class RBACElementTypeFilter(BaseRequestModel):
+    """Filter for RBAC element type (scope_type / entity_type) columns.
 
-    equals: str | None = None
-    in_: list[str] | None = None
-    not_equals: str | None = None
-    not_in: list[str] | None = None
+    Mirrors the Strawberry GQL EnumFilter pattern: equals / in / not_equals / not_in.
+    Used for both ``scope_type`` and ``entity_type`` fields, which share the
+    ``RBACElementTypeDTO`` value space at the API surface.
+    """
+
+    equals: RBACElementTypeDTO | None = None
+    in_: list[RBACElementTypeDTO] | None = None
+    not_equals: RBACElementTypeDTO | None = None
+    not_in: list[RBACElementTypeDTO] | None = None
+
+
+class OperationTypeFilter(BaseRequestModel):
+    """Filter for permission operation columns over ``OperationTypeDTO``."""
+
+    equals: OperationTypeDTO | None = None
+    in_: list[OperationTypeDTO] | None = None
+    not_equals: OperationTypeDTO | None = None
+    not_in: list[OperationTypeDTO] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):

@@ -42,13 +42,17 @@ def search(
         EntityFilter,
         EntityOrderBy,
     )
-    from ai.backend.common.dto.manager.v2.rbac.types import EntityOrderField
+    from ai.backend.common.dto.manager.v2.rbac.types import (
+        EntityOrderField,
+        RBACElementTypeDTO,
+        RBACElementTypeFilter,
+    )
 
     # Build filter only if any filter option is provided
     filter_dto: EntityFilter | None = None
     if entity_type is not None:
         filter_dto = EntityFilter(
-            entity_type=entity_type,
+            entity_type=RBACElementTypeFilter(equals=RBACElementTypeDTO(entity_type)),
         )
 
     # Build order only if --order-by is provided

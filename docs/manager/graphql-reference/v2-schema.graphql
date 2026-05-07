@@ -4300,7 +4300,7 @@ type EntityConnection {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: RBACElementType = null
+  entityType: RBACElementTypeFilter = null
   entityId: StringFilter = null
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
@@ -7623,6 +7623,23 @@ enum OperationType {
   GRANT_HARD_DELETE
 }
 
+"""
+Added in UNRELEASED. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
+"""
+input OperationTypeFilter {
+  """Matches rows with this exact operation."""
+  equals: OperationType = null
+
+  """Matches rows whose operation is in this list."""
+  in: [OperationType!] = null
+
+  """Excludes rows with this exact operation."""
+  notEquals: OperationType = null
+
+  """Excludes rows whose operation is in this list."""
+  notIn: [OperationType!] = null
+}
+
 """Added in 24.09.0. Sort direction for ordering"""
 enum OrderDirection {
   ASC
@@ -7683,9 +7700,10 @@ type PermissionEdge {
 
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
-  roleId: UUID = null
-  scopeType: RBACElementType = null
-  entityType: RBACElementType = null
+  roleId: UUIDFilter = null
+  scopeType: RBACElementTypeFilter = null
+  scopeId: StringFilter = null
+  entityType: RBACElementTypeFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
@@ -7696,10 +7714,10 @@ input PermissionFilter {
 Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
 """
 input PermissionNestedFilter {
-  scopeId: String = null
-  scopeType: RBACElementType = null
-  entityType: RBACElementType = null
-  operation: OperationType = null
+  scopeId: StringFilter = null
+  scopeType: RBACElementTypeFilter = null
+  entityType: RBACElementTypeFilter = null
+  operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
   NOT: [PermissionNestedFilter!] = null
@@ -9532,6 +9550,23 @@ enum RBACElementType {
   IMAGE_ALIAS
   ROLE_ASSIGNMENT
   ARTIFACT_REVISION
+}
+
+"""
+Added in UNRELEASED. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
+"""
+input RBACElementTypeFilter {
+  """Matches rows with this exact element type."""
+  equals: RBACElementType = null
+
+  """Matches rows whose element type is in this list."""
+  in: [RBACElementType!] = null
+
+  """Excludes rows with this exact element type."""
+  notEquals: RBACElementType = null
+
+  """Excludes rows whose element type is in this list."""
+  notIn: [RBACElementType!] = null
 }
 
 """

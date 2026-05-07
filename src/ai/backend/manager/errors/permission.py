@@ -14,6 +14,7 @@ __all__ = (
     "NotEnoughPermission",
     "ObjectPermissionNotFound",
     "PermissionNotFound",
+    "ReplaceRolePermissionRoleIdMismatch",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
     "RoleNotFound",
@@ -89,4 +90,16 @@ class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.PERMISSION,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ReplaceRolePermissionRoleIdMismatch(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/replace-role-permission-role-id-mismatch"
+    error_title = "Permission entry role_id does not match the request role_id."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.MISMATCH,
         )

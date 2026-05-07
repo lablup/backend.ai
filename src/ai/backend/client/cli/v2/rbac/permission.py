@@ -42,20 +42,33 @@ def search(
     entity_type: str | None,
 ) -> None:
     """Search permissions."""
+    from ai.backend.common.dto.manager.query import UUIDFilter
     from ai.backend.common.dto.manager.v2.rbac.request import (
         AdminSearchPermissionsGQLInput,
         PermissionFilter,
         PermissionOrderBy,
     )
-    from ai.backend.common.dto.manager.v2.rbac.types import PermissionOrderField
+    from ai.backend.common.dto.manager.v2.rbac.types import (
+        PermissionOrderField,
+        RBACElementTypeDTO,
+        RBACElementTypeFilter,
+    )
 
     # Build filter only if any filter option is provided
     filter_dto: PermissionFilter | None = None
     if any([role_id is not None, scope_type is not None, entity_type is not None]):
         filter_dto = PermissionFilter(
-            role_id=UUID(role_id) if role_id is not None else None,
-            scope_type=scope_type,
-            entity_type=entity_type,
+            role_id=UUIDFilter(equals=UUID(role_id)) if role_id is not None else None,
+            scope_type=(
+                RBACElementTypeFilter(equals=RBACElementTypeDTO(scope_type))
+                if scope_type is not None
+                else None
+            ),
+            entity_type=(
+                RBACElementTypeFilter(equals=RBACElementTypeDTO(entity_type))
+                if entity_type is not None
+                else None
+            ),
         )
 
     # Build order only if --order-by is provided
