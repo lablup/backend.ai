@@ -612,7 +612,11 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
             ),
             image_id=ImageID(uuid.uuid4()),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            startup_command=None,
+            bootstrap_script=None,
+            callback_url=None,
             extra_vfolder_mounts=[],
+            preset_values=[],
         )
 
     async def test_existing_revision_returns_data(

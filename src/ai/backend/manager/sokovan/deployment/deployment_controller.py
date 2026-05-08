@@ -305,7 +305,7 @@ class DeploymentController:
             endpoint_id=endpoint_id, updater=updater
         )
         if modified_endpoint.current_revision_id is not None:
-            current_revision = await self._deployment_repository.get_revision_spec(
+            current_revision = await self._deployment_repository.get_revision(
                 modified_endpoint.current_revision_id
             )
             await self._scheduling_controller.validate_session_spec(

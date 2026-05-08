@@ -883,11 +883,15 @@ class ModelRevisionData:
     # (SET NULL FK); the revision is kept for history but cannot be
     # redeployed.
     image_id: ImageID | None
-    model_definition: ModelDefinition | None = None
+    startup_command: str | None
+    bootstrap_script: str | None
+    callback_url: yarl.URL | None
     # Same type used for row storage, ``MountMetadata.extra_mounts``, and
     # this data-layer projection — keeps ``mount_perm`` visible end-to-end
     # so modify flows can carry it over without information loss.
-    extra_vfolder_mounts: list[MountInfoEntry] = field(default_factory=list)
+    extra_vfolder_mounts: list[MountInfoEntry]
+    preset_values: list[PresetValueData]
+    model_definition: ModelDefinition | None = None
     # Original deployment-level preset selection used to build this
     # revision; ``None`` for legacy rows and revisions created without a
     # preset.
@@ -898,10 +902,7 @@ class ModelRevisionData:
 
         Used as the base (lowest-priority-below-request) layer on the legacy
         modify path so untouched fields survive when the user submits a partial
-        override. Fields that do not live on ``ModelRevisionData``
-        (``startup_command``, ``bootstrap_script``, ``callback_url``) remain
-        ``None`` — the reader pipeline resolves them from preset /
-        ``deployment-config.yaml`` / ``model-definition.yaml`` / user override.
+        override.
         """
         environ = self.model_runtime_config.environ
         resource_slots = dict(self.resource_config.resource_slot) or None
@@ -917,8 +918,11 @@ class ModelRevisionData:
             resource_opts=resource_opts,
             cluster_mode=self.cluster_config.mode,
             cluster_size=self.cluster_config.size,
+            startup_command=self.startup_command,
+            bootstrap_script=self.bootstrap_script,
             environ={k: str(v) for k, v in environ.items()} if environ else None,
             runtime_variant_id=self.model_runtime_config.runtime_variant_id,
+            callback_url=self.callback_url,
             inference_runtime_config=self.model_runtime_config.inference_runtime_config,
             model_definition=model_definition_draft,
         )

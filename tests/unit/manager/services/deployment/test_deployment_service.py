@@ -434,6 +434,11 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 definition_path="model-definition.yaml",
             ),
             image_id=ImageID(image_id),
+            startup_command=None,
+            bootstrap_script=None,
+            callback_url=None,
+            extra_vfolder_mounts=[],
+            preset_values=[],
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
@@ -669,6 +674,11 @@ class TestConvertDeploymentInfoToData:
                 ),
                 created_at=datetime(2024, 1, 1, tzinfo=UTC),
                 image_id=ImageID(uuid.uuid4()),
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+                extra_vfolder_mounts=[],
+                preset_values=[],
             )
 
         return make

@@ -63,7 +63,11 @@ class TestRevisionDataToDTO:
             ),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             image_id=ImageID(uuid4()),
+            startup_command=None,
+            bootstrap_script=None,
+            callback_url=None,
             extra_vfolder_mounts=[],
+            preset_values=[],
         )
 
         dto = DeploymentAdapter._revision_data_to_dto(revision)

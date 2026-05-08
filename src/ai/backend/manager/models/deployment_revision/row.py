@@ -24,17 +24,12 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
-    ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,
-    ModelRevisionSpec,
     ModelRuntimeConfigData,
-    MountMetadata,
-    PresetValueSpec,
     ResourceConfigData,
-    ResourceSpec,
 )
-from ai.backend.manager.errors.deployment import RevisionNotDeployable
+from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -253,56 +248,6 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         viewonly=True,
     )
 
-    def to_model_revision_spec(self) -> ModelRevisionSpec:
-        """Convert to ModelRevisionSpec for deployment lifecycle operations.
-
-        Raises ``RevisionNotDeployable`` when the revision references
-        resources that have since been deleted — specifically when
-        ``self.image`` is NULL (the image row was removed via SET NULL
-        FK) or ``self.model`` is NULL (the model vfolder was removed).
-        The scheduler is expected to catch this and transition the
-        deployment to ``BLOCKED``.
-        """
-        if self.image is None:
-            raise RevisionNotDeployable(
-                f"Revision {self.id} cannot be deployed: referenced image has been deleted."
-            )
-        if self.model is None:
-            raise RevisionNotDeployable(
-                f"Revision {self.id} cannot be deployed: referenced model vfolder has been deleted."
-            )
-        return ModelRevisionSpec(
-            revision_id=self.id,
-            image_id=self.image,
-            resource_spec=ResourceSpec(
-                cluster_mode=ClusterMode(self.cluster_mode),
-                cluster_size=self.cluster_size,
-                resource_slots=ResourceSlot({
-                    r.slot_name: r.quantity for r in self.resource_slot_rows
-                }),
-                resource_opts=self.resource_opts,
-            ),
-            mounts=MountMetadata(
-                model_vfolder_id=self.model,
-                model_definition_path=self.model_definition_path,
-                model_mount_destination=self.model_mount_destination,
-                extra_mounts=list(self.extra_mounts),
-            ),
-            execution=ExecutionSpec(
-                startup_command=self.startup_command,
-                bootstrap_script=self.bootstrap_script,
-                environ=self.environ,
-                runtime_variant_id=RuntimeVariantID(self.runtime_variant_id),
-                callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
-            ),
-            model_definition=self.model_definition,
-            preset_values=[
-                PresetValueSpec(preset_id=pv.preset_id, value=pv.value)
-                for pv in (self.preset_values or [])
-            ],
-            revision_preset_id=self.revision_preset_id,
-        )
-
     def to_data(self) -> ModelRevisionData:
         """Convert to ModelRevisionData dataclass."""
         return ModelRevisionData(
@@ -330,7 +275,14 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             ),
             created_at=self.created_at,
             image_id=self.image,
-            model_definition=self.model_definition,
+            startup_command=self.startup_command,
+            bootstrap_script=self.bootstrap_script,
+            callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
             extra_vfolder_mounts=list(self.extra_mounts),
+            preset_values=[
+                PresetValueData(preset_id=pv.preset_id, value=pv.value)
+                for pv in (self.preset_values or [])
+            ],
+            model_definition=self.model_definition,
             revision_preset_id=self.revision_preset_id,
         )

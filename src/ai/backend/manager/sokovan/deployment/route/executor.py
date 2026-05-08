@@ -1052,7 +1052,7 @@ class RouteExecutor:
                     deployment,
                     revision_id=route.revision_id,
                 )
-                target_revision = await self._deployment_repo.get_revision_spec(route.revision_id)
+                target_revision = await self._deployment_repo.get_revision(route.revision_id)
 
                 draft = DeploymentSessionDraftBuilder.build(
                     deployment_info=deployment,

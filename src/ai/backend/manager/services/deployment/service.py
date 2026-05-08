@@ -26,21 +26,19 @@ from ai.backend.manager.data.deployment.creator import (
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    ExecutionSpec,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelReplicaData,
     ModelRevisionData,
-    ModelRevisionSpec,
     ReplicaStateData,
+    ResourceSpec,
     RevisionRefreshResult,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
-)
-from ai.backend.manager.data.deployment_revision_preset.types import (
-    PresetValueData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -329,32 +327,48 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
     )
 
 
-def _build_creator_from_revision_spec(spec: ModelRevisionSpec) -> ModelRevisionCreator:
-    """Rebuild a ``ModelRevisionCreator`` from an existing revision's spec.
+def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionCreator:
+    """Rebuild a ``ModelRevisionCreator`` from an existing revision's persisted data.
 
     ``model_definition`` is reset to ``None`` so ``DeploymentController.add_revision``
-    re-resolves it from the vfolder. ``revision_preset_id`` is carried over from the
-    persisted spec so the new revision keeps the same preset attribution; the
-    materialised ``preset_values`` are also propagated to preserve the preset
-    effect without requiring re-application. ``extra_mounts`` is left empty
-    because ``add_revision`` does not propagate this field to the new revision
-    spec (see ``DeploymentController.add_revision``).
+    re-resolves it from the vfolder. ``revision_preset_id`` and ``preset_values`` are
+    carried over so the new revision keeps the same preset attribution. ``extra_mounts``
+    is left empty because ``add_revision`` does not propagate this field to the new
+    revision spec.
     """
+    if data.model_mount_config.vfolder_id is None:
+        raise InvalidAPIParameters(
+            f"Revision {data.id} has no model vfolder; cannot rebuild creator"
+        )
     return ModelRevisionCreator(
-        image_id=spec.image_id,
-        resource_spec=spec.resource_spec,
+        image_id=data.image_id,
+        resource_spec=ResourceSpec(
+            cluster_mode=data.cluster_config.mode,
+            cluster_size=data.cluster_config.size,
+            resource_slots=dict(data.resource_config.resource_slot),
+            resource_opts=dict(data.resource_config.resource_opts) or None,
+        ),
         mounts=VFolderMountsCreator(
-            model_vfolder_id=spec.mounts.model_vfolder_id,
-            model_definition_path=spec.mounts.model_definition_path,
-            model_mount_destination=spec.mounts.model_mount_destination,
+            model_vfolder_id=data.model_mount_config.vfolder_id,
+            model_definition_path=data.model_mount_config.definition_path or None,
+            model_mount_destination=data.model_mount_config.mount_destination or "/models",
             extra_mounts=[],
         ),
-        execution=spec.execution,
+        execution=ExecutionSpec(
+            startup_command=data.startup_command,
+            bootstrap_script=data.bootstrap_script,
+            environ=(
+                {k: str(v) for k, v in data.model_runtime_config.environ.items()}
+                if data.model_runtime_config.environ
+                else None
+            ),
+            runtime_variant_id=data.model_runtime_config.runtime_variant_id,
+            callback_url=data.callback_url,
+            inference_runtime_config=data.model_runtime_config.inference_runtime_config,
+        ),
         model_definition=None,
-        revision_preset_id=spec.revision_preset_id,
-        preset_values=[
-            PresetValueData(preset_id=pv.preset_id, value=pv.value) for pv in spec.preset_values
-        ],
+        revision_preset_id=data.revision_preset_id,
+        preset_values=list(data.preset_values),
     )
 
 
@@ -674,8 +688,8 @@ class DeploymentService:
         failed = 0
         for deployment_id in deployment_ids:
             try:
-                spec = await self._deployment_repository.get_current_revision_spec(deployment_id)
-                creator = _build_creator_from_revision_spec(spec)
+                data = await self._deployment_repository.get_current_revision(deployment_id)
+                creator = _build_creator_from_revision_data(data)
                 new_revision = await self._deployment_controller.add_deployment_revision(
                     deployment_id=deployment_id,
                     revision=creator,
