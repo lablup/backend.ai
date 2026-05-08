@@ -64,7 +64,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentSummarySearchResult,
     DeploymentWithHistory,
     LegacyRevisionCreateReadBundle,
-    LegacyRevisionModifyReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -1165,22 +1164,6 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
-    async def load_legacy_model_service_revision_read_bundle(
-        self,
-        runtime_variant_id: RuntimeVariantID,
-        preset_id: DeploymentPresetID | None,
-        endpoint_id: DeploymentID,
-    ) -> LegacyRevisionModifyReadBundle:
-        """Batched read for the legacy model-serving modify path.
-
-        Now takes a ``RuntimeVariantID`` — the legacy service layer is
-        responsible for resolving name→id before invoking this flow.
-        """
-        return await self._db_source.load_legacy_model_service_revision_read_bundle(
-            runtime_variant_id, preset_id, endpoint_id
-        )
-
-    @deployment_repository_resilience.apply()
     async def load_deployment_revision_read_bundle(
         self,
         runtime_variant_id: RuntimeVariantID,
@@ -1268,6 +1251,22 @@ class DeploymentRepository:
             DeploymentRevisionNotFound: If the endpoint has no current revision.
         """
         return await self._db_source.get_current_revision_spec(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_latest_revision(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get the latest revision (highest ``revision_number``) of a deployment.
+
+        Unlike :meth:`get_current_revision`, this does not consult
+        ``EndpointRow.current_revision``: it returns the most recently
+        created revision for the endpoint regardless of activation state.
+
+        Raises:
+            DeploymentRevisionNotFound: If no revisions exist for the endpoint.
+        """
+        return await self._db_source.get_latest_revision(endpoint_id)
 
     @deployment_repository_resilience.apply()
     async def search_revisions(

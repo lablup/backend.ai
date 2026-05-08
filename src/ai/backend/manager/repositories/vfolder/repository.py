@@ -744,12 +744,21 @@ class VfolderRepository:
                         .values(status=VFolderOperationStatus.DELETE_ONGOING)
                     )
                     await db_session.execute(delete_stmt)
+                    # ``onupdate=now()`` on ``updated_at`` expires the
+                    # column on the in-memory rows after the UPDATE;
+                    # explicitly refresh so the subsequent conversion
+                    # does not need a lazy SELECT (which would fail
+                    # outside the greenlet bridge).
+                    for row in succeeded_rows:
+                        await db_session.refresh(row, attribute_names=["updated_at"])
+
+                succeeded_data = [self._vfolder_row_to_data(row) for row in succeeded_rows]
 
             if succeeded_ids:
                 # Delete relation rows for succeeded vfolders only.
                 await delete_vfolder_relation_rows(db_conn, self._db.begin_session, succeeded_ids)
 
-            result.succeeded = [self._vfolder_row_to_data(row) for row in succeeded_rows]
+            result.succeeded = succeeded_data
             return result
 
     @vfolder_repository_resilience.apply()

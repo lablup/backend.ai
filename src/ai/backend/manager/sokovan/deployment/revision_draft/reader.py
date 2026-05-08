@@ -18,7 +18,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import ClusterMode
@@ -87,32 +86,6 @@ class RevisionDraftReader:
         ]
         if bundle.preset is not None:
             drafts.append(self._preset_to_draft(bundle.preset, bundle.preset_resource_slots or []))
-        drafts.extend(await self._read_vfolder_drafts(mounts, bundle.variant))
-        drafts.append(request_draft)
-        return drafts
-
-    async def read_for_legacy_model_service_revision(
-        self,
-        *,
-        endpoint_id: DeploymentID,
-        request_draft: RevisionDraft,
-        mounts: MountMetadata,
-        execution: ExecutionSpec,
-        preset_id: DeploymentPresetID | None,
-    ) -> list[RevisionDraft]:
-        """Legacy model-serving modify: current revision layered between preset and yaml."""
-        bundle = await self._deployment_repository.load_legacy_model_service_revision_read_bundle(
-            runtime_variant_id=execution.runtime_variant_id,
-            preset_id=preset_id,
-            endpoint_id=endpoint_id,
-        )
-        drafts: list[RevisionDraft] = [
-            self._model_mount_path_default_draft(mounts),
-            self._variant_baseline_to_draft(bundle.variant),
-        ]
-        if bundle.preset is not None:
-            drafts.append(self._preset_to_draft(bundle.preset, bundle.preset_resource_slots or []))
-        drafts.append(bundle.base.to_draft())
         drafts.extend(await self._read_vfolder_drafts(mounts, bundle.variant))
         drafts.append(request_draft)
         return drafts
