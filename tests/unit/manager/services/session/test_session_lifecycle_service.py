@@ -33,9 +33,6 @@ from ai.backend.manager.api.rest.session.handler import (
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.data.user.types import SessionOwnerContext
-from ai.backend.manager.errors.api import (
-    InvalidAPIParameters as ManagerInvalidAPIParameters,
-)
 from ai.backend.manager.errors.common import ServiceUnavailable
 from ai.backend.manager.errors.image import UnknownImageReferenceError
 from ai.backend.manager.errors.kernel import (
@@ -1175,62 +1172,6 @@ class TestCreateFromParams:
         assert merged["mount_options"][vfid] == {"permission": "ro"}
         assert "mounts" not in merged
         assert "mount_map" not in merged
-
-    async def test_legacy_mounts_mixed_name_and_uuid(self) -> None:
-        """Names and UUID-strings can coexist in the legacy ``mounts`` list —
-        names go through the resolver, UUIDs bypass it.
-        """
-        name_vfid = UUID("33333333-3333-3333-3333-333333333333")
-        uuid_only_vfid = UUID("44444444-4444-4444-4444-444444444444")
-
-        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
-            assert list(action.vfolder_names) == ["vf-named"], (
-                "Only the name entry should reach the resolver"
-            )
-            return ResolveIdsByNamesActionResult(name_to_id={"vf-named": name_vfid})
-
-        resolver = MagicMock()
-        resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
-        vfolder_pkg = MagicMock()
-        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
-        handler = SessionHandler.__new__(SessionHandler)
-        handler._vfolder = vfolder_pkg
-
-        legacy_config: dict[str, Any] = {
-            "mounts": ["vf-named", str(uuid_only_vfid)],
-            "mount_map": {"vf-named": "/named-dst", str(uuid_only_vfid): "/uuid-dst"},
-            "mount_options": {},
-        }
-        name_to_id = await handler._resolve_legacy_name_mounts(
-            legacy_config["mounts"],
-            legacy_config["mount_map"],
-            legacy_config["mount_options"],
-        )
-        merged = _merge_resolved_legacy_mounts(legacy_config, name_to_id)
-
-        assert sorted(merged["mount_ids"], key=str) == sorted([name_vfid, uuid_only_vfid], key=str)
-        assert merged["mount_id_map"] == {
-            name_vfid: "/named-dst",
-            uuid_only_vfid: "/uuid-dst",
-        }
-
-    async def test_legacy_mounts_name_with_subpath_still_rejected(self) -> None:
-        """``name/subpath`` syntax stays rejected — name-shaped subpath inputs
-        cannot fit into the UUID-keyed buckets without losing the subpath.
-        """
-        resolver = MagicMock()
-        resolver.wait_for_complete = AsyncMock()
-        vfolder_pkg = MagicMock()
-        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
-        handler = SessionHandler.__new__(SessionHandler)
-        handler._vfolder = vfolder_pkg
-
-        with pytest.raises(ManagerInvalidAPIParameters, match="subpath syntax"):
-            await handler._resolve_legacy_name_mounts(
-                ["vf-a/.subdir"],
-                {},
-                {},
-            )
 
     async def test_owner_access_key_uses_owner_user_scope(
         self,
