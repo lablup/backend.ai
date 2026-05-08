@@ -233,11 +233,6 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
 
     Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
     """
-    # Resolve the revision spec for the *current* revision specifically.
-    # ``info.model_revisions`` may also contain the deploying revision during a
-    # rolling update, and PostgreSQL returns those rows in undefined order, so
-    # picking ``model_revisions[0]`` would non-deterministically expose the
-    # deploying revision under ``current_revision_id``.
     revision: ModelRevisionData | None = None
     rev: ModelRevisionSpec | None = None
     if info.current_revision_id is not None:

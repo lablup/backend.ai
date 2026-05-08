@@ -7,6 +7,7 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
@@ -645,20 +646,11 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
 class TestConvertDeploymentInfoToData:
     """Regression test for ``_convert_deployment_info_to_data`` (BA-5963)."""
 
-    def test_current_revision_resolved_by_id_match_not_list_order(self) -> None:
-        """During a rolling update, ``DeploymentInfo.model_revisions`` may carry
-        both the current and deploying revisions. PostgreSQL returns those rows
-        in undefined order, so the conversion must resolve the current revision
-        by an explicit ``current_revision_id`` match — picking
-        ``model_revisions[0]`` non-deterministically leaks the deploying
-        revision into ``current_revision_id`` on the public response (BA-5963).
-        """
-        deploying_revision_id = DeploymentRevisionID(uuid.uuid4())
-        current_revision_id = DeploymentRevisionID(uuid.uuid4())
-
-        def make_spec(revision_id: DeploymentRevisionID) -> ModelRevisionSpec:
+    @pytest.fixture
+    def make_revision_spec(self) -> Callable[[], ModelRevisionSpec]:
+        def make() -> ModelRevisionSpec:
             return ModelRevisionSpec(
-                revision_id=revision_id,
+                revision_id=DeploymentRevisionID(uuid.uuid4()),
                 image_id=ImageID(uuid.uuid4()),
                 resource_spec=ResourceSpec(
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -676,10 +668,16 @@ class TestConvertDeploymentInfoToData:
                 ),
             )
 
-        deploying_spec = make_spec(deploying_revision_id)
-        current_spec = make_spec(current_revision_id)
+        return make
 
-        # Adversarial ordering: deploying revision listed first.
+    def test_current_revision_resolved_by_id_match_not_list_order(
+        self,
+        make_revision_spec: Callable[[], ModelRevisionSpec],
+    ) -> None:
+        """Pin: revision lookup must use explicit ``current_revision_id``, not list[0]."""
+        deploying_spec = make_revision_spec()
+        current_spec = make_revision_spec()
+
         deployment_info = DeploymentInfo(
             id=DeploymentID(uuid.uuid4()),
             metadata=DeploymentMetadata(
@@ -701,14 +699,14 @@ class TestConvertDeploymentInfoToData:
             network=DeploymentNetworkSpec(open_to_public=False),
             model_revisions=[deploying_spec, current_spec],
             options=DeploymentOptions(),
-            current_revision_id=current_revision_id,
-            deploying_revision_id=deploying_revision_id,
+            current_revision_id=current_spec.revision_id,
+            deploying_revision_id=deploying_spec.revision_id,
         )
 
         deployment_data = _convert_deployment_info_to_data(deployment_info)
 
-        assert deployment_data.current_revision_id == current_revision_id
-        assert deployment_data.deploying_revision_id == deploying_revision_id
+        assert deployment_data.current_revision_id == current_spec.revision_id
+        assert deployment_data.deploying_revision_id == deploying_spec.revision_id
         assert deployment_data.current_revision_id != deployment_data.deploying_revision_id
         assert deployment_data.revision is not None
-        assert deployment_data.revision.id == current_revision_id
+        assert deployment_data.revision.id == current_spec.revision_id
