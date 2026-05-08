@@ -223,6 +223,9 @@ def _build_controller(
     config_provider = MagicMock()
     etcd_loader = MagicMock()
     etcd_loader.get_vfolder_types = AsyncMock(return_value=["user"])
+    etcd_loader.get_resource_slots = AsyncMock(
+        return_value={SlotName("cpu"): SlotTypes.COUNT, SlotName("mem"): SlotTypes.BYTES}
+    )
     config_provider.legacy_etcd_config_loader = etcd_loader
 
     storage_manager = MagicMock()
