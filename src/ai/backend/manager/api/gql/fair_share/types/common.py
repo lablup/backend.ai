@@ -158,7 +158,7 @@ class FairShareCalculationSnapshotGQL(PydanticOutputMixin[FairShareCalculationSn
             description="Average daily decayed resource usage during the lookback period. Calculated as total_decayed_usage divided by lookback duration in days. For each resource type, this represents the average decayed amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).",
         )
     )  # type: ignore[misc]
-    def average_daily_decayed_usage(self) -> ResourceSlotGQL:
+    def average_daily_decayed_usage(self) -> ResourceSlotGQL | None:
         from ai.backend.manager.api.gql.resource_usage.types.common_calculations import (
             calculate_average_daily_usage,
         )

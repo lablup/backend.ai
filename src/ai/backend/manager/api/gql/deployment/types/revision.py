@@ -221,7 +221,7 @@ class ResourceConfig:
     )
 
     @gql_field(description="The resource group of this entity.")  # type: ignore[misc]
-    def resource_group(self) -> ResourceGroup:
+    def resource_group(self) -> ResourceGroup | None:
         """Resolves the federated ResourceGroup."""
         global_id = to_global_id(
             ScalingGroupNode, self.resource_group_name, is_target_graphene_object=True
@@ -284,7 +284,7 @@ class ModelMountConfig:
     )
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
-    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
+    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
         vfolder_global_id = to_global_id(
             VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
         )
@@ -314,7 +314,7 @@ class ExtraVFolderMountInfoGQL:
     )
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
-    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
+    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
         vfolder_global_id = to_global_id(
             VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
         )
@@ -491,7 +491,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         description="The image of this entity.",
         deprecation_reason="Use image_v2 instead.",
     )  # type: ignore[misc]
-    async def image(self, info: Info[StrawberryGQLContext]) -> Image:
+    async def image(self, info: Info[StrawberryGQLContext]) -> Image | None:
         image_global_id = to_global_id(
             ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
         )
@@ -552,7 +552,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         info: Info[StrawberryGQLContext],
         filter: AllocatedResourceSlotFilterGQL | None = None,
         order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
-    ) -> list[AllocatedResourceSlotGQL]:
+    ) -> list[AllocatedResourceSlotGQL] | None:
         from ai.backend.common.dto.manager.v2.resource_slot.request import (
             SearchAllocatedResourceSlotsInput,
         )

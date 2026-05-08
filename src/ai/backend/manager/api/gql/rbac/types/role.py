@@ -194,10 +194,13 @@ class RoleGQL(PydanticNodeMixin[Any]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        PermissionConnection,
-        strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
-    ]:
+    ) -> (
+        Annotated[
+            PermissionConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        ]
+        | None
+    ):
         from ai.backend.manager.api.gql.rbac.types.permission import (
             PermissionConnection,
             PermissionEdge,
@@ -264,7 +267,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> RoleAssignmentConnection:
+    ) -> RoleAssignmentConnection | None:
         # Add role_id filter to scope assignments to this role
         role_filter = RoleAssignmentFilter(role_id=UUIDFilter(equals=UUID(self.id)))
         if filter is not None:
@@ -338,10 +341,13 @@ class RoleGQL(PydanticNodeMixin[Any]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        EntityConnection,
-        strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
-    ]:
+    ) -> (
+        Annotated[
+            EntityConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
+        ]
+        | None
+    ):
         from ai.backend.manager.api.gql.rbac.types.entity import (
             EntityConnection,
             EntityEdge,

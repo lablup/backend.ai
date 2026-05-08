@@ -34,7 +34,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 async def admin_create_prometheus_query_preset_category(
     info: Info[StrawberryGQLContext],
     input: CreateCategoryInputGQL,
-) -> CreateCategoryPayloadGQL:
+) -> CreateCategoryPayloadGQL | None:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset_category.create(
         input.to_pydantic()
@@ -51,7 +51,7 @@ async def admin_create_prometheus_query_preset_category(
 async def admin_delete_prometheus_query_preset_category(
     info: Info[StrawberryGQLContext],
     id: ID,
-) -> DeleteCategoryPayloadGQL:
+) -> DeleteCategoryPayloadGQL | None:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset_category.delete(
         DeleteCategoryInputDTO(id=UUID(id))

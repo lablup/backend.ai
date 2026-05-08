@@ -106,7 +106,7 @@ async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | 
         added_version="25.16.0", description="Get JSON Schema for inference runtime configuration"
     )
 )  # type: ignore[misc]
-async def inference_runtime_config(name: str) -> JSON:
+async def inference_runtime_config(name: str) -> JSON | None:
     match name.lower():
         case "vllm":
             return cast(JSON, VLLMRuntimeConfig.to_json_schema())
@@ -131,7 +131,7 @@ async def inference_runtime_config(name: str) -> JSON:
         description="Get configuration JSON Schemas for all inference runtimes.",
     )
 )  # type: ignore[misc]
-async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
+async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON | None:
     return cast(
         JSON,
         {
@@ -150,7 +150,7 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 async def add_model_revision(
     input: AddRevisionInput,
     info: Info[StrawberryGQLContext],
-) -> AddRevisionPayload:
+) -> AddRevisionPayload | None:
     """Add a model revision to a deployment."""
     input_dto = input.to_pydantic()
     payload = await info.context.adapters.deployment.add_revision(
@@ -169,7 +169,7 @@ async def add_model_revision(
 async def activate_deployment_revision(
     input: ActivateRevisionInputGQL,
     info: Info[StrawberryGQLContext, None],
-) -> ActivateRevisionPayloadGQL:
+) -> ActivateRevisionPayloadGQL | None:
     """Activate a revision to be the current revision for a deployment."""
     payload = await info.context.adapters.deployment.activate_revision(input.to_pydantic())
     return ActivateRevisionPayloadGQL(

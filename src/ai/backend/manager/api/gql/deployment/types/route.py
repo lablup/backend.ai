@@ -121,7 +121,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     @gql_field(description="The deployment this route belongs to.")  # type: ignore[misc]
     async def deployment(
         self, info: Info[StrawberryGQLContext]
-    ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
+    ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")] | None:
         """Resolve deployment using dataloader."""
         deployment_id = UUID(str(self.deployment_id))
         deployment_data = await info.context.data_loaders.deployment_loader.load(deployment_id)

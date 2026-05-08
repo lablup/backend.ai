@@ -176,7 +176,7 @@ async def resource_groups(
 async def admin_update_resource_group_fair_share_spec(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupFairShareSpecInput,
-) -> UpdateResourceGroupFairShareSpecPayload:
+) -> UpdateResourceGroupFairShareSpecPayload | None:
     """Update fair share spec with partial update and validation."""
     check_admin_only()
 
@@ -199,7 +199,7 @@ async def admin_update_resource_group_fair_share_spec(
 async def update_resource_group_fair_share_spec(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupFairShareSpecInput,
-) -> UpdateResourceGroupFairShareSpecPayload:
+) -> UpdateResourceGroupFairShareSpecPayload | None:
     """Update fair share spec with partial update and validation."""
     dto = input.to_pydantic()
     payload_dto = await info.context.adapters.resource_group.update_fair_share_spec(dto)
@@ -216,7 +216,7 @@ async def update_resource_group_fair_share_spec(
 async def admin_update_resource_group(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupInput,
-) -> UpdateResourceGroupPayload:
+) -> UpdateResourceGroupPayload | None:
     """Update resource group configuration with partial update."""
     check_admin_only()
 
@@ -240,7 +240,7 @@ async def admin_update_resource_group(
 async def replace_resource_group_default_deployment_options(
     info: Info[StrawberryGQLContext],
     input: ReplaceResourceGroupDefaultDeploymentOptionsInputGQL,
-) -> ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL:
+) -> ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL | None:
     """Admin-only replacement of the resource group default deployment options.
 
     Only the refreshed ``default_deployment_options`` surface is returned
@@ -276,7 +276,7 @@ async def replace_resource_group_default_deployment_options(
 async def replace_resource_group_default_session_options(
     info: Info[StrawberryGQLContext],
     input: ReplaceResourceGroupDefaultSessionOptionsInputGQL,
-) -> ReplaceResourceGroupDefaultSessionOptionsPayloadGQL:
+) -> ReplaceResourceGroupDefaultSessionOptionsPayloadGQL | None:
     """Admin-only replacement of the resource group default session options.
 
     Only the refreshed ``default_session_options`` surface is returned
@@ -319,7 +319,7 @@ async def admin_resource_group_v2(
 async def admin_create_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: CreateResourceGroupInputGQL,
-) -> CreateResourceGroupPayloadGQL:
+) -> CreateResourceGroupPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.create(input.to_pydantic())
     return CreateResourceGroupPayloadGQL.from_pydantic(payload)
@@ -334,7 +334,7 @@ async def admin_create_resource_group_v2(
 async def admin_delete_resource_group_v2(
     info: Info[StrawberryGQLContext],
     name: str,
-) -> DeleteResourceGroupPayloadGQL:
+) -> DeleteResourceGroupPayloadGQL | None:
     check_admin_only()
     result = await info.context.adapters.resource_group.purge(name)
     payload = DeleteResourceGroupPayload(id=result.id)
@@ -353,7 +353,7 @@ async def admin_delete_resource_group_v2(
 async def admin_allowed_resource_groups_for_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
-) -> AllowedResourceGroupsPayloadGQL:
+) -> AllowedResourceGroupsPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.get_allowed_resource_groups_for_domain(
         domain_name
@@ -370,7 +370,7 @@ async def admin_allowed_resource_groups_for_domain_v2(
 async def admin_allowed_resource_groups_for_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
-) -> AllowedResourceGroupsPayloadGQL:
+) -> AllowedResourceGroupsPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.get_allowed_resource_groups_for_project(
         project_id
@@ -387,7 +387,7 @@ async def admin_allowed_resource_groups_for_project_v2(
 async def admin_allowed_domains_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
-) -> AllowedDomainsPayloadGQL:
+) -> AllowedDomainsPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.get_allowed_domains_for_resource_group(
         resource_group_name
@@ -404,7 +404,7 @@ async def admin_allowed_domains_for_resource_group_v2(
 async def admin_allowed_projects_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
-) -> AllowedProjectsPayloadGQL:
+) -> AllowedProjectsPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.get_allowed_projects_for_resource_group(
         resource_group_name
@@ -424,7 +424,7 @@ async def admin_allowed_projects_for_resource_group_v2(
 async def admin_update_allowed_resource_groups_for_domain_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedResourceGroupsForDomainInputGQL,
-) -> AllowedResourceGroupsPayloadGQL:
+) -> AllowedResourceGroupsPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.update_allowed_resource_groups_for_domain(
         input.to_pydantic()
@@ -441,7 +441,7 @@ async def admin_update_allowed_resource_groups_for_domain_v2(
 async def admin_update_allowed_resource_groups_for_project_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedResourceGroupsForProjectInputGQL,
-) -> AllowedResourceGroupsPayloadGQL:
+) -> AllowedResourceGroupsPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.update_allowed_resource_groups_for_project(
         input.to_pydantic()
@@ -458,7 +458,7 @@ async def admin_update_allowed_resource_groups_for_project_v2(
 async def admin_update_allowed_domains_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedDomainsForResourceGroupInputGQL,
-) -> AllowedDomainsPayloadGQL:
+) -> AllowedDomainsPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.update_allowed_domains_for_resource_group(
         input.to_pydantic()
@@ -475,7 +475,7 @@ async def admin_update_allowed_domains_for_resource_group_v2(
 async def admin_update_allowed_projects_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedProjectsForResourceGroupInputGQL,
-) -> AllowedProjectsPayloadGQL:
+) -> AllowedProjectsPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_group.update_allowed_projects_for_resource_group(
         input.to_pydantic()

@@ -289,7 +289,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     async def container_count(
         self,
         info: Info[StrawberryGQLContext],
-    ) -> int:
+    ) -> int | None:
         """
         Get the container count for a specific agent.
         """
@@ -320,9 +320,10 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        KernelV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
-    ]:
+    ) -> (
+        Annotated[KernelV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")]
+        | None
+    ):
         """Fetch kernels associated with this agent."""
         from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
         from ai.backend.manager.api.gql.base import encode_cursor
@@ -381,9 +382,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        SessionV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
-    ]:
+    ) -> (
+        Annotated[
+            SessionV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
+        ]
+        | None
+    ):
         """Fetch sessions associated with this agent."""
         from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
         from ai.backend.manager.api.gql.base import encode_cursor
@@ -446,10 +450,13 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         before: str | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        AgentResourceConnectionGQL,
-        strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
-    ]:
+    ) -> (
+        Annotated[
+            AgentResourceConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+        ]
+        | None
+    ):
         """Fetch per-slot resource capacity and usage for this agent."""
         from decimal import Decimal
 

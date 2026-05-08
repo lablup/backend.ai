@@ -26,7 +26,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 async def update_deployment_policy(
     input: UpdateDeploymentPolicyInputGQL,
     info: Info[StrawberryGQLContext],
-) -> UpdateDeploymentPolicyPayloadGQL:
+) -> UpdateDeploymentPolicyPayloadGQL | None:
     """Update (upsert) a deployment policy for a deployment."""
     check_admin_only()
     payload = await info.context.adapters.deployment.upsert_policy(input.to_pydantic())

@@ -85,7 +85,7 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
     @classmethod
     async def remote_artifact_registries(
         cls, ctx: strawberry.Info[StrawberryGQLContext]
-    ) -> ArtifactRegistryMetaConnection:
+    ) -> ArtifactRegistryMetaConnection | None:
         raise NotImplementedAPI("This API is not implemented.")
 
 
@@ -214,7 +214,7 @@ class DeleteReservoirRegistryPayload(PydanticOutputMixin[DeleteReservoirRegistry
 @gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create reservoir registry."))
 async def create_reservoir_registry(
     input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
-) -> CreateReservoirRegistryPayload:
+) -> CreateReservoirRegistryPayload | None:
     result = await info.context.adapters.reservoir_registry.create(input.to_pydantic())
     return CreateReservoirRegistryPayload(
         reservoir=ReservoirRegistry.from_pydantic(result.reservoir)
@@ -224,7 +224,7 @@ async def create_reservoir_registry(
 @gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update reservoir registry."))
 async def update_reservoir_registry(
     input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
-) -> UpdateReservoirRegistryPayload:
+) -> UpdateReservoirRegistryPayload | None:
     result = await info.context.adapters.reservoir_registry.update(input.to_pydantic())
     return UpdateReservoirRegistryPayload(
         reservoir=ReservoirRegistry.from_pydantic(result.reservoir)
@@ -234,7 +234,7 @@ async def update_reservoir_registry(
 @gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete reservoir registry."))
 async def delete_reservoir_registry(
     input: DeleteReservoirRegistryInput, info: Info[StrawberryGQLContext]
-) -> DeleteReservoirRegistryPayload:
+) -> DeleteReservoirRegistryPayload | None:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.reservoir_registry.delete(pydantic_input)
     return DeleteReservoirRegistryPayload(id=result.id)

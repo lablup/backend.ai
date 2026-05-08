@@ -228,7 +228,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         )
 
     @gql_field(description="The revision of this entity.")  # type: ignore[misc]
-    async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
+    async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
         """Resolve revision by ID using DataLoader."""
         result = await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
         if result is None:

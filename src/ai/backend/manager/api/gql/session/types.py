@@ -376,7 +376,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
         )
     )  # type: ignore[misc]
-    async def images(self, info: Info[StrawberryGQLContext]) -> ImageV2ConnectionGQL:
+    async def images(self, info: Info[StrawberryGQLContext]) -> ImageV2ConnectionGQL | None:
         from ai.backend.manager.api.gql.image.types import ImageV2EdgeGQL
 
         if not self.image_ids:
@@ -411,7 +411,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             added_version="26.3.0", description="The kernels belonging to this session."
         )
     )  # type: ignore[misc]
-    async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL:
+    async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL | None:
         user = current_user()
         if user is None:
             raise UserNotFound("User not found in context")

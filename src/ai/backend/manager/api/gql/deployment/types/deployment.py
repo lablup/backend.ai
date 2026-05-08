@@ -236,7 +236,7 @@ class ModelDeploymentMetadata:
         description="The project of this entity.",
         deprecation_reason="Use project_v2 instead.",
     )  # type: ignore[misc]
-    async def project(self, info: Info[StrawberryGQLContext]) -> Project:
+    async def project(self, info: Info[StrawberryGQLContext]) -> Project | None:
         project_global_id = to_global_id(
             GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
         )
@@ -263,7 +263,7 @@ class ModelDeploymentMetadata:
         description="The domain of this entity.",
         deprecation_reason="Use domain_v2 instead.",
     )  # type: ignore[misc]
-    async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
+    async def domain(self, info: Info[StrawberryGQLContext]) -> Domain | None:
         domain_global_id = to_global_id(
             DomainNode, self.domain_name, is_target_graphene_object=True
         )
@@ -397,7 +397,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ModelRevisionConnection:
+    ) -> ModelRevisionConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revisions(
@@ -438,7 +438,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ModelReplicaConnection:
+    ) -> ModelReplicaConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_replicas(
@@ -479,7 +479,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> AutoScalingRuleConnection:
+    ) -> AutoScalingRuleConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_rules(
@@ -522,7 +522,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> AccessTokenConnection:
+    ) -> AccessTokenConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_access_tokens(

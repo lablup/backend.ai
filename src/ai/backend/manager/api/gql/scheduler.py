@@ -77,7 +77,7 @@ class SchedulingBroadcastEventPayloadGQL:
     @gql_field(
         description="The session ID associated with the replica. This can be null right after replica creation."
     )  # type: ignore[misc]
-    async def session(self, info: Info[StrawberryGQLContext]) -> Session:
+    async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
         session_global_id = to_global_id(
             ComputeSessionNode, self.session_id, is_target_graphene_object=True
         )

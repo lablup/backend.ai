@@ -45,7 +45,7 @@ class ExtraVFolderMount(PydanticNodeMixin[Any]):
     vfolder_id: ID
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
-    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
+    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
         vfolder_global_id = AsyncNode.to_global_id("VirtualFolderNode", str(self.vfolder_id))
         return VFolder(id=ID(vfolder_global_id))
 

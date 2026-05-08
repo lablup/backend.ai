@@ -23,7 +23,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def scheduling_handlers(
     info: Info[StrawberryGQLContext],
-) -> list[SchedulingHandlerNodeGQL]:
+) -> list[SchedulingHandlerNodeGQL] | None:
     """Return every registered deployment scheduling handler."""
     check_admin_only()
     payload = await info.context.adapters.scheduling_handler.list_scheduling_handlers()
