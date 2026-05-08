@@ -20,7 +20,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentOptions,
     DeploymentState,
-    ModelRevisionSpec,
+    ModelRevisionData,
     ReplicaSpec,
     RouteHealthStatus,
     RouteStatus,
@@ -161,7 +161,7 @@ def _create_deployment_info(
             open_to_public=False,
             url=None,
         ),
-        model_revisions=[cast(ModelRevisionSpec, revision)] if has_revision else [],
+        model_revisions=[cast(ModelRevisionData, revision)] if has_revision else [],
         current_revision_id=DeploymentRevisionID(rev_id) if has_revision else None,
         options=DeploymentOptions(),
     )

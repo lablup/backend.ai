@@ -615,7 +615,7 @@ class DeploymentExecutor:
         Resolves the runtime variant id to a name at this boundary since
         the AppProxy wire API still keys on the variant name string.
         """
-        target_revision = deployment.resolve_revision_spec(revision_id)
+        target_revision = deployment.resolve_revision_data(revision_id)
 
         health_check_config = None
         if target_revision.model_definition:
@@ -627,7 +627,7 @@ class DeploymentExecutor:
             )
 
         variant = await self._runtime_variant_repo.get_by_id(
-            target_revision.execution.runtime_variant_id
+            target_revision.model_runtime_config.runtime_variant_id
         )
 
         return CreateEndpointItem(

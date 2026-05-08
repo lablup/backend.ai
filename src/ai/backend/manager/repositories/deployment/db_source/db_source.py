@@ -2537,6 +2537,34 @@ class DeploymentDBSource:
                 )
             return row.to_model_revision_spec()
 
+    async def get_revision_spec(
+        self,
+        revision_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Get a revision as a ``ModelRevisionSpec`` by revision id.
+
+        Used by operations (sokovan session draft / validation) that need
+        the spec shape — startup_command, bootstrap_script, callback_url,
+        preset_values — that ``ModelRevisionData`` does not carry.
+
+        Raises:
+            DeploymentRevisionNotFound: If the revision does not exist.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            revision_query = (
+                sa.select(DeploymentRevisionRow)
+                .where(DeploymentRevisionRow.id == revision_id)
+                .options(
+                    selectinload(DeploymentRevisionRow.image_row),
+                    selectinload(DeploymentRevisionRow.resource_slot_rows),
+                )
+            )
+            result = await db_sess.execute(revision_query)
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
+            return row.to_model_revision_spec()
+
     async def get_latest_revision(
         self,
         endpoint_id: uuid.UUID,

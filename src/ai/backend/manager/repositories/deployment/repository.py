@@ -1253,6 +1253,18 @@ class DeploymentRepository:
         return await self._db_source.get_current_revision_spec(endpoint_id)
 
     @deployment_repository_resilience.apply()
+    async def get_revision_spec(
+        self,
+        revision_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Get a revision as a ``ModelRevisionSpec`` by revision id.
+
+        Raises:
+            DeploymentRevisionNotFound: If the revision does not exist.
+        """
+        return await self._db_source.get_revision_spec(revision_id)
+
+    @deployment_repository_resilience.apply()
     async def get_latest_revision(
         self,
         endpoint_id: uuid.UUID,

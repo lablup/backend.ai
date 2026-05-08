@@ -18,9 +18,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.types import (
-    ResourceSlot,
-)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
@@ -28,18 +25,14 @@ from ai.backend.manager.data.deployment.creator import (
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
-    ClusterConfigData,
     DeploymentInfo,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
-    ModelMountConfigData,
     ModelReplicaData,
     ModelRevisionData,
     ModelRevisionSpec,
-    ModelRuntimeConfigData,
     ReplicaStateData,
-    ResourceConfigData,
     RevisionRefreshResult,
     RouteHealthStatus,
     RouteInfo,
@@ -234,52 +227,20 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
     Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
     """
     revision: ModelRevisionData | None = None
-    rev: ModelRevisionSpec | None = None
     if info.current_revision_id is not None:
-        rev = next(
-            (r for r in info.model_revisions if r.revision_id == info.current_revision_id),
+        revision = next(
+            (r for r in info.model_revisions if r.id == info.current_revision_id),
             None,
         )
-        if rev is None:
+        if revision is None:
             log.error(
                 "Deployment {} has current_revision_id {} but no matching "
-                "ModelRevisionSpec was found in DeploymentInfo.model_revisions; "
+                "ModelRevisionData was found in DeploymentInfo.model_revisions; "
                 "current_revision will be reported as null. This usually means "
                 "EndpointRow.revisions was not eagerly loaded by the caller.",
                 info.id,
                 info.current_revision_id,
             )
-    if rev is not None:
-        if rev.revision_id is None:
-            raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
-        if rev.revision_number is None:
-            raise ValueError(f"ModelRevisionSpec has no revision_number for deployment {info.id}")
-        revision = ModelRevisionData(
-            id=rev.revision_id,
-            revision_number=rev.revision_number,
-            cluster_config=ClusterConfigData(
-                mode=rev.resource_spec.cluster_mode,
-                size=rev.resource_spec.cluster_size,
-            ),
-            resource_config=ResourceConfigData(
-                resource_group_name=info.metadata.resource_group,
-                resource_slot=ResourceSlot.from_json(rev.resource_spec.resource_slots),
-            ),
-            model_mount_config=ModelMountConfigData(
-                vfolder_id=rev.mounts.model_vfolder_id,
-                mount_destination=rev.mounts.model_mount_destination,
-                definition_path=rev.mounts.model_definition_path or "",
-            ),
-            model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant_id=rev.execution.runtime_variant_id,
-                inference_runtime_config=rev.execution.inference_runtime_config or {},
-            ),
-            extra_vfolder_mounts=list(rev.mounts.extra_mounts),
-            image_id=rev.image_id,
-            created_at=info.metadata.created_at or datetime.now(UTC),
-            model_definition=rev.model_definition,
-            revision_preset_id=rev.revision_preset_id,
-        )
 
     desired_count = info.replica_spec.desired_replica_count
     if desired_count is None:

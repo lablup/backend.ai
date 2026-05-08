@@ -432,7 +432,6 @@ class PresetValueSpec(ConfiguredModel):
 
 class ModelRevisionSpec(ConfiguredModel):
     revision_id: DeploymentRevisionID | None = None
-    revision_number: int | None = None
     # Image reference is a single UUID pointer to the ``images`` row. The
     # legacy canonical + architecture pair no longer lives on the spec;
     # callers that need those strings should resolve them from the
@@ -667,21 +666,26 @@ class DeploymentInfo:
     state: DeploymentState
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
-    model_revisions: list[ModelRevisionSpec]
+    # ``DeploymentInfo`` is a read-time snapshot, so it carries
+    # ``ModelRevisionData`` (read representation) — never the write-side
+    # ``ModelRevisionSpec``. Sokovan callers that need the spec shape
+    # (e.g., draft / validation flows) must fetch it via
+    # ``DeploymentRepository.get_revision_spec``.
+    model_revisions: list[ModelRevisionData]
     options: DeploymentOptions
     current_revision_id: DeploymentRevisionID | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: DeploymentRevisionID | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
-    def resolve_revision_spec(self, revision_id: DeploymentRevisionID) -> ModelRevisionSpec:
-        """Find a ModelRevisionSpec by revision_id from model_revisions.
+    def resolve_revision_data(self, revision_id: DeploymentRevisionID) -> ModelRevisionData:
+        """Find a ``ModelRevisionData`` by id from ``model_revisions``.
 
         Raises:
             DeploymentRevisionNotFound: If the revision is not found.
         """
         for revision in self.model_revisions:
-            if revision.revision_id == revision_id:
+            if revision.id == revision_id:
                 return revision
         raise DeploymentRevisionNotFound(
             f"Revision {revision_id} not found in model_revisions of deployment {self.id}"

@@ -72,7 +72,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentState,
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
-    ModelRevisionSpec,
+    ModelRevisionData,
     ReplicaSpec,
 )
 from ai.backend.manager.data.model_serving.types import (
@@ -733,10 +733,10 @@ class EndpointRow(Base):  # type: ignore[misc]
         if self.deployment_policy is not None:
             policy_data = self.deployment_policy.to_data()
 
-        model_revisions: list[ModelRevisionSpec] = []
+        model_revisions: list[ModelRevisionData] = []
         for rev_row in self.revisions:
             if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                model_revisions.append(rev_row.to_model_revision_spec())
+                model_revisions.append(rev_row.to_data())
 
         info = self._to_deployment_info_with_revisions(model_revisions)
         info.policy = policy_data
@@ -744,7 +744,7 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     def _to_deployment_info_with_revisions(
         self,
-        model_revisions: list[ModelRevisionSpec],
+        model_revisions: list[ModelRevisionData],
     ) -> DeploymentInfo:
         """Build DeploymentInfo with pre-built model_revisions dict."""
         return DeploymentInfo(
