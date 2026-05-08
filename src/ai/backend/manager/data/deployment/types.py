@@ -686,30 +686,6 @@ class DeploymentInfo:
             f"Revision {revision_id} not found in model_revisions of deployment {self.id}"
         )
 
-    def is_transition_timed_out(
-        self,
-        started_at: datetime | None,
-        handler_name: str,
-        current_dbtime: datetime,
-    ) -> bool:
-        """Check whether the handler has exceeded its configured timeout
-        against this deployment's persisted :class:`DeploymentOptions`.
-
-        ``options.handler_options.resolve(handler_name).timeout`` yields
-        the allowed seconds; ``None`` means unbounded. ``started_at``
-        ``None`` also means "never started" so the answer is always
-        ``False``. Both timestamps originate from PostgreSQL
-        ``timestamptz`` columns and therefore share the same tzinfo —
-        no conversion needed.
-        """
-        if started_at is None:
-            return False
-        timeout = self.options.handler_options.resolve(handler_name).timeout
-        if timeout is None:
-            return False
-        elapsed = (current_dbtime - started_at).total_seconds()
-        return elapsed > timeout
-
 
 @dataclass(frozen=True)
 class DeploymentLastHistory:

@@ -109,14 +109,18 @@ class HandlerOptions(_OptionsBaseModel):
     """Per-handler runtime policy entry.
 
     Carries every per-handler knob the scheduler coordinator consults
-    when deciding what to do after a handler invocation:
+    when deciding what to do after a handler invocation. Both fields
+    default to ``None`` meaning "no limit" — the corresponding
+    classification (expired / give_up) simply does not fire when the
+    field is ``None``.
 
     - ``timeout``: maximum wall-clock seconds the session may stay in
       the phase a given handler operates on. ``None`` disables the
       timeout (the phase may run indefinitely).
-    - ``max_retry_count``: maximum number of retry attempts before the
+    - ``max_retry_count``: maximum retry attempts before the
       coordinator gives up on the session for that phase. ``None``
-      defers to the global ``SERVICE_MAX_RETRIES`` fallback.
+      disables the retry limit (the coordinator never classifies a
+      failure as ``give_up`` on this dimension).
     """
 
     timeout: int | None = Field(
@@ -131,10 +135,35 @@ class HandlerOptions(_OptionsBaseModel):
         description=(
             "Per-handler retry budget. The coordinator transitions the "
             "session through `give_up` once `phase_attempts` reaches "
-            "this value. `None` falls back to the global "
-            "`SERVICE_MAX_RETRIES`."
+            "this value. `None` disables the retry limit — `give_up` "
+            "never fires for this handler."
         ),
     )
+
+    def is_retry_exhausted(self, phase_attempts: int) -> bool:
+        """Whether the retry budget has been spent for the given phase.
+
+        Returns ``False`` when ``max_retry_count`` is ``None`` (no limit
+        configured) so callers do not have to special-case the unbounded
+        policy.
+        """
+        if self.max_retry_count is None:
+            return False
+        return phase_attempts >= self.max_retry_count
+
+    def is_timed_out(self, phase_started_at: datetime | None, current_time: datetime) -> bool:
+        """Whether the phase has run past the configured timeout.
+
+        Returns ``False`` when ``timeout`` is ``None`` (no limit
+        configured) or ``phase_started_at`` is ``None`` (the phase has
+        not started yet) so callers do not have to special-case either.
+        Both timestamps are expected to share the same tzinfo (typically
+        sourced from PostgreSQL ``timestamptz`` columns).
+        """
+        if self.timeout is None or phase_started_at is None:
+            return False
+        elapsed = (current_time - phase_started_at).total_seconds()
+        return elapsed > self.timeout
 
 
 class SessionHandlerOptions(_OptionsBaseModel):

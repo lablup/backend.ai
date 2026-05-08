@@ -38,9 +38,9 @@ class HandlerOptionsInput(BaseRequestModel):
     """Per-handler scheduler policy fields (no handler name).
 
     Used as the ``default`` slot inside ``SessionHandlerOptionsInput``.
-    Field-level ``None`` means "fall back to global defaults" —
-    ``timeout_sec=None`` is unbounded, ``max_retry_count=None`` defers
-    to the global ``SERVICE_MAX_RETRIES``.
+    Field-level ``null`` means "no limit" — the corresponding
+    classification simply does not fire (timeout-elapsed or retry-
+    exhausted) on that dimension.
     """
 
     timeout_sec: int | None = Field(
@@ -54,7 +54,10 @@ class HandlerOptionsInput(BaseRequestModel):
     max_retry_count: int | None = Field(
         default=None,
         ge=0,
-        description=("Per-phase retry budget. `null` defers to the global `SERVICE_MAX_RETRIES`."),
+        description=(
+            "Per-phase retry budget. `null` disables the retry limit "
+            "— `give_up` never fires for this handler."
+        ),
     )
 
 

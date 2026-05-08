@@ -856,6 +856,7 @@ class SessionRow(Base):  # type: ignore[misc]
                 network_type=self.network_type,
                 network_id=self.network_id,
             ),
+            handler_options=self.options.handler_options,
         )
 
     @property
