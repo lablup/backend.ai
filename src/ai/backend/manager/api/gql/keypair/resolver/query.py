@@ -37,7 +37,7 @@ async def my_keypairs(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KeyPairConnection:
+) -> KeyPairConnection | None:
     result = await info.context.adapters.user.search_my_keypairs(
         SearchMyKeypairsRequest(
             filter=filter.to_pydantic() if filter is not None else None,
@@ -80,7 +80,7 @@ async def admin_keypairs_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KeyPairConnection:
+) -> KeyPairConnection | None:
     check_admin_only()
     result = await info.context.adapters.user.gql_admin_search_keypairs(
         AdminSearchKeypairsInput(
@@ -132,7 +132,7 @@ async def admin_keypair_v2(
 async def admin_ssh_keypair_v2(
     info: Info[StrawberryGQLContext],
     access_key: str,
-) -> AdminGetSSHKeypairPayloadGQL:
+) -> AdminGetSSHKeypairPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.user.admin_get_ssh_keypair(access_key)
     return AdminGetSSHKeypairPayloadGQL.from_pydantic(payload)

@@ -209,6 +209,6 @@ async def my_user_v2(
 )  # type: ignore[misc]
 async def my_client_ip(
     info: Info[StrawberryGQLContext],
-) -> MyClientIpGQL:
+) -> MyClientIpGQL | None:
     ip = current_client_ip() or ""
     return MyClientIpGQL(client_ip=ip)

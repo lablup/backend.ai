@@ -53,7 +53,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
 async def create_vfolder_v2(
     info: Info[StrawberryGQLContext],
     input: CreateVFolderInputGQL,
-) -> CreateVFolderPayloadGQL:
+) -> CreateVFolderPayloadGQL | None:
     payload = await info.context.adapters.vfolder.create(input.to_pydantic())
     return CreateVFolderPayloadGQL.from_pydantic(payload)
 
@@ -67,7 +67,7 @@ async def create_vfolder_v2(
 async def delete_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
-) -> DeleteVFolderPayloadGQL:
+) -> DeleteVFolderPayloadGQL | None:
     payload = await info.context.adapters.vfolder.delete(vfolder_id)
     return DeleteVFolderPayloadGQL.from_pydantic(payload)
 
@@ -82,7 +82,7 @@ async def purge_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     options: PurgeVFolderOptionsInputGQL | None = None,
-) -> PurgeVFolderPayloadGQL:
+) -> PurgeVFolderPayloadGQL | None:
     options_dto = options.to_pydantic() if options is not None else PurgeVFolderOptions()
     payload = await info.context.adapters.vfolder.purge(
         vfolder_id,
@@ -101,7 +101,7 @@ async def purge_vfolder_v2(
 async def restore_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
-) -> RestoreVFolderPayloadGQL:
+) -> RestoreVFolderPayloadGQL | None:
     """Restore a virtual folder from trash."""
     payload = await info.context.adapters.vfolder.restore(vfolder_id)
     return RestoreVFolderPayloadGQL.from_pydantic(payload)
@@ -117,7 +117,7 @@ async def deploy_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     input: DeployVFolderInputGQL,
-) -> DeployVFolderPayloadGQL:
+) -> DeployVFolderPayloadGQL | None:
     payload = await info.context.adapters.vfolder.deploy(vfolder_id, input.to_pydantic())
     return DeployVFolderPayloadGQL.from_pydantic(payload)
 
@@ -132,7 +132,7 @@ async def clone_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     input: CloneVFolderInputGQL,
-) -> CloneVFolderPayloadGQL:
+) -> CloneVFolderPayloadGQL | None:
     payload = await info.context.adapters.vfolder.clone(vfolder_id, input.to_pydantic())
     return CloneVFolderPayloadGQL.from_pydantic(payload)
 
@@ -147,7 +147,7 @@ async def vfolder_list_files_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     input: ListFilesInputGQL,
-) -> ListFilesPayloadGQL:
+) -> ListFilesPayloadGQL | None:
     payload = await info.context.adapters.vfolder.list_files(vfolder_id, input.to_pydantic())
     return ListFilesPayloadGQL.from_pydantic(payload)
 
@@ -162,7 +162,7 @@ async def vfolder_mkdir_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     input: MkdirInputGQL,
-) -> MkdirPayloadGQL:
+) -> MkdirPayloadGQL | None:
     payload = await info.context.adapters.vfolder.mkdir(vfolder_id, input.to_pydantic())
     return MkdirPayloadGQL.from_pydantic(payload)
 
@@ -177,7 +177,7 @@ async def vfolder_move_file_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     input: MoveFileInputGQL,
-) -> MoveFilePayloadGQL:
+) -> MoveFilePayloadGQL | None:
     payload = await info.context.adapters.vfolder.move_file(vfolder_id, input.to_pydantic())
     return MoveFilePayloadGQL.from_pydantic(payload)
 
@@ -192,7 +192,7 @@ async def vfolder_delete_files_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     input: DeleteFilesInputGQL,
-) -> DeleteFilesPayloadGQL:
+) -> DeleteFilesPayloadGQL | None:
     payload = await info.context.adapters.vfolder.delete_files(vfolder_id, input.to_pydantic())
     return DeleteFilesPayloadGQL.from_pydantic(payload)
 
@@ -207,7 +207,7 @@ async def vfolder_create_upload_session_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     input: UploadSessionInputGQL,
-) -> UploadSessionPayloadGQL:
+) -> UploadSessionPayloadGQL | None:
     payload = await info.context.adapters.vfolder.create_upload_session(
         vfolder_id, input.to_pydantic()
     )
@@ -224,7 +224,7 @@ async def vfolder_create_download_session_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     input: DownloadSessionInputGQL,
-) -> DownloadSessionPayloadGQL:
+) -> DownloadSessionPayloadGQL | None:
     payload = await info.context.adapters.vfolder.create_download_session(
         vfolder_id, input.to_pydantic()
     )
@@ -240,7 +240,7 @@ async def vfolder_create_download_session_v2(
 async def bulk_delete_vfolders_v2(
     info: Info[StrawberryGQLContext],
     input: BulkDeleteVFoldersInputGQL,
-) -> BulkDeleteVFoldersPayloadGQL:
+) -> BulkDeleteVFoldersPayloadGQL | None:
     """Soft-delete multiple virtual folders.
 
     Args:
@@ -270,7 +270,7 @@ async def create_vfolder_in_project(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
     input: CreateVFolderInScopeInputGQL,
-) -> CreateVFolderPayloadGQL:
+) -> CreateVFolderPayloadGQL | None:
     """Create a new virtual folder scoped to a project."""
     payload = await info.context.adapters.vfolder.create_in_project(project_id, input.to_pydantic())
     return CreateVFolderPayloadGQL.from_pydantic(payload)
@@ -285,7 +285,7 @@ async def create_vfolder_in_project(
 async def bulk_purge_vfolders_v2(
     info: Info[StrawberryGQLContext],
     input: BulkPurgeVFoldersInputGQL,
-) -> BulkPurgeVFoldersPayloadGQL:
+) -> BulkPurgeVFoldersPayloadGQL | None:
     """Permanently purge multiple virtual folders, optionally cascading linked model cards."""
     ctx = info.context
     dto = input.to_pydantic()

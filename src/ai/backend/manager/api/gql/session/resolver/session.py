@@ -63,7 +63,7 @@ async def admin_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> SessionV2ConnectionGQL:
+) -> SessionV2ConnectionGQL | None:
     check_admin_only()
     payload = await info.context.adapters.session.admin_search(
         AdminSearchSessionsInput(
@@ -108,7 +108,7 @@ async def project_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> SessionV2ConnectionGQL:
+) -> SessionV2ConnectionGQL | None:
     from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 
     payload = await info.context.adapters.session.gql_search_by_project(
@@ -147,7 +147,7 @@ async def project_sessions_v2(
 async def enqueue_session(
     input: EnqueueSessionInputGQL,
     info: Info[StrawberryGQLContext],
-) -> EnqueueSessionPayloadGQL:
+) -> EnqueueSessionPayloadGQL | None:
     """Enqueue a new compute session (interactive or batch)."""
     user_data = current_user()
     if user_data is None:
@@ -177,7 +177,7 @@ async def terminate_project_sessions_v2(
     scope: ProjectSessionScopeGQL,
     session_ids: list[ID],
     forced: bool = False,
-) -> TerminateSessionsPayloadGQL:
+) -> TerminateSessionsPayloadGQL | None:
     """Terminate one or more sessions scoped to a project."""
     payload = await info.context.adapters.session.terminate_in_project(
         TerminateSessionsInProjectInput(

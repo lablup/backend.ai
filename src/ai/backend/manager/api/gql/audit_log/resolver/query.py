@@ -36,7 +36,7 @@ async def admin_audit_logs_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> AuditLogV2ConnectionGQL:
+) -> AuditLogV2ConnectionGQL | None:
     check_admin_only()
     result = await info.context.adapters.audit_log.admin_search(
         AdminSearchAuditLogsInput(

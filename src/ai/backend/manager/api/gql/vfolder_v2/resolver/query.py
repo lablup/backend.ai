@@ -40,7 +40,7 @@ async def admin_vfolders_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> VFolderConnection:
+) -> VFolderConnection | None:
     """Search all virtual folders (superadmin only)."""
     check_admin_only()
     result = await info.context.adapters.vfolder.admin_search(
@@ -101,7 +101,7 @@ async def project_vfolders(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> VFolderConnection:
+) -> VFolderConnection | None:
     """List virtual folders within a specific project."""
     result = await info.context.adapters.vfolder.project_search(
         project_id,
@@ -146,7 +146,7 @@ async def my_vfolders(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> VFolderConnection:
+) -> VFolderConnection | None:
     """Search virtual folders accessible to the current user."""
     result = await info.context.adapters.vfolder.my_search(
         SearchVFoldersInput(

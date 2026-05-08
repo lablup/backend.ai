@@ -99,7 +99,7 @@ async def prometheus_query_preset_result(
     time_range: QueryTimeRangeInput | None = None,
     options: ExecuteQueryDefinitionOptionsInput | None = None,
     time_window: str | None = None,
-) -> QueryDefinitionResultGQL:
+) -> QueryDefinitionResultGQL | None:
     dto = await info.context.adapters.prometheus_query_preset.execute_preset(
         preset_id=UUID(id),
         options=options.to_pydantic() if options is not None else None,

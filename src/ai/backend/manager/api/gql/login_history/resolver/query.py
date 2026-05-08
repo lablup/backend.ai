@@ -41,7 +41,7 @@ async def admin_login_history_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> LoginHistoryV2ConnectionGQL:
+) -> LoginHistoryV2ConnectionGQL | None:
     check_admin_only()
     result = await info.context.adapters.login_history.admin_search(
         AdminSearchLoginHistoryInput(
@@ -85,7 +85,7 @@ async def my_login_history_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> LoginHistoryV2ConnectionGQL:
+) -> LoginHistoryV2ConnectionGQL | None:
     result = await info.context.adapters.login_history.my_search(
         MySearchLoginHistoryInput(
             filter=filter.to_pydantic() if filter else None,

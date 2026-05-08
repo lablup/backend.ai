@@ -51,7 +51,7 @@ async def my_role_invitations(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RoleInvitationConnection:
+) -> RoleInvitationConnection | None:
     result = await info.context.adapters.rbac.my_search_role_invitations(
         SearchRoleInvitationsInput(
             filter=filter.to_pydantic() if filter is not None else None,
@@ -99,7 +99,7 @@ async def my_sent_role_invitations(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RoleInvitationConnection:
+) -> RoleInvitationConnection | None:
     result = await info.context.adapters.rbac.my_sent_search_role_invitations(
         SearchRoleInvitationsInput(
             filter=filter.to_pydantic() if filter is not None else None,
@@ -148,7 +148,7 @@ async def role_scoped_role_invitations(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RoleInvitationConnection:
+) -> RoleInvitationConnection | None:
     result = await info.context.adapters.rbac.role_search_invitations(
         role_id,
         SearchRoleInvitationsInput(
@@ -197,7 +197,7 @@ async def admin_role_invitations(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RoleInvitationConnection:
+) -> RoleInvitationConnection | None:
     check_admin_only()
     result = await info.context.adapters.rbac.admin_search_role_invitations(
         SearchRoleInvitationsInput(
@@ -242,7 +242,7 @@ async def admin_role_invitations(
 async def create_role_invitation(
     info: Info[StrawberryGQLContext],
     input: CreateRoleInvitationInputGQL,
-) -> CreateRoleInvitationPayload:
+) -> CreateRoleInvitationPayload | None:
     result = await info.context.adapters.rbac.create_role_invitation(input.to_pydantic())
     return CreateRoleInvitationPayload.from_pydantic(result)
 
@@ -256,7 +256,7 @@ async def create_role_invitation(
 async def accept_role_invitation(
     info: Info[StrawberryGQLContext],
     input: AcceptRoleInvitationInputGQL,
-) -> RoleInvitationGQL:
+) -> RoleInvitationGQL | None:
     dto = input.to_pydantic()
     result = await info.context.adapters.rbac.accept_role_invitation(dto.invitation_id)
     return RoleInvitationGQL.from_pydantic(result)
@@ -271,7 +271,7 @@ async def accept_role_invitation(
 async def reject_role_invitation(
     info: Info[StrawberryGQLContext],
     input: RejectRoleInvitationInputGQL,
-) -> RoleInvitationGQL:
+) -> RoleInvitationGQL | None:
     dto = input.to_pydantic()
     result = await info.context.adapters.rbac.reject_role_invitation(dto.invitation_id)
     return RoleInvitationGQL.from_pydantic(result)
@@ -286,7 +286,7 @@ async def reject_role_invitation(
 async def admin_cancel_role_invitation(
     info: Info[StrawberryGQLContext],
     input: CancelRoleInvitationInputGQL,
-) -> RoleInvitationGQL:
+) -> RoleInvitationGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     result = await info.context.adapters.rbac.cancel_role_invitation(dto.invitation_id)

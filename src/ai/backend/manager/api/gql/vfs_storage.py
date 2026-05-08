@@ -86,7 +86,7 @@ VFSStorageEdge = Edge[VFSStorage]
 )
 class VFSStorageConnection(Connection[VFSStorage]):
     @gql_field(description="The count of this entity.")  # type: ignore[misc]
-    def count(self) -> int:
+    def count(self) -> int | None:
         return len(self.edges)
 
 
@@ -189,7 +189,7 @@ class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
 )
 async def create_vfs_storage(
     input: CreateVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> CreateVFSStoragePayload:
+) -> CreateVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.create(input.to_pydantic())
     return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
@@ -200,7 +200,7 @@ async def create_vfs_storage(
 )
 async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> UpdateVFSStoragePayload:
+) -> UpdateVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.update(input.to_pydantic())
     return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
@@ -211,6 +211,6 @@ async def update_vfs_storage(
 )
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> DeleteVFSStoragePayload:
+) -> DeleteVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.delete(input.to_pydantic())
     return DeleteVFSStoragePayload.from_pydantic(result)

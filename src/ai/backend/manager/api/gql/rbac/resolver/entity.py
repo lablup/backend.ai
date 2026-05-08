@@ -37,7 +37,7 @@ async def admin_entities(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> EntityConnection:
+) -> EntityConnection | None:
     """Search entity associations with filtering, ordering, and pagination."""
     check_admin_only()
     result = await info.context.adapters.rbac.admin_search_entities_gql(

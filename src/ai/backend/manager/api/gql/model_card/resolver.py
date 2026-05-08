@@ -124,7 +124,7 @@ async def model_card_v2(
 async def admin_create_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: CreateModelCardInputGQL,
-) -> CreateModelCardPayloadGQL:
+) -> CreateModelCardPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.model_card.create(dto)
@@ -140,7 +140,7 @@ async def admin_create_model_card_v2(
 async def admin_update_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateModelCardInputGQL,
-) -> UpdateModelCardPayloadGQL:
+) -> UpdateModelCardPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.model_card.update(dto)
@@ -157,7 +157,7 @@ async def admin_delete_model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
     options: DeleteModelCardOptionsGQL | None = None,
-) -> DeleteModelCardPayloadGQL:
+) -> DeleteModelCardPayloadGQL | None:
     check_admin_only()
     options_dto = options.to_pydantic() if options is not None else DeleteModelCardOptions()
     payload = await info.context.adapters.model_card.delete(id, options=options_dto)
@@ -198,7 +198,7 @@ async def admin_bulk_delete_model_cards_v2(
 async def scan_project_model_cards_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
-) -> ScanProjectModelCardsPayloadGQL:
+) -> ScanProjectModelCardsPayloadGQL | None:
     payload = await info.context.adapters.model_card.scan_project(project_id)
     return ScanProjectModelCardsPayloadGQL.from_pydantic(payload)
 
@@ -213,7 +213,7 @@ async def deploy_model_card_v2(
     info: Info[StrawberryGQLContext],
     card_id: UUID,
     input: DeployModelCardInputGQL,
-) -> DeployModelCardPayloadGQL:
+) -> DeployModelCardPayloadGQL | None:
     payload = await info.context.adapters.model_card.deploy(card_id, input.to_pydantic())
     return DeployModelCardPayloadGQL.from_pydantic(payload)
 

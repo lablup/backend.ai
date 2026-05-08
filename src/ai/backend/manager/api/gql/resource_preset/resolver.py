@@ -114,7 +114,7 @@ async def admin_resource_preset_v2(
 async def admin_create_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     input: CreateResourcePresetInputGQL,
-) -> CreateResourcePresetPayloadGQL:
+) -> CreateResourcePresetPayloadGQL | None:
     check_admin_only()
 
     dto = input.to_pydantic()
@@ -139,7 +139,7 @@ async def admin_create_resource_preset_v2(
 async def admin_update_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateResourcePresetInputGQL,
-) -> UpdateResourcePresetPayloadGQL:
+) -> UpdateResourcePresetPayloadGQL | None:
     check_admin_only()
 
     dto = input.to_pydantic()
@@ -156,7 +156,7 @@ async def admin_update_resource_preset_v2(
 async def admin_delete_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteResourcePresetPayloadGQL:
+) -> DeleteResourcePresetPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_preset.delete(id)
     return DeleteResourcePresetPayloadGQL.from_pydantic(payload)

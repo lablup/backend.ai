@@ -78,7 +78,7 @@ StorageNamespaceEdge = Edge[StorageNamespace]
 )
 class StorageNamespaceConnection(Connection[StorageNamespace]):
     @gql_field(description="The count of this entity.")  # type: ignore[misc]
-    def count(self) -> int:
+    def count(self) -> int | None:
         return len(self.edges)
 
 
@@ -135,7 +135,7 @@ class UnregisterStorageNamespacePayload:
 )
 async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
-) -> RegisterStorageNamespacePayload:
+) -> RegisterStorageNamespacePayload | None:
     payload = await info.context.adapters.storage_namespace.register(input.to_pydantic())
     return RegisterStorageNamespacePayload(id=payload.namespace.storage_id)
 
@@ -147,7 +147,7 @@ async def register_storage_namespace(
 )
 async def unregister_storage_namespace(
     input: UnregisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
-) -> UnregisterStorageNamespacePayload:
+) -> UnregisterStorageNamespacePayload | None:
     pydantic_input = input.to_pydantic()
     payload = await info.context.adapters.storage_namespace.unregister(pydantic_input)
     return UnregisterStorageNamespacePayload(id=payload.id)
