@@ -87,6 +87,7 @@ from .upserter import (
     execute_upserter,
 )
 from .utils import (
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -174,6 +175,7 @@ __all__ = [
     "BatchPurgerResult",
     "execute_batch_purger",
     # Utils
+    "combine_conditions_and",
     "combine_conditions_or",
     "negate_conditions",
 ]

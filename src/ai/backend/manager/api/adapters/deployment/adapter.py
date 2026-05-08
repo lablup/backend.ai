@@ -223,6 +223,7 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     Updater,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -597,63 +598,7 @@ class DeploymentAdapter(BaseAdapter):
             raise RuntimeError("No authenticated user in context")
         conditions: list[QueryCondition] = []
         if input.filter:
-            f = input.filter
-            if f.name is not None:
-                condition = self.convert_string_filter(
-                    f.name,
-                    contains_factory=DeploymentConditions.by_name_contains,
-                    equals_factory=DeploymentConditions.by_name_equals,
-                    starts_with_factory=DeploymentConditions.by_name_starts_with,
-                    ends_with_factory=DeploymentConditions.by_name_ends_with,
-                    in_factory=DeploymentConditions.by_name_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.status is not None:
-                if f.status.equals is not None:
-                    lifecycles = _status_to_lifecycles(ModelDeploymentStatus(f.status.equals))
-                    if lifecycles:
-                        conditions.append(DeploymentConditions.by_status_in(lifecycles))
-                if f.status.in_ is not None:
-                    lifecycles = _statuses_to_lifecycles([
-                        ModelDeploymentStatus(s) for s in f.status.in_
-                    ])
-                    if lifecycles:
-                        conditions.append(DeploymentConditions.by_status_in(lifecycles))
-                if f.status.not_equals is not None:
-                    lifecycles = _status_to_lifecycles(ModelDeploymentStatus(f.status.not_equals))
-                    if lifecycles:
-                        conditions.append(DeploymentConditions.by_status_not_in(lifecycles))
-                if f.status.not_in is not None:
-                    lifecycles = _statuses_to_lifecycles([
-                        ModelDeploymentStatus(s) for s in f.status.not_in
-                    ])
-                    if lifecycles:
-                        conditions.append(DeploymentConditions.by_status_not_in(lifecycles))
-            if f.open_to_public is not None:
-                conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
-            if f.tags is not None:
-                condition = self.convert_string_filter(
-                    f.tags,
-                    contains_factory=DeploymentConditions.by_tag_contains,
-                    equals_factory=DeploymentConditions.by_tag_equals,
-                    starts_with_factory=DeploymentConditions.by_tag_starts_with,
-                    ends_with_factory=DeploymentConditions.by_tag_ends_with,
-                    in_factory=DeploymentConditions.by_tag_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.endpoint_url is not None:
-                condition = self.convert_string_filter(
-                    f.endpoint_url,
-                    contains_factory=DeploymentConditions.by_url_contains,
-                    equals_factory=DeploymentConditions.by_url_equals,
-                    starts_with_factory=DeploymentConditions.by_url_starts_with,
-                    ends_with_factory=DeploymentConditions.by_url_ends_with,
-                    in_factory=DeploymentConditions.by_url_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
+            conditions.extend(self._convert_deployment_filter(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
@@ -691,63 +636,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search deployments within a specific project."""
         conditions: list[QueryCondition] = []
         if input.filter:
-            f = input.filter
-            if f.name is not None:
-                condition = self.convert_string_filter(
-                    f.name,
-                    contains_factory=DeploymentConditions.by_name_contains,
-                    equals_factory=DeploymentConditions.by_name_equals,
-                    starts_with_factory=DeploymentConditions.by_name_starts_with,
-                    ends_with_factory=DeploymentConditions.by_name_ends_with,
-                    in_factory=DeploymentConditions.by_name_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.status is not None:
-                if f.status.equals is not None:
-                    lifecycles = _status_to_lifecycles(ModelDeploymentStatus(f.status.equals))
-                    if lifecycles:
-                        conditions.append(DeploymentConditions.by_status_in(lifecycles))
-                if f.status.in_ is not None:
-                    lifecycles = _statuses_to_lifecycles([
-                        ModelDeploymentStatus(s) for s in f.status.in_
-                    ])
-                    if lifecycles:
-                        conditions.append(DeploymentConditions.by_status_in(lifecycles))
-                if f.status.not_equals is not None:
-                    lifecycles = _status_to_lifecycles(ModelDeploymentStatus(f.status.not_equals))
-                    if lifecycles:
-                        conditions.append(DeploymentConditions.by_status_not_in(lifecycles))
-                if f.status.not_in is not None:
-                    lifecycles = _statuses_to_lifecycles([
-                        ModelDeploymentStatus(s) for s in f.status.not_in
-                    ])
-                    if lifecycles:
-                        conditions.append(DeploymentConditions.by_status_not_in(lifecycles))
-            if f.open_to_public is not None:
-                conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
-            if f.tags is not None:
-                condition = self.convert_string_filter(
-                    f.tags,
-                    contains_factory=DeploymentConditions.by_tag_contains,
-                    equals_factory=DeploymentConditions.by_tag_equals,
-                    starts_with_factory=DeploymentConditions.by_tag_starts_with,
-                    ends_with_factory=DeploymentConditions.by_tag_ends_with,
-                    in_factory=DeploymentConditions.by_tag_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.endpoint_url is not None:
-                condition = self.convert_string_filter(
-                    f.endpoint_url,
-                    contains_factory=DeploymentConditions.by_url_contains,
-                    equals_factory=DeploymentConditions.by_url_equals,
-                    starts_with_factory=DeploymentConditions.by_url_starts_with,
-                    ends_with_factory=DeploymentConditions.by_url_ends_with,
-                    in_factory=DeploymentConditions.by_url_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
+            conditions.extend(self._convert_deployment_filter(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
@@ -1662,17 +1551,18 @@ class DeploymentAdapter(BaseAdapter):
             for sub in f.AND:
                 conditions.extend(self._convert_deployment_filter(sub))
         if f.OR:
-            or_conditions: list[QueryCondition] = []
+            or_groups: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_deployment_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+                sub_conditions = self._convert_deployment_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_deployment_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_deployment_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _build_deployment_querier(self, input: AdminSearchDeploymentsInput) -> BatchQuerier:
@@ -1753,17 +1643,18 @@ class DeploymentAdapter(BaseAdapter):
             for sub in f.AND:
                 conditions.extend(self._convert_revision_filter(sub))
         if f.OR:
-            or_conditions: list[QueryCondition] = []
+            or_groups: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_revision_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+                sub_conditions = self._convert_revision_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_revision_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_revision_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _build_revision_querier(
@@ -1814,17 +1705,18 @@ class DeploymentAdapter(BaseAdapter):
             for sub in f.AND:
                 conditions.extend(self._convert_route_filter(sub))
         if f.OR:
-            or_conditions: list[QueryCondition] = []
+            or_groups: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_route_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+                sub_conditions = self._convert_route_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_route_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_route_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _build_route_querier(
@@ -1886,17 +1778,18 @@ class DeploymentAdapter(BaseAdapter):
             for sub in f.AND:
                 conditions.extend(self._convert_access_token_filter(sub))
         if f.OR:
-            or_conditions: list[QueryCondition] = []
+            or_groups: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_access_token_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+                sub_conditions = self._convert_access_token_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_access_token_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_access_token_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _build_access_token_querier(
@@ -1955,17 +1848,18 @@ class DeploymentAdapter(BaseAdapter):
             for sub in f.AND:
                 conditions.extend(self._convert_auto_scaling_rule_filter(sub))
         if f.OR:
-            or_conditions: list[QueryCondition] = []
+            or_groups: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_auto_scaling_rule_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+                sub_conditions = self._convert_auto_scaling_rule_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_auto_scaling_rule_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_auto_scaling_rule_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _build_auto_scaling_rule_querier(
@@ -2068,17 +1962,18 @@ class DeploymentAdapter(BaseAdapter):
             for sub in f.AND:
                 conditions.extend(self._convert_replica_filter(sub))
         if f.OR:
-            or_conditions: list[QueryCondition] = []
+            or_groups: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_replica_filter(sub))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
+                sub_conditions = self._convert_replica_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_replica_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_replica_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _build_replica_querier(
@@ -2160,17 +2055,18 @@ class DeploymentAdapter(BaseAdapter):
             for sub in filter_.AND:
                 conditions.extend(self._convert_allocated_slot_filter(sub, conditions_cls))
         if filter_.OR:
-            or_conds: list[QueryCondition] = []
+            or_groups: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_allocated_slot_filter(sub, conditions_cls))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
+                sub_conditions = self._convert_allocated_slot_filter(sub, conditions_cls)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
         if filter_.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter_.NOT:
-                not_conds.extend(self._convert_allocated_slot_filter(sub, conditions_cls))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_allocated_slot_filter(sub, conditions_cls)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     # ------------------------------------------------------------------
