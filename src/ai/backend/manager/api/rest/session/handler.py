@@ -234,12 +234,8 @@ def _validate_creation_config(
 
 
 def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:
-    """Move UUID-shaped strings from the legacy ``mounts`` / ``mount_map`` /
-    ``mount_options`` buckets into the UUID-keyed ``mount_ids`` /
-    ``mount_id_map`` / ``mount_options`` buckets, leaving only name-shaped
-    entries for ``_resolve_legacy_name_mounts``. ``mount_options`` is
-    polymorphic (modern callers key it by UUID, legacy callers by name),
-    so name keys are preserved alongside the routed UUID-keyed entries.
+    """Lift UUID-shaped strings from legacy mount buckets onto the UUID-keyed
+    buckets, leaving only name-shaped entries for the name resolver.
     """
     next_config = dict(creation_config)
     mount_ids: list[Any] = list(next_config.get("mount_ids") or [])
