@@ -79,28 +79,15 @@ class BaseRootResponseModel[T](RootModel[T]):
 TRequestModel = TypeVar("TRequestModel", bound=BaseRequestModel)
 
 
-def _convert_validation_error_for[T](
-    location_prefix: str,
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
-    """
-    Decorator factory that converts Pydantic ``ValidationError`` raised by
-    a parameter parser into a :class:`PydanticValidationError` annotated
-    with ``location_prefix`` (e.g. "body", "query", "header", "path").
-    """
+def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
+    @functools.wraps(func)
+    def wrapped(*args: Any, **kwargs: Any) -> T:
+        try:
+            return func(*args, **kwargs)
+        except ValidationError as e:
+            raise PydanticValidationError.from_pydantic(e) from e
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        @functools.wraps(func)
-        def wrapped(*args: Any, **kwargs: Any) -> T:
-            try:
-                return func(*args, **kwargs)
-            except ValidationError as e:
-                raise PydanticValidationError.from_pydantic(
-                    e, location_prefix=location_prefix
-                ) from e
-
-        return wrapped
-
-    return decorator
+    return wrapped
 
 
 class BodyParam[TRequestModel: BaseRequestModel]:
@@ -119,7 +106,7 @@ class BodyParam[TRequestModel: BaseRequestModel]:
             )
         return self._parsed
 
-    @_convert_validation_error_for("body")
+    @convert_validation_error
     def from_body(self, json_body: str) -> Self:
         self._parsed = self._model.model_validate(json_body)
         return self
@@ -141,7 +128,7 @@ class QueryParam[TRequestModel: BaseRequestModel]:
             )
         return self._parsed
 
-    @_convert_validation_error_for("query")
+    @convert_validation_error
     def from_query(self, query: MultiMapping[str]) -> Self:
         self._parsed = self._model.model_validate(query)
         return self
@@ -163,7 +150,7 @@ class HeaderParam[TRequestModel: BaseRequestModel]:
             )
         return self._parsed
 
-    @_convert_validation_error_for("header")
+    @convert_validation_error
     def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
         self._parsed = self._model.model_validate(headers)
         return self
@@ -185,7 +172,7 @@ class PathParam[TRequestModel: BaseRequestModel]:
             )
         return self._parsed
 
-    @_convert_validation_error_for("path")
+    @convert_validation_error
     def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
         self._parsed = self._model.model_validate(match_info)
         return self

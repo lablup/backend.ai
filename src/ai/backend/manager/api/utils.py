@@ -218,18 +218,15 @@ def pydantic_params_api_handler[
                 raise InvalidAPIParameters("Malformed body") from e
             stripped_params = orig_params.copy()
             log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
-            primary_location = "body" if body_exists else "query"
             try:
                 checked_params = checker.model_validate(stripped_params)
             except ValidationError as ex:
-                raise PydanticValidationError.from_pydantic(
-                    ex, location_prefix=primary_location
-                ) from ex
+                raise PydanticValidationError.from_pydantic(ex) from ex
             if body_exists and query_param_checker is not None:
                 try:
                     query_params = query_param_checker.model_validate(request.query)
                 except ValidationError as ex:
-                    raise PydanticValidationError.from_pydantic(ex, location_prefix="query") from ex
+                    raise PydanticValidationError.from_pydantic(ex) from ex
                 kwargs["query"] = query_params
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
