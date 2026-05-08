@@ -14,21 +14,6 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.config import (
-    ModelConfigDraft as ModelConfigDraftDTO,
-)
-from ai.backend.common.config import (
-    ModelDefinitionDraft as ModelDefinitionDraftDTO,
-)
-from ai.backend.common.config import (
-    ModelHealthCheckDraft as ModelHealthCheckDraftDTO,
-)
-from ai.backend.common.config import (
-    ModelMetadata as ModelMetadataDTO,
-)
-from ai.backend.common.config import (
-    ModelServiceConfigDraft as ModelServiceConfigDraftDTO,
-)
-from ai.backend.common.config import (
     PreStartAction as PreStartActionDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -57,10 +42,25 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ImageInput as ImageInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelConfigInput as ModelConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelDefinitionInput as ModelDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelHealthCheckInput as ModelHealthCheckInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelMetadataInput as ModelMetadataInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelMountConfigInput as ModelMountConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelRuntimeConfigInput as ModelRuntimeConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelServiceConfigInput as ModelServiceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceConfigInput as ResourceConfigInputDTO,
@@ -808,7 +808,7 @@ class PreStartActionInputGQL(PydanticInputMixin[PreStartActionDTO]):
     ),
     name="ModelHealthCheckInput",
 )
-class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckDraftDTO]):
+class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
     interval: float | None = gql_field(
         description="Interval in seconds between health checks. Falls back to the runtime variant or built-in default (10.0) when omitted.",
         default=None,
@@ -842,7 +842,7 @@ class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckDraftDTO]):
     ),
     name="ModelServiceConfigInput",
 )
-class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDraftDTO]):
+class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO]):
     pre_start_actions: list[PreStartActionInputGQL] | None = gql_field(
         description="List of pre-start actions to execute before starting the model service.",
         default=None,
@@ -873,7 +873,7 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDraftDTO])
     ),
     name="ModelMetadataInput",
 )
-class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataDTO]):
+class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataInputDTO]):
     author: str | None = gql_field(description="Author of the model.", default=None)
     title: str | None = gql_field(description="Title of the model.", default=None)
     version: str | None = gql_field(description="Version of the model.", default=None)
@@ -902,7 +902,7 @@ class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataDTO]):
     ),
     name="ModelConfigInput",
 )
-class ModelConfigInputGQL(PydanticInputMixin[ModelConfigDraftDTO]):
+class ModelConfigInputGQL(PydanticInputMixin[ModelConfigInputDTO]):
     name: str | None = gql_field(
         description=(
             "Name of the model. May be supplied by the runtime variant default model"
@@ -934,7 +934,7 @@ class ModelConfigInputGQL(PydanticInputMixin[ModelConfigDraftDTO]):
     ),
     name="ModelDefinitionInput",
 )
-class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionDraftDTO]):
+class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionInputDTO]):
     models: list[ModelConfigInputGQL] | None = gql_field(
         description=(
             "List of model entries in the model definition. Omit to inherit the entire"

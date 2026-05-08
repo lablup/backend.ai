@@ -62,6 +62,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput,
     UpdateDeploymentInput,
     UpsertDeploymentPolicyInput,
+    to_model_definition_draft,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     AccessTokenNode,
@@ -505,7 +506,7 @@ class DeploymentAdapter(BaseAdapter):
                     else None,
                 ),
                 mounts=mounts_creator,
-                model_definition=initial_revision.model_definition,
+                model_definition=to_model_definition_draft(initial_revision.model_definition),
                 revision_preset_id=initial_revision.revision_preset_id,
                 execution=ExecutionSpec(
                     runtime_variant_id=initial_revision.model_runtime_config.runtime_variant_id,
@@ -1110,7 +1111,7 @@ class DeploymentAdapter(BaseAdapter):
                 else None,
                 inference_runtime_config=input.model_runtime_config.inference_runtime_config,
             ),
-            model_definition=input.model_definition,
+            model_definition=to_model_definition_draft(input.model_definition),
             revision_preset_id=input.revision_preset_id,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(

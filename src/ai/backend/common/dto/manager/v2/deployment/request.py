@@ -13,7 +13,10 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import (
+    ModelDefinitionDraft,
+    PreStartAction,
+)
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteHealthStatus,
@@ -80,10 +83,15 @@ __all__ = (
     "EnvironmentVariablesInput",
     "ExtraVFolderMountInput",
     "ImageInput",
+    "ModelConfigInput",
+    "ModelDefinitionInput",
     "ModelDeploymentMetadataInput",
     "ModelDeploymentNetworkAccessInput",
+    "ModelHealthCheckInput",
+    "ModelMetadataInput",
     "ModelMountConfigInput",
     "ModelRuntimeConfigInput",
+    "ModelServiceConfigInput",
     "ReplicaFilter",
     "ReplicaOrder",
     "ReplicaStatusFilter",
@@ -114,6 +122,126 @@ __all__ = (
     "UpdateRouteTrafficStatusInput",
     "UpsertDeploymentPolicyInput",
 )
+
+
+class ModelHealthCheckInput(BaseRequestModel):
+    """Input for the model service health check.
+
+    Every field is optional. Lower-priority sources in the revision merge
+    chain (runtime variant default, revision preset, vfolder
+    ``model-definition.yaml``) supply values for any field the request
+    omits; the strict :class:`~ai.backend.common.config.ModelHealthCheck`
+    is materialized only at the persistence boundary by
+    :meth:`~ai.backend.common.config.ModelHealthCheckDraft.to_resolved`.
+    """
+
+    interval: float | None = Field(
+        default=None, description="Interval in seconds between health checks."
+    )
+    path: str | None = Field(default=None, description="Path to check for health status.")
+    max_retries: int | None = Field(
+        default=None, description="Maximum number of retries for health check."
+    )
+    max_wait_time: float | None = Field(
+        default=None,
+        description="Maximum time in seconds to wait for a health check response.",
+    )
+    expected_status_code: int | None = Field(
+        default=None, description="Expected HTTP status code for a healthy response."
+    )
+    initial_delay: float | None = Field(
+        default=None, description="Initial delay in seconds before the first health check."
+    )
+
+
+class ModelMetadataInput(BaseRequestModel):
+    """Input for model metadata. Every field is optional."""
+
+    author: str | None = Field(default=None, description="Author of the model.")
+    title: str | None = Field(default=None, description="Title of the model.")
+    version: str | None = Field(default=None, description="Version of the model.")
+    created: str | None = Field(default=None, description="Creation date of the model.")
+    last_modified: str | None = Field(default=None, description="Last modified date of the model.")
+    description: str | None = Field(default=None, description="Description of the model.")
+    task: str | None = Field(default=None, description="Task type of the model.")
+    category: str | None = Field(default=None, description="Category of the model.")
+    architecture: str | None = Field(default=None, description="Architecture of the model.")
+    framework: list[str] | None = Field(default=None, description="Frameworks used by the model.")
+    label: list[str] | None = Field(default=None, description="Labels for the model.")
+    license: str | None = Field(default=None, description="License of the model.")
+    min_resource: dict[str, Any] | None = Field(
+        default=None, description="Minimum resource requirements for the model."
+    )
+
+
+class ModelServiceConfigInput(BaseRequestModel):
+    """Input for the model service configuration. Every field is optional.
+
+    Lower-priority sources in the revision merge chain supply any field
+    the request omits.
+    """
+
+    pre_start_actions: list[PreStartAction] | None = Field(
+        default=None,
+        description="List of pre-start actions to execute before starting the model service.",
+    )
+    start_command: list[str] | None = Field(
+        default=None, description="Command to start the model service."
+    )
+    shell: str | None = Field(default=None, description="Shell configured for the model service.")
+    port: int | None = Field(default=None, description="Port number for the model service.")
+    health_check: ModelHealthCheckInput | None = Field(
+        default=None, description="Health check configuration for the model service."
+    )
+
+
+class ModelConfigInput(BaseRequestModel):
+    """Input for a single model entry within a model definition.
+
+    Every field is optional so the revision merge chain (runtime variant
+    default, revision preset, vfolder ``model-definition.yaml``, and the
+    ``model_mount_destination`` default) can fill in whatever the request
+    leaves unset.
+    """
+
+    name: str | None = Field(default=None, description="Name of the model.")
+    model_path: str | None = Field(default=None, description="Path to the model file.")
+    service: ModelServiceConfigInput | None = Field(
+        default=None, description="Configuration for the model service."
+    )
+    metadata: ModelMetadataInput | None = Field(
+        default=None, description="Metadata about the model."
+    )
+
+
+class ModelDefinitionInput(BaseRequestModel):
+    """Input for the full model definition.
+
+    A request may omit ``models`` entirely to inherit the definition from
+    a lower-priority source, or supply an entry to override per-index.
+    """
+
+    models: list[ModelConfigInput] | None = Field(
+        default=None, description="List of model entries in the model definition."
+    )
+
+
+def to_model_definition_draft(
+    input: ModelDefinitionInput | None,
+) -> ModelDefinitionDraft | None:
+    """Project a v2 :class:`ModelDefinitionInput` onto the internal merge-chain
+    :class:`~ai.backend.common.config.ModelDefinitionDraft`.
+
+    The two types are structurally isomorphic by design (both all-optional
+    super-sets of the strict :class:`~ai.backend.common.config.ModelDefinition`),
+    so a dump-and-validate round-trip is sufficient. Required-field
+    enforcement still happens in
+    :meth:`~ai.backend.common.config.ModelDefinitionDraft.to_resolved` after
+    the full merge.
+    """
+    if input is None:
+        return None
+    return ModelDefinitionDraft.model_validate(input.model_dump())
 
 
 class ClusterConfigInput(BaseRequestModel):
@@ -233,7 +361,7 @@ class CreateRevisionInputDTO(BaseRequestModel):
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    model_definition: ModelDefinitionDraft | None = Field(
+    model_definition: ModelDefinitionInput | None = Field(
         default=None,
         description="Model definition to override the default values generated by the server",
     )
@@ -269,7 +397,7 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    model_definition: ModelDefinitionDraft | None = Field(
+    model_definition: ModelDefinitionInput | None = Field(
         default=None,
         description="Model definition to override the default values generated by the server",
     )
@@ -396,7 +524,7 @@ class RevisionInput(BaseRequestModel):
         default="/models", description="Mount destination for model vfolder"
     )
     model_definition_path: str = Field(description="Path to model definition file")
-    model_definition: ModelDefinitionDraft | None = Field(
+    model_definition: ModelDefinitionInput | None = Field(
         default=None,
         description="Model definition to override the default values generated by the server",
     )
