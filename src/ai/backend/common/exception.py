@@ -447,13 +447,26 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
 _MAX_INPUT_REPR_LEN = 200
 
 
-def _format_pydantic_loc(loc: tuple[Any, ...], location_prefix: str | None) -> str:
+def format_pydantic_loc(loc: tuple[Any, ...], location_prefix: str | None = None) -> str:
+    """
+    Render a Pydantic error ``loc`` tuple into a single dotted path,
+    using bracket notation for integer indices (``users[0].email``).
+
+    This matches the convention previously inlined in
+    ``session_spec_preparer._format_loc`` so error messages emitted from
+    different layers read identically.
+    """
     parts: list[str] = []
     if location_prefix:
         parts.append(location_prefix)
     for item in loc:
-        parts.append(str(item))
-    return ".".join(parts) if parts else "<root>"
+        if isinstance(item, int):
+            parts.append(f"[{item}]")
+        elif parts:
+            parts.append(f".{item}")
+        else:
+            parts.append(str(item))
+    return "".join(parts) if parts else "<root>"
 
 
 def format_pydantic_validation_errors(
@@ -471,7 +484,7 @@ def format_pydantic_validation_errors(
     summary_items: list[str] = []
     structured: list[dict[str, Any]] = []
     for err in raw_errors:
-        loc = _format_pydantic_loc(tuple(err.get("loc", ())), location_prefix)
+        loc = format_pydantic_loc(tuple(err.get("loc", ())), location_prefix)
         msg = err.get("msg", "validation failed")
         summary_items.append(f"{loc}: {msg}")
         entry: dict[str, Any] = {

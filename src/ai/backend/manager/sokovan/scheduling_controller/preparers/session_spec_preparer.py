@@ -21,6 +21,7 @@ from collections.abc import Iterable
 
 from pydantic import ValidationError
 
+from ai.backend.common.exception import format_pydantic_loc
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
@@ -67,18 +68,8 @@ class SessionSpecPreparer:
         try:
             return SessionSpec.model_validate(draft.model_dump(exclude_none=True))
         except ValidationError as exc:
-            missing_paths = [self._format_loc(err["loc"]) for err in exc.errors()]
+            missing_paths = [format_pydantic_loc(tuple(err["loc"])) for err in exc.errors()]
             raise IncompleteSessionSpec(
                 extra_msg="SessionSpec fields not resolved: " + ", ".join(missing_paths),
                 extra_data={"missing": missing_paths},
             ) from exc
-
-    @staticmethod
-    def _format_loc(loc: tuple[object, ...]) -> str:
-        parts: list[str] = []
-        for item in loc:
-            if isinstance(item, int):
-                parts.append(f"[{item}]")
-            else:
-                parts.append(f".{item}" if parts else str(item))
-        return "".join(parts)
