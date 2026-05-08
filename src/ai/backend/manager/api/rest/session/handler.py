@@ -345,9 +345,7 @@ class SessionHandler:
         self._vfolder = vfolder
         self._config_provider = config_provider
 
-    async def _normalize_legacy_mounts(
-        self, validated_config: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _normalize_legacy_mounts(self, validated_config: dict[str, Any]) -> dict[str, Any]:
         """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
         ``mount_options`` surfaces: route UUID-shaped entries onto the
         UUID-keyed buckets, then resolve any remaining names to UUIDs and
