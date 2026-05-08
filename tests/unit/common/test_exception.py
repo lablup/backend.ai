@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from aiohttp import web
+from pydantic import BaseModel, ValidationError
 
 from ai.backend.common.exception import (
     ErrorCode,
@@ -14,7 +15,33 @@ from ai.backend.common.exception import (
     ErrorOperation,
     PassthroughError,
     UserNotFound,
+    format_pydantic_loc,
+    format_pydantic_validation_errors,
 )
+
+
+class _DummyAddress(BaseModel):
+    city: str
+    zipcode: int
+
+
+class _DummyUser(BaseModel):
+    """A throwaway model used to provoke ``ValidationError`` shapes the
+    formatter is expected to handle: top-level fields, nested fields,
+    and list-indexed fields."""
+
+    name: str
+    age: int
+    address: _DummyAddress
+    tags: list[str]
+
+
+def _make_validation_error(payload: dict[str, Any]) -> ValidationError:
+    try:
+        _DummyUser.model_validate(payload)
+    except ValidationError as e:
+        return e
+    raise AssertionError("Expected ValidationError but model validated successfully")
 
 
 class TestBackendAIErrorCode:
@@ -111,3 +138,121 @@ class TestBackendAIErrorCode:
 
         # Verify content type is application/problem+json
         assert resp.content_type == "application/problem+json"
+
+
+class TestFormatPydanticLoc:
+    @pytest.mark.parametrize(
+        "loc, prefix, expected",
+        [
+            # Empty loc renders as <root>
+            ((), None, "<root>"),
+            # Empty loc with a prefix shows just the prefix
+            ((), "body", "body"),
+            # Single string field
+            (("name",), None, "name"),
+            # Nested string fields are dotted
+            (("address", "city"), None, "address.city"),
+            # Integer index uses bracket notation
+            (("tags", 0), None, "tags[0]"),
+            # Mix of nested fields and index
+            (("users", 2, "email"), None, "users[2].email"),
+            # Prefix is prepended
+            (("name",), "body", "body.name"),
+            (("address", "city"), "body", "body.address.city"),
+            (("tags", 0), "body", "body.tags[0]"),
+            # Leading int with prefix still uses bracket notation
+            ((0, "name"), "body", "body[0].name"),
+        ],
+    )
+    def test_format_pydantic_loc(
+        self,
+        loc: tuple[Any, ...],
+        prefix: str | None,
+        expected: str,
+    ) -> None:
+        assert format_pydantic_loc(loc, prefix) == expected
+
+
+class TestFormatPydanticValidationErrors:
+    def test_single_missing_field_summary(self) -> None:
+        exc = _make_validation_error({
+            "age": 30,
+            "address": {"city": "Seoul", "zipcode": 12345},
+            "tags": [],
+        })
+
+        summary, structured = format_pydantic_validation_errors(exc)
+
+        assert summary == "name: Field required"
+        assert len(structured) == 1
+        entry = structured[0]
+        assert entry["loc"] == "name"
+        assert entry["msg"] == "Field required"
+        assert entry["type"] == "missing"
+
+    def test_multiple_errors_joined_with_semicolon(self) -> None:
+        exc = _make_validation_error({"name": "Alice", "age": "not-a-number"})
+
+        summary, structured = format_pydantic_validation_errors(exc)
+
+        # Multiple errors are joined with "; " in deterministic Pydantic order
+        assert "; " in summary
+        # Every per-field error must surface in both summary and structured list
+        locs = [entry["loc"] for entry in structured]
+        assert "age" in locs
+        assert "address" in locs
+        for entry in structured:
+            assert f"{entry['loc']}: {entry['msg']}" in summary
+
+    def test_nested_and_indexed_locs(self) -> None:
+        exc = _make_validation_error({
+            "name": "Alice",
+            "age": 30,
+            "address": {"city": "Seoul", "zipcode": "not-a-number"},
+            "tags": ["ok", 123],
+        })
+
+        _, structured = format_pydantic_validation_errors(exc)
+
+        locs = {entry["loc"] for entry in structured}
+        # Nested field renders dotted
+        assert "address.zipcode" in locs
+        # List index renders with bracket notation
+        assert "tags[1]" in locs
+
+    def test_location_prefix_is_prepended(self) -> None:
+        exc = _make_validation_error({
+            "age": 30,
+            "address": {"city": "Seoul", "zipcode": 12345},
+            "tags": [],
+        })
+
+        summary, structured = format_pydantic_validation_errors(exc, location_prefix="body")
+
+        assert summary.startswith("body.name:")
+        assert structured[0]["loc"] == "body.name"
+
+    def test_input_repr_is_truncated(self) -> None:
+        long_value = "x" * 500
+        exc = _make_validation_error({
+            "name": "Alice",
+            "age": long_value,  # str → int validation fails, large input echoed back
+            "address": {"city": "Seoul", "zipcode": 12345},
+            "tags": [],
+        })
+
+        _, structured = format_pydantic_validation_errors(exc)
+        age_entry = next(e for e in structured if e["loc"] == "age")
+        assert "input" in age_entry
+        assert age_entry["input"].endswith("...<truncated>")
+        # The truncation cap is 200 chars before the marker
+        assert len(age_entry["input"]) <= 200 + len("...<truncated>")
+
+    def test_empty_payload_produces_field_required_summary(self) -> None:
+        # Sanity check: a wholly empty payload still produces a real
+        # summary (no <root> fallback) because every required field
+        # surfaces an individual error.
+        exc = _make_validation_error({})
+        summary, structured = format_pydantic_validation_errors(exc)
+        assert summary != "validation failed"
+        assert all(entry["msg"] == "Field required" for entry in structured)
