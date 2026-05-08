@@ -432,6 +432,11 @@ class PresetValueSpec(ConfiguredModel):
 
 class ModelRevisionSpec(ConfiguredModel):
     revision_id: DeploymentRevisionID | None = None
+    # Sequential per-deployment number (``deployment_revisions.revision_number``).
+    # ``None`` while the spec is being built from a draft and the row has not
+    # yet been persisted; populated whenever the spec is loaded from an
+    # existing row.
+    revision_number: int | None = None
     # Image reference is a single UUID pointer to the ``images`` row. The
     # legacy canonical + architecture pair no longer lives on the spec;
     # callers that need those strings should resolve them from the
@@ -873,6 +878,11 @@ class ModelMountConfigData:
 @dataclass
 class ModelRevisionData:
     id: UUID
+    # Per-deployment sequential counter assigned at insert time via
+    # ``deployment_revisions.revision_number`` (UNIQUE per endpoint). Useful
+    # for surfacing "Revision #N" labels and for client-side ordering
+    # without having to re-query the server.
+    revision_number: int
     cluster_config: ClusterConfigData
     resource_config: ResourceConfigData
     model_runtime_config: ModelRuntimeConfigData

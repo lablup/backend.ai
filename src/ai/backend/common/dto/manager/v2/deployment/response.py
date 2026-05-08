@@ -100,6 +100,13 @@ class RevisionNode(BaseResponseModel):
     """Node model representing a deployment revision."""
 
     id: UUID = Field(description="Revision ID")
+    revision_number: int = Field(
+        description=(
+            "Per-deployment sequential revision number assigned at insert "
+            "time (UNIQUE per endpoint). Stable across the lifetime of the "
+            "row and suitable for surfacing 'Revision #N' labels."
+        ),
+    )
     # ``image_id`` is null when the referenced image row has been deleted
     # (``deployment_revisions.image`` SET NULL FK); the revision is kept for
     # history but cannot be redeployed in that state.

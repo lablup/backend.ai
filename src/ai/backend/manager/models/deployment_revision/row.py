@@ -273,6 +273,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             )
         return ModelRevisionSpec(
             revision_id=self.id,
+            revision_number=self.revision_number,
             image_id=self.image,
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode(self.cluster_mode),
@@ -307,6 +308,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         """Convert to ModelRevisionData dataclass."""
         return ModelRevisionData(
             id=self.id,
+            revision_number=self.revision_number,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode(self.cluster_mode),
                 size=self.cluster_size,

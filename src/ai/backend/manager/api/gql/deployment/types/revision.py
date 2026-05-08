@@ -452,6 +452,16 @@ class ModelDefinitionGQL:
 class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     image_id: ID
     id: NodeID[str]
+    revision_number: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Per-deployment sequential revision number assigned at "
+                "insert time (UNIQUE per deployment). Use this to surface "
+                "'Revision #N' labels and to order revisions client-side."
+            ),
+        ),
+    )
     cluster_config: ClusterConfig = gql_field(
         description="Cluster configuration for replica distribution."
     )

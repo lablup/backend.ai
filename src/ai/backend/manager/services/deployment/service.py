@@ -252,8 +252,11 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
     if rev is not None:
         if rev.revision_id is None:
             raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
+        if rev.revision_number is None:
+            raise ValueError(f"ModelRevisionSpec has no revision_number for deployment {info.id}")
         revision = ModelRevisionData(
             id=rev.revision_id,
+            revision_number=rev.revision_number,
             cluster_config=ClusterConfigData(
                 mode=rev.resource_spec.cluster_mode,
                 size=rev.resource_spec.cluster_size,

@@ -418,6 +418,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     def revision_data(self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID) -> ModelRevisionData:
         return ModelRevisionData(
             id=uuid.uuid4(),
+            revision_number=1,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,
@@ -651,6 +652,7 @@ class TestConvertDeploymentInfoToData:
         def make() -> ModelRevisionSpec:
             return ModelRevisionSpec(
                 revision_id=DeploymentRevisionID(uuid.uuid4()),
+                revision_number=1,
                 image_id=ImageID(uuid.uuid4()),
                 resource_spec=ResourceSpec(
                     cluster_mode=ClusterMode.SINGLE_NODE,
