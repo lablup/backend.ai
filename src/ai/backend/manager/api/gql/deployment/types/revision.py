@@ -810,28 +810,20 @@ class PreStartActionInputGQL(PydanticInputMixin[PreStartActionDTO]):
 )
 class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
     interval: float | None = gql_field(
-        description="Interval in seconds between health checks. Falls back to the runtime variant or built-in default (10.0) when omitted.",
-        default=None,
+        description="Interval in seconds between health checks.", default=None
     )
-    path: str | None = gql_field(
-        description="Path to check for health status. May be supplied by the runtime variant default model definition or the model vfolder's model-definition.yaml when omitted.",
-        default=None,
-    )
+    path: str | None = gql_field(description="Path to check for health status.", default=None)
     max_retries: int | None = gql_field(
-        description="Maximum number of retries for health check. Falls back to the runtime variant or built-in default (10) when omitted.",
-        default=None,
+        description="Maximum number of retries for health check.", default=None
     )
     max_wait_time: float | None = gql_field(
-        description="Maximum time in seconds to wait for a health check response. Falls back to the runtime variant or built-in default (15.0) when omitted.",
-        default=None,
+        description="Maximum time in seconds to wait for a health check response.", default=None
     )
     expected_status_code: int | None = gql_field(
-        description="Expected HTTP status code for a healthy response. Falls back to the runtime variant or built-in default (200) when omitted.",
-        default=None,
+        description="Expected HTTP status code for a healthy response.", default=None
     )
     initial_delay: float | None = gql_field(
-        description="Initial delay in seconds before the first health check. Falls back to the runtime variant or built-in default (60.0) when omitted.",
-        default=None,
+        description="Initial delay in seconds before the first health check.", default=None
     )
 
 
@@ -851,16 +843,9 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
         description="Command to start the model service.", default=None
     )
     shell: str | None = gql_field(
-        description="Shell configured for the model service. Falls back to the runtime variant or built-in default (/bin/bash) when omitted.",
-        default=None,
+        description="Shell configured for the model service.", default=None
     )
-    port: int | None = gql_field(
-        description=(
-            "Port number for the model service. May be supplied by the runtime variant"
-            " default model definition or the model vfolder's model-definition.yaml when omitted."
-        ),
-        default=None,
-    )
+    port: int | None = gql_field(description="Port number for the model service.", default=None)
     health_check: ModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None
     )
@@ -903,22 +888,8 @@ class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataInputDTO]):
     name="ModelConfigInput",
 )
 class ModelConfigInputGQL(PydanticInputMixin[ModelConfigInputDTO]):
-    name: str | None = gql_field(
-        description=(
-            "Name of the model. May be supplied by the runtime variant default model"
-            " definition, a revision preset, or the model vfolder's model-definition.yaml"
-            " when omitted; the merge chain produces the final value."
-        ),
-        default=None,
-    )
-    model_path: str | None = gql_field(
-        description=(
-            "Path to the model file. Defaults to the model mount destination when not"
-            " overridden by the runtime variant, a revision preset, the vfolder's"
-            " model-definition.yaml, or this request."
-        ),
-        default=None,
-    )
+    name: str | None = gql_field(description="Name of the model.", default=None)
+    model_path: str | None = gql_field(description="Path to the model file.", default=None)
     service: ModelServiceConfigInputGQL | None = gql_field(
         description="Configuration for the model service.", default=None
     )
@@ -936,12 +907,7 @@ class ModelConfigInputGQL(PydanticInputMixin[ModelConfigInputDTO]):
 )
 class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionInputDTO]):
     models: list[ModelConfigInputGQL] | None = gql_field(
-        description=(
-            "List of model entries in the model definition. Omit to inherit the entire"
-            " definition from the runtime variant default, the revision preset, or the"
-            " model vfolder's model-definition.yaml; provide entries to override per-index."
-        ),
-        default=None,
+        description="List of models in the model definition.", default=None
     )
 
 
