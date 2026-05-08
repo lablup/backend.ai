@@ -4268,28 +4268,80 @@ scalar Decimal
   @join__type(graph: STRAWBERRY)
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry response for session timeouts.
+Added in UNRELEASED. A single (handler_name, options) entry response for session handler options.
 """
-type DefaultSessionHandlerTimeoutEntryInfo
+type DefaultSessionHandlerOptionsEntryInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Handler identifier matching `SessionLifecycleHandler.name()`."""
-  handlerName: String!
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
 
   """
-  Timeout in seconds; `null` means this handler is unbounded regardless of the `default` timeout.
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
   """
-  timeoutSec: Int
+  maxRetryCount: Int
+
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
+  handlerName: String!
 }
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry for session timeouts.
+Added in UNRELEASED. A single (handler_name, options) entry for session handler options.
 """
-input DefaultSessionHandlerTimeoutEntryInput
+input DefaultSessionHandlerOptionsEntryInput
   @join__type(graph: STRAWBERRY)
 {
   handlerName: String!
   timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy snapshot for session handler options.
+"""
+type DefaultSessionHandlerOptionsInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy fields for session handler options.
+"""
+input DefaultSessionHandlerOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""Added in UNRELEASED. Session handler-options policy response."""
+type DefaultSessionHandlerOptionsPolicyInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Fallback per-handler policy applied to handlers not listed in `by_handler`.
+  """
+  default: DefaultSessionHandlerOptionsInfo!
+
+  """Per-handler overrides."""
+  byHandler: [DefaultSessionHandlerOptionsEntryInfo!]!
+}
+
+"""
+Added in UNRELEASED. Session handler-options input (timeout + retry, handler-keyed).
+"""
+input DefaultSessionHandlerOptionsPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  default: DefaultSessionHandlerOptionsInput = null
+  byHandler: [DefaultSessionHandlerOptionsEntryInput!] = null
 }
 
 """Added in UNRELEASED. Baseline kernel execution spec response."""
@@ -4356,8 +4408,8 @@ type DefaultSessionOptionsInfo
   """
   defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInfo
 
-  """Default timeout policy."""
-  timeouts: DefaultSessionTimeoutsInfo!
+  """Default handler-keyed scheduler policy (timeout + retry)."""
+  handlerOptions: DefaultSessionHandlerOptionsPolicyInfo!
 
   """Default agent selection policy."""
   agentSelectionPolicy: SessionAgentSelectionPolicy!
@@ -4374,7 +4426,7 @@ input DefaultSessionOptionsInput
   clusterMode: String = null
   defaultFailurePolicy: SessionFailurePolicy = null
   defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInput = null
-  timeouts: DefaultSessionTimeoutsInput = null
+  handlerOptions: DefaultSessionHandlerOptionsPolicyInput = null
   agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
@@ -4395,27 +4447,6 @@ input DefaultSessionResourceOptsInput
   @join__type(graph: STRAWBERRY)
 {
   shmem: BinarySizeInput = null
-}
-
-"""Added in UNRELEASED. Session timeout policy response."""
-type DefaultSessionTimeoutsInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Fallback timeout in seconds applied to handlers not listed in `by_handler`; `null` means unbounded.
-  """
-  default: Int
-
-  """Per-handler timeout overrides."""
-  byHandler: [DefaultSessionHandlerTimeoutEntryInfo!]!
-}
-
-"""Added in UNRELEASED. Session timeout policy input (handler-keyed)."""
-input DefaultSessionTimeoutsInput
-  @join__type(graph: STRAWBERRY)
-{
-  default: Int = null
-  byHandler: [DefaultSessionHandlerTimeoutEntryInput!] = null
 }
 
 """Added in 25.15.0. """
@@ -5078,6 +5109,25 @@ input DeploymentFilter
   NOT: [DeploymentFilter!] = null
 }
 
+"""Added in UNRELEASED. Deployment handler-options policy response."""
+type DeploymentHandlerOptionsInfoGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Fallback per-handler policy."""
+  default: HandlerOptionsInfoGQL!
+
+  """Per-handler overrides."""
+  byHandler: [HandlerOptionsEntryInfoGQL!]!
+}
+
+"""Added in UNRELEASED. Deployment handler-options policy input."""
+input DeploymentHandlerOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  default: HandlerOptionsInput = null
+  byHandler: [HandlerOptionsEntryInput!] = null
+}
+
 """Added in 26.3.0. Deployment history record."""
 type DeploymentHistory implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -5168,15 +5218,15 @@ enum DeploymentHistoryOrderField
 type DeploymentOptionsInfoGQL
   @join__type(graph: STRAWBERRY)
 {
-  """Handler timeout policy."""
-  timeouts: DeploymentTimeoutsInfoGQL!
+  """Handler-keyed scheduler policy (timeout + retry)."""
+  handlerOptions: DeploymentHandlerOptionsInfoGQL!
 }
 
 """Added in UNRELEASED. Deployment options payload input."""
 input DeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
 {
-  timeouts: DeploymentTimeoutsInput!
+  handlerOptions: DeploymentHandlerOptionsInput!
 }
 
 """Added in 25.19.0. """
@@ -5454,25 +5504,6 @@ enum DeploymentStrategyType
 {
   ROLLING @join__enumValue(graph: STRAWBERRY)
   BLUE_GREEN @join__enumValue(graph: STRAWBERRY)
-}
-
-"""Added in UNRELEASED. Deployment timeout policy response."""
-type DeploymentTimeoutsInfoGQL
-  @join__type(graph: STRAWBERRY)
-{
-  """Fallback timeout in seconds; null means unbounded."""
-  default: Int
-
-  """Per-handler timeout overrides."""
-  byHandler: [HandlerTimeoutEntryInfoGQL!]!
-}
-
-"""Added in UNRELEASED. Deployment timeout policy input."""
-input DeploymentTimeoutsInput
-  @join__type(graph: STRAWBERRY)
-{
-  default: Int = null
-  byHandler: [HandlerTimeoutEntryInput!] = null
 }
 
 """Added in 26.4.2. Input for deploying a model card as a new deployment."""
@@ -7009,24 +7040,57 @@ scalar GroupPermissionField
   @join__type(graph: GRAPHENE)
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry response.
+Added in UNRELEASED. A single (handler_name, options) entry response for deployment handler options.
 """
-type HandlerTimeoutEntryInfoGQL
+type HandlerOptionsEntryInfoGQL
   @join__type(graph: STRAWBERRY)
 {
-  """Handler identifier."""
-  handlerName: String!
-
-  """Timeout in seconds; null means this handler is unbounded."""
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
   timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
+  handlerName: String!
 }
 
-"""Added in UNRELEASED. A single (handler_name, timeout_sec) entry."""
-input HandlerTimeoutEntryInput
+"""
+Added in UNRELEASED. A single (handler_name, options) entry for deployment handler options.
+"""
+input HandlerOptionsEntryInput
   @join__type(graph: STRAWBERRY)
 {
   handlerName: String!
   timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy snapshot for deployment handler options.
+"""
+type HandlerOptionsInfoGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy fields for deployment handler options.
+"""
+input HandlerOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  timeoutSec: Int = null
+  maxRetryCount: Int = null
 }
 
 """Added in 25.14.0. HuggingFace registry node."""
@@ -13616,7 +13680,7 @@ type Query
   adminResourceGroupV2(name: String!): ResourceGroup @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.timeouts.by_handler``.
+  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
   """
   schedulingHandlers: [SchedulingHandlerNode!] @join__field(graph: STRAWBERRY)
 
@@ -16612,7 +16676,7 @@ enum SchedulingHandlerCategory
 }
 
 """
-Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.timeouts.by_handler``.
+Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``.
 """
 type SchedulingHandlerNode
   @join__type(graph: STRAWBERRY)

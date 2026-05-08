@@ -2724,24 +2724,68 @@ input DateTimeFilter {
 scalar Decimal
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry response for session timeouts.
+Added in UNRELEASED. A single (handler_name, options) entry response for session handler options.
 """
-type DefaultSessionHandlerTimeoutEntryInfo {
-  """Handler identifier matching `SessionLifecycleHandler.name()`."""
-  handlerName: String!
+type DefaultSessionHandlerOptionsEntryInfo {
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
 
   """
-  Timeout in seconds; `null` means this handler is unbounded regardless of the `default` timeout.
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
   """
-  timeoutSec: Int
+  maxRetryCount: Int
+
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
+  handlerName: String!
 }
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry for session timeouts.
+Added in UNRELEASED. A single (handler_name, options) entry for session handler options.
 """
-input DefaultSessionHandlerTimeoutEntryInput {
+input DefaultSessionHandlerOptionsEntryInput {
   handlerName: String!
   timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy snapshot for session handler options.
+"""
+type DefaultSessionHandlerOptionsInfo {
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy fields for session handler options.
+"""
+input DefaultSessionHandlerOptionsInput {
+  timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""Added in UNRELEASED. Session handler-options policy response."""
+type DefaultSessionHandlerOptionsPolicyInfo {
+  """
+  Fallback per-handler policy applied to handlers not listed in `by_handler`.
+  """
+  default: DefaultSessionHandlerOptionsInfo!
+
+  """Per-handler overrides."""
+  byHandler: [DefaultSessionHandlerOptionsEntryInfo!]!
+}
+
+"""
+Added in UNRELEASED. Session handler-options input (timeout + retry, handler-keyed).
+"""
+input DefaultSessionHandlerOptionsPolicyInput {
+  default: DefaultSessionHandlerOptionsInput = null
+  byHandler: [DefaultSessionHandlerOptionsEntryInput!] = null
 }
 
 """Added in UNRELEASED. Baseline kernel execution spec response."""
@@ -2802,8 +2846,8 @@ type DefaultSessionOptionsInfo {
   """
   defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInfo
 
-  """Default timeout policy."""
-  timeouts: DefaultSessionTimeoutsInfo!
+  """Default handler-keyed scheduler policy (timeout + retry)."""
+  handlerOptions: DefaultSessionHandlerOptionsPolicyInfo!
 
   """Default agent selection policy."""
   agentSelectionPolicy: SessionAgentSelectionPolicy!
@@ -2818,7 +2862,7 @@ input DefaultSessionOptionsInput {
   clusterMode: String = null
   defaultFailurePolicy: SessionFailurePolicy = null
   defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInput = null
-  timeouts: DefaultSessionTimeoutsInput = null
+  handlerOptions: DefaultSessionHandlerOptionsPolicyInput = null
   agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
@@ -2835,23 +2879,6 @@ Added in UNRELEASED. Qualitative resource hints for session-level defaults (shar
 """
 input DefaultSessionResourceOptsInput {
   shmem: BinarySizeInput = null
-}
-
-"""Added in UNRELEASED. Session timeout policy response."""
-type DefaultSessionTimeoutsInfo {
-  """
-  Fallback timeout in seconds applied to handlers not listed in `by_handler`; `null` means unbounded.
-  """
-  default: Int
-
-  """Per-handler timeout overrides."""
-  byHandler: [DefaultSessionHandlerTimeoutEntryInfo!]!
-}
-
-"""Added in UNRELEASED. Session timeout policy input (handler-keyed)."""
-input DefaultSessionTimeoutsInput {
-  default: Int = null
-  byHandler: [DefaultSessionHandlerTimeoutEntryInput!] = null
 }
 
 """
@@ -3365,6 +3392,21 @@ input DeploymentFilter {
   NOT: [DeploymentFilter!] = null
 }
 
+"""Added in UNRELEASED. Deployment handler-options policy response."""
+type DeploymentHandlerOptionsInfoGQL {
+  """Fallback per-handler policy."""
+  default: HandlerOptionsInfoGQL!
+
+  """Per-handler overrides."""
+  byHandler: [HandlerOptionsEntryInfoGQL!]!
+}
+
+"""Added in UNRELEASED. Deployment handler-options policy input."""
+input DeploymentHandlerOptionsInput {
+  default: HandlerOptionsInput = null
+  byHandler: [HandlerOptionsEntryInput!] = null
+}
+
 """Added in 26.3.0. Deployment history record."""
 type DeploymentHistory implements Node {
   """The Globally Unique ID of this object"""
@@ -3440,13 +3482,13 @@ enum DeploymentHistoryOrderField {
 
 """Added in UNRELEASED. Deployment options payload response."""
 type DeploymentOptionsInfoGQL {
-  """Handler timeout policy."""
-  timeouts: DeploymentTimeoutsInfoGQL!
+  """Handler-keyed scheduler policy (timeout + retry)."""
+  handlerOptions: DeploymentHandlerOptionsInfoGQL!
 }
 
 """Added in UNRELEASED. Deployment options payload input."""
 input DeploymentOptionsInput {
-  timeouts: DeploymentTimeoutsInput!
+  handlerOptions: DeploymentHandlerOptionsInput!
 }
 
 """Added in 25.19.0. """
@@ -3682,21 +3724,6 @@ Added in 25.19.0. This enum represents the deployment strategy type of a model d
 enum DeploymentStrategyType {
   ROLLING
   BLUE_GREEN
-}
-
-"""Added in UNRELEASED. Deployment timeout policy response."""
-type DeploymentTimeoutsInfoGQL {
-  """Fallback timeout in seconds; null means unbounded."""
-  default: Int
-
-  """Per-handler timeout overrides."""
-  byHandler: [HandlerTimeoutEntryInfoGQL!]!
-}
-
-"""Added in UNRELEASED. Deployment timeout policy input."""
-input DeploymentTimeoutsInput {
-  default: Int = null
-  byHandler: [HandlerTimeoutEntryInput!] = null
 }
 
 """
@@ -4552,20 +4579,49 @@ extend type GroupNode @key(fields: "id") {
 }
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry response.
+Added in UNRELEASED. A single (handler_name, options) entry response for deployment handler options.
 """
-type HandlerTimeoutEntryInfoGQL {
-  """Handler identifier."""
-  handlerName: String!
-
-  """Timeout in seconds; null means this handler is unbounded."""
+type HandlerOptionsEntryInfoGQL {
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
   timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
+  handlerName: String!
 }
 
-"""Added in UNRELEASED. A single (handler_name, timeout_sec) entry."""
-input HandlerTimeoutEntryInput {
+"""
+Added in UNRELEASED. A single (handler_name, options) entry for deployment handler options.
+"""
+input HandlerOptionsEntryInput {
   handlerName: String!
   timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy snapshot for deployment handler options.
+"""
+type HandlerOptionsInfoGQL {
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy fields for deployment handler options.
+"""
+input HandlerOptionsInput {
+  timeoutSec: Int = null
+  maxRetryCount: Int = null
 }
 
 """Added in 25.14.0. HuggingFace registry node."""
@@ -8748,7 +8804,7 @@ type Query {
   adminResourceGroupV2(name: String!): ResourceGroup
 
   """
-  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.timeouts.by_handler``.
+  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
   """
   schedulingHandlers: [SchedulingHandlerNode!]
 
@@ -11244,7 +11300,7 @@ enum SchedulingHandlerCategory {
 }
 
 """
-Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.timeouts.by_handler``.
+Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``.
 """
 type SchedulingHandlerNode {
   """Stable handler key used in deployment timeout maps."""

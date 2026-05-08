@@ -227,12 +227,13 @@ class ResourceGroupAdapter(BaseAdapter):
         super().__init__(processors)
         # ``deployment_coordinator`` is the authoritative source for the
         # live set of registered handler names; we consult it when
-        # validating ``default_deployment_options.timeouts.by_handler``
-        # keys so an unknown handler surfaces as a 400 instead of a
-        # silently stored, never-dispatched entry.
+        # validating
+        # ``default_deployment_options.handler_options.by_handler`` keys
+        # so an unknown handler surfaces as a 400 instead of a silently
+        # stored, never-dispatched entry.
         self._deployment_coordinator = deployment_coordinator
         # ``schedule_coordinator`` plays the same role for the session
-        # side — ``default_session_options.timeouts.by_handler`` keys
+        # side — ``default_session_options.handler_options.by_handler`` keys
         # are validated against the live set of session lifecycle
         # handlers.
         self._schedule_coordinator = schedule_coordinator

@@ -24,6 +24,7 @@ from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.kernel.types import KernelStatus
+    from ai.backend.manager.data.session.options import SessionHandlerOptions
     from ai.backend.manager.models.network import NetworkType
 
 
@@ -283,6 +284,11 @@ class SessionInfo:
     lifecycle: SessionLifecycle
     metrics: SessionMetrics
     network: SessionNetwork
+    handler_options: SessionHandlerOptions
+    """Frozen handler-keyed scheduler policy snapshot. Sourced from
+    ``SessionRow.options.handler_options``. Coordinator resolves
+    per-handler timeout / max_retry_count from this field at failure
+    classification time."""
 
 
 # ========== Scheduling History Types ==========

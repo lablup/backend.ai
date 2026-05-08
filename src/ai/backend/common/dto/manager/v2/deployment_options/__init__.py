@@ -1,4 +1,4 @@
-"""Shared DTOs for deployment options (timeouts, etc.).
+"""Shared DTOs for deployment options (handler options, etc.).
 
 These core sub-models are used by both the per-deployment
 ``endpoints.options`` surface and the per-resource-group
@@ -9,21 +9,17 @@ circular imports.
 """
 
 from ai.backend.common.dto.manager.v2.deployment_options.request import (
+    DeploymentHandlerOptionsInput,
     DeploymentOptionsInput,
-    DeploymentTimeoutsInput,
-    HandlerTimeoutEntryInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
-    DeploymentTimeoutsInfo,
-    HandlerTimeoutEntryInfo,
 )
 
 __all__ = (
+    "DeploymentHandlerOptionsInfo",
+    "DeploymentHandlerOptionsInput",
     "DeploymentOptionsInfo",
     "DeploymentOptionsInput",
-    "DeploymentTimeoutsInfo",
-    "DeploymentTimeoutsInput",
-    "HandlerTimeoutEntryInfo",
-    "HandlerTimeoutEntryInput",
 )

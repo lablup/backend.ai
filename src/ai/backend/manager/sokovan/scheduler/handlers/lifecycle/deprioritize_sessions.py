@@ -64,8 +64,13 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
 
         - success: Session → PENDING (re-schedule with lower priority)
         - need_retry: None
-        - expired: None
-        - give_up: None
+        - expired: None (the operation is a single repository update —
+          no phase timeout to enforce)
+        - give_up: Session → PENDING (same target as success — the
+          priority adjustment is a single best-effort write; if it
+          repeatedly fails, leaving the session stuck in
+          DEPRIORITIZING is worse than putting it back in the queue
+          with whatever priority it currently has)
         """
         return StatusTransitions(
             success=TransitionStatus(
@@ -74,7 +79,10 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
             ),
             need_retry=None,
             expired=None,
-            give_up=None,
+            give_up=TransitionStatus(
+                session=SessionStatus.PENDING,
+                kernel=None,
+            ),
         )
 
     @property

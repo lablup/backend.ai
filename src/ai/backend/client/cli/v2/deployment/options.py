@@ -104,9 +104,12 @@ def replace_options(
         ReplaceDeploymentOptionsInput,
     )
     from ai.backend.common.dto.manager.v2.deployment_options import (
+        DeploymentHandlerOptionsInput,
         DeploymentOptionsInput,
-        DeploymentTimeoutsInput,
-        HandlerTimeoutEntryInput,
+    )
+    from ai.backend.common.dto.manager.v2.session_options import (
+        HandlerOptionsEntryInput,
+        HandlerOptionsInput,
     )
 
     if config_path is not None:
@@ -121,7 +124,7 @@ def replace_options(
                 options=DeploymentOptionsInput.model_validate(raw),
             )
     else:
-        entries: list[HandlerTimeoutEntryInput] = []
+        entries: list[HandlerOptionsEntryInput] = []
         for spec in handlers:
             if "=" not in spec:
                 raise click.BadParameter(
@@ -129,15 +132,15 @@ def replace_options(
                 )
             name, _, value_str = spec.partition("=")
             entries.append(
-                HandlerTimeoutEntryInput(
+                HandlerOptionsEntryInput(
                     handler_name=name.strip(),
                     timeout_sec=_parse_timeout_value(value_str),
                 )
             )
         body = ReplaceDeploymentOptionsInput(
             options=DeploymentOptionsInput(
-                timeouts=DeploymentTimeoutsInput(
-                    default=_parse_default(default_timeout),
+                handler_options=DeploymentHandlerOptionsInput(
+                    default=HandlerOptionsInput(timeout_sec=_parse_default(default_timeout)),
                     by_handler=entries,
                 ),
             ),

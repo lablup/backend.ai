@@ -42,7 +42,7 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
@@ -115,7 +115,7 @@ class DeploymentSessionDraftBuilder:
                         ),
                     ),
                 ),
-                timeouts=SessionTimeouts(),
+                handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=context.session_owner.sudo_session_enabled,

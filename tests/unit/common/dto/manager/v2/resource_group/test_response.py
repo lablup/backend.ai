@@ -6,8 +6,8 @@ import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
-    DeploymentTimeoutsInfo,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     CreateResourceGroupPayload,
@@ -29,7 +29,8 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.common.dto.manager.v2.session_options.response import (
     DefaultSessionOptionsInfo,
-    SessionTimeoutsInfo,
+    HandlerOptionsInfo,
+    SessionHandlerOptionsInfo,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
@@ -75,7 +76,10 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
             ),
         ),
         default_deployment_options=DeploymentOptionsInfo(
-            timeouts=DeploymentTimeoutsInfo(default=None, by_handler=[]),
+            handler_options=DeploymentHandlerOptionsInfo(
+                default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
+                by_handler=[],
+            ),
         ),
         default_session_options=DefaultSessionOptionsInfo(
             priority=0,
@@ -83,7 +87,10 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
             cluster_mode=ClusterModeEnum.SINGLE_NODE,
             default_failure_policy=FailurePolicyEnum.STRICT,
             default_kernel_execution_spec=None,
-            timeouts=SessionTimeoutsInfo(default=None, by_handler=[]),
+            handler_options=SessionHandlerOptionsInfo(
+                default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
+                by_handler=[],
+            ),
             agent_selection_policy=AgentSelectionPolicyEnum.STRICT,
         ),
     )

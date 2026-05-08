@@ -56,12 +56,14 @@ from .deployment import (
     UpdateDeploymentPayload,
 )
 from .deployment_options import (
+    DeploymentHandlerOptionsInfoGQL,
+    DeploymentHandlerOptionsInputGQL,
     DeploymentOptionsInfoGQL,
     DeploymentOptionsInputGQL,
-    DeploymentTimeoutsInfoGQL,
-    DeploymentTimeoutsInputGQL,
-    HandlerTimeoutEntryInfoGQL,
-    HandlerTimeoutEntryInputGQL,
+    HandlerOptionsEntryInfoGQL,
+    HandlerOptionsEntryInputGQL,
+    HandlerOptionsInfoGQL,
+    HandlerOptionsInputGQL,
 )
 from .policy import (
     BlueGreenConfigInputGQL,
@@ -202,12 +204,14 @@ __all__ = [
     "UpdateDeploymentInput",
     "UpdateDeploymentPayload",
     # Deployment Options
+    "DeploymentHandlerOptionsInfoGQL",
+    "DeploymentHandlerOptionsInputGQL",
     "DeploymentOptionsInfoGQL",
     "DeploymentOptionsInputGQL",
-    "DeploymentTimeoutsInfoGQL",
-    "DeploymentTimeoutsInputGQL",
-    "HandlerTimeoutEntryInfoGQL",
-    "HandlerTimeoutEntryInputGQL",
+    "HandlerOptionsEntryInfoGQL",
+    "HandlerOptionsEntryInputGQL",
+    "HandlerOptionsInfoGQL",
+    "HandlerOptionsInputGQL",
     # Policy
     "BlueGreenConfigInputGQL",
     "BlueGreenStrategySpecGQL",

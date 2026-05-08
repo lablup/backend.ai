@@ -456,7 +456,7 @@ class DeploymentAdapter(BaseAdapter):
         super().__init__(processors)
         # ``deployment_coordinator`` is the authoritative source for the
         # live set of registered handler names; we consult it when
-        # validating ``DeploymentOptions.timeouts.by_handler`` keys so an
+        # validating ``DeploymentOptions.handler_options.by_handler`` keys so an
         # unknown handler surfaces as a 400 instead of a silently stored,
         # never-dispatched entry.
         self._deployment_coordinator = deployment_coordinator

@@ -4,7 +4,7 @@ Verifies the one-shot RG-default merge that replaces the prior split
 ``ApplyResourceGroupDefaultsRule`` + ``ApplyDefaultKernelExecutionSpecRule``:
 
   * option-level defaults (priority / is_preemptible / cluster_mode /
-    timeouts / scheduling_target.agent_selection_policy)
+    handler_options / scheduling_target.agent_selection_policy)
   * per-group execution_spec defaults (image_id / resources /
     resource_opts / environ / mounts / startup_command /
     bootstrap_script / starts_at / batch_timeout_sec)
@@ -31,9 +31,10 @@ from ai.backend.manager.data.session.options import (
     AgentSelectionPolicy,
     DefaultSessionOptions,
     FailurePolicy,
+    HandlerOptions,
     KernelExecutionSpec,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecPreparationContext,
@@ -60,7 +61,7 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
         is_preemptible=False,
         cluster_mode=ClusterMode.MULTI_NODE,
         default_failure_policy=FailurePolicy.STRICT,
-        timeouts=SessionTimeouts(default=60, by_handler={}),
+        handler_options=SessionHandlerOptions(default=HandlerOptions(timeout=60), by_handler={}),
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         default_kernel_execution_spec=KernelExecutionSpec(
             image_id=rg_image_id,
@@ -89,7 +90,9 @@ class TestMergeResourceGroupDefaultsRule:
         assert opts.priority == 42
         assert opts.is_preemptible is False
         assert opts.cluster_mode == ClusterMode.MULTI_NODE
-        assert opts.timeouts == SessionTimeouts(default=60, by_handler={})
+        assert opts.handler_options == SessionHandlerOptions(
+            default=HandlerOptions(timeout=60), by_handler={}
+        )
         assert opts.scheduling_target.agent_selection_policy == AgentSelectionPolicy.STRICT
 
     async def test_preserves_explicit_option_values(

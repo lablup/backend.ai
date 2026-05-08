@@ -44,8 +44,11 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RollingUpdateConfigInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
-    DeploymentTimeoutsInfo,
+)
+from ai.backend.common.dto.manager.v2.session_options.response import (
+    HandlerOptionsInfo,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
@@ -85,7 +88,10 @@ def _make_model_runtime_config(**kwargs: object) -> ModelRuntimeConfigInfoDTO:
 
 def _make_deployment_options(**kwargs: object) -> DeploymentOptionsInfo:
     defaults: dict[str, Any] = {
-        "timeouts": DeploymentTimeoutsInfo(default=None, by_handler=[]),
+        "handler_options": DeploymentHandlerOptionsInfo(
+            default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
+            by_handler=[],
+        ),
     }
     defaults.update(kwargs)
     return DeploymentOptionsInfo(**defaults)

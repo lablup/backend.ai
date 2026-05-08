@@ -56,7 +56,7 @@ from ai.backend.manager.data.session.options import (
     FailurePolicy,
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.models.network import NetworkType
 
@@ -149,7 +149,7 @@ class SessionOptionsDraft(_DraftBaseModel):
     cluster_size: int | None = None
     scheduling_target: SchedulingTargetDraft = Field(default_factory=SchedulingTargetDraft)
     kernel_groups: tuple[KernelGroupDraft, ...] | None = None
-    timeouts: SessionTimeouts | None = None
+    handler_options: SessionHandlerOptions | None = None
 
 
 class SessionIdentityDraft(_DraftBaseModel):
