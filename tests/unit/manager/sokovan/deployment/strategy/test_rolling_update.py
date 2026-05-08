@@ -29,7 +29,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
     ReplicaCountData,
@@ -120,7 +120,7 @@ def make_deployment(
         replica_counts=ReplicaCountData(
             replica_count=desired,
         ),
-        network=DeploymentNetworkSpec(open_to_public=False),
+        network=DeploymentNetworkData(open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None),
         model_revisions=[],
         options=DeploymentOptions(),
         current_revision_id=DeploymentRevisionID(current_revision_id),

@@ -67,7 +67,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
     DeploymentSummaryData,
@@ -769,9 +769,11 @@ class EndpointRow(Base):  # type: ignore[misc]
                 replica_count=self.replicas,
                 desired_replica_count=self.desired_replicas,
             ),
-            network=DeploymentNetworkSpec(
+            network=DeploymentNetworkData(
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                access_token_ids=None,
                 url=self.url,
+                preferred_domain_name=None,
             ),
             model_revisions=list(model_revisions),
             options=self.options,

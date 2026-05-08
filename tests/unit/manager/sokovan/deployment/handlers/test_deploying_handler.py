@@ -23,7 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
     ReplicaCountData,
@@ -127,9 +127,11 @@ class TestDeployingProvisioningHandler:
                     replica_count=1,
                     desired_replica_count=1,
                 ),
-                network=DeploymentNetworkSpec(
+                network=DeploymentNetworkData(
                     open_to_public=False,
+                    access_token_ids=None,
                     url=None,
+                    preferred_domain_name=None,
                 ),
                 model_revisions=[revision],
                 current_revision_id=None,

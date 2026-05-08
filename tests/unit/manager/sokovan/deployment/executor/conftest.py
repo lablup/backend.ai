@@ -17,7 +17,7 @@ from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
     ModelRevisionData,
@@ -157,9 +157,11 @@ def _create_deployment_info(
             replica_count=replica_count,
             desired_replica_count=desired_replica_count,
         ),
-        network=DeploymentNetworkSpec(
+        network=DeploymentNetworkData(
             open_to_public=False,
+            access_token_ids=None,
             url=None,
+            preferred_domain_name=None,
         ),
         model_revisions=[cast(ModelRevisionData, revision)] if has_revision else [],
         current_revision_id=DeploymentRevisionID(rev_id) if has_revision else None,

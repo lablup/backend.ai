@@ -16,7 +16,7 @@ from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
     ReplicaCountData,
@@ -165,9 +165,11 @@ def _create_deployment_info(
             replica_count=1,
             desired_replica_count=1,
         ),
-        network=DeploymentNetworkSpec(
+        network=DeploymentNetworkData(
             open_to_public=False,
+            access_token_ids=None,
             url="http://test.endpoint",
+            preferred_domain_name=None,
         ),
         model_revisions=[],
         options=DeploymentOptions(),

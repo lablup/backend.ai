@@ -672,12 +672,20 @@ class DeploymentNetworkSpec:
 
 
 @dataclass
+class DeploymentNetworkData:
+    open_to_public: bool
+    access_token_ids: list[UUID] | None
+    url: str | None
+    preferred_domain_name: str | None
+
+
+@dataclass
 class DeploymentInfo:
     id: DeploymentID
     metadata: DeploymentMetadata
     state: DeploymentState
     replica_counts: ReplicaCountData
-    network: DeploymentNetworkSpec
+    network: DeploymentNetworkData
     model_revisions: list[ModelRevisionData]
     options: DeploymentOptions
     current_revision_id: DeploymentRevisionID | None = None
@@ -752,12 +760,6 @@ class DeploymentWithHistory:
 
     deployment_info: DeploymentInfo
     last_history: DeploymentLastHistory | None
-
-
-@dataclass
-class DeploymentSessionSpec:
-    id: UUID
-    metadata: DeploymentMetadata
 
 
 @dataclass
@@ -961,7 +963,7 @@ class ReplicaStateData:
 class ModelDeploymentData:
     id: DeploymentID
     metadata: ModelDeploymentMetadataInfo
-    network_access: DeploymentNetworkSpec
+    network_access: DeploymentNetworkData
     revision: ModelRevisionData | None
     current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None
