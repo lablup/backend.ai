@@ -292,7 +292,7 @@ class DeploymentCoordinator:
         """Return the live set of handler instances registered on this coordinator.
 
         The coordinator owns the authoritative registry; callers that need
-        handler names (e.g. for validating ``DeploymentOptions.timeouts.by_handler``)
+        handler names (e.g. for validating ``DeploymentOptions.handler_options.by_handler``)
         or handler metadata (e.g. for ``/v2/scheduling-handlers``) should
         consult this method rather than maintaining a parallel static list.
         """

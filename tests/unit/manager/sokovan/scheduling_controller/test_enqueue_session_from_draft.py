@@ -68,7 +68,7 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.common import RejectedByHook
@@ -139,7 +139,7 @@ def draft(image_id: ImageID) -> SessionSpecDraft:
                     ),
                 ),
             ),
-            timeouts=SessionTimeouts(),
+            handler_options=SessionHandlerOptions(),
         ),
     )
 

@@ -28,6 +28,7 @@ from ai.backend.common.identifier.deployment_revision import DeploymentRevisionI
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.manager.data.session.options import HandlerOptions
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 
 if TYPE_CHECKING:
@@ -361,27 +362,36 @@ class ConfiguredModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class DeploymentTimeouts(ConfiguredModel):
-    """Handler-keyed timeout thresholds in seconds.
+class DeploymentHandlerOptions(ConfiguredModel):
+    """Handler-keyed deployment scheduler policy.
 
-    Resolution order for a given ``handler_name``:
-    1. ``by_handler[handler_name]`` if the key is present (value may be
-       ``None`` to explicitly disable the timeout for that handler).
+    Mirrors ``SessionHandlerOptions``. Resolution order for a given
+    ``handler_name``:
+    1. ``by_handler[handler_name]`` if present.
     2. ``default`` otherwise.
 
-    ``None`` at either layer means "no timeout — handler may run
-    indefinitely." Constructing ``DeploymentTimeouts()`` with no args
-    yields a fully unbounded policy; the project's baseline policy
-    lives on the scaling group's ``default_deployment_options``.
+    Each ``HandlerOptions`` field falls back to ``default``'s value
+    when the per-handler override leaves it ``None``. Constructing
+    ``DeploymentHandlerOptions()`` with no args yields an unbounded
+    policy with global retry fallback; the project's baseline lives on
+    the scaling group's ``default_deployment_options``.
     """
 
-    default: int | None = None
-    by_handler: dict[str, int | None] = Field(default_factory=dict)
+    default: HandlerOptions = Field(default_factory=HandlerOptions)
+    by_handler: dict[str, HandlerOptions] = Field(default_factory=dict)
 
-    def resolve(self, handler_name: str) -> int | None:
-        if handler_name in self.by_handler:
-            return self.by_handler[handler_name]
-        return self.default
+    def resolve(self, handler_name: str) -> HandlerOptions:
+        override = self.by_handler.get(handler_name)
+        if override is None:
+            return self.default
+        return HandlerOptions(
+            timeout=override.timeout if override.timeout is not None else self.default.timeout,
+            max_retry_count=(
+                override.max_retry_count
+                if override.max_retry_count is not None
+                else self.default.max_retry_count
+            ),
+        )
 
 
 class DeploymentOptions(ConfiguredModel):
@@ -394,7 +404,7 @@ class DeploymentOptions(ConfiguredModel):
     existing deployments.
     """
 
-    timeouts: DeploymentTimeouts = Field(default_factory=DeploymentTimeouts)
+    handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
 
 
 class ResourceSpec(ConfiguredModel):
@@ -685,15 +695,16 @@ class DeploymentInfo:
         """Check whether the handler has exceeded its configured timeout
         against this deployment's persisted :class:`DeploymentOptions`.
 
-        ``options.timeouts.resolve(handler_name)`` yields the allowed
-        seconds; ``None`` means unbounded. ``started_at`` ``None`` also
-        means "never started" so the answer is always ``False``. Both
-        timestamps originate from PostgreSQL ``timestamptz`` columns
-        and therefore share the same tzinfo — no conversion needed.
+        ``options.handler_options.resolve(handler_name).timeout`` yields
+        the allowed seconds; ``None`` means unbounded. ``started_at``
+        ``None`` also means "never started" so the answer is always
+        ``False``. Both timestamps originate from PostgreSQL
+        ``timestamptz`` columns and therefore share the same tzinfo —
+        no conversion needed.
         """
         if started_at is None:
             return False
-        timeout = self.options.timeouts.resolve(handler_name)
+        timeout = self.options.handler_options.resolve(handler_name).timeout
         if timeout is None:
             return False
         elapsed = (current_dbtime - started_at).total_seconds()

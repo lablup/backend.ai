@@ -1,4 +1,4 @@
-"""GraphQL types for deployment options (timeouts, etc.).
+"""GraphQL types for deployment options (handler options, etc.).
 
 Mirrors the shared :mod:`ai.backend.common.dto.manager.v2.deployment_options`
 DTOs so both input (Replace mutations) and output (``DeploymentNode.options``)
@@ -8,22 +8,28 @@ surfaces can travel through GraphQL with Strawberry-compatible types.
 from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.deployment_options.request import (
+    DeploymentHandlerOptionsInput as DeploymentHandlerOptionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_options.request import (
     DeploymentOptionsInput as DeploymentOptionsInputDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment_options.request import (
-    DeploymentTimeoutsInput as DeploymentTimeoutsInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment_options.request import (
-    HandlerTimeoutEntryInput as HandlerTimeoutEntryInputDTO,
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo as DeploymentHandlerOptionsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentOptionsInfo as DeploymentOptionsInfoDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment_options.response import (
-    DeploymentTimeoutsInfo as DeploymentTimeoutsInfoDTO,
+from ai.backend.common.dto.manager.v2.session_options.request import (
+    HandlerOptionsEntryInput as HandlerOptionsEntryInputDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment_options.response import (
-    HandlerTimeoutEntryInfo as HandlerTimeoutEntryInfoDTO,
+from ai.backend.common.dto.manager.v2.session_options.request import (
+    HandlerOptionsInput as HandlerOptionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session_options.response import (
+    HandlerOptionsEntryInfo as HandlerOptionsEntryInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.session_options.response import (
+    HandlerOptionsInfo as HandlerOptionsInfoDTO,
 )
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -37,25 +43,38 @@ from ai.backend.manager.api.gql.decorators import (
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A single (handler_name, timeout_sec) entry.",
+        description="Per-handler scheduler policy fields for deployment handler options.",
     ),
-    name="HandlerTimeoutEntryInput",
+    name="HandlerOptionsInput",
 )
-class HandlerTimeoutEntryInputGQL(PydanticInputMixin[HandlerTimeoutEntryInputDTO]):
-    handler_name: str
+class HandlerOptionsInputGQL(PydanticInputMixin[HandlerOptionsInputDTO]):
     timeout_sec: int | None = None
+    max_retry_count: int | None = None
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Deployment timeout policy input.",
+        description="A single (handler_name, options) entry for deployment handler options.",
     ),
-    name="DeploymentTimeoutsInput",
+    name="HandlerOptionsEntryInput",
 )
-class DeploymentTimeoutsInputGQL(PydanticInputMixin[DeploymentTimeoutsInputDTO]):
-    default: int | None = None
-    by_handler: list[HandlerTimeoutEntryInputGQL] | None = None
+class HandlerOptionsEntryInputGQL(PydanticInputMixin[HandlerOptionsEntryInputDTO]):
+    handler_name: str
+    timeout_sec: int | None = None
+    max_retry_count: int | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Deployment handler-options policy input.",
+    ),
+    name="DeploymentHandlerOptionsInput",
+)
+class DeploymentHandlerOptionsInputGQL(PydanticInputMixin[DeploymentHandlerOptionsInputDTO]):
+    default: HandlerOptionsInputGQL | None = None
+    by_handler: list[HandlerOptionsEntryInputGQL] | None = None
 
 
 @gql_pydantic_input(
@@ -66,31 +85,44 @@ class DeploymentTimeoutsInputGQL(PydanticInputMixin[DeploymentTimeoutsInputDTO])
     name="DeploymentOptionsInput",
 )
 class DeploymentOptionsInputGQL(PydanticInputMixin[DeploymentOptionsInputDTO]):
-    timeouts: DeploymentTimeoutsInputGQL
+    handler_options: DeploymentHandlerOptionsInputGQL
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A single (handler_name, timeout_sec) entry response.",
+        description="Per-handler scheduler policy snapshot for deployment handler options.",
     ),
-    model=HandlerTimeoutEntryInfoDTO,
+    model=HandlerOptionsInfoDTO,
 )
-class HandlerTimeoutEntryInfoGQL:
+class HandlerOptionsInfoGQL:
+    timeout_sec: int | None
+    max_retry_count: int | None
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A single (handler_name, options) entry response for deployment handler options.",
+    ),
+    model=HandlerOptionsEntryInfoDTO,
+)
+class HandlerOptionsEntryInfoGQL:
     handler_name: str
     timeout_sec: int | None
+    max_retry_count: int | None
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Deployment timeout policy response.",
+        description="Deployment handler-options policy response.",
     ),
-    model=DeploymentTimeoutsInfoDTO,
+    model=DeploymentHandlerOptionsInfoDTO,
 )
-class DeploymentTimeoutsInfoGQL:
-    default: int | None
-    by_handler: list[HandlerTimeoutEntryInfoGQL]
+class DeploymentHandlerOptionsInfoGQL:
+    default: HandlerOptionsInfoGQL
+    by_handler: list[HandlerOptionsEntryInfoGQL]
 
 
 @gql_pydantic_type(
@@ -101,4 +133,4 @@ class DeploymentTimeoutsInfoGQL:
     model=DeploymentOptionsInfoDTO,
 )
 class DeploymentOptionsInfoGQL:
-    timeouts: DeploymentTimeoutsInfoGQL
+    handler_options: DeploymentHandlerOptionsInfoGQL

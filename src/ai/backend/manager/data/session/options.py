@@ -1,11 +1,12 @@
 """Session options schema.
 
 Mirrors the shape of ``data/deployment/types.py::DeploymentOptions`` and
-``DeploymentTimeouts`` so the two subsystems share identical
-timeout-by-handler semantics. Every option in this module is stored on
-either ``SessionRow`` individual columns or ``SessionRow.options`` JSONB
-(resp. ``ScalingGroupRow.default_session_options`` JSONB) and
-reassembled into the dataclasses here at read time.
+``DeploymentHandlerOptions`` so the two subsystems share identical
+handler-keyed scheduler-policy semantics. Every option in this module
+is stored on either ``SessionRow`` individual columns or
+``SessionRow.options`` JSONB (resp.
+``ScalingGroupRow.default_session_options`` JSONB) and reassembled into
+the dataclasses here at read time.
 
 See ``SessionOptions`` docstring for the column vs JSONB split.
 """
@@ -104,36 +105,78 @@ class AgentSelectionPolicy(enum.StrEnum):
     when they have no capacity."""
 
 
-class SessionTimeouts(_OptionsBaseModel):
-    """Handler-keyed timeout thresholds in seconds.
+class HandlerOptions(_OptionsBaseModel):
+    """Per-handler runtime policy entry.
 
-    Mirrors ``DeploymentTimeouts``. Resolution for a given
-    ``handler_name`` (= ``SessionLifecycleHandler.name()``):
-    ``by_handler[name]`` if present (value may be ``None`` to disable
-    the timeout for that handler), otherwise ``default``. ``None`` at
-    either layer means unbounded.
+    Carries every per-handler knob the scheduler coordinator consults
+    when deciding what to do after a handler invocation:
+
+    - ``timeout``: maximum wall-clock seconds the session may stay in
+      the phase a given handler operates on. ``None`` disables the
+      timeout (the phase may run indefinitely).
+    - ``max_retry_count``: maximum number of retry attempts before the
+      coordinator gives up on the session for that phase. ``None``
+      defers to the global ``SERVICE_MAX_RETRIES`` fallback.
     """
 
-    default: int | None = Field(
+    timeout: int | None = Field(
         default=None,
         description=(
-            "Fallback timeout in seconds applied to any handler not "
-            "overridden in `by_handler`. `None` means unbounded."
+            "Phase timeout in seconds for the handler. `None` disables "
+            "the timeout — the phase may run indefinitely."
         ),
     )
-    by_handler: dict[str, int | None] = Field(
-        default_factory=dict,
+    max_retry_count: int | None = Field(
+        default=None,
         description=(
-            "Per-handler timeout overrides keyed by "
-            "`SessionLifecycleHandler.name()`. `None` value forces "
-            "'no timeout' for that handler regardless of `default`."
+            "Per-handler retry budget. The coordinator transitions the "
+            "session through `give_up` once `phase_attempts` reaches "
+            "this value. `None` falls back to the global "
+            "`SERVICE_MAX_RETRIES`."
         ),
     )
 
-    def resolve(self, handler_name: str) -> int | None:
-        if handler_name in self.by_handler:
-            return self.by_handler[handler_name]
-        return self.default
+
+class SessionHandlerOptions(_OptionsBaseModel):
+    """Handler-keyed scheduler policy.
+
+    Mirrors ``DeploymentHandlerOptions``. Resolution for a given
+    ``handler_name`` (= ``SessionLifecycleHandler.name()``): the entry
+    in ``by_handler`` if present, otherwise ``default``. Each
+    ``HandlerOptions`` field falls back to ``default``'s value when the
+    per-handler override leaves it ``None``.
+    """
+
+    default: HandlerOptions = Field(
+        default_factory=HandlerOptions,
+        description=(
+            "Fallback policy applied to any handler not overridden in "
+            "`by_handler`. Individual fields default to `None` "
+            "(unbounded timeout, global retry fallback)."
+        ),
+    )
+    by_handler: dict[str, HandlerOptions] = Field(
+        default_factory=dict,
+        description=(
+            "Per-handler overrides keyed by "
+            "`SessionLifecycleHandler.name()`. Field-level `None` in "
+            "an override falls back to the corresponding field on "
+            "`default`."
+        ),
+    )
+
+    def resolve(self, handler_name: str) -> HandlerOptions:
+        override = self.by_handler.get(handler_name)
+        if override is None:
+            return self.default
+        return HandlerOptions(
+            timeout=override.timeout if override.timeout is not None else self.default.timeout,
+            max_retry_count=(
+                override.max_retry_count
+                if override.max_retry_count is not None
+                else self.default.max_retry_count
+            ),
+        )
 
 
 class ResourceOpts(_OptionsBaseModel):
@@ -251,7 +294,7 @@ class KernelExecutionSpec(_OptionsBaseModel):
         default=None,
         description=(
             "BATCH-session soft deadline in seconds for the user "
-            "payload. Independent of `SessionTimeouts.by_handler` "
+            "payload. Independent of `SessionHandlerOptions.by_handler` "
             "which tracks scheduler-loop handlers."
         ),
     )
@@ -347,9 +390,9 @@ class DefaultSessionOptions(_OptionsBaseModel):
             "supply all required fields itself."
         ),
     )
-    timeouts: SessionTimeouts = Field(
-        default_factory=SessionTimeouts,
-        description="Default handler-keyed timeout policy.",
+    handler_options: SessionHandlerOptions = Field(
+        default_factory=SessionHandlerOptions,
+        description="Default handler-keyed scheduler policy (timeout + retry).",
     )
     agent_selection_policy: AgentSelectionPolicy = Field(
         default=AgentSelectionPolicy.PREFERRED,
@@ -384,9 +427,9 @@ class SessionStoredOptions(_OptionsBaseModel):
             "to the SessionRow column-level fields in that case."
         ),
     )
-    timeouts: SessionTimeouts = Field(
-        default_factory=SessionTimeouts,
-        description="Frozen handler-keyed timeout policy.",
+    handler_options: SessionHandlerOptions = Field(
+        default_factory=SessionHandlerOptions,
+        description="Frozen handler-keyed scheduler policy (timeout + retry).",
     )
     agent_selection_policy: AgentSelectionPolicy = Field(
         default=AgentSelectionPolicy.PREFERRED,
@@ -413,7 +456,7 @@ class SessionOptions(_OptionsBaseModel):
       | ``scheduling_target.designated_agents``        | ``SessionRow.designated_agent_ids`` column     |
       | ``scheduling_target.agent_selection_policy``   | ``SessionRow.options`` JSONB                   |
       | ``kernel_groups``                              | ``SessionRow.options`` JSONB                   |
-      | ``timeouts``                                   | ``SessionRow.options`` JSONB                   |
+      | ``handler_options``                            | ``SessionRow.options`` JSONB                   |
 
     This class is NOT persisted as a whole — use ``SessionStoredOptions``
     for the JSONB surface.
@@ -432,6 +475,6 @@ class SessionOptions(_OptionsBaseModel):
     kernel_groups: list[KernelGroup] = Field(
         description="Resolved kernel-group layout (each group frozen).",
     )
-    timeouts: SessionTimeouts = Field(
-        description="Frozen handler-keyed timeout policy.",
+    handler_options: SessionHandlerOptions = Field(
+        description="Frozen handler-keyed scheduler policy (timeout + retry).",
     )

@@ -36,8 +36,8 @@ from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
     ResourceOpts,
     SchedulingTarget,
+    SessionHandlerOptions,
     SessionOptions,
-    SessionTimeouts,
 )
 from ai.backend.manager.data.session.spec import (
     KernelSpec,
@@ -150,7 +150,7 @@ def _spec(
             cluster_size=len(kernel_specs),
             scheduling_target=SchedulingTarget(),
             kernel_groups=[],
-            timeouts=SessionTimeouts(),
+            handler_options=SessionHandlerOptions(),
         ),
         kernel_specs=decorated_kernel_specs,
     )

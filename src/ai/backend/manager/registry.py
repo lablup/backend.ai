@@ -120,7 +120,7 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
@@ -1155,7 +1155,7 @@ class AgentRegistry:
                     designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
                 ),
                 kernel_groups=tuple(groups_by_role.values()),
-                timeouts=SessionTimeouts(),
+                handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=sudo_session_enabled,

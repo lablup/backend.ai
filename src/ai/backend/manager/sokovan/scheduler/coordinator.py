@@ -222,7 +222,7 @@ class ScheduleCoordinator:
         coordinator.
 
         Used by the ResourceGroup admin-replace path to validate
-        ``SessionTimeouts.by_handler`` keys against the live registry.
+        ``SessionHandlerOptions.by_handler`` keys against the live registry.
         Deduplicates on ``id()`` because a single handler instance may
         be registered under multiple ``ScheduleType`` keys.
         """

@@ -83,7 +83,7 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
@@ -672,7 +672,7 @@ class ModelServingService:
                         ),
                     ),
                 ),
-                timeouts=SessionTimeouts(),
+                handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=sudo_session_enabled,
