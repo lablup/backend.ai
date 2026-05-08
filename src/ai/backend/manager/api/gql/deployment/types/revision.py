@@ -452,7 +452,6 @@ class ModelDefinitionGQL:
 class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     image_id: ID
     id: NodeID[str]
-    name: str = gql_field(description="The name identifier for this revision.")
     cluster_config: ClusterConfig = gql_field(
         description="Cluster configuration for replica distribution."
     )

@@ -32,7 +32,6 @@ class TestRevisionDataToDTO:
     def test_model_definition_is_mapped_to_revision_dto(self) -> None:
         revision = ModelRevisionData(
             id=uuid4(),
-            name="revision-1",
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,

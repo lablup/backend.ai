@@ -107,7 +107,6 @@ class RevisionDTO(BaseModel):
     """DTO for model revision data."""
 
     id: UUID = Field(description="Revision ID")
-    name: str = Field(description="Revision name")
     cluster_config: ClusterConfigDTO = Field(description="Cluster configuration")
     resource_config: ResourceConfigDTO = Field(description="Resource configuration")
     model_runtime_config: ModelRuntimeConfigDTO = Field(description="Model runtime configuration")

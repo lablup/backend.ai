@@ -307,7 +307,6 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         """Convert to ModelRevisionData dataclass."""
         return ModelRevisionData(
             id=self.id,
-            name=f"revision-{self.revision_number}",
             cluster_config=ClusterConfigData(
                 mode=ClusterMode(self.cluster_mode),
                 size=self.cluster_size,

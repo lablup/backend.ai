@@ -405,7 +405,6 @@ class TestDeploymentRevisionRow:
             data = revision.to_data()
             assert isinstance(data, ModelRevisionData)
             assert data.id == revision.id
-            assert data.name == "revision-1"
             assert data.cluster_config.mode == ClusterMode.SINGLE_NODE
             assert data.cluster_config.size == 1
             assert data.resource_config.resource_group_name == "default"

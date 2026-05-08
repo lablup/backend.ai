@@ -903,7 +903,6 @@ class ModelMountConfigData:
 @dataclass
 class ModelRevisionData:
     id: UUID
-    name: str
     cluster_config: ClusterConfigData
     resource_config: ResourceConfigData
     model_runtime_config: ModelRuntimeConfigData

@@ -1818,7 +1818,6 @@ class TestDeploymentRevisionOperations:
         assert result.cluster_config.size == 1
         assert result.resource_config.resource_group_name == test_scaling_group_name
         assert result.model_runtime_config.runtime_variant_id is not None
-        assert result.name == "revision-1"
 
     async def test_get_revision(
         self,
@@ -1829,7 +1828,6 @@ class TestDeploymentRevisionOperations:
         result = await deployment_repository.get_revision(test_revision_data.id)
 
         assert result.id == test_revision_data.id
-        assert result.name == "revision-1"
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
 
     async def test_get_revision_not_found(
