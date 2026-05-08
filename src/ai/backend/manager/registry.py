@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
@@ -138,6 +139,7 @@ from .errors.api import InvalidAPIParameters
 from .errors.image import ImageNotFound
 from .errors.kernel import (
     InvalidKernelConfig,
+    InvalidResourceOpts,
     SessionAlreadyExists,
     SessionNotFound,
     TooManySessionsMatched,
@@ -1017,7 +1019,10 @@ class AgentRegistry:
         resource_entries = self._resource_entries_from_legacy_dict(
             creation_config.get("resources") or {}
         )
-        resource_opts = ResourceOpts.model_validate(creation_config.get("resource_opts") or {})
+        try:
+            resource_opts = ResourceOpts.model_validate(creation_config.get("resource_opts") or {})
+        except ValidationError as e:
+            raise InvalidResourceOpts.from_pydantic(e) from e
         environ_dict = dict(creation_config.get("environ") or {})
         preopen_ports = tuple(creation_config.get("preopen_ports") or ())
         # Session-level fields (callback, dependencies, etc.) flow onto

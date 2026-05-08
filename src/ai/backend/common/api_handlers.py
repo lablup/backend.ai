@@ -31,6 +31,7 @@ from .exception import (
     MalformedRequestBody,
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
+    PydanticValidationError,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -78,15 +79,28 @@ class BaseRootResponseModel[T](RootModel[T]):
 TRequestModel = TypeVar("TRequestModel", bound=BaseRequestModel)
 
 
-def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
-    @functools.wraps(func)
-    def wrapped(*args: Any, **kwargs: Any) -> T:
-        try:
-            return func(*args, **kwargs)
-        except ValidationError as e:
-            raise InvalidAPIParameters(repr(e)) from e
+def _convert_validation_error_for[T](
+    location_prefix: str,
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """
+    Decorator factory that converts Pydantic ``ValidationError`` raised by
+    a parameter parser into a :class:`PydanticValidationError` annotated
+    with ``location_prefix`` (e.g. "body", "query", "header", "path").
+    """
 
-    return wrapped
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(func)
+        def wrapped(*args: Any, **kwargs: Any) -> T:
+            try:
+                return func(*args, **kwargs)
+            except ValidationError as e:
+                raise PydanticValidationError.from_pydantic(
+                    e, location_prefix=location_prefix
+                ) from e
+
+        return wrapped
+
+    return decorator
 
 
 class BodyParam[TRequestModel: BaseRequestModel]:
@@ -105,7 +119,7 @@ class BodyParam[TRequestModel: BaseRequestModel]:
             )
         return self._parsed
 
-    @convert_validation_error
+    @_convert_validation_error_for("body")
     def from_body(self, json_body: str) -> Self:
         self._parsed = self._model.model_validate(json_body)
         return self
@@ -127,7 +141,7 @@ class QueryParam[TRequestModel: BaseRequestModel]:
             )
         return self._parsed
 
-    @convert_validation_error
+    @_convert_validation_error_for("query")
     def from_query(self, query: MultiMapping[str]) -> Self:
         self._parsed = self._model.model_validate(query)
         return self
@@ -149,7 +163,7 @@ class HeaderParam[TRequestModel: BaseRequestModel]:
             )
         return self._parsed
 
-    @convert_validation_error
+    @_convert_validation_error_for("header")
     def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
         self._parsed = self._model.model_validate(headers)
         return self
@@ -171,7 +185,7 @@ class PathParam[TRequestModel: BaseRequestModel]:
             )
         return self._parsed
 
-    @convert_validation_error
+    @_convert_validation_error_for("path")
     def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
         self._parsed = self._model.model_validate(match_info)
         return self
@@ -227,49 +241,43 @@ type _ParserType = (
 
 
 async def extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
-    try:
-        # MiddlewareParam Type
-        if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
-            try:
-                return cast(_ParamType, await input_param_type.from_request(request))
-            except ValidationError as e:
-                raise MiddlewareParamParsingFailed(
-                    f"Failed while parsing {input_param_type}"
-                ) from e
+    # MiddlewareParam Type
+    if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
+        try:
+            return cast(_ParamType, await input_param_type.from_request(request))
+        except ValidationError as e:
+            raise MiddlewareParamParsingFailed(f"Failed while parsing {input_param_type}") from e
 
-        # If origin type name is BodyParam/QueryParam/HeaderParam/PathParam
-        origin_type = get_origin(input_param_type)
-        pydantic_model = get_args(input_param_type)[0]
-        param_instance = input_param_type(pydantic_model)
+    # If origin type name is BodyParam/QueryParam/HeaderParam/PathParam
+    origin_type = get_origin(input_param_type)
+    pydantic_model = get_args(input_param_type)[0]
+    param_instance = input_param_type(pydantic_model)
 
-        if origin_type is BodyParam:
-            if not request.can_read_body:
-                raise MalformedRequestBody(
-                    f"Malformed body - URL: {request.url}, Method: {request.method}"
-                )
-            try:
-                body = await request.json()
-            except json.decoder.JSONDecodeError as e:
-                raise MalformedRequestBody(
-                    f"Malformed body - URL: {request.url}, Method: {request.method}"
-                ) from e
-            return cast(_ParamType, param_instance.from_body(body))
+    if origin_type is BodyParam:
+        if not request.can_read_body:
+            raise MalformedRequestBody(
+                f"Malformed body - URL: {request.url}, Method: {request.method}"
+            )
+        try:
+            body = await request.json()
+        except json.decoder.JSONDecodeError as e:
+            raise MalformedRequestBody(
+                f"Malformed body - URL: {request.url}, Method: {request.method}"
+            ) from e
+        return cast(_ParamType, param_instance.from_body(body))
 
-        if origin_type is QueryParam:
-            return cast(_ParamType, param_instance.from_query(request.query))
+    if origin_type is QueryParam:
+        return cast(_ParamType, param_instance.from_query(request.query))
 
-        if origin_type is HeaderParam:
-            return cast(_ParamType, param_instance.from_header(request.headers))
+    if origin_type is HeaderParam:
+        return cast(_ParamType, param_instance.from_header(request.headers))
 
-        if origin_type is PathParam:
-            return cast(_ParamType, param_instance.from_path(request.match_info))
+    if origin_type is PathParam:
+        return cast(_ParamType, param_instance.from_path(request.match_info))
 
-        raise InvalidAPIParameters(
-            f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
-        )
-
-    except ValidationError as e:
-        raise InvalidAPIParameters(str(e)) from e
+    raise InvalidAPIParameters(
+        f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
+    )
 
 
 class _HandlerParameters:

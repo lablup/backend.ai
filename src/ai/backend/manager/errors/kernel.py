@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
+from pydantic import ValidationError
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -15,6 +16,7 @@ from ai.backend.common.exception import (
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
+    format_pydantic_validation_errors,
 )
 from ai.backend.common.json import dump_json
 from ai.backend.manager.exceptions import AgentError
@@ -325,6 +327,58 @@ class InvalidKernelConfig(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class InvalidSessionCreationConfig(BackendAIError, web.HTTPBadRequest):
+    """
+    Raised when the session creation ``config`` payload sent by the client
+    does not satisfy the version-appropriate ``CreationConfig`` schema.
+    """
+
+    error_type = "https://api.backend.ai/probs/invalid-session-creation-config"
+    error_title = "Invalid session creation config."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+    @classmethod
+    def from_pydantic(
+        cls, exc: ValidationError, *, location_prefix: str | None = "config"
+    ) -> InvalidSessionCreationConfig:
+        summary, structured = format_pydantic_validation_errors(
+            exc, location_prefix=location_prefix
+        )
+        return cls(extra_msg=summary, extra_data={"errors": structured})
+
+
+class InvalidResourceOpts(BackendAIError, web.HTTPBadRequest):
+    """
+    Raised when the ``resource_opts`` payload supplied with a session or
+    deployment request fails ``ResourceOpts`` validation.
+    """
+
+    error_type = "https://api.backend.ai/probs/invalid-resource-opts"
+    error_title = "Invalid resource options."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+    @classmethod
+    def from_pydantic(
+        cls, exc: ValidationError, *, location_prefix: str | None = "resource_opts"
+    ) -> InvalidResourceOpts:
+        summary, structured = format_pydantic_validation_errors(
+            exc, location_prefix=location_prefix
+        )
+        return cls(extra_msg=summary, extra_data={"errors": structured})
 
 
 class IncompleteSessionSpec(BackendAIError, web.HTTPBadRequest):

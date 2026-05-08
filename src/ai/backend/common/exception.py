@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Self
 
 from aiohttp import web
+from pydantic import ValidationError
 
 from .json import dump_json
 
@@ -441,6 +442,80 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+_MAX_INPUT_REPR_LEN = 200
+
+
+def _format_pydantic_loc(loc: tuple[Any, ...], location_prefix: str | None) -> str:
+    parts: list[str] = []
+    if location_prefix:
+        parts.append(location_prefix)
+    for item in loc:
+        parts.append(str(item))
+    return ".".join(parts) if parts else "<root>"
+
+
+def format_pydantic_validation_errors(
+    exc: ValidationError, *, location_prefix: str | None = None
+) -> tuple[str, list[dict[str, Any]]]:
+    """
+    Build a human-readable summary and a structured list of field errors
+    from a Pydantic ValidationError.
+
+    The summary joins each field error as "{loc}: {msg}" with "; ".
+    The structured list keeps loc/msg/type per error and a truncated input
+    repr for diagnostics.
+    """
+    raw_errors = exc.errors()
+    summary_items: list[str] = []
+    structured: list[dict[str, Any]] = []
+    for err in raw_errors:
+        loc = _format_pydantic_loc(tuple(err.get("loc", ())), location_prefix)
+        msg = err.get("msg", "validation failed")
+        summary_items.append(f"{loc}: {msg}")
+        entry: dict[str, Any] = {
+            "loc": loc,
+            "msg": msg,
+            "type": err.get("type"),
+        }
+        if "input" in err:
+            input_repr = repr(err["input"])
+            if len(input_repr) > _MAX_INPUT_REPR_LEN:
+                input_repr = input_repr[:_MAX_INPUT_REPR_LEN] + "...<truncated>"
+            entry["input"] = input_repr
+        structured.append(entry)
+    summary = "; ".join(summary_items) if summary_items else "validation failed"
+    return summary, structured
+
+
+class PydanticValidationError(BackendAIError, web.HTTPBadRequest):
+    """
+    Raised when an incoming request payload fails Pydantic validation.
+
+    The HTTP response carries a human-readable ``msg`` summarizing every
+    failed field and a structured ``data.errors`` list for clients that
+    want to render per-field messages.
+    """
+
+    error_type = "https://api.backend.ai/probs/pydantic-validation"
+    error_title = "Request payload validation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+    @classmethod
+    def from_pydantic(
+        cls, exc: ValidationError, *, location_prefix: str | None = None
+    ) -> PydanticValidationError:
+        summary, structured = format_pydantic_validation_errors(
+            exc, location_prefix=location_prefix
+        )
+        return cls(extra_msg=summary, extra_data={"errors": structured})
 
 
 class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):

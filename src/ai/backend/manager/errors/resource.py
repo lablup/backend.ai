@@ -5,6 +5,7 @@ Resource management exceptions (groups, domains, scaling groups, instances).
 from __future__ import annotations
 
 from aiohttp import web
+from pydantic import ValidationError
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -12,6 +13,7 @@ from ai.backend.common.exception import (
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
+    format_pydantic_validation_errors,
 )
 
 from .common import ObjectNotFound
@@ -85,6 +87,32 @@ class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEnt
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class InvalidScalingGroupOpts(BackendAIError, web.HTTPBadRequest):
+    """
+    Raised when ``scheduler_opts`` supplied through a scaling-group GraphQL
+    mutation does not satisfy the ``ScalingGroupOpts`` schema.
+    """
+
+    error_type = "https://api.backend.ai/probs/invalid-scaling-group-opts"
+    error_title = "Invalid scaling group scheduler options."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+    @classmethod
+    def from_pydantic(
+        cls, exc: ValidationError, *, location_prefix: str | None = "scheduler_opts"
+    ) -> InvalidScalingGroupOpts:
+        summary, structured = format_pydantic_validation_errors(
+            exc, location_prefix=location_prefix
+        )
+        return cls(extra_msg=summary, extra_data={"errors": structured})
 
 
 class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
@@ -536,6 +564,33 @@ class ConfigurationLoadFailed(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class InvalidManagerConfig(BackendAIError, web.HTTPBadRequest):
+    """
+    Raised when an admin-supplied manager unified configuration update fails
+    ``ManagerUnifiedConfig`` validation. Returns 400 because the bad payload
+    came from the caller, not from a server-side load failure.
+    """
+
+    error_type = "https://api.backend.ai/probs/invalid-manager-config"
+    error_title = "Invalid manager configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+    @classmethod
+    def from_pydantic(
+        cls, exc: ValidationError, *, location_prefix: str | None = "config"
+    ) -> InvalidManagerConfig:
+        summary, structured = format_pydantic_validation_errors(
+            exc, location_prefix=location_prefix
+        )
+        return cls(extra_msg=summary, extra_data={"errors": structured})
 
 
 class DataTransformationFailed(BackendAIError, web.HTTPInternalServerError):

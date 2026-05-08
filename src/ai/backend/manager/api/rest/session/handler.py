@@ -18,7 +18,7 @@ from uuid import UUID
 
 import yarl
 from aiohttp import web
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ai.backend.common.api_handlers import APIResponse, BaseResponseModel, BodyParam, QueryParam
 from ai.backend.common.contexts.user import current_user
@@ -90,6 +90,7 @@ from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.kernel import InvalidSessionCreationConfig
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.user import UserRole
@@ -192,45 +193,38 @@ def _validate_creation_config(
     template: bool = False,
 ) -> dict[str, Any]:
     """Validate creation config dict against the API-version-appropriate Pydantic model."""
-    try:
-        model: BaseModel
-        if template:
-            if api_version[0] >= 8:
-                model = CreationConfigV6Template.model_validate(config)
-            elif api_version[0] >= 6:
-                model = CreationConfigV5Template.model_validate(config)
-            elif api_version[0] >= 5:
-                model = CreationConfigV4Template.model_validate(config)
-            elif api_version >= (4, "20190315"):
-                model = CreationConfigV3Template.model_validate(config)
-            else:
-                model = CreationConfigV3Template.model_validate(config)
+    model_cls: type[BaseModel]
+    if template:
+        if api_version[0] >= 8:
+            model_cls = CreationConfigV6Template
+        elif api_version[0] >= 6:
+            model_cls = CreationConfigV5Template
+        elif api_version[0] >= 5:
+            model_cls = CreationConfigV4Template
         else:
-            if api_version[0] >= 9:
-                model = CreationConfigV7.model_validate(config)
-            elif api_version[0] >= 8:
-                model = CreationConfigV6.model_validate(config)
-            elif api_version[0] >= 6:
-                model = CreationConfigV5.model_validate(config)
-            elif api_version[0] >= 5:
-                model = CreationConfigV4.model_validate(config)
-            elif api_version >= (4, "20190315"):
-                model = CreationConfigV3.model_validate(config)
-            elif 2 <= api_version[0] <= 4:
-                model = CreationConfigV2.model_validate(config)
-            elif api_version[0] == 1:
-                model = CreationConfigV1.model_validate(config)
-            else:
-                raise InvalidAPIParameters("API version not supported")
-        return model.model_dump(by_alias=False)
-    except Exception as e:
-        if isinstance(e, InvalidAPIParameters):
-            raise
-        log.debug("Validation error: {0}", e)
-        raise InvalidAPIParameters(
-            "Input validation error",
-            extra_data={"config": str(e)},
-        ) from e
+            model_cls = CreationConfigV3Template
+    else:
+        if api_version[0] >= 9:
+            model_cls = CreationConfigV7
+        elif api_version[0] >= 8:
+            model_cls = CreationConfigV6
+        elif api_version[0] >= 6:
+            model_cls = CreationConfigV5
+        elif api_version[0] >= 5:
+            model_cls = CreationConfigV4
+        elif api_version >= (4, "20190315"):
+            model_cls = CreationConfigV3
+        elif 2 <= api_version[0] <= 4:
+            model_cls = CreationConfigV2
+        elif api_version[0] == 1:
+            model_cls = CreationConfigV1
+        else:
+            raise InvalidAPIParameters("API version not supported")
+    try:
+        model = model_cls.model_validate(config)
+    except ValidationError as e:
+        raise InvalidSessionCreationConfig.from_pydantic(e) from e
+    return model.model_dump(by_alias=False)
 
 
 def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:

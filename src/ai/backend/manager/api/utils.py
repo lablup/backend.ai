@@ -39,8 +39,7 @@ from aiohttp.typedefs import Handler
 from pydantic import Field, TypeAdapter, ValidationError
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
-from ai.backend.common.exception import DeprecatedAPI
-from ai.backend.common.json import load_json
+from ai.backend.common.exception import DeprecatedAPI, PydanticValidationError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import (
     InvalidAPIParameters,
@@ -205,8 +204,8 @@ def pydantic_params_api_handler[
         ) -> web.StreamResponse:
             orig_params: Any
             body: str = ""
+            body_exists = request.can_read_body
             try:
-                body_exists = request.can_read_body
                 if body_exists:
                     body = await request.text()
                     if request.content_type == "text/yaml":
@@ -215,30 +214,23 @@ def pydantic_params_api_handler[
                         orig_params = (loads or json.loads)(body)
                 else:
                     orig_params = dict(request.query)
-                stripped_params = orig_params.copy()
-                log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
-                checked_params = checker.model_validate(stripped_params)
-                if body_exists and query_param_checker is not None:
-                    query_params = query_param_checker.model_validate(request.query)
-                    kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
                 raise InvalidAPIParameters("Malformed body") from e
+            stripped_params = orig_params.copy()
+            log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
+            primary_location = "body" if body_exists else "query"
+            try:
+                checked_params = checker.model_validate(stripped_params)
             except ValidationError as ex:
-                first_error = ex.errors()[0]
-                # Format the first validation error as the message
-                # The client may refer extra_data to access the full validation errors.
-                metadata = {
-                    "input": first_error["input"],
-                }
-                if loc := first_error["loc"]:
-                    metadata["loc"] = loc[0]
-                metadata_formatted_items = [
-                    f"type={first_error['type']}",  # format as symbol
-                    *(f"{k}={v!r}" for k, v in metadata.items()),
-                ]
-                msg = f"{first_error['msg']} [{', '.join(metadata_formatted_items)}]"
-                # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
-                raise InvalidAPIParameters(msg, extra_data=load_json(ex.json())) from ex
+                raise PydanticValidationError.from_pydantic(
+                    ex, location_prefix=primary_location
+                ) from ex
+            if body_exists and query_param_checker is not None:
+                try:
+                    query_params = query_param_checker.model_validate(request.query)
+                except ValidationError as ex:
+                    raise PydanticValidationError.from_pydantic(ex, location_prefix="query") from ex
+                kwargs["query"] = query_params
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 

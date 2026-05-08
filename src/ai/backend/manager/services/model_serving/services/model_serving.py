@@ -8,7 +8,7 @@ from http import HTTPStatus
 from typing import Any, cast
 
 import aiohttp
-from pydantic import HttpUrl
+from pydantic import HttpUrl, ValidationError
 from yarl import URL
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -87,6 +87,7 @@ from ai.backend.manager.data.session.options import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.errors.kernel import InvalidResourceOpts
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
@@ -619,7 +620,10 @@ class ModelServingService:
             service_prepare_ctx.extra_mounts,
         )
         resource_entries = self._resource_entries_from_config(action.config.resources)
-        resource_opts = ResourceOpts.model_validate(action.config.resource_opts or {})
+        try:
+            resource_opts = ResourceOpts.model_validate(action.config.resource_opts or {})
+        except ValidationError as e:
+            raise InvalidResourceOpts.from_pydantic(e) from e
         environ = dict(action.config.environ or {})
         callback_url = URL(action.callback_url.unicode_string()) if action.callback_url else None
 

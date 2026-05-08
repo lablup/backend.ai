@@ -5,6 +5,7 @@ API-related exceptions.
 from __future__ import annotations
 
 from aiohttp import web
+from pydantic import ValidationError
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -12,6 +13,7 @@ from ai.backend.common.exception import (
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
+    format_pydantic_validation_errors,
 )
 
 
@@ -85,6 +87,27 @@ class InvalidGraphQLParameters(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class InvalidGraphQLPydanticInput(InvalidGraphQLParameters):
+    """
+    Raised when a GraphQL input fails Pydantic validation while being
+    converted to its DTO. Carries the same structured error payload as
+    :class:`PydanticValidationError` so that GraphQL clients can render
+    per-field messages.
+    """
+
+    error_type = "https://api.backend.ai/probs/invalid-graphql-pydantic-input"
+    error_title = "GraphQL input validation failed."
+
+    @classmethod
+    def from_pydantic(
+        cls, exc: ValidationError, *, location_prefix: str | None = None
+    ) -> InvalidGraphQLPydanticInput:
+        summary, structured = format_pydantic_validation_errors(
+            exc, location_prefix=location_prefix
+        )
+        return cls(extra_msg=summary, extra_data={"errors": structured})
 
 
 class InvalidCursor(BackendAIError, web.HTTPBadRequest):

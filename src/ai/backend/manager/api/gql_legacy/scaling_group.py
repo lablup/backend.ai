@@ -14,13 +14,14 @@ import graphene_federation
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
+from pydantic import ValidationError
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import InvalidScalingGroupOpts, ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -677,13 +678,17 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             driver=OptionalState.from_graphql(self.driver),
             driver_opts=OptionalState.from_graphql(self.driver_opts),
         )
+        validated_scheduler_opts: Any
+        if self.scheduler_opts is not None and self.scheduler_opts is not Undefined:
+            try:
+                validated_scheduler_opts = ScalingGroupOpts.model_validate(self.scheduler_opts)
+            except ValidationError as e:
+                raise InvalidScalingGroupOpts.from_pydantic(e) from e
+        else:
+            validated_scheduler_opts = Undefined
         scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
             scheduler=OptionalState.from_graphql(self.scheduler),
-            scheduler_opts=OptionalState.from_graphql(
-                ScalingGroupOpts.model_validate(self.scheduler_opts)
-                if self.scheduler_opts is not None and self.scheduler_opts is not Undefined
-                else Undefined
-            ),
+            scheduler_opts=OptionalState.from_graphql(validated_scheduler_opts),
         )
         spec = ScalingGroupUpdaterSpec(
             status=status_spec,
@@ -715,6 +720,10 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
         graph_ctx: GraphQueryContext = info.context
+        try:
+            scheduler_opts = ScalingGroupOpts.model_validate(props.scheduler_opts)
+        except ValidationError as e:
+            raise InvalidScalingGroupOpts.from_pydantic(e) from e
         spec = ScalingGroupCreatorSpec(
             name=name,
             description=props.description,
@@ -725,7 +734,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             driver=props.driver,
             driver_opts=props.driver_opts,
             scheduler=props.scheduler,
-            scheduler_opts=ScalingGroupOpts.model_validate(props.scheduler_opts),
+            scheduler_opts=scheduler_opts,
             use_host_network=bool(props.use_host_network),
         )
         creator = Creator(spec=spec)

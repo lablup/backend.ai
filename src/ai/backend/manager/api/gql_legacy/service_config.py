@@ -3,11 +3,13 @@ import logging
 from typing import TYPE_CHECKING, Any, Final, Self
 
 import graphene
+from pydantic import ValidationError
 
 from ai.backend.common.lock import EtcdLock
 from ai.backend.common.utils import deep_merge
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.errors.resource import InvalidManagerConfig
 from ai.backend.manager.models.user import UserRole
 
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
@@ -197,9 +199,12 @@ class ModifyServiceConfigNode(graphene.Mutation):  # type: ignore[misc]
                 input.configuration,
             )
 
-            new_config = ManagerUnifiedConfig.model_validate(
-                merged_raw_unified_config, by_name=True
-            )
+            try:
+                new_config = ManagerUnifiedConfig.model_validate(
+                    merged_raw_unified_config, by_name=True
+                )
+            except ValidationError as e:
+                raise InvalidManagerConfig.from_pydantic(e) from e
             ctx.config_provider.reload(new_config)
 
             await ctx.etcd.put_prefix(cls._get_etcd_prefix_key(input.service), input.configuration)
