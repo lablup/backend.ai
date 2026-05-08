@@ -282,9 +282,25 @@ def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]
     return next_config
 
 
+def _split_legacy_name_subpath(raw: str) -> tuple[str, str | None]:
+    """Split a legacy ``mounts``-style entry of the form ``"name"`` or
+    ``"name/subpath"`` into a ``(name, subpath)`` pair.
+
+    Returns ``subpath=None`` when the entry has no ``/``; a non-empty
+    string otherwise (the ``name/`` form with an empty trailing segment
+    is treated as no-subpath, mirroring the historical behavior of
+    :func:`prepare_vfolder_mounts`'s string-form ``ref`` parser).
+    """
+    name, sep, subpath = raw.partition("/")
+    if not sep or not subpath:
+        return name, None
+    return name, subpath
+
+
 def _merge_resolved_legacy_mounts(
     creation_config: dict[str, Any],
     name_to_id: dict[str, UUID],
+    name_to_subpath: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Merge a ``name → UUID`` resolution into the UUID-keyed buckets of
     ``creation_config`` and drop the now-resolved name-keyed legacy keys.
@@ -293,9 +309,16 @@ def _merge_resolved_legacy_mounts(
     and entries from the name-keyed ``mount_map`` / ``mount_options``
     dicts are re-keyed onto the resolved UUIDs without overwriting an
     explicit UUID-keyed entry the caller already supplied.
+
+    ``name_to_subpath`` carries any per-name source-subpath extracted from
+    legacy ``mounts=["name/subdir"]`` entries; the resolved subpath is
+    forwarded onto ``mount_id_subpaths`` keyed by the corresponding UUID,
+    again without overwriting an existing UUID-keyed value.
     """
     if not name_to_id:
         return creation_config
+
+    name_to_subpath = name_to_subpath or {}
 
     merged_mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
     existing_uuid_set: set[UUID] = set()
@@ -305,6 +328,9 @@ def _merge_resolved_legacy_mounts(
         except (ValueError, TypeError):
             continue
     merged_mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
+    merged_mount_id_subpaths: dict[Any, str] = dict(
+        creation_config.get("mount_id_subpaths") or {}
+    )
     merged_mount_options: dict[Any, Any] = dict(creation_config.get("mount_options") or {})
     legacy_mount_map = creation_config.get("mount_map") or {}
     legacy_mount_options = creation_config.get("mount_options") or {}
@@ -317,10 +343,13 @@ def _merge_resolved_legacy_mounts(
             merged_mount_id_map[vfid] = dst
         if (opts := legacy_mount_options.get(name)) and vfid not in merged_mount_options:
             merged_mount_options[vfid] = opts
+        if (subpath := name_to_subpath.get(name)) and vfid not in merged_mount_id_subpaths:
+            merged_mount_id_subpaths[vfid] = subpath
 
     next_config = dict(creation_config)
     next_config["mount_ids"] = merged_mount_ids
     next_config["mount_id_map"] = merged_mount_id_map
+    next_config["mount_id_subpaths"] = merged_mount_id_subpaths
     next_config["mount_options"] = merged_mount_options
     next_config.pop("mounts", None)
     next_config.pop("mount_map", None)
@@ -349,7 +378,9 @@ class SessionHandler:
         """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
         ``mount_options`` surfaces: route UUID-shaped entries onto the
         UUID-keyed buckets, then resolve any remaining names to UUIDs and
-        merge the resolution back in.
+        merge the resolution back in. Legacy ``mounts=["name/subdir"]``
+        entries are split into a ``(name, subpath)`` pair here; the
+        resolved UUID + subpath is forwarded onto ``mount_id_subpaths``.
         """
         legacy_mounts = validated_config.get("mounts") or ()
         legacy_mount_map = validated_config.get("mount_map") or {}
@@ -357,21 +388,21 @@ class SessionHandler:
         if not (legacy_mounts or legacy_mount_map or legacy_mount_options):
             return validated_config
         validated_config = _route_legacy_uuid_mounts(validated_config)
-        name_to_id = await self._resolve_legacy_name_mounts(
+        name_to_id, name_to_subpath = await self._resolve_legacy_name_mounts(
             validated_config.get("mounts") or (),
             validated_config.get("mount_map") or {},
             validated_config.get("mount_options") or {},
         )
-        return _merge_resolved_legacy_mounts(validated_config, name_to_id)
+        return _merge_resolved_legacy_mounts(validated_config, name_to_id, name_to_subpath)
 
     async def _resolve_legacy_name_mounts(
         self,
         mounts: Sequence[str],
         mount_map: Mapping[str, str],
         mount_options: Mapping[str, Any],
-    ) -> dict[str, UUID]:
+    ) -> tuple[dict[str, UUID], dict[str, str]]:
         """Resolve legacy v1 CLI name-keyed mount surfaces into a unified
-        ``name → UUID`` mapping.
+        ``name → UUID`` mapping plus an extracted ``name → subpath`` mapping.
 
         ``mounts`` (list of names), ``mount_map`` (dict keyed by name), and
         ``mount_options`` (dict keyed by name) are all name-based legacy
@@ -380,32 +411,40 @@ class SessionHandler:
         ``mount_map`` or ``mount_options`` is not silently dropped
         downstream.
 
-        Subpath syntax (``name/subdir``) is rejected here because
-        :class:`MountInfoEntry` carries no subpath field; silently dropping
-        it would mount the wrong directory. Subpath mounts must use the
-        UUID-keyed surface where the storage proxy handles vfsubpath
-        separately.
+        ``mounts`` entries of the form ``"name/subdir"`` are split: the
+        bare ``name`` is what gets resolved, and ``subdir`` is captured
+        into the second return value so the caller can forward it onto
+        ``mount_id_subpaths``. ``MountInfoEntry`` now carries
+        ``source_subpath`` end-to-end, so the legacy form no longer needs
+        to be rejected.
 
         Merging the resolved ids/maps back into ``creation_config`` is the
         caller's responsibility — see :func:`_merge_resolved_legacy_mounts`.
         """
         if not mounts and not mount_map and not mount_options:
-            return {}
-
-        subpath_entries = [m for m in mounts if "/" in str(m)]
-        if subpath_entries:
-            raise InvalidAPIParameters(
-                "Legacy 'mounts' field with subpath syntax "
-                f"({subpath_entries}) is not supported. "
-                "Use UUID-keyed 'mount_ids' / 'mount_id_map' instead."
-            )
+            return {}, {}
 
         names_to_resolve: list[str] = []
         seen: set[str] = set()
+        name_to_subpath: dict[str, str] = {}
 
-        # ``mounts`` and ``mount_map`` are strictly name-keyed legacy
-        # surfaces — every entry is treated as a vfolder name.
-        for raw in list(mounts) + list(mount_map.keys()):
+        # ``mounts`` is name-keyed and may carry a per-entry subpath as
+        # ``"name/subdir"``; split before queueing the bare name for
+        # resolution. ``mount_map`` keys are also strictly name-keyed
+        # legacy surfaces — every entry is treated as a vfolder name.
+        for raw in mounts:
+            entry = str(raw)
+            name, subpath = _split_legacy_name_subpath(entry)
+            if subpath is not None:
+                # Last write wins on conflicting per-name subpaths; the
+                # historical CLI never produces such input, and downstream
+                # ``prepare_vfolder_mounts`` deduplicates by ``(vfid, vfsubpath)``.
+                name_to_subpath[name] = subpath
+            if name in seen:
+                continue
+            seen.add(name)
+            names_to_resolve.append(name)
+        for raw in mount_map.keys():
             name = str(raw)
             if name in seen:
                 continue
@@ -429,12 +468,12 @@ class SessionHandler:
             names_to_resolve.append(name)
 
         if not names_to_resolve:
-            return {}
+            return {}, name_to_subpath
 
         result = await self._vfolder.resolve_vfolder_ids_by_names.wait_for_complete(
             ResolveIdsByNamesAction(vfolder_names=names_to_resolve)
         )
-        return dict(result.name_to_id)
+        return dict(result.name_to_id), name_to_subpath
 
     # ------------------------------------------------------------------
     # create_from_template (POST /_/create-from-template)

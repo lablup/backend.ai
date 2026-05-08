@@ -1067,12 +1067,14 @@ class TestCreateFromParams:
             "mount_map": {"vf-a": "/data"},
             "mount_options": {"vf-a": {"permission": "ro", "type": "bind"}},
         }
-        name_to_id = await handler._resolve_legacy_name_mounts(
+        name_to_id, name_to_subpath = await handler._resolve_legacy_name_mounts(
             legacy_config["mounts"],
             legacy_config["mount_map"],
             legacy_config["mount_options"],
         )
-        resolved_config = _merge_resolved_legacy_mounts(legacy_config, name_to_id)
+        resolved_config = _merge_resolved_legacy_mounts(
+            legacy_config, name_to_id, name_to_subpath
+        )
 
         # Step 2: feed the resolved config to the service and verify it
         # arrives at AgentRegistry.create_session intact.
