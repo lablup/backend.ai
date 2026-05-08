@@ -291,7 +291,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         "DeploymentRevisionRow",
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_revisions_join_condition,
-        order_by="DeploymentRevisionRow.revision_number",
+        order_by="DeploymentRevisionRow.revision_number.desc()",
     )
 
     auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
