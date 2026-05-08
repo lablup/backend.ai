@@ -228,43 +228,49 @@ type _ParserType = (
 
 
 async def extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
-    # MiddlewareParam Type
-    if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
-        try:
-            return cast(_ParamType, await input_param_type.from_request(request))
-        except ValidationError as e:
-            raise MiddlewareParamParsingFailed(f"Failed while parsing {input_param_type}") from e
+    try:
+        # MiddlewareParam Type
+        if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
+            try:
+                return cast(_ParamType, await input_param_type.from_request(request))
+            except ValidationError as e:
+                raise MiddlewareParamParsingFailed(
+                    f"Failed while parsing {input_param_type}"
+                ) from e
 
-    # If origin type name is BodyParam/QueryParam/HeaderParam/PathParam
-    origin_type = get_origin(input_param_type)
-    pydantic_model = get_args(input_param_type)[0]
-    param_instance = input_param_type(pydantic_model)
+        # If origin type name is BodyParam/QueryParam/HeaderParam/PathParam
+        origin_type = get_origin(input_param_type)
+        pydantic_model = get_args(input_param_type)[0]
+        param_instance = input_param_type(pydantic_model)
 
-    if origin_type is BodyParam:
-        if not request.can_read_body:
-            raise MalformedRequestBody(
-                f"Malformed body - URL: {request.url}, Method: {request.method}"
-            )
-        try:
-            body = await request.json()
-        except json.decoder.JSONDecodeError as e:
-            raise MalformedRequestBody(
-                f"Malformed body - URL: {request.url}, Method: {request.method}"
-            ) from e
-        return cast(_ParamType, param_instance.from_body(body))
+        if origin_type is BodyParam:
+            if not request.can_read_body:
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}"
+                )
+            try:
+                body = await request.json()
+            except json.decoder.JSONDecodeError as e:
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}"
+                ) from e
+            return cast(_ParamType, param_instance.from_body(body))
 
-    if origin_type is QueryParam:
-        return cast(_ParamType, param_instance.from_query(request.query))
+        if origin_type is QueryParam:
+            return cast(_ParamType, param_instance.from_query(request.query))
 
-    if origin_type is HeaderParam:
-        return cast(_ParamType, param_instance.from_header(request.headers))
+        if origin_type is HeaderParam:
+            return cast(_ParamType, param_instance.from_header(request.headers))
 
-    if origin_type is PathParam:
-        return cast(_ParamType, param_instance.from_path(request.match_info))
+        if origin_type is PathParam:
+            return cast(_ParamType, param_instance.from_path(request.match_info))
 
-    raise InvalidAPIParameters(
-        f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
-    )
+        raise InvalidAPIParameters(
+            f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
+        )
+
+    except ValidationError as e:
+        raise InvalidAPIParameters(str(e)) from e
 
 
 class _HandlerParameters:
