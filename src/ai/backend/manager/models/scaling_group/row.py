@@ -30,6 +30,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
@@ -40,6 +41,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.data.session.options import DefaultSessionOptions
+from ai.backend.manager.errors.resource import InvalidScalingGroupOpts
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -105,8 +107,10 @@ class PreemptionConfig(BaseModel):
         return value.value
 
 
-class ScalingGroupOpts(BaseModel):
+class ScalingGroupOpts(BackendAIModel):
     model_config = ConfigDict(frozen=True)
+
+    __bai_error_class__ = InvalidScalingGroupOpts
 
     allowed_session_types: list[SessionTypes] = Field(
         default_factory=lambda: [

@@ -204,6 +204,7 @@ from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
+from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
@@ -224,6 +225,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
+from ai.backend.manager.errors.resource import InvalidManagerConfig
 from ai.backend.manager.pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -3333,7 +3335,9 @@ class ExportConfig(BaseConfigSchema):
     ]
 
 
-class ManagerUnifiedConfig(BaseConfigSchema):
+class ManagerUnifiedConfig(BaseConfigSchema, BackendAIModel):
+    __bai_error_class__ = InvalidManagerConfig
+
     # From legacy local config
     db: Annotated[
         DatabaseConfig,

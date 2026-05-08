@@ -14,14 +14,13 @@ import graphene_federation
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
-from pydantic import ValidationError
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.resource import InvalidScalingGroupOpts, ScalingGroupNotFound
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -680,10 +679,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         validated_scheduler_opts: Any
         if self.scheduler_opts is not None and self.scheduler_opts is not Undefined:
-            try:
-                validated_scheduler_opts = ScalingGroupOpts.model_validate(self.scheduler_opts)
-            except ValidationError as e:
-                raise InvalidScalingGroupOpts.from_pydantic(e) from e
+            validated_scheduler_opts = ScalingGroupOpts.bai_validate(self.scheduler_opts)
         else:
             validated_scheduler_opts = Undefined
         scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
@@ -720,10 +716,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
         graph_ctx: GraphQueryContext = info.context
-        try:
-            scheduler_opts = ScalingGroupOpts.model_validate(props.scheduler_opts)
-        except ValidationError as e:
-            raise InvalidScalingGroupOpts.from_pydantic(e) from e
+        scheduler_opts = ScalingGroupOpts.bai_validate(props.scheduler_opts)
         spec = ScalingGroupCreatorSpec(
             name=name,
             description=props.description,

@@ -17,7 +17,6 @@ import trafaret as t
 import yarl
 from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
-from pydantic import ValidationError
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
@@ -75,7 +74,6 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.errors.image import UnknownImageReferenceError
 from ai.backend.manager.errors.kernel import (
-    InvalidResourceOpts,
     InvalidSessionData,
     KernelNotReady,
     QuotaExceeded,
@@ -1573,10 +1571,7 @@ class SessionService:
         resource_opts_payload: dict[str, Any] = {}
         if action.resource.shmem is not None:
             resource_opts_payload["shmem"] = BinarySize.from_str(action.resource.shmem)
-        try:
-            resource_opts = ResourceOpts.model_validate(resource_opts_payload)
-        except ValidationError as e:
-            raise InvalidResourceOpts.from_pydantic(e) from e
+        resource_opts = ResourceOpts.bai_validate(resource_opts_payload)
 
         mount_entries = tuple(action.mounts or ())
 

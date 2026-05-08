@@ -4,10 +4,10 @@ import enum
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 from aiohttp import web
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from .json import dump_json
 
@@ -407,6 +407,19 @@ class BackendAIError(web.HTTPError, ABC):
         """
         raise NotImplementedError("Subclasses must implement error_code() method.")
 
+    @classmethod
+    def from_pydantic(cls, exc: ValidationError, *, location_prefix: str | None = None) -> Self:
+        """Build an instance from a Pydantic ``ValidationError``,
+        embedding a human-readable summary plus the structured per-field
+        error list. Used by :class:`BackendAIModel.bai_validate` and any
+        explicit ``except ValidationError`` site that wants to surface a
+        domain error class. Subclasses may override to customize the
+        default ``location_prefix`` or attach extra fields."""
+        summary, structured = format_pydantic_validation_errors(
+            exc, location_prefix=location_prefix
+        )
+        return cls(extra_msg=summary, extra_data={"errors": structured})
+
 
 class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-error-code"
@@ -500,6 +513,33 @@ def format_pydantic_validation_errors(
         structured.append(entry)
     summary = "; ".join(summary_items) if summary_items else "validation failed"
     return summary, structured
+
+
+class BackendAIModel(BaseModel):
+    """Pydantic base that lets a subclass opt into automatic
+    ``BackendAIError`` conversion on validation failure.
+
+    Subclasses register the error class they want by setting
+    ``__bai_error_class__``. Call ``Model.bai_validate(payload)`` from
+    user-input paths to get a domain-specific 4xx exception instead of
+    the raw ``ValidationError``. Plain ``model_validate`` is left
+    untouched so the same model can still be used in non-HTTP contexts
+    (bootstrap, DB row deserialization) without surfacing HTTP-shaped
+    errors there.
+    """
+
+    __bai_error_class__: ClassVar[type[BackendAIError] | None] = None
+
+    @classmethod
+    def bai_validate(cls, *args: Any, **kwargs: Any) -> Self:
+        if cls.__bai_error_class__ is None:
+            raise NotImplementedError(
+                f"{cls.__name__} must set __bai_error_class__ to use bai_validate()"
+            )
+        try:
+            return cls.model_validate(*args, **kwargs)
+        except ValidationError as e:
+            raise cls.__bai_error_class__.from_pydantic(e) from e
 
 
 class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):

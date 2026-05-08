@@ -5,7 +5,6 @@ Resource management exceptions (groups, domains, scaling groups, instances).
 from __future__ import annotations
 
 from aiohttp import web
-from pydantic import ValidationError
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -13,7 +12,6 @@ from ai.backend.common.exception import (
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
-    format_pydantic_validation_errors,
 )
 
 from .common import ObjectNotFound
@@ -104,15 +102,6 @@ class InvalidScalingGroupOpts(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
-
-    @classmethod
-    def from_pydantic(
-        cls, exc: ValidationError, *, location_prefix: str | None = "scheduler_opts"
-    ) -> InvalidScalingGroupOpts:
-        summary, structured = format_pydantic_validation_errors(
-            exc, location_prefix=location_prefix
-        )
-        return cls(extra_msg=summary, extra_data={"errors": structured})
 
 
 class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
@@ -582,15 +571,6 @@ class InvalidManagerConfig(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
-
-    @classmethod
-    def from_pydantic(
-        cls, exc: ValidationError, *, location_prefix: str | None = "config"
-    ) -> InvalidManagerConfig:
-        summary, structured = format_pydantic_validation_errors(
-            exc, location_prefix=location_prefix
-        )
-        return cls(extra_msg=summary, extra_data={"errors": structured})
 
 
 class DataTransformationFailed(BackendAIError, web.HTTPInternalServerError):
