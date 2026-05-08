@@ -959,6 +959,7 @@ class ModelDeploymentData:
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkSpec
     revision: ModelRevisionData | None
+    current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None
     revision_history_ids: list[DeploymentRevisionID]
     scaling_rule_ids: list[UUID]

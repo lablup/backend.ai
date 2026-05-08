@@ -233,10 +233,23 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
 
     Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
     """
-    # Map revision if available
     revision: ModelRevisionData | None = None
-    if info.model_revisions:
-        rev = info.model_revisions[0]
+    rev: ModelRevisionSpec | None = None
+    if info.current_revision_id is not None:
+        rev = next(
+            (r for r in info.model_revisions if r.revision_id == info.current_revision_id),
+            None,
+        )
+        if rev is None:
+            log.error(
+                "Deployment {} has current_revision_id {} but no matching "
+                "ModelRevisionSpec was found in DeploymentInfo.model_revisions; "
+                "current_revision will be reported as null. This usually means "
+                "EndpointRow.revisions was not eagerly loaded by the caller.",
+                info.id,
+                info.current_revision_id,
+            )
+    if rev is not None:
         if rev.revision_id is None:
             raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
         revision = ModelRevisionData(
@@ -283,6 +296,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         network_access=info.network,
         revision_history_ids=[info.current_revision_id] if info.current_revision_id else [],
         revision=revision,
+        current_revision_id=info.current_revision_id,
         deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
