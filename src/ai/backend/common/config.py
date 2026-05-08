@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
@@ -14,6 +15,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    field_validator,
 )
 
 from . import validators as tx
@@ -143,6 +145,16 @@ agent_selector_globalconfig_iv = t.Dict({}).allow_extra("*")
 agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 
 
+def _normalize_start_command(value: Any) -> Any:
+    """Coerce legacy ``str`` ``start_command`` into argv list via
+    :func:`shlex.split`. Lists, ``None``, and other types pass through so
+    the schema's strict check rejects them.
+    """
+    if isinstance(value, str):
+        return shlex.split(value)
+    return value
+
+
 model_definition_iv = t.Dict({
     t.Key("models"): t.List(
         t.Dict({
@@ -159,7 +171,8 @@ model_definition_iv = t.Dict({
                         t.Key("args"): t.Dict().allow_extra("*"),
                     })
                 ),
-                t.Key("start_command", default=None): t.Null | t.List(t.String),
+                t.Key("start_command", default=None): (t.Null | t.String | t.List(t.String))
+                >> _normalize_start_command,
                 t.Key("shell", default="/bin/bash"): t.String,
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
@@ -269,6 +282,11 @@ class ModelServiceConfig(BaseConfigModel):
         default=None,
         description="Health check configuration for the model service.",
     )
+
+    @field_validator("start_command", mode="before")
+    @classmethod
+    def _coerce_start_command(cls, value: Any) -> Any:
+        return _normalize_start_command(value)
 
 
 class ModelMetadata(BaseConfigModel):
@@ -534,6 +552,11 @@ class ModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = None
     health_check: ModelHealthCheckDraft | None = None
+
+    @field_validator("start_command", mode="before")
+    @classmethod
+    def _coerce_start_command(cls, value: Any) -> Any:
+        return _normalize_start_command(value)
 
     def to_resolved(self) -> ModelServiceConfig:
         if self.port is None:
