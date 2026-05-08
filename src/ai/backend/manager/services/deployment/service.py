@@ -246,7 +246,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             None,
         )
         if rev is None:
-            log.warning(
+            log.error(
                 "Deployment {} has current_revision_id {} but no matching "
                 "ModelRevisionSpec was found in DeploymentInfo.model_revisions; "
                 "current_revision will be reported as null. This usually means "
