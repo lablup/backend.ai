@@ -440,13 +440,15 @@ class SessionHandler:
             template=True,
         )
 
-        validated_config = _route_legacy_uuid_mounts(validated_config)
         legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
         legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
         legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
         if legacy_mounts or legacy_mount_map or legacy_mount_options:
+            validated_config = _route_legacy_uuid_mounts(validated_config)
             name_to_id = await self._resolve_legacy_name_mounts(
-                legacy_mounts, legacy_mount_map, legacy_mount_options
+                validated_config.get("mounts") or (),
+                validated_config.get("mount_map") or {},
+                validated_config.get("mount_options") or {},
             )
             validated_config = _merge_resolved_legacy_mounts(validated_config, name_to_id)
 
@@ -552,13 +554,15 @@ class SessionHandler:
         api_version = request["api_version"]
         validated_config = _validate_creation_config(api_version, params.config)
 
-        validated_config = _route_legacy_uuid_mounts(validated_config)
         legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
         legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
         legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
         if legacy_mounts or legacy_mount_map or legacy_mount_options:
+            validated_config = _route_legacy_uuid_mounts(validated_config)
             name_to_id = await self._resolve_legacy_name_mounts(
-                legacy_mounts, legacy_mount_map, legacy_mount_options
+                validated_config.get("mounts") or (),
+                validated_config.get("mount_map") or {},
+                validated_config.get("mount_options") or {},
             )
             validated_config = _merge_resolved_legacy_mounts(validated_config, name_to_id)
 
