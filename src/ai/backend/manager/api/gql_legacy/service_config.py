@@ -197,7 +197,7 @@ class ModifyServiceConfigNode(graphene.Mutation):  # type: ignore[misc]
                 input.configuration,
             )
 
-            new_config = ManagerUnifiedConfig.bai_validate(merged_raw_unified_config, by_name=True)
+            new_config = ManagerUnifiedConfig.model_validate(merged_raw_unified_config, by_name=True)
             ctx.config_provider.reload(new_config)
 
             await ctx.etcd.put_prefix(cls._get_etcd_prefix_key(input.service), input.configuration)

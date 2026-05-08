@@ -619,7 +619,7 @@ class ModelServingService:
             service_prepare_ctx.extra_mounts,
         )
         resource_entries = self._resource_entries_from_config(action.config.resources)
-        resource_opts = ResourceOpts.bai_validate(action.config.resource_opts or {})
+        resource_opts = ResourceOpts.model_validate(action.config.resource_opts or {})
         environ = dict(action.config.environ or {})
         callback_url = URL(action.callback_url.unicode_string()) if action.callback_url else None
 

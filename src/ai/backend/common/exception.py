@@ -517,21 +517,44 @@ def format_pydantic_validation_errors(
 
 class ApiPayloadModel(BaseModel):
     """Pydantic base for API request payloads — i.e. data coming in
-    from an external caller. Calling :meth:`bai_validate` instead of
-    ``model_validate`` converts a ``ValidationError`` into a HTTP 400
-    :class:`InvalidAPIParameters` carrying the structured per-field
-    error list, so user-input paths surface a clean 4xx without
-    repeating ``try / except ValidationError`` at every call site.
+    from an external caller.
 
-    Plain ``model_validate`` is left untouched so the same model can
-    still be used in non-HTTP contexts (bootstrap, DB row
-    deserialization) without surfacing HTTP-shaped errors there.
+    Overrides ``model_validate`` / ``model_validate_json`` /
+    ``model_validate_strings`` so a ``ValidationError`` is auto-mapped
+    to :class:`InvalidAPIParameters` (HTTP 400) carrying the structured
+    per-field error list. User-input call sites get a clean 4xx
+    without repeating ``try / except ValidationError`` at every site.
+
+    Notes:
+
+    * Pydantic v2 routes nested validation through
+      ``__pydantic_validator__`` directly, not the classmethod, so this
+      override only affects explicit ``Model.model_validate(...)``
+      calls — nested models are unaffected.
+    * The ``__init__`` constructor and the compiled validator stay
+      untouched, so internal default-value construction
+      (``Model()`` / ``Model(field=...)``) still works exactly like
+      stock Pydantic.
     """
 
     @classmethod
-    def bai_validate(cls, *args: Any, **kwargs: Any) -> Self:
+    def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
         try:
-            return cls.model_validate(*args, **kwargs)
+            return super().model_validate(*args, **kwargs)
+        except ValidationError as e:
+            raise InvalidAPIParameters.from_pydantic(e) from e
+
+    @classmethod
+    def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
+        try:
+            return super().model_validate_json(*args, **kwargs)
+        except ValidationError as e:
+            raise InvalidAPIParameters.from_pydantic(e) from e
+
+    @classmethod
+    def model_validate_strings(cls, *args: Any, **kwargs: Any) -> Self:
+        try:
+            return super().model_validate_strings(*args, **kwargs)
         except ValidationError as e:
             raise InvalidAPIParameters.from_pydantic(e) from e
 

@@ -1017,7 +1017,7 @@ class AgentRegistry:
         resource_entries = self._resource_entries_from_legacy_dict(
             creation_config.get("resources") or {}
         )
-        resource_opts = ResourceOpts.bai_validate(creation_config.get("resource_opts") or {})
+        resource_opts = ResourceOpts.model_validate(creation_config.get("resource_opts") or {})
         environ_dict = dict(creation_config.get("environ") or {})
         preopen_ports = tuple(creation_config.get("preopen_ports") or ())
         # Session-level fields (callback, dependencies, etc.) flow onto

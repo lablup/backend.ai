@@ -679,7 +679,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         validated_scheduler_opts: Any
         if self.scheduler_opts is not None and self.scheduler_opts is not Undefined:
-            validated_scheduler_opts = ScalingGroupOpts.bai_validate(self.scheduler_opts)
+            validated_scheduler_opts = ScalingGroupOpts.model_validate(self.scheduler_opts)
         else:
             validated_scheduler_opts = Undefined
         scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
@@ -716,7 +716,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
         graph_ctx: GraphQueryContext = info.context
-        scheduler_opts = ScalingGroupOpts.bai_validate(props.scheduler_opts)
+        scheduler_opts = ScalingGroupOpts.model_validate(props.scheduler_opts)
         spec = ScalingGroupCreatorSpec(
             name=name,
             description=props.description,

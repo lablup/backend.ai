@@ -1571,7 +1571,7 @@ class SessionService:
         resource_opts_payload: dict[str, Any] = {}
         if action.resource.shmem is not None:
             resource_opts_payload["shmem"] = BinarySize.from_str(action.resource.shmem)
-        resource_opts = ResourceOpts.bai_validate(resource_opts_payload)
+        resource_opts = ResourceOpts.model_validate(resource_opts_payload)
 
         mount_entries = tuple(action.mounts or ())
 
