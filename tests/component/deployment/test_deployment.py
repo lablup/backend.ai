@@ -628,13 +628,14 @@ class TestStatusMapping:
 
         After the scaling_state split, the lifecycle axis is monotonic and
         SCALING is no longer surfaced through ModelDeploymentStatus — legacy
-        ``lifecycle=SCALING`` rows (and the deprecated CREATED) fold into
-        READY. Replica reconciliation is exposed via the orthogonal
-        ``scaling_state`` field on the deployment node instead.
+        ``lifecycle=SCALING`` rows fold into READY. Replica reconciliation is
+        exposed via the orthogonal ``scaling_state`` field on the deployment
+        node instead. The deprecated ``lifecycle=CREATED`` (never-deployed)
+        folds into PENDING.
         """
         mapping = {
             EndpointLifecycle.PENDING: ModelDeploymentStatus.PENDING,
-            EndpointLifecycle.CREATED: ModelDeploymentStatus.READY,
+            EndpointLifecycle.CREATED: ModelDeploymentStatus.PENDING,
             EndpointLifecycle.READY: ModelDeploymentStatus.READY,
             EndpointLifecycle.SCALING: ModelDeploymentStatus.READY,
             EndpointLifecycle.DEPLOYING: ModelDeploymentStatus.DEPLOYING,

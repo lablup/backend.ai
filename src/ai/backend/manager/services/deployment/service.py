@@ -213,12 +213,12 @@ def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentSta
     no longer surfaced through ``ModelDeploymentStatus`` — a legacy
     ``lifecycle=SCALING`` row folds into ``READY`` so clients only have to
     consult ``scaling_state`` to decide whether a replica reconcile is in
-    flight.
+    flight. Legacy ``CREATED`` (never-deployed) folds into ``PENDING``.
     """
     match lifecycle:
-        case EndpointLifecycle.PENDING:
+        case EndpointLifecycle.PENDING | EndpointLifecycle.CREATED:
             return ModelDeploymentStatus.PENDING
-        case EndpointLifecycle.CREATED | EndpointLifecycle.READY | EndpointLifecycle.SCALING:
+        case EndpointLifecycle.READY | EndpointLifecycle.SCALING:
             return ModelDeploymentStatus.READY
         case EndpointLifecycle.DEPLOYING:
             return ModelDeploymentStatus.DEPLOYING
