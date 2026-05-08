@@ -345,6 +345,27 @@ class SessionHandler:
         self._vfolder = vfolder
         self._config_provider = config_provider
 
+    async def _normalize_legacy_mounts(
+        self, validated_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
+        ``mount_options`` surfaces: route UUID-shaped entries onto the
+        UUID-keyed buckets, then resolve any remaining names to UUIDs and
+        merge the resolution back in.
+        """
+        legacy_mounts = validated_config.get("mounts") or ()
+        legacy_mount_map = validated_config.get("mount_map") or {}
+        legacy_mount_options = validated_config.get("mount_options") or {}
+        if not (legacy_mounts or legacy_mount_map or legacy_mount_options):
+            return validated_config
+        validated_config = _route_legacy_uuid_mounts(validated_config)
+        name_to_id = await self._resolve_legacy_name_mounts(
+            validated_config.get("mounts") or (),
+            validated_config.get("mount_map") or {},
+            validated_config.get("mount_options") or {},
+        )
+        return _merge_resolved_legacy_mounts(validated_config, name_to_id)
+
     async def _resolve_legacy_name_mounts(
         self,
         mounts: Sequence[str],
@@ -439,17 +460,7 @@ class SessionHandler:
             template=True,
         )
 
-        legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
-        legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
-        legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
-        if legacy_mounts or legacy_mount_map or legacy_mount_options:
-            validated_config = _route_legacy_uuid_mounts(validated_config)
-            name_to_id = await self._resolve_legacy_name_mounts(
-                validated_config.get("mounts") or (),
-                validated_config.get("mount_map") or {},
-                validated_config.get("mount_options") or {},
-            )
-            validated_config = _merge_resolved_legacy_mounts(validated_config, name_to_id)
+        validated_config = await self._normalize_legacy_mounts(validated_config)
 
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
@@ -553,17 +564,7 @@ class SessionHandler:
         api_version = request["api_version"]
         validated_config = _validate_creation_config(api_version, params.config)
 
-        legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
-        legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
-        legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
-        if legacy_mounts or legacy_mount_map or legacy_mount_options:
-            validated_config = _route_legacy_uuid_mounts(validated_config)
-            name_to_id = await self._resolve_legacy_name_mounts(
-                validated_config.get("mounts") or (),
-                validated_config.get("mount_map") or {},
-                validated_config.get("mount_options") or {},
-            )
-            validated_config = _merge_resolved_legacy_mounts(validated_config, name_to_id)
+        validated_config = await self._normalize_legacy_mounts(validated_config)
 
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
