@@ -87,23 +87,6 @@ class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEnt
         )
 
 
-class InvalidScalingGroupOpts(BackendAIError, web.HTTPBadRequest):
-    """
-    Raised when ``scheduler_opts`` supplied through a scaling-group GraphQL
-    mutation does not satisfy the ``ScalingGroupOpts`` schema.
-    """
-
-    error_type = "https://api.backend.ai/probs/invalid-scaling-group-opts"
-    error_title = "Invalid scaling group scheduler options."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SCALING_GROUP,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
 class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/scaling-group-deletion-failure"
     error_title = "Failed to delete scaling group."
@@ -552,24 +535,6 @@ class ConfigurationLoadFailed(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class InvalidManagerConfig(BackendAIError, web.HTTPBadRequest):
-    """
-    Raised when an admin-supplied manager unified configuration update fails
-    ``ManagerUnifiedConfig`` validation. Returns 400 because the bad payload
-    came from the caller, not from a server-side load failure.
-    """
-
-    error_type = "https://api.backend.ai/probs/invalid-manager-config"
-    error_title = "Invalid manager configuration."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 

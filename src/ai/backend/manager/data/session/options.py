@@ -20,7 +20,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ai.backend.common.exception import BackendAIModel
+from ai.backend.common.exception import ApiPayloadModel
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     AgentId,
@@ -29,7 +29,6 @@ from ai.backend.common.types import (
     MountInfoEntry,
     ResourceSlotEntry,
 )
-from ai.backend.manager.errors.kernel import InvalidResourceOpts
 
 
 class _OptionsBaseModel(BaseModel):
@@ -212,13 +211,11 @@ class SessionHandlerOptions(_OptionsBaseModel):
         )
 
 
-class ResourceOpts(_OptionsBaseModel, BackendAIModel):
+class ResourceOpts(_OptionsBaseModel, ApiPayloadModel):
     """Per-kernel qualitative resource hints.
 
     Distinct from ``ResourceSlot`` which carries quantitative slots.
     """
-
-    __bai_error_class__ = InvalidResourceOpts
 
     shmem: BinarySizeField | None = Field(
         default=None,

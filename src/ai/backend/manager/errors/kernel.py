@@ -327,40 +327,6 @@ class InvalidKernelConfig(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidSessionCreationConfig(BackendAIError, web.HTTPBadRequest):
-    """
-    Raised when the session creation ``config`` payload sent by the client
-    does not satisfy the version-appropriate ``CreationConfig`` schema.
-    """
-
-    error_type = "https://api.backend.ai/probs/invalid-session-creation-config"
-    error_title = "Invalid session creation config."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class InvalidResourceOpts(BackendAIError, web.HTTPBadRequest):
-    """
-    Raised when the ``resource_opts`` payload supplied with a session or
-    deployment request fails ``ResourceOpts`` validation.
-    """
-
-    error_type = "https://api.backend.ai/probs/invalid-resource-opts"
-    error_title = "Invalid resource options."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
 class IncompleteSessionSpec(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/incomplete-session-spec"
     error_title = "Session spec has unresolved required fields."

@@ -90,7 +90,6 @@ from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.kernel import InvalidSessionCreationConfig
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.user import UserRole
@@ -223,7 +222,7 @@ def _validate_creation_config(
     try:
         model = model_cls.model_validate(config)
     except ValidationError as e:
-        raise InvalidSessionCreationConfig.from_pydantic(e) from e
+        raise InvalidAPIParameters.from_pydantic(e) from e
     return model.model_dump(by_alias=False)
 
 
