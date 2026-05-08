@@ -31,7 +31,6 @@ from .exception import (
     MalformedRequestBody,
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
-    PydanticValidationError,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -85,7 +84,7 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
         try:
             return func(*args, **kwargs)
         except ValidationError as e:
-            raise PydanticValidationError.from_pydantic(e) from e
+            raise InvalidAPIParameters(repr(e)) from e
 
     return wrapped
 
