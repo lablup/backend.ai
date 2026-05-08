@@ -237,40 +237,43 @@ def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]
     """Lift UUID-shaped strings from legacy mount buckets onto the UUID-keyed
     buckets, leaving only name-shaped entries for the name resolver.
     """
-    next_config = dict(creation_config)
-    mount_ids: list[Any] = list(next_config.get("mount_ids") or [])
-    mount_id_map: dict[Any, str] = dict(next_config.get("mount_id_map") or {})
+    legacy_mounts = creation_config.get("mounts") or ()
+    legacy_mount_map = creation_config.get("mount_map") or {}
+    legacy_mount_options = creation_config.get("mount_options") or {}
+
+    mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
+    mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
     mount_options: dict[Any, Any] = {}
     name_mounts: list[Any] = []
     name_mount_map: dict[str, str] = {}
 
-    for raw in next_config.get("mounts") or ():
+    legacy_mounts_keys = {str(m) for m in legacy_mounts}
+    seen: set[str] = set()
+    for raw in list(legacy_mounts) + list(legacy_mount_map) + list(legacy_mount_options):
+        key = str(raw)
+        if key in seen:
+            continue
+        seen.add(key)
+        dst = legacy_mount_map.get(key)
+        opts = legacy_mount_options.get(key)
         try:
-            vfid = UUID(str(raw))
+            vfid = UUID(key)
         except (ValueError, TypeError):
-            name_mounts.append(raw)
+            if key in legacy_mounts_keys:
+                name_mounts.append(raw)
+            if dst is not None:
+                name_mount_map[key] = dst
+            if opts is not None:
+                mount_options[key] = opts
             continue
         if vfid not in mount_ids:
             mount_ids.append(vfid)
-    for raw, dst in (next_config.get("mount_map") or {}).items():
-        try:
-            vfid = UUID(str(raw))
-        except (ValueError, TypeError):
-            name_mount_map[raw] = dst
-            continue
-        if vfid not in mount_ids:
-            mount_ids.append(vfid)
-        mount_id_map.setdefault(vfid, dst)
-    for raw, opts in (next_config.get("mount_options") or {}).items():
-        try:
-            vfid = UUID(str(raw))
-        except (ValueError, TypeError):
-            mount_options[raw] = opts
-            continue
-        if vfid not in mount_ids:
-            mount_ids.append(vfid)
-        mount_options.setdefault(vfid, opts)
+        if dst is not None:
+            mount_id_map.setdefault(vfid, dst)
+        if opts is not None:
+            mount_options.setdefault(vfid, opts)
 
+    next_config = dict(creation_config)
     next_config["mounts"] = name_mounts
     next_config["mount_map"] = name_mount_map
     next_config["mount_options"] = mount_options

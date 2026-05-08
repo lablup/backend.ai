@@ -1138,26 +1138,35 @@ class TestCreateFromParams:
         assert "mounts" not in passed_config
         assert "mount_map" not in passed_config
 
-    async def test_route_legacy_uuid_mounts(self) -> None:
-        """``_route_legacy_uuid_mounts`` lifts UUID-shaped strings out of the
-        legacy ``mounts`` / ``mount_map`` / ``mount_options`` buckets into the
-        UUID-keyed ``mount_ids`` / ``mount_id_map`` / ``mount_options``.
-        """
-        vfid = UUID("22222222-2222-2222-2222-222222222222")
-        vfid_str = str(vfid)
-        legacy_config: dict[str, Any] = {
+    @pytest.fixture
+    def legacy_uuid_mount_vfid(self) -> UUID:
+        return UUID("22222222-2222-2222-2222-222222222222")
+
+    @pytest.fixture
+    def legacy_uuid_mount_config(self, legacy_uuid_mount_vfid: UUID) -> dict[str, Any]:
+        vfid_str = str(legacy_uuid_mount_vfid)
+        return {
             "mounts": [vfid_str, "vf-named"],
             "mount_map": {vfid_str: "/data"},
             "mount_options": {vfid_str: {"permission": "ro"}},
         }
 
-        routed = _route_legacy_uuid_mounts(legacy_config)
+    async def test_route_legacy_uuid_mounts(
+        self,
+        legacy_uuid_mount_vfid: UUID,
+        legacy_uuid_mount_config: dict[str, Any],
+    ) -> None:
+        """``_route_legacy_uuid_mounts`` lifts UUID-shaped strings out of the
+        legacy ``mounts`` / ``mount_map`` / ``mount_options`` buckets into the
+        UUID-keyed ``mount_ids`` / ``mount_id_map`` / ``mount_options``.
+        """
+        routed = _route_legacy_uuid_mounts(legacy_uuid_mount_config)
 
         assert routed["mounts"] == ["vf-named"]
         assert routed["mount_map"] == {}
-        assert routed["mount_options"] == {vfid: {"permission": "ro"}}
-        assert routed["mount_ids"] == [vfid]
-        assert routed["mount_id_map"] == {vfid: "/data"}
+        assert routed["mount_options"] == {legacy_uuid_mount_vfid: {"permission": "ro"}}
+        assert routed["mount_ids"] == [legacy_uuid_mount_vfid]
+        assert routed["mount_id_map"] == {legacy_uuid_mount_vfid: "/data"}
 
     async def test_owner_access_key_uses_owner_user_scope(
         self,
