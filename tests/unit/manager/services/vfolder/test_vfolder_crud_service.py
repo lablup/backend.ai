@@ -165,6 +165,7 @@ def _make_vfolder_data(
         cur_size=0,
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
         last_used=None,
+        updated_at=datetime(2025, 1, 1, tzinfo=UTC),
         creator="test@example.com",
         creator_id=user_id,
         unmanaged_path=unmanaged_path,

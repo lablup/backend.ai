@@ -67,6 +67,7 @@ def sample_vfolder_data(sample_vfolder_uuid: uuid.UUID) -> VFolderData:
         cur_size=0,
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
         last_used=None,
+        updated_at=datetime(2025, 1, 1, tzinfo=UTC),
         creator="test@example.com",
         creator_id=sample_vfolder_uuid,
         unmanaged_path=None,

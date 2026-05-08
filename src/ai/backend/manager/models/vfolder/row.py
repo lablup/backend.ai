@@ -338,6 +338,13 @@ class VFolderRow(Base):  # type: ignore[misc]
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
+    )
     # creator is always set to the user who created vfolder (regardless user/project types)
     creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
     creator_id: Mapped[uuid.UUID | None] = mapped_column("creator_id", GUID, nullable=True)
@@ -446,6 +453,7 @@ class VFolderRow(Base):  # type: ignore[misc]
             cur_size=self.cur_size or 0,
             created_at=self.created_at or datetime.now(UTC),
             last_used=self.last_used,
+            updated_at=self.updated_at,
             creator=self.creator,
             creator_id=self.creator_id,
             unmanaged_path=self.unmanaged_path,
@@ -591,6 +599,7 @@ async def query_accessible_vfolders(
         vfolders.c.usage_mode,
         vfolders.c.created_at,
         vfolders.c.last_used,
+        vfolders.c.updated_at,
         vfolders.c.max_files,
         vfolders.c.max_size,
         vfolders.c.ownership_type,
@@ -628,6 +637,7 @@ async def query_accessible_vfolders(
                 "usage_mode": row.vfolders_usage_mode,
                 "created_at": row.vfolders_created_at,
                 "last_used": row.vfolders_last_used,
+                "updated_at": row.vfolders_updated_at,
                 "max_size": row.vfolders_max_size,
                 "max_files": row.vfolders_max_files,
                 "ownership_type": row.vfolders_ownership_type,
