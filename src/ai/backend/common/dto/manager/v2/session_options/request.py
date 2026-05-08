@@ -55,8 +55,10 @@ class HandlerOptionsInput(BaseRequestModel):
         default=None,
         ge=0,
         description=(
-            "Per-phase retry budget. `null` disables the retry limit "
-            "— `give_up` never fires for this handler."
+            "Per-phase retry budget. `null` on the wire means "
+            "'no override' and inherits the data-layer default "
+            "(currently `5`); set explicitly to disable the retry "
+            "limit (`give_up` never fires)."
         ),
     )
 

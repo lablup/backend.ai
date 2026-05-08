@@ -371,10 +371,10 @@ class DeploymentHandlerOptions(ConfiguredModel):
     2. ``default`` otherwise.
 
     Each ``HandlerOptions`` field falls back to ``default``'s value
-    when the per-handler override leaves it ``None``. Constructing
-    ``DeploymentHandlerOptions()`` with no args yields an unbounded
-    policy with global retry fallback; the project's baseline lives on
-    the scaling group's ``default_deployment_options``.
+    when the per-handler override leaves it ``None``. The
+    ``HandlerOptions`` field defaults (timeout=None, max_retry_count=5)
+    flow through here so a freshly-constructed
+    ``DeploymentHandlerOptions()`` keeps the legacy retry budget.
     """
 
     default: HandlerOptions = Field(default_factory=HandlerOptions)

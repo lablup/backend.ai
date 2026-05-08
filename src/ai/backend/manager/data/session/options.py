@@ -109,18 +109,19 @@ class HandlerOptions(_OptionsBaseModel):
     """Per-handler runtime policy entry.
 
     Carries every per-handler knob the scheduler coordinator consults
-    when deciding what to do after a handler invocation. Both fields
-    default to ``None`` meaning "no limit" — the corresponding
-    classification (expired / give_up) simply does not fire when the
-    field is ``None``.
+    when deciding what to do after a handler invocation. Each field's
+    classification (expired / give_up) only fires when the field is
+    set; ``None`` means "no limit on this dimension".
 
     - ``timeout``: maximum wall-clock seconds the session may stay in
-      the phase a given handler operates on. ``None`` disables the
-      timeout (the phase may run indefinitely).
+      the phase a given handler operates on. Default ``None`` —
+      operators opt in by setting per-handler timeouts.
     - ``max_retry_count``: maximum retry attempts before the
-      coordinator gives up on the session for that phase. ``None``
-      disables the retry limit (the coordinator never classifies a
-      failure as ``give_up`` on this dimension).
+      coordinator gives up on the session for that phase. Default
+      ``5`` mirrors the legacy ``SERVICE_MAX_RETRIES`` global so the
+      coordinator continues to give up after five attempts without
+      operator opt-in. Set to ``None`` explicitly to disable the
+      retry limit for a handler.
     """
 
     timeout: int | None = Field(
@@ -131,12 +132,13 @@ class HandlerOptions(_OptionsBaseModel):
         ),
     )
     max_retry_count: int | None = Field(
-        default=None,
+        default=5,
         description=(
             "Per-handler retry budget. The coordinator transitions the "
             "session through `give_up` once `phase_attempts` reaches "
-            "this value. `None` disables the retry limit — `give_up` "
-            "never fires for this handler."
+            "this value. Default `5` matches the legacy "
+            "`SERVICE_MAX_RETRIES` threshold; `None` disables the "
+            "retry limit so `give_up` never fires for this handler."
         ),
     )
 
@@ -180,8 +182,8 @@ class SessionHandlerOptions(_OptionsBaseModel):
         default_factory=HandlerOptions,
         description=(
             "Fallback policy applied to any handler not overridden in "
-            "`by_handler`. Individual fields default to `None` "
-            "(unbounded timeout, global retry fallback)."
+            "`by_handler`. Picks up `HandlerOptions`' field defaults "
+            "(timeout unbounded, max_retry_count=5)."
         ),
     )
     by_handler: dict[str, HandlerOptions] = Field(

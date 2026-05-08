@@ -29,7 +29,10 @@ class HandlerOptionsInfo(BaseResponseModel):
         description=("Phase timeout in seconds; `null` means unbounded for this entry."),
     )
     max_retry_count: int | None = Field(
-        description=("Per-phase retry budget; `null` defers to the global `SERVICE_MAX_RETRIES`."),
+        description=(
+            "Per-phase retry budget; `null` means the retry limit is "
+            "disabled (`give_up` never fires for this handler)."
+        ),
     )
 
 

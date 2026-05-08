@@ -55,6 +55,10 @@ depends_on = None
 # ---------------------------------------------------------------------------
 
 # scaling_groups.default_session_options — full DefaultSessionOptions snapshot.
+# ``max_retry_count: 5`` on the ``default`` slot mirrors the legacy
+# ``SERVICE_MAX_RETRIES`` threshold so coordinator give-up keeps firing
+# without operator opt-in. Per-handler overrides in ``by_handler``
+# leave ``max_retry_count`` as ``null`` to fall back to the default.
 _DEFAULT_SESSION_OPTIONS_JSON = (
     "{"
     '"priority":10,'
@@ -63,7 +67,7 @@ _DEFAULT_SESSION_OPTIONS_JSON = (
     '"default_failure_policy":"strict",'
     '"default_kernel_execution_spec":null,'
     '"handler_options":{'
-    '"default":{"timeout":null,"max_retry_count":null},'
+    '"default":{"timeout":null,"max_retry_count":5},'
     '"by_handler":{}'
     "},"
     '"agent_selection_policy":"preferred"'
@@ -75,7 +79,7 @@ _SESSION_STORED_OPTIONS_JSON = (
     "{"
     '"kernel_groups":[],'
     '"handler_options":{'
-    '"default":{"timeout":null,"max_retry_count":null},'
+    '"default":{"timeout":null,"max_retry_count":5},'
     '"by_handler":{}'
     "},"
     '"agent_selection_policy":"preferred"'
@@ -84,15 +88,17 @@ _SESSION_STORED_OPTIONS_JSON = (
 
 # scaling_groups.default_deployment_options / endpoints.options —
 # DeploymentOptions snapshot. Preserves the legacy 3600s lifecycle
-# timeouts that were baked into ``b1a2c3d4e5f6``.
+# timeouts baked into ``b1a2c3d4e5f6``. ``max_retry_count=5`` flows
+# through every entry so the JSONB matches what a freshly-constructed
+# ``HandlerOptions()`` would emit.
 _DEPLOYMENT_OPTIONS_JSON = (
     "{"
     '"handler_options":{'
-    '"default":{"timeout":null,"max_retry_count":null},'
+    '"default":{"timeout":null,"max_retry_count":5},'
     '"by_handler":{'
-    '"deploying-provisioning":{"timeout":3600,"max_retry_count":null},'
-    '"deploying-rolling-back":{"timeout":3600,"max_retry_count":null},'
-    '"scaling-deployments":{"timeout":3600,"max_retry_count":null}'
+    '"deploying-provisioning":{"timeout":3600,"max_retry_count":5},'
+    '"deploying-rolling-back":{"timeout":3600,"max_retry_count":5},'
+    '"scaling-deployments":{"timeout":3600,"max_retry_count":5}'
     "}"
     "}"
     "}"
@@ -166,6 +172,14 @@ def _set_default(table: str, column: str, default_json: str) -> None:
 def _upgrade_one(table: str, column: str) -> None:
     """Rewrite the ``timeouts`` key in one JSONB column.
 
+    Backfill convention: every produced ``HandlerOptions`` entry
+    (``default`` and each ``by_handler[k]``) carries
+    ``max_retry_count = 5`` — matching the new ``HandlerOptions``
+    field default so existing rows look identical to what a
+    freshly-constructed ``HandlerOptions()`` emits, and the
+    coordinator's give-up threshold stays at the legacy 5-attempt
+    budget without operator opt-in.
+
     Idempotent: the WHERE clause skips rows that no longer have a
     ``timeouts`` key (already migrated).
     """
@@ -181,7 +195,7 @@ def _upgrade_one(table: str, column: str) -> None:
                         'default',
                         jsonb_build_object(
                             'timeout', {column}->'timeouts'->'default',
-                            'max_retry_count', NULL
+                            'max_retry_count', 5
                         ),
                         'by_handler',
                         COALESCE(
@@ -190,7 +204,7 @@ def _upgrade_one(table: str, column: str) -> None:
                                     k,
                                     jsonb_build_object(
                                         'timeout', v,
-                                        'max_retry_count', NULL
+                                        'max_retry_count', 5
                                     )
                                 )
                                 FROM jsonb_each({column}->'timeouts'->'by_handler') AS x(k, v)
