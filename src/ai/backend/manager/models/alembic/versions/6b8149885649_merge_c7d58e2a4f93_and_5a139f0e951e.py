@@ -4,6 +4,8 @@ Revision ID: 6b8149885649
 Revises: c7d58e2a4f93, 5a139f0e951e
 Create Date: 2026-05-08
 
+No-op merge revision; no schema changes.
+
 """
 
 # revision identifiers, used by Alembic.
