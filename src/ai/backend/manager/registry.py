@@ -224,14 +224,19 @@ class AgentRegistry:
         """Project legacy ``creation_config`` mount dict keys into typed
         :class:`MountInfoEntry` tuples.
 
-        Reads UUID-keyed ``mount_ids`` / ``mount_id_map`` / ``mount_options``
-        (modern v1 session-service path). Name-keyed ``mounts`` entries
-        are not handled here — :class:`SessionService` resolves those into
-        the UUID-keyed buckets upstream before any code in this module
-        runs.
+        Reads UUID-keyed ``mount_ids`` / ``mount_id_map`` /
+        ``mount_id_subpaths`` / ``mount_options`` (modern v1 session-service
+        path). Name-keyed ``mounts`` entries are not handled here —
+        :class:`SessionService` resolves those into the UUID-keyed buckets
+        upstream before any code in this module runs. ``mount_id_subpaths``
+        and ``mount_options`` are read with the same UUID-vs-UUID-string-key
+        polymorphism as ``mount_id_map``: callers wiring them up from JSON
+        may have either form depending on whether the value was decoded by
+        Pydantic (UUID keys) or pulled out of a raw dict (string keys).
         """
         mount_ids = creation_config.get("mount_ids") or []
         mount_id_map: Mapping[Any, str] = creation_config.get("mount_id_map") or {}
+        mount_id_subpaths: Mapping[Any, str] = creation_config.get("mount_id_subpaths") or {}
         mount_options: Mapping[Any, Mapping[str, Any]] = creation_config.get("mount_options") or {}
 
         entries: list[MountInfoEntry] = []
@@ -251,11 +256,16 @@ class AgentRegistry:
                 except ValueError:
                     perm = None
             dst_path = mount_id_map.get(vfolder_uuid) or mount_id_map.get(raw_id)
+            subpath_raw = mount_id_subpaths.get(vfolder_uuid) or mount_id_subpaths.get(raw_id)
+            source_subpath: str | None = None
+            if isinstance(subpath_raw, str) and subpath_raw:
+                source_subpath = subpath_raw
             entries.append(
                 MountInfoEntry(
                     vfolder_id=VFolderUUID(vfolder_uuid),
                     mount_destination=dst_path,
                     mount_perm=perm,
+                    source_subpath=source_subpath,
                 )
             )
         return tuple(entries)

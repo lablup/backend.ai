@@ -431,6 +431,16 @@ class CreationConfigV7(BaseFieldModel):
         default=None,
         validation_alias=AliasChoices("mount_id_map", "mountIdMap"),
     )
+    mount_id_subpaths: dict[UUID, str] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("mount_id_subpaths", "mountIdSubpaths"),
+        description=(
+            "Per-mount source-subpath keyed by vfolder UUID. ``None`` (the default) "
+            "and missing entries mean 'mount the vfolder root'; a non-empty value "
+            "mounts that subdirectory of the vfolder at the corresponding "
+            "``mount_id_map`` destination."
+        ),
+    )
     mount_options: dict[str, MountOption] | None = Field(
         default=None,
         validation_alias=AliasChoices("mount_options", "mountOptions"),
