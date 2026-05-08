@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from http import HTTPStatus
-from typing import Any
+from typing import Any, NamedTuple
 
 import pytest
 from aiohttp import web
@@ -42,6 +42,15 @@ def _make_validation_error(payload: dict[str, Any]) -> ValidationError:
     except ValidationError as e:
         return e
     raise AssertionError("Expected ValidationError but model validated successfully")
+
+
+class _LocCase(NamedTuple):
+    """A single ``format_pydantic_loc`` test case: input loc tuple,
+    optional location prefix, and the expected rendered string."""
+
+    loc: tuple[Any, ...]
+    prefix: str | None
+    expected: str
 
 
 class TestBackendAIErrorCode:
@@ -142,35 +151,30 @@ class TestBackendAIErrorCode:
 
 class TestFormatPydanticLoc:
     @pytest.mark.parametrize(
-        "loc, prefix, expected",
+        "case",
         [
             # Empty loc renders as <root>
-            ((), None, "<root>"),
+            _LocCase(loc=(), prefix=None, expected="<root>"),
             # Empty loc with a prefix shows just the prefix
-            ((), "body", "body"),
+            _LocCase(loc=(), prefix="body", expected="body"),
             # Single string field
-            (("name",), None, "name"),
+            _LocCase(loc=("name",), prefix=None, expected="name"),
             # Nested string fields are dotted
-            (("address", "city"), None, "address.city"),
+            _LocCase(loc=("address", "city"), prefix=None, expected="address.city"),
             # Integer index uses bracket notation
-            (("tags", 0), None, "tags[0]"),
+            _LocCase(loc=("tags", 0), prefix=None, expected="tags[0]"),
             # Mix of nested fields and index
-            (("users", 2, "email"), None, "users[2].email"),
+            _LocCase(loc=("users", 2, "email"), prefix=None, expected="users[2].email"),
             # Prefix is prepended
-            (("name",), "body", "body.name"),
-            (("address", "city"), "body", "body.address.city"),
-            (("tags", 0), "body", "body.tags[0]"),
+            _LocCase(loc=("name",), prefix="body", expected="body.name"),
+            _LocCase(loc=("address", "city"), prefix="body", expected="body.address.city"),
+            _LocCase(loc=("tags", 0), prefix="body", expected="body.tags[0]"),
             # Leading int with prefix still uses bracket notation
-            ((0, "name"), "body", "body[0].name"),
+            _LocCase(loc=(0, "name"), prefix="body", expected="body[0].name"),
         ],
     )
-    def test_format_pydantic_loc(
-        self,
-        loc: tuple[Any, ...],
-        prefix: str | None,
-        expected: str,
-    ) -> None:
-        assert format_pydantic_loc(loc, prefix) == expected
+    def test_format_pydantic_loc(self, case: _LocCase) -> None:
+        assert format_pydantic_loc(case.loc, case.prefix) == case.expected
 
 
 class TestFormatPydanticValidationErrors:
