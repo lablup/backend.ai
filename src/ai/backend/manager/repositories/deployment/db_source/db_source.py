@@ -67,7 +67,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentSummarySearchResult,
     DeploymentWithHistory,
     LegacyRevisionCreateReadBundle,
-    LegacyRevisionModifyReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -2269,23 +2268,6 @@ class DeploymentDBSource:
                 preset_resource_slots=_project_preset_slots(preset_row, preset_slots),
             )
 
-    async def load_legacy_model_service_revision_read_bundle(
-        self,
-        runtime_variant_id: RuntimeVariantID,
-        preset_id: DeploymentPresetID | None,
-        endpoint_id: DeploymentID,
-    ) -> LegacyRevisionModifyReadBundle:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            variant_row = await self._fetch_runtime_variant_by_id(session, runtime_variant_id)
-            preset_row, preset_slots = await self._fetch_preset_with_slots(session, preset_id)
-            latest_row = await self._fetch_latest_revision_row(session, endpoint_id)
-            return LegacyRevisionModifyReadBundle(
-                variant=variant_row.to_data(),
-                preset=preset_row.to_data() if preset_row is not None else None,
-                preset_resource_slots=_project_preset_slots(preset_row, preset_slots),
-                base=latest_row.to_data(),
-            )
-
     async def load_deployment_revision_read_bundle(
         self,
         runtime_variant_id: RuntimeVariantID,
@@ -2554,6 +2536,26 @@ class DeploymentDBSource:
                     f"Deployment revision {current_revision_id} not found"
                 )
             return row.to_model_revision_spec()
+
+    async def get_latest_revision(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get the latest revision (highest ``revision_number``) of a deployment.
+
+        Unlike :meth:`get_current_revision`, this does not consult
+        ``EndpointRow.current_revision``: it returns the most recently
+        created revision for the endpoint regardless of activation state.
+
+        Args:
+            endpoint_id: ID of the deployment endpoint
+
+        Raises:
+            EndpointNotFound: If no revisions exist for the endpoint.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            row = await self._fetch_latest_revision_row(db_sess, DeploymentID(endpoint_id))
+            return row.to_data()
 
     async def search_revisions(
         self,

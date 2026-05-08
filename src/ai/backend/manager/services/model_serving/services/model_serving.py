@@ -981,40 +981,42 @@ class ModelServingService:
         # 2. If revision-level fields changed, create + activate a new revision.
         #    Revisions are immutable, so every mutation goes through the same
         #    ``add_revision`` entry point as fresh creation — this legacy path
-        #    merely supplies the current revision as the caller-provided base
+        #    merely supplies the latest revision as the caller-provided base
         #    so that untouched fields survive while yaml stays authoritative.
+        #    The latest (rather than current/active) revision is used so that
+        #    a modify issued while a previous revision is still deploying
+        #    layers on top of that in-flight revision instead of discarding
+        #    its changes.
         if spec.has_revision_changes():
-            current_rev = await self._deployment_repository.get_current_revision(
-                action.deployment_id
-            )
-            current_draft = current_rev.to_draft()
+            latest_rev = await self._deployment_repository.get_latest_revision(action.deployment_id)
+            latest_draft = latest_rev.to_draft()
             override_draft = await self._build_revision_overrides_from_spec(spec)
             # Legacy ``ModifyEndpoint`` semantics preserve untouched fields by
             # layering overrides on top of the existing revision. The
             # controller's ``add_revision`` no longer accepts a caller-provided
             # ``base`` layer, so we pre-merge here and pass the result as the
             # request-level override draft.
-            overrides = current_draft.merge(override_draft)
+            overrides = latest_draft.merge(override_draft)
 
-            vfolder_id = current_rev.model_mount_config.vfolder_id
+            vfolder_id = latest_rev.model_mount_config.vfolder_id
             if vfolder_id is None:
-                raise InvalidAPIParameters("model vfolder id is missing on the current revision")
+                raise InvalidAPIParameters("model vfolder id is missing on the latest revision")
             definition_path_override = spec.model_definition_path.optional_value()
             mounts = MountMetadata(
                 model_vfolder_id=vfolder_id,
                 model_definition_path=(
                     definition_path_override
                     if definition_path_override is not None
-                    else current_rev.model_mount_config.definition_path
+                    else latest_rev.model_mount_config.definition_path
                 ),
-                model_mount_destination=current_rev.model_mount_config.mount_destination
+                model_mount_destination=latest_rev.model_mount_config.mount_destination
                 or "/models",
-                # Carry over the current revision's extra mounts so that an
+                # Carry over the latest revision's extra mounts so that an
                 # otherwise unrelated modify (e.g. replica-count) does not
                 # strip them; ``mount_perm`` survives because the
                 # revision-side projection uses the same ``MountInfoEntry``
                 # shape.
-                extra_mounts=list(current_rev.extra_vfolder_mounts),
+                extra_mounts=list(latest_rev.extra_vfolder_mounts),
             )
             revision = await self._deployment_controller.add_revision(
                 endpoint_id=action.deployment_id,

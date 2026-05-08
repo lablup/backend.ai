@@ -633,23 +633,6 @@ class LegacyRevisionCreateReadBundle:
 
 
 @dataclass(frozen=True)
-class LegacyRevisionModifyReadBundle:
-    """DB reads for legacy model-serving modify.
-
-    ``base`` is the latest revision (highest ``revision_number``) already
-    attached to the endpoint, returned as the raw ``ModelRevisionData``. The
-    reader projects it into a merge-layer draft; v2 ``add_revision`` never
-    loads this because v2 treats each revision as a fresh full input rather
-    than a delta.
-    """
-
-    variant: RuntimeVariantData
-    preset: DeploymentRevisionPresetData | None
-    preset_resource_slots: list[ResourceSlotEntryData] | None
-    base: ModelRevisionData
-
-
-@dataclass(frozen=True)
 class DeploymentRevisionReadBundle:
     """DB reads for v2 deployment ``add_revision`` (typed ids, no base)."""
 

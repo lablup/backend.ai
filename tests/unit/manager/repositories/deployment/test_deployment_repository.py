@@ -46,7 +46,11 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
-from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
+from ai.backend.manager.errors.service import (
+    AutoScalingPolicyNotFound,
+    DeploymentPolicyNotFound,
+    EndpointNotFound,
+)
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
@@ -1353,9 +1357,11 @@ class TestDeploymentRevisionOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,  # KeyPairRow relationship dependency
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
+                KeyPairRow,  # UserRow.main_access_key FK target
                 GroupRow,
                 VFolderRow,
                 ImageRow,
@@ -1859,6 +1865,59 @@ class TestDeploymentRevisionOperations:
         result = await deployment_repository.get_latest_revision_number(test_endpoint_id)
 
         assert result == 3
+
+    async def test_get_latest_revision_returns_highest_revision_number(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: DeploymentID,
+        test_multiple_revisions: list[ModelRevisionData],
+    ) -> None:
+        """`get_latest_revision` returns the revision with the highest revision_number."""
+        result = await deployment_repository.get_latest_revision(test_endpoint_id)
+
+        expected_latest = test_multiple_revisions[-1]
+        assert result.id == expected_latest.id
+
+    async def test_get_latest_revision_ignores_endpoint_current_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: DeploymentID,
+        test_multiple_revisions: list[ModelRevisionData],
+    ) -> None:
+        """`get_latest_revision` returns the latest revision even when ``current_revision`` points elsewhere.
+
+        This is the legacy ``modify_endpoint`` scenario: a previous revision
+        is still serving (``current_revision`` = v1) while a more recent
+        revision has been created (latest = v3). The base for the next
+        modify must be v3, not v1.
+        """
+        first_revision = test_multiple_revisions[0]
+        latest_revision = test_multiple_revisions[-1]
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == test_endpoint_id)
+                .values(current_revision=first_revision.id)
+            )
+            await db_sess.commit()
+
+        latest = await deployment_repository.get_latest_revision(test_endpoint_id)
+        current = await deployment_repository.get_current_revision(test_endpoint_id)
+
+        assert latest.id == latest_revision.id
+        assert current.id == first_revision.id
+        assert latest.id != current.id
+
+    async def test_get_latest_revision_no_revisions_raises(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        """`get_latest_revision` raises ``EndpointNotFound`` when no revisions exist."""
+        with pytest.raises(EndpointNotFound):
+            await deployment_repository.get_latest_revision(test_endpoint_id)
 
     async def test_search_revisions_empty(
         self,
