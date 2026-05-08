@@ -16,11 +16,14 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.exception import InvalidAPIParameters, UnknownImageReference
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
     ClusterMode,
     KernelId,
+    MountInfoEntry,
+    MountPermission,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -1072,9 +1075,7 @@ class TestCreateFromParams:
             legacy_config["mount_map"],
             legacy_config["mount_options"],
         )
-        resolved_config = _merge_resolved_legacy_mounts(
-            legacy_config, name_to_id, name_to_subpath
-        )
+        resolved_config = _merge_resolved_legacy_mounts(legacy_config, name_to_id, name_to_subpath)
 
         # Step 2: feed the resolved config to the service and verify it
         # arrives at AgentRegistry.create_session intact.
@@ -1169,6 +1170,121 @@ class TestCreateFromParams:
         assert routed["mount_options"] == {legacy_uuid_mount_vfid: {"permission": "ro"}}
         assert routed["mount_ids"] == [legacy_uuid_mount_vfid]
         assert routed["mount_id_map"] == {legacy_uuid_mount_vfid: "/data"}
+
+    async def test_legacy_mounts_with_subpath_resolves_into_mount_id_subpaths(
+        self,
+    ) -> None:
+        """BA-5959: ``mounts=["name/subpath"]`` is no longer rejected.
+
+        The bare name resolves to a UUID, the subpath is captured into
+        ``name_to_subpath``, and ``_merge_resolved_legacy_mounts`` forwards
+        it onto ``mount_id_subpaths`` keyed by the resolved UUID.
+        """
+        vfid = UUID("33333333-3333-3333-3333-333333333333")
+
+        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
+            # Only the bare ``vf-a`` should reach the resolver — not
+            # ``vf-a/.pipeline``.
+            assert list(action.vfolder_names) == ["vf-a"]
+            return ResolveIdsByNamesActionResult(name_to_id={"vf-a": vfid})
+
+        resolver = MagicMock()
+        resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
+        vfolder_pkg = MagicMock()
+        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
+        handler = SessionHandler.__new__(SessionHandler)
+        handler._vfolder = vfolder_pkg
+
+        legacy_config: dict[str, Any] = {
+            "mounts": ["vf-a/.pipeline"],
+            "mount_map": {},
+            "mount_options": {},
+        }
+        name_to_id, name_to_subpath = await handler._resolve_legacy_name_mounts(
+            legacy_config["mounts"],
+            legacy_config["mount_map"],
+            legacy_config["mount_options"],
+        )
+        assert name_to_id == {"vf-a": vfid}
+        assert name_to_subpath == {"vf-a": ".pipeline"}
+
+        merged = _merge_resolved_legacy_mounts(legacy_config, name_to_id, name_to_subpath)
+        assert merged["mount_ids"] == [vfid]
+        assert merged["mount_id_subpaths"] == {vfid: ".pipeline"}
+        assert "mounts" not in merged
+
+    async def test_mount_id_subpaths_round_trips_through_registry_projection(
+        self,
+    ) -> None:
+        """BA-5959: ``mount_id_subpaths`` from the wire surfaces as
+        ``MountInfoEntry.source_subpath`` on the projected entry, while
+        a missing key keeps ``source_subpath`` as ``None``.
+        """
+        vfid_with_sub = UUID("44444444-4444-4444-4444-444444444444")
+        vfid_no_sub = UUID("55555555-5555-5555-5555-555555555555")
+
+        creation_config: dict[str, Any] = {
+            "mount_ids": [vfid_with_sub, vfid_no_sub],
+            "mount_id_map": {vfid_with_sub: "/data"},
+            "mount_id_subpaths": {vfid_with_sub: ".pipeline"},
+            "mount_options": {vfid_with_sub: {"permission": "ro"}},
+        }
+
+        entries = AgentRegistry._mount_entries_from_creation_config(creation_config)
+        assert len(entries) == 2
+        by_id = {entry.vfolder_id: entry for entry in entries}
+        key_with_sub = VFolderUUID(vfid_with_sub)
+        key_no_sub = VFolderUUID(vfid_no_sub)
+        assert by_id[key_with_sub].source_subpath == ".pipeline"
+        assert by_id[key_with_sub].mount_destination == "/data"
+        assert by_id[key_with_sub].mount_perm == MountPermission.READ_ONLY
+        assert by_id[key_no_sub].source_subpath is None
+        assert by_id[key_no_sub].mount_destination is None
+
+    async def test_mount_id_subpaths_accepts_uuid_string_keys(self) -> None:
+        """BA-5959: callers wiring ``mount_id_subpaths`` from a raw dict
+        may pass UUID-string keys; the registry projection accepts both
+        forms (mirroring ``mount_id_map`` / ``mount_options``).
+        """
+        vfid = UUID("66666666-6666-6666-6666-666666666666")
+        creation_config: dict[str, Any] = {
+            "mount_ids": [vfid],
+            "mount_id_subpaths": {str(vfid): ".scratch"},
+        }
+        entries = AgentRegistry._mount_entries_from_creation_config(creation_config)
+        assert len(entries) == 1
+        assert entries[0].source_subpath == ".scratch"
+
+    async def test_mount_info_entry_persistence_round_trip_preserves_subpath(
+        self,
+    ) -> None:
+        """BA-5959: a ``MountInfoEntry`` round-trips ``source_subpath``
+        through the JSONB-backed deployment-revision serialization, and a
+        legacy persisted shape (no ``source_subpath`` key) still
+        deserializes — the new field defaults to ``None``.
+        """
+        vfid = UUID("77777777-7777-7777-7777-777777777777")
+        entry = MountInfoEntry(
+            vfolder_id=VFolderUUID(vfid),
+            mount_destination="/data",
+            mount_perm=MountPermission.READ_WRITE,
+            source_subpath=".pipeline",
+        )
+        # ``PydanticListColumn`` calls ``model_dump(mode="json")`` and
+        # later ``model_validate``; emulate that round-trip directly.
+        dumped = entry.model_dump(mode="json")
+        assert dumped["source_subpath"] == ".pipeline"
+        roundtripped = MountInfoEntry.model_validate(dumped)
+        assert roundtripped.source_subpath == ".pipeline"
+
+        # Legacy rows persisted before the new field exists.
+        legacy_dumped = {
+            "vfolder_id": str(vfid),
+            "mount_destination": "/data",
+            "mount_perm": "rw",
+        }
+        legacy_loaded = MountInfoEntry.model_validate(legacy_dumped)
+        assert legacy_loaded.source_subpath is None
 
     async def test_owner_access_key_uses_owner_user_scope(
         self,

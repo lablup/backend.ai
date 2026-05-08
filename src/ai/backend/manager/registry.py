@@ -245,7 +245,19 @@ class AgentRegistry:
                 vfolder_uuid = uuid.UUID(str(raw_id))
             except (ValueError, TypeError):
                 continue
-            opts = mount_options.get(raw_id) or mount_options.get(vfolder_uuid) or {}
+            uuid_str = str(vfolder_uuid)
+
+            def _lookup(d: Mapping[Any, Any]) -> Any:
+                # Polymorphic key lookup: accept the UUID, the original
+                # ``raw_id`` (could be a UUID or a UUID-string from the
+                # validator), and the canonical UUID-string form.
+                if (val := d.get(vfolder_uuid)) is not None:
+                    return val
+                if (val := d.get(raw_id)) is not None:
+                    return val
+                return d.get(uuid_str)
+
+            opts = _lookup(mount_options) or {}
             raw_perm = opts.get("permission")
             perm: MountPermission | None = None
             if isinstance(raw_perm, MountPermission):
@@ -255,8 +267,8 @@ class AgentRegistry:
                     perm = MountPermission(raw_perm)
                 except ValueError:
                     perm = None
-            dst_path = mount_id_map.get(vfolder_uuid) or mount_id_map.get(raw_id)
-            subpath_raw = mount_id_subpaths.get(vfolder_uuid) or mount_id_subpaths.get(raw_id)
+            dst_path = _lookup(mount_id_map)
+            subpath_raw = _lookup(mount_id_subpaths)
             source_subpath: str | None = None
             if isinstance(subpath_raw, str) and subpath_raw:
                 source_subpath = subpath_raw

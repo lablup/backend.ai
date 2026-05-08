@@ -188,6 +188,21 @@ class TestCreationConfigV7:
         assert cfg.mounts == ["/old-data"]
         assert cfg.mount_map == {"old": "/path"}
 
+    def test_mount_id_subpaths_default_none(self) -> None:
+        cfg = CreationConfigV7.model_validate({})
+        assert cfg.mount_id_subpaths is None
+
+    def test_mount_id_subpaths_round_trips_uuid_keys(self) -> None:
+        """BA-5959: ``mount_id_subpaths`` accepts both snake_case and
+        camelCase aliases and round-trips UUID-string keys into UUIDs."""
+        mount_id = uuid4()
+        cfg = CreationConfigV7.model_validate({
+            "mount_ids": [str(mount_id)],
+            "mountIdSubpaths": {str(mount_id): ".pipeline"},
+        })
+        assert cfg.mount_id_subpaths is not None
+        assert cfg.mount_id_subpaths[mount_id] == ".pipeline"
+
 
 class TestTimeoutSeconds:
     def setup_method(self) -> None:

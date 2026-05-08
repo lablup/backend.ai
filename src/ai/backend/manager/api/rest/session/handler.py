@@ -328,9 +328,7 @@ def _merge_resolved_legacy_mounts(
         except (ValueError, TypeError):
             continue
     merged_mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
-    merged_mount_id_subpaths: dict[Any, str] = dict(
-        creation_config.get("mount_id_subpaths") or {}
-    )
+    merged_mount_id_subpaths: dict[Any, str] = dict(creation_config.get("mount_id_subpaths") or {})
     merged_mount_options: dict[Any, Any] = dict(creation_config.get("mount_options") or {})
     legacy_mount_map = creation_config.get("mount_map") or {}
     legacy_mount_options = creation_config.get("mount_options") or {}
