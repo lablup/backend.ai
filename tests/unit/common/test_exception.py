@@ -174,11 +174,17 @@ class TestFormatPydanticLoc:
         ],
     )
     def test_format_pydantic_loc(self, case: _LocCase) -> None:
+        """Render every supported loc shape (empty, plain, nested, indexed,
+        prefixed) and assert the exact dotted/bracketed string it should
+        produce."""
         assert format_pydantic_loc(case.loc, case.prefix) == case.expected
 
 
 class TestFormatPydanticValidationErrors:
     def test_single_missing_field_summary(self) -> None:
+        """One missing field → summary is exactly ``"<field>: <msg>"`` and
+        the structured list has a single entry with ``loc``/``msg``/``type``
+        all populated."""
         exc = _make_validation_error({
             "age": 30,
             "address": {"city": "Seoul", "zipcode": 12345},
@@ -195,13 +201,14 @@ class TestFormatPydanticValidationErrors:
         assert entry["type"] == "missing"
 
     def test_multiple_errors_joined_with_semicolon(self) -> None:
+        """Multiple field errors → summary joins them with ``"; "`` and
+        every structured entry's ``"<loc>: <msg>"`` line is present in the
+        summary (no error gets dropped)."""
         exc = _make_validation_error({"name": "Alice", "age": "not-a-number"})
 
         summary, structured = format_pydantic_validation_errors(exc)
 
-        # Multiple errors are joined with "; " in deterministic Pydantic order
         assert "; " in summary
-        # Every per-field error must surface in both summary and structured list
         locs = [entry["loc"] for entry in structured]
         assert "age" in locs
         assert "address" in locs
@@ -209,6 +216,9 @@ class TestFormatPydanticValidationErrors:
             assert f"{entry['loc']}: {entry['msg']}" in summary
 
     def test_nested_and_indexed_locs(self) -> None:
+        """Nested object fields render as dotted paths
+        (``address.zipcode``) and list indices render with bracket
+        notation (``tags[1]``)."""
         exc = _make_validation_error({
             "name": "Alice",
             "age": 30,
@@ -219,12 +229,13 @@ class TestFormatPydanticValidationErrors:
         _, structured = format_pydantic_validation_errors(exc)
 
         locs = {entry["loc"] for entry in structured}
-        # Nested field renders dotted
         assert "address.zipcode" in locs
-        # List index renders with bracket notation
         assert "tags[1]" in locs
 
     def test_location_prefix_is_prepended(self) -> None:
+        """``location_prefix`` is prepended to every loc — the summary
+        starts with the prefix and each structured entry's ``loc`` is
+        prefixed too."""
         exc = _make_validation_error({
             "age": 30,
             "address": {"city": "Seoul", "zipcode": 12345},
@@ -237,10 +248,13 @@ class TestFormatPydanticValidationErrors:
         assert structured[0]["loc"] == "body.name"
 
     def test_input_repr_is_truncated(self) -> None:
+        """An over-long offending value is echoed back into ``input`` but
+        truncated past the 200-char cap with a ``"...<truncated>"``
+        suffix — keeps the response payload bounded."""
         long_value = "x" * 500
         exc = _make_validation_error({
             "name": "Alice",
-            "age": long_value,  # str → int validation fails, large input echoed back
+            "age": long_value,
             "address": {"city": "Seoul", "zipcode": 12345},
             "tags": [],
         })
@@ -249,13 +263,12 @@ class TestFormatPydanticValidationErrors:
         age_entry = next(e for e in structured if e["loc"] == "age")
         assert "input" in age_entry
         assert age_entry["input"].endswith("...<truncated>")
-        # The truncation cap is 200 chars before the marker
         assert len(age_entry["input"]) <= 200 + len("...<truncated>")
 
     def test_empty_payload_produces_field_required_summary(self) -> None:
-        # Sanity check: a wholly empty payload still produces a real
-        # summary (no <root> fallback) because every required field
-        # surfaces an individual error.
+        """An entirely empty payload still produces a real per-field
+        summary (not the ``"validation failed"`` fallback) because every
+        required field surfaces its own error."""
         exc = _make_validation_error({})
         summary, structured = format_pydantic_validation_errors(exc)
         assert summary != "validation failed"
