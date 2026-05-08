@@ -2731,7 +2731,7 @@ type DefaultSessionHandlerOptionsEntryInfo {
   timeoutSec: Int
 
   """
-  Per-phase retry budget; `null` defers to the global `SERVICE_MAX_RETRIES`.
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
   """
   maxRetryCount: Int
 
@@ -2756,7 +2756,7 @@ type DefaultSessionHandlerOptionsInfo {
   timeoutSec: Int
 
   """
-  Per-phase retry budget; `null` defers to the global `SERVICE_MAX_RETRIES`.
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
   """
   maxRetryCount: Int
 }
@@ -4586,7 +4586,7 @@ type HandlerOptionsEntryInfoGQL {
   timeoutSec: Int
 
   """
-  Per-phase retry budget; `null` defers to the global `SERVICE_MAX_RETRIES`.
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
   """
   maxRetryCount: Int
 
@@ -4611,7 +4611,7 @@ type HandlerOptionsInfoGQL {
   timeoutSec: Int
 
   """
-  Per-phase retry budget; `null` defers to the global `SERVICE_MAX_RETRIES`.
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
   """
   maxRetryCount: Int
 }
