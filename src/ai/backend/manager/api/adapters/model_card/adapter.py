@@ -221,15 +221,16 @@ class ModelCardAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    async def search_in_vfolder(
+    async def search_by_vfolder(
         self,
         scope: VFolderModelCardSearchScope,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
         """Search model cards backed by a specific VFolder.
 
-        Access is delegated to the parent VFolder resolver — the caller must
-        already have permission to resolve the VFolder.
+        Used by the ``VFolderGQL.model_cards`` nested resolver. Access is
+        delegated to the parent VFolder resolver — the caller must already
+        have permission to resolve the VFolder.
         """
         conditions = [scope.to_condition()]
         if input.filter:

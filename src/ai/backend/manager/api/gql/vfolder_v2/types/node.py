@@ -9,12 +9,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
-from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.model_card.request import (
-    ModelCardOrder,
-    SearchModelCardsInput,
-)
-from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
@@ -102,22 +97,11 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ModelCardV2Connection | None:
-        orders = (
-            [
-                ModelCardOrder(
-                    field=ModelCardOrderField(o.field.value),
-                    direction=OrderDirection(o.direction),
-                )
-                for o in order_by
-            ]
-            if order_by
-            else None
-        )
-        result = await info.context.adapters.model_card.search_in_vfolder(
+        result = await info.context.adapters.model_card.search_by_vfolder(
             scope=VFolderModelCardSearchScope(vfolder_id=VFolderUUID(UUID(self.id))),
             input=SearchModelCardsInput(
                 filter=filter.to_pydantic() if filter is not None else None,
-                order=orders,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
                 first=first,
                 after=after,
                 last=last,
