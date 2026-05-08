@@ -233,6 +233,56 @@ def _validate_creation_config(
         ) from e
 
 
+def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:
+    """Move UUID-shaped strings from the legacy ``mounts`` / ``mount_map`` /
+    ``mount_options`` buckets into the UUID-keyed ``mount_ids`` /
+    ``mount_id_map`` / ``mount_options`` buckets, leaving only name-shaped
+    entries for ``_resolve_legacy_name_mounts``. ``mount_options`` is
+    polymorphic (modern callers key it by UUID, legacy callers by name),
+    so name keys are preserved alongside the routed UUID-keyed entries.
+    """
+    next_config = dict(creation_config)
+    mount_ids: list[Any] = list(next_config.get("mount_ids") or [])
+    mount_id_map: dict[Any, str] = dict(next_config.get("mount_id_map") or {})
+    mount_options: dict[Any, Any] = {}
+    name_mounts: list[Any] = []
+    name_mount_map: dict[str, str] = {}
+
+    for raw in next_config.get("mounts") or ():
+        try:
+            vfid = UUID(str(raw))
+        except (ValueError, TypeError):
+            name_mounts.append(raw)
+            continue
+        if vfid not in mount_ids:
+            mount_ids.append(vfid)
+    for raw, dst in (next_config.get("mount_map") or {}).items():
+        try:
+            vfid = UUID(str(raw))
+        except (ValueError, TypeError):
+            name_mount_map[raw] = dst
+            continue
+        if vfid not in mount_ids:
+            mount_ids.append(vfid)
+        mount_id_map.setdefault(vfid, dst)
+    for raw, opts in (next_config.get("mount_options") or {}).items():
+        try:
+            vfid = UUID(str(raw))
+        except (ValueError, TypeError):
+            mount_options[raw] = opts
+            continue
+        if vfid not in mount_ids:
+            mount_ids.append(vfid)
+        mount_options.setdefault(vfid, opts)
+
+    next_config["mounts"] = name_mounts
+    next_config["mount_map"] = name_mount_map
+    next_config["mount_options"] = mount_options
+    next_config["mount_ids"] = mount_ids
+    next_config["mount_id_map"] = mount_id_map
+    return next_config
+
+
 def _merge_resolved_legacy_mounts(
     creation_config: dict[str, Any],
     name_to_id: dict[str, UUID],
@@ -245,20 +295,7 @@ def _merge_resolved_legacy_mounts(
     dicts are re-keyed onto the resolved UUIDs without overwriting an
     explicit UUID-keyed entry the caller already supplied.
     """
-    legacy_mount_map = creation_config.get("mount_map") or {}
-    legacy_mount_options = creation_config.get("mount_options") or {}
-    legacy_mounts = creation_config.get("mounts") or ()
-    pass_through_uuids: dict[UUID, str] = {}
-    for raw in (
-        list(legacy_mounts) + list(legacy_mount_map.keys()) + list(legacy_mount_options.keys())
-    ):
-        key = str(raw)
-        try:
-            pass_through_uuids.setdefault(UUID(key), key)
-        except (ValueError, TypeError):
-            continue
-
-    if not name_to_id and not pass_through_uuids:
+    if not name_to_id:
         return creation_config
 
     merged_mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
@@ -270,6 +307,8 @@ def _merge_resolved_legacy_mounts(
             continue
     merged_mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
     merged_mount_options: dict[Any, Any] = dict(creation_config.get("mount_options") or {})
+    legacy_mount_map = creation_config.get("mount_map") or {}
+    legacy_mount_options = creation_config.get("mount_options") or {}
 
     for name, vfid in name_to_id.items():
         if vfid not in existing_uuid_set:
@@ -278,15 +317,6 @@ def _merge_resolved_legacy_mounts(
         if (dst := legacy_mount_map.get(name)) and vfid not in merged_mount_id_map:
             merged_mount_id_map[vfid] = dst
         if (opts := legacy_mount_options.get(name)) and vfid not in merged_mount_options:
-            merged_mount_options[vfid] = opts
-
-    for vfid, key in pass_through_uuids.items():
-        if vfid not in existing_uuid_set:
-            merged_mount_ids.append(vfid)
-            existing_uuid_set.add(vfid)
-        if (dst := legacy_mount_map.get(key)) and vfid not in merged_mount_id_map:
-            merged_mount_id_map[vfid] = dst
-        if (opts := legacy_mount_options.get(key)) and vfid not in merged_mount_options:
             merged_mount_options[vfid] = opts
 
     next_config = dict(creation_config)
@@ -362,11 +392,6 @@ class SessionHandler:
             if name in seen:
                 continue
             seen.add(name)
-            try:
-                UUID(name)
-                continue
-            except (ValueError, TypeError):
-                pass
             names_to_resolve.append(name)
 
         # ``mount_options`` is the single polymorphic field shared by
@@ -415,6 +440,7 @@ class SessionHandler:
             template=True,
         )
 
+        validated_config = _route_legacy_uuid_mounts(validated_config)
         legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
         legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
         legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}
@@ -526,6 +552,7 @@ class SessionHandler:
         api_version = request["api_version"]
         validated_config = _validate_creation_config(api_version, params.config)
 
+        validated_config = _route_legacy_uuid_mounts(validated_config)
         legacy_mounts: Sequence[str] = validated_config.get("mounts") or ()
         legacy_mount_map: dict[str, str] = validated_config.get("mount_map") or {}
         legacy_mount_options: dict[str, Any] = validated_config.get("mount_options") or {}

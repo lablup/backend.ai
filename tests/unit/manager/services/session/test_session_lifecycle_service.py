@@ -29,6 +29,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.api.rest.session.handler import (
     SessionHandler,
     _merge_resolved_legacy_mounts,
+    _route_legacy_uuid_mounts,
 )
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
@@ -1137,41 +1138,26 @@ class TestCreateFromParams:
         assert "mounts" not in passed_config
         assert "mount_map" not in passed_config
 
-    async def test_legacy_mounts_uuid_string_routes_to_mount_ids(self) -> None:
-        """A UUID-shaped string in legacy ``mounts`` bypasses the name resolver
-        and lands in ``mount_ids`` / ``mount_id_map`` / ``mount_options`` keyed
-        by the parsed UUID.
+    async def test_route_legacy_uuid_mounts(self) -> None:
+        """``_route_legacy_uuid_mounts`` lifts UUID-shaped strings out of the
+        legacy ``mounts`` / ``mount_map`` / ``mount_options`` buckets into the
+        UUID-keyed ``mount_ids`` / ``mount_id_map`` / ``mount_options``.
         """
         vfid = UUID("22222222-2222-2222-2222-222222222222")
         vfid_str = str(vfid)
-
-        resolver = MagicMock()
-        resolver.wait_for_complete = AsyncMock(
-            side_effect=AssertionError("name resolver must not be called for UUIDs")
-        )
-        vfolder_pkg = MagicMock()
-        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
-        handler = SessionHandler.__new__(SessionHandler)
-        handler._vfolder = vfolder_pkg
-
         legacy_config: dict[str, Any] = {
-            "mounts": [vfid_str],
+            "mounts": [vfid_str, "vf-named"],
             "mount_map": {vfid_str: "/data"},
             "mount_options": {vfid_str: {"permission": "ro"}},
         }
-        name_to_id = await handler._resolve_legacy_name_mounts(
-            legacy_config["mounts"],
-            legacy_config["mount_map"],
-            legacy_config["mount_options"],
-        )
-        merged = _merge_resolved_legacy_mounts(legacy_config, name_to_id)
 
-        assert name_to_id == {}
-        assert merged["mount_ids"] == [vfid]
-        assert merged["mount_id_map"] == {vfid: "/data"}
-        assert merged["mount_options"][vfid] == {"permission": "ro"}
-        assert "mounts" not in merged
-        assert "mount_map" not in merged
+        routed = _route_legacy_uuid_mounts(legacy_config)
+
+        assert routed["mounts"] == ["vf-named"]
+        assert routed["mount_map"] == {}
+        assert routed["mount_options"] == {vfid: {"permission": "ro"}}
+        assert routed["mount_ids"] == [vfid]
+        assert routed["mount_id_map"] == {vfid: "/data"}
 
     async def test_owner_access_key_uses_owner_user_scope(
         self,
