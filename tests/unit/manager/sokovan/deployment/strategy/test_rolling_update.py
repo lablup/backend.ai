@@ -120,7 +120,9 @@ def make_deployment(
         replica_counts=ReplicaCountData(
             replica_count=desired,
         ),
-        network=DeploymentNetworkData(open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None),
+        network=DeploymentNetworkData(
+            open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+        ),
         model_revisions=[],
         options=DeploymentOptions(),
         current_revision_id=DeploymentRevisionID(current_revision_id),

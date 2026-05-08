@@ -149,7 +149,9 @@ class DeploymentCRUDBaseFixtures:
                 retry_count=0,
             ),
             replica_counts=ReplicaCountData(replica_count=2, desired_replica_count=None),
-            network=DeploymentNetworkData(open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
             model_revisions=[],
             options=DeploymentOptions(),
         )
