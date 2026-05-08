@@ -666,11 +666,6 @@ class DeploymentInfo:
     state: DeploymentState
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
-    # ``DeploymentInfo`` is a read-time snapshot, so it carries
-    # ``ModelRevisionData`` (read representation) — never the write-side
-    # ``ModelRevisionSpec``. Sokovan callers that need the spec shape
-    # (e.g., draft / validation flows) must fetch it via
-    # ``DeploymentRepository.get_revision_spec``.
     model_revisions: list[ModelRevisionData]
     options: DeploymentOptions
     current_revision_id: DeploymentRevisionID | None = None

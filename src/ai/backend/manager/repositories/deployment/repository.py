@@ -1257,11 +1257,7 @@ class DeploymentRepository:
         self,
         revision_id: uuid.UUID,
     ) -> ModelRevisionSpec:
-        """Get a revision as a ``ModelRevisionSpec`` by revision id.
-
-        Raises:
-            DeploymentRevisionNotFound: If the revision does not exist.
-        """
+        """Get a revision as a ``ModelRevisionSpec`` by revision id."""
         return await self._db_source.get_revision_spec(revision_id)
 
     @deployment_repository_resilience.apply()

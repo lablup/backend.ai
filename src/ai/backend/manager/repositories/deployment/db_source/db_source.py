@@ -2541,15 +2541,7 @@ class DeploymentDBSource:
         self,
         revision_id: uuid.UUID,
     ) -> ModelRevisionSpec:
-        """Get a revision as a ``ModelRevisionSpec`` by revision id.
-
-        Used by operations (sokovan session draft / validation) that need
-        the spec shape — startup_command, bootstrap_script, callback_url,
-        preset_values — that ``ModelRevisionData`` does not carry.
-
-        Raises:
-            DeploymentRevisionNotFound: If the revision does not exist.
-        """
+        """Get a revision as a ``ModelRevisionSpec`` by revision id."""
         async with self._db.begin_readonly_session() as db_sess:
             revision_query = (
                 sa.select(DeploymentRevisionRow)
