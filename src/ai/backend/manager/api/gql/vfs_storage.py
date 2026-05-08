@@ -86,7 +86,7 @@ VFSStorageEdge = Edge[VFSStorage]
 )
 class VFSStorageConnection(Connection[VFSStorage]):
     @gql_field(description="The count of this entity.")  # type: ignore[misc]
-    def count(self) -> int | None:
+    def count(self) -> int:
         return len(self.edges)
 
 

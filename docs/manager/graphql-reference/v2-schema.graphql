@@ -4588,7 +4588,7 @@ type HuggingFaceRegistryConnection {
   edges: [HuggingFaceRegistryEdge!]!
 
   """The count of this entity."""
-  count: Int
+  count: Int!
 }
 
 """An edge in a connection."""
@@ -7582,7 +7582,7 @@ type ObjectStorageConnection {
   edges: [ObjectStorageEdge!]!
 
   """The count of this entity."""
-  count: Int
+  count: Int!
 }
 
 """An edge in a connection."""
@@ -9860,7 +9860,7 @@ type ReservoirRegistryConnection {
   edges: [ReservoirRegistryEdge!]!
 
   """The count of this entity."""
-  count: Int
+  count: Int!
 }
 
 """An edge in a connection."""
@@ -11923,7 +11923,7 @@ type StorageNamespaceConnection {
   edges: [StorageNamespaceEdge!]!
 
   """The count of this entity."""
-  count: Int
+  count: Int!
 }
 
 """An edge in a connection."""
@@ -13842,7 +13842,7 @@ type VFSStorageConnection {
   edges: [VFSStorageEdge!]!
 
   """The count of this entity."""
-  count: Int
+  count: Int!
 }
 
 """An edge in a connection."""

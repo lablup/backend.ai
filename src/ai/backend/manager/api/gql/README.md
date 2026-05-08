@@ -215,10 +215,10 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     @gql_field(description="Projects belonging to this domain.")
     async def projects(self, info: Info[StrawberryGQLContext]) -> ProjectV2ConnectionGQL | None: ...
 
-# Computed nested field — derived scalar
+# Trivially derived scalar — exempt, see Exceptions below
 class FooConnection(Connection[Foo]):
     @gql_field(description="Total count.")
-    def count(self) -> int | None: ...
+    def count(self) -> int: ...
 
 # List — only the outer list is nullable; element non-null is fine
 @gql_root_field(BackendAIGQLMeta(...))
@@ -237,12 +237,12 @@ catch domain exceptions inside fetchers just to swallow them as `None` — let
 **Exceptions**
 
 - **Statically projected DTO fields** — class-level attributes that map directly from
-  the backing Pydantic DTO (e.g. via `@gql_pydantic_type(all_fields=True)` or scalar
-  declarations like `name: str`) follow the DTO contract and may stay non-null. The
-  rule applies to fields that run through a Python resolver, not to fields whose value
-  is guaranteed by the DTO.
-- **Apollo Federation entry points** — `_service: _Service!` and
-  `_entities([_Any!]!): [_Entity]!` are mandated by the spec and remain non-null.
+  the backing Pydantic DTO (e.g. `name: str`) may stay non-null.
+- **Trivially derived scalars** — resolver-decorated fields whose value is computed
+  synchronously from non-null parent state with no I/O, permission check, or external
+  call. Example: a Connection `count` returning `len(self.edges)` stays non-null.
+- **Apollo Federation entry points** — `_service` and `_entities` are mandated by the
+  spec and remain non-null.
 - **Subscriptions** — streaming-event return types are governed separately.
 
 ## Fetcher Pattern
