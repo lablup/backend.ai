@@ -57,7 +57,12 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         - success: None (sweep operation doesn't have success transition)
         - need_retry: None
         - expired: Session/kernel → TERMINATING (pending timeout exceeded)
-        - give_up: None
+        - give_up: None (intentional — sweep is a best-effort
+          maintenance pass over PENDING sessions; if a particular
+          session repeatedly fails to be swept the next sweep run
+          will pick it up again. Forcing a give_up transition would
+          mutate session state on a transient maintenance error,
+          which we'd rather avoid.)
         """
         return StatusTransitions(
             success=None,
