@@ -423,10 +423,10 @@ def _get_revision_resource_slot_pagination_spec() -> PaginationSpec:
 
 
 _STATUS_TO_LIFECYCLE: dict[ModelDeploymentStatus, list[EndpointLifecycle]] = {
-    ModelDeploymentStatus.PENDING: [EndpointLifecycle.PENDING],
+    ModelDeploymentStatus.PENDING: [EndpointLifecycle.PENDING, EndpointLifecycle.CREATED],
     ModelDeploymentStatus.SCALING: [EndpointLifecycle.SCALING],
     ModelDeploymentStatus.DEPLOYING: [EndpointLifecycle.DEPLOYING],
-    ModelDeploymentStatus.READY: [EndpointLifecycle.READY, EndpointLifecycle.CREATED],
+    ModelDeploymentStatus.READY: [EndpointLifecycle.READY],
     ModelDeploymentStatus.STOPPING: [EndpointLifecycle.DESTROYING],
     ModelDeploymentStatus.STOPPED: [EndpointLifecycle.DESTROYED],
 }

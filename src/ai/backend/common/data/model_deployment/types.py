@@ -28,7 +28,7 @@ class ActivenessStatus(CIStrEnum):
 _LIFECYCLE_TO_DEPLOYMENT_STATUS_ALIASES: dict[str, str] = {
     "destroying": "STOPPING",
     "destroyed": "STOPPED",
-    "created": "READY",  # EndpointLifecycle deprecated alias of READY
+    "created": "PENDING",  # never-deployed initial state
 }
 
 
