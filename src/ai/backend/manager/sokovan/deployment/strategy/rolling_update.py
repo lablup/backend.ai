@@ -86,7 +86,7 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         """
         if not isinstance(spec, RollingUpdateSpec):
             raise TypeError(f"Expected RollingUpdateSpec, got {type(spec).__name__}")
-        desired = deployment.replica_spec.target_replica_count
+        desired = deployment.replica_counts.target_replica_count
         deploying_revision_id = deployment.deploying_revision_id
         if deploying_revision_id is None:
             raise InvalidEndpointState(

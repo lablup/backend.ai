@@ -240,9 +240,9 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
                 info.current_revision_id,
             )
 
-    desired_count = info.replica_spec.desired_replica_count
+    desired_count = info.replica_counts.desired_replica_count
     if desired_count is None:
-        desired_count = info.replica_spec.replica_count
+        desired_count = info.replica_counts.replica_count
 
     return ModelDeploymentData(
         id=info.id,

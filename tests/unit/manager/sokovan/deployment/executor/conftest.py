@@ -21,7 +21,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentState,
     ModelRevisionData,
-    ReplicaSpec,
+    ReplicaCountData,
     RouteHealthStatus,
     RouteStatus,
 )
@@ -153,7 +153,7 @@ def _create_deployment_info(
             scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica_spec=ReplicaSpec(
+        replica_counts=ReplicaCountData(
             replica_count=replica_count,
             desired_replica_count=desired_replica_count,
         ),

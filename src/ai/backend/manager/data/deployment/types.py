@@ -358,6 +358,18 @@ class ReplicaSpec:
         return self.replica_count
 
 
+@dataclass
+class ReplicaCountData:
+    replica_count: int
+    desired_replica_count: int | None
+
+    @property
+    def target_replica_count(self) -> int:
+        if self.desired_replica_count is not None:
+            return self.desired_replica_count
+        return self.replica_count
+
+
 class ConfiguredModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -664,7 +676,7 @@ class DeploymentInfo:
     id: DeploymentID
     metadata: DeploymentMetadata
     state: DeploymentState
-    replica_spec: ReplicaSpec
+    replica_counts: ReplicaCountData
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionData]
     options: DeploymentOptions
