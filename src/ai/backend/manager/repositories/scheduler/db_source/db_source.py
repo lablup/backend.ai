@@ -1575,6 +1575,7 @@ class ScheduleDBSource:
                             VFolderMountRequest(
                                 ref=UUID(str(entry.vfolder_id)),
                                 dst_path=entry.mount_destination,
+                                subpath=entry.source_subpath,
                                 options=VFolderMountOptions(permission=entry.mount_perm),
                             )
                         )

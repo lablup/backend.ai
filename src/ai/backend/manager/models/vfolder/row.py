@@ -913,11 +913,20 @@ async def prepare_vfolder_mounts(
     requested_mount_name_map: dict[str, str] = {}
     requested_mount_map: dict[uuid.UUID, str] = {}
     requested_mount_options: dict[str | uuid.UUID, VFolderMountOptions] = {}
+    # Explicit per-mount source-subpaths supplied by UUID-keyed callers via
+    # ``VFolderMountRequest.subpath``. ``None`` (absent key) keeps the
+    # historical "mount root" default; a non-empty value pins the mount
+    # source to ``<vfolder>/<subpath>``. The string-form ``ref="name/sub"``
+    # path populates ``requested_vfolder_subpaths`` directly below and so
+    # never reaches this dict.
+    requested_uuid_subpaths: dict[uuid.UUID, str] = {}
 
     for req in mount_requests:
         if isinstance(req.ref, uuid.UUID):
             if req.dst_path is not None:
                 requested_mount_map[req.ref] = req.dst_path
+            if req.subpath is not None and req.subpath != "":
+                requested_uuid_subpaths[req.ref] = os.path.normpath(req.subpath)
             requested_mount_options[req.ref] = req.options
         else:
             requested_mounts.append(req.ref)
@@ -937,6 +946,8 @@ async def prepare_vfolder_mounts(
         key = req.ref
         if isinstance(key, uuid.UUID):
             requested_vfolder_ids.add(key)
+            if (uuid_subpath := requested_uuid_subpaths.get(key)) is not None:
+                requested_vfolder_subpaths[key] = uuid_subpath
             continue
         name, _, subpath = key.partition("/")
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
@@ -947,7 +958,7 @@ async def prepare_vfolder_mounts(
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
         _already_resolved.add(name)
     for vfolder_uuid, value in requested_mount_map.items():
-        requested_vfolder_subpaths[vfolder_uuid] = "."
+        requested_vfolder_subpaths.setdefault(vfolder_uuid, ".")
         requested_vfolder_dstpaths[vfolder_uuid] = value
     for key, value in requested_mount_name_map.items():
         requested_vfolder_dstpaths[key] = value
@@ -1015,7 +1026,10 @@ async def prepare_vfolder_mounts(
         name = row["name"]
         if vfid in requested_vfolder_ids:
             requested_vfolder_names[vfid] = name
-            requested_vfolder_subpaths[vfid] = "."
+            # Don't clobber an explicit per-mount subpath — only fill in
+            # the historical "." default for UUID-keyed requests that did
+            # not supply one.
+            requested_vfolder_subpaths.setdefault(vfid, ".")
         if name in _already_resolved:
             continue
         if name not in requested_names:
