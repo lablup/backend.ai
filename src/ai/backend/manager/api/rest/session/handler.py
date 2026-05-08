@@ -243,26 +243,20 @@ def _merge_resolved_legacy_mounts(
     The resolved ids are appended to ``mount_ids`` (skipping duplicates),
     and entries from the name-keyed ``mount_map`` / ``mount_options``
     dicts are re-keyed onto the resolved UUIDs without overwriting an
-    explicit UUID-keyed entry the caller already supplied. Legacy entries
-    that came in already as UUID-shaped strings are routed onto the
-    UUID-keyed buckets the same way.
+    explicit UUID-keyed entry the caller already supplied.
     """
-    legacy_mounts = creation_config.get("mounts") or ()
     legacy_mount_map = creation_config.get("mount_map") or {}
     legacy_mount_options = creation_config.get("mount_options") or {}
-
-    # Collect UUIDs that arrived as already-stringified UUIDs in any of the
-    # legacy buckets so name-resolution and pass-through can share one merge.
+    legacy_mounts = creation_config.get("mounts") or ()
     pass_through_uuids: dict[UUID, str] = {}
     for raw in (
         list(legacy_mounts) + list(legacy_mount_map.keys()) + list(legacy_mount_options.keys())
     ):
         key = str(raw)
         try:
-            vfid = UUID(key)
+            pass_through_uuids.setdefault(UUID(key), key)
         except (ValueError, TypeError):
             continue
-        pass_through_uuids.setdefault(vfid, key)
 
     if not name_to_id and not pass_through_uuids:
         return creation_config
@@ -277,7 +271,16 @@ def _merge_resolved_legacy_mounts(
     merged_mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
     merged_mount_options: dict[Any, Any] = dict(creation_config.get("mount_options") or {})
 
-    def _route(vfid: UUID, key: str) -> None:
+    for name, vfid in name_to_id.items():
+        if vfid not in existing_uuid_set:
+            merged_mount_ids.append(vfid)
+            existing_uuid_set.add(vfid)
+        if (dst := legacy_mount_map.get(name)) and vfid not in merged_mount_id_map:
+            merged_mount_id_map[vfid] = dst
+        if (opts := legacy_mount_options.get(name)) and vfid not in merged_mount_options:
+            merged_mount_options[vfid] = opts
+
+    for vfid, key in pass_through_uuids.items():
         if vfid not in existing_uuid_set:
             merged_mount_ids.append(vfid)
             existing_uuid_set.add(vfid)
@@ -285,11 +288,6 @@ def _merge_resolved_legacy_mounts(
             merged_mount_id_map[vfid] = dst
         if (opts := legacy_mount_options.get(key)) and vfid not in merged_mount_options:
             merged_mount_options[vfid] = opts
-
-    for name, vfid in name_to_id.items():
-        _route(vfid, name)
-    for vfid, key in pass_through_uuids.items():
-        _route(vfid, key)
 
     next_config = dict(creation_config)
     next_config["mount_ids"] = merged_mount_ids
@@ -332,9 +330,7 @@ class SessionHandler:
         inputs populated together by ``-v`` on the v1 CLI; they must be
         re-keyed onto UUIDs together so a name that appears only in
         ``mount_map`` or ``mount_options`` is not silently dropped
-        downstream. Entries that are already UUID-shaped strings are
-        skipped here and routed directly to ``mount_ids`` by
-        :func:`_merge_resolved_legacy_mounts`.
+        downstream.
 
         Subpath syntax (``name/subdir``) is rejected here because
         :class:`MountInfoEntry` carries no subpath field; silently dropping
@@ -356,26 +352,37 @@ class SessionHandler:
                 "Use UUID-keyed 'mount_ids' / 'mount_id_map' instead."
             )
 
-        def _is_uuid(s: str) -> bool:
-            try:
-                UUID(s)
-            except (ValueError, TypeError):
-                return False
-            return True
-
         names_to_resolve: list[str] = []
         seen: set[str] = set()
 
-        # All three buckets may carry UUID-shaped strings — those are passed
-        # through to ``_merge_resolved_legacy_mounts`` and only real names
-        # reach the resolver.
-        for raw in list(mounts) + list(mount_map.keys()) + list(mount_options.keys()):
+        # ``mounts`` and ``mount_map`` are strictly name-keyed legacy
+        # surfaces — every entry is treated as a vfolder name.
+        for raw in list(mounts) + list(mount_map.keys()):
             name = str(raw)
             if name in seen:
                 continue
             seen.add(name)
-            if _is_uuid(name):
+            try:
+                UUID(name)
                 continue
+            except (ValueError, TypeError):
+                pass
+            names_to_resolve.append(name)
+
+        # ``mount_options`` is the single polymorphic field shared by
+        # both legacy (name-keyed) and modern (UUID-string-keyed)
+        # callers; skip keys that already parse as UUID strings since
+        # they are not vfolder names to resolve.
+        for raw in mount_options.keys():
+            name = str(raw)
+            if name in seen:
+                continue
+            try:
+                UUID(name)
+                continue
+            except (ValueError, TypeError):
+                pass
+            seen.add(name)
             names_to_resolve.append(name)
 
         if not names_to_resolve:
