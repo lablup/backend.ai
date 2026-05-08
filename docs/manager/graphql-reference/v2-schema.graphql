@@ -6348,9 +6348,6 @@ type ModelRevision implements Node {
   id: ID!
   imageId: ID!
 
-  """The name identifier for this revision."""
-  name: String!
-
   """Cluster configuration for replica distribution."""
   clusterConfig: ClusterConfig!
 

@@ -411,7 +411,6 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     def revision_data(self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID) -> ModelRevisionData:
         return ModelRevisionData(
             id=uuid.uuid4(),
-            name="rev-1",
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,

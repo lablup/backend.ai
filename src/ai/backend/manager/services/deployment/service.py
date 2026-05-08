@@ -241,10 +241,6 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
         revision = ModelRevisionData(
             id=rev.revision_id,
-            # DeploymentInfo no longer carries revision_number, so name the
-            # projected ModelRevisionData by the revision UUID as a stable
-            # stand-in.
-            name=f"revision-{rev.revision_id}",
             cluster_config=ClusterConfigData(
                 mode=rev.resource_spec.cluster_mode,
                 size=rev.resource_spec.cluster_size,

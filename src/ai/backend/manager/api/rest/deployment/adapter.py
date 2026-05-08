@@ -267,7 +267,6 @@ class RevisionAdapter(BaseFilterAdapter):
             raise IncompleteRevisionData(f"Revision {data.id} has incomplete model mount config")
         return RevisionDTO(
             id=data.id,
-            name=data.name,
             cluster_config=ClusterConfigDTO(
                 mode=data.cluster_config.mode,
                 size=data.cluster_config.size,

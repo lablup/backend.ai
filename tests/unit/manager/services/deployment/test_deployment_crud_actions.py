@@ -593,7 +593,6 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
     def revision_data(self) -> ModelRevisionData:
         return ModelRevisionData(
             id=uuid.uuid4(),
-            name="rev-1",
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,
@@ -621,14 +620,13 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         revision_data: ModelRevisionData,
     ) -> None:
-        """Existing revision returns ModelRevisionData with name/cluster_config/resource_config/image_id/extra_vfolder_mounts."""
+        """Existing revision returns ModelRevisionData with cluster_config/resource_config/image_id/extra_vfolder_mounts."""
         mock_deployment_repository.get_revision = AsyncMock(return_value=revision_data)
 
         action = GetRevisionByIdAction(revision_id=revision_data.id)
         result = await processors.get_revision_by_id.wait_for_complete(action)
 
         assert result.data == revision_data
-        assert result.data.name == "rev-1"
         assert result.data.cluster_config.mode == ClusterMode.SINGLE_NODE
         assert result.data.resource_config.resource_group_name == "default"
         assert result.data.image_id == revision_data.image_id
