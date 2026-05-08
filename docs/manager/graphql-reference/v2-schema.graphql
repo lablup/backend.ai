@@ -6044,11 +6044,15 @@ type ModelConfig {
 Added in 26.4.0. Configuration for a single model within a model definition.
 """
 input ModelConfigInput {
-  """Name of the model."""
-  name: String!
+  """
+  Name of the model. May be supplied by the runtime variant default model definition, a revision preset, or the model vfolder's model-definition.yaml when omitted; the merge chain produces the final value.
+  """
+  name: String = null
 
-  """Path to the model file."""
-  modelPath: String!
+  """
+  Path to the model file. Defaults to the model mount destination when not overridden by the runtime variant, a revision preset, the vfolder's model-definition.yaml, or this request.
+  """
+  modelPath: String = null
 
   """Configuration for the model service."""
   service: ModelServiceConfigInput = null
@@ -6069,8 +6073,10 @@ type ModelDefinition {
 Added in 26.4.0. Model definition containing a list of model configurations.
 """
 input ModelDefinitionInput {
-  """List of models in the model definition."""
-  models: [ModelConfigInput!]!
+  """
+  List of model entries in the model definition. Omit to inherit the entire definition from the runtime variant default, the revision preset, or the model vfolder's model-definition.yaml; provide entries to override per-index.
+  """
+  models: [ModelConfigInput!] = null
 }
 
 """
@@ -6217,23 +6223,35 @@ type ModelHealthCheck {
 
 """Added in 26.4.0. Health check configuration for a model service."""
 input ModelHealthCheckInput {
-  """Interval in seconds between health checks."""
-  interval: Float! = 10
+  """
+  Interval in seconds between health checks. Falls back to the runtime variant or built-in default (10.0) when omitted.
+  """
+  interval: Float = null
 
-  """Path to check for health status."""
-  path: String!
+  """
+  Path to check for health status. May be supplied by the runtime variant default model definition or the model vfolder's model-definition.yaml when omitted.
+  """
+  path: String = null
 
-  """Maximum number of retries for health check."""
-  maxRetries: Int! = 10
+  """
+  Maximum number of retries for health check. Falls back to the runtime variant or built-in default (10) when omitted.
+  """
+  maxRetries: Int = null
 
-  """Maximum time in seconds to wait for a health check response."""
-  maxWaitTime: Float! = 15
+  """
+  Maximum time in seconds to wait for a health check response. Falls back to the runtime variant or built-in default (15.0) when omitted.
+  """
+  maxWaitTime: Float = null
 
-  """Expected HTTP status code for a healthy response."""
-  expectedStatusCode: Int! = 200
+  """
+  Expected HTTP status code for a healthy response. Falls back to the runtime variant or built-in default (200) when omitted.
+  """
+  expectedStatusCode: Int = null
 
-  """Initial delay in seconds before the first health check."""
-  initialDelay: Float! = 60
+  """
+  Initial delay in seconds before the first health check. Falls back to the runtime variant or built-in default (60.0) when omitted.
+  """
+  initialDelay: Float = null
 }
 
 """Added in 26.4.2. Metadata describing a model entry."""
@@ -6554,16 +6572,20 @@ input ModelServiceConfigInput {
   """
   List of pre-start actions to execute before starting the model service.
   """
-  preStartActions: [PreStartActionInput!]!
+  preStartActions: [PreStartActionInput!] = null
 
   """Command to start the model service."""
   startCommand: [String!] = null
 
-  """Shell configured for the model service."""
-  shell: String! = "/bin/bash"
+  """
+  Shell configured for the model service. Falls back to the runtime variant or built-in default (/bin/bash) when omitted.
+  """
+  shell: String = null
 
-  """Port number for the model service. Must be greater than 1."""
-  port: Int!
+  """
+  Port number for the model service. May be supplied by the runtime variant default model definition or the model vfolder's model-definition.yaml when omitted.
+  """
+  port: Int = null
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheckInput = null
