@@ -655,7 +655,7 @@ MountPermissionLiteral = Literal["ro", "rw", "wd"]
 class MountInfoEntry(BaseModel):
     """Revision-stored form of a user-supplied extra mount.
 
-    The row column persists only these three fields; everything else
+    The row column persists only these four fields; everything else
     (``name``, ``vfsubpath``, ``host_path``, ``usage_mode``) that
     ``VFolderMount`` carries is re-derived at session creation via
     ``prepare_vfolder_mounts``, so storing it would just be dead weight.
@@ -673,6 +673,14 @@ class MountInfoEntry(BaseModel):
     and is frozen onto deployment revision rows so later vfolder
     permission changes cannot retroactively alter already-spawned
     sessions.
+
+    ``source_subpath`` is ``None`` (the default) when the caller wants to
+    mount the vfolder root — :func:`prepare_vfolder_mounts` then resolves
+    the mount source to ``"."``. A non-empty value pins the mount source to
+    that subdirectory of the vfolder; the storage proxy exposes the
+    requested subdirectory as the bind-mount source via ``vfsubpath``.
+    Rows persisted before this field existed deserialize cleanly thanks to
+    the default.
     """
 
     vfolder_id: VFolderUUID
@@ -681,6 +689,7 @@ class MountInfoEntry(BaseModel):
         default=None,
     )
     mount_perm: MountPermission | None = Field(default=None)
+    source_subpath: str | None = Field(default=None)
 
 
 class MountTypes(enum.StrEnum):
@@ -701,10 +710,21 @@ class VFolderMountOptions:
 
 @attrs.define(slots=True)
 class VFolderMountRequest:
-    """A single vfolder mount request combining reference, destination path, and options."""
+    """A single vfolder mount request combining reference, destination path, and options.
+
+    ``subpath`` is the explicit per-mount source-subpath: when set, the
+    mount source becomes ``<vfolder>/<subpath>`` instead of the vfolder
+    root. It is the typed equivalent of the legacy string-form
+    ``ref="name/subpath"`` and the only way to express a subpath when
+    ``ref`` is a :class:`uuid.UUID`. ``None`` (the default) keeps the
+    historical "mount root" behavior. The two carriers must not be mixed:
+    ``ref`` of the form ``"name/subdir"`` already implies a subpath, so
+    callers should pick exactly one form.
+    """
 
     ref: str | uuid.UUID  # vfolder name (with optional /subpath) or UUID
     dst_path: str | None = None  # custom mount destination path
+    subpath: str | None = None  # explicit source subpath relative to vfolder root
     options: VFolderMountOptions = attrs.Factory(VFolderMountOptions)
 
 
