@@ -1264,7 +1264,7 @@ class DeploymentRepository:
         created revision for the endpoint regardless of activation state.
 
         Raises:
-            EndpointNotFound: If no revisions exist for the endpoint.
+            DeploymentRevisionNotFound: If no revisions exist for the endpoint.
         """
         return await self._db_source.get_latest_revision(endpoint_id)
 

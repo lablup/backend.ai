@@ -2341,7 +2341,7 @@ class DeploymentDBSource:
             )
         ).scalar_one_or_none()
         if row is None:
-            raise EndpointNotFound(f"No revisions exist for endpoint {endpoint_id}")
+            raise DeploymentRevisionNotFound(f"No revisions exist for endpoint {endpoint_id}")
         return row
 
     # Deployment Revision Methods
@@ -2551,7 +2551,7 @@ class DeploymentDBSource:
             endpoint_id: ID of the deployment endpoint
 
         Raises:
-            EndpointNotFound: If no revisions exist for the endpoint.
+            DeploymentRevisionNotFound: If no revisions exist for the endpoint.
         """
         async with self._db.begin_readonly_session() as db_sess:
             row = await self._fetch_latest_revision_row(db_sess, DeploymentID(endpoint_id))

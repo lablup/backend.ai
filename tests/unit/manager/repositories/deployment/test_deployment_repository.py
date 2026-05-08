@@ -46,11 +46,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
-from ai.backend.manager.errors.service import (
-    AutoScalingPolicyNotFound,
-    DeploymentPolicyNotFound,
-    EndpointNotFound,
-)
+from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
@@ -1915,8 +1911,8 @@ class TestDeploymentRevisionOperations:
         deployment_repository: DeploymentRepository,
         test_endpoint_id: DeploymentID,
     ) -> None:
-        """`get_latest_revision` raises ``EndpointNotFound`` when no revisions exist."""
-        with pytest.raises(EndpointNotFound):
+        """`get_latest_revision` raises ``DeploymentRevisionNotFound`` when no revisions exist."""
+        with pytest.raises(DeploymentRevisionNotFound):
             await deployment_repository.get_latest_revision(test_endpoint_id)
 
     async def test_search_revisions_empty(
