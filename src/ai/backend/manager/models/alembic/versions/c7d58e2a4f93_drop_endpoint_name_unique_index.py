@@ -1,7 +1,7 @@
 """Drop endpoint name unique index
 
 Revision ID: c7d58e2a4f93
-Revises: 46e007d9b237
+Revises: 3632aad9d5d9
 Create Date: 2026-05-07 19:40:00.000000
 
 Drop the partial unique index on (name, domain, project). The previous
@@ -19,7 +19,7 @@ from sqlalchemy.exc import IntegrityError
 
 # revision identifiers, used by Alembic.
 revision = "c7d58e2a4f93"
-down_revision = "46e007d9b237"
+down_revision = "3632aad9d5d9"
 # Part of: 26.5.0
 branch_labels = None
 depends_on = None
