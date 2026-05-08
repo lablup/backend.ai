@@ -68,6 +68,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     ExecutionSpec,
     ImageIdentifierDraft,
+    ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountMetadata,
     ReplicaSpec,
@@ -167,6 +168,14 @@ def _serve_info_from_dto(dto: ServiceInfo, runtime_variant_name: RuntimeVariant)
     )
 
 
+def _resolve_active_revision_spec(info: DeploymentInfo) -> ModelRevisionSpec | None:
+    """Resolve the active revision spec by id (current first, then deploying)."""
+    target_id = info.current_revision_id or info.deploying_revision_id
+    if target_id is None:
+        return None
+    return next((r for r in info.model_revisions if r.revision_id == target_id), None)
+
+
 def _serve_info_from_deployment_info(
     deployment_info: DeploymentInfo,
     runtime_variant_name: RuntimeVariant,
@@ -177,7 +186,7 @@ def _serve_info_from_deployment_info(
     active revision's ``runtime_variant_id`` (internal data types are
     id-only; the legacy REST response still exposes the name string).
     """
-    model_revision = deployment_info.model_revisions[0] if deployment_info.model_revisions else None
+    model_revision = _resolve_active_revision_spec(deployment_info)
 
     return ServeInfoModel(
         endpoint_id=deployment_info.id,
@@ -378,9 +387,7 @@ class ServiceHandler:
             await self._deployment.create_legacy_deployment.wait_for_complete(deployment_action)
         )
         deployment_info = deployment_result.data
-        model_revision = (
-            deployment_info.model_revisions[0] if deployment_info.model_revisions else None
-        )
+        model_revision = _resolve_active_revision_spec(deployment_info)
         if model_revision is None:
             raise RuntimeVariantNotFound()
         runtime_variant_name = await self._resolve_runtime_variant_name(
