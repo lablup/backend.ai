@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import secrets
-from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
@@ -44,7 +43,6 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardOrderField,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
@@ -69,18 +67,19 @@ from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
-from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
+from ai.backend.manager.repositories.model_card.types import (
+    ProjectModelCardSearchScope,
+    VFolderModelCardSearchScope,
+)
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.model_card.actions.available_presets import (
@@ -222,35 +221,40 @@ class ModelCardAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    async def batch_load_by_vfolder_ids(
+    async def search_in_vfolder(
         self,
-        vfolder_ids: Sequence[VFolderUUID],
-    ) -> list[list[ModelCardNode]]:
-        """Batch fetch model cards grouped by vfolder ID for the GraphQL DataLoader.
+        scope: VFolderModelCardSearchScope,
+        input: SearchModelCardsInput,
+    ) -> SearchModelCardsPayload:
+        """Search model cards backed by a specific VFolder.
 
-        Returns one list of nodes per input vfolder (same order); each inner
-        list is sorted most-recently-created first. A vfolder with no model
-        cards yields an empty list.
+        Access is delegated to the parent VFolder resolver — the caller must
+        already have permission to resolve the VFolder.
         """
-        if not vfolder_ids:
-            return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ModelCardConditions.by_vfolder_ids(list(vfolder_ids))],
-            orders=[
-                ModelCardOrders.created_at(ascending=False),
-                ModelCardOrders.id(ascending=False),
-            ],
+        conditions = [scope.to_condition()]
+        if input.filter:
+            conditions.extend(self._convert_filter(input.filter))
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_model_card_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
         result = await self._processors.model_card.search.wait_for_complete(
             SearchModelCardsAction(querier=querier)
         )
-        cards_by_vfolder: dict[VFolderUUID, list[ModelCardNode]] = {}
-        for data in result.items:
-            cards_by_vfolder.setdefault(VFolderUUID(data.vfolder_id), []).append(
-                self._data_to_node(data)
-            )
-        return [cards_by_vfolder.get(vfolder_id, []) for vfolder_id in vfolder_ids]
+        return SearchModelCardsPayload(
+            items=[self._data_to_node(d) for d in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def get(self, card_id: UUID) -> ModelCardNode:
         conditions: list[QueryCondition] = [lambda: ModelCardRow.id == card_id]

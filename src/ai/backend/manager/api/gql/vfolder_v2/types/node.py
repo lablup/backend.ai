@@ -9,6 +9,12 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.model_card.request import (
+    ModelCardOrder,
+    SearchModelCardsInput,
+)
+from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
@@ -20,12 +26,16 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
 )
 from ai.backend.manager.api.gql.model_card.types import (
+    ModelCardFilterGQL,
+    ModelCardGQL,
+    ModelCardOrderByGQL,
     ModelCardV2Connection,
     ModelCardV2Edge,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderOperationStatusGQL
+from ai.backend.manager.repositories.model_card.types import VFolderModelCardSearchScope
 
 from .nested import (
     VFolderAccessControlInfoGQL,
@@ -77,26 +87,58 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Model cards backed by this vfolder, sorted most-recently-created first.",
+            description="Model cards backed by this vfolder.",
         )
     )  # type: ignore[misc]
     async def model_cards(
         self,
         info: Info[StrawberryGQLContext],
+        filter: ModelCardFilterGQL | None = None,
+        order_by: list[ModelCardOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> ModelCardV2Connection | None:
-        nodes = await info.context.data_loaders.model_cards_by_vfolder_loader.load(
-            VFolderUUID(UUID(self.id))
+        orders = (
+            [
+                ModelCardOrder(
+                    field=ModelCardOrderField(o.field.value),
+                    direction=OrderDirection(o.direction),
+                )
+                for o in order_by
+            ]
+            if order_by
+            else None
         )
-        edges = [ModelCardV2Edge(node=node, cursor=str(node.id)) for node in nodes]
+        result = await info.context.adapters.model_card.search_in_vfolder(
+            scope=VFolderModelCardSearchScope(vfolder_id=VFolderUUID(UUID(self.id))),
+            input=SearchModelCardsInput(
+                filter=filter.to_pydantic() if filter is not None else None,
+                order=orders,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        edges = [
+            ModelCardV2Edge(node=ModelCardGQL.from_pydantic(item), cursor=str(item.id))
+            for item in result.items
+        ]
         return ModelCardV2Connection(
             edges=edges,
             page_info=PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
             ),
-            count=len(nodes),
+            count=result.total_count,
         )
 
     @classmethod
