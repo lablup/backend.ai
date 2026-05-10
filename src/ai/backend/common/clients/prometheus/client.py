@@ -26,10 +26,10 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
+from ai.backend.common.metrics.types import KernelLiveStatValues
 from ai.backend.common.types import KernelId
 
 from .preset import MetricPreset
-from .types import MetricValue
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 
@@ -82,7 +82,7 @@ class PrometheusClient:
     async def fetch_container_live_stats(
         self,
         kernel_ids: Sequence[KernelId],
-    ) -> dict[KernelId, list[MetricValue]]:
+    ) -> KernelLiveStatValues:
         queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
         gauge_response = await self._query_instant(queries.gauge)
         diff_response = await self._query_instant(queries.diff)
@@ -91,7 +91,7 @@ class PrometheusClient:
         diff = KernelMetricValuesByKernel.from_prometheus_response(diff_response)
         rate = KernelMetricValuesByKernel.from_prometheus_response(rate_response)
         merged = gauge.merged_with(diff).merged_with(rate)
-        return merged.values_by_kernel
+        return KernelLiveStatValues.with_capacity_sentinels(merged.values_by_kernel)
 
     async def execute_preset(
         self,
