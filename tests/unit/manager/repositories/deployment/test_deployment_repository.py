@@ -2010,7 +2010,7 @@ class TestDeploymentRevisionOperations:
         # Verify returned DeploymentInfo contains updated values
         assert deployment_info.id == test_endpoint_id
         assert deployment_info.metadata.name == new_name
-        assert deployment_info.replica_spec.replica_count == new_replica_count
+        assert deployment_info.replica_counts.replica_count == new_replica_count
 
         # Verify database state matches returned values
         async with db_with_cleanup.begin_readonly_session() as db_sess:

@@ -9,6 +9,7 @@ from ai.backend.common.types import MountInfoEntry, MountPermission, ResourceSlo
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ModelRevisionData,
+    ModelRevisionSpec,
     ResourceSpec,
 )
 
@@ -81,5 +82,25 @@ class SessionValidationSpec:
                     model_revision.model_runtime_config.inference_runtime_config
                 ),
             ),
+            session_type=SessionTypes.INFERENCE,
+        )
+
+    @classmethod
+    def from_spec(cls, model_revision: ModelRevisionSpec) -> Self:
+        # Write-side counterpart for the legacy bridge: the draft pipeline
+        # builds a ``ModelRevisionSpec`` before any row is persisted, so
+        # there is no ``ModelRevisionData`` to validate against yet.
+        return cls(
+            mount_entries=[
+                MountInfoEntry(
+                    vfolder_id=model_revision.mounts.model_vfolder_id,
+                    mount_destination=model_revision.mounts.model_mount_destination,
+                    mount_perm=MountPermission.READ_ONLY,
+                ),
+                *model_revision.mounts.extra_mounts,
+            ],
+            resource_spec=model_revision.resource_spec,
+            image_id=model_revision.image_id,
+            execution_spec=model_revision.execution,
             session_type=SessionTypes.INFERENCE,
         )

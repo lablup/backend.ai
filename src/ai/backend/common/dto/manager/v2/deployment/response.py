@@ -103,7 +103,7 @@ class RevisionNode(BaseResponseModel):
     revision_number: int = Field(
         description=(
             "Per-deployment sequential revision number assigned at insert "
-            "time (UNIQUE per endpoint). Stable across the lifetime of the "
+            "time (UNIQUE per deployment). Stable across the lifetime of the "
             "row and suitable for surfacing 'Revision #N' labels."
         ),
     )

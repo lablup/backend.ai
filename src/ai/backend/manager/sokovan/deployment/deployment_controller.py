@@ -246,7 +246,7 @@ class DeploymentController:
             mounts=draft.draft_model_revision.mounts
         )
         await self._scheduling_controller.validate_session_spec(
-            SessionValidationSpec.from_revision(model_revision=model_revision_spec)
+            SessionValidationSpec.from_spec(model_revision=model_revision_spec)
         )
         creator = NewDeploymentCreator(
             metadata=draft.metadata,

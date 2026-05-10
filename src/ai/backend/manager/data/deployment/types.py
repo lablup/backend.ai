@@ -916,7 +916,12 @@ class ModelRevisionData:
 
         Used as the base (lowest-priority-below-request) layer on the legacy
         modify path so untouched fields survive when the user submits a partial
-        override.
+        override. Every write-time field on ``ModelRevisionData`` (image,
+        resource, runtime, ``startup_command`` / ``bootstrap_script`` /
+        ``callback_url`` / ``model_definition``) flows back into the draft as
+        the baseline; preset / ``deployment-config.yaml`` /
+        ``model-definition.yaml`` / user request layers then override on top
+        via ``merge_revision_drafts``.
         """
         environ = self.model_runtime_config.environ
         resource_slots = dict(self.resource_config.resource_slot) or None
