@@ -20,7 +20,8 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
@@ -33,7 +34,7 @@ def _terminating_route() -> RouteData:
     return RouteData(
         route_id=uuid4(),
         deployment_id=DeploymentID(uuid4()),
-        session_id=SessionId(uuid4()),
+        session_data=RouteSessionData(session_id=SessionId(uuid4()), status=SessionStatus.RUNNING),
         status=RouteStatus.TERMINATING,
         health_status=RouteHealthStatus.HEALTHY,
         traffic_ratio=1.0,
@@ -150,7 +151,7 @@ class TestTerminateRoutesDrain:
         without_session = RouteData(
             route_id=uuid4(),
             deployment_id=DeploymentID(uuid4()),
-            session_id=None,
+            session_data=None,
             status=RouteStatus.TERMINATING,
             health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=1.0,

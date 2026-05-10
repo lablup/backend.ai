@@ -7,6 +7,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
+    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -66,6 +67,10 @@ class ProvisioningRouteHandler(RouteHandler):
             failure=RouteTransitionTarget(status=RouteStatus.FAILED_TO_START),
             stale=None,
         )
+
+    @classmethod
+    def health_check_filter(cls) -> RouteHealthCheckFilter:
+        return RouteHealthCheckFilter()
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute provisioning for routes."""

@@ -31,9 +31,9 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
-from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 
@@ -576,7 +576,9 @@ class TestCleanupRoutesByConfig:
         orphan_route = RouteData(
             route_id=uuid4(),
             deployment_id=deployment_id,
-            session_id=SessionId(uuid4()),
+            session_data=RouteSessionData(
+                session_id=SessionId(uuid4()), status=SessionStatus.RUNNING
+            ),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=1.0,
@@ -619,7 +621,7 @@ class TestCleanupRoutesByConfig:
         provisioning_route = RouteData(
             route_id=uuid4(),
             deployment_id=deployment_id,
-            session_id=None,
+            session_data=None,
             status=RouteStatus.PROVISIONING,
             health_status=RouteHealthStatus.NOT_CHECKED,
             traffic_ratio=1.0,
@@ -662,7 +664,9 @@ class TestCleanupRoutesByConfig:
         bootstrap_route = RouteData(
             route_id=uuid4(),
             deployment_id=deployment_id,
-            session_id=SessionId(uuid4()),
+            session_data=RouteSessionData(
+                session_id=SessionId(uuid4()), status=SessionStatus.RUNNING
+            ),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=1.0,
@@ -915,12 +919,14 @@ def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
     return RouteData(
         route_id=uuid4(),
         deployment_id=endpoint_id,
-        session_id=SessionId(uuid4()),
+        session_data=RouteSessionData(session_id=SessionId(uuid4()), status=SessionStatus.RUNNING),
         status=RouteStatus.RUNNING,
         health_status=RouteHealthStatus.HEALTHY,
         traffic_ratio=1.0,
         revision_id=DeploymentRevisionID(uuid4()),
         created_at=datetime.now(tzutc()),
+        replica_host="10.0.0.1",
+        replica_port=8000,
     )
 
 
@@ -949,17 +955,6 @@ def _wire_proxy_target(
     mock_deployment_repo.get_deployments_by_ids.return_value = deployments
     mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
         resource_group: ScalingGroupProxyTarget(addr=addr, api_token=token),
-    }
-    mock_deployment_repo.fetch_route_connection_infos.return_value = {
-        UUID(str(eid)): [
-            AppProxyRouteEntry(
-                session_id=uuid4(),
-                route_id=uuid4(),
-                kernel_host="10.0.0.1",
-                kernel_port=8000,
-            )
-        ]
-        for eid in endpoint_ids
     }
 
 

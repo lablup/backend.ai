@@ -45,7 +45,7 @@ def sample_route_data() -> RouteData:
     return RouteData(
         route_id=uuid4(),
         deployment_id=DeploymentID(uuid4()),
-        session_id=None,
+        session_data=None,
         status=RouteStatus.PROVISIONING,
         health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
@@ -387,7 +387,7 @@ class TestProcessRouteLifecycle:
                 RouteData(
                     route_id=uuid4(),
                     deployment_id=DeploymentID(uuid4()),
-                    session_id=None,
+                    session_data=None,
                     status=RouteStatus.RUNNING,
                     health_status=RouteHealthStatus.HEALTHY,
                     traffic_ratio=1.0,

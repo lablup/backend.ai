@@ -14,7 +14,7 @@ from pydantic import HttpUrl
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.config import ModelDefinitionDraft, ModelHealthCheck
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
@@ -67,14 +67,14 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
-    RouteHealthStatus,
+    RouteHealthCheckFilter,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
+    RouteTargetStatuses,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -631,11 +631,18 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_routes_by_statuses(
         self,
-        statuses: list[RouteStatus],
-        health_statuses: list[RouteHealthStatus],
+        target: RouteTargetStatuses,
+        health_check_filter: RouteHealthCheckFilter,
     ) -> list[RouteData]:
-        """Get routes by lifecycle and health statuses."""
-        return await self._db_source.get_routes_by_statuses(statuses, health_statuses)
+        """Routes matching ``(lifecycle, health)`` with revision-level
+        ``health_check_enabled`` gating per ``health_check_filter``.
+        """
+        return await self._db_source.get_routes_by_statuses(target, health_check_filter)
+
+    @deployment_repository_resilience.apply()
+    async def get_routes_for_health_observation(self) -> list[RouteData]:
+        """RUNNING routes whose revision declared ``service.health_check``."""
+        return await self._db_source.get_routes_for_health_observation()
 
     @deployment_repository_resilience.apply()
     async def update_route_status_bulk(
@@ -745,14 +752,6 @@ class DeploymentRepository:
     ) -> None:
         """Update replica_host and replica_port for routes."""
         await self._db_source.update_route_replica_info(updates)
-
-    @deployment_repository_resilience.apply()
-    async def fetch_health_check_configs_by_revision_ids(
-        self,
-        revision_ids: set[DeploymentRevisionID],
-    ) -> dict[DeploymentRevisionID, ModelHealthCheck | None]:
-        """Fetch health check configurations for revisions."""
-        return await self._db_source.fetch_health_check_configs_by_revision_ids(revision_ids)
 
     @deployment_repository_resilience.apply()
     async def delete_routes_by_route_ids(
@@ -1092,17 +1091,6 @@ class DeploymentRepository:
     ) -> Mapping[uuid.UUID, SessionStatus | None]:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
-
-    @deployment_repository_resilience.apply()
-    async def fetch_route_connection_infos(
-        self,
-        *,
-        route_querier: BatchQuerier,
-    ) -> Mapping[uuid.UUID, list[AppProxyRouteEntry]]:
-        """Resolve routing-table entries per endpoint via a caller-composed querier."""
-        return await self._db_source.fetch_route_connection_infos(
-            route_querier=route_querier,
-        )
 
     @deployment_repository_resilience.apply()
     async def search_deployment_ids(self, *, querier: BatchQuerier) -> list[DeploymentID]:

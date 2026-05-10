@@ -7,10 +7,12 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
+    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
     RouteTargetStatuses,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -59,7 +61,14 @@ class AppProxySyncRouteHandler(RouteHandler):
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
             health=[RouteHealthStatus.HEALTHY],
+            traffic_status=RouteTrafficStatus.ACTIVE,
         )
+
+    @classmethod
+    def health_check_filter(cls) -> RouteHealthCheckFilter:
+        # Routes whose revision disabled health_check stay NOT_CHECKED forever;
+        # include them so they still register as AppProxy targets.
+        return RouteHealthCheckFilter(include_health_check_disabled=True)
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:

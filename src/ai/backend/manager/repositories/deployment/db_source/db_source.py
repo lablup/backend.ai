@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.config import ModelDefinition, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
@@ -71,15 +71,16 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
+    RouteTargetStatuses,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
@@ -177,6 +178,7 @@ from ai.backend.manager.repositories.deployment.types import (
     ProjectDeploymentSearchScope,
     RouteData,
     RouteServiceDiscoveryInfo,
+    RouteSessionData,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
@@ -200,6 +202,35 @@ class EndpointWithRoutesRawData:
 
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+def _build_session_data(
+    session: uuid.UUID | None,
+    session_status: SessionStatus | None,
+) -> RouteSessionData | None:
+    """Compose ``RouteSessionData`` from a route's joined session columns.
+
+    Returns ``None`` when the route has no session yet (``session IS NULL``)
+    or when the joined session row is missing.
+    """
+    if session is None or session_status is None:
+        return None
+    return RouteSessionData(session_id=SessionId(session), status=session_status)
+
+
+def _project_health_check_config(
+    model_definition: ModelDefinition | None,
+) -> ModelHealthCheck | None:
+    """Project the joined ``model_definition`` to its health-check block.
+
+    ``None`` means the revision opted out of HTTP probing — the manager
+    skips probe scheduling and AppProxy receives traffic as soon as the
+    route reaches RUNNING. Mirrors ``ModelDefinition.is_health_check_enabled()``
+    used at insert time to populate the filterable boolean column.
+    """
+    if model_definition is None:
+        return None
+    return model_definition.health_check_config()
 
 
 def _project_preset_slots(
@@ -979,15 +1010,17 @@ class DeploymentDBSource:
     ) -> list[RouteData]:
         """Get all routes for an endpoint."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(RoutingRow.endpoint == endpoint_id)
+            query = (
+                sa.select(RoutingRow, SessionRow.status)
+                .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
+                .where(RoutingRow.endpoint == endpoint_id)
+            )
             result = await db_sess.execute(query)
-            rows = result.scalars().all()
-
             return [
                 RouteData(
                     route_id=row.id,
                     deployment_id=row.endpoint,
-                    session_id=SessionId(row.session) if row.session else None,
+                    session_data=_build_session_data(row.session, session_status),
                     status=row.status,
                     health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
@@ -997,7 +1030,7 @@ class DeploymentDBSource:
                     replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
-                for row in rows
+                for row, session_status in result.all()
             ]
 
     async def update_route_session(
@@ -1586,24 +1619,55 @@ class DeploymentDBSource:
 
     async def get_routes_by_statuses(
         self,
-        statuses: list[RouteStatus],
-        health_statuses: list[RouteHealthStatus],
+        target: RouteTargetStatuses,
+        health_check_filter: RouteHealthCheckFilter,
     ) -> list[RouteData]:
-        """Get routes by lifecycle and health statuses."""
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(
-                RoutingRow.status.in_(statuses),
-                RoutingRow.health_status.in_(health_statuses),
-            )
-            result = await db_sess.execute(query)
-            rows: Sequence[RoutingRow] = result.scalars().all()
+        """Routes matching ``(lifecycle, health, traffic_status)`` with
+        revision-level ``health_check_enabled`` gating per ``health_check_filter``.
 
-            route_data_list: list[RouteData] = []
-            for row in rows:
-                route_data = RouteData(
+        ``model_definition`` is selected so the resolved
+        ``ModelHealthCheck`` (or ``None``) can be attached to each
+        :class:`RouteData`. The boolean ``health_check_enabled`` column
+        is still used at SQL level for filtering — the row payload only
+        carries the projected config.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(
+                    RoutingRow,
+                    DeploymentRevisionRow.model_definition,
+                    SessionRow.status,
+                )
+                .join(
+                    DeploymentRevisionRow,
+                    DeploymentRevisionRow.id == RoutingRow.revision,
+                )
+                .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
+            )
+            query = query.where(RoutingRow.status.in_(target.lifecycle))
+            if health_check_filter.include_health_check_disabled:
+                query = query.where(
+                    sa.or_(
+                        RoutingRow.health_status.in_(target.health),
+                        DeploymentRevisionRow.health_check_enabled.is_(False),
+                    )
+                )
+            else:
+                query = query.where(RoutingRow.health_status.in_(target.health))
+            if health_check_filter.health_check_required is not None:
+                query = query.where(
+                    DeploymentRevisionRow.health_check_enabled.is_(
+                        health_check_filter.health_check_required
+                    )
+                )
+            if target.traffic_status is not None:
+                query = query.where(RoutingRow.traffic_status == target.traffic_status)
+            result = await db_sess.execute(query)
+            return [
+                RouteData(
                     route_id=row.id,
                     deployment_id=row.endpoint,
-                    session_id=SessionId(row.session) if row.session else None,
+                    session_data=_build_session_data(row.session, session_status),
                     status=row.status,
                     health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
@@ -1612,10 +1676,46 @@ class DeploymentDBSource:
                     replica_host=row.replica_host,
                     replica_port=row.replica_port,
                     error_data=row.error_data or {},
+                    health_check_config=_project_health_check_config(model_definition),
                 )
-                route_data_list.append(route_data)
+                for row, model_definition, session_status in result.all()
+            ]
 
-            return route_data_list
+    async def get_routes_for_health_observation(self) -> list[RouteData]:
+        """RUNNING routes whose revision declared ``service.health_check``."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(
+                    RoutingRow,
+                    DeploymentRevisionRow.model_definition,
+                    SessionRow.status,
+                )
+                .join(
+                    DeploymentRevisionRow,
+                    DeploymentRevisionRow.id == RoutingRow.revision,
+                )
+                .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
+                .where(RoutingRow.status == RouteStatus.RUNNING)
+                .where(DeploymentRevisionRow.health_check_enabled.is_(True))
+            )
+            result = await db_sess.execute(query)
+            return [
+                RouteData(
+                    route_id=row.id,
+                    deployment_id=row.endpoint,
+                    session_data=_build_session_data(row.session, session_status),
+                    status=row.status,
+                    health_status=row.health_status,
+                    traffic_ratio=row.traffic_ratio,
+                    created_at=row.created_at,
+                    revision_id=DeploymentRevisionID(row.revision),
+                    replica_host=row.replica_host,
+                    replica_port=row.replica_port,
+                    error_data=row.error_data or {},
+                    health_check_config=_project_health_check_config(model_definition),
+                )
+                for row, model_definition, session_status in result.all()
+            ]
 
     async def update_route_status_bulk(
         self,
@@ -1857,38 +1957,6 @@ class DeploymentDBSource:
                 )
                 await db_sess.execute(query)
 
-    async def fetch_health_check_configs_by_revision_ids(
-        self,
-        revision_ids: set[DeploymentRevisionID],
-    ) -> dict[DeploymentRevisionID, ModelHealthCheck | None]:
-        """Fetch health check configurations for revisions.
-
-        Reads only the ``model_definition`` column — variant-specific
-        health check defaults are already baked into that column at
-        revision-creation time, so no runtime dispatch by variant name
-        and no other row fields are needed. SET NULL state on
-        ``image`` / ``model`` does not affect this lookup.
-
-        Returns:
-            Mapping of revision_id to ModelHealthCheck (None if the
-            revision has no model_definition or no health_check inside).
-        """
-        if not revision_ids:
-            return {}
-
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(
-                DeploymentRevisionRow.id,
-                DeploymentRevisionRow.model_definition,
-            ).where(DeploymentRevisionRow.id.in_(revision_ids))
-            result = await db_sess.execute(query)
-            configs: dict[DeploymentRevisionID, ModelHealthCheck | None] = {}
-            for revision_id, model_definition in result.all():
-                configs[DeploymentRevisionID(revision_id)] = (
-                    model_definition.health_check_config() if model_definition is not None else None
-                )
-            return configs
-
     async def delete_routes_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
@@ -2081,80 +2149,6 @@ class DeploymentDBSource:
                 status_map[route_id] = session_status
 
             return status_map
-
-    async def fetch_route_connection_infos(
-        self,
-        *,
-        route_querier: BatchQuerier,
-    ) -> Mapping[uuid.UUID, list[AppProxyRouteEntry]]:
-        """Resolve routing-table entries grouped by endpoint id.
-
-        The caller composes ``route_querier`` with every filter that
-        applies (lifecycle / health / traffic_status / endpoint id set,
-        etc.) — db_source does not impose defaults and does not take a
-        separate ``endpoint_ids`` argument. The returned mapping only
-        contains endpoints that actually have at least one matching
-        route; the caller treats a missing key as "no traffic-receiving
-        routes for this endpoint" itself.
-
-        Internally fetches the filtered ``RoutingRow`` set, then bulk-
-        loads the main kernel for each running session and extracts
-        the inference port. Sessions that are not RUNNING/CREATING are
-        skipped because their kernel host:port is not stable.
-        """
-        result_map: dict[uuid.UUID, list[AppProxyRouteEntry]] = {}
-
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            route_query = sa.select(RoutingRow).options(
-                selectinload(RoutingRow.session_row),
-            )
-            route_result = await execute_batch_querier(db_sess, route_query, route_querier)
-            route_rows: list[RoutingRow] = [r.RoutingRow for r in route_result.rows]
-            if not route_rows:
-                return result_map
-
-            # Only sessions whose kernel network address is stable contribute
-            # to the routing table; the rest will fall in on the next sync
-            # cycle once they reach RUNNING.
-            route_by_session: dict[uuid.UUID, RoutingRow] = {}
-            for r in route_rows:
-                if r.session is None or r.session_row is None:
-                    continue
-                if r.session_row.status not in (
-                    SessionStatus.RUNNING,
-                    SessionStatus.CREATING,
-                ):
-                    continue
-                route_by_session[r.session] = r
-
-            if not route_by_session:
-                return result_map
-
-            kernels = await KernelRow.batch_load_main_kernels_by_session_id(
-                db_sess, list(route_by_session.keys())
-            )
-
-            for kernel in kernels:
-                route = route_by_session.get(kernel.session_id)
-                if route is None or kernel.service_ports is None or not kernel.kernel_host:
-                    continue
-                # First inference port wins (legacy single-inference-port
-                # contract preserved during the row-method removal).
-                inference_port = next(
-                    (p for p in kernel.service_ports if p.get("is_inference")),
-                    None,
-                )
-                if inference_port is None or not inference_port.get("host_ports"):
-                    continue
-                entry = AppProxyRouteEntry(
-                    session_id=kernel.session_id,
-                    route_id=route.id,
-                    kernel_host=kernel.kernel_host,
-                    kernel_port=inference_port["host_ports"][0],
-                )
-                result_map.setdefault(uuid.UUID(str(route.endpoint)), []).append(entry)
-
-        return result_map
 
     async def search_deployment_ids(self, *, querier: BatchQuerier) -> list[DeploymentID]:
         """Search deployment ids using ``BatchQuerier``.

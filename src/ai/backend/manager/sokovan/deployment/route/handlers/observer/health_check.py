@@ -55,8 +55,11 @@ class RouteHealthObserver(RouteObserver):
         if not routes:
             return RouteObservationResult(observed_count=0)
 
-        # Filter routes that have replica connection info
-        checkable = [r for r in routes if r.replica_host and r.replica_port]
+        checkable = [
+            r
+            for r in routes
+            if r.replica_host and r.replica_port and r.health_check_config is not None
+        ]
         if not checkable:
             return RouteObservationResult(observed_count=0)
 

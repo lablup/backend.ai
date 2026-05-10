@@ -11,11 +11,13 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -58,13 +60,32 @@ class EndpointData:
     resource_opts: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class RouteSessionData:
+    """Session id + status snapshot attached to a RouteData.
+
+    ``RoutingRow.session`` has ``ondelete=RESTRICT`` so a route cannot
+    reference a missing session row; ``status`` therefore is always set
+    when ``session_id`` is.
+    """
+
+    session_id: SessionId
+    status: SessionStatus
+
+
 @dataclass
 class RouteData:
-    """Data structure for model service route."""
+    """Data structure for model service route.
+
+    ``health_check_config`` is the resolved ``ModelHealthCheck`` from the
+    revision's ``model_definition`` (or ``None`` when the revision opted
+    out). It is loaded eagerly with the route, so consumers do not need
+    to re-query the revision row to know how (or whether) to probe.
+    """
 
     route_id: uuid.UUID
     deployment_id: DeploymentID
-    session_id: SessionId | None
+    session_data: RouteSessionData | None
     status: RouteStatus
     health_status: RouteHealthStatus
     traffic_ratio: float
@@ -74,6 +95,12 @@ class RouteData:
     replica_port: int | None = None
     updated_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
+    health_check_config: ModelHealthCheck | None = None
+
+    @property
+    def session_id(self) -> SessionId | None:
+        """Convenience accessor; reads from ``session_data``."""
+        return self.session_data.session_id if self.session_data else None
 
 
 @dataclass

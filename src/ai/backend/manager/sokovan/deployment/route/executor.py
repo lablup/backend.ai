@@ -10,6 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     RouteHealthRecord,
     ValkeyScheduleClient,
 )
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkRegisterRoutesRequest,
     BulkUnregisterRoutesRequest,
@@ -34,16 +35,13 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     RouteHealthStatus,
-    RouteStatus,
-    RouteTrafficStatus,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.deployment import (
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
 )
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
@@ -321,39 +319,45 @@ class RouteExecutor:
         routes: Sequence[RouteData],
         replica_info: Mapping[UUID, tuple[str, int]],
     ) -> None:
-        """Create RouteHealthRecords in Valkey for routes that just got replica info."""
-        revision_ids = {r.revision_id for r in routes}
-        health_configs = await self._deployment_repo.fetch_health_check_configs_by_revision_ids(
-            revision_ids
-        )
+        """Create RouteHealthRecords in Valkey for routes that just got replica info.
+
+        Routes whose revision disabled ``service.health_check`` get no record
+        and no probe — the gating is the route's own ``health_check_config``,
+        loaded eagerly with the route, so no second DB read is needed here.
+        """
+        # Narrow ``health_check_config`` to ``ModelHealthCheck`` once at
+        # the filter step so the per-route loop reads ``hc.path`` /
+        # ``hc.initial_delay`` without re-checking for None.
+        configured: list[tuple[RouteData, ModelHealthCheck]] = [
+            (r, hc) for r in routes if (hc := r.health_check_config) is not None
+        ]
+        if not configured:
+            return
+
         redis_time = await self._valkey_schedule.get_redis_time()
 
         # Read existing running_at values that were set when routes transitioned to RUNNING
         # These may be in partial hashes (only running_at field), so read raw field directly
         running_at_map = await self._valkey_schedule.get_route_running_at_batch([
-            str(r.route_id) for r in routes
+            str(r.route_id) for r, _ in configured
         ])
 
         records: list[RouteHealthRecord] = []
-        for route in routes:
+        for route, health_config in configured:
             host, port = replica_info[route.route_id]
-            health_config = health_configs.get(route.revision_id)
-
-            health_path = health_config.path if health_config else "/"
-            initial_delay = health_config.initial_delay if health_config else 60.0
             created_at = int(route.created_at.timestamp())
 
             # Use running_at from Valkey (set at RUNNING transition), fallback to redis_time
             route_id_str = str(route.route_id)
             running_at = running_at_map.get(route_id_str) or redis_time
-            initial_delay_until = running_at + int(initial_delay)
+            initial_delay_until = running_at + int(health_config.initial_delay)
 
             records.append(
                 RouteHealthRecord(
                     route_id=route_id_str,
                     created_at=created_at,
                     initial_delay_until=initial_delay_until,
-                    health_path=health_path,
+                    health_path=health_config.path,
                     inference_port=port,
                     replica_host=host,
                     running_at=running_at,
@@ -553,24 +557,18 @@ class RouteExecutor:
         return RouteExecutionResult(successes=[], errors=[])
 
     async def sync_appproxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Push the current HEALTHY routing tables for affected endpoints to AppProxy.
+        """Push the routing tables for affected endpoints to AppProxy.
 
-        Steps:
-        1. Group the input routes by endpoint (the AppProxy contract is
-           endpoint-scoped: one ``circuit.route_info`` per deployment).
-        2. Resolve each endpoint's proxy target (wsproxy_addr / token)
-           via the deployment repository in two batched calls.
-        3. Re-read the authoritative RUNNING + HEALTHY route set per
-           endpoint with a caller-composed ``BatchQuerier`` so the same
-           plumbing works for sync, debug, and reporting paths — no
-           ``only_healthy`` flag and no Row-side query method.
-        4. Group endpoints by proxy target and issue one
-           ``bulk_update_routes`` HTTP call per target instead of one
-           event per endpoint, which previously meant one DB connection
-           per endpoint on the AppProxy side.
-        5. Map per-entry response status back to the lifecycle handler's
-           per-route success / error result so failed pushes are picked
-           up by the next short cycle.
+        The input routes are pre-filtered by the coordinator on
+        ``(lifecycle, health, traffic_status)`` plus the
+        ``include_health_check_disabled`` OR-clause, so they already
+        represent the authoritative set to register. Each route's
+        ``replica_host``/``replica_port`` is kept up to date by
+        ``check_running_routes`` and is used directly here — same pattern
+        as :meth:`register_routes_now`. Routes with missing replica info
+        are skipped (they will be picked up once populated). Endpoints
+        are grouped by proxy target so each target receives a single
+        ``bulk_update_routes`` HTTP call.
         """
         if not routes:
             return RouteExecutionResult(successes=[], errors=[])
@@ -590,21 +588,11 @@ class RouteExecutor:
             scaling_groups
         )
 
-        # Caller composes the filter so the conditions stay explicit at
-        # the call site instead of hiding behind a flag-laden helper.
-        route_querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                RouteConditions.by_endpoint_ids(endpoint_ids),
-                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                RouteConditions.by_health_statuses([RouteHealthStatus.HEALTHY]),
-                RouteConditions.by_traffic_status_equals(RouteTrafficStatus.ACTIVE),
-            ],
-        )
-        connection_infos = await self._deployment_repo.fetch_route_connection_infos(
-            route_querier=route_querier,
-        )
-
+        # Routes that actually make it onto the wire per endpoint;
+        # routes already added to ``errors`` (no replica info, missing
+        # deployment, no proxy target) are excluded so the response
+        # mapping does not double-count them.
+        in_flight_by_endpoint: dict[DeploymentID, list[RouteData]] = {}
         items_by_target: dict[tuple[str, str], list[UpdateRoutesItem]] = {}
         for endpoint_id in endpoint_ids:
             deployment = deployment_by_id.get(endpoint_id)
@@ -631,19 +619,58 @@ class RouteExecutor:
                         )
                     )
                 continue
-            entries = connection_infos.get(endpoint_id, [])
+
+            entries: list[RouteEntry] = []
+            in_flight_routes: list[RouteData] = []
+            for route in routes_by_endpoint[endpoint_id]:
+                if route.session_data is None:
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="RUNNING route has no session attached",
+                            error_detail=f"route_id={route.route_id}",
+                            error_code=None,
+                        )
+                    )
+                    continue
+                if route.session_data.status not in (
+                    SessionStatus.RUNNING,
+                    SessionStatus.CREATING,
+                ):
+                    # Session is dying/dead — skip silently; the next
+                    # check_running_routes cycle transitions the route
+                    # to TERMINATING and the next sync converges.
+                    continue
+                if not route.replica_host or not route.replica_port:
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="Route has no replica connection info to sync",
+                            error_detail=(
+                                f"session_id={route.session_data.session_id} "
+                                f"replica_host={route.replica_host} "
+                                f"replica_port={route.replica_port}"
+                            ),
+                            error_code=None,
+                        )
+                    )
+                    continue
+                entries.append(
+                    RouteEntry(
+                        session_id=route.session_data.session_id,
+                        route_id=route.route_id,
+                        kernel_host=route.replica_host,
+                        kernel_port=route.replica_port,
+                    )
+                )
+                in_flight_routes.append(route)
+            if not entries:
+                continue
+            in_flight_by_endpoint[endpoint_id] = in_flight_routes
             items_by_target.setdefault((target.addr, target.api_token), []).append(
                 UpdateRoutesItem(
                     deployment_id=endpoint_id,
-                    routes=[
-                        RouteEntry(
-                            session_id=entry.session_id,
-                            route_id=entry.route_id,
-                            kernel_host=entry.kernel_host,
-                            kernel_port=entry.kernel_port,
-                        )
-                        for entry in entries
-                    ],
+                    routes=entries,
                 )
             )
 
@@ -656,7 +683,7 @@ class RouteExecutor:
                 error_code = _extract_error_code(exc)
                 for item in items:
                     ep_id = DeploymentID(item.deployment_id)
-                    for route in routes_by_endpoint.get(ep_id, []):
+                    for route in in_flight_by_endpoint.get(ep_id, []):
                         errors.append(
                             RouteExecutionError(
                                 route_info=route,
@@ -669,7 +696,7 @@ class RouteExecutor:
 
             for resp_item in response.endpoints:
                 ep_id = DeploymentID(resp_item.deployment_id)
-                ep_routes = routes_by_endpoint.get(ep_id, [])
+                ep_routes = in_flight_by_endpoint.get(ep_id, [])
                 if resp_item.success:
                     successes.extend(ep_routes)
                 else:

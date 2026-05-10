@@ -251,10 +251,29 @@ class DeploymentTargetStatuses:
 
 @dataclass(frozen=True)
 class RouteTargetStatuses:
-    """Target statuses for route handler filtering (lifecycle x health)."""
+    """Target statuses for route handler filtering (lifecycle x health x traffic).
+
+    ``traffic_status=None`` skips the filter; otherwise the row's
+    ``traffic_status`` must match.
+    """
 
     lifecycle: list[RouteStatus]
     health: list[RouteHealthStatus]
+    traffic_status: RouteTrafficStatus | None = None
+
+
+@dataclass(frozen=True)
+class RouteHealthCheckFilter:
+    """Revision-level ``health_check_enabled`` gating for route queries.
+
+    - ``health_check_required=None``: no filter on the flag.
+    - ``health_check_required=True/False``: AND with the flag.
+    - ``include_health_check_disabled=True``: OR-include rows where the flag
+      is ``False``, regardless of the row's ``health_status``.
+    """
+
+    health_check_required: bool | None = None
+    include_health_check_disabled: bool = False
 
 
 @dataclass(frozen=True)

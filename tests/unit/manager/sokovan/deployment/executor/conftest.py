@@ -179,7 +179,7 @@ def _create_route_data(
     return RouteData(
         route_id=route_id or uuid4(),
         deployment_id=DeploymentID(endpoint_id or uuid4()),
-        session_id=None,
+        session_data=None,
         status=status,
         health_status=health_status,
         traffic_ratio=1.0,

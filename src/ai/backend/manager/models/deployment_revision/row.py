@@ -139,6 +139,14 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     model_definition: Mapped[ModelDefinition | None] = mapped_column(
         "model_definition", PydanticColumn(ModelDefinition), nullable=True
     )
+    # Set at insert time from ``model_definition.is_health_check_enabled()``.
+    health_check_enabled: Mapped[bool] = mapped_column(
+        "health_check_enabled",
+        sa.Boolean(),
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
 
     # Resource configuration
     resource_group: Mapped[str] = mapped_column(

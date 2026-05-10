@@ -23,7 +23,8 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
@@ -37,7 +38,10 @@ def _make_route(
     return RouteData(
         route_id=uuid4(),
         deployment_id=DeploymentID(uuid4()),
-        session_id=session_id or SessionId(uuid4()),
+        session_data=RouteSessionData(
+            session_id=session_id or SessionId(uuid4()),
+            status=SessionStatus.RUNNING,
+        ),
         status=RouteStatus.RUNNING,
         health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
@@ -45,6 +49,7 @@ def _make_route(
         revision_id=DeploymentRevisionID(uuid4()),
         replica_host="10.0.0.1",
         replica_port=8000,
+        health_check_config=ModelHealthCheck(path="/health", initial_delay=720.0),
     )
 
 
@@ -59,7 +64,6 @@ class TestInitializeHealthRecordsInitialDelay:
     async def test_running_at_present_uses_running_at(
         self,
         route_executor: RouteExecutor,
-        mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """ID-001: When running_at exists in Valkey, initial_delay_until is based on running_at.
@@ -75,9 +79,6 @@ class TestInitializeHealthRecordsInitialDelay:
             route_id_str: 5000,
         }
         mock_valkey_schedule.get_redis_time.return_value = 5100
-        mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
-            route.revision_id: ModelHealthCheck(path="/health", initial_delay=720.0),
-        }
 
         await route_executor._initialize_health_records(
             [route],
@@ -93,7 +94,6 @@ class TestInitializeHealthRecordsInitialDelay:
     async def test_running_at_none_falls_back_to_redis_time(
         self,
         route_executor: RouteExecutor,
-        mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """ID-002: When running_at is None, fallback to current redis_time.
@@ -106,9 +106,6 @@ class TestInitializeHealthRecordsInitialDelay:
 
         mock_valkey_schedule.get_route_running_at_batch.return_value = {}
         mock_valkey_schedule.get_redis_time.return_value = 6000
-        mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
-            route.revision_id: ModelHealthCheck(path="/health", initial_delay=720.0),
-        }
 
         await route_executor._initialize_health_records(
             [route],
@@ -124,7 +121,6 @@ class TestInitializeHealthRecordsInitialDelay:
     async def test_created_at_expired_but_running_at_not_expired(
         self,
         route_executor: RouteExecutor,
-        mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """ID-003: created_at-based delay would have expired, but running_at-based has not.
@@ -142,9 +138,6 @@ class TestInitializeHealthRecordsInitialDelay:
             route_id_str: 5000,
         }
         mock_valkey_schedule.get_redis_time.return_value = 1800
-        mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
-            route.revision_id: ModelHealthCheck(path="/health", initial_delay=720.0),
-        }
 
         await route_executor._initialize_health_records(
             [route],

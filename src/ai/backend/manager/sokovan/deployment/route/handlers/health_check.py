@@ -7,6 +7,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
+    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -59,6 +60,11 @@ class HealthCheckRouteHandler(RouteHandler):
                 RouteHealthStatus.DEGRADED,
             ],
         )
+
+    @classmethod
+    def health_check_filter(cls) -> RouteHealthCheckFilter:
+        # Skip routes whose revision disabled health checks — no probe target.
+        return RouteHealthCheckFilter(health_check_required=True)
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:

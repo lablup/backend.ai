@@ -7,6 +7,7 @@ from .endpoint import (
     ProjectDeploymentSearchScope,
     RouteData,
     RouteServiceDiscoveryInfo,
+    RouteSessionData,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "ProjectDeploymentSearchScope",
     "RouteData",
     "RouteServiceDiscoveryInfo",
+    "RouteSessionData",
 ]

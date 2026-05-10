@@ -20,7 +20,7 @@ from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
@@ -197,11 +197,10 @@ class RouteCoordinator:
                 lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
                 await stack.enter_async_context(self._lock_factory(handler.lock_id, lock_lifetime))
 
-            # Get routes by target lifecycle + health statuses
             target = handler.target_statuses()
             routes = await self._deployment_repository.get_routes_by_statuses(
-                target.lifecycle,
-                target.health,
+                target,
+                handler.health_check_filter(),
             )
             if not routes:
                 log.trace("No routes to process for handler: {}", handler.name())
@@ -230,10 +229,7 @@ class RouteCoordinator:
         changing route status in DB.
         """
         try:
-            routes = await self._deployment_repository.get_routes_by_statuses(
-                [RouteStatus.RUNNING],
-                list(RouteHealthStatus),
-            )
+            routes = await self._deployment_repository.get_routes_for_health_observation()
             if not routes:
                 return
 
