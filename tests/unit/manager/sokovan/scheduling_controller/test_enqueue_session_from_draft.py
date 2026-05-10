@@ -208,6 +208,10 @@ def _fetch_bundle(image_id: ImageID) -> SessionSpecContextFetch:
         vfolder_mounts_by_role={"main": (_vfolder_mount(),)},
         dotfile_data=DotfileBundle(),
         keypair_resource_policy=_keypair_policy(),
+        known_slot_types={
+            SlotName("cpu"): SlotTypes.COUNT,
+            SlotName("mem"): SlotTypes.BYTES,
+        },
     )
 
 

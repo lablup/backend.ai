@@ -6,6 +6,7 @@ import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
@@ -187,6 +188,21 @@ def _create_resource_slot_from_policy(
     return ResourceSlot.from_policy(resource_policy_map, cast(Mapping[str, Any], known_slot_types))
 
 
+@dataclass(frozen=True)
+class _ScalingGroupWithSlotInventory:
+    """Scaling group bundled with the slot inventory served by its agents.
+
+    ``active_slot_types`` maps each slot name served by a non-terminated
+    agent in this scaling group to its registered :class:`SlotTypes`
+    unit. The validator chain consults this map both for membership
+    (reject requests for slots the RG does not provide) and for unit
+    metadata (humanize values during error formatting).
+    """
+
+    sg_row: ScalingGroupRow
+    active_slot_types: Mapping[SlotName, SlotTypes]
+
+
 class ScheduleDBSource:
     """
     Database source for schedule-related operations.
@@ -288,6 +304,46 @@ class ScheduleDBSource:
                 snapshot_data=snapshot_data,
                 spec=spec,
             )
+
+    async def _fetch_scaling_group_with_slot_inventory(
+        self,
+        db_sess: SASession,
+        name: str,
+    ) -> _ScalingGroupWithSlotInventory:
+        """Load a scaling group together with its per-RG slot inventory.
+
+        Eager-loads ``agents`` -> ``agent_resource_rows`` -> ``slot_type_row``
+        via ``selectinload``, filters out TERMINATED agents, and projects
+        the remaining rows into ``{slot_name: SlotTypes}``. The ``AgentRow``
+        instances themselves are not exposed — callers only see the SG row
+        and the derived inventory.
+
+        Raises:
+            ScalingGroupNotFound: when the scaling group does not exist.
+        """
+        sg_row = (
+            await db_sess.scalars(
+                sa.select(ScalingGroupRow)
+                .options(
+                    selectinload(ScalingGroupRow.agents)
+                    .selectinload(AgentRow.agent_resource_rows)
+                    .selectinload(AgentResourceRow.slot_type_row)
+                )
+                .where(ScalingGroupRow.name == name)
+            )
+        ).one_or_none()
+        if sg_row is None:
+            raise ScalingGroupNotFound(f"Resource group {name} not found")
+        active_slot_types: dict[SlotName, SlotTypes] = {
+            SlotName(ar.slot_name): SlotTypes(ar.slot_type_row.slot_type)
+            for agent in sg_row.agents
+            if agent.status != AgentStatus.TERMINATED
+            for ar in agent.agent_resource_rows
+        }
+        return _ScalingGroupWithSlotInventory(
+            sg_row=sg_row,
+            active_slot_types=active_slot_types,
+        )
 
     async def _fetch_scaling_group(
         self, db_sess: SASession, scaling_group: str
@@ -1463,16 +1519,13 @@ class ScheduleDBSource:
             network_info: ScalingGroupNetworkInfo | None = None
             rg_defaults = None
             resource_group_allow_fractional = False
+            known_slot_types: Mapping[SlotName, SlotTypes] = {}
             if resource_group_name:
-                sg_row = (
-                    await db_sess.scalars(
-                        sa.select(ScalingGroupRow).where(
-                            ScalingGroupRow.name == resource_group_name
-                        )
-                    )
-                ).one_or_none()
-                if sg_row is None:
-                    raise ScalingGroupNotFound(f"Resource group {resource_group_name} not found")
+                rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
+                    db_sess, resource_group_name
+                )
+                sg_row = rg_bundle.sg_row
+                known_slot_types = rg_bundle.active_slot_types
                 # Every production caller of ``enqueue_session_from_draft`` populates
                 # access_key/domain_name/project_id alongside resource_group_name; this
                 # branch flags the contract violation rather than letting the RG
@@ -1632,6 +1685,7 @@ class ScheduleDBSource:
             dotfile_data=dotfile_bundle,
             active_session_count=active_session_count,
             keypair_resource_policy=keypair_policy,
+            known_slot_types=known_slot_types,
         )
 
     async def pick_default_resource_group(

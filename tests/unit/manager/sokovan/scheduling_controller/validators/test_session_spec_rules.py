@@ -58,11 +58,17 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.container_limit
 from ai.backend.manager.sokovan.scheduling_controller.validators.dotfile_vfolder_conflict_rule import (
     DotfileVFolderConflictRule,
 )
+from ai.backend.manager.sokovan.scheduling_controller.validators.image_slot_type_rule import (
+    ImageSlotTypeRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.inference_model_folder_rule import (
     InferenceModelFolderRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_validation_rule import (
     MountNameValidationRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
+    RequestedSlotTypeRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
     ResourceLimitRule,
@@ -397,3 +403,106 @@ class TestDotfileVFolderConflictRule:
             )
         )
         DotfileVFolderConflictRule().validate(spec, ctx)
+
+
+def _image_info_with_slots(
+    image_id: ImageID,
+    *,
+    slot_keys: tuple[str, ...],
+) -> ImageInfo:
+    return ImageInfo(
+        id=uuid.UUID(str(image_id)),
+        canonical="repo/img:tag",
+        architecture="x86_64",
+        registry="repo",
+        labels={},
+        resource_spec={k: {"min": "1", "max": None} for k in slot_keys},
+    )
+
+
+def _kernel_with_resources(
+    image_id: ImageID,
+    *,
+    resources: tuple[tuple[str, str], ...],
+) -> KernelSpec:
+    return KernelSpec(
+        cluster_role="main",
+        cluster_idx=1,
+        cluster_hostname="main1",
+        local_rank=0,
+        execution_spec=KernelExecutionSpec(
+            image_id=image_id,
+            resources=[ResourceSlotEntry(resource_type=k, quantity=q) for k, q in resources],
+            resource_opts=ResourceOpts(),
+        ),
+    )
+
+
+_RG_BASE: dict[SlotName, SlotTypes] = {
+    SlotName("cpu"): SlotTypes.COUNT,
+    SlotName("mem"): SlotTypes.BYTES,
+}
+
+
+class TestImageSlotTypeRule:
+    def test_passes_when_image_slots_served_by_rg(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(
+            image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem"))},
+            known_slot_types=dict(_RG_BASE),
+        )
+        ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_image_slot_not_served_by_rg(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(
+            image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem", "cuda.device"))},
+            known_slot_types={**_RG_BASE, SlotName("cuda.shares"): SlotTypes.COUNT},
+        )
+        with pytest.raises(InvalidAPIParameters):
+            ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_when_rg_has_no_active_agents(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(
+            image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem"))},
+        )
+        with pytest.raises(InvalidAPIParameters):
+            ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_noop_without_image_info(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        ImageSlotTypeRule().validate(spec, ctx)
+
+
+class TestRequestedSlotTypeRule:
+    def test_passes_when_requested_slots_served_by_rg(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((
+            _kernel_with_resources(img, resources=(("cpu", "1"), ("mem", "1073741824"))),
+        ))
+        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        RequestedSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_requested_slot_not_served_by_rg(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((
+            _kernel_with_resources(
+                img,
+                resources=(("cpu", "1"), ("mem", "1073741824"), ("cuda.device", "1")),
+            ),
+        ))
+        ctx = _ctx(known_slot_types={**_RG_BASE, SlotName("cuda.shares"): SlotTypes.COUNT})
+        with pytest.raises(InvalidAPIParameters):
+            RequestedSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_when_rg_has_no_active_agents(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel_with_resources(img, resources=(("cpu", "1"),)),))
+        with pytest.raises(InvalidAPIParameters):
+            RequestedSlotTypeRule().validate(spec, _ctx())
