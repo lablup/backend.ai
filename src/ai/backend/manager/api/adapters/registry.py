@@ -11,6 +11,9 @@ from ai.backend.manager.api.adapters.artifact_registry.adapter import ArtifactRe
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
+from ai.backend.manager.api.adapters.deployment_revision.adapter import (
+    DeploymentRevisionAdapter,
+)
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
@@ -78,6 +81,7 @@ class Adapters:
         audit_log: AuditLogAdapter,
         container_registry: ContainerRegistryAdapter,
         deployment: DeploymentAdapter,
+        deployment_revision: DeploymentRevisionAdapter,
         domain: DomainAdapter,
         fair_share: FairShareAdapter,
         huggingface_registry: HuggingFaceRegistryAdapter,
@@ -119,6 +123,7 @@ class Adapters:
         self.audit_log = audit_log
         self.container_registry = container_registry
         self.deployment = deployment
+        self.deployment_revision = deployment_revision
         self.domain = domain
         self.fair_share = fair_share
         self.huggingface_registry = huggingface_registry
@@ -179,6 +184,7 @@ class Adapters:
             audit_log=AuditLogAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
             deployment=DeploymentAdapter(processors, deployment_coordinator),
+            deployment_revision=DeploymentRevisionAdapter(processors),
             domain=DomainAdapter(processors),
             fair_share=FairShareAdapter(processors),
             huggingface_registry=HuggingFaceRegistryAdapter(processors),

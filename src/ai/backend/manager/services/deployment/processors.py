@@ -82,6 +82,10 @@ from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.list_active_deployments_with_current_revision import (
+    ListActiveDeploymentsWithCurrentRevisionAction,
+    ListActiveDeploymentsWithCurrentRevisionActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
@@ -98,9 +102,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
     SearchRevisionsAction,
     SearchRevisionsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
-    RefreshDeploymentRevisionsAction,
-    RefreshDeploymentRevisionsActionResult,
+from ai.backend.manager.services.deployment.actions.refresh_deployment_revision import (
+    RefreshDeploymentRevisionAction,
+    RefreshDeploymentRevisionActionResult,
 )
 from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
     ReplaceDeploymentOptionsAction,
@@ -183,8 +187,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
         SearchRevisionResourceSlotsAction, SearchRevisionResourceSlotsActionResult
     ]
     activate_revision: ActionProcessor[ActivateRevisionAction, ActivateRevisionActionResult]
-    admin_refresh_deployment_revisions: ActionProcessor[
-        RefreshDeploymentRevisionsAction, RefreshDeploymentRevisionsActionResult
+    list_active_deployments_with_current_revision: ActionProcessor[
+        ListActiveDeploymentsWithCurrentRevisionAction,
+        ListActiveDeploymentsWithCurrentRevisionActionResult,
+    ]
+    refresh_deployment_revision: ActionProcessor[
+        RefreshDeploymentRevisionAction, RefreshDeploymentRevisionActionResult
     ]
 
     # Route operations
@@ -273,8 +281,11 @@ class DeploymentProcessors(AbstractProcessorPackage):
             service.search_revision_resource_slots, action_monitors
         )
         self.activate_revision = ActionProcessor(service.activate_revision, action_monitors)
-        self.admin_refresh_deployment_revisions = ActionProcessor(
-            service.admin_refresh_deployment_revisions, action_monitors
+        self.list_active_deployments_with_current_revision = ActionProcessor(
+            service.list_active_deployments_with_current_revision, action_monitors
+        )
+        self.refresh_deployment_revision = ActionProcessor(
+            service.refresh_deployment_revision, action_monitors
         )
 
         # Route operations
@@ -336,7 +347,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SearchRevisionsAction.spec(),
             SearchRevisionResourceSlotsAction.spec(),
             ActivateRevisionAction.spec(),
-            RefreshDeploymentRevisionsAction.spec(),
+            ListActiveDeploymentsWithCurrentRevisionAction.spec(),
+            RefreshDeploymentRevisionAction.spec(),
             # Route operations
             SyncReplicaAction.spec(),
             SearchRoutesAction.spec(),

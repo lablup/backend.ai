@@ -887,6 +887,7 @@ class ModelMountConfigData:
 @dataclass
 class ModelRevisionData:
     id: UUID
+    deployment_id: DeploymentID
     revision_number: int
     cluster_config: ClusterConfigData
     resource_config: ResourceConfigData

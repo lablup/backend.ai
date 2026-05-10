@@ -61,6 +61,9 @@ from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
+    from ai.backend.manager.api.adapters.deployment_revision.adapter import (
+        DeploymentRevisionAdapter,
+    )
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -68,8 +71,14 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class V2DeploymentHandler:
     """REST v2 handler for deployment operations."""
 
-    def __init__(self, *, adapter: DeploymentAdapter) -> None:
+    def __init__(
+        self,
+        *,
+        adapter: DeploymentAdapter,
+        revision_adapter: DeploymentRevisionAdapter,
+    ) -> None:
         self._adapter = adapter
+        self._revision_adapter = revision_adapter
 
     # ------------------------------------------------------------------
     # Core deployment CRUD
@@ -268,7 +277,7 @@ class V2DeploymentHandler:
 
     async def admin_refresh_deployment_revisions(self) -> APIResponse:
         """Rebuild and activate a fresh revision for every active deployment."""
-        result = await self._adapter.admin_refresh_deployment_revisions()
+        result = await self._revision_adapter.admin_refresh_deployment_revisions()
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # ------------------------------------------------------------------

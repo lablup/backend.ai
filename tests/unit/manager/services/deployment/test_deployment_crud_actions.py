@@ -595,6 +595,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
     def revision_data(self) -> ModelRevisionData:
         return ModelRevisionData(
             id=uuid.uuid4(),
+            deployment_id=DeploymentID(uuid.uuid4()),
             revision_number=1,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,

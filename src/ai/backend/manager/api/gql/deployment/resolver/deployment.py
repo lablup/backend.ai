@@ -289,7 +289,7 @@ async def admin_refresh_deployment_revisions(
     info: Info[StrawberryGQLContext],
 ) -> AdminRefreshDeploymentRevisionsPayload | None:
     check_admin_only()
-    payload = await info.context.adapters.deployment.admin_refresh_deployment_revisions()
+    payload = await info.context.adapters.deployment_revision.admin_refresh_deployment_revisions()
     return AdminRefreshDeploymentRevisionsPayload(
         results=[
             RevisionRefreshResult(

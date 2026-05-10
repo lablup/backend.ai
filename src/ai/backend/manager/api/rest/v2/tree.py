@@ -122,7 +122,10 @@ def build_v2_routes(
     artifact_registry_handler = V2ArtifactRegistryHandler(adapter=adapters.artifact_registry)
     audit_log_handler = V2AuditLogHandler(adapter=adapters.audit_log)
     container_registry_handler = V2ContainerRegistryHandler(adapter=adapters.container_registry)
-    deployment_handler = V2DeploymentHandler(adapter=adapters.deployment)
+    deployment_handler = V2DeploymentHandler(
+        adapter=adapters.deployment,
+        revision_adapter=adapters.deployment_revision,
+    )
     domain_handler = V2DomainHandler(adapter=adapters.domain)
     fair_share_handler = V2FairShareHandler(adapter=adapters.fair_share)
     huggingface_registry_handler = V2HuggingFaceRegistryHandler(

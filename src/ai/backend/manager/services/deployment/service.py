@@ -20,20 +20,14 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
-from ai.backend.manager.data.deployment.creator import (
-    ModelRevisionCreator,
-    VFolderMountsCreator,
-)
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    ExecutionSpec,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelReplicaData,
     ModelRevisionData,
     ReplicaStateData,
-    ResourceSpec,
     RevisionRefreshResult,
     RouteHealthStatus,
     RouteInfo,
@@ -135,6 +129,10 @@ from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.list_active_deployments_with_current_revision import (
+    ListActiveDeploymentsWithCurrentRevisionAction,
+    ListActiveDeploymentsWithCurrentRevisionActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
@@ -151,9 +149,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
     SearchRevisionsAction,
     SearchRevisionsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
-    RefreshDeploymentRevisionsAction,
-    RefreshDeploymentRevisionsActionResult,
+from ai.backend.manager.services.deployment.actions.refresh_deployment_revision import (
+    RefreshDeploymentRevisionAction,
+    RefreshDeploymentRevisionActionResult,
 )
 from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
     ReplaceDeploymentOptionsAction,
@@ -324,51 +322,6 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
         activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),
         detail=route.error_data,
         created_at=route.created_at,
-    )
-
-
-def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionCreator:
-    """Rebuild a ``ModelRevisionCreator`` from an existing revision's persisted data.
-
-    ``model_definition`` is reset to ``None`` so ``DeploymentController.add_revision``
-    re-resolves it from the vfolder. ``revision_preset_id`` and ``preset_values`` are
-    carried over so the new revision keeps the same preset attribution. ``extra_mounts``
-    is left empty because ``add_revision`` does not propagate this field to the new
-    revision spec.
-    """
-    if data.model_mount_config.vfolder_id is None:
-        raise InvalidAPIParameters(
-            f"Revision {data.id} has no model vfolder; cannot rebuild creator"
-        )
-    return ModelRevisionCreator(
-        image_id=data.image_id,
-        resource_spec=ResourceSpec(
-            cluster_mode=data.cluster_config.mode,
-            cluster_size=data.cluster_config.size,
-            resource_slots=dict(data.resource_config.resource_slot),
-            resource_opts=dict(data.resource_config.resource_opts) or None,
-        ),
-        mounts=VFolderMountsCreator(
-            model_vfolder_id=data.model_mount_config.vfolder_id,
-            model_definition_path=data.model_mount_config.definition_path or None,
-            model_mount_destination=data.model_mount_config.mount_destination or "/models",
-            extra_mounts=[],
-        ),
-        execution=ExecutionSpec(
-            startup_command=data.startup_command,
-            bootstrap_script=data.bootstrap_script,
-            environ=(
-                {k: str(v) for k, v in data.model_runtime_config.environ.items()}
-                if data.model_runtime_config.environ
-                else None
-            ),
-            runtime_variant_id=data.model_runtime_config.runtime_variant_id,
-            callback_url=data.callback_url,
-            inference_runtime_config=data.model_runtime_config.inference_runtime_config,
-        ),
-        model_definition=None,
-        revision_preset_id=data.revision_preset_id,
-        preset_values=list(data.preset_values),
     )
 
 
@@ -659,21 +612,21 @@ class DeploymentService:
             deployment_policy=result.deployment_policy,
         )
 
-    async def admin_refresh_deployment_revisions(
-        self, action: RefreshDeploymentRevisionsAction
-    ) -> RefreshDeploymentRevisionsActionResult:
-        """Refresh revisions for all active deployments.
+    async def list_active_deployments_with_current_revision(
+        self,
+        action: ListActiveDeploymentsWithCurrentRevisionAction,
+    ) -> ListActiveDeploymentsWithCurrentRevisionActionResult:
+        """List active deployments paired with their current revision data.
 
-        For each active deployment, rebuilds a ``ModelRevisionCreator`` from the
-        current revision and delegates to
-        ``DeploymentController.add_deployment_revision(auto_activate=True)``
-        (which re-resolves preset / deployment-config / model_definition and
-        activates the new revision). Each deployment is processed independently
-        so a single failure does not abort the rest (partial success by design).
+        Backs the admin bulk revision refresh: the adapter consumes this
+        list, projects each ``ModelRevisionData`` onto a
+        ``ModelRevisionCreator``, then invokes
+        ``refresh_deployment_revision`` per item.  All type conversions stay
+        in the adapter; the service only orchestrates the read pass.
         """
-        # Bulk scan + independent per-deployment orchestration: multiple repo
-        # and controller calls are required by design to preserve partial
-        # success semantics. Each inner call owns its own transaction boundary.
+        # Bulk scan + per-id read: two-phase fetch is required to preserve
+        # partial-success semantics in the adapter (a single missing
+        # revision must not abort the entire refresh).
         active_querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[
@@ -683,50 +636,63 @@ class DeploymentService:
         deployment_ids = await self._deployment_repository.search_deployment_ids(
             querier=active_querier,
         )
-        results: list[RevisionRefreshResult] = []
-        succeeded = 0
-        failed = 0
+        revisions: list[ModelRevisionData] = []
         for deployment_id in deployment_ids:
             try:
-                data = await self._deployment_repository.get_current_revision(deployment_id)
-                creator = _build_creator_from_revision_data(data)
-                new_revision = await self._deployment_controller.add_deployment_revision(
-                    deployment_id=deployment_id,
-                    revision=creator,
-                    auto_activate=True,
-                )
-                results.append(
-                    RevisionRefreshResult(
-                        deployment_id=deployment_id,
-                        new_revision_id=new_revision.id,
-                        success=True,
-                        failure_reason=None,
-                    )
-                )
-                succeeded += 1
+                revision = await self._deployment_repository.get_current_revision(deployment_id)
             except Exception as exc:
                 log.warning(
-                    "admin_refresh_deployment_revisions failed for deployment {}: {}: {}",
+                    "list_active_deployments_with_current_revision: skipping {}: {}: {}",
                     deployment_id,
                     type(exc).__name__,
                     exc,
                 )
-                results.append(
-                    RevisionRefreshResult(
-                        deployment_id=deployment_id,
-                        new_revision_id=None,
-                        success=False,
-                        failure_reason=f"{type(exc).__name__}: {exc}",
-                    )
-                )
-                failed += 1
-        log.info(
-            "admin_refresh_deployment_revisions summary: total={} succeeded={} failed={}",
-            len(deployment_ids),
-            succeeded,
-            failed,
+                continue
+            revisions.append(revision)
+        return ListActiveDeploymentsWithCurrentRevisionActionResult(revisions=revisions)
+
+    async def refresh_deployment_revision(
+        self,
+        action: RefreshDeploymentRevisionAction,
+    ) -> RefreshDeploymentRevisionActionResult:
+        """Add and activate a fresh revision for one deployment.
+
+        The adapter has already converted the previous revision's
+        ``ModelRevisionData`` into ``action.creator``; this method just runs
+        ``DeploymentController.add_deployment_revision(auto_activate=True)``
+        and packages the outcome into a ``RevisionRefreshResult`` so the
+        adapter can aggregate per-item success/failure without itself
+        catching exceptions.
+        """
+        try:
+            new_revision = await self._deployment_controller.add_deployment_revision(
+                deployment_id=action.deployment_id,
+                revision=action.creator,
+                auto_activate=True,
+            )
+        except Exception as exc:
+            log.warning(
+                "refresh_deployment_revision failed for deployment {}: {}: {}",
+                action.deployment_id,
+                type(exc).__name__,
+                exc,
+            )
+            return RefreshDeploymentRevisionActionResult(
+                result=RevisionRefreshResult(
+                    deployment_id=action.deployment_id,
+                    new_revision_id=None,
+                    success=False,
+                    failure_reason=f"{type(exc).__name__}: {exc}",
+                ),
+            )
+        return RefreshDeploymentRevisionActionResult(
+            result=RevisionRefreshResult(
+                deployment_id=action.deployment_id,
+                new_revision_id=new_revision.id,
+                success=True,
+                failure_reason=None,
+            ),
         )
-        return RefreshDeploymentRevisionsActionResult(results=results)
 
     # ========== Route Operations ==========
 
