@@ -86,7 +86,7 @@ class SessionValidationSpec:
         )
 
     @classmethod
-    def from_spec(cls, model_revision: ModelRevisionSpec) -> Self:
+    def from_revision_spec(cls, model_revision: ModelRevisionSpec) -> Self:
         # Write-side counterpart for the legacy bridge: the draft pipeline
         # builds a ``ModelRevisionSpec`` before any row is persisted, so
         # there is no ``ModelRevisionData`` to validate against yet.

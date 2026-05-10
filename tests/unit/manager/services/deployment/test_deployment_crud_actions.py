@@ -148,7 +148,7 @@ class DeploymentCRUDBaseFixtures:
                 scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
-            replica_counts=ReplicaCountData(replica_count=2, desired_replica_count=None),
+            replica=ReplicaCountData(replica_count=2, desired_replica_count=None),
             network=DeploymentNetworkData(
                 open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
             ),

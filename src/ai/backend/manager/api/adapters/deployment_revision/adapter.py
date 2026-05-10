@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     AdminRefreshDeploymentRevisionsPayload,
     RevisionRefreshResultInfo,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
@@ -27,8 +28,8 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.services.deployment.actions.list_active_deployments_with_current_revision import (
     ListActiveDeploymentsWithCurrentRevisionAction,
 )
-from ai.backend.manager.services.deployment.actions.refresh_deployment_revision import (
-    RefreshDeploymentRevisionAction,
+from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
+    RefreshDeploymentRevisionsAction,
 )
 
 
@@ -44,26 +45,28 @@ class DeploymentRevisionAdapter(BaseAdapter):
     ) -> AdminRefreshDeploymentRevisionsPayload:
         """Create and activate a fresh revision for every active deployment.
 
-        Two-phase orchestration: a read-side action returns
-        ``(deployment_id, ModelRevisionData)`` pairs, this adapter projects
-        each pair into a ``ModelRevisionCreator`` (failures here surface
-        per-item without aborting the whole sweep), and the per-deployment
-        refresh action runs the controller call.
+        Two-phase orchestration: a read-side action returns the current
+        ``ModelRevisionData`` for every active deployment, this adapter
+        projects each onto a ``ModelRevisionCreator`` (failures here
+        surface per-item without aborting the whole sweep), and the batch
+        refresh action processes the resulting ``creators_by_id`` map in a
+        single service call.
         """
         list_result = await self._processors.deployment.list_active_deployments_with_current_revision.wait_for_complete(
             ListActiveDeploymentsWithCurrentRevisionAction()
         )
-        results: list[RevisionRefreshResultInfo] = []
+        creators_by_id: dict[DeploymentID, ModelRevisionCreator] = {}
+        conversion_failures: list[RevisionRefreshResultInfo] = []
         for revision in list_result.revisions:
             try:
-                creator = self._creator_from_data(revision)
+                creators_by_id[revision.deployment_id] = self._creator_from_data(revision)
             except InvalidAPIParameters as exc:
                 # Conversion failed (e.g., revision missing the model
                 # vfolder after a SET-NULL FK cleanup). Surface it as a
                 # per-deployment failure rather than aborting the bulk
                 # refresh — same contract the inline service loop used
                 # to provide via try/except.
-                results.append(
+                conversion_failures.append(
                     RevisionRefreshResultInfo(
                         deployment_id=revision.deployment_id,
                         new_revision_id=None,
@@ -71,25 +74,25 @@ class DeploymentRevisionAdapter(BaseAdapter):
                         failure_reason=f"{type(exc).__name__}: {exc}",
                     )
                 )
-                continue
-            refresh_result = (
-                await self._processors.deployment.refresh_deployment_revision.wait_for_complete(
-                    RefreshDeploymentRevisionAction(
-                        deployment_id=revision.deployment_id,
-                        creator=creator,
+        refresh_result = (
+            await self._processors.deployment.refresh_deployment_revisions.wait_for_complete(
+                RefreshDeploymentRevisionsAction(creators_by_id=creators_by_id)
+            )
+        )
+        return AdminRefreshDeploymentRevisionsPayload(
+            results=[
+                *conversion_failures,
+                *(
+                    RevisionRefreshResultInfo(
+                        deployment_id=r.deployment_id,
+                        new_revision_id=r.new_revision_id,
+                        success=r.success,
+                        failure_reason=r.failure_reason,
                     )
-                )
-            )
-            r = refresh_result.result
-            results.append(
-                RevisionRefreshResultInfo(
-                    deployment_id=r.deployment_id,
-                    new_revision_id=r.new_revision_id,
-                    success=r.success,
-                    failure_reason=r.failure_reason,
-                )
-            )
-        return AdminRefreshDeploymentRevisionsPayload(results=results)
+                    for r in refresh_result.results
+                ),
+            ]
+        )
 
     @staticmethod
     def _creator_from_data(data: ModelRevisionData) -> ModelRevisionCreator:

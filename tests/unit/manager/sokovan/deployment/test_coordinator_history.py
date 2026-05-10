@@ -61,7 +61,7 @@ def sample_deployment_info() -> DeploymentInfo:
             scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica_counts=ReplicaCountData(
+        replica=ReplicaCountData(
             replica_count=1,
             desired_replica_count=None,
         ),

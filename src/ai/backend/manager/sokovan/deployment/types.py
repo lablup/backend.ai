@@ -96,7 +96,7 @@ class RouteCreationSpec:
     def get_target_replicas_from_deployment(deployment_info: DeploymentInfo) -> int:
         """Get the target number of replicas for a DeploymentInfo."""
         # DeploymentInfo has replica_spec.replica_count
-        return deployment_info.replica_counts.replica_count
+        return deployment_info.replica.replica_count
 
     # Extension methods for DeploymentInfoWithRoutes compatibility
     @staticmethod

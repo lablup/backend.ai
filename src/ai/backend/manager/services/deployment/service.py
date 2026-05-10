@@ -149,9 +149,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
     SearchRevisionsAction,
     SearchRevisionsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.refresh_deployment_revision import (
-    RefreshDeploymentRevisionAction,
-    RefreshDeploymentRevisionActionResult,
+from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
+    RefreshDeploymentRevisionsAction,
+    RefreshDeploymentRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
     ReplaceDeploymentOptionsAction,
@@ -238,9 +238,9 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
                 info.current_revision_id,
             )
 
-    desired_count = info.replica_counts.desired_replica_count
+    desired_count = info.replica.desired_replica_count
     if desired_count is None:
-        desired_count = info.replica_counts.replica_count
+        desired_count = info.replica.replica_count
 
     return ModelDeploymentData(
         id=info.id,
@@ -621,8 +621,9 @@ class DeploymentService:
         Backs the admin bulk revision refresh: the adapter consumes this
         list, projects each ``ModelRevisionData`` onto a
         ``ModelRevisionCreator``, then invokes
-        ``refresh_deployment_revision`` per item.  All type conversions stay
-        in the adapter; the service only orchestrates the read pass.
+        ``refresh_deployment_revisions`` once with the prepared map. All
+        type conversions stay in the adapter; the service only orchestrates
+        the read pass.
         """
         # Bulk scan + per-id read: two-phase fetch is required to preserve
         # partial-success semantics in the adapter (a single missing
@@ -651,48 +652,64 @@ class DeploymentService:
             revisions.append(revision)
         return ListActiveDeploymentsWithCurrentRevisionActionResult(revisions=revisions)
 
-    async def refresh_deployment_revision(
+    async def refresh_deployment_revisions(
         self,
-        action: RefreshDeploymentRevisionAction,
-    ) -> RefreshDeploymentRevisionActionResult:
-        """Add and activate a fresh revision for one deployment.
+        action: RefreshDeploymentRevisionsAction,
+    ) -> RefreshDeploymentRevisionsActionResult:
+        """Add and activate a fresh revision for each entry in
+        ``action.creators_by_id``.
 
-        The adapter has already converted the previous revision's
-        ``ModelRevisionData`` into ``action.creator``; this method just runs
-        ``DeploymentController.add_deployment_revision(auto_activate=True)``
-        and packages the outcome into a ``RevisionRefreshResult`` so the
-        adapter can aggregate per-item success/failure without itself
-        catching exceptions.
+        The adapter has already converted every previous-revision
+        ``ModelRevisionData`` into a ``ModelRevisionCreator``; this method
+        only runs ``DeploymentController.add_deployment_revision(
+        auto_activate=True)`` per (deployment_id, creator) pair and packages
+        the outcomes into ``RevisionRefreshResult``s. Each deployment is
+        processed independently so a single failure does not abort the rest
+        (partial success by design).
         """
-        try:
-            new_revision = await self._deployment_controller.add_deployment_revision(
-                deployment_id=action.deployment_id,
-                revision=action.creator,
-                auto_activate=True,
+        results: list[RevisionRefreshResult] = []
+        succeeded = 0
+        failed = 0
+        for deployment_id, creator in action.creators_by_id.items():
+            try:
+                new_revision = await self._deployment_controller.add_deployment_revision(
+                    deployment_id=deployment_id,
+                    revision=creator,
+                    auto_activate=True,
+                )
+            except Exception as exc:
+                log.warning(
+                    "refresh_deployment_revisions failed for deployment {}: {}: {}",
+                    deployment_id,
+                    type(exc).__name__,
+                    exc,
+                )
+                results.append(
+                    RevisionRefreshResult(
+                        deployment_id=deployment_id,
+                        new_revision_id=None,
+                        success=False,
+                        failure_reason=f"{type(exc).__name__}: {exc}",
+                    )
+                )
+                failed += 1
+                continue
+            results.append(
+                RevisionRefreshResult(
+                    deployment_id=deployment_id,
+                    new_revision_id=new_revision.id,
+                    success=True,
+                    failure_reason=None,
+                )
             )
-        except Exception as exc:
-            log.warning(
-                "refresh_deployment_revision failed for deployment {}: {}: {}",
-                action.deployment_id,
-                type(exc).__name__,
-                exc,
-            )
-            return RefreshDeploymentRevisionActionResult(
-                result=RevisionRefreshResult(
-                    deployment_id=action.deployment_id,
-                    new_revision_id=None,
-                    success=False,
-                    failure_reason=f"{type(exc).__name__}: {exc}",
-                ),
-            )
-        return RefreshDeploymentRevisionActionResult(
-            result=RevisionRefreshResult(
-                deployment_id=action.deployment_id,
-                new_revision_id=new_revision.id,
-                success=True,
-                failure_reason=None,
-            ),
+            succeeded += 1
+        log.info(
+            "refresh_deployment_revisions summary: total={} succeeded={} failed={}",
+            len(action.creators_by_id),
+            succeeded,
+            failed,
         )
+        return RefreshDeploymentRevisionsActionResult(results=results)
 
     # ========== Route Operations ==========
 

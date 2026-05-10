@@ -200,8 +200,8 @@ def _serve_info_from_deployment_info(
         model_definition_path=model_revision.model_mount_config.definition_path
         if model_revision
         else None,
-        replicas=deployment_info.replica_counts.replica_count,
-        desired_session_count=deployment_info.replica_counts.replica_count,
+        replicas=deployment_info.replica.replica_count,
+        desired_session_count=deployment_info.replica.replica_count,
         active_routes=[],
         service_endpoint=HttpUrl(deployment_info.network.url)
         if deployment_info.network.url

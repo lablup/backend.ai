@@ -684,7 +684,7 @@ class DeploymentInfo:
     id: DeploymentID
     metadata: DeploymentMetadata
     state: DeploymentState
-    replica_counts: ReplicaCountData
+    replica: ReplicaCountData
     network: DeploymentNetworkData
     model_revisions: list[ModelRevisionData]
     options: DeploymentOptions

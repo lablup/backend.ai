@@ -896,7 +896,7 @@ class DeploymentRepository:
             return None
 
         current_datetime = datetime.now(UTC)
-        current_replica_count = deployment.replica_counts.target_replica_count
+        current_replica_count = deployment.replica.target_replica_count
         routes = metrics_data.routes_by_deployment.get(deployment.id, [])
 
         for rule in auto_scaling_rules:

@@ -765,7 +765,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 scaling_state=self.scaling_state,
                 retry_count=self.retries,
             ),
-            replica_counts=ReplicaCountData(
+            replica=ReplicaCountData(
                 replica_count=self.replicas,
                 desired_replica_count=self.desired_replicas,
             ),
