@@ -183,7 +183,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         SearchRevisionResourceSlotsAction, SearchRevisionResourceSlotsActionResult
     ]
     activate_revision: ActionProcessor[ActivateRevisionAction, ActivateRevisionActionResult]
-    refresh_deployment_revisions: ActionProcessor[
+    admin_refresh_deployment_revisions: ActionProcessor[
         RefreshDeploymentRevisionsAction, RefreshDeploymentRevisionsActionResult
     ]
 
@@ -273,8 +273,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
             service.search_revision_resource_slots, action_monitors
         )
         self.activate_revision = ActionProcessor(service.activate_revision, action_monitors)
-        self.refresh_deployment_revisions = ActionProcessor(
-            service.refresh_deployment_revisions, action_monitors
+        self.admin_refresh_deployment_revisions = ActionProcessor(
+            service.admin_refresh_deployment_revisions, action_monitors
         )
 
         # Route operations

@@ -67,6 +67,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     AccessTokenNode,
     ActivateRevisionPayload,
     AddRevisionPayload,
+    AdminRefreshDeploymentRevisionsPayload,
     AdminSearchDeploymentsPayload,
     AdminSearchRevisionsPayload,
     AutoScalingRuleNode,
@@ -86,6 +87,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     ReplaceDeploymentOptionsPayload,
     ReplicaNode,
     RevisionNode,
+    RevisionRefreshResultInfo,
     RouteNode,
     SearchAccessTokensPayload,
     SearchAutoScalingRulesPayload,
@@ -294,6 +296,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
+)
+from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
+    RefreshDeploymentRevisionsAction,
 )
 from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
     ReplaceDeploymentOptionsAction,
@@ -778,6 +783,27 @@ class DeploymentAdapter(BaseAdapter):
             previous_revision_id=action_result.previous_revision_id,
             activated_revision_id=action_result.activated_revision_id,
             deployment_policy=self._policy_data_to_dto(action_result.deployment_policy),
+        )
+
+    async def admin_refresh_deployment_revisions(
+        self,
+    ) -> AdminRefreshDeploymentRevisionsPayload:
+        """Create and activate a fresh revision for every active deployment."""
+        action_result = (
+            await self._processors.deployment.admin_refresh_deployment_revisions.wait_for_complete(
+                RefreshDeploymentRevisionsAction()
+            )
+        )
+        return AdminRefreshDeploymentRevisionsPayload(
+            results=[
+                RevisionRefreshResultInfo(
+                    deployment_id=r.deployment_id,
+                    new_revision_id=r.new_revision_id,
+                    success=r.success,
+                    failure_reason=r.failure_reason,
+                )
+                for r in action_result.results
+            ]
         )
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:

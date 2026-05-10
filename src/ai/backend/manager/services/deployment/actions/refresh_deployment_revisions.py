@@ -1,28 +1,20 @@
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 from ai.backend.manager.data.deployment.types import RevisionRefreshResult
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
 @dataclass
 class RefreshDeploymentRevisionsAction(DeploymentBaseAction):
-    """Admin-only batch action that adds and activates a fresh revision for
-    each deployment in ``creators_by_id``.
+    """Admin-only action to refresh revisions for all active deployments.
 
-    The adapter layer is responsible for projecting each previous-revision
-    ``ModelRevisionData`` onto a ``ModelRevisionCreator`` before invoking
-    this action; the service does no type conversion of its own. Each
-    deployment is processed independently so a single failure does not
-    abort the rest (partial success by design).
+    Creates a new revision based on each active deployment's current revision
+    and activates it, allowing DeploymentController to re-resolve preset,
+    deployment-config, and model_definition.
     """
-
-    creators_by_id: Mapping[DeploymentID, ModelRevisionCreator]
 
     @override
     def entity_id(self) -> str | None:
