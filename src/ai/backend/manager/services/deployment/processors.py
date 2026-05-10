@@ -82,10 +82,6 @@ from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
 )
-from ai.backend.manager.services.deployment.actions.list_active_deployments_with_current_revision import (
-    ListActiveDeploymentsWithCurrentRevisionAction,
-    ListActiveDeploymentsWithCurrentRevisionActionResult,
-)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
@@ -187,10 +183,6 @@ class DeploymentProcessors(AbstractProcessorPackage):
         SearchRevisionResourceSlotsAction, SearchRevisionResourceSlotsActionResult
     ]
     activate_revision: ActionProcessor[ActivateRevisionAction, ActivateRevisionActionResult]
-    list_active_deployments_with_current_revision: ActionProcessor[
-        ListActiveDeploymentsWithCurrentRevisionAction,
-        ListActiveDeploymentsWithCurrentRevisionActionResult,
-    ]
     refresh_deployment_revisions: ActionProcessor[
         RefreshDeploymentRevisionsAction, RefreshDeploymentRevisionsActionResult
     ]
@@ -281,9 +273,6 @@ class DeploymentProcessors(AbstractProcessorPackage):
             service.search_revision_resource_slots, action_monitors
         )
         self.activate_revision = ActionProcessor(service.activate_revision, action_monitors)
-        self.list_active_deployments_with_current_revision = ActionProcessor(
-            service.list_active_deployments_with_current_revision, action_monitors
-        )
         self.refresh_deployment_revisions = ActionProcessor(
             service.refresh_deployment_revisions, action_monitors
         )
@@ -347,7 +336,6 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SearchRevisionsAction.spec(),
             SearchRevisionResourceSlotsAction.spec(),
             ActivateRevisionAction.spec(),
-            ListActiveDeploymentsWithCurrentRevisionAction.spec(),
             RefreshDeploymentRevisionsAction.spec(),
             # Route operations
             SyncReplicaAction.spec(),

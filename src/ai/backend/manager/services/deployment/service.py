@@ -41,8 +41,6 @@ from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
 from ai.backend.manager.models.endpoint import EndpointTokenRow
-from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -128,10 +126,6 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
 from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
-)
-from ai.backend.manager.services.deployment.actions.list_active_deployments_with_current_revision import (
-    ListActiveDeploymentsWithCurrentRevisionAction,
-    ListActiveDeploymentsWithCurrentRevisionActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
@@ -611,46 +605,6 @@ class DeploymentService:
             activated_revision_id=result.activated_revision_id,
             deployment_policy=result.deployment_policy,
         )
-
-    async def list_active_deployments_with_current_revision(
-        self,
-        action: ListActiveDeploymentsWithCurrentRevisionAction,
-    ) -> ListActiveDeploymentsWithCurrentRevisionActionResult:
-        """List active deployments paired with their current revision data.
-
-        Backs the admin bulk revision refresh: the adapter consumes this
-        list, projects each ``ModelRevisionData`` onto a
-        ``ModelRevisionCreator``, then invokes
-        ``refresh_deployment_revisions`` once with the prepared map. All
-        type conversions stay in the adapter; the service only orchestrates
-        the read pass.
-        """
-        # Bulk scan + per-id read: two-phase fetch is required to preserve
-        # partial-success semantics in the adapter (a single missing
-        # revision must not abort the entire refresh).
-        active_querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                DeploymentConditions.by_lifecycle_stages(EndpointLifecycle.active_states()),
-            ],
-        )
-        deployment_ids = await self._deployment_repository.search_deployment_ids(
-            querier=active_querier,
-        )
-        revisions: list[ModelRevisionData] = []
-        for deployment_id in deployment_ids:
-            try:
-                revision = await self._deployment_repository.get_current_revision(deployment_id)
-            except Exception as exc:
-                log.warning(
-                    "list_active_deployments_with_current_revision: skipping {}: {}: {}",
-                    deployment_id,
-                    type(exc).__name__,
-                    exc,
-                )
-                continue
-            revisions.append(revision)
-        return ListActiveDeploymentsWithCurrentRevisionActionResult(revisions=revisions)
 
     async def refresh_deployment_revisions(
         self,
