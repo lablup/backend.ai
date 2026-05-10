@@ -176,13 +176,8 @@ class ModelDefinitionInput(BaseRequestModel):
 
     models: list[ModelConfigInput] | None = None
 
-
-def to_model_definition_draft(
-    input: ModelDefinitionInput | None,
-) -> ModelDefinitionDraft | None:
-    if input is None:
-        return None
-    return ModelDefinitionDraft.model_validate(input.model_dump())
+    def to_draft(self) -> ModelDefinitionDraft:
+        return ModelDefinitionDraft.model_validate(self.model_dump())
 
 
 class ClusterConfigInput(BaseRequestModel):

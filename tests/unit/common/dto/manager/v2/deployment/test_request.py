@@ -11,7 +11,6 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
-from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateDeploymentInput,
@@ -25,6 +24,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput,
     ExtraVFolderMountInput,
     ImageInput,
+    ModelDefinitionInput,
     ModelDeploymentMetadataInput,
     ModelDeploymentNetworkAccessInput,
     ModelMountConfigInput,
@@ -55,7 +55,7 @@ def _make_revision_input(**kwargs: object) -> RevisionInput:
         "runtime_variant_id": RuntimeVariantID(uuid.uuid4()),
         "model_vfolder_id": VFolderUUID(uuid.uuid4()),
         "model_definition_path": "/models/model.yaml",
-        "model_definition": ModelDefinitionDraft(),
+        "model_definition": ModelDefinitionInput(),
     }
     defaults.update(kwargs)
     return RevisionInput(**defaults)
@@ -82,7 +82,7 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
             mount_destination="/models",
             definition_path="/models/model.yaml",
         ),
-        "model_definition": ModelDefinitionDraft(),
+        "model_definition": ModelDefinitionInput(),
     }
     defaults.update(kwargs)
     return CreateRevisionInputDTO(**defaults)
@@ -103,7 +103,7 @@ class TestRevisionInput:
             runtime_variant_id=runtime_variant_id,
             model_vfolder_id=model_id,
             model_definition_path="/models/def.yaml",
-            model_definition=ModelDefinitionDraft(),
+            model_definition=ModelDefinitionInput(),
         )
         assert rev.image_id == image_id
         assert rev.cluster_mode == ClusterMode.SINGLE_NODE
