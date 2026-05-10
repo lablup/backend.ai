@@ -44,6 +44,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
+from ai.backend.manager.errors.deployment import RevisionMissingModelVFolder
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 
@@ -76,7 +77,7 @@ class DeploymentSessionDraftBuilder:
         model_definition_payload = cls._model_definition_payload(target_revision, context)
 
         if target_revision.model_mount_config.vfolder_id is None:
-            raise ValueError(
+            raise RevisionMissingModelVFolder(
                 f"Revision {target_revision.id} has no model vfolder; cannot build session draft"
             )
 
@@ -152,7 +153,7 @@ class DeploymentSessionDraftBuilder:
         # Model vfolder is always first (READ_ONLY), extra mounts follow
         # with their frozen permissions already on each entry.
         if target_revision.model_mount_config.vfolder_id is None:
-            raise ValueError(
+            raise RevisionMissingModelVFolder(
                 f"Revision {target_revision.id} has no model vfolder; cannot build mount entries"
             )
         return (
