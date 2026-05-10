@@ -20145,6 +20145,9 @@ type VFolder implements Node
 
   """Path for unmanaged virtual folders."""
   unmanagedPath: String
+
+  """Added in UNRELEASED. Model cards backed by this vfolder."""
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
 
 """

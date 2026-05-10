@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -11,6 +12,7 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.models.condition_utils import (
     make_nested_string_in_factory,
     make_string_in_factory,
@@ -23,6 +25,13 @@ __all__ = ("ModelCardConditions",)
 
 
 class ModelCardConditions:
+    @staticmethod
+    def by_vfolder_ids(vfolder_ids: Collection[VFolderUUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ModelCardRow.vfolder.in_(vfolder_ids)
+
+        return inner
+
     @staticmethod
     def by_domain(domain_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
