@@ -263,20 +263,6 @@ class RouteTargetStatuses:
 
 
 @dataclass(frozen=True)
-class RouteHealthCheckFilter:
-    """Revision-level ``health_check_enabled`` gating for route queries.
-
-    - ``health_check_required=None``: no filter on the flag.
-    - ``health_check_required=True/False``: AND with the flag.
-    - ``include_health_check_disabled=True``: OR-include rows where the flag
-      is ``False``, regardless of the row's ``health_status``.
-    """
-
-    health_check_required: bool | None = None
-    include_health_check_disabled: bool = False
-
-
-@dataclass(frozen=True)
 class RouteTransitionTarget:
     """Target state for a route transition (lifecycle + health)."""
 

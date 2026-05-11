@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from dateutil.tz import tzutc
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
@@ -26,8 +27,14 @@ from ai.backend.manager.sokovan.deployment.route.handlers.health_check import (
 )
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
+_DEFAULT_HEALTH_CHECK = ModelHealthCheck(path="/health")
 
-def _route(health_status: RouteHealthStatus) -> RouteData:
+
+def _route(
+    health_status: RouteHealthStatus,
+    *,
+    health_check_config: ModelHealthCheck | None = _DEFAULT_HEALTH_CHECK,
+) -> RouteData:
     return RouteData(
         route_id=uuid4(),
         deployment_id=DeploymentID(uuid4()),
@@ -39,6 +46,7 @@ def _route(health_status: RouteHealthStatus) -> RouteData:
         replica_host="10.0.0.1",
         replica_port=8000,
         created_at=datetime.now(tzutc()),
+        health_check_config=health_check_config,
     )
 
 
@@ -46,7 +54,9 @@ class TestHealthCheckHandler:
     """Tests for HealthCheckRouteHandler delegation."""
 
     async def test_execute_delegates_to_executor_check_route_health(self) -> None:
-        """RR-HC-001: handler.execute is a thin pass-through to check_route_health."""
+        """RR-HC-001: handler.execute is a thin pass-through to check_route_health
+        for routes whose revision configured ``service.health_check``.
+        """
         executor = AsyncMock()
         check_result = RouteExecutionResult(successes=[], errors=[], stale=[])
         executor.check_route_health = AsyncMock(return_value=check_result)
@@ -58,6 +68,26 @@ class TestHealthCheckHandler:
 
         executor.check_route_health.assert_awaited_once_with(routes)
         assert result is check_result
+
+    async def test_execute_skips_routes_without_health_check_config(self) -> None:
+        """Routes whose revision opted out of ``service.health_check`` (no
+        ``health_check_config``) are filtered out before the executor runs.
+
+        The executor's ``check_route_health`` would otherwise classify their
+        missing ``RouteHealthRecord`` as ``stale`` and mark them DEGRADED.
+        """
+        executor = AsyncMock()
+        executor.check_route_health = AsyncMock()
+        event_producer = MagicMock()
+        handler = HealthCheckRouteHandler(executor, event_producer)
+        routes = [_route(RouteHealthStatus.NOT_CHECKED, health_check_config=None)]
+
+        result = await handler.execute(routes)
+
+        executor.check_route_health.assert_not_awaited()
+        assert result.successes == []
+        assert result.errors == []
+        assert result.stale == []
 
     async def test_post_process_logs_only(self) -> None:
         """RR-HC-002: post_process is a logging shim — no executor call here.

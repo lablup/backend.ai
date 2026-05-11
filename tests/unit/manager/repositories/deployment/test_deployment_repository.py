@@ -47,7 +47,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentPolicyData,
     ModelRevisionData,
-    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteTargetStatuses,
@@ -3494,9 +3493,9 @@ class TestRouteOperations:
 class TestGetRoutesByStatuses:
     """Test cases for ``DeploymentRepository.get_routes_by_statuses()``.
 
-    Exercises the (lifecycle x health x traffic_status x revision-level
-    ``health_check_enabled``) filter matrix used by sokovan route handlers
-    to gate AppProxy registration and health probing.
+    Exercises the (lifecycle x health x traffic_status) filter used by
+    sokovan route handlers, plus the ``health_check_config`` projection
+    from each revision's ``model_definition``.
     """
 
     @pytest.fixture
@@ -3924,7 +3923,6 @@ class TestGetRoutesByStatuses:
                 lifecycle=[RouteStatus.RUNNING],
                 health=list(RouteHealthStatus),
             ),
-            RouteHealthCheckFilter(),
         )
 
         assert {r.route_id for r in result} == {
@@ -3940,14 +3938,13 @@ class TestGetRoutesByStatuses:
         populated_routes: dict[str, uuid.UUID],
     ) -> None:
         """Health filter restricts to rows whose ``RoutingRow.health_status`` is
-        in the target list (without ``include_health_check_disabled``).
+        in the target list.
         """
         result = await deployment_repository.get_routes_by_statuses(
             RouteTargetStatuses(
                 lifecycle=[RouteStatus.RUNNING],
                 health=[RouteHealthStatus.HEALTHY],
             ),
-            RouteHealthCheckFilter(),
         )
 
         assert {r.route_id for r in result} == {
@@ -3969,14 +3966,12 @@ class TestGetRoutesByStatuses:
                 health=[RouteHealthStatus.HEALTHY],
                 traffic_status=RouteTrafficStatus.INACTIVE,
             ),
-            RouteHealthCheckFilter(),
         )
         both = await deployment_repository.get_routes_by_statuses(
             RouteTargetStatuses(
                 lifecycle=[RouteStatus.RUNNING],
                 health=[RouteHealthStatus.HEALTHY],
             ),
-            RouteHealthCheckFilter(),
         )
 
         assert {r.route_id for r in only_inactive} == {
@@ -3985,74 +3980,6 @@ class TestGetRoutesByStatuses:
         assert {r.route_id for r in both} == {
             populated_routes["running_hc_on_healthy_active"],
             populated_routes["running_hc_on_healthy_inactive"],
-        }
-
-    async def test_health_check_required_true_returns_only_hc_enabled_routes(
-        self,
-        deployment_repository: DeploymentRepository,
-        populated_routes: dict[str, uuid.UUID],
-    ) -> None:
-        """``health_check_required=True`` keeps only rows whose revision has
-        ``health_check_enabled=True`` (the health-probe scheduling path).
-        """
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=list(RouteHealthStatus),
-            ),
-            RouteHealthCheckFilter(health_check_required=True),
-        )
-
-        assert {r.route_id for r in result} == {
-            populated_routes["running_hc_on_healthy_active"],
-            populated_routes["running_hc_on_unhealthy_active"],
-            populated_routes["running_hc_on_healthy_inactive"],
-        }
-
-    async def test_health_check_required_false_returns_only_hc_disabled_routes(
-        self,
-        deployment_repository: DeploymentRepository,
-        populated_routes: dict[str, uuid.UUID],
-    ) -> None:
-        """``health_check_required=False`` keeps only rows whose revision has
-        ``health_check_enabled=False``.
-        """
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=list(RouteHealthStatus),
-            ),
-            RouteHealthCheckFilter(health_check_required=False),
-        )
-
-        assert {r.route_id for r in result} == {
-            populated_routes["running_hc_off_not_checked_active"],
-        }
-
-    async def test_include_health_check_disabled_or_includes_disabled_revisions(
-        self,
-        deployment_repository: DeploymentRepository,
-        populated_routes: dict[str, uuid.UUID],
-    ) -> None:
-        """``include_health_check_disabled=True`` OR-includes hc-disabled rows
-        regardless of their ``health_status`` (the AppProxy-sync path).
-
-        hc-enabled rows still must satisfy the health filter, so
-        ``running_hc_on_unhealthy_active`` (UNHEALTHY + hc-on) is excluded
-        even though it is RUNNING.
-        """
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=[RouteHealthStatus.HEALTHY],
-            ),
-            RouteHealthCheckFilter(include_health_check_disabled=True),
-        )
-
-        assert {r.route_id for r in result} == {
-            populated_routes["running_hc_on_healthy_active"],
-            populated_routes["running_hc_on_healthy_inactive"],
-            populated_routes["running_hc_off_not_checked_active"],
         }
 
     async def test_health_check_config_projected_from_model_definition(
@@ -4069,7 +3996,6 @@ class TestGetRoutesByStatuses:
                 lifecycle=[RouteStatus.RUNNING],
                 health=list(RouteHealthStatus),
             ),
-            RouteHealthCheckFilter(),
         )
         by_route = {r.route_id: r for r in result}
         hc_on = by_route[populated_routes["running_hc_on_healthy_active"]]
@@ -4090,7 +4016,6 @@ class TestGetRoutesByStatuses:
                 lifecycle=[RouteStatus.TERMINATED],
                 health=list(RouteHealthStatus),
             ),
-            RouteHealthCheckFilter(),
         )
 
         assert result == []

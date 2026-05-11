@@ -5,7 +5,6 @@ from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
-    RouteHealthCheckFilter,
     RouteStatusTransitions,
     RouteTargetStatuses,
 )
@@ -59,12 +58,6 @@ class RouteHandler(ABC):
             Each target can change lifecycle status, health status, or both.
         """
         raise NotImplementedError("Subclasses must implement status_transitions()")
-
-    @classmethod
-    @abstractmethod
-    def health_check_filter(cls) -> RouteHealthCheckFilter:
-        """Revision-level ``health_check_enabled`` gating for this handler."""
-        raise NotImplementedError("Subclasses must implement health_check_filter()")
 
     @abstractmethod
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:

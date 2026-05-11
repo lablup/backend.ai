@@ -7,7 +7,6 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
-    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -62,11 +61,6 @@ class HealthCheckRouteHandler(RouteHandler):
         )
 
     @classmethod
-    def health_check_filter(cls) -> RouteHealthCheckFilter:
-        # Skip routes whose revision disabled health checks — no probe target.
-        return RouteHealthCheckFilter(health_check_required=True)
-
-    @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
         """Health check only changes health_status, not lifecycle status."""
         return RouteStatusTransitions(
@@ -76,11 +70,18 @@ class HealthCheckRouteHandler(RouteHandler):
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Execute health check for routes."""
-        log.debug("Checking health for {} routes", len(routes))
+        """Execute health check for routes.
 
-        # Execute route health check logic via executor
-        return await self._route_executor.check_route_health(routes)
+        Routes whose revision opted out of ``service.health_check`` carry no
+        ``health_check_config`` and never had a ``RouteHealthRecord`` registered;
+        skipping them avoids classifying their missing record as stale/degraded.
+        """
+        eligible = [r for r in routes if r.health_check_config is not None]
+        if not eligible:
+            return RouteExecutionResult(successes=[], errors=[], stale=[])
+
+        log.debug("Checking health for {} routes", len(eligible))
+        return await self._route_executor.check_route_health(eligible)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Log health-check results.

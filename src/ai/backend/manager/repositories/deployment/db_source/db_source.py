@@ -71,7 +71,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
-    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
@@ -1620,16 +1619,13 @@ class DeploymentDBSource:
     async def get_routes_by_statuses(
         self,
         target: RouteTargetStatuses,
-        health_check_filter: RouteHealthCheckFilter,
     ) -> list[RouteData]:
-        """Routes matching ``(lifecycle, health, traffic_status)`` with
-        revision-level ``health_check_enabled`` gating per ``health_check_filter``.
+        """Routes matching ``(lifecycle, health, traffic_status)``.
 
         ``model_definition`` is selected so the resolved
         ``ModelHealthCheck`` (or ``None``) can be attached to each
-        :class:`RouteData`. The boolean ``health_check_enabled`` column
-        is still used at SQL level for filtering — the row payload only
-        carries the projected config.
+        :class:`RouteData`; callers gate on ``RouteData.health_check_config``
+        in memory when revision-level health-check enablement matters.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
@@ -1645,21 +1641,7 @@ class DeploymentDBSource:
                 .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
             )
             query = query.where(RoutingRow.status.in_(target.lifecycle))
-            if health_check_filter.include_health_check_disabled:
-                query = query.where(
-                    sa.or_(
-                        RoutingRow.health_status.in_(target.health),
-                        DeploymentRevisionRow.health_check_enabled.is_(False),
-                    )
-                )
-            else:
-                query = query.where(RoutingRow.health_status.in_(target.health))
-            if health_check_filter.health_check_required is not None:
-                query = query.where(
-                    DeploymentRevisionRow.health_check_enabled.is_(
-                        health_check_filter.health_check_required
-                    )
-                )
+            query = query.where(RoutingRow.health_status.in_(target.health))
             if target.traffic_status is not None:
                 query = query.where(RoutingRow.traffic_status == target.traffic_status)
             result = await db_sess.execute(query)

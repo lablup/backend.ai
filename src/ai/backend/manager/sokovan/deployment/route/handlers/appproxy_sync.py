@@ -7,7 +7,6 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
-    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -58,17 +57,14 @@ class AppProxySyncRouteHandler(RouteHandler):
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:
+        # Includes NOT_CHECKED so routes whose revision disabled health_check
+        # (they stay NOT_CHECKED forever) remain candidates; ``execute`` then
+        # narrows the in-memory set to HEALTHY or hc-disabled rows.
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
-            health=[RouteHealthStatus.HEALTHY],
+            health=[RouteHealthStatus.HEALTHY, RouteHealthStatus.NOT_CHECKED],
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
-
-    @classmethod
-    def health_check_filter(cls) -> RouteHealthCheckFilter:
-        # Routes whose revision disabled health_check stay NOT_CHECKED forever;
-        # include them so they still register as AppProxy targets.
-        return RouteHealthCheckFilter(include_health_check_disabled=True)
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
@@ -80,7 +76,18 @@ class AppProxySyncRouteHandler(RouteHandler):
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        return await self._route_executor.sync_appproxy(routes)
+        # Register HEALTHY routes plus revisions that opted out of health_check
+        # (those carry ``health_check_config is None`` and stay NOT_CHECKED);
+        # NOT_CHECKED routes whose revision still has a probe config must wait
+        # for their first successful probe before being announced.
+        eligible = [
+            r
+            for r in routes
+            if r.health_status == RouteHealthStatus.HEALTHY or r.health_check_config is None
+        ]
+        if not eligible:
+            return RouteExecutionResult(successes=[], errors=[])
+        return await self._route_executor.sync_appproxy(eligible)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         synced = len(result.successes)
