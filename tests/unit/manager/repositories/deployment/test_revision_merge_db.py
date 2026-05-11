@@ -1,22 +1,16 @@
 """DB-backed verification of the BA-5983 revision merge contract.
 
-A real ``RuntimeVariantRow`` is seeded via a fixture (so the variant's
-``default_model_definition`` round-trips through ``PydanticColumn``
-serialization). The production ``RevisionDraftReader`` +
-``RevisionDraft.merge`` pipeline is then run against request drafts
-built from various ``ModelDefinitionInput`` shapes; the parametrized
-table only carries the request input and the expected outcome.
+Each test class seeds one specific ``RuntimeVariantRow.default_model_definition``
+shape into the DB (so it round-trips through ``PydanticColumn``
+serialization) and runs the production ``RevisionDraftReader`` +
+``RevisionDraft.merge`` pipeline against various request inputs. The
+parametrize tables only carry the request ``ModelDefinitionInput`` and
+the expected resolved values — the DB baseline is fixed per class via
+its ``variant_id`` fixture.
 
-Two scenario groups, each pinned to its own DB baseline fixture:
-
-- ``TestMergeWithFullBaseline`` — variant ships every required field;
-  the parametrized inputs probe how different requests combine with
-  it (inherit-all, partial override).
-- ``TestMergeRaisesWithIncompleteBaseline`` — variant ships an
-  incomplete definition where ``to_resolved()`` is expected to raise
-  because no source supplies a required nested field. Each parametrize
-  entry pairs an incomplete baseline shape with the expected error
-  pattern; the request is always all-empty.
+Scenarios are partitioned by baseline shape so each class makes the
+"what's in the DB" / "what the user sends" / "what should come out"
+relationship obvious at a glance.
 """
 
 from __future__ import annotations
@@ -38,6 +32,8 @@ from ai.backend.common.config import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelConfigInput,
     ModelDefinitionInput,
+    ModelHealthCheckInput,
+    ModelServiceConfigInput,
 )
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -128,10 +124,27 @@ async def _merge_via_reader(
     return functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
 
 
-class TestMergeWithFullBaseline:
-    """Baseline supplies every required field. The parametrize table
-    pairs each ``ModelDefinitionInput`` shape with the resolved values
-    we expect after merging it against this baseline."""
+def _assert_resolved_matches(merged: RevisionDraft, expected: ResolvedExpectation) -> None:
+    assert merged.model_definition is not None
+    resolved = merged.model_definition.to_resolved()
+    model = resolved.models[0]
+    assert model.name == expected.name
+    assert model.model_path == expected.model_path
+    if expected.service_port is not None:
+        assert model.service is not None
+        assert model.service.port == expected.service_port
+    if expected.health_check_path is not None:
+        assert model.service is not None
+        assert model.service.health_check is not None
+        assert model.service.health_check.path == expected.health_check_path
+
+
+class TestMergeWithCompleteBaseline:
+    """The variant ships a fully-populated ``default_model_definition``.
+
+    Any request — including all-empty — resolves successfully because
+    the DB-side baseline already covers every required field.
+    """
 
     @pytest.fixture
     async def variant_id(
@@ -165,7 +178,7 @@ class TestMergeWithFullBaseline:
                     service_port=9000,
                     health_check_path="/healthz",
                 ),
-                id="empty_request_inherits_full_baseline",
+                id="empty_request_inherits_baseline",
             ),
             pytest.param(
                 ModelDefinitionInput(models=[ModelConfigInput(name="user-name")]),
@@ -179,7 +192,7 @@ class TestMergeWithFullBaseline:
             ),
         ],
     )
-    async def test_merge_resolves_to_expected_values(
+    async def test_resolves_to_expected_values(
         self,
         reader: RevisionDraftReader,
         mounts: MountMetadata,
@@ -191,81 +204,215 @@ class TestMergeWithFullBaseline:
 
         merged = await _merge_via_reader(reader, variant_id, request, mounts)
 
-        assert merged.model_definition is not None
-        resolved = merged.model_definition.to_resolved()
-        model = resolved.models[0]
-        assert model.name == expected.name
-        assert model.model_path == expected.model_path
-        if expected.service_port is not None:
-            assert model.service is not None
-            assert model.service.port == expected.service_port
-        if expected.health_check_path is not None:
-            assert model.service is not None
-            assert model.service.health_check is not None
-            assert model.service.health_check.path == expected.health_check_path
+        _assert_resolved_matches(merged, expected)
 
 
-class TestMergeRaisesWithIncompleteBaseline:
-    """Each parametrize entry seeds its own incomplete baseline (via the
-    ``baseline_factory``) and expects ``to_resolved()`` to raise because
-    no source supplies a required field. The request is always
-    all-empty so the failure mode comes entirely from the baseline."""
+class TestMergeWhenBaselineLacksName:
+    """The variant baseline omits ``name``. The merge succeeds only
+    when the request supplies one — otherwise ``to_resolved()`` raises.
+    """
+
+    @pytest.fixture
+    async def variant_id(
+        self,
+        db_with_variant_table: ExtendedAsyncSAEngine,
+    ) -> RuntimeVariantID:
+        return await _seed_variant(
+            db_with_variant_table,
+            ModelDefinitionDraft(
+                models=[ModelConfigDraft(model_path="/baseline/path")],
+            ),
+        )
 
     @pytest.mark.parametrize(
-        ("incomplete_baseline", "error_pattern"),
+        ("request_input", "expected"),
         [
             pytest.param(
-                # Reader's mount-destination default also fills model_path,
-                # so the only required ``ModelConfig`` field that ends up
-                # unfilled is ``name``.
-                ModelDefinitionDraft(models=[ModelConfigDraft(model_path="/p")]),
-                r"ModelConfig\.name is required",
-                id="name_unfilled",
-            ),
-            pytest.param(
-                ModelDefinitionDraft(
-                    models=[
-                        ModelConfigDraft(
-                            name="n",
-                            model_path="/p",
-                            service=ModelServiceConfigDraft(),
-                        ),
-                    ],
-                ),
-                r"ModelServiceConfig\.port is required",
-                id="service_port_unfilled",
-            ),
-            pytest.param(
-                ModelDefinitionDraft(
-                    models=[
-                        ModelConfigDraft(
-                            name="n",
-                            model_path="/p",
-                            service=ModelServiceConfigDraft(
-                                port=8080,
-                                health_check=ModelHealthCheckDraft(),
-                            ),
-                        ),
-                    ],
-                ),
-                r"ModelHealthCheck\.path is required",
-                id="health_check_path_unfilled",
+                ModelDefinitionInput(models=[ModelConfigInput(name="from-request")]),
+                ResolvedExpectation(name="from-request", model_path="/baseline/path"),
+                id="request_supplies_missing_name",
             ),
         ],
     )
-    async def test_required_field_unfilled_after_merge_raises(
+    async def test_request_supplying_name_resolves(
         self,
-        db_with_variant_table: ExtendedAsyncSAEngine,
         reader: RevisionDraftReader,
         mounts: MountMetadata,
-        incomplete_baseline: ModelDefinitionDraft,
-        error_pattern: str,
+        variant_id: RuntimeVariantID,
+        request_input: ModelDefinitionInput,
+        expected: ResolvedExpectation,
     ) -> None:
-        variant_id = await _seed_variant(db_with_variant_table, incomplete_baseline)
+        request = RevisionDraft(model_definition=request_input.to_draft())
+
+        merged = await _merge_via_reader(reader, variant_id, request, mounts)
+
+        _assert_resolved_matches(merged, expected)
+
+    async def test_empty_request_raises_name_required(
+        self,
+        reader: RevisionDraftReader,
+        mounts: MountMetadata,
+        variant_id: RuntimeVariantID,
+    ) -> None:
         request = RevisionDraft(model_definition=ModelDefinitionInput().to_draft())
 
         merged = await _merge_via_reader(reader, variant_id, request, mounts)
 
         assert merged.model_definition is not None
-        with pytest.raises(ValueError, match=error_pattern):
+        with pytest.raises(ValueError, match=r"ModelConfig\.name is required"):
+            merged.model_definition.to_resolved()
+
+
+class TestMergeWhenBaselineLacksServicePort:
+    """The variant baseline supplies a ``service`` block without
+    ``port``. The merge succeeds only when the request supplies the
+    port — otherwise ``to_resolved()`` raises.
+    """
+
+    @pytest.fixture
+    async def variant_id(
+        self,
+        db_with_variant_table: ExtendedAsyncSAEngine,
+    ) -> RuntimeVariantID:
+        return await _seed_variant(
+            db_with_variant_table,
+            ModelDefinitionDraft(
+                models=[
+                    ModelConfigDraft(
+                        name="baseline",
+                        model_path="/baseline/path",
+                        service=ModelServiceConfigDraft(
+                            health_check=ModelHealthCheckDraft(path="/healthz"),
+                        ),
+                    ),
+                ],
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        ("request_input", "expected"),
+        [
+            pytest.param(
+                ModelDefinitionInput(
+                    models=[
+                        ModelConfigInput(
+                            service=ModelServiceConfigInput(port=8080),
+                        ),
+                    ],
+                ),
+                ResolvedExpectation(
+                    name="baseline",
+                    model_path="/baseline/path",
+                    service_port=8080,
+                    health_check_path="/healthz",
+                ),
+                id="request_supplies_service_port",
+            ),
+        ],
+    )
+    async def test_request_supplying_port_resolves(
+        self,
+        reader: RevisionDraftReader,
+        mounts: MountMetadata,
+        variant_id: RuntimeVariantID,
+        request_input: ModelDefinitionInput,
+        expected: ResolvedExpectation,
+    ) -> None:
+        request = RevisionDraft(model_definition=request_input.to_draft())
+
+        merged = await _merge_via_reader(reader, variant_id, request, mounts)
+
+        _assert_resolved_matches(merged, expected)
+
+    async def test_empty_request_raises_port_required(
+        self,
+        reader: RevisionDraftReader,
+        mounts: MountMetadata,
+        variant_id: RuntimeVariantID,
+    ) -> None:
+        request = RevisionDraft(model_definition=ModelDefinitionInput().to_draft())
+
+        merged = await _merge_via_reader(reader, variant_id, request, mounts)
+
+        assert merged.model_definition is not None
+        with pytest.raises(ValueError, match=r"ModelServiceConfig\.port is required"):
+            merged.model_definition.to_resolved()
+
+
+class TestMergeWhenBaselineLacksHealthCheckPath:
+    """The variant baseline supplies ``service.health_check`` without
+    ``path``. The merge succeeds only when the request supplies the
+    path — otherwise ``to_resolved()`` raises.
+    """
+
+    @pytest.fixture
+    async def variant_id(
+        self,
+        db_with_variant_table: ExtendedAsyncSAEngine,
+    ) -> RuntimeVariantID:
+        return await _seed_variant(
+            db_with_variant_table,
+            ModelDefinitionDraft(
+                models=[
+                    ModelConfigDraft(
+                        name="baseline",
+                        model_path="/baseline/path",
+                        service=ModelServiceConfigDraft(
+                            port=8080,
+                            health_check=ModelHealthCheckDraft(),
+                        ),
+                    ),
+                ],
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        ("request_input", "expected"),
+        [
+            pytest.param(
+                ModelDefinitionInput(
+                    models=[
+                        ModelConfigInput(
+                            service=ModelServiceConfigInput(
+                                health_check=ModelHealthCheckInput(path="/ready"),
+                            ),
+                        ),
+                    ],
+                ),
+                ResolvedExpectation(
+                    name="baseline",
+                    model_path="/baseline/path",
+                    service_port=8080,
+                    health_check_path="/ready",
+                ),
+                id="request_supplies_health_check_path",
+            ),
+        ],
+    )
+    async def test_request_supplying_path_resolves(
+        self,
+        reader: RevisionDraftReader,
+        mounts: MountMetadata,
+        variant_id: RuntimeVariantID,
+        request_input: ModelDefinitionInput,
+        expected: ResolvedExpectation,
+    ) -> None:
+        request = RevisionDraft(model_definition=request_input.to_draft())
+
+        merged = await _merge_via_reader(reader, variant_id, request, mounts)
+
+        _assert_resolved_matches(merged, expected)
+
+    async def test_empty_request_raises_health_check_path_required(
+        self,
+        reader: RevisionDraftReader,
+        mounts: MountMetadata,
+        variant_id: RuntimeVariantID,
+    ) -> None:
+        request = RevisionDraft(model_definition=ModelDefinitionInput().to_draft())
+
+        merged = await _merge_via_reader(reader, variant_id, request, mounts)
+
+        assert merged.model_definition is not None
+        with pytest.raises(ValueError, match=r"ModelHealthCheck\.path is required"):
             merged.model_definition.to_resolved()
