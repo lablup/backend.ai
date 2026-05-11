@@ -134,7 +134,7 @@ def _create_deployment_info(
     rev_id = uuid4()
     revision = MagicMock() if has_revision else None
     if revision is not None:
-        revision.revision_id = rev_id
+        revision.id = rev_id
 
     return DeploymentInfo(
         id=DeploymentID(dep_id),

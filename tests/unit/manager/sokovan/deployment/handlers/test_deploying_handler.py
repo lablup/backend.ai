@@ -103,7 +103,7 @@ class TestDeployingProvisioningHandler:
         """
         deploying_rev_id = DeploymentRevisionID(uuid4())
         revision = MagicMock()
-        revision.revision_id = deploying_rev_id
+        revision.id = deploying_rev_id
 
         return DeploymentWithHistory(
             deployment_info=DeploymentInfo(
