@@ -3955,14 +3955,14 @@ class TestGetRoutesByStatuses:
         deployment_repository: DeploymentRepository,
         populated_routes: dict[str, uuid.UUID],
     ) -> None:
-        """``traffic_status=INACTIVE`` excludes ACTIVE rows; omitting it (``None``)
+        """``traffic=INACTIVE`` excludes ACTIVE rows; omitting it (``None``)
         keeps both ACTIVE and INACTIVE rows in the result set.
         """
         only_inactive = await deployment_repository.get_routes_by_statuses(
             RouteTargetStatuses(
                 lifecycle=[RouteStatus.RUNNING],
                 health=[RouteHealthStatus.HEALTHY],
-                traffic_status=RouteTrafficStatus.INACTIVE,
+                traffic=RouteTrafficStatus.INACTIVE,
             ),
         )
         both = await deployment_repository.get_routes_by_statuses(

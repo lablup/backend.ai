@@ -63,7 +63,7 @@ class AppProxySyncRouteHandler(RouteHandler):
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
             health=[RouteHealthStatus.HEALTHY, RouteHealthStatus.NOT_CHECKED],
-            traffic_status=RouteTrafficStatus.ACTIVE,
+            traffic=RouteTrafficStatus.ACTIVE,
         )
 
     @classmethod

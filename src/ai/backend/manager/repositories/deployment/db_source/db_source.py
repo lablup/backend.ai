@@ -1619,7 +1619,7 @@ class DeploymentDBSource:
         self,
         target: RouteTargetStatuses,
     ) -> list[RouteData]:
-        """Routes matching ``(lifecycle, health, traffic_status)``.
+        """Routes matching ``(lifecycle, health, traffic)``.
 
         ``model_definition`` is selected so the resolved
         ``ModelHealthCheck`` (or ``None``) can be attached to each
@@ -1643,8 +1643,8 @@ class DeploymentDBSource:
                     RoutingRow.health_status.in_(target.health),
                 )
             )
-            if target.traffic_status is not None:
-                query = query.where(RoutingRow.traffic_status == target.traffic_status)
+            if target.traffic is not None:
+                query = query.where(RoutingRow.traffic_status == target.traffic)
             result = await db_sess.execute(query)
             return [
                 RouteData(

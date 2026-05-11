@@ -632,7 +632,7 @@ class DeploymentRepository:
         self,
         target: RouteTargetStatuses,
     ) -> list[RouteData]:
-        """Routes matching ``(lifecycle, health, traffic_status)``."""
+        """Routes matching ``(lifecycle, health, traffic)``."""
         return await self._db_source.get_routes_by_statuses(target)
 
     @deployment_repository_resilience.apply()
