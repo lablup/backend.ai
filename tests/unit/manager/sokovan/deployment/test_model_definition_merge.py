@@ -148,71 +148,59 @@ class TestMergeRaisesWhenAllSourcesAreEmpty:
     required field, ``to_resolved()`` must raise at the persistence
     boundary — preserving the pre-BA-5983 contract."""
 
-    def test_missing_model_name_raises(self) -> None:
-        request = RevisionDraft(
-            model_definition=ModelDefinitionInput(
-                models=[ModelConfigInput(model_path="/p")],
-            ).to_draft(),
-        )
+    @pytest.mark.parametrize(
+        ("request_input", "error_pattern"),
+        [
+            pytest.param(
+                ModelDefinitionInput(models=[ModelConfigInput(model_path="/p")]),
+                r"ModelConfig\.name is required",
+                id="missing_name",
+            ),
+            pytest.param(
+                ModelDefinitionInput(models=[ModelConfigInput(name="n")]),
+                r"ModelConfig\.model_path is required",
+                id="missing_model_path",
+            ),
+            pytest.param(
+                ModelDefinitionInput(
+                    models=[
+                        ModelConfigInput(
+                            name="n",
+                            model_path="/p",
+                            service=ModelServiceConfigInput(),
+                        )
+                    ],
+                ),
+                r"ModelServiceConfig\.port is required",
+                id="missing_service_port",
+            ),
+            pytest.param(
+                ModelDefinitionInput(
+                    models=[
+                        ModelConfigInput(
+                            name="n",
+                            model_path="/p",
+                            service=ModelServiceConfigInput(
+                                port=8080,
+                                health_check=ModelHealthCheckInput(),
+                            ),
+                        )
+                    ],
+                ),
+                r"ModelHealthCheck\.path is required",
+                id="missing_health_check_path",
+            ),
+        ],
+    )
+    def test_missing_required_field_raises(
+        self, request_input: ModelDefinitionInput, error_pattern: str
+    ) -> None:
+        request = RevisionDraft(model_definition=request_input.to_draft())
 
         merged = _merge(request)
 
         assert merged.model_definition is not None
-        with pytest.raises(ValueError, match=r"ModelConfig\.name is required"):
-            merged.model_definition.to_resolved()
-
-    def test_missing_model_path_raises(self) -> None:
-        request = RevisionDraft(
-            model_definition=ModelDefinitionInput(
-                models=[ModelConfigInput(name="n")],
-            ).to_draft(),
-        )
-
-        merged = _merge(request)
-
-        assert merged.model_definition is not None
-        with pytest.raises(ValueError, match=r"ModelConfig\.model_path is required"):
-            merged.model_definition.to_resolved()
-
-    def test_missing_service_port_raises(self) -> None:
-        request = RevisionDraft(
-            model_definition=ModelDefinitionInput(
-                models=[
-                    ModelConfigInput(
-                        name="n",
-                        model_path="/p",
-                        service=ModelServiceConfigInput(),
-                    )
-                ],
-            ).to_draft(),
-        )
-
-        merged = _merge(request)
-
-        assert merged.model_definition is not None
-        with pytest.raises(ValueError, match=r"ModelServiceConfig\.port is required"):
-            merged.model_definition.to_resolved()
-
-    def test_missing_health_check_path_raises(self) -> None:
-        request = RevisionDraft(
-            model_definition=ModelDefinitionInput(
-                models=[
-                    ModelConfigInput(
-                        name="n",
-                        model_path="/p",
-                        service=ModelServiceConfigInput(
-                            port=8080,
-                            health_check=ModelHealthCheckInput(),
-                        ),
-                    )
-                ],
-            ).to_draft(),
-        )
-
-        merged = _merge(request)
-
-        assert merged.model_definition is not None
-        with pytest.raises(ValueError, match=r"ModelHealthCheck\.path is required"):
+        with pytest.raises(ValueError, match=error_pattern):
             merged.model_definition.to_resolved()
 
     def test_empty_request_with_no_baseline_yields_empty_resolved(self) -> None:
