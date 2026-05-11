@@ -890,18 +890,24 @@ class ModelMountConfigData:
 
 @dataclass
 class ExecutionData:
-    """Execution-time hooks frozen on the persisted revision.
+    """Container-execution overrides frozen on the persisted revision:
+    what command runs in the model container, what setup script runs
+    before it, and where deployment lifecycle events get POSTed.
 
-    Sibling of ``ModelRuntimeConfigData`` (which carries the runtime
-    variant + environ + inference runtime knobs). Split out because these
-    three fields have a different lifecycle: they are user-supplied
-    overrides layered on top of preset / deployment-config / model-
-    definition resolution, while runtime variant + environ are produced
-    by the resolver pipeline.
+    Sibling of ``ModelRuntimeConfigData`` (runtime variant / environ /
+    inference runtime knobs); kept separate so the schedulers and draft
+    builders can pass these straight to the kernel spec without picking
+    them out of the runtime config bag.
     """
 
+    # Replaces the image ``CMD`` when starting the model container.
+    # ``None`` keeps whatever the image baked in.
     startup_command: str | None
+    # Shell script run once at container startup, before
+    # ``startup_command``. ``None`` for revisions that do no extra setup.
     bootstrap_script: str | None
+    # Webhook the manager POSTs to on deployment lifecycle events
+    # (provisioning, ready, failure, …); ``None`` disables callbacks.
     callback_url: yarl.URL | None
 
 
