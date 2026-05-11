@@ -173,58 +173,104 @@ class TestEmptyInputMergesWithBaseline:
 class TestMergeRaisesWhenAllSourcesAreEmpty:
     """When neither the request nor any baseline source supplies a
     required field, ``to_resolved()`` must raise at the persistence
-    boundary — preserving the pre-BA-5983 contract."""
+    boundary — preserving the pre-BA-5983 contract.
+
+    Each scenario layers a baseline draft (variant-style) together with
+    a request draft so the merge actually combines fields across
+    sources; the target required field remains unfilled in every layer
+    and the resolved-time check fires on it specifically."""
 
     @pytest.mark.parametrize(
-        ("request_input", "error_pattern"),
+        ("drafts", "error_pattern"),
         [
             pytest.param(
-                ModelDefinitionInput(models=[ModelConfigInput(model_path="/p")]),
+                [
+                    # baseline supplies model_path; request adds nothing.
+                    RevisionDraft(
+                        model_definition=ModelDefinitionDraft(
+                            models=[ModelConfigDraft(model_path="/baseline/path")],
+                        ),
+                    ),
+                    RevisionDraft(
+                        model_definition=ModelDefinitionInput(
+                            models=[ModelConfigInput()],
+                        ).to_draft(),
+                    ),
+                ],
                 r"ModelConfig\.name is required",
-                id="missing_name",
+                id="name_unfilled_across_baseline_and_request",
             ),
             pytest.param(
-                ModelDefinitionInput(models=[ModelConfigInput(name="n")]),
+                [
+                    # baseline supplies name; request adds nothing.
+                    RevisionDraft(
+                        model_definition=ModelDefinitionDraft(
+                            models=[ModelConfigDraft(name="baseline-name")],
+                        ),
+                    ),
+                    RevisionDraft(
+                        model_definition=ModelDefinitionInput(
+                            models=[ModelConfigInput()],
+                        ).to_draft(),
+                    ),
+                ],
                 r"ModelConfig\.model_path is required",
-                id="missing_model_path",
+                id="model_path_unfilled_across_baseline_and_request",
             ),
             pytest.param(
-                ModelDefinitionInput(
-                    models=[
-                        ModelConfigInput(
-                            name="n",
-                            model_path="/p",
-                            service=ModelServiceConfigInput(),
-                        )
-                    ],
-                ),
+                [
+                    # baseline supplies the outer ModelConfig fields;
+                    # request adds an empty service (no port anywhere).
+                    RevisionDraft(
+                        model_definition=ModelDefinitionDraft(
+                            models=[ModelConfigDraft(name="n", model_path="/p")],
+                        ),
+                    ),
+                    RevisionDraft(
+                        model_definition=ModelDefinitionInput(
+                            models=[ModelConfigInput(service=ModelServiceConfigInput())],
+                        ).to_draft(),
+                    ),
+                ],
                 r"ModelServiceConfig\.port is required",
-                id="missing_service_port",
+                id="service_port_unfilled_across_baseline_and_request",
             ),
             pytest.param(
-                ModelDefinitionInput(
-                    models=[
-                        ModelConfigInput(
-                            name="n",
-                            model_path="/p",
-                            service=ModelServiceConfigInput(
-                                port=8080,
-                                health_check=ModelHealthCheckInput(),
-                            ),
-                        )
-                    ],
-                ),
+                [
+                    # baseline supplies a service with port; request adds
+                    # an empty health_check (no path anywhere).
+                    RevisionDraft(
+                        model_definition=ModelDefinitionDraft(
+                            models=[
+                                ModelConfigDraft(
+                                    name="n",
+                                    model_path="/p",
+                                    service=ModelServiceConfigDraft(port=8080),
+                                )
+                            ],
+                        ),
+                    ),
+                    RevisionDraft(
+                        model_definition=ModelDefinitionInput(
+                            models=[
+                                ModelConfigInput(
+                                    service=ModelServiceConfigInput(
+                                        health_check=ModelHealthCheckInput(),
+                                    ),
+                                )
+                            ],
+                        ).to_draft(),
+                    ),
+                ],
                 r"ModelHealthCheck\.path is required",
-                id="missing_health_check_path",
+                id="health_check_path_unfilled_across_baseline_and_request",
             ),
         ],
     )
-    def test_missing_required_field_raises(
-        self, request_input: ModelDefinitionInput, error_pattern: str
+    def test_required_field_unfilled_after_merge_raises(
+        self, drafts: list[RevisionDraft], error_pattern: str
     ) -> None:
-        request = RevisionDraft(model_definition=request_input.to_draft())
-
-        merged = _merge(request)
+        merged = _merge(*drafts)
 
         assert merged.model_definition is not None
         with pytest.raises(ValueError, match=error_pattern):

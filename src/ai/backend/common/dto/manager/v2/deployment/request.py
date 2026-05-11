@@ -177,7 +177,12 @@ class ModelDefinitionInput(BaseRequestModel):
     models: list[ModelConfigInput] | None = None
 
     def to_draft(self) -> ModelDefinitionDraft:
-        return ModelDefinitionDraft.model_validate(self.model_dump())
+        # ``exclude_unset=True`` keeps the resulting draft's
+        # ``model_fields_set`` aligned with what the caller actually
+        # provided. Without it, every field would appear "explicitly
+        # set" (to ``None``) and clobber lower-priority sources during
+        # the revision merge.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
 
 
 class ClusterConfigInput(BaseRequestModel):
