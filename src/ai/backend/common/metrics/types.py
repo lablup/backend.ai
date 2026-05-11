@@ -37,28 +37,35 @@ class KernelLiveStatValues:
         values_by_kernel: Mapping[KernelId, list[MetricValue]],
     ) -> Self:
         """For metrics in `CAPACITY_SENTINEL_METRICS` that are live (have a
-        CURRENT sample) but lack a Prometheus capacity series, append a
-        synthetic CAPACITY sample carrying `CAPACITY_SENTINEL`. Existing
-        capacity values are preserved.
+        CURRENT sample), force the CAPACITY sample to `CAPACITY_SENTINEL`.
+
+        These metrics have no meaningful capacity (cumulative counters / rates),
+        so any CAPACITY value present in the Prometheus response is a stale
+        current-as-fallback artifact and must be overwritten rather than
+        respected.
         """
         new_values: dict[KernelId, list[MetricValue]] = {
             kid: list(vs) for kid, vs in values_by_kernel.items()
         }
-        for vs in new_values.values():
-            reported_currents: set[str] = set()
-            reported_capacities: set[str] = set()
-            for v in vs:
-                if v.value_type is ValueType.CURRENT:
-                    reported_currents.add(v.metric_name)
-                elif v.value_type is ValueType.CAPACITY:
-                    reported_capacities.add(v.metric_name)
-            sentinel_targets = (reported_currents & CAPACITY_SENTINEL_METRICS) - reported_capacities
+        for kid, vs in new_values.items():
+            reported_currents: set[str] = {
+                v.metric_name for v in vs if v.value_type is ValueType.CURRENT
+            }
+            sentinel_targets = reported_currents & CAPACITY_SENTINEL_METRICS
+            if not sentinel_targets:
+                continue
+            rewritten = [
+                v
+                for v in vs
+                if not (v.value_type is ValueType.CAPACITY and v.metric_name in sentinel_targets)
+            ]
             for metric_name in sentinel_targets:
-                vs.append(
+                rewritten.append(
                     MetricValue(
                         metric_name=metric_name,
                         value_type=ValueType.CAPACITY,
                         value=CAPACITY_SENTINEL,
                     )
                 )
+            new_values[kid] = rewritten
         return cls(values_by_kernel=new_values)

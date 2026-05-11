@@ -45,15 +45,24 @@ class TestWithCapacitySentinels:
         })
         assert _capacities_of(result, kernel_id) == {metric_name: CAPACITY_SENTINEL}
 
-    async def test_existing_capacity_is_preserved(self, kernel_id: KernelId) -> None:
-        """A real Prometheus capacity sample is not overwritten by the sentinel."""
+    @pytest.mark.parametrize(
+        "metric_name",
+        ["cpu_used", "net_rx", "net_tx", "io_read", "io_write"],
+    )
+    async def test_existing_capacity_is_overwritten(
+        self, kernel_id: KernelId, metric_name: str
+    ) -> None:
+        """Whitelisted metrics never have a meaningful capacity, so any
+        capacity already present (e.g. a current-as-fallback artifact) must
+        be overwritten by the sentinel.
+        """
         result = KernelLiveStatValues.with_capacity_sentinels({
             kernel_id: [
-                MetricValue("net_rx", ValueType.CURRENT, "10"),
-                MetricValue("net_rx", ValueType.CAPACITY, "999"),
+                MetricValue(metric_name, ValueType.CURRENT, "10"),
+                MetricValue(metric_name, ValueType.CAPACITY, "999"),
             ],
         })
-        assert _capacities_of(result, kernel_id) == {"net_rx": "999"}
+        assert _capacities_of(result, kernel_id) == {metric_name: CAPACITY_SENTINEL}
 
     async def test_skips_metric_without_current_sample(self, kernel_id: KernelId) -> None:
         """No phantom capacity is added when the metric has no CURRENT sample."""
