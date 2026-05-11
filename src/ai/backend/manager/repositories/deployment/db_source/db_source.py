@@ -1638,9 +1638,11 @@ class DeploymentDBSource:
                     DeploymentRevisionRow.id == RoutingRow.revision,
                 )
                 .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
+                .where(
+                    RoutingRow.status.in_(target.lifecycle),
+                    RoutingRow.health_status.in_(target.health),
+                )
             )
-            query = query.where(RoutingRow.status.in_(target.lifecycle))
-            query = query.where(RoutingRow.health_status.in_(target.health))
             if target.traffic_status is not None:
                 query = query.where(RoutingRow.traffic_status == target.traffic_status)
             result = await db_sess.execute(query)
