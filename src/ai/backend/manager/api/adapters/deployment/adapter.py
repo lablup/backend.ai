@@ -2274,6 +2274,7 @@ class DeploymentAdapter(BaseAdapter):
                 for m in data.model_mount_config.extra_mounts
             ],
             revision_preset_id=data.preset.preset_id,
+            health_check_enabled=data.health_check_enabled,
         )
 
     @staticmethod

@@ -496,6 +496,19 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         ),
         default=None,
     )
+    health_check_enabled: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether the revision's resolved ``model_definition`` "
+                "declares a ``service.health_check`` block. When ``False`` "
+                "the manager skips HTTP health probing for routes of this "
+                "revision and AppProxy still registers them once their "
+                "sessions reach ``RUNNING``."
+            ),
+        ),
+        default=False,
+    )
     created_at: datetime = gql_field(description="Timestamp when the revision was created.")
 
     @gql_field(
