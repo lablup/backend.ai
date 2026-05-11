@@ -6045,10 +6045,10 @@ Added in 26.4.0. Configuration for a single model within a model definition.
 """
 input ModelConfigInput {
   """Name of the model."""
-  name: String!
+  name: String = null
 
   """Path to the model file."""
-  modelPath: String!
+  modelPath: String = null
 
   """Configuration for the model service."""
   service: ModelServiceConfigInput = null
@@ -6070,7 +6070,7 @@ Added in 26.4.0. Model definition containing a list of model configurations.
 """
 input ModelDefinitionInput {
   """List of models in the model definition."""
-  models: [ModelConfigInput!]!
+  models: [ModelConfigInput!] = null
 }
 
 """
@@ -6218,22 +6218,22 @@ type ModelHealthCheck {
 """Added in 26.4.0. Health check configuration for a model service."""
 input ModelHealthCheckInput {
   """Interval in seconds between health checks."""
-  interval: Float! = 10
+  interval: Float = null
 
   """Path to check for health status."""
-  path: String!
+  path: String = null
 
   """Maximum number of retries for health check."""
-  maxRetries: Int! = 10
+  maxRetries: Int = null
 
   """Maximum time in seconds to wait for a health check response."""
-  maxWaitTime: Float! = 15
+  maxWaitTime: Float = null
 
   """Expected HTTP status code for a healthy response."""
-  expectedStatusCode: Int! = 200
+  expectedStatusCode: Int = null
 
   """Initial delay in seconds before the first health check."""
-  initialDelay: Float! = 60
+  initialDelay: Float = null
 }
 
 """Added in 26.4.2. Metadata describing a model entry."""
@@ -6559,16 +6559,16 @@ input ModelServiceConfigInput {
   """
   List of pre-start actions to execute before starting the model service.
   """
-  preStartActions: [PreStartActionInput!]!
+  preStartActions: [PreStartActionInput!] = null
 
   """Command to start the model service."""
   startCommand: [String!] = null
 
   """Shell configured for the model service."""
-  shell: String! = "/bin/bash"
+  shell: String = null
 
-  """Port number for the model service. Must be greater than 1."""
-  port: Int!
+  """Port number for the model service."""
+  port: Int = null
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheckInput = null

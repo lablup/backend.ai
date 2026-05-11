@@ -14,21 +14,6 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.config import (
-    ModelConfig as ModelConfigDTO,
-)
-from ai.backend.common.config import (
-    ModelDefinition as ModelDefinitionDTO,
-)
-from ai.backend.common.config import (
-    ModelHealthCheck as ModelHealthCheckDTO,
-)
-from ai.backend.common.config import (
-    ModelMetadata as ModelMetadataDTO,
-)
-from ai.backend.common.config import (
-    ModelServiceConfig as ModelServiceConfigDTO,
-)
-from ai.backend.common.config import (
     PreStartAction as PreStartActionDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -57,10 +42,25 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ImageInput as ImageInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelConfigInput as ModelConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelDefinitionInput as ModelDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelHealthCheckInput as ModelHealthCheckInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelMetadataInput as ModelMetadataInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelMountConfigInput as ModelMountConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelRuntimeConfigInput as ModelRuntimeConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelServiceConfigInput as ModelServiceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceConfigInput as ResourceConfigInputDTO,
@@ -819,22 +819,22 @@ class PreStartActionInputGQL(PydanticInputMixin[PreStartActionDTO]):
     ),
     name="ModelHealthCheckInput",
 )
-class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckDTO]):
-    interval: float = gql_field(
-        description="Interval in seconds between health checks.", default=10.0
+class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
+    interval: float | None = gql_field(
+        description="Interval in seconds between health checks.", default=None
     )
-    path: str = gql_field(description="Path to check for health status.")
-    max_retries: int = gql_field(
-        description="Maximum number of retries for health check.", default=10
+    path: str | None = gql_field(description="Path to check for health status.", default=None)
+    max_retries: int | None = gql_field(
+        description="Maximum number of retries for health check.", default=None
     )
-    max_wait_time: float = gql_field(
-        description="Maximum time in seconds to wait for a health check response.", default=15.0
+    max_wait_time: float | None = gql_field(
+        description="Maximum time in seconds to wait for a health check response.", default=None
     )
-    expected_status_code: int = gql_field(
-        description="Expected HTTP status code for a healthy response.", default=200
+    expected_status_code: int | None = gql_field(
+        description="Expected HTTP status code for a healthy response.", default=None
     )
-    initial_delay: float = gql_field(
-        description="Initial delay in seconds before the first health check.", default=60.0
+    initial_delay: float | None = gql_field(
+        description="Initial delay in seconds before the first health check.", default=None
     )
 
 
@@ -845,19 +845,18 @@ class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckDTO]):
     ),
     name="ModelServiceConfigInput",
 )
-class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDTO]):
-    pre_start_actions: list[PreStartActionInputGQL] = gql_field(
+class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO]):
+    pre_start_actions: list[PreStartActionInputGQL] | None = gql_field(
         description="List of pre-start actions to execute before starting the model service.",
-        default=strawberry.UNSET,
+        default=None,
     )
     start_command: list[str] | None = gql_field(
         description="Command to start the model service.", default=None
     )
-    shell: str = gql_field(
-        description="Shell configured for the model service.",
-        default="/bin/bash",
+    shell: str | None = gql_field(
+        description="Shell configured for the model service.", default=None
     )
-    port: int = gql_field(description="Port number for the model service. Must be greater than 1.")
+    port: int | None = gql_field(description="Port number for the model service.", default=None)
     health_check: ModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None
     )
@@ -870,7 +869,7 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDTO]):
     ),
     name="ModelMetadataInput",
 )
-class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataDTO]):
+class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataInputDTO]):
     author: str | None = gql_field(description="Author of the model.", default=None)
     title: str | None = gql_field(description="Title of the model.", default=None)
     version: str | None = gql_field(description="Version of the model.", default=None)
@@ -899,9 +898,9 @@ class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataDTO]):
     ),
     name="ModelConfigInput",
 )
-class ModelConfigInputGQL(PydanticInputMixin[ModelConfigDTO]):
-    name: str = gql_field(description="Name of the model.")
-    model_path: str = gql_field(description="Path to the model file.")
+class ModelConfigInputGQL(PydanticInputMixin[ModelConfigInputDTO]):
+    name: str | None = gql_field(description="Name of the model.", default=None)
+    model_path: str | None = gql_field(description="Path to the model file.", default=None)
     service: ModelServiceConfigInputGQL | None = gql_field(
         description="Configuration for the model service.", default=None
     )
@@ -917,9 +916,9 @@ class ModelConfigInputGQL(PydanticInputMixin[ModelConfigDTO]):
     ),
     name="ModelDefinitionInput",
 )
-class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionDTO]):
-    models: list[ModelConfigInputGQL] = gql_field(
-        description="List of models in the model definition."
+class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionInputDTO]):
+    models: list[ModelConfigInputGQL] | None = gql_field(
+        description="List of models in the model definition.", default=None
     )
 
 

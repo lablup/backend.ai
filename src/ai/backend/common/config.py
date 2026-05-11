@@ -534,16 +534,9 @@ class ModelHealthCheckDraft(BaseConfigModel):
     def to_resolved(self) -> ModelHealthCheck:
         if self.path is None:
             raise ValueError("ModelHealthCheck.path is required")
-        return ModelHealthCheck(
-            interval=self.interval if self.interval is not None else 10.0,
-            path=self.path,
-            max_retries=self.max_retries if self.max_retries is not None else 10,
-            max_wait_time=self.max_wait_time if self.max_wait_time is not None else 15.0,
-            expected_status_code=(
-                self.expected_status_code if self.expected_status_code is not None else 200
-            ),
-            initial_delay=self.initial_delay if self.initial_delay is not None else 60.0,
-        )
+        # Drop unset (None) fields so the strict type's ``Field(default=...)``
+        # declarations remain the single source of truth for default values.
+        return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
 
 
 class ModelServiceConfigDraft(BaseConfigModel):
@@ -561,12 +554,13 @@ class ModelServiceConfigDraft(BaseConfigModel):
     def to_resolved(self) -> ModelServiceConfig:
         if self.port is None:
             raise ValueError("ModelServiceConfig.port is required")
+        # Drop unset (None) scalars so the strict type's ``Field(default=...)``
+        # declarations remain the single source of truth for default values;
+        # resolve the nested ``health_check`` draft explicitly so its own
+        # required-field check (``path``) fires with a clear error message.
         return ModelServiceConfig(
-            pre_start_actions=self.pre_start_actions or [],
-            start_command=self.start_command,
-            shell=self.shell if self.shell is not None else "/bin/bash",
-            port=self.port,
-            health_check=(self.health_check.to_resolved() if self.health_check else None),
+            **self.model_dump(exclude_none=True, exclude={"health_check"}),
+            health_check=self.health_check.to_resolved() if self.health_check else None,
         )
 
 
