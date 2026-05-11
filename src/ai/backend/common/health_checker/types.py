@@ -1,8 +1,32 @@
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass
 from datetime import datetime
 from typing import NewType
+
+
+class ProbeKind(enum.Enum):
+    """
+    Kind of health probe a checker contributes to.
+
+    Mirrors Kubernetes liveness vs readiness probes, plus an informational
+    lane for dependencies whose state is worth surfacing but not worth gating:
+
+    - LIVENESS: "Is the process alive and not deadlocked?" — failure triggers restart.
+    - READINESS: "Can this instance serve traffic?" — failure removes it from
+      the load balancer. Liveness-registered checkers also count toward
+      readiness (a process that is not alive cannot be ready).
+    - INFORMATIONAL: "Surface this dependency's state to operators but never
+      let it gate liveness or readiness." Use for observability/auxiliary
+      services (e.g. Prometheus) whose outage should not cut traffic or
+      cause restarts.
+    """
+
+    LIVENESS = "liveness"
+    READINESS = "readiness"
+    INFORMATIONAL = "informational"
+
 
 # Service group is a string identifier with type safety
 # Allows components to define their own service groups while maintaining type safety

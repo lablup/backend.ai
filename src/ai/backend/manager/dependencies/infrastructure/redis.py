@@ -156,19 +156,11 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
         finally:
             await clients.close()
 
-    def gen_health_checkers(
+    def gen_liveness_checker(
         self,
         resource: ValkeyClients,
     ) -> ServiceHealthChecker:
-        """
-        Return a single health checker for all 8 Valkey clients.
-
-        Args:
-            resource: The initialized Valkey clients
-
-        Returns:
-            ValkeyHealthChecker that checks all 8 Valkey clients
-        """
+        """Liveness — Valkey connection-stuck observed; restart recovers."""
         return ValkeyHealthChecker(
             clients={
                 CID_REDIS_ARTIFACT: resource.artifact,

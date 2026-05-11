@@ -24,14 +24,6 @@ class EtcdProvider(DependencyProvider[StorageProxyUnifiedConfig, AsyncEtcd]):
         async with make_etcd(setup_input) as etcd:
             yield etcd
 
-    def gen_health_checkers(self, resource: AsyncEtcd) -> ServiceHealthChecker:
-        """
-        Return health checker for etcd.
-
-        Args:
-            resource: The initialized etcd client
-
-        Returns:
-            Health checker for etcd
-        """
+    def gen_liveness_checker(self, resource: AsyncEtcd) -> ServiceHealthChecker:
+        """Liveness — stuck etcd connection observed; restart is the recovery path."""
         return EtcdHealthChecker(etcd=resource)

@@ -806,9 +806,11 @@ async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
     root_ctx.health_probe = probe
 
-    # Register health checkers using already-initialized resources
-    await probe.register(DatabaseHealthChecker(db=root_ctx.db))
-    await probe.register(
+    # Database: readiness only — no connection-stuck restart pattern needed.
+    await probe.register_readiness(DatabaseHealthChecker(db=root_ctx.db))
+
+    # Valkey: liveness — also surfaced in readiness.
+    await probe.register_liveness(
         ValkeyHealthChecker(
             clients={
                 ComponentId("live"): root_ctx.valkey_live,

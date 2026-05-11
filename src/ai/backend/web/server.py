@@ -48,7 +48,11 @@ from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
-from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.internal.health import (
+    ConnectivityCheckResponse,
+    HealthResponse,
+    HealthStatus,
+)
 from ai.backend.common.dto.manager.auth.request import UpdatePasswordNoAuthRequest
 from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
@@ -547,20 +551,38 @@ async def extend_login_session(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
-async def check_health(request: web.Request) -> web.Response:
-    """Health check endpoint with dependency connectivity status"""
-    request["do_not_print_access_log"] = True
-
-    health_probe: HealthProbe = request.app["health_probe"]
-    connectivity = await health_probe.get_connectivity_status()
+def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
-
     return web.json_response(response.model_dump(mode="json"))
+
+
+async def check_health(request: web.Request) -> web.Response:
+    """Aggregated health (union of liveness and readiness)."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_connectivity_status()
+    return _build_web_health_response(connectivity)
+
+
+async def check_livez(request: web.Request) -> web.Response:
+    """Liveness probe — only liveness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_liveness_status()
+    return _build_web_health_response(connectivity)
+
+
+async def check_readyz(request: web.Request) -> web.Response:
+    """Readiness probe — only readiness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_readiness_status()
+    return _build_web_health_response(connectivity)
 
 
 async def webserver_healthcheck(request: web.Request) -> web.Response:
@@ -882,6 +904,8 @@ async def webapp_ctx(
     cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
     cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/health", check_health))
+    cors.add(app.router.add_route("GET", "/livez", check_livez))
+    cors.add(app.router.add_route("GET", "/readyz", check_readyz))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
@@ -1000,7 +1024,8 @@ async def server_main(
 
         # Initialize health probe
         health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
-        await health_probe.register(
+        # Valkey: liveness — also surfaced in readiness.
+        await health_probe.register_liveness(
             ValkeyHealthChecker(
                 clients={
                     ComponentId("session"): app["redis"],

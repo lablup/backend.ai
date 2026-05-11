@@ -70,16 +70,8 @@ class RedisProvider(DependencyProvider[AsyncEtcd, StorageProxyValkeyClients]):
             await bgtask_client.close()
             await artifact_client.close()
 
-    def gen_health_checkers(self, resource: StorageProxyValkeyClients) -> ServiceHealthChecker:
-        """
-        Return health checkers for storage proxy Valkey clients.
-
-        Args:
-            resource: The initialized Valkey clients
-
-        Returns:
-            Health checker for bgtask and artifact clients
-        """
+    def gen_liveness_checker(self, resource: StorageProxyValkeyClients) -> ServiceHealthChecker:
+        """Liveness — Valkey connection-stuck observed; restart recovers."""
         return ValkeyHealthChecker(
             clients={
                 CID_REDIS_BGTASK: resource.bgtask,

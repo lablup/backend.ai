@@ -101,13 +101,14 @@ def check(
             agent_input = AgentDependencyInput(config_path=config_path, log_level=log_level)
             await dependency_stack.enter_composer(agent_composer, agent_input)
 
-            # Get collected health checkers and register them
-            health_checkers = dependency_stack.get_health_checkers()
-            for key, checker in health_checkers.items():
-                await probe.register(checker)
+            liveness_checkers = dependency_stack.get_liveness_checkers()
+            readiness_checkers = dependency_stack.get_readiness_checkers()
+            for checker in liveness_checkers.values():
+                await probe.register_liveness(checker)
+            for checker in readiness_checkers.values():
+                await probe.register_readiness(checker)
 
-            # Perform health checks on successfully initialized components
-            if health_checkers:
+            if liveness_checkers or readiness_checkers:
                 await probe.check_all()
 
             yield

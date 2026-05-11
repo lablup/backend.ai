@@ -82,7 +82,11 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
-from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.internal.health import (
+    ConnectivityCheckResponse,
+    HealthResponse,
+    HealthStatus,
+)
 from ai.backend.common.events.dispatcher import EventDispatcher, EventHandler, EventProducer
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
@@ -500,8 +504,8 @@ async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
     root_ctx.health_probe = probe
 
-    # Register health checkers using already-initialized resources
-    await probe.register(
+    # Valkey: liveness — also surfaced in readiness.
+    await probe.register_liveness(
         ValkeyHealthChecker(
             clients={
                 ComponentId("live"): root_ctx.valkey_live,
@@ -610,11 +614,7 @@ async def metrics(request: web.Request) -> web.Response:
     )
 
 
-async def hello(request: web.Request) -> web.Response:
-    """Health check endpoint with dependency connectivity status"""
-    request["do_not_print_access_log"] = True
-    root_ctx: RootContext = request.app["_root.context"]
-    connectivity = await root_ctx.health_probe.get_connectivity_status()
+def _build_worker_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
@@ -622,6 +622,30 @@ async def hello(request: web.Request) -> web.Response:
         connectivity=connectivity,
     )
     return web.json_response(response.model_dump(mode="json"))
+
+
+async def hello(request: web.Request) -> web.Response:
+    """Aggregated health (union of liveness and readiness)."""
+    request["do_not_print_access_log"] = True
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
+    return _build_worker_health_response(connectivity)
+
+
+async def livez(request: web.Request) -> web.Response:
+    """Liveness probe — only liveness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_liveness_status()
+    return _build_worker_health_response(connectivity)
+
+
+async def readyz(request: web.Request) -> web.Response:
+    """Readiness probe — only readiness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_readiness_status()
+    return _build_worker_health_response(connectivity)
 
 
 async def status(request: web.Request) -> web.Response:
@@ -811,6 +835,8 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+    cors.add(app.router.add_route("GET", "/livez", livez))
+    cors.add(app.router.add_route("GET", "/readyz", readyz))
     cors.add(app.router.add_route("GET", "/status", status))
     cors.add(app.router.add_route("GET", "/metrics", metrics))
     for pkg_name in subapp_pkgs:

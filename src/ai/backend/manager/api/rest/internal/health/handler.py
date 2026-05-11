@@ -6,12 +6,29 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
-from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.internal.health import (
+    ConnectivityCheckResponse,
+    HealthResponse,
+    HealthStatus,
+)
 from ai.backend.manager import __version__
 from ai.backend.manager.dto.context import RequestCtx
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker.probe import HealthProbe
+
+
+_COMPONENT_NAME = "manager"
+
+
+def _build_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    response = HealthResponse(
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+        version=__version__,
+        component=_COMPONENT_NAME,
+        connectivity=connectivity,
+    )
+    return web.json_response(response.model_dump(mode="json"))
 
 
 class InternalHealthHandler:
@@ -21,13 +38,19 @@ class InternalHealthHandler:
         self._health_probe = health_probe
 
     async def hello(self, request_ctx: RequestCtx) -> web.Response:
-        """Internal health check endpoint with full dependency connectivity status."""
+        """Aggregated health (union of liveness and readiness)."""
         request_ctx.request["do_not_print_access_log"] = True
         connectivity = await self._health_probe.get_connectivity_status()
-        response = HealthResponse(
-            status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-            version=__version__,
-            component="manager",
-            connectivity=connectivity,
-        )
-        return web.json_response(response.model_dump(mode="json"))
+        return _build_response(connectivity)
+
+    async def livez(self, request_ctx: RequestCtx) -> web.Response:
+        """Liveness probe — reports only liveness-registered checkers."""
+        request_ctx.request["do_not_print_access_log"] = True
+        connectivity = await self._health_probe.get_liveness_status()
+        return _build_response(connectivity)
+
+    async def readyz(self, request_ctx: RequestCtx) -> web.Response:
+        """Readiness probe — reports only readiness-registered checkers."""
+        request_ctx.request["do_not_print_access_log"] = True
+        connectivity = await self._health_probe.get_readiness_status()
+        return _build_response(connectivity)
