@@ -11,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateDeploymentInput,
@@ -24,11 +25,14 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput,
     ExtraVFolderMountInput,
     ImageInput,
+    ModelConfigInput,
     ModelDefinitionInput,
     ModelDeploymentMetadataInput,
     ModelDeploymentNetworkAccessInput,
+    ModelHealthCheckInput,
     ModelMountConfigInput,
     ModelRuntimeConfigInput,
+    ModelServiceConfigInput,
     ResourceConfigInput,
     ResourceGroupInput,
     ResourceSlotEntryInput,
@@ -148,6 +152,49 @@ class TestRevisionInput:
         assert rev.extra_mounts is not None
         assert len(rev.extra_mounts) == 1
         assert rev.extra_mounts[0].mount_destination == "/data"
+
+
+class TestModelDefinitionInputToDraft:
+    """``ModelDefinitionInput.to_draft`` converts the all-optional v2
+    input DTO into the ``ModelDefinitionDraft`` consumed by the
+    revision merge chain. The conversion must preserve unset semantics
+    so omitted fields stay unset on the resulting draft — otherwise
+    every ``None`` would clobber lower-priority sources during merge
+    (BA-5983).
+    """
+
+    @pytest.mark.parametrize(
+        "input_dto",
+        [
+            pytest.param(ModelDefinitionInput(), id="empty"),
+            pytest.param(
+                ModelDefinitionInput(models=[ModelConfigInput(name="only-name")]),
+                id="partial_name_only",
+            ),
+            pytest.param(
+                ModelDefinitionInput(
+                    models=[
+                        ModelConfigInput(
+                            name="m",
+                            service=ModelServiceConfigInput(
+                                port=8080,
+                                health_check=ModelHealthCheckInput(path="/healthz"),
+                            ),
+                        )
+                    ]
+                ),
+                id="nested_service_and_health_check",
+            ),
+        ],
+    )
+    def test_to_draft_preserves_set_fields(self, input_dto: ModelDefinitionInput) -> None:
+        draft = input_dto.to_draft()
+        assert isinstance(draft, ModelDefinitionDraft)
+        # ``model_fields_set`` on the draft must match what the caller
+        # explicitly set on the input — that is what the merge logic
+        # uses to distinguish "unset → defer to baseline" from
+        # "explicitly None → clobber baseline".
+        assert draft.model_fields_set == input_dto.model_fields_set
 
 
 class TestExtraVFolderMountInput:
