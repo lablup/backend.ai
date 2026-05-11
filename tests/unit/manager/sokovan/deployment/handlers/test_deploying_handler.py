@@ -26,7 +26,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ReplicaCountData,
+    ReplicaData,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.handlers.deploying import (
@@ -123,7 +123,7 @@ class TestDeployingProvisioningHandler:
                     scaling_state=ScalingState.STABLE,
                     retry_count=0,
                 ),
-                replica=ReplicaCountData(
+                replica=ReplicaData(
                     replica_count=1,
                     desired_replica_count=1,
                 ),

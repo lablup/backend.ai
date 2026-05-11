@@ -32,7 +32,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ReplicaCountData,
+    ReplicaData,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
@@ -117,7 +117,7 @@ def make_deployment(
             scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica=ReplicaCountData(
+        replica=ReplicaData(
             replica_count=desired,
             desired_replica_count=None,
         ),
@@ -927,7 +927,7 @@ class TestDesiredReplicaCount:
     def test_desired_replica_count_overrides_replica_count(self) -> None:
         """When desired_replica_count is set, it takes precedence."""
         deployment = make_deployment(desired=3)
-        deployment.replica = ReplicaCountData(
+        deployment.replica = ReplicaData(
             replica_count=1,
             desired_replica_count=3,
         )
@@ -943,7 +943,7 @@ class TestDesiredReplicaCount:
     def test_replica_count_used_when_no_desired(self) -> None:
         """When desired_replica_count is None, uses replica_count."""
         deployment = make_deployment(desired=2)
-        deployment.replica = ReplicaCountData(
+        deployment.replica = ReplicaData(
             replica_count=2,
             desired_replica_count=None,
         )

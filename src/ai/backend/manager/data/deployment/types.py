@@ -359,7 +359,7 @@ class ReplicaSpec:
 
 
 @dataclass
-class ReplicaCountData:
+class ReplicaData:
     replica_count: int
     desired_replica_count: int | None
 
@@ -684,7 +684,7 @@ class DeploymentInfo:
     id: DeploymentID
     metadata: DeploymentMetadata
     state: DeploymentState
-    replica: ReplicaCountData
+    replica: ReplicaData
     network: DeploymentNetworkData
     model_revisions: list[ModelRevisionData]
     options: DeploymentOptions

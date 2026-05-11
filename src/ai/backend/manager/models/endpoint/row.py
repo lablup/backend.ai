@@ -73,7 +73,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
-    ReplicaCountData,
+    ReplicaData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -765,7 +765,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 scaling_state=self.scaling_state,
                 retry_count=self.retries,
             ),
-            replica=ReplicaCountData(
+            replica=ReplicaData(
                 replica_count=self.replicas,
                 desired_replica_count=self.desired_replicas,
             ),
