@@ -45,8 +45,8 @@ class RevisionDraftReader:
     """Fan out the DB + storage reads that feed the revision merge chain.
 
     One public method per API path (legacy create, legacy modify, v2 add).
-    Each returns the ordered list of drafts the controller feeds into
-    ``merge_revision_drafts`` — lowest priority first. The model mount
+    Each returns the ordered list of drafts the controller layers via
+    ``RevisionDraft.merge`` — lowest priority first. The model mount
     destination is added as the lowest-priority ``model_path`` default.
     """
 
