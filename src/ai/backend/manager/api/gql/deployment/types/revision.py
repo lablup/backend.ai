@@ -101,6 +101,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
 )
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
@@ -568,7 +569,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         )
 
         payload = await info.context.adapters.deployment.search_revision_resource_slots(
-            revision_id=UUID(str(self.id)),
+            revision_id=DeploymentRevisionID(UUID(str(self.id))),
             input=SearchAllocatedResourceSlotsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
