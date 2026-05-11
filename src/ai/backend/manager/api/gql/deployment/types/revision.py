@@ -787,7 +787,7 @@ class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
 class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
     vfolder_id: ID
     mount_destination: str
-    definition_path: str
+    definition_path: str | None = None
 
 
 @gql_pydantic_input(
