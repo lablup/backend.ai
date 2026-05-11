@@ -43,19 +43,19 @@ from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentState,
+    ExecutionData,
     ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,
-    ModelRevisionSpec,
     ModelRuntimeConfigData,
-    MountMetadata,
-    ReplicaSpec,
+    PresetAttributionData,
+    ReplicaData,
     ResourceConfigData,
     ResourceSpec,
 )
@@ -380,8 +380,10 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
-            replica_spec=ReplicaSpec(replica_count=1),
-            network=DeploymentNetworkSpec(open_to_public=False),
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
             model_revisions=[],
             options=DeploymentOptions(),
         )
@@ -417,7 +419,9 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     @pytest.fixture
     def revision_data(self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID) -> ModelRevisionData:
         return ModelRevisionData(
-            id=uuid.uuid4(),
+            id=DeploymentRevisionID(uuid.uuid4()),
+            deployment_id=DeploymentID(uuid.uuid4()),
+            revision_number=1,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,
@@ -433,8 +437,15 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 vfolder_id=VFolderUUID(model_vfolder_id),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
+                extra_mounts=[],
             ),
             image_id=ImageID(image_id),
+            execution=ExecutionData(
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+            ),
+            preset=PresetAttributionData(preset_id=None, values=[]),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
@@ -485,7 +496,9 @@ class TestAddModelRevision(ModelRevisionFixtures):
         mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
 
         action = AddModelRevisionAction(
-            model_deployment_id=deployment_id, adder=revision_creator, auto_activate=False
+            model_deployment_id=DeploymentID(deployment_id),
+            adder=revision_creator,
+            auto_activate=False,
         )
         result = await processors.add_model_revision.wait_for_complete(action)
 
@@ -543,8 +556,10 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
                 scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
-            replica_spec=ReplicaSpec(replica_count=1),
-            network=DeploymentNetworkSpec(open_to_public=False),
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
             model_revisions=[],
             options=DeploymentOptions(),
         )
@@ -628,7 +643,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         """
         action = CreateAccessTokenAction(
             creator=ModelDeploymentAccessTokenCreator(
-                model_deployment_id=deployment_id,
+                model_deployment_id=DeploymentID(deployment_id),
                 expires_at=datetime(2099, 1, 1, tzinfo=UTC),
             ),
         )
@@ -647,36 +662,48 @@ class TestConvertDeploymentInfoToData:
     """Regression test for ``_convert_deployment_info_to_data`` (BA-5963)."""
 
     @pytest.fixture
-    def make_revision_spec(self) -> Callable[[], ModelRevisionSpec]:
-        def make() -> ModelRevisionSpec:
-            return ModelRevisionSpec(
-                revision_id=DeploymentRevisionID(uuid.uuid4()),
-                image_id=ImageID(uuid.uuid4()),
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots={"cpu": "1"},
+    def make_revision_data(self) -> Callable[[int], ModelRevisionData]:
+        def make(revision_number: int) -> ModelRevisionData:
+            return ModelRevisionData(
+                id=DeploymentRevisionID(uuid.uuid4()),
+                deployment_id=DeploymentID(uuid.uuid4()),
+                revision_number=revision_number,
+                cluster_config=ClusterConfigData(
+                    mode=ClusterMode.SINGLE_NODE,
+                    size=1,
                 ),
-                mounts=MountMetadata(
-                    model_vfolder_id=VFolderUUID(uuid.uuid4()),
-                    model_definition_path="model-definition.yaml",
-                    model_mount_destination="/models",
-                    extra_mounts=[],
+                resource_config=ResourceConfigData(
+                    resource_group_name="default",
+                    resource_slot=ResourceSlot({"cpu": "1"}),
                 ),
-                execution=ExecutionSpec(
+                model_runtime_config=ModelRuntimeConfigData(
                     runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 ),
+                model_mount_config=ModelMountConfigData(
+                    vfolder_id=VFolderUUID(uuid.uuid4()),
+                    mount_destination="/models",
+                    definition_path="model-definition.yaml",
+                    extra_mounts=[],
+                ),
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                image_id=ImageID(uuid.uuid4()),
+                execution=ExecutionData(
+                    startup_command=None,
+                    bootstrap_script=None,
+                    callback_url=None,
+                ),
+                preset=PresetAttributionData(preset_id=None, values=[]),
             )
 
         return make
 
     def test_current_revision_resolved_by_id_match_not_list_order(
         self,
-        make_revision_spec: Callable[[], ModelRevisionSpec],
+        make_revision_data: Callable[[int], ModelRevisionData],
     ) -> None:
         """Pin: revision lookup must use explicit ``current_revision_id``, not list[0]."""
-        deploying_spec = make_revision_spec()
-        current_spec = make_revision_spec()
+        deploying_data = make_revision_data(1)
+        current_data = make_revision_data(2)
 
         deployment_info = DeploymentInfo(
             id=DeploymentID(uuid.uuid4()),
@@ -695,18 +722,20 @@ class TestConvertDeploymentInfoToData:
                 scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
-            replica_spec=ReplicaSpec(replica_count=1),
-            network=DeploymentNetworkSpec(open_to_public=False),
-            model_revisions=[deploying_spec, current_spec],
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
+            model_revisions=[deploying_data, current_data],
             options=DeploymentOptions(),
-            current_revision_id=current_spec.revision_id,
-            deploying_revision_id=deploying_spec.revision_id,
+            current_revision_id=DeploymentRevisionID(current_data.id),
+            deploying_revision_id=DeploymentRevisionID(deploying_data.id),
         )
 
         deployment_data = _convert_deployment_info_to_data(deployment_info)
 
-        assert deployment_data.current_revision_id == current_spec.revision_id
-        assert deployment_data.deploying_revision_id == deploying_spec.revision_id
+        assert deployment_data.current_revision_id == current_data.id
+        assert deployment_data.deploying_revision_id == deploying_data.id
         assert deployment_data.current_revision_id != deployment_data.deploying_revision_id
         assert deployment_data.revision is not None
-        assert deployment_data.revision.id == current_spec.revision_id
+        assert deployment_data.revision.id == current_data.id

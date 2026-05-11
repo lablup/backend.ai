@@ -358,6 +358,18 @@ class ReplicaSpec:
         return self.replica_count
 
 
+@dataclass
+class ReplicaData:
+    replica_count: int
+    desired_replica_count: int | None
+
+    @property
+    def target_replica_count(self) -> int:
+        if self.desired_replica_count is not None:
+            return self.desired_replica_count
+        return self.replica_count
+
+
 class ConfiguredModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -660,27 +672,35 @@ class DeploymentNetworkSpec:
 
 
 @dataclass
+class DeploymentNetworkData:
+    open_to_public: bool
+    access_token_ids: list[UUID] | None
+    url: str | None
+    preferred_domain_name: str | None
+
+
+@dataclass
 class DeploymentInfo:
     id: DeploymentID
     metadata: DeploymentMetadata
     state: DeploymentState
-    replica_spec: ReplicaSpec
-    network: DeploymentNetworkSpec
-    model_revisions: list[ModelRevisionSpec]
+    replica: ReplicaData
+    network: DeploymentNetworkData
+    model_revisions: list[ModelRevisionData]
     options: DeploymentOptions
     current_revision_id: DeploymentRevisionID | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: DeploymentRevisionID | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
-    def resolve_revision_spec(self, revision_id: DeploymentRevisionID) -> ModelRevisionSpec:
-        """Find a ModelRevisionSpec by revision_id from model_revisions.
+    def resolve_revision_data(self, revision_id: DeploymentRevisionID) -> ModelRevisionData:
+        """Find a ``ModelRevisionData`` by id from ``model_revisions``.
 
         Raises:
             DeploymentRevisionNotFound: If the revision is not found.
         """
         for revision in self.model_revisions:
-            if revision.revision_id == revision_id:
+            if revision.id == revision_id:
                 return revision
         raise DeploymentRevisionNotFound(
             f"Revision {revision_id} not found in model_revisions of deployment {self.id}"
@@ -740,12 +760,6 @@ class DeploymentWithHistory:
 
     deployment_info: DeploymentInfo
     last_history: DeploymentLastHistory | None
-
-
-@dataclass
-class DeploymentSessionSpec:
-    id: UUID
-    metadata: DeploymentMetadata
 
 
 @dataclass
@@ -868,39 +882,88 @@ class ModelMountConfigData:
     vfolder_id: VFolderUUID | None
     mount_destination: str | None
     definition_path: str
+    # Same type used for row storage, ``MountMetadata.extra_mounts``, and
+    # this data-layer projection — keeps ``mount_perm`` visible end-to-end
+    # so modify flows can carry it over without information loss.
+    extra_mounts: list[MountInfoEntry]
+
+
+@dataclass
+class ExecutionData:
+    """Container-execution overrides frozen on the persisted revision:
+    what command runs in the model container, what setup script runs
+    before it, and where deployment lifecycle events get POSTed.
+
+    Sibling of ``ModelRuntimeConfigData`` (runtime variant / environ /
+    inference runtime knobs); kept separate so the schedulers and draft
+    builders can pass these straight to the kernel spec without picking
+    them out of the runtime config bag.
+    """
+
+    # Replaces the image ``CMD`` when starting the model container.
+    # ``None`` keeps whatever the image baked in.
+    startup_command: str | None
+    # Shell script run once at container startup, before
+    # ``startup_command``. ``None`` for revisions that do no extra setup.
+    bootstrap_script: str | None
+    # Webhook the manager POSTs to on deployment lifecycle events
+    # (provisioning, ready, failure, …); ``None`` disables callbacks.
+    callback_url: yarl.URL | None
+
+
+@dataclass
+class PresetAttributionData:
+    """The deployment-level preset that produced this revision and the
+    materialised values it expanded into.
+
+    ``preset_id is None`` means the revision was created without a
+    preset (legacy rows or fully ad-hoc creations); the resolver still
+    populates the ``values`` list — possibly empty — from the
+    ``deployment_revisions.preset_values`` JSONB column either way.
+    """
+
+    preset_id: DeploymentPresetID | None
+    values: list[PresetValueData]
 
 
 @dataclass
 class ModelRevisionData:
-    id: UUID
+    # Identity
+    id: DeploymentRevisionID
+    deployment_id: DeploymentID
+    revision_number: int
+    created_at: datetime
+    # Image — ``image_id is None`` signals the backing image row has
+    # been deleted (SET NULL FK); the revision is kept for history but
+    # cannot be redeployed.
+    image_id: ImageID | None
+    # Resource
     cluster_config: ClusterConfigData
     resource_config: ResourceConfigData
+    # Runtime + execution
     model_runtime_config: ModelRuntimeConfigData
+    execution: ExecutionData
+    # Mount
     model_mount_config: ModelMountConfigData
-    created_at: datetime
-    # ``image_id is None`` signals the backing image row has been deleted
-    # (SET NULL FK); the revision is kept for history but cannot be
-    # redeployed.
-    image_id: ImageID | None
+    # Preset attribution
+    preset: PresetAttributionData
+    # Model definition (resolved against the model vfolder at
+    # persistence time; ``None`` if the source had none).
     model_definition: ModelDefinition | None = None
-    # Same type used for row storage, ``MountMetadata.extra_mounts``, and
-    # this data-layer projection — keeps ``mount_perm`` visible end-to-end
-    # so modify flows can carry it over without information loss.
-    extra_vfolder_mounts: list[MountInfoEntry] = field(default_factory=list)
-    # Original deployment-level preset selection used to build this
-    # revision; ``None`` for legacy rows and revisions created without a
-    # preset.
-    revision_preset_id: DeploymentPresetID | None = None
 
     def to_draft(self) -> RevisionDraft:
         """Project this persisted revision onto a ``RevisionDraft`` layer.
 
         Used as the base (lowest-priority-below-request) layer on the legacy
         modify path so untouched fields survive when the user submits a partial
-        override. Fields that do not live on ``ModelRevisionData``
-        (``startup_command``, ``bootstrap_script``, ``callback_url``) remain
-        ``None`` — the reader pipeline resolves them from preset /
-        ``deployment-config.yaml`` / ``model-definition.yaml`` / user override.
+        override. Every write-time field on ``ModelRevisionData`` —
+        ``image_id``, ``cluster_config`` / ``resource_config``,
+        ``model_runtime_config`` (runtime variant + environ +
+        inference_runtime_config), ``execution`` (startup_command /
+        bootstrap_script / callback_url), and ``model_definition`` —
+        flows back into the draft as the baseline; preset /
+        ``deployment-config.yaml`` / ``model-definition.yaml`` / user
+        request layers then override on top via ``merge_revision_drafts``.
         """
         environ = self.model_runtime_config.environ
         resource_slots = dict(self.resource_config.resource_slot) or None
@@ -916,8 +979,11 @@ class ModelRevisionData:
             resource_opts=resource_opts,
             cluster_mode=self.cluster_config.mode,
             cluster_size=self.cluster_config.size,
+            startup_command=self.execution.startup_command,
+            bootstrap_script=self.execution.bootstrap_script,
             environ={k: str(v) for k, v in environ.items()} if environ else None,
             runtime_variant_id=self.model_runtime_config.runtime_variant_id,
+            callback_url=self.execution.callback_url,
             inference_runtime_config=self.model_runtime_config.inference_runtime_config,
             model_definition=model_definition_draft,
         )
@@ -944,7 +1010,7 @@ class ReplicaStateData:
 class ModelDeploymentData:
     id: DeploymentID
     metadata: ModelDeploymentMetadataInfo
-    network_access: DeploymentNetworkSpec
+    network_access: DeploymentNetworkData
     revision: ModelRevisionData | None
     current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None

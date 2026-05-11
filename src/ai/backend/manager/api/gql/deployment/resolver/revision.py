@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchRevisionsInput,
 )
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -97,7 +98,9 @@ async def revisions(
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
-    node = await info.context.adapters.deployment.get_revision(UUID(revision_id))
+    node = await info.context.adapters.deployment.get_revision(
+        DeploymentRevisionID(UUID(revision_id))
+    )
     return ModelRevision.from_pydantic(node)
 
 

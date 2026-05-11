@@ -18,9 +18,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.types import (
-    ResourceSlot,
-)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
@@ -28,26 +25,20 @@ from ai.backend.manager.data.deployment.creator import (
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
-    ClusterConfigData,
     DeploymentInfo,
+    ExecutionSpec,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
-    ModelMountConfigData,
     ModelReplicaData,
     ModelRevisionData,
-    ModelRevisionSpec,
-    ModelRuntimeConfigData,
     ReplicaStateData,
-    ResourceConfigData,
+    ResourceSpec,
     RevisionRefreshResult,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
-)
-from ai.backend.manager.data.deployment_revision_preset.types import (
-    PresetValueData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -234,53 +225,24 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
     Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
     """
     revision: ModelRevisionData | None = None
-    rev: ModelRevisionSpec | None = None
     if info.current_revision_id is not None:
-        rev = next(
-            (r for r in info.model_revisions if r.revision_id == info.current_revision_id),
+        revision = next(
+            (r for r in info.model_revisions if r.id == info.current_revision_id),
             None,
         )
-        if rev is None:
+        if revision is None:
             log.error(
                 "Deployment {} has current_revision_id {} but no matching "
-                "ModelRevisionSpec was found in DeploymentInfo.model_revisions; "
+                "ModelRevisionData was found in DeploymentInfo.model_revisions; "
                 "current_revision will be reported as null. This usually means "
                 "EndpointRow.revisions was not eagerly loaded by the caller.",
                 info.id,
                 info.current_revision_id,
             )
-    if rev is not None:
-        if rev.revision_id is None:
-            raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
-        revision = ModelRevisionData(
-            id=rev.revision_id,
-            cluster_config=ClusterConfigData(
-                mode=rev.resource_spec.cluster_mode,
-                size=rev.resource_spec.cluster_size,
-            ),
-            resource_config=ResourceConfigData(
-                resource_group_name=info.metadata.resource_group,
-                resource_slot=ResourceSlot.from_json(rev.resource_spec.resource_slots),
-            ),
-            model_mount_config=ModelMountConfigData(
-                vfolder_id=rev.mounts.model_vfolder_id,
-                mount_destination=rev.mounts.model_mount_destination,
-                definition_path=rev.mounts.model_definition_path or "",
-            ),
-            model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant_id=rev.execution.runtime_variant_id,
-                inference_runtime_config=rev.execution.inference_runtime_config or {},
-            ),
-            extra_vfolder_mounts=list(rev.mounts.extra_mounts),
-            image_id=rev.image_id,
-            created_at=info.metadata.created_at or datetime.now(UTC),
-            model_definition=rev.model_definition,
-            revision_preset_id=rev.revision_preset_id,
-        )
 
-    desired_count = info.replica_spec.desired_replica_count
+    desired_count = info.replica.desired_replica_count
     if desired_count is None:
-        desired_count = info.replica_spec.replica_count
+        desired_count = info.replica.replica_count
 
     return ModelDeploymentData(
         id=info.id,
@@ -365,32 +327,48 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
     )
 
 
-def _build_creator_from_revision_spec(spec: ModelRevisionSpec) -> ModelRevisionCreator:
-    """Rebuild a ``ModelRevisionCreator`` from an existing revision's spec.
+def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionCreator:
+    """Rebuild a ``ModelRevisionCreator`` from an existing revision's persisted data.
 
     ``model_definition`` is reset to ``None`` so ``DeploymentController.add_revision``
-    re-resolves it from the vfolder. ``revision_preset_id`` is carried over from the
-    persisted spec so the new revision keeps the same preset attribution; the
-    materialised ``preset_values`` are also propagated to preserve the preset
-    effect without requiring re-application. ``extra_mounts`` is left empty
-    because ``add_revision`` does not propagate this field to the new revision
-    spec (see ``DeploymentController.add_revision``).
+    re-resolves it from the vfolder. ``revision_preset_id`` and ``preset_values`` are
+    carried over so the new revision keeps the same preset attribution. ``extra_mounts``
+    is left empty because ``add_revision`` does not propagate this field to the new
+    revision spec.
     """
+    if data.model_mount_config.vfolder_id is None:
+        raise InvalidAPIParameters(
+            f"Revision {data.id} has no model vfolder; cannot rebuild creator"
+        )
     return ModelRevisionCreator(
-        image_id=spec.image_id,
-        resource_spec=spec.resource_spec,
+        image_id=data.image_id,
+        resource_spec=ResourceSpec(
+            cluster_mode=data.cluster_config.mode,
+            cluster_size=data.cluster_config.size,
+            resource_slots=dict(data.resource_config.resource_slot),
+            resource_opts=dict(data.resource_config.resource_opts) or None,
+        ),
         mounts=VFolderMountsCreator(
-            model_vfolder_id=spec.mounts.model_vfolder_id,
-            model_definition_path=spec.mounts.model_definition_path,
-            model_mount_destination=spec.mounts.model_mount_destination,
+            model_vfolder_id=data.model_mount_config.vfolder_id,
+            model_definition_path=data.model_mount_config.definition_path or None,
+            model_mount_destination=data.model_mount_config.mount_destination or "/models",
             extra_mounts=[],
         ),
-        execution=spec.execution,
+        execution=ExecutionSpec(
+            startup_command=data.execution.startup_command,
+            bootstrap_script=data.execution.bootstrap_script,
+            environ=(
+                {k: str(v) for k, v in data.model_runtime_config.environ.items()}
+                if data.model_runtime_config.environ
+                else None
+            ),
+            runtime_variant_id=data.model_runtime_config.runtime_variant_id,
+            callback_url=data.execution.callback_url,
+            inference_runtime_config=data.model_runtime_config.inference_runtime_config,
+        ),
         model_definition=None,
-        revision_preset_id=spec.revision_preset_id,
-        preset_values=[
-            PresetValueData(preset_id=pv.preset_id, value=pv.value) for pv in spec.preset_values
-        ],
+        revision_preset_id=data.preset.preset_id,
+        preset_values=list(data.preset.values),
     )
 
 
@@ -482,7 +460,7 @@ class DeploymentService:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
         log.info("Updating deployment with ID: {}", action.updater.pk_value)
-        endpoint_id = cast(UUID, action.updater.pk_value)
+        endpoint_id = DeploymentID(cast(UUID, action.updater.pk_value))
         spec = cast(DeploymentUpdaterSpec, action.updater.spec)
         deployment_info = await self._deployment_controller.update_deployment(endpoint_id, spec)
         return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
@@ -710,8 +688,8 @@ class DeploymentService:
         failed = 0
         for deployment_id in deployment_ids:
             try:
-                spec = await self._deployment_repository.get_current_revision_spec(deployment_id)
-                creator = _build_creator_from_revision_spec(spec)
+                data = await self._deployment_repository.get_current_revision(deployment_id)
+                creator = _build_creator_from_revision_data(data)
                 new_revision = await self._deployment_controller.add_deployment_revision(
                     deployment_id=deployment_id,
                     revision=creator,

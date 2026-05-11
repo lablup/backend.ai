@@ -29,10 +29,10 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ReplicaSpec,
+    ReplicaData,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
@@ -117,10 +117,13 @@ def make_deployment(
             scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica_spec=ReplicaSpec(
+        replica=ReplicaData(
             replica_count=desired,
+            desired_replica_count=None,
         ),
-        network=DeploymentNetworkSpec(open_to_public=False),
+        network=DeploymentNetworkData(
+            open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+        ),
         model_revisions=[],
         options=DeploymentOptions(),
         current_revision_id=DeploymentRevisionID(current_revision_id),
@@ -924,7 +927,7 @@ class TestDesiredReplicaCount:
     def test_desired_replica_count_overrides_replica_count(self) -> None:
         """When desired_replica_count is set, it takes precedence."""
         deployment = make_deployment(desired=3)
-        deployment.replica_spec = ReplicaSpec(
+        deployment.replica = ReplicaData(
             replica_count=1,
             desired_replica_count=3,
         )
@@ -940,7 +943,7 @@ class TestDesiredReplicaCount:
     def test_replica_count_used_when_no_desired(self) -> None:
         """When desired_replica_count is None, uses replica_count."""
         deployment = make_deployment(desired=2)
-        deployment.replica_spec = ReplicaSpec(
+        deployment.replica = ReplicaData(
             replica_count=2,
             desired_replica_count=None,
         )

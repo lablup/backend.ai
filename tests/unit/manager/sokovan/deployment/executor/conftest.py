@@ -17,11 +17,11 @@ from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ModelRevisionSpec,
-    ReplicaSpec,
+    ModelRevisionData,
+    ReplicaData,
     RouteHealthStatus,
     RouteStatus,
 )
@@ -134,7 +134,7 @@ def _create_deployment_info(
     rev_id = uuid4()
     revision = MagicMock() if has_revision else None
     if revision is not None:
-        revision.revision_id = rev_id
+        revision.id = rev_id
 
     return DeploymentInfo(
         id=DeploymentID(dep_id),
@@ -153,15 +153,17 @@ def _create_deployment_info(
             scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica_spec=ReplicaSpec(
+        replica=ReplicaData(
             replica_count=replica_count,
             desired_replica_count=desired_replica_count,
         ),
-        network=DeploymentNetworkSpec(
+        network=DeploymentNetworkData(
             open_to_public=False,
+            access_token_ids=None,
             url=None,
+            preferred_domain_name=None,
         ),
-        model_revisions=[cast(ModelRevisionSpec, revision)] if has_revision else [],
+        model_revisions=[cast(ModelRevisionData, revision)] if has_revision else [],
         current_revision_id=DeploymentRevisionID(rev_id) if has_revision else None,
         options=DeploymentOptions(),
     )

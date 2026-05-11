@@ -615,7 +615,7 @@ class DeploymentExecutor:
         Resolves the runtime variant id to a name at this boundary since
         the AppProxy wire API still keys on the variant name string.
         """
-        target_revision = deployment.resolve_revision_spec(revision_id)
+        target_revision = deployment.resolve_revision_data(revision_id)
 
         health_check_config = None
         if target_revision.model_definition:
@@ -627,7 +627,7 @@ class DeploymentExecutor:
             )
 
         variant = await self._runtime_variant_repo.get_by_id(
-            target_revision.execution.runtime_variant_id
+            target_revision.model_runtime_config.runtime_variant_id
         )
 
         return CreateEndpointItem(
@@ -661,9 +661,9 @@ class DeploymentExecutor:
         with recorder.phase("verify_replicas"):
             with recorder.step("compare_route_count"):
                 routes = route_map[deployment.id]
-                if len(routes) != deployment.replica_spec.target_replica_count:
+                if len(routes) != deployment.replica.target_replica_count:
                     raise ReplicaCountMismatch(
-                        expected=deployment.replica_spec.target_replica_count,
+                        expected=deployment.replica.target_replica_count,
                         actual=len(routes),
                     )
 
@@ -682,7 +682,7 @@ class DeploymentExecutor:
 
         with recorder.phase("evaluate_scaling"):
             with recorder.step("calculate_scale_action"):
-                target_count = deployment.replica_spec.target_replica_count
+                target_count = deployment.replica.target_replica_count
                 routes = route_map[deployment.id]
                 if len(routes) < target_count:
                     # Build creators for scale out
@@ -845,8 +845,8 @@ class DeploymentExecutor:
             if not auto_scaling_rule:
                 with recorder.step("apply_manual_scaling"):
                     routes = metrics_data.routes_by_deployment.get(deployment.id, [])
-                    if deployment.replica_spec.replica_count != len(routes):
-                        return deployment.replica_spec.replica_count
+                    if deployment.replica.replica_count != len(routes):
+                        return deployment.replica.replica_count
                     return None
 
             with recorder.step("evaluate_autoscaling_rules"):

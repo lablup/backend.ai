@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
 from typing import Any, cast
-from uuid import UUID
 
 from pydantic import HttpUrl
 
@@ -67,7 +66,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
-    ModelRevisionSpec,
     RevisionSearchResult,
     RouteHealthStatus,
     RouteInfo,
@@ -205,7 +203,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_modified_endpoint(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
         """Get modified endpoint without applying changes.
@@ -244,7 +242,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_endpoint_lifecycle_bulk(
         self,
-        endpoint_ids: list[uuid.UUID],
+        endpoint_ids: list[DeploymentID],
         prevoius_status: list[EndpointLifecycle],
         new_status: EndpointLifecycle,
     ) -> None:
@@ -336,7 +334,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
         """Get endpoint information.
 
@@ -348,7 +346,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def destroy_endpoint(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> bool:
         """Destroy an endpoint and all its routes."""
         return await self._db_source.update_endpoint_lifecycle(
@@ -375,7 +373,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def delete_endpoint(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> bool:
         """Delete an endpoint and all its routes."""
         return await self._db_source.delete_endpoint_with_routes(endpoint_id)
@@ -383,7 +381,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_service_endpoint(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> HttpUrl | None:
         """Get service endpoint URL."""
         try:
@@ -399,7 +397,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_autoscaling_rule(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         creator: AutoScalingRuleCreator,
     ) -> AutoScalingRule:
         """Create a new autoscaling rule for an endpoint."""
@@ -408,7 +406,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def list_autoscaling_rules(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> list[AutoScalingRule]:
         """List all autoscaling rules for an endpoint."""
         return await self._db_source.list_autoscaling_rules(endpoint_id)
@@ -460,7 +458,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def list_model_deployment_autoscaling_rules(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> list[ModelDeploymentAutoScalingRuleData]:
         """List all autoscaling rules for an endpoint using ModelDeployment types."""
         return await self._db_source.list_model_deployment_autoscaling_rules(endpoint_id)
@@ -706,7 +704,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_endpoint_url(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         url: str,
     ) -> None:
         """Update a single endpoint's registered URL.
@@ -772,7 +770,7 @@ class DeploymentRepository:
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
-        revision_id: UUID,
+        revision_id: DeploymentRevisionID,
     ) -> DeploymentContext:
         """Fetch all context data needed for session creation from deployment info.
 
@@ -897,7 +895,7 @@ class DeploymentRepository:
             return None
 
         current_datetime = datetime.now(UTC)
-        current_replica_count = deployment.replica_spec.target_replica_count
+        current_replica_count = deployment.replica.target_replica_count
         routes = metrics_data.routes_by_deployment.get(deployment.id, [])
 
         for rule in auto_scaling_rules:
@@ -1188,7 +1186,7 @@ class DeploymentRepository:
     async def create_revision_with_next_number(
         self,
         creator: RBACEntityCreator[DeploymentRevisionRow],
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> ModelRevisionData:
         """Atomically read the latest revision number and create a new revision.
 
@@ -1199,7 +1197,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_revision(
         self,
-        revision_id: uuid.UUID,
+        revision_id: DeploymentRevisionID,
     ) -> ModelRevisionData:
         """Get a deployment revision by ID.
 
@@ -1227,7 +1225,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_current_revision(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> ModelRevisionData:
         """Get the current revision of a deployment.
 
@@ -1241,21 +1239,9 @@ class DeploymentRepository:
         return await self._db_source.get_current_revision(endpoint_id)
 
     @deployment_repository_resilience.apply()
-    async def get_current_revision_spec(
-        self,
-        endpoint_id: uuid.UUID,
-    ) -> ModelRevisionSpec:
-        """Get the current revision as a ModelRevisionSpec for revision refresh.
-
-        Raises:
-            DeploymentRevisionNotFound: If the endpoint has no current revision.
-        """
-        return await self._db_source.get_current_revision_spec(endpoint_id)
-
-    @deployment_repository_resilience.apply()
     async def get_latest_revision(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> ModelRevisionData:
         """Get the latest revision (highest ``revision_number``) of a deployment.
 
@@ -1279,7 +1265,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_latest_revision_number(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> int | None:
         """Get the latest revision number for an endpoint.
 
@@ -1305,9 +1291,9 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def set_deploying_revision(
         self,
-        endpoint_id: uuid.UUID,
-        revision_id: uuid.UUID,
-    ) -> tuple[uuid.UUID | None, bool]:
+        endpoint_id: DeploymentID,
+        revision_id: DeploymentRevisionID,
+    ) -> tuple[DeploymentRevisionID | None, bool]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
         Overrides any previous ``deploying_revision`` unconditionally;
@@ -1323,7 +1309,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def prune_old_revisions(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         revision_history_limit: int,
     ) -> int:
         """Delete old revisions that exceed the history limit.
@@ -1348,7 +1334,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_auto_scaling_policy(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> DeploymentAutoScalingPolicyData:
         """Get the auto-scaling policy for an endpoint.
 
@@ -1392,7 +1378,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_deployment_policy(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> DeploymentPolicyData:
         """Get the deployment policy for an endpoint.
 
@@ -1469,7 +1455,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def search_revision_resource_slots(
         self,
-        revision_id: uuid.UUID,
+        revision_id: DeploymentRevisionID,
         querier: BatchQuerier,
     ) -> tuple[list[tuple[str, Decimal]], int, bool, bool]:
         """Search resource slots allocated to a deployment revision."""

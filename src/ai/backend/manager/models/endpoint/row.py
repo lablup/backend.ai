@@ -67,13 +67,13 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
-    ModelRevisionSpec,
-    ReplicaSpec,
+    ModelRevisionData,
+    ReplicaData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -733,10 +733,10 @@ class EndpointRow(Base):  # type: ignore[misc]
         if self.deployment_policy is not None:
             policy_data = self.deployment_policy.to_data()
 
-        model_revisions: list[ModelRevisionSpec] = []
+        model_revisions: list[ModelRevisionData] = []
         for rev_row in self.revisions:
             if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                model_revisions.append(rev_row.to_model_revision_spec())
+                model_revisions.append(rev_row.to_data())
 
         info = self._to_deployment_info_with_revisions(model_revisions)
         info.policy = policy_data
@@ -744,7 +744,7 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     def _to_deployment_info_with_revisions(
         self,
-        model_revisions: list[ModelRevisionSpec],
+        model_revisions: list[ModelRevisionData],
     ) -> DeploymentInfo:
         """Build DeploymentInfo with pre-built model_revisions dict."""
         return DeploymentInfo(
@@ -765,13 +765,15 @@ class EndpointRow(Base):  # type: ignore[misc]
                 scaling_state=self.scaling_state,
                 retry_count=self.retries,
             ),
-            replica_spec=ReplicaSpec(
+            replica=ReplicaData(
                 replica_count=self.replicas,
                 desired_replica_count=self.desired_replicas,
             ),
-            network=DeploymentNetworkSpec(
+            network=DeploymentNetworkData(
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                access_token_ids=None,
                 url=self.url,
+                preferred_domain_name=None,
             ),
             model_revisions=list(model_revisions),
             options=self.options,

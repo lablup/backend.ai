@@ -136,6 +136,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsInfoDTO,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -666,24 +667,24 @@ class DeploymentAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def get(self, deployment_id: UUID) -> DeploymentNode:
+    async def get(self, deployment_id: DeploymentID) -> DeploymentNode:
         """Retrieve a single deployment by ID."""
         action_result = await self._processors.deployment.get_deployment_by_id.wait_for_complete(
             GetDeploymentByIdAction(deployment_id=deployment_id)
         )
         return self._deployment_data_to_dto(action_result.data)
 
-    async def get_current_revision(self, deployment_id: UUID) -> RevisionNode:
+    async def get_current_revision(self, deployment_id: DeploymentID) -> RevisionNode:
         """Retrieve the current active revision of a deployment."""
         deployment = await self.get(deployment_id)
         if deployment.current_revision_id is None:
             raise DeploymentRevisionNotFound(f"Deployment {deployment_id} has no current revision")
-        return await self.get_revision(deployment.current_revision_id)
+        return await self.get_revision(DeploymentRevisionID(deployment.current_revision_id))
 
     async def update(
         self,
         input: UpdateDeploymentInput,
-        deployment_id: UUID,
+        deployment_id: DeploymentID,
     ) -> UpdateDeploymentPayload:
         """Update deployment metadata and configuration."""
         metadata_spec: DeploymentMetadataUpdaterSpec | None = None
@@ -766,7 +767,7 @@ class DeploymentAdapter(BaseAdapter):
     async def sync_replicas(self, input: SyncReplicaInput) -> SyncReplicaPayload:
         """Force sync replica information for a deployment."""
         await self._processors.deployment.sync_replicas.wait_for_complete(
-            SyncReplicaAction(deployment_id=input.model_deployment_id)
+            SyncReplicaAction(deployment_id=DeploymentID(input.model_deployment_id))
         )
         return SyncReplicaPayload(success=True)
 
@@ -774,8 +775,8 @@ class DeploymentAdapter(BaseAdapter):
         """Activate a specific revision as the current revision."""
         action_result = await self._processors.deployment.activate_revision.wait_for_complete(
             ActivateRevisionAction(
-                deployment_id=input.deployment_id,
-                revision_id=input.revision_id,
+                deployment_id=DeploymentID(input.deployment_id),
+                revision_id=DeploymentRevisionID(input.revision_id),
             )
         )
         return ActivateRevisionPayload(
@@ -823,7 +824,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> CreateAccessTokenPayload:
         """Create a new access token for a deployment."""
         creator = ModelDeploymentAccessTokenCreator(
-            model_deployment_id=input.model_deployment_id,
+            model_deployment_id=DeploymentID(input.model_deployment_id),
             expires_at=input.expires_at,
         )
         action_result = await self._processors.deployment.create_access_token.wait_for_complete(
@@ -1007,10 +1008,10 @@ class DeploymentAdapter(BaseAdapter):
     # Deployment policy operations
     # ------------------------------------------------------------------
 
-    async def get_policy(self, deployment_id: UUID) -> GetDeploymentPolicyPayload:
+    async def get_policy(self, deployment_id: DeploymentID) -> GetDeploymentPolicyPayload:
         """Retrieve a deployment policy by deployment ID."""
         action_result = await self._processors.deployment.get_deployment_policy.wait_for_complete(
-            GetDeploymentPolicyAction(deployment_id=DeploymentID(deployment_id))
+            GetDeploymentPolicyAction(deployment_id=deployment_id)
         )
         return GetDeploymentPolicyPayload(policy=self._policy_data_to_dto(action_result.data))
 
@@ -1115,14 +1116,14 @@ class DeploymentAdapter(BaseAdapter):
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(
-                model_deployment_id=input.deployment_id,
+                model_deployment_id=DeploymentID(input.deployment_id),
                 adder=adder,
                 auto_activate=options.auto_activate,
             )
         )
         return AddRevisionPayload(revision=self._revision_data_to_dto(action_result.revision))
 
-    async def get_revision(self, revision_id: UUID) -> RevisionNode:
+    async def get_revision(self, revision_id: DeploymentRevisionID) -> RevisionNode:
         """Retrieve a single revision by ID."""
         action_result = await self._processors.deployment.get_revision_by_id.wait_for_complete(
             GetRevisionByIdAction(revision_id=revision_id)
@@ -1168,7 +1169,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_revision_resource_slots(
         self,
-        revision_id: UUID,
+        revision_id: DeploymentRevisionID,
         input: SearchAllocatedResourceSlotsInput,
     ) -> SearchAllocatedResourceSlotsPayload:
         """Search resource slots allocated to a deployment revision."""
@@ -1317,7 +1318,9 @@ class DeploymentAdapter(BaseAdapter):
         action_result = await self._processors.deployment.search_revisions.wait_for_complete(
             SearchRevisionsAction(querier=querier)
         )
-        revision_map = {data.id: self._revision_data_to_dto(data) for data in action_result.data}
+        revision_map: dict[uuid.UUID, RevisionNode] = {
+            data.id: self._revision_data_to_dto(data) for data in action_result.data
+        }
         return [revision_map.get(revision_id) for revision_id in revision_ids]
 
     async def batch_load_replicas_by_ids(
@@ -2005,7 +2008,7 @@ class DeploymentAdapter(BaseAdapter):
     def _build_revision_resource_slot_querier(
         self,
         input: SearchAllocatedResourceSlotsInput,
-        revision_id: UUID,
+        revision_id: DeploymentRevisionID,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = [
             RevisionResourceSlotConditions.by_revision_id(revision_id),
@@ -2215,6 +2218,7 @@ class DeploymentAdapter(BaseAdapter):
             )
         return RevisionNode(
             id=data.id,
+            revision_number=data.revision_number,
             image_id=data.image_id,
             cluster_config=ClusterConfigInfoDTO(
                 mode=data.cluster_config.mode.name,
@@ -2263,9 +2267,9 @@ class DeploymentAdapter(BaseAdapter):
                     mount_destination=m.mount_destination,
                     mount_perm=m.mount_perm,
                 )
-                for m in data.extra_vfolder_mounts
+                for m in data.model_mount_config.extra_mounts
             ],
-            revision_preset_id=data.revision_preset_id,
+            revision_preset_id=data.preset.preset_id,
         )
 
     @staticmethod

@@ -101,6 +101,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
 )
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
@@ -452,6 +453,16 @@ class ModelDefinitionGQL:
 class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     image_id: ID
     id: NodeID[str]
+    revision_number: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Per-deployment sequential revision number assigned at "
+                "insert time (UNIQUE per deployment). Use this to surface "
+                "'Revision #N' labels and to order revisions client-side."
+            ),
+        ),
+    )
     cluster_config: ClusterConfig = gql_field(
         description="Cluster configuration for replica distribution."
     )
@@ -558,7 +569,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         )
 
         payload = await info.context.adapters.deployment.search_revision_resource_slots(
-            revision_id=UUID(str(self.id)),
+            revision_id=DeploymentRevisionID(UUID(str(self.id))),
             input=SearchAllocatedResourceSlotsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,

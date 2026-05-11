@@ -23,10 +23,10 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ReplicaSpec,
+    ReplicaData,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.handlers.deploying import (
@@ -103,7 +103,7 @@ class TestDeployingProvisioningHandler:
         """
         deploying_rev_id = DeploymentRevisionID(uuid4())
         revision = MagicMock()
-        revision.revision_id = deploying_rev_id
+        revision.id = deploying_rev_id
 
         return DeploymentWithHistory(
             deployment_info=DeploymentInfo(
@@ -123,13 +123,15 @@ class TestDeployingProvisioningHandler:
                     scaling_state=ScalingState.STABLE,
                     retry_count=0,
                 ),
-                replica_spec=ReplicaSpec(
+                replica=ReplicaData(
                     replica_count=1,
                     desired_replica_count=1,
                 ),
-                network=DeploymentNetworkSpec(
+                network=DeploymentNetworkData(
                     open_to_public=False,
+                    access_token_ids=None,
                     url=None,
+                    preferred_domain_name=None,
                 ),
                 model_revisions=[revision],
                 current_revision_id=None,

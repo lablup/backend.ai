@@ -27,7 +27,7 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
     SessionTypes,
 )
-from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionSpec
+from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionData
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -44,6 +44,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
+from ai.backend.manager.errors.deployment import RevisionMissingModelVFolder
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 
@@ -64,16 +65,21 @@ class DeploymentSessionDraftBuilder:
         deployment_info: DeploymentInfo,
         context: DeploymentContext,
         route_id: UUID,
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
     ) -> SessionSpecDraft:
         environ = cls._resolve_environ(deployment_info, target_revision, context)
         startup_command = target_revision.execution.startup_command
         mounts = cls._resolve_mounts(target_revision)
         resource_entries = cls._resource_entries(target_revision)
         resource_opts = ResourceOpts.model_validate(
-            target_revision.resource_spec.resource_opts or {}
+            dict(target_revision.resource_config.resource_opts) or {}
         )
         model_definition_payload = cls._model_definition_payload(target_revision, context)
+
+        if target_revision.model_mount_config.vfolder_id is None:
+            raise RevisionMissingModelVFolder(
+                f"Revision {target_revision.id} has no model vfolder; cannot build session draft"
+            )
 
         return SessionSpecDraft(
             identity=SessionIdentityDraft(
@@ -97,13 +103,13 @@ class DeploymentSessionDraftBuilder:
             options=SessionOptionsDraft(
                 priority=SESSION_PRIORITY_DEFAULT,
                 is_preemptible=False,
-                cluster_mode=target_revision.resource_spec.cluster_mode,
-                cluster_size=target_revision.resource_spec.cluster_size,
+                cluster_mode=target_revision.cluster_config.mode,
+                cluster_size=target_revision.cluster_config.size,
                 scheduling_target=SchedulingTargetDraft(),
                 kernel_groups=(
                     KernelGroupDraft(
                         role="main",
-                        replica_count=target_revision.resource_spec.cluster_size,
+                        replica_count=target_revision.cluster_config.size,
                         execution_spec=KernelExecutionSpecDraft(
                             image_id=target_revision.image_id,
                             resources=resource_entries,
@@ -119,7 +125,7 @@ class DeploymentSessionDraftBuilder:
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=context.session_owner.sudo_session_enabled,
-                model_definition_path=target_revision.mounts.model_definition_path,
+                model_definition_path=target_revision.model_mount_config.definition_path,
                 model_definition=model_definition_payload,
             ),
         )
@@ -127,10 +133,13 @@ class DeploymentSessionDraftBuilder:
     @staticmethod
     def _resolve_environ(
         deployment_info: DeploymentInfo,
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
         context: DeploymentContext,
     ) -> dict[str, str]:
-        environ: dict[str, str] = dict(target_revision.execution.environ or {})
+        revision_environ = target_revision.model_runtime_config.environ
+        environ: dict[str, str] = (
+            {k: str(v) for k, v in revision_environ.items()} if revision_environ else {}
+        )
         if "BACKEND_MODEL_NAME" not in environ:
             environ["BACKEND_MODEL_NAME"] = deployment_info.metadata.name
         if context.resolved_presets:
@@ -139,24 +148,30 @@ class DeploymentSessionDraftBuilder:
 
     @staticmethod
     def _resolve_mounts(
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
     ) -> tuple[MountInfoEntry, ...]:
         # Model vfolder is always first (READ_ONLY), extra mounts follow
         # with their frozen permissions already on each entry.
+        if target_revision.model_mount_config.vfolder_id is None:
+            raise RevisionMissingModelVFolder(
+                f"Revision {target_revision.id} has no model vfolder; cannot build mount entries"
+            )
         return (
             MountInfoEntry(
-                vfolder_id=target_revision.mounts.model_vfolder_id,
-                mount_destination=target_revision.mounts.model_mount_destination,
+                vfolder_id=target_revision.model_mount_config.vfolder_id,
+                mount_destination=(
+                    target_revision.model_mount_config.mount_destination or "/models"
+                ),
                 mount_perm=MountPermission.READ_ONLY,
             ),
-            *target_revision.mounts.extra_mounts,
+            *target_revision.model_mount_config.extra_mounts,
         )
 
     @staticmethod
     def _resource_entries(
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
     ) -> tuple[ResourceSlotEntry, ...]:
-        resource_slots = target_revision.resource_spec.resource_slots or {}
+        resource_slots = dict(target_revision.resource_config.resource_slot)
         return tuple(
             ResourceSlotEntry(resource_type=str(k), quantity=str(Decimal(v)))
             for k, v in resource_slots.items()
@@ -165,7 +180,7 @@ class DeploymentSessionDraftBuilder:
 
     @staticmethod
     def _model_definition_payload(
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
         context: DeploymentContext,
     ) -> dict[str, Any] | None:
         """Materialize ``model_definition`` into the kernel payload.

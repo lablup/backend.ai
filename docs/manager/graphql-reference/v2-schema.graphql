@@ -6404,6 +6404,11 @@ type ModelRevision implements Node {
   id: ID!
   imageId: ID!
 
+  """
+  Added in UNRELEASED. Per-deployment sequential revision number assigned at insert time (UNIQUE per deployment). Use this to surface 'Revision #N' labels and to order revisions client-side.
+  """
+  revisionNumber: Int!
+
   """Cluster configuration for replica distribution."""
   clusterConfig: ClusterConfig!
 

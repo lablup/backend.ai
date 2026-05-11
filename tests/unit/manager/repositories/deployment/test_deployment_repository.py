@@ -19,6 +19,7 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -1836,7 +1837,7 @@ class TestDeploymentRevisionOperations:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that get_revision raises DeploymentRevisionNotFound for nonexistent ID."""
-        nonexistent_id = uuid.uuid4()
+        nonexistent_id = DeploymentRevisionID(uuid.uuid4())
 
         with pytest.raises(DeploymentRevisionNotFound):
             await deployment_repository.get_revision(nonexistent_id)
@@ -2010,7 +2011,7 @@ class TestDeploymentRevisionOperations:
         # Verify returned DeploymentInfo contains updated values
         assert deployment_info.id == test_endpoint_id
         assert deployment_info.metadata.name == new_name
-        assert deployment_info.replica_spec.replica_count == new_replica_count
+        assert deployment_info.replica.replica_count == new_replica_count
 
         # Verify database state matches returned values
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -3347,7 +3348,7 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
             traffic_ratio=1.0,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
@@ -3381,7 +3382,7 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3429,7 +3430,7 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3879,7 +3880,7 @@ class TestDeploymentRepositoryDuplicateName:
         the same (name, domain, project) is already in DESTROYING."""
         target_id, _ = coexisting_active_and_destroying_endpoints
 
-        succeeded = await deployment_repository.destroy_endpoint(target_id)
+        succeeded = await deployment_repository.destroy_endpoint(DeploymentID(target_id))
         assert succeeded is True
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -3904,9 +3905,9 @@ class TestDeploymentRepositoryDuplicateName:
         against re-activation; orphan routes from the preempted rollout
         are cleaned up by ``RouteEvictionHandler``'s orphan branch.
         """
-        endpoint_id = uuid.uuid4()
-        previous_deploying = uuid.uuid4()
-        new_deploying = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
+        previous_deploying = DeploymentRevisionID(uuid.uuid4())
+        new_deploying = DeploymentRevisionID(uuid.uuid4())
         user_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -3954,7 +3955,7 @@ class TestDeploymentRepositoryDuplicateName:
         """``set_deploying_revision`` returns updated=False when the endpoint id
         does not match any row, instead of raising."""
         previous_current, updated = await deployment_repository.set_deploying_revision(
-            uuid.uuid4(), uuid.uuid4()
+            DeploymentID(uuid.uuid4()), DeploymentRevisionID(uuid.uuid4())
         )
         assert updated is False
         assert previous_current is None

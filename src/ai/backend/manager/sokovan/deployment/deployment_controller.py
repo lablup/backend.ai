@@ -14,6 +14,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import (
@@ -246,7 +247,7 @@ class DeploymentController:
             mounts=draft.draft_model_revision.mounts
         )
         await self._scheduling_controller.validate_session_spec(
-            SessionValidationSpec.from_revision(model_revision=model_revision_spec)
+            SessionValidationSpec.from_revision_spec(model_revision=model_revision_spec)
         )
         creator = NewDeploymentCreator(
             metadata=draft.metadata,
@@ -286,7 +287,7 @@ class DeploymentController:
 
     async def update_deployment(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         spec: DeploymentUpdaterSpec,
     ) -> DeploymentInfo:
         """
@@ -305,7 +306,7 @@ class DeploymentController:
             endpoint_id=endpoint_id, updater=updater
         )
         if modified_endpoint.current_revision_id is not None:
-            current_revision = modified_endpoint.resolve_revision_spec(
+            current_revision = await self._deployment_repository.get_revision(
                 modified_endpoint.current_revision_id
             )
             await self._scheduling_controller.validate_session_spec(
@@ -320,7 +321,7 @@ class DeploymentController:
 
     async def destroy_deployment(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> bool:
         """
         Destroy an existing deployment and its associated model service.
@@ -513,8 +514,8 @@ class DeploymentController:
 
     async def activate_revision(
         self,
-        deployment_id: uuid.UUID,
-        revision_id: uuid.UUID,
+        deployment_id: DeploymentID,
+        revision_id: DeploymentRevisionID,
     ) -> ActivateRevisionResult:
         """Activate a specific revision by initiating the deployment strategy.
 
@@ -640,7 +641,7 @@ class DeploymentController:
 
     async def _prune_revision_history(
         self,
-        deployment_id: uuid.UUID,
+        deployment_id: DeploymentID,
         revision_history_limit: int | None,
     ) -> None:
         """Delete old revisions that exceed the history limit.

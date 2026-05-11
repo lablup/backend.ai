@@ -68,7 +68,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     ExecutionSpec,
     ImageIdentifierDraft,
-    ModelRevisionSpec,
+    ModelRevisionData,
     ModelRevisionSpecDraft,
     MountMetadata,
     ReplicaSpec,
@@ -168,12 +168,12 @@ def _serve_info_from_dto(dto: ServiceInfo, runtime_variant_name: RuntimeVariant)
     )
 
 
-def _resolve_target_revision_spec(info: DeploymentInfo) -> ModelRevisionSpec | None:
-    """Resolve the target revision spec by id (current first, then deploying)."""
+def _resolve_target_revision_data(info: DeploymentInfo) -> ModelRevisionData | None:
+    """Resolve the target revision data by id (current first, then deploying)."""
     target_id = info.current_revision_id or info.deploying_revision_id
     if target_id is None:
         return None
-    return next((r for r in info.model_revisions if r.revision_id == target_id), None)
+    return next((r for r in info.model_revisions if r.id == target_id), None)
 
 
 def _serve_info_from_deployment_info(
@@ -186,22 +186,22 @@ def _serve_info_from_deployment_info(
     active revision's ``runtime_variant_id`` (internal data types are
     id-only; the legacy REST response still exposes the name string).
     """
-    model_revision = _resolve_target_revision_spec(deployment_info)
+    model_revision = _resolve_target_revision_data(deployment_info)
 
     return ServeInfoModel(
         endpoint_id=deployment_info.id,
         # ``None`` here covers two cases: no revision exists, or the revision's
         # model vfolder has been deleted (SET NULL FK).
-        model_id=model_revision.mounts.model_vfolder_id if model_revision else None,
-        extra_mounts=[m.vfolder_id for m in model_revision.mounts.extra_mounts]
+        model_id=model_revision.model_mount_config.vfolder_id if model_revision else None,
+        extra_mounts=[m.vfolder_id for m in model_revision.model_mount_config.extra_mounts]
         if model_revision
         else [],
         name=deployment_info.metadata.name,
-        model_definition_path=model_revision.mounts.model_definition_path
+        model_definition_path=model_revision.model_mount_config.definition_path
         if model_revision
         else None,
-        replicas=deployment_info.replica_spec.replica_count,
-        desired_session_count=deployment_info.replica_spec.replica_count,
+        replicas=deployment_info.replica.replica_count,
+        desired_session_count=deployment_info.replica.replica_count,
         active_routes=[],
         service_endpoint=HttpUrl(deployment_info.network.url)
         if deployment_info.network.url
@@ -387,11 +387,11 @@ class ServiceHandler:
             await self._deployment.create_legacy_deployment.wait_for_complete(deployment_action)
         )
         deployment_info = deployment_result.data
-        model_revision = _resolve_target_revision_spec(deployment_info)
+        model_revision = _resolve_target_revision_data(deployment_info)
         if model_revision is None:
             raise RuntimeVariantNotFound()
         runtime_variant_name = await self._resolve_runtime_variant_name(
-            model_revision.execution.runtime_variant_id
+            model_revision.model_runtime_config.runtime_variant_id
         )
         resp = _serve_info_from_deployment_info(deployment_info, runtime_variant_name)
         return APIResponse.build(HTTPStatus.CREATED, resp)
