@@ -1681,42 +1681,6 @@ class DeploymentDBSource:
                 for row, model_definition, session_status in result.all()
             ]
 
-    async def get_routes_for_health_observation(self) -> list[RouteData]:
-        """RUNNING routes whose revision declared ``service.health_check``."""
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(
-                    RoutingRow,
-                    DeploymentRevisionRow.model_definition,
-                    SessionRow.status,
-                )
-                .join(
-                    DeploymentRevisionRow,
-                    DeploymentRevisionRow.id == RoutingRow.revision,
-                )
-                .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
-                .where(RoutingRow.status == RouteStatus.RUNNING)
-                .where(DeploymentRevisionRow.health_check_enabled.is_(True))
-            )
-            result = await db_sess.execute(query)
-            return [
-                RouteData(
-                    route_id=row.id,
-                    deployment_id=row.endpoint,
-                    session_data=_build_session_data(row.session, session_status),
-                    status=row.status,
-                    health_status=row.health_status,
-                    traffic_ratio=row.traffic_ratio,
-                    created_at=row.created_at,
-                    revision_id=DeploymentRevisionID(row.revision),
-                    replica_host=row.replica_host,
-                    replica_port=row.replica_port,
-                    error_data=row.error_data or {},
-                    health_check_config=_project_health_check_config(model_definition),
-                )
-                for row, model_definition, session_status in result.all()
-            ]
-
     async def update_route_status_bulk(
         self,
         route_ids: set[uuid.UUID],

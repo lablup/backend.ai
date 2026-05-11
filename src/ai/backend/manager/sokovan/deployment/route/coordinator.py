@@ -20,7 +20,12 @@ from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthCheckFilter,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTargetStatuses,
+)
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
@@ -229,7 +234,13 @@ class RouteCoordinator:
         changing route status in DB.
         """
         try:
-            routes = await self._deployment_repository.get_routes_for_health_observation()
+            routes = await self._deployment_repository.get_routes_by_statuses(
+                RouteTargetStatuses(
+                    lifecycle=[RouteStatus.RUNNING],
+                    health=list(RouteHealthStatus),
+                ),
+                RouteHealthCheckFilter(health_check_required=True),
+            )
             if not routes:
                 return
 

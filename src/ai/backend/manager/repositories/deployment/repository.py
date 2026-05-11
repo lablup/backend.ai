@@ -640,11 +640,6 @@ class DeploymentRepository:
         return await self._db_source.get_routes_by_statuses(target, health_check_filter)
 
     @deployment_repository_resilience.apply()
-    async def get_routes_for_health_observation(self) -> list[RouteData]:
-        """RUNNING routes whose revision declared ``service.health_check``."""
-        return await self._db_source.get_routes_for_health_observation()
-
-    @deployment_repository_resilience.apply()
     async def update_route_status_bulk(
         self,
         route_ids: set[uuid.UUID],
