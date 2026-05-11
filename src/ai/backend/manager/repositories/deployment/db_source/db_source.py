@@ -224,8 +224,7 @@ def _project_health_check_config(
 
     ``None`` means the revision opted out of HTTP probing — the manager
     skips probe scheduling and AppProxy receives traffic as soon as the
-    route reaches RUNNING. Mirrors ``ModelDefinition.is_health_check_enabled()``
-    used at insert time to populate the filterable boolean column.
+    route reaches RUNNING.
     """
     if model_definition is None:
         return None

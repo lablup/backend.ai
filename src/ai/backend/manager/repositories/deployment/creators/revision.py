@@ -73,9 +73,6 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             model_mount_destination=self.model_mount_destination,
             model_definition_path=self.model_definition_path,
             model_definition=self.model_definition,
-            health_check_enabled=bool(
-                self.model_definition and self.model_definition.is_health_check_enabled()
-            ),
             resource_group=self.resource_group,
             resource_opts=self.resource_opts,
             cluster_mode=self.cluster_mode,
