@@ -12,7 +12,13 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import (
+    ModelConfig,
+    ModelDefinition,
+    ModelDefinitionDraft,
+    ModelHealthCheck,
+    ModelServiceConfig,
+)
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -41,7 +47,10 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentPolicyData,
     ModelRevisionData,
+    RouteHealthCheckFilter,
+    RouteHealthStatus,
     RouteStatus,
+    RouteTargetStatuses,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.image.types import ImageType
@@ -3480,6 +3489,611 @@ class TestRouteOperations:
         result = await deployment_repository.update_route(updater)
 
         assert result is False
+
+
+class TestGetRoutesByStatuses:
+    """Test cases for ``DeploymentRepository.get_routes_by_statuses()``.
+
+    Exercises the (lifecycle x health x traffic_status x revision-level
+    ``health_check_enabled``) filter matrix used by sokovan route handlers
+    to gate AppProxy registration and health probing.
+    """
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,
+                AgentRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ResourceSlotTypeRow,
+                SessionRow,
+                KernelRow,
+                EndpointRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
+                DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
+                RoutingRow,
+                AssociationScopesEntitiesRow,
+            ],
+        ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    name=sgroup_name,
+                    description="Test scaling group",
+                    is_active=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                )
+            )
+            await db_sess.commit()
+        return sgroup_name
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.commit()
+        return policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                    max_network_count=5,
+                )
+            )
+            await db_sess.commit()
+        return policy_name
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> uuid.UUID:
+        user_uuid = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"testuser-{user_uuid.hex[:8]}",
+                    email=f"test-{user_uuid.hex[:8]}@example.com",
+                    password=create_test_password_info("test_password"),
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name=test_domain_name,
+                    role=UserRole.USER,
+                    resource_policy=test_resource_policy_name,
+                )
+            )
+            await db_sess.commit()
+        return user_uuid
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        group_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                GroupRow(
+                    id=group_id,
+                    name=f"test-group-{uuid.uuid4().hex[:8]}",
+                    domain_name=test_domain_name,
+                    resource_policy=test_project_resource_policy_name,
+                )
+            )
+            await db_sess.commit()
+        return group_id
+
+    @pytest.fixture
+    async def endpoint_and_revisions(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+    ) -> tuple[DeploymentID, DeploymentRevisionID, DeploymentRevisionID]:
+        """Create an endpoint and two revisions:
+
+        - ``revision_hc_on``: ``health_check_enabled=True`` with a ``/health`` probe
+        - ``revision_hc_off``: ``health_check_enabled=False`` and ``model_definition=None``
+        """
+        endpoint_id = DeploymentID(uuid.uuid4())
+        revision_hc_on_id = DeploymentRevisionID(uuid.uuid4())
+        revision_hc_off_id = DeploymentRevisionID(uuid.uuid4())
+        registry_id = uuid.uuid4()
+        image_id = ImageID(uuid.uuid4())
+        runtime_variant_id = RuntimeVariantID(uuid.uuid4())
+
+        hc_on_model_def = ModelDefinition(
+            models=[
+                ModelConfig(
+                    name="hc-on-model",
+                    model_path="/models",
+                    service=ModelServiceConfig(
+                        port=8000,
+                        health_check=ModelHealthCheck(path="/health"),
+                    ),
+                )
+            ]
+        )
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=registry_id,
+                    url="https://test-registry.example.com",
+                    registry_name="test-registry",
+                    type=ContainerRegistryType.DOCKER,
+                    project=None,
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+            image = ImageRow(
+                name="test-registry/test-image:latest",
+                project=None,
+                architecture="x86_64",
+                registry_id=registry_id,
+                is_local=False,
+                registry="test-registry",
+                image="test-image",
+                tag="latest",
+                config_digest="sha256:" + "a" * 64,
+                size_bytes=100000000,
+                type=ImageType.COMPUTE,
+                accelerators=None,
+                labels={},
+                resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
+            )
+            image.id = image_id
+            db_sess.add(image)
+            db_sess.add(
+                RuntimeVariantRow(
+                    id=runtime_variant_id,
+                    name=f"variant-{runtime_variant_id.hex[:8]}",
+                    description="test variant",
+                    default_model_definition=ModelDefinitionDraft(),
+                    reads_vfolder_config_files=False,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                EndpointRow(
+                    id=endpoint_id,
+                    name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
+                    created_user=test_user_uuid,
+                    session_owner=test_user_uuid,
+                    domain=test_domain_name,
+                    project=test_group_id,
+                    resource_group=test_scaling_group_name,
+                    desired_replicas=1,
+                    url="http://test.example.com",
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.READY,
+                    current_revision=revision_hc_on_id,
+                )
+            )
+            await db_sess.flush()
+            revision_hc_on = DeploymentRevisionRow(
+                id=revision_hc_on_id,
+                endpoint=endpoint_id,
+                revision_number=1,
+                image=image_id,
+                model=None,
+                model_mount_destination="/models",
+                model_definition=hc_on_model_def,
+                health_check_enabled=True,
+                resource_group=test_scaling_group_name,
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                runtime_variant_id=runtime_variant_id,
+                environ={},
+                extra_mounts=[],
+            )
+            revision_hc_on.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
+            ]
+            db_sess.add(revision_hc_on)
+            revision_hc_off = DeploymentRevisionRow(
+                id=revision_hc_off_id,
+                endpoint=endpoint_id,
+                revision_number=2,
+                image=image_id,
+                model=None,
+                model_mount_destination="/models",
+                model_definition=None,
+                health_check_enabled=False,
+                resource_group=test_scaling_group_name,
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                runtime_variant_id=runtime_variant_id,
+                environ={},
+                extra_mounts=[],
+            )
+            revision_hc_off.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
+            ]
+            db_sess.add(revision_hc_off)
+            await db_sess.commit()
+
+        return endpoint_id, revision_hc_on_id, revision_hc_off_id
+
+    @pytest.fixture
+    def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DeploymentRepository:
+        return DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=MagicMock(),
+            valkey_stat=MagicMock(),
+            valkey_live=MagicMock(),
+            valkey_schedule=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def populated_routes(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+        endpoint_and_revisions: tuple[DeploymentID, DeploymentRevisionID, DeploymentRevisionID],
+    ) -> dict[str, uuid.UUID]:
+        """Seed a fixed matrix of routes covering every combination the filter
+        permutations exercise. Returns a ``{name: route_id}`` map; tests assert
+        against these names without inserting additional rows themselves.
+        """
+        endpoint_id, revision_hc_on_id, revision_hc_off_id = endpoint_and_revisions
+        seeds: list[
+            tuple[
+                str,
+                DeploymentRevisionID,
+                RouteStatus,
+                RouteHealthStatus,
+                RouteTrafficStatus,
+            ]
+        ] = [
+            (
+                "running_hc_on_healthy_active",
+                revision_hc_on_id,
+                RouteStatus.RUNNING,
+                RouteHealthStatus.HEALTHY,
+                RouteTrafficStatus.ACTIVE,
+            ),
+            (
+                "running_hc_on_unhealthy_active",
+                revision_hc_on_id,
+                RouteStatus.RUNNING,
+                RouteHealthStatus.UNHEALTHY,
+                RouteTrafficStatus.ACTIVE,
+            ),
+            (
+                "running_hc_on_healthy_inactive",
+                revision_hc_on_id,
+                RouteStatus.RUNNING,
+                RouteHealthStatus.HEALTHY,
+                RouteTrafficStatus.INACTIVE,
+            ),
+            (
+                "running_hc_off_not_checked_active",
+                revision_hc_off_id,
+                RouteStatus.RUNNING,
+                RouteHealthStatus.NOT_CHECKED,
+                RouteTrafficStatus.ACTIVE,
+            ),
+            (
+                "provisioning_hc_on",
+                revision_hc_on_id,
+                RouteStatus.PROVISIONING,
+                RouteHealthStatus.NOT_CHECKED,
+                RouteTrafficStatus.ACTIVE,
+            ),
+            (
+                "provisioning_hc_off",
+                revision_hc_off_id,
+                RouteStatus.PROVISIONING,
+                RouteHealthStatus.NOT_CHECKED,
+                RouteTrafficStatus.ACTIVE,
+            ),
+        ]
+        ids: dict[str, uuid.UUID] = {}
+        async with db_with_cleanup.begin_session() as db_sess:
+            for name, revision_id, status, health, traffic in seeds:
+                route_id = uuid.uuid4()
+                row = RoutingRow(
+                    id=route_id,
+                    endpoint=endpoint_id,
+                    session=None,
+                    session_owner=test_user_uuid,
+                    domain=test_domain_name,
+                    project=test_group_id,
+                    revision=revision_id,
+                    status=status,
+                    traffic_ratio=1.0,
+                    traffic_status=traffic,
+                )
+                # ``health_status`` is not in ``RoutingRow.__init__``; set the
+                # attribute directly so the row inserts with the intended value
+                # instead of the default ``NOT_CHECKED``.
+                row.health_status = health
+                db_sess.add(row)
+                ids[name] = route_id
+            await db_sess.commit()
+        return ids
+
+    async def test_filter_by_lifecycle_status(
+        self,
+        deployment_repository: DeploymentRepository,
+        populated_routes: dict[str, uuid.UUID],
+    ) -> None:
+        """Lifecycle filter restricts results to rows whose
+        ``RoutingRow.status`` is in the target list.
+        """
+        result = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.RUNNING],
+                health=list(RouteHealthStatus),
+            ),
+            RouteHealthCheckFilter(),
+        )
+
+        assert {r.route_id for r in result} == {
+            populated_routes["running_hc_on_healthy_active"],
+            populated_routes["running_hc_on_unhealthy_active"],
+            populated_routes["running_hc_on_healthy_inactive"],
+            populated_routes["running_hc_off_not_checked_active"],
+        }
+
+    async def test_filter_by_health_status(
+        self,
+        deployment_repository: DeploymentRepository,
+        populated_routes: dict[str, uuid.UUID],
+    ) -> None:
+        """Health filter restricts to rows whose ``RoutingRow.health_status`` is
+        in the target list (without ``include_health_check_disabled``).
+        """
+        result = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.RUNNING],
+                health=[RouteHealthStatus.HEALTHY],
+            ),
+            RouteHealthCheckFilter(),
+        )
+
+        assert {r.route_id for r in result} == {
+            populated_routes["running_hc_on_healthy_active"],
+            populated_routes["running_hc_on_healthy_inactive"],
+        }
+
+    async def test_traffic_status_filter(
+        self,
+        deployment_repository: DeploymentRepository,
+        populated_routes: dict[str, uuid.UUID],
+    ) -> None:
+        """``traffic_status=INACTIVE`` excludes ACTIVE rows; omitting it (``None``)
+        keeps both ACTIVE and INACTIVE rows in the result set.
+        """
+        only_inactive = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.RUNNING],
+                health=[RouteHealthStatus.HEALTHY],
+                traffic_status=RouteTrafficStatus.INACTIVE,
+            ),
+            RouteHealthCheckFilter(),
+        )
+        both = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.RUNNING],
+                health=[RouteHealthStatus.HEALTHY],
+            ),
+            RouteHealthCheckFilter(),
+        )
+
+        assert {r.route_id for r in only_inactive} == {
+            populated_routes["running_hc_on_healthy_inactive"],
+        }
+        assert {r.route_id for r in both} == {
+            populated_routes["running_hc_on_healthy_active"],
+            populated_routes["running_hc_on_healthy_inactive"],
+        }
+
+    async def test_health_check_required_true_returns_only_hc_enabled_routes(
+        self,
+        deployment_repository: DeploymentRepository,
+        populated_routes: dict[str, uuid.UUID],
+    ) -> None:
+        """``health_check_required=True`` keeps only rows whose revision has
+        ``health_check_enabled=True`` (the health-probe scheduling path).
+        """
+        result = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.RUNNING],
+                health=list(RouteHealthStatus),
+            ),
+            RouteHealthCheckFilter(health_check_required=True),
+        )
+
+        assert {r.route_id for r in result} == {
+            populated_routes["running_hc_on_healthy_active"],
+            populated_routes["running_hc_on_unhealthy_active"],
+            populated_routes["running_hc_on_healthy_inactive"],
+        }
+
+    async def test_health_check_required_false_returns_only_hc_disabled_routes(
+        self,
+        deployment_repository: DeploymentRepository,
+        populated_routes: dict[str, uuid.UUID],
+    ) -> None:
+        """``health_check_required=False`` keeps only rows whose revision has
+        ``health_check_enabled=False``.
+        """
+        result = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.RUNNING],
+                health=list(RouteHealthStatus),
+            ),
+            RouteHealthCheckFilter(health_check_required=False),
+        )
+
+        assert {r.route_id for r in result} == {
+            populated_routes["running_hc_off_not_checked_active"],
+        }
+
+    async def test_include_health_check_disabled_or_includes_disabled_revisions(
+        self,
+        deployment_repository: DeploymentRepository,
+        populated_routes: dict[str, uuid.UUID],
+    ) -> None:
+        """``include_health_check_disabled=True`` OR-includes hc-disabled rows
+        regardless of their ``health_status`` (the AppProxy-sync path).
+
+        hc-enabled rows still must satisfy the health filter, so
+        ``running_hc_on_unhealthy_active`` (UNHEALTHY + hc-on) is excluded
+        even though it is RUNNING.
+        """
+        result = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.RUNNING],
+                health=[RouteHealthStatus.HEALTHY],
+            ),
+            RouteHealthCheckFilter(include_health_check_disabled=True),
+        )
+
+        assert {r.route_id for r in result} == {
+            populated_routes["running_hc_on_healthy_active"],
+            populated_routes["running_hc_on_healthy_inactive"],
+            populated_routes["running_hc_off_not_checked_active"],
+        }
+
+    async def test_health_check_config_projected_from_model_definition(
+        self,
+        deployment_repository: DeploymentRepository,
+        populated_routes: dict[str, uuid.UUID],
+    ) -> None:
+        """``RouteData.health_check_config`` mirrors the revision's
+        ``model_definition.health_check_config()``: a populated
+        :class:`ModelHealthCheck` for hc-enabled revisions, ``None`` otherwise.
+        """
+        result = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.RUNNING],
+                health=list(RouteHealthStatus),
+            ),
+            RouteHealthCheckFilter(),
+        )
+        by_route = {r.route_id: r for r in result}
+        hc_on = by_route[populated_routes["running_hc_on_healthy_active"]]
+        hc_off = by_route[populated_routes["running_hc_off_not_checked_active"]]
+
+        assert hc_on.health_check_config is not None
+        assert hc_on.health_check_config.path == "/health"
+        assert hc_off.health_check_config is None
+
+    async def test_no_matches_returns_empty(
+        self,
+        deployment_repository: DeploymentRepository,
+        populated_routes: dict[str, uuid.UUID],
+    ) -> None:
+        """Filter that matches no row returns an empty list, not an error."""
+        result = await deployment_repository.get_routes_by_statuses(
+            RouteTargetStatuses(
+                lifecycle=[RouteStatus.TERMINATED],
+                health=list(RouteHealthStatus),
+            ),
+            RouteHealthCheckFilter(),
+        )
+
+        assert result == []
 
 
 class TestDeploymentRepositoryDuplicateName:
