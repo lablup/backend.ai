@@ -419,7 +419,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     @pytest.fixture
     def revision_data(self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID) -> ModelRevisionData:
         return ModelRevisionData(
-            id=uuid.uuid4(),
+            id=DeploymentRevisionID(uuid.uuid4()),
             deployment_id=DeploymentID(uuid.uuid4()),
             revision_number=1,
             cluster_config=ClusterConfigData(
@@ -496,7 +496,9 @@ class TestAddModelRevision(ModelRevisionFixtures):
         mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
 
         action = AddModelRevisionAction(
-            model_deployment_id=deployment_id, adder=revision_creator, auto_activate=False
+            model_deployment_id=DeploymentID(deployment_id),
+            adder=revision_creator,
+            auto_activate=False,
         )
         result = await processors.add_model_revision.wait_for_complete(action)
 
@@ -641,7 +643,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         """
         action = CreateAccessTokenAction(
             creator=ModelDeploymentAccessTokenCreator(
-                model_deployment_id=deployment_id,
+                model_deployment_id=DeploymentID(deployment_id),
                 expires_at=datetime(2099, 1, 1, tzinfo=UTC),
             ),
         )

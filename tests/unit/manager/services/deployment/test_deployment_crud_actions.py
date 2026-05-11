@@ -20,6 +20,7 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -564,7 +565,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         """Replica count mismatch triggers CHECK_REPLICA marking."""
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = SyncReplicaAction(deployment_id=deployment_id)
+        action = SyncReplicaAction(deployment_id=DeploymentID(deployment_id))
         result = await processors.sync_replicas.wait_for_complete(action)
 
         assert result.success is True
@@ -581,7 +582,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         """Already synced state still performs marking."""
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = SyncReplicaAction(deployment_id=deployment_id)
+        action = SyncReplicaAction(deployment_id=DeploymentID(deployment_id))
         result = await processors.sync_replicas.wait_for_complete(action)
 
         assert result.success is True
@@ -596,7 +597,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
     @pytest.fixture
     def revision_data(self) -> ModelRevisionData:
         return ModelRevisionData(
-            id=uuid.uuid4(),
+            id=DeploymentRevisionID(uuid.uuid4()),
             deployment_id=DeploymentID(uuid.uuid4()),
             revision_number=1,
             cluster_config=ClusterConfigData(
@@ -655,6 +656,6 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
             side_effect=Exception("DeploymentRevisionNotFound")
         )
 
-        action = GetRevisionByIdAction(revision_id=uuid.uuid4())
+        action = GetRevisionByIdAction(revision_id=DeploymentRevisionID(uuid.uuid4()))
         with pytest.raises(Exception, match="DeploymentRevisionNotFound"):
             await processors.get_revision_by_id.wait_for_complete(action)

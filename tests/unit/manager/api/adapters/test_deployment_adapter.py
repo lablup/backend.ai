@@ -9,6 +9,7 @@ from uuid import uuid4
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -34,7 +35,7 @@ class TestRevisionDataToDTO:
 
     def test_model_definition_is_mapped_to_revision_dto(self) -> None:
         revision = ModelRevisionData(
-            id=uuid4(),
+            id=DeploymentRevisionID(uuid4()),
             deployment_id=DeploymentID(uuid4()),
             revision_number=1,
             cluster_config=ClusterConfigData(
