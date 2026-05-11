@@ -133,16 +133,6 @@ class RevisionNode(BaseResponseModel):
             "or for legacy rows that predate this field."
         ),
     )
-    health_check_enabled: bool = Field(
-        default=False,
-        description=(
-            "Whether the revision's resolved ``model_definition`` declares a "
-            "``service.health_check`` block. Computed at insert time and "
-            "persisted as a denormalized flag; the manager skips HTTP health "
-            "probing for revisions where this is ``False`` and AppProxy still "
-            "registers their routes once the underlying sessions reach RUNNING."
-        ),
-    )
 
 
 class DeploymentNode(BaseResponseModel):

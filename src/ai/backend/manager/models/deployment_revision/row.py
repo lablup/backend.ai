@@ -300,5 +300,4 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 ],
             ),
             model_definition=self.model_definition,
-            health_check_enabled=self.health_check_enabled,
         )

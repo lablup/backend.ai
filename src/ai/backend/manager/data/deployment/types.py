@@ -956,9 +956,6 @@ class ModelRevisionData:
     # Model definition (resolved against the model vfolder at
     # persistence time; ``None`` if the source had none).
     model_definition: ModelDefinition | None = None
-    # Denormalized flag derived from ``model_definition.is_health_check_enabled()``
-    # at insert time; persisted on the row even if ``model_definition`` is null.
-    health_check_enabled: bool = False
 
     def to_draft(self) -> RevisionDraft:
         """Project this persisted revision onto a ``RevisionDraft`` layer.
