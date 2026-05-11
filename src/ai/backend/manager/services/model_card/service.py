@@ -4,7 +4,7 @@ from uuid import UUID
 from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinition
-from ai.backend.common.exception import bai_validation_error
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -182,12 +182,13 @@ class ModelCardService:
         except Exception as e:
             raise ModelCardParseError(extra_msg=f"invalid YAML in {model_def_filename}: {e}") from e
 
-        with bai_validation_error(
-            ModelCardParseError,
-            extra_msg=f"invalid model definition in {model_def_filename}",
-            location_prefix=model_def_filename,
-        ):
+        try:
             model_def = ModelDefinition.model_validate(parsed)
+        except InvalidAPIParameters as e:
+            raise ModelCardParseError(
+                extra_msg=f"invalid model definition in {model_def_filename}",
+                extra_data=e.extra_data,
+            ) from e
         if not model_def.models:
             raise ModelCardParseError(extra_msg=f"no models defined in {model_def_filename}")
 
