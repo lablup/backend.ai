@@ -204,7 +204,6 @@ from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
-from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
@@ -3334,7 +3333,7 @@ class ExportConfig(BaseConfigSchema):
     ]
 
 
-class ManagerUnifiedConfig(BaseConfigSchema, BackendAIModel):
+class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: Annotated[
         DatabaseConfig,

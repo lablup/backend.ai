@@ -12,7 +12,6 @@ import tomli
 import trafaret as t
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     field_validator,
@@ -40,7 +39,7 @@ __all__ = (
 )
 
 
-class BaseConfigSchema(BaseModel):
+class BaseConfigSchema(BackendAIModel):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -53,7 +52,7 @@ class BaseConfigSchema(BaseModel):
     )
 
 
-class BaseConfigModel(BaseModel):
+class BaseConfigModel(BackendAIModel):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -472,7 +471,7 @@ def _merge_definition(base: ModelDefinition, override: ModelDefinition) -> Model
     return ModelDefinition.model_construct(models=models)
 
 
-class ModelDefinition(BaseConfigModel, BackendAIModel):
+class ModelDefinition(BaseConfigModel):
     models: list[ModelConfig] = Field(
         default_factory=list,
         description="List of models in the model definition.",
