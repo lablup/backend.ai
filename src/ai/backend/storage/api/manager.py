@@ -146,6 +146,8 @@ def skip_token_auth(
 
 
 def _build_storage_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """Detail /health — always 200; informational tier failures reported as
+    DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
@@ -153,6 +155,21 @@ def _build_storage_health_response(connectivity: ConnectivityCheckResponse) -> w
         connectivity=connectivity,
     )
     return web.json_response(response.model_dump(mode="json"))
+
+
+def _build_storage_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
+    is_healthy = connectivity.overall_healthy
+    response = HealthResponse(
+        status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
+        version=__version__,
+        component="storage-proxy",
+        connectivity=connectivity,
+    )
+    return web.json_response(
+        response.model_dump(mode="json"),
+        status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
+    )
 
 
 @skip_token_auth
@@ -170,7 +187,7 @@ async def check_livez(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     ctx: RootContext = request.app["ctx"]
     connectivity = await ctx.health_probe.get_liveness_status()
-    return _build_storage_health_response(connectivity)
+    return _build_storage_probe_response(connectivity)
 
 
 @skip_token_auth
@@ -179,7 +196,7 @@ async def check_readyz(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     ctx: RootContext = request.app["ctx"]
     connectivity = await ctx.health_probe.get_readiness_status()
-    return _build_storage_health_response(connectivity)
+    return _build_storage_probe_response(connectivity)
 
 
 @skip_token_auth

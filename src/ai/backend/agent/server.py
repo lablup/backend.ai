@@ -21,6 +21,7 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import AsyncExitStack, asynccontextmanager
+from http import HTTPStatus
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -1305,6 +1306,8 @@ async def server_main_logwrapper(
 
 
 def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """Detail /health — always 200; informational tier failures reported as
+    DEGRADED in the body but not surfaced via HTTP status."""
     from . import __version__
 
     response = HealthResponse(
@@ -1314,6 +1317,23 @@ def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web
         connectivity=connectivity,
     )
     return web.json_response(response.model_dump(mode="json"))
+
+
+def _build_agent_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
+    from . import __version__
+
+    is_healthy = connectivity.overall_healthy
+    response = HealthResponse(
+        status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
+        version=__version__,
+        component="agent",
+        connectivity=connectivity,
+    )
+    return web.json_response(
+        response.model_dump(mode="json"),
+        status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
+    )
 
 
 async def check_health(request: web.Request) -> web.Response:
@@ -1329,7 +1349,7 @@ async def check_livez(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     health_probe: HealthProbe = request.app["health_probe"]
     connectivity = await health_probe.get_liveness_status()
-    return _build_agent_health_response(connectivity)
+    return _build_agent_probe_response(connectivity)
 
 
 async def check_readyz(request: web.Request) -> web.Response:
@@ -1337,7 +1357,7 @@ async def check_readyz(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     health_probe: HealthProbe = request.app["health_probe"]
     connectivity = await health_probe.get_readiness_status()
-    return _build_agent_health_response(connectivity)
+    return _build_agent_probe_response(connectivity)
 
 
 def build_root_server() -> web.Application:

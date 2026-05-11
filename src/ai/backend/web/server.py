@@ -23,6 +23,7 @@ from collections.abc import (
 from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import UTC, datetime
 from functools import partial
+from http import HTTPStatus
 from pathlib import Path
 from pprint import pprint
 from typing import Any, cast
@@ -552,6 +553,8 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
 
 def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """Detail /health — always 200; informational tier failures reported as
+    DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
@@ -559,6 +562,21 @@ def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.R
         connectivity=connectivity,
     )
     return web.json_response(response.model_dump(mode="json"))
+
+
+def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
+    is_healthy = connectivity.overall_healthy
+    response = HealthResponse(
+        status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
+        version=__version__,
+        component="webserver",
+        connectivity=connectivity,
+    )
+    return web.json_response(
+        response.model_dump(mode="json"),
+        status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
+    )
 
 
 async def check_health(request: web.Request) -> web.Response:
@@ -574,7 +592,7 @@ async def check_livez(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     health_probe: HealthProbe = request.app["health_probe"]
     connectivity = await health_probe.get_liveness_status()
-    return _build_web_health_response(connectivity)
+    return _build_web_probe_response(connectivity)
 
 
 async def check_readyz(request: web.Request) -> web.Response:
@@ -582,7 +600,7 @@ async def check_readyz(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     health_probe: HealthProbe = request.app["health_probe"]
     connectivity = await health_probe.get_readiness_status()
-    return _build_web_health_response(connectivity)
+    return _build_web_probe_response(connectivity)
 
 
 async def webserver_healthcheck(request: web.Request) -> web.Response:
