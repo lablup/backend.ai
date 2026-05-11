@@ -1264,3 +1264,29 @@ class CloudDetectionError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class IncompleteModelDefinitionError(BackendAIError, web.HTTPBadRequest):
+    """Raised when a required model-definition field is missing after the
+    revision merge chain. ``sources`` lists every layer that could have
+    supplied the value so the caller can tell exactly where to set it."""
+
+    error_type = "https://api.backend.ai/probs/incomplete-model-definition"
+    error_title = "Incomplete Model Definition"
+
+    def __init__(self, field: str, sources: tuple[str, ...]) -> None:
+        sources_str = ", ".join(sources)
+        super().__init__(
+            extra_msg=(
+                f"`{field}` was not provided by any source ({sources_str}). "
+                f"Set `{field}` in one of these sources."
+            ),
+            extra_data={"field": field, "sources": list(sources)},
+        )
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

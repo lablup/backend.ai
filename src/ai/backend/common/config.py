@@ -20,7 +20,7 @@ from pydantic import (
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
-from .exception import ConfigurationError
+from .exception import ConfigurationError, IncompleteModelDefinitionError
 from .types import RedisHelperConfig
 
 __all__ = (
@@ -533,7 +533,15 @@ class ModelHealthCheckDraft(BaseConfigModel):
 
     def to_resolved(self) -> ModelHealthCheck:
         if self.path is None:
-            raise ValueError("ModelHealthCheck.path is required")
+            raise IncompleteModelDefinitionError(
+                field="ModelHealthCheck.path",
+                sources=(
+                    "request input",
+                    "revision preset",
+                    "runtime variant's default model definition",
+                    "model-definition.yaml on the model vfolder",
+                ),
+            )
         # Drop unset (None) fields so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values.
         return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
@@ -553,7 +561,15 @@ class ModelServiceConfigDraft(BaseConfigModel):
 
     def to_resolved(self) -> ModelServiceConfig:
         if self.port is None:
-            raise ValueError("ModelServiceConfig.port is required")
+            raise IncompleteModelDefinitionError(
+                field="ModelServiceConfig.port",
+                sources=(
+                    "request input",
+                    "revision preset",
+                    "runtime variant's default model definition",
+                    "model-definition.yaml on the model vfolder",
+                ),
+            )
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values;
         # resolve the nested ``health_check`` draft explicitly so its own
@@ -572,9 +588,26 @@ class ModelConfigDraft(BaseConfigModel):
 
     def to_resolved(self) -> ModelConfig:
         if self.name is None:
-            raise ValueError("ModelConfig.name is required")
+            raise IncompleteModelDefinitionError(
+                field="ModelConfig.name",
+                sources=(
+                    "request input",
+                    "revision preset",
+                    "runtime variant's default model definition",
+                    "model-definition.yaml on the model vfolder",
+                ),
+            )
         if self.model_path is None:
-            raise ValueError("ModelConfig.model_path is required")
+            raise IncompleteModelDefinitionError(
+                field="ModelConfig.model_path",
+                sources=(
+                    "request input",
+                    "revision preset",
+                    "runtime variant's default model definition",
+                    "model-definition.yaml on the model vfolder",
+                    "model mount destination",
+                ),
+            )
         service = self.service.to_resolved() if self.service else None
         if service is not None and service.start_command:
             # ``{model_path}`` placeholders in the variant baseline's
