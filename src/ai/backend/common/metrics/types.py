@@ -54,11 +54,13 @@ class KernelLiveStatValues:
             sentinel_targets = reported_currents & CAPACITY_SENTINEL_METRICS
             if not sentinel_targets:
                 continue
-            rewritten = [
+            rewritten: list[MetricValue] = []
+            samples_to_keep = [
                 v
                 for v in vs
                 if not (v.value_type is ValueType.CAPACITY and v.metric_name in sentinel_targets)
             ]
+            rewritten.extend(samples_to_keep)
             for metric_name in sentinel_targets:
                 rewritten.append(
                     MetricValue(
