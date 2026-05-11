@@ -18,6 +18,7 @@ from ai.backend.common.config import (
     merge,
     override_key,
 )
+from ai.backend.common.exception import IncompleteModelDefinitionError
 
 
 def test_override_key() -> None:
@@ -283,6 +284,28 @@ class TestModelConfigs:
             "--model-path",
             "/data",
         ]
+
+    def test_to_resolved_raises_incomplete_error_when_name_missing(self) -> None:
+        # After the merge chain collapses, ``name`` is still ``None``;
+        # the error must name the missing field and the source layers
+        # so callers know exactly which layer should have supplied it.
+        draft = ModelDefinitionDraft.model_validate({
+            "models": [{"model_path": "/models/demo"}],
+        })
+
+        with pytest.raises(IncompleteModelDefinitionError) as exc_info:
+            draft.to_resolved()
+
+        assert exc_info.value.extra_data == {
+            "field": "ModelConfig.name",
+            "sources": [
+                "request input",
+                "revision preset",
+                "runtime variant's default model definition",
+                "model-definition.yaml on the model vfolder",
+            ],
+        }
+        assert exc_info.value.status_code == 400
 
     def test_to_resolved_leaves_start_command_with_no_placeholder_unchanged(self) -> None:
         draft = ModelDefinitionDraft.model_validate({
