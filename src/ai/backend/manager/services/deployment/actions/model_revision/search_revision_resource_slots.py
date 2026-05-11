@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -19,7 +19,7 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 class SearchRevisionResourceSlotsAction(ModelRevisionBaseAction):
     """Action to search resource slots allocated to a deployment revision."""
 
-    revision_id: uuid.UUID
+    revision_id: DeploymentRevisionID
     querier: BatchQuerier
 
     @override

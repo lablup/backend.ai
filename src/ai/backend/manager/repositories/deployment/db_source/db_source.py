@@ -376,7 +376,7 @@ class DeploymentDBSource:
 
     async def get_endpoint(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
         """Get endpoint by ID.
 
@@ -582,7 +582,7 @@ class DeploymentDBSource:
 
     async def update_endpoint_lifecycle(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         lifecycle: EndpointLifecycle,
     ) -> bool:
         """Update endpoint lifecycle status.
@@ -608,7 +608,7 @@ class DeploymentDBSource:
 
     async def get_modified_endpoint(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
         """Get modified endpoint without applying changes.
@@ -790,7 +790,7 @@ class DeploymentDBSource:
 
     async def delete_endpoint_with_routes(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> bool:
         """Delete an endpoint and all its routes in a single transaction."""
         async with self._begin_session_read_committed() as db_sess:
@@ -801,7 +801,7 @@ class DeploymentDBSource:
 
     async def create_autoscaling_rule(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         creator: AutoScalingRuleCreator,
     ) -> AutoScalingRule:
         """Create a new autoscaling rule for an endpoint."""
@@ -820,7 +820,7 @@ class DeploymentDBSource:
 
     async def list_autoscaling_rules(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> list[AutoScalingRule]:
         """List all autoscaling rules for an endpoint."""
         async with self._begin_readonly_session_read_committed() as db_sess:
@@ -932,7 +932,7 @@ class DeploymentDBSource:
 
     async def list_model_deployment_autoscaling_rules(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> list[ModelDeploymentAutoScalingRuleData]:
         """List all autoscaling rules for an endpoint using ModelDeployment types."""
         async with self._begin_readonly_session_read_committed() as db_sess:
@@ -975,7 +975,7 @@ class DeploymentDBSource:
 
     async def get_routes_by_endpoint(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> list[RouteData]:
         """Get all routes for an endpoint."""
         async with self._begin_readonly_session_read_committed() as db_sess:
@@ -1290,7 +1290,7 @@ class DeploymentDBSource:
     async def _delete_routes_and_endpoint(
         self,
         db_sess: SASession,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> bool:
         """Private method to delete routes, policy, and endpoint in a single transaction."""
         # First delete all routes for this endpoint
@@ -1311,7 +1311,7 @@ class DeploymentDBSource:
     async def _fetch_endpoint_and_routes(
         self,
         db_sess: SASession,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> EndpointWithRoutesRawData | None:
         """Fetch endpoint and routes from database."""
         # Fetch endpoint
@@ -1782,7 +1782,7 @@ class DeploymentDBSource:
 
     async def update_endpoint_url(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         url: str,
     ) -> None:
         """Update a single endpoint's registered URL.
@@ -1913,7 +1913,7 @@ class DeploymentDBSource:
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
-        revision_id: uuid.UUID,
+        revision_id: DeploymentRevisionID,
     ) -> DeploymentContext:
         """Fetch all context data needed for session creation from deployment info.
 
@@ -2171,7 +2171,7 @@ class DeploymentDBSource:
 
     async def get_endpoint_health_check_config(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> ModelHealthCheck | None:
         """Read the endpoint's active-revision health-check config.
 
@@ -2347,7 +2347,7 @@ class DeploymentDBSource:
 
     async def get_latest_revision_number(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> int | None:
         """Get the latest revision number for an endpoint.
 
@@ -2384,7 +2384,7 @@ class DeploymentDBSource:
     async def create_revision_with_next_number(
         self,
         creator: RBACEntityCreator[DeploymentRevisionRow],
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> ModelRevisionData:
         """Atomically read the latest revision number and create a new revision.
 
@@ -2422,7 +2422,7 @@ class DeploymentDBSource:
 
     async def get_revision(
         self,
-        revision_id: uuid.UUID,
+        revision_id: DeploymentRevisionID,
     ) -> ModelRevisionData:
         """Get a deployment revision by ID.
 
@@ -2468,7 +2468,7 @@ class DeploymentDBSource:
 
     async def get_current_revision(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> ModelRevisionData:
         """Get the current revision of a deployment.
 
@@ -2501,7 +2501,7 @@ class DeploymentDBSource:
 
     async def get_latest_revision(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> ModelRevisionData:
         """Get the latest revision (highest ``revision_number``) of a deployment.
 
@@ -2610,9 +2610,9 @@ class DeploymentDBSource:
 
     async def set_deploying_revision(
         self,
-        endpoint_id: uuid.UUID,
-        revision_id: uuid.UUID,
-    ) -> tuple[uuid.UUID | None, bool]:
+        endpoint_id: DeploymentID,
+        revision_id: DeploymentRevisionID,
+    ) -> tuple[DeploymentRevisionID | None, bool]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
         Overrides any previous ``deploying_revision`` unconditionally;
@@ -2638,11 +2638,11 @@ class DeploymentDBSource:
             row = result.one_or_none()
             if row is None:
                 return None, False
-            return cast(uuid.UUID | None, row[0]), True
+            return cast(DeploymentRevisionID | None, row[0]), True
 
     async def prune_old_revisions(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
         revision_history_limit: int,
     ) -> int:
         """Delete old revisions exceeding the history limit.
@@ -2727,7 +2727,7 @@ class DeploymentDBSource:
 
     async def get_auto_scaling_policy(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> DeploymentAutoScalingPolicyData:
         """Get the auto-scaling policy for an endpoint.
 
@@ -2797,7 +2797,7 @@ class DeploymentDBSource:
 
     async def get_deployment_policy(
         self,
-        endpoint_id: uuid.UUID,
+        endpoint_id: DeploymentID,
     ) -> DeploymentPolicyData:
         """Get the deployment policy for an endpoint.
 
@@ -3077,7 +3077,7 @@ class DeploymentDBSource:
 
     async def search_revision_resource_slots(
         self,
-        revision_id: uuid.UUID,
+        revision_id: DeploymentRevisionID,
         querier: BatchQuerier,
     ) -> tuple[list[tuple[str, Decimal]], int, bool, bool]:
         """Search resource slots allocated to a deployment revision.

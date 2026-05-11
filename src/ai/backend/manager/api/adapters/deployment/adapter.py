@@ -767,7 +767,7 @@ class DeploymentAdapter(BaseAdapter):
     async def sync_replicas(self, input: SyncReplicaInput) -> SyncReplicaPayload:
         """Force sync replica information for a deployment."""
         await self._processors.deployment.sync_replicas.wait_for_complete(
-            SyncReplicaAction(deployment_id=input.model_deployment_id)
+            SyncReplicaAction(deployment_id=DeploymentID(input.model_deployment_id))
         )
         return SyncReplicaPayload(success=True)
 
@@ -775,8 +775,8 @@ class DeploymentAdapter(BaseAdapter):
         """Activate a specific revision as the current revision."""
         action_result = await self._processors.deployment.activate_revision.wait_for_complete(
             ActivateRevisionAction(
-                deployment_id=input.deployment_id,
-                revision_id=input.revision_id,
+                deployment_id=DeploymentID(input.deployment_id),
+                revision_id=DeploymentRevisionID(input.revision_id),
             )
         )
         return ActivateRevisionPayload(
@@ -824,7 +824,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> CreateAccessTokenPayload:
         """Create a new access token for a deployment."""
         creator = ModelDeploymentAccessTokenCreator(
-            model_deployment_id=input.model_deployment_id,
+            model_deployment_id=DeploymentID(input.model_deployment_id),
             expires_at=input.expires_at,
         )
         action_result = await self._processors.deployment.create_access_token.wait_for_complete(
@@ -1116,7 +1116,7 @@ class DeploymentAdapter(BaseAdapter):
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(
-                model_deployment_id=input.deployment_id,
+                model_deployment_id=DeploymentID(input.deployment_id),
                 adder=adder,
                 auto_activate=options.auto_activate,
             )
@@ -1318,7 +1318,9 @@ class DeploymentAdapter(BaseAdapter):
         action_result = await self._processors.deployment.search_revisions.wait_for_complete(
             SearchRevisionsAction(querier=querier)
         )
-        revision_map = {data.id: self._revision_data_to_dto(data) for data in action_result.data}
+        revision_map: dict[uuid.UUID, RevisionNode] = {
+            data.id: self._revision_data_to_dto(data) for data in action_result.data
+        }
         return [revision_map.get(revision_id) for revision_id in revision_ids]
 
     async def batch_load_replicas_by_ids(

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
@@ -29,7 +30,7 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     session_owner_id: uuid.UUID
     domain: str
     project_id: uuid.UUID
-    revision_id: uuid.UUID
+    revision_id: DeploymentRevisionID
     traffic_ratio: float = 1.0
     traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE
 

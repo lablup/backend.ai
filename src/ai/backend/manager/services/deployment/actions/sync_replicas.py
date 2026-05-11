@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.deployment.actions.replica.base import DeploymentReplicaBaseAction
@@ -11,7 +11,7 @@ from ai.backend.manager.services.deployment.actions.replica.base import Deployme
 class SyncReplicaAction(DeploymentReplicaBaseAction):
     """Action to sync replicas for an existing deployment."""
 
-    deployment_id: UUID
+    deployment_id: DeploymentID
 
     @override
     def entity_id(self) -> str | None:

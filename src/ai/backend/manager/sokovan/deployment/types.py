@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     RouteStatus,
@@ -60,8 +61,8 @@ class ActivateRevisionResult:
     """
 
     deployment_info: DeploymentInfo
-    previous_revision_id: UUID | None
-    activated_revision_id: UUID
+    previous_revision_id: DeploymentRevisionID | None
+    activated_revision_id: DeploymentRevisionID
     deployment_policy: DeploymentPolicyData
 
 

@@ -929,7 +929,7 @@ class PresetAttributionData:
 @dataclass
 class ModelRevisionData:
     # Identity
-    id: UUID
+    id: DeploymentRevisionID
     deployment_id: DeploymentID
     revision_number: int
     created_at: datetime

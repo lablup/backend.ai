@@ -460,7 +460,7 @@ class DeploymentService:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
         log.info("Updating deployment with ID: {}", action.updater.pk_value)
-        endpoint_id = cast(UUID, action.updater.pk_value)
+        endpoint_id = DeploymentID(cast(UUID, action.updater.pk_value))
         spec = cast(DeploymentUpdaterSpec, action.updater.spec)
         deployment_info = await self._deployment_controller.update_deployment(endpoint_id, spec)
         return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
