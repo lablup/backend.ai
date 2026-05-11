@@ -6432,6 +6432,11 @@ type ModelRevision implements Node {
   """
   revisionPresetId: UUID
 
+  """
+  Added in UNRELEASED. Whether the revision's resolved ``model_definition`` declares a ``service.health_check`` block. When ``False`` the manager skips HTTP health probing for routes of this revision and AppProxy still registers them once their sessions reach ``RUNNING``.
+  """
+  healthCheckEnabled: Boolean!
+
   """Timestamp when the revision was created."""
   createdAt: DateTime!
 
