@@ -646,8 +646,10 @@ async def server_main(
 
         # Initialize health probe
         health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
-        await health_probe.register(EtcdHealthChecker(etcd=etcd))
-        await health_probe.register(
+        # Liveness-registered: also surfaced in readiness — connection-stuck
+        # issues observed where restart is the actual recovery path.
+        await health_probe.register_liveness(EtcdHealthChecker(etcd=etcd))
+        await health_probe.register_liveness(
             ValkeyHealthChecker(
                 clients={
                     ComponentId("bgtask"): bgtask_mgr._valkey_client,

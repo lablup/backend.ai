@@ -38,17 +38,9 @@ class DockerDependency(DependencyProvider[AgentUnifiedConfig, Docker]):
         finally:
             await docker.close()
 
-    def gen_health_checkers(
+    def gen_liveness_checker(
         self,
         resource: Docker,
     ) -> ServiceHealthChecker:
-        """
-        Return Docker health checker.
-
-        Args:
-            resource: The initialized Docker client
-
-        Returns:
-            DockerHealthChecker for Docker
-        """
+        """Liveness — Docker daemon connection-stuck observed; restart recovers."""
         return DockerHealthChecker(docker=resource)

@@ -42,14 +42,6 @@ class RedisProvider(DependencyProvider[WebServerUnifiedConfig, ValkeySessionClie
         finally:
             await valkey_session_client.close()
 
-    def gen_health_checkers(self, resource: ValkeySessionClient) -> ServiceHealthChecker:
-        """
-        Return health checker for session Valkey client.
-
-        Args:
-            resource: The initialized Valkey session client
-
-        Returns:
-            Health checker for session storage
-        """
+    def gen_liveness_checker(self, resource: ValkeySessionClient) -> ServiceHealthChecker:
+        """Liveness — Valkey connection-stuck observed; restart recovers."""
         return ValkeyHealthChecker(clients={CID_REDIS_SESSION: resource})

@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from http import HTTPStatus
 from typing import Literal
 from uuid import UUID
 
@@ -21,7 +22,11 @@ from ai.backend.appproxy.common.utils import pydantic_api_response_handler
 from ai.backend.appproxy.coordinator import __version__
 from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
 from ai.backend.appproxy.coordinator.types import RootContext
-from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.internal.health import (
+    ConnectivityCheckResponse,
+    HealthResponse,
+    HealthStatus,
+)
 from ai.backend.common.types import ModelServiceStatus
 from ai.backend.logging import BraceStyleAdapter
 
@@ -287,11 +292,9 @@ async def get_circuit_health(
     return PydanticResponse(HealthStatusResponseModel(success=True, circuits=[circuit_status]))
 
 
-async def hello(request: web.Request) -> web.Response:
-    """Health check endpoint with dependency connectivity status"""
-    request["do_not_print_access_log"] = True
-    root_ctx: RootContext = request.app["_root.context"]
-    connectivity = await root_ctx.health_probe.get_connectivity_status()
+def _build_coordinator_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """Detail /health — always 200; informational tier failures reported as
+    DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
@@ -299,6 +302,45 @@ async def hello(request: web.Request) -> web.Response:
         connectivity=connectivity,
     )
     return web.json_response(response.model_dump(mode="json"))
+
+
+def _build_coordinator_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
+    is_healthy = connectivity.overall_healthy
+    response = HealthResponse(
+        status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
+        version=__version__,
+        component="appproxy-coordinator",
+        connectivity=connectivity,
+    )
+    return web.json_response(
+        response.model_dump(mode="json"),
+        status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
+    )
+
+
+async def hello(request: web.Request) -> web.Response:
+    """Aggregated health (union of liveness and readiness)."""
+    request["do_not_print_access_log"] = True
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
+    return _build_coordinator_health_response(connectivity)
+
+
+async def livez(request: web.Request) -> web.Response:
+    """Liveness probe — only liveness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_liveness_status()
+    return _build_coordinator_probe_response(connectivity)
+
+
+async def readyz(request: web.Request) -> web.Response:
+    """Readiness probe — only readiness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_readiness_status()
+    return _build_coordinator_probe_response(connectivity)
 
 
 @auth_required("manager")
@@ -349,6 +391,8 @@ def create_app(
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", hello))
+    cors.add(add_route("GET", "/livez", livez))
+    cors.add(add_route("GET", "/readyz", readyz))
     cors.add(add_route("GET", "/status", status))
     cors.add(add_route("GET", "/summary", get_health_summary))
     cors.add(add_route("GET", "/endpoints", get_endpoints_health))

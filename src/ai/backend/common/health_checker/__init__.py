@@ -17,7 +17,7 @@ from .exceptions import (
     HealthCheckerNotFound,
     HealthCheckError,
 )
-from .probe import HealthProbe, HealthProbeOptions, RegisteredChecker
+from .probe import HealthProbe, HealthProbeOptions
 from .types import (
     AGENT,
     APPPROXY,
@@ -44,6 +44,7 @@ from .types import (
     AllServicesHealth,
     ComponentHealthStatus,
     ComponentId,
+    ProbeKind,
     ServiceGroup,
     ServiceHealth,
 )
@@ -69,6 +70,7 @@ __all__ = [
     "ComponentHealthStatus",
     "ServiceHealth",
     "AllServicesHealth",
+    "ProbeKind",
     # Built-in ServiceGroups
     "MANAGER",
     "AGENT",
@@ -96,5 +98,4 @@ __all__ = [
     # Probe
     "HealthProbe",
     "HealthProbeOptions",
-    "RegisteredChecker",
 ]

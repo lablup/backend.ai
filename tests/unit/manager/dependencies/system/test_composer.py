@@ -127,7 +127,9 @@ class TestSystemComposer:
 
         # Setup mock health probe
         mock_probe = MagicMock()
-        mock_probe.register = AsyncMock()
+        mock_probe.register_liveness = AsyncMock()
+        mock_probe.register_readiness = AsyncMock()
+        mock_probe.register_informational = AsyncMock()
         mock_probe.start = AsyncMock()
         mock_probe.stop = AsyncMock()
         mock_health_probe_class.return_value = mock_probe

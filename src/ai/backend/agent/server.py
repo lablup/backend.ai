@@ -21,6 +21,7 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import AsyncExitStack, asynccontextmanager
+from http import HTTPStatus
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -72,7 +73,11 @@ from ai.backend.common.dto.agent.response import (
     CodeCompletionResp,
     PurgeImagesResp,
 )
-from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.internal.health import (
+    ConnectivityCheckResponse,
+    HealthResponse,
+    HealthStatus,
+)
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.event_types.kernel.anycast import (
@@ -412,21 +417,22 @@ class AgentRPCServer(aobject):
         # Initialize health probe
         self.health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
 
-        # Register health checkers
-        await self.health_probe.register(EtcdHealthChecker(etcd=self.etcd))
+        # Liveness-registered: also surfaced in readiness — connection-stuck
+        # issues observed where restart is the actual recovery path.
+        await self.health_probe.register_liveness(EtcdHealthChecker(etcd=self.etcd))
 
         # Get default agent for health checking
         default_agent = self.runtime.get_agent(None)
 
-        # Register Docker health checker based on config
         if self.local_config.agent_common.backend == AgentBackend.DOCKER:
             from ai.backend.agent.docker.agent import DockerAgent
 
             docker_agent = cast(DockerAgent, default_agent)
-            await self.health_probe.register(DockerHealthChecker(docker=docker_agent.docker))
+            await self.health_probe.register_liveness(
+                DockerHealthChecker(docker=docker_agent.docker)
+            )
 
-        # Register Valkey health checker with all 4 agent valkey clients
-        await self.health_probe.register(
+        await self.health_probe.register_liveness(
             ValkeyHealthChecker(
                 clients={
                     ComponentId("stat"): default_agent.valkey_stat_client,
@@ -1299,15 +1305,11 @@ async def server_main_logwrapper(
         traceback.print_exc(file=sys.stderr)
 
 
-async def check_health(request: web.Request) -> web.Response:
-    """Health check endpoint with dependency connectivity status"""
-
+def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """Detail /health — always 200; informational tier failures reported as
+    DEGRADED in the body but not surfaced via HTTP status."""
     from . import __version__
 
-    request["do_not_print_access_log"] = True
-
-    health_probe: HealthProbe = request.app["health_probe"]
-    connectivity = await health_probe.get_connectivity_status()
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
@@ -1315,6 +1317,47 @@ async def check_health(request: web.Request) -> web.Response:
         connectivity=connectivity,
     )
     return web.json_response(response.model_dump(mode="json"))
+
+
+def _build_agent_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
+    from . import __version__
+
+    is_healthy = connectivity.overall_healthy
+    response = HealthResponse(
+        status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
+        version=__version__,
+        component="agent",
+        connectivity=connectivity,
+    )
+    return web.json_response(
+        response.model_dump(mode="json"),
+        status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
+    )
+
+
+async def check_health(request: web.Request) -> web.Response:
+    """Aggregated health (union of liveness and readiness)."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_connectivity_status()
+    return _build_agent_health_response(connectivity)
+
+
+async def check_livez(request: web.Request) -> web.Response:
+    """Liveness probe — only liveness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_liveness_status()
+    return _build_agent_probe_response(connectivity)
+
+
+async def check_readyz(request: web.Request) -> web.Response:
+    """Readiness probe — only readiness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_readiness_status()
+    return _build_agent_probe_response(connectivity)
 
 
 def build_root_server() -> web.Application:
@@ -1333,6 +1376,8 @@ def build_root_server() -> web.Application:
         },
     )
     cors.add(app.router.add_route("GET", r"/health", check_health))
+    cors.add(app.router.add_route("GET", r"/livez", check_livez))
+    cors.add(app.router.add_route("GET", r"/readyz", check_readyz))
     cors.add(
         app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     )

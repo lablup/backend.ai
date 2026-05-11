@@ -33,17 +33,9 @@ class DatabaseDependency(InfrastructureDependency[ExtendedAsyncSAEngine]):
         async with connect_database(setup_input.db) as db:
             yield db
 
-    def gen_health_checkers(
+    def gen_readiness_checker(
         self,
         resource: ExtendedAsyncSAEngine,
     ) -> ServiceHealthChecker:
-        """
-        Return database health checker.
-
-        Args:
-            resource: The initialized database engine
-
-        Returns:
-            DatabaseHealthChecker for PostgreSQL database
-        """
+        """Readiness only — DB unreachable should drain traffic, not trigger restart."""
         return DatabaseHealthChecker(db=resource)

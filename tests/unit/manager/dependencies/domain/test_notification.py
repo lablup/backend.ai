@@ -49,4 +49,6 @@ class TestNotificationCenterDependency:
     def test_gen_health_checkers_returns_none(self) -> None:
         """NonMonitorable dependency should return None for health checkers."""
         dependency = NotificationCenterDependency()
-        assert dependency.gen_health_checkers(MagicMock()) is None
+        resource = MagicMock()
+        assert dependency.gen_liveness_checker(resource) is None
+        assert dependency.gen_readiness_checker(resource) is None
