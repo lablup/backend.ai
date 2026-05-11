@@ -684,7 +684,7 @@ class DeploymentDBSource:
 
     async def update_endpoint_lifecycle_bulk(
         self,
-        endpoint_ids: list[uuid.UUID],
+        endpoint_ids: list[DeploymentID],
         prevoius_statuses: list[EndpointLifecycle],
         new_status: EndpointLifecycle,
     ) -> None:
@@ -757,10 +757,10 @@ class DeploymentDBSource:
     async def _get_last_deployment_histories_by_category(
         self,
         db_sess: SASession,
-        deployment_ids: Sequence[uuid.UUID],
+        deployment_ids: Sequence[DeploymentID],
         *,
         category: DeploymentHandlerCategory,
-    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+    ) -> dict[DeploymentID, DeploymentHistoryRow]:
         """Return the most recent history row in ``category`` for each
         deployment id."""
         if not deployment_ids:
@@ -780,7 +780,7 @@ class DeploymentDBSource:
         )
         result = await db_sess.execute(query)
         rows = result.scalars().all()
-        return {row.deployment_id: row for row in rows}
+        return {DeploymentID(row.deployment_id): row for row in rows}
 
     async def get_db_now(self) -> datetime:
         """Get current database server time."""

@@ -242,7 +242,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_endpoint_lifecycle_bulk(
         self,
-        endpoint_ids: list[uuid.UUID],
+        endpoint_ids: list[DeploymentID],
         prevoius_status: list[EndpointLifecycle],
         new_status: EndpointLifecycle,
     ) -> None:
