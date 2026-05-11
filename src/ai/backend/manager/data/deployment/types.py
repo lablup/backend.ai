@@ -263,6 +263,18 @@ class RouteTargetStatuses:
 
 
 @dataclass(frozen=True)
+class RouteHealthCheckFilter:
+    """In-memory gating on a revision's ``health_check_config``.
+
+    ``True`` keeps only routes whose revision has a config; ``False``
+    keeps only routes without; ``None`` skips the filter. Anything more
+    specific belongs in the calling handler.
+    """
+
+    health_check_required: bool | None = None
+
+
+@dataclass(frozen=True)
 class RouteTransitionTarget:
     """Target state for a route transition (lifecycle + health)."""
 

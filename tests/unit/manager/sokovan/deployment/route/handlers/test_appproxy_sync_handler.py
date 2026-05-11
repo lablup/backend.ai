@@ -1,10 +1,11 @@
 """Unit tests for AppProxySyncRouteHandler.
 
-The handler narrows the route set fetched by the coordinator before
-calling ``RouteExecutor.sync_appproxy``: only HEALTHY routes or routes
-whose revision opted out of ``service.health_check`` should be
-announced to AppProxy. NOT_CHECKED routes whose revision still has a
-probe config must wait for the first successful probe.
+The handler fetches ``RUNNING`` routes whose ``health_status`` is
+HEALTHY (probed and passed) or NOT_CHECKED (revisions that opted out of
+health_check) and forwards the AppProxy-eligible subset to
+``RouteExecutor.sync_appproxy``. NOT_CHECKED rows whose revision still
+has a probe (the route hasn't completed its first probe yet) are
+filtered out in ``execute``.
 """
 
 from __future__ import annotations
@@ -19,7 +20,11 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionData
 from ai.backend.manager.sokovan.deployment.route.handlers.appproxy_sync import (
@@ -49,11 +54,29 @@ def _route(
 
 
 class TestAppProxySyncHandler:
-    """Tests for the AppProxySyncRouteHandler eligibility filter."""
+    """Tests for AppProxySyncRouteHandler declarations and execution."""
 
-    async def test_execute_keeps_healthy_and_hc_disabled_routes(self) -> None:
-        """HEALTHY routes pass through; NOT_CHECKED routes pass through only
-        when their revision has no ``health_check_config``.
+    def test_target_statuses_includes_healthy_and_not_checked(self) -> None:
+        """The SQL fetch covers HEALTHY (probed rows) and NOT_CHECKED
+        (revisions that opted out of health_check; they stay in this state
+        for life). traffic=ACTIVE is required so we never register routes
+        that are being drained.
+        """
+        target = AppProxySyncRouteHandler.target_statuses()
+        assert target.lifecycle == [RouteStatus.RUNNING]
+        assert target.health == [RouteHealthStatus.HEALTHY, RouteHealthStatus.NOT_CHECKED]
+        assert target.traffic == RouteTrafficStatus.ACTIVE
+
+    def test_health_check_filter_imposes_no_repo_level_gating(self) -> None:
+        """The repo filter is a no-op; the (NOT_CHECKED + probe-configured)
+        case that AppProxy must skip is rejected in ``execute`` instead.
+        """
+        filt = AppProxySyncRouteHandler.health_check_filter()
+        assert filt.health_check_required is None
+
+    async def test_execute_keeps_healthy_and_unprobed_routes(self) -> None:
+        """HEALTHY rows pass through; NOT_CHECKED rows pass only when their
+        revision has no ``health_check_config``.
         """
         executor = AsyncMock()
         sync_result = RouteExecutionResult(successes=[], errors=[])

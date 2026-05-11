@@ -7,6 +7,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
+    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -57,14 +58,17 @@ class AppProxySyncRouteHandler(RouteHandler):
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:
-        # Includes NOT_CHECKED so routes whose revision disabled health_check
-        # (they stay NOT_CHECKED forever) remain candidates; ``execute`` then
-        # narrows the in-memory set to HEALTHY or hc-disabled rows.
+        # NOT_CHECKED rows pass through for hc-disabled revisions; ``execute``
+        # rejects hc-enabled NOT_CHECKED rows whose probe is still pending.
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
             health=[RouteHealthStatus.HEALTHY, RouteHealthStatus.NOT_CHECKED],
             traffic=RouteTrafficStatus.ACTIVE,
         )
+
+    @classmethod
+    def health_check_filter(cls) -> RouteHealthCheckFilter:
+        return RouteHealthCheckFilter()
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
@@ -76,10 +80,7 @@ class AppProxySyncRouteHandler(RouteHandler):
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        # Register HEALTHY routes plus revisions that opted out of health_check
-        # (those carry ``health_check_config is None`` and stay NOT_CHECKED);
-        # NOT_CHECKED routes whose revision still has a probe config must wait
-        # for their first successful probe before being announced.
+        # Skip NOT_CHECKED hc-enabled rows: their first probe hasn't run yet.
         eligible = [
             r
             for r in routes

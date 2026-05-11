@@ -21,6 +21,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteTargetStatuses,
@@ -202,7 +203,10 @@ class RouteCoordinator:
                 await stack.enter_async_context(self._lock_factory(handler.lock_id, lock_lifetime))
 
             target = handler.target_statuses()
-            routes = await self._deployment_repository.get_routes_by_statuses(target)
+            routes = await self._deployment_repository.get_routes_by_statuses(
+                target,
+                handler.health_check_filter(),
+            )
             if not routes:
                 log.trace("No routes to process for handler: {}", handler.name())
                 return
@@ -235,6 +239,7 @@ class RouteCoordinator:
                     lifecycle=[RouteStatus.RUNNING],
                     health=list(RouteHealthStatus),
                 ),
+                RouteHealthCheckFilter(health_check_required=True),
             )
             if not routes:
                 return

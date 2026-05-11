@@ -559,9 +559,10 @@ class RouteExecutor:
     async def sync_appproxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Push the routing tables for affected endpoints to AppProxy.
 
-        The input routes are pre-filtered by the handler (HEALTHY or
-        revision-disabled health_check), so they already represent the
-        authoritative set to register. Each route's
+        The input routes are pre-filtered by the coordinator on
+        ``(lifecycle, health, traffic)`` plus the
+        ``include_health_check_disabled`` post-filter, so they already
+        represent the authoritative set to register. Each route's
         ``replica_host``/``replica_port`` is kept up to date by
         ``check_running_routes`` and is used directly here — same pattern
         as :meth:`register_routes_now`. Routes with missing replica info

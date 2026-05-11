@@ -71,6 +71,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
@@ -229,6 +230,20 @@ def _project_health_check_config(
     if model_definition is None:
         return None
     return model_definition.health_check_config()
+
+
+def _passes_health_check(
+    has_health_check_config: bool,
+    health_check_required: bool | None,
+) -> bool:
+    """Whether the revision's ``health_check_config`` presence matches
+    ``health_check_required`` (``None`` skips the check).
+    """
+    if health_check_required is True:
+        return has_health_check_config
+    if health_check_required is False:
+        return not has_health_check_config
+    return True
 
 
 def _project_preset_slots(
@@ -1618,13 +1633,15 @@ class DeploymentDBSource:
     async def get_routes_by_statuses(
         self,
         target: RouteTargetStatuses,
+        health_check_filter: RouteHealthCheckFilter,
     ) -> list[RouteData]:
-        """Routes matching ``(lifecycle, health, traffic)``.
+        """Routes matching ``(lifecycle, health, traffic)`` with
+        revision-level ``health_check_config`` gating applied in memory.
 
         ``model_definition`` is selected so the resolved
-        ``ModelHealthCheck`` (or ``None``) can be attached to each
-        :class:`RouteData`; callers gate on ``RouteData.health_check_config``
-        in memory when revision-level health-check enablement matters.
+        ``ModelHealthCheck`` (or ``None``) is attached to each
+        :class:`RouteData`; ``health_check_filter`` then runs over those
+        materialized rows.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
@@ -1646,23 +1663,29 @@ class DeploymentDBSource:
             if target.traffic is not None:
                 query = query.where(RoutingRow.traffic_status == target.traffic)
             result = await db_sess.execute(query)
-            return [
-                RouteData(
-                    route_id=row.id,
-                    deployment_id=row.endpoint,
-                    session_data=_build_session_data(row.session, session_status),
-                    status=row.status,
-                    health_status=row.health_status,
-                    traffic_ratio=row.traffic_ratio,
-                    created_at=row.created_at,
-                    revision_id=DeploymentRevisionID(row.revision),
-                    replica_host=row.replica_host,
-                    replica_port=row.replica_port,
-                    error_data=row.error_data or {},
-                    health_check_config=_project_health_check_config(model_definition),
+            routes: list[RouteData] = []
+            for row, model_definition, session_status in result.all():
+                health_check_config = _project_health_check_config(model_definition)
+                has_config = health_check_config is not None
+                if not _passes_health_check(has_config, health_check_filter.health_check_required):
+                    continue
+                routes.append(
+                    RouteData(
+                        route_id=row.id,
+                        deployment_id=row.endpoint,
+                        session_data=_build_session_data(row.session, session_status),
+                        status=row.status,
+                        health_status=row.health_status,
+                        traffic_ratio=row.traffic_ratio,
+                        created_at=row.created_at,
+                        revision_id=DeploymentRevisionID(row.revision),
+                        replica_host=row.replica_host,
+                        replica_port=row.replica_port,
+                        error_data=row.error_data or {},
+                        health_check_config=health_check_config,
+                    )
                 )
-                for row, model_definition, session_status in result.all()
-            ]
+            return routes
 
     async def update_route_status_bulk(
         self,
