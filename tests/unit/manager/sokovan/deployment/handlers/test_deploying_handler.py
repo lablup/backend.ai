@@ -217,3 +217,11 @@ class TestDeployingProvisioningHandler:
 
         evaluated_infos = mock_evaluator.evaluate.await_args.args[0]
         assert all(info.id != dep_id for info in evaluated_infos)
+
+    def test_give_up_transition_targets_rolling_back(self) -> None:
+        """Retry-exhausted deployments must transition to ROLLING_BACK."""
+        transitions = DeployingProvisioningHandler.status_transitions()
+
+        assert transitions.give_up is not None
+        assert transitions.give_up.lifecycle == EndpointLifecycle.DEPLOYING
+        assert transitions.give_up.sub_step == DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK

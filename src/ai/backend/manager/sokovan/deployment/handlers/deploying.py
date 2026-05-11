@@ -77,7 +77,10 @@ class DeployingProvisioningHandler(DeploymentHandler):
 
     - **Route mutations executed** (create/drain): need_retry — stays in
       PROVISIONING with a new history record for progress tracking.
-      Never escalated to give_up (normal progress).
+      Once ``max_retry_count`` attempts in this phase are exhausted the
+      coordinator escalates to give_up, transitioning the deployment to
+      ROLLING_BACK so a wedged provisioning loop (e.g. every spawn fails
+      on the agent) cannot accumulate routes indefinitely.
     - **No changes** (routes still warming up): skipped — no history.
     - **Completed** (all old routes replaced): success → READY.
     """
@@ -134,6 +137,10 @@ class DeployingProvisioningHandler(DeploymentHandler):
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
             ),
             expired=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+            ),
+            give_up=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
             ),
