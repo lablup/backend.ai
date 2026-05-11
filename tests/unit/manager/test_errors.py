@@ -6,11 +6,11 @@ import pytest
 from aiohttp import web
 from pydantic import BaseModel, ValidationError
 
-from ai.backend.common.exception import ApiPayloadModel, InvalidAPIParameters
+from ai.backend.common.exception import BackendAIModel, InvalidAPIParameters
 
 
-class _PayloadTestModel(ApiPayloadModel):
-    """Minimal :class:`ApiPayloadModel` subclass used to drive the
+class _PayloadTestModel(BackendAIModel):
+    """Minimal :class:`BackendAIModel` subclass used to drive the
     override tests without coupling them to a real migrated model's
     schema."""
 
@@ -19,17 +19,17 @@ class _PayloadTestModel(ApiPayloadModel):
 
 
 class _PlainTestModel(BaseModel):
-    """Plain Pydantic model (no ``ApiPayloadModel`` mixin) used to
+    """Plain Pydantic model (no ``BackendAIModel`` mixin) used to
     confirm the override is opt-in and stock ``BaseModel`` users still
     get raw ``ValidationError``."""
 
     name: str
 
 
-class TestApiPayloadModelOverride:
+class TestBackendAIModelOverride:
     """Verify that subclasses get automatic ``InvalidAPIParameters``
     (HTTP 400) conversion on validation failure just by inheriting
-    :class:`ApiPayloadModel` — no per-call-site ``try / except`` and no
+    :class:`BackendAIModel` — no per-call-site ``try / except`` and no
     sibling ``bai_validate`` method."""
 
     def test_model_validate_passes_through_on_success(self) -> None:
@@ -73,7 +73,7 @@ class TestApiPayloadModelOverride:
             _PayloadTestModel(**bad_kwargs)
 
     def test_plain_basemodel_still_raises_validation_error(self) -> None:
-        """Without inheriting :class:`ApiPayloadModel` a model keeps
+        """Without inheriting :class:`BackendAIModel` a model keeps
         the standard Pydantic behavior — the override is fully
         opt-in."""
         with pytest.raises(ValidationError):

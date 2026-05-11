@@ -1,11 +1,10 @@
 import logging
 from uuid import UUID
 
-from pydantic import ValidationError
 from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinition
-from ai.backend.common.exception import format_pydantic_validation_errors
+from ai.backend.common.exception import bai_validation_error
 from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -183,16 +182,12 @@ class ModelCardService:
         except Exception as e:
             raise ModelCardParseError(extra_msg=f"invalid YAML in {model_def_filename}: {e}") from e
 
-        try:
+        with bai_validation_error(
+            ModelCardParseError,
+            extra_msg=f"invalid model definition in {model_def_filename}",
+            location_prefix=model_def_filename,
+        ):
             model_def = ModelDefinition.model_validate(parsed)
-        except ValidationError as e:
-            summary, structured = format_pydantic_validation_errors(
-                e, location_prefix=model_def_filename
-            )
-            raise ModelCardParseError(
-                extra_msg=f"invalid model definition in {model_def_filename}: {summary}",
-                extra_data={"errors": structured},
-            ) from e
         if not model_def.models:
             raise ModelCardParseError(extra_msg=f"no models defined in {model_def_filename}")
 

@@ -20,7 +20,7 @@ from pydantic import (
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
-from .exception import ConfigurationError
+from .exception import BackendAIModel, ConfigurationError
 from .types import RedisHelperConfig
 
 __all__ = (
@@ -472,7 +472,7 @@ def _merge_definition(base: ModelDefinition, override: ModelDefinition) -> Model
     return ModelDefinition.model_construct(models=models)
 
 
-class ModelDefinition(BaseConfigModel):
+class ModelDefinition(BaseConfigModel, BackendAIModel):
     models: list[ModelConfig] = Field(
         default_factory=list,
         description="List of models in the model definition.",

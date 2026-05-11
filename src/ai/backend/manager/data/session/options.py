@@ -20,7 +20,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ai.backend.common.exception import ApiPayloadModel
+from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     AgentId,
@@ -211,7 +211,7 @@ class SessionHandlerOptions(_OptionsBaseModel):
         )
 
 
-class ResourceOpts(_OptionsBaseModel, ApiPayloadModel):
+class ResourceOpts(_OptionsBaseModel, BackendAIModel):
     """Per-kernel qualitative resource hints.
 
     Distinct from ``ResourceSlot`` which carries quantitative slots.

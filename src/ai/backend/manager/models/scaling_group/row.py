@@ -30,7 +30,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
-from ai.backend.common.exception import ApiPayloadModel
+from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
@@ -106,7 +106,7 @@ class PreemptionConfig(BaseModel):
         return value.value
 
 
-class ScalingGroupOpts(ApiPayloadModel):
+class ScalingGroupOpts(BackendAIModel):
     model_config = ConfigDict(frozen=True)
 
     allowed_session_types: list[SessionTypes] = Field(

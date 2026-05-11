@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import enum
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Self
 
@@ -411,7 +413,7 @@ class BackendAIError(web.HTTPError, ABC):
     def from_pydantic(cls, exc: ValidationError, *, location_prefix: str | None = None) -> Self:
         """Build an instance from a Pydantic ``ValidationError``,
         embedding a human-readable summary plus the structured per-field
-        error list. Used by :class:`ApiPayloadModel.bai_validate` and any
+        error list. Used by :class:`BackendAIModel.model_validate` and any
         explicit ``except ValidationError`` site that wants to surface a
         domain error class. Subclasses may override to customize the
         default ``location_prefix`` or attach extra fields."""
@@ -515,15 +517,69 @@ def format_pydantic_validation_errors(
     return summary, structured
 
 
-class ApiPayloadModel(BaseModel):
-    """Pydantic base for API request payloads — i.e. data coming in
-    from an external caller.
+_bai_validation_error_factory_var: ContextVar[
+    Callable[[ValidationError], BackendAIError] | None
+] = ContextVar("bai_validation_error_factory", default=None)
+
+
+@contextmanager
+def bai_validation_error(
+    error_class: type[BackendAIError],
+    *,
+    extra_msg: str | None = None,
+    location_prefix: str | None = None,
+) -> Iterator[None]:
+    """In this block, :class:`BackendAIModel` validation failures raise
+    ``error_class`` instead of the default :class:`InvalidAPIParameters`.
+
+    Lets a caller attach domain-specific context (a vFolder name, the
+    YAML filename, ...) to a Pydantic ``ValidationError`` without a
+    per-call-site ``try / except``. ``extra_msg`` becomes the raised
+    error's ``extra_msg``; per-field structured errors always land in
+    ``extra_data["errors"]``. If ``extra_msg`` is None, the joined
+    Pydantic summary is used as the message instead.
+
+    Implemented via a ``ContextVar`` so the override propagates across
+    ``await`` and nested function calls (asyncio copies the context
+    on each task).
+    """
+
+    def factory(exc: ValidationError) -> BackendAIError:
+        summary, structured = format_pydantic_validation_errors(
+            exc, location_prefix=location_prefix
+        )
+        return error_class(
+            extra_msg=extra_msg if extra_msg is not None else summary,
+            extra_data={"errors": structured},
+        )
+
+    token = _bai_validation_error_factory_var.set(factory)
+    try:
+        yield
+    finally:
+        _bai_validation_error_factory_var.reset(token)
+
+
+def _raise_bai_validation_error(exc: ValidationError) -> BackendAIError:
+    factory = _bai_validation_error_factory_var.get()
+    if factory is not None:
+        return factory(exc)
+    return InvalidAPIParameters.from_pydantic(exc)
+
+
+class BackendAIModel(BaseModel):
+    """Project-wide Pydantic base for Backend.AI models.
 
     Overrides ``model_validate`` / ``model_validate_json`` /
     ``model_validate_strings`` so a ``ValidationError`` is auto-mapped
     to :class:`InvalidAPIParameters` (HTTP 400) carrying the structured
-    per-field error list. User-input call sites get a clean 4xx
-    without repeating ``try / except ValidationError`` at every site.
+    per-field error list. Call sites get a clean 4xx without repeating
+    ``try / except ValidationError`` at every site.
+
+    Callers that need a domain-specific error class (e.g. a parser that
+    wants ``ModelDefinitionValidationError`` instead of the generic
+    400) can wrap the ``model_validate`` call in
+    :func:`bai_validation_error` to swap the default factory.
 
     Notes:
 
@@ -542,21 +598,21 @@ class ApiPayloadModel(BaseModel):
         try:
             return super().model_validate(*args, **kwargs)
         except ValidationError as e:
-            raise InvalidAPIParameters.from_pydantic(e) from e
+            raise _raise_bai_validation_error(e) from e
 
     @classmethod
     def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
         try:
             return super().model_validate_json(*args, **kwargs)
         except ValidationError as e:
-            raise InvalidAPIParameters.from_pydantic(e) from e
+            raise _raise_bai_validation_error(e) from e
 
     @classmethod
     def model_validate_strings(cls, *args: Any, **kwargs: Any) -> Self:
         try:
             return super().model_validate_strings(*args, **kwargs)
         except ValidationError as e:
-            raise InvalidAPIParameters.from_pydantic(e) from e
+            raise _raise_bai_validation_error(e) from e
 
 
 class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):

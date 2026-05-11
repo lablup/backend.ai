@@ -51,7 +51,6 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
-from pydantic import ValidationError
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -158,7 +157,11 @@ from ai.backend.common.events.types import (
     AbstractBroadcastEvent,
     AbstractEvent,
 )
-from ai.backend.common.exception import ConfigurationError, VolumeMountFailed
+from ai.backend.common.exception import (
+    ConfigurationError,
+    VolumeMountFailed,
+    bai_validation_error,
+)
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -3292,13 +3295,14 @@ class AbstractAgent[
                 f" vFolder {model_folder.name} (ID {model_folder.vfid})",
             )
 
-        try:
-            parsed = ModelDefinition.model_validate(inlined)
-        except ValidationError as e:
-            raise ModelDefinitionValidationError(
+        with bai_validation_error(
+            ModelDefinitionValidationError,
+            extra_msg=(
                 "Failed to validate model definition for vFolder"
-                f" {model_folder.name} (ID {model_folder.vfid})",
-            ) from e
+                f" {model_folder.name} (ID {model_folder.vfid})"
+            ),
+        ):
+            parsed = ModelDefinition.model_validate(inlined)
         if not parsed.models:
             raise ModelDefinitionEmptyError
         model_definition = parsed.model_dump(mode="json")
