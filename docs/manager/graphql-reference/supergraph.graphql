@@ -9558,7 +9558,7 @@ input ModelMountConfigInput
 {
   vfolderId: ID!
   mountDestination: String!
-  definitionPath: String!
+  definitionPath: String = null
 }
 
 """

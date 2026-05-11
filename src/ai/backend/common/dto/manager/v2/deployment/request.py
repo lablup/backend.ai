@@ -202,7 +202,14 @@ class ModelMountConfigInput(BaseRequestModel):
 
     vfolder_id: VFolderUUID = Field(description="VFolder ID for the model")
     mount_destination: str = Field(description="Mount destination path inside container")
-    definition_path: str = Field(description="Path to model definition file")
+    definition_path: str | None = Field(
+        default=None,
+        description=(
+            "Optional path to the model definition file within the model vfolder. "
+            "When omitted, the server auto-detects `model-definition.yaml` or "
+            "`model-definition.yml`."
+        ),
+    )
 
 
 class ExtraVFolderMountInput(BaseRequestModel):
