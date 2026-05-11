@@ -302,7 +302,7 @@ class TestModelConfigs:
                 "request input",
                 "revision preset",
                 "runtime variant's default model definition",
-                "model-definition.yaml on the model vfolder",
+                "model definition file on the model vfolder",
             ],
         }
         assert exc_info.value.status_code == 400

@@ -539,7 +539,7 @@ class ModelHealthCheckDraft(BaseConfigModel):
                     "request input",
                     "revision preset",
                     "runtime variant's default model definition",
-                    "model-definition.yaml on the model vfolder",
+                    "model definition file on the model vfolder",
                 ),
             )
         # Drop unset (None) fields so the strict type's ``Field(default=...)``
@@ -567,7 +567,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
                     "request input",
                     "revision preset",
                     "runtime variant's default model definition",
-                    "model-definition.yaml on the model vfolder",
+                    "model definition file on the model vfolder",
                 ),
             )
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
@@ -594,7 +594,7 @@ class ModelConfigDraft(BaseConfigModel):
                     "request input",
                     "revision preset",
                     "runtime variant's default model definition",
-                    "model-definition.yaml on the model vfolder",
+                    "model definition file on the model vfolder",
                 ),
             )
         if self.model_path is None:
@@ -604,7 +604,7 @@ class ModelConfigDraft(BaseConfigModel):
                     "request input",
                     "revision preset",
                     "runtime variant's default model definition",
-                    "model-definition.yaml on the model vfolder",
+                    "model definition file on the model vfolder",
                     "model mount destination",
                 ),
             )
