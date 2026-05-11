@@ -355,20 +355,20 @@ def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionC
             extra_mounts=[],
         ),
         execution=ExecutionSpec(
-            startup_command=data.startup_command,
-            bootstrap_script=data.bootstrap_script,
+            startup_command=data.execution.startup_command,
+            bootstrap_script=data.execution.bootstrap_script,
             environ=(
                 {k: str(v) for k, v in data.model_runtime_config.environ.items()}
                 if data.model_runtime_config.environ
                 else None
             ),
             runtime_variant_id=data.model_runtime_config.runtime_variant_id,
-            callback_url=data.callback_url,
+            callback_url=data.execution.callback_url,
             inference_runtime_config=data.model_runtime_config.inference_runtime_config,
         ),
         model_definition=None,
-        revision_preset_id=data.revision_preset_id,
-        preset_values=list(data.preset_values),
+        revision_preset_id=data.preset.preset_id,
+        preset_values=list(data.preset.values),
     )
 
 

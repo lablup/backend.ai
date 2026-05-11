@@ -1016,7 +1016,7 @@ class ModelServingService:
                 # strip them; ``mount_perm`` survives because the
                 # revision-side projection uses the same ``MountInfoEntry``
                 # shape.
-                extra_mounts=list(latest_rev.extra_vfolder_mounts),
+                extra_mounts=list(latest_rev.model_mount_config.extra_mounts),
             )
             revision = await self._deployment_controller.add_revision(
                 endpoint_id=action.deployment_id,

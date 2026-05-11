@@ -39,10 +39,12 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
+    ExecutionData,
     ModelDeploymentAccessTokenData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    PresetAttributionData,
     ReplicaData,
     ResourceConfigData,
     RouteHealthStatus,
@@ -612,14 +614,16 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 vfolder_id=VFolderUUID(uuid.uuid4()),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
+                extra_mounts=[],
             ),
             image_id=ImageID(uuid.uuid4()),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            startup_command=None,
-            bootstrap_script=None,
-            callback_url=None,
-            extra_vfolder_mounts=[],
-            preset_values=[],
+            execution=ExecutionData(
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+            ),
+            preset=PresetAttributionData(preset_id=None, values=[]),
         )
 
     async def test_existing_revision_returns_data(
@@ -628,7 +632,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         revision_data: ModelRevisionData,
     ) -> None:
-        """Existing revision returns ModelRevisionData with cluster_config/resource_config/image_id/extra_vfolder_mounts."""
+        """Existing revision returns ModelRevisionData with cluster_config/resource_config/image_id/extra_mounts."""
         mock_deployment_repository.get_revision = AsyncMock(return_value=revision_data)
 
         action = GetRevisionByIdAction(revision_id=revision_data.id)
@@ -638,7 +642,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
         assert result.data.cluster_config.mode == ClusterMode.SINGLE_NODE
         assert result.data.resource_config.resource_group_name == "default"
         assert result.data.image_id == revision_data.image_id
-        assert result.data.extra_vfolder_mounts == []
+        assert result.data.model_mount_config.extra_mounts == []
         mock_deployment_repository.get_revision.assert_called_once_with(revision_data.id)
 
     async def test_non_existent_revision_raises(

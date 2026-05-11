@@ -59,7 +59,7 @@ class SessionValidationSpec:
                     ),
                     mount_perm=MountPermission.READ_ONLY,
                 ),
-                *model_revision.extra_vfolder_mounts,
+                *model_revision.model_mount_config.extra_mounts,
             ],
             resource_spec=ResourceSpec(
                 cluster_mode=model_revision.cluster_config.mode,
@@ -69,15 +69,15 @@ class SessionValidationSpec:
             ),
             image_id=model_revision.image_id,
             execution_spec=ExecutionSpec(
-                startup_command=model_revision.startup_command,
-                bootstrap_script=model_revision.bootstrap_script,
+                startup_command=model_revision.execution.startup_command,
+                bootstrap_script=model_revision.execution.bootstrap_script,
                 environ=(
                     {k: str(v) for k, v in model_revision.model_runtime_config.environ.items()}
                     if model_revision.model_runtime_config.environ
                     else None
                 ),
                 runtime_variant_id=model_revision.model_runtime_config.runtime_variant_id,
-                callback_url=model_revision.callback_url,
+                callback_url=model_revision.execution.callback_url,
                 inference_runtime_config=(
                     model_revision.model_runtime_config.inference_runtime_config
                 ),

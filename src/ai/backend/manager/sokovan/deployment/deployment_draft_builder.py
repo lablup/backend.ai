@@ -68,7 +68,7 @@ class DeploymentSessionDraftBuilder:
         target_revision: ModelRevisionData,
     ) -> SessionSpecDraft:
         environ = cls._resolve_environ(deployment_info, target_revision, context)
-        startup_command = target_revision.startup_command
+        startup_command = target_revision.execution.startup_command
         mounts = cls._resolve_mounts(target_revision)
         resource_entries = cls._resource_entries(target_revision)
         resource_opts = ResourceOpts.model_validate(
@@ -99,7 +99,7 @@ class DeploymentSessionDraftBuilder:
                 tag=deployment_info.metadata.tag,
             ),
             network=SessionNetworkDraft(),
-            callback_url=target_revision.callback_url,
+            callback_url=target_revision.execution.callback_url,
             options=SessionOptionsDraft(
                 priority=SESSION_PRIORITY_DEFAULT,
                 is_preemptible=False,
@@ -117,7 +117,7 @@ class DeploymentSessionDraftBuilder:
                             environ=environ,
                             mounts=mounts,
                             startup_command=startup_command,
-                            bootstrap_script=(target_revision.bootstrap_script or None),
+                            bootstrap_script=(target_revision.execution.bootstrap_script or None),
                         ),
                     ),
                 ),
@@ -164,7 +164,7 @@ class DeploymentSessionDraftBuilder:
                 ),
                 mount_perm=MountPermission.READ_ONLY,
             ),
-            *target_revision.extra_vfolder_mounts,
+            *target_revision.model_mount_config.extra_mounts,
         )
 
     @staticmethod

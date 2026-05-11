@@ -19,9 +19,11 @@ from ai.backend.manager.api.adapters.deployment.adapter import (
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    ExecutionData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    PresetAttributionData,
     ResourceConfigData,
 )
 from ai.backend.manager.types import TriState
@@ -50,6 +52,7 @@ class TestRevisionDataToDTO:
                 vfolder_id=VFolderUUID(uuid4()),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
+                extra_mounts=[],
             ),
             model_definition=ModelDefinition(
                 models=[
@@ -65,11 +68,12 @@ class TestRevisionDataToDTO:
             ),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             image_id=ImageID(uuid4()),
-            startup_command=None,
-            bootstrap_script=None,
-            callback_url=None,
-            extra_vfolder_mounts=[],
-            preset_values=[],
+            execution=ExecutionData(
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+            ),
+            preset=PresetAttributionData(preset_id=None, values=[]),
         )
 
         dto = DeploymentAdapter._revision_data_to_dto(revision)

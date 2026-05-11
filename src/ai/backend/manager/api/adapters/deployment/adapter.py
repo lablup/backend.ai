@@ -2264,9 +2264,9 @@ class DeploymentAdapter(BaseAdapter):
                     mount_destination=m.mount_destination,
                     mount_perm=m.mount_perm,
                 )
-                for m in data.extra_vfolder_mounts
+                for m in data.model_mount_config.extra_mounts
             ],
-            revision_preset_id=data.revision_preset_id,
+            revision_preset_id=data.preset.preset_id,
         )
 
     @staticmethod

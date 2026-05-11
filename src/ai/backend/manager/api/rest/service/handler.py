@@ -193,7 +193,7 @@ def _serve_info_from_deployment_info(
         # ``None`` here covers two cases: no revision exists, or the revision's
         # model vfolder has been deleted (SET NULL FK).
         model_id=model_revision.model_mount_config.vfolder_id if model_revision else None,
-        extra_mounts=[m.vfolder_id for m in model_revision.extra_vfolder_mounts]
+        extra_mounts=[m.vfolder_id for m in model_revision.model_mount_config.extra_mounts]
         if model_revision
         else [],
         name=deployment_info.metadata.name,

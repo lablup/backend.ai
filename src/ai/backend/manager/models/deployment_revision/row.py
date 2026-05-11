@@ -24,9 +24,11 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    ExecutionData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    PresetAttributionData,
     ResourceConfigData,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
@@ -254,6 +256,8 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             id=self.id,
             deployment_id=self.endpoint,
             revision_number=self.revision_number,
+            created_at=self.created_at,
+            image_id=self.image,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode(self.cluster_mode),
                 size=self.cluster_size,
@@ -269,21 +273,23 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 runtime_variant_id=RuntimeVariantID(self.runtime_variant_id),
                 environ=self.environ,
             ),
+            execution=ExecutionData(
+                startup_command=self.startup_command,
+                bootstrap_script=self.bootstrap_script,
+                callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
+            ),
             model_mount_config=ModelMountConfigData(
                 vfolder_id=self.model,
                 mount_destination=self.model_mount_destination,
                 definition_path=self.model_definition_path or "",
+                extra_mounts=list(self.extra_mounts),
             ),
-            created_at=self.created_at,
-            image_id=self.image,
-            startup_command=self.startup_command,
-            bootstrap_script=self.bootstrap_script,
-            callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
-            extra_vfolder_mounts=list(self.extra_mounts),
-            preset_values=[
-                PresetValueData(preset_id=pv.preset_id, value=pv.value)
-                for pv in (self.preset_values or [])
-            ],
+            preset=PresetAttributionData(
+                preset_id=self.revision_preset_id,
+                values=[
+                    PresetValueData(preset_id=pv.preset_id, value=pv.value)
+                    for pv in (self.preset_values or [])
+                ],
+            ),
             model_definition=self.model_definition,
-            revision_preset_id=self.revision_preset_id,
         )
