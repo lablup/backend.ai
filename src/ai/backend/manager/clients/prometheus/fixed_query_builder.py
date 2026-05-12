@@ -3,21 +3,21 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from ai.backend.common.clients.prometheus.metric_types import (
+from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.common.metrics.types import (
+    CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
+    CONTAINER_UTILIZATION_METRIC_NAME,
+)
+from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.metric_types import (
     DIFF_METRICS,
     RATE_METRICS,
     ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
     MetricType,
 )
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
-from ai.backend.common.clients.prometheus.querier import ContainerMetricQuerier
-from ai.backend.common.clients.prometheus.types import ValueType
-from ai.backend.common.metrics.types import (
-    CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
-    CONTAINER_UTILIZATION_METRIC_NAME,
-)
-from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.querier import ContainerMetricQuerier
+from ai.backend.manager.clients.prometheus.types import ValueType
 
 _GAUGE_TEMPLATE: Final[str] = (
     f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"

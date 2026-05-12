@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.clients.prometheus.metric_types import (
+from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResult,
 )
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.manager.services.metric.actions.base import (
     QueryMetricAction,
     QueryMetricActionResult,

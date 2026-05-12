@@ -16,7 +16,6 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
@@ -29,6 +28,7 @@ from ai.backend.manager.api.rest.v2.prometheus_query_preset.handler import (
 from ai.backend.manager.api.rest.v2.prometheus_query_preset.registry import (
     register_v2_prometheus_query_preset_routes,
 )
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.prometheus_query_preset_category import (

@@ -8,8 +8,8 @@ from uuid import UUID
 
 import graphene
 
-from ai.backend.common.clients.prometheus.metric_types import ContainerMetricOptionalLabel
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+from ai.backend.manager.clients.prometheus.metric_types import ContainerMetricOptionalLabel
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
 )

@@ -4,12 +4,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from ai.backend.common.clients.http_client import ClientPool, tcp_client_session_factory
-from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.fixed_query_builder import (
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
 )
-from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
 

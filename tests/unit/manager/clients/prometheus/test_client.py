@@ -5,11 +5,8 @@ import aiohttp
 import pytest
 
 from ai.backend.common.clients.prometheus import (
-    ContainerLiveStatQueryBuilder,
-    ContainerMetricQueryBuilder,
     LabelMatcher,
     MetricPreset,
-    PrometheusClient,
 )
 from ai.backend.common.dto.clients.prometheus import (
     LabelValueResponse,
@@ -17,6 +14,11 @@ from ai.backend.common.dto.clients.prometheus import (
     QueryTimeRange,
 )
 from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
+from ai.backend.manager.clients.prometheus import (
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
+    PrometheusClient,
+)
 
 
 def create_mock_response(

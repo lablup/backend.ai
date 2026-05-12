@@ -8,13 +8,13 @@ from typing import Final, Self
 from uuid import UUID
 
 from ai.backend.common.clients.prometheus.preset import MetricPreset
-from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
 from ai.backend.common.dto.clients.prometheus.response import (
     MetricResponseInfo,
     PrometheusResponse,
 )
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.types import MetricValue, ValueType
 
 __all__ = [
     "ContainerLiveStatQueries",
