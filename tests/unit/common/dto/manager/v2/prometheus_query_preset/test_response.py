@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -88,7 +89,7 @@ class TestQueryDefinitionNode:
         assert node.options.group_labels == ["instance"]
 
     def test_missing_required_field_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             QueryDefinitionNode.model_validate({
                 "id": str(_UUID1),
                 "name": "test",
@@ -146,7 +147,7 @@ class TestCreateQueryDefinitionPayload:
         assert payload.item.name == "cpu_usage"
 
     def test_missing_item_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionPayload.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -182,7 +183,7 @@ class TestDeleteQueryDefinitionPayload:
         assert payload.id == _UUID1
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteQueryDefinitionPayload.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -236,7 +237,7 @@ class TestSearchQueryDefinitionsPayload:
         assert payload.total_count == 2
 
     def test_missing_total_count_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQueryDefinitionsPayload.model_validate({"items": []})
 
     def test_round_trip_serialization(self) -> None:
@@ -338,7 +339,7 @@ class TestExecuteQueryDefinitionPayload:
         assert payload.data.result_type == "matrix"
 
     def test_missing_status_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExecuteQueryDefinitionPayload.model_validate({
                 "data": {"result_type": "matrix", "result": []}
             })

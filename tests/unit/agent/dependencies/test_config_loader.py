@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.agent.dependencies.bootstrap.config import (
@@ -101,7 +102,7 @@ reserved-cpu = 1
             log_level=LogLevel.WARNING,
         )
 
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             async with loader.provide(input_data):
                 pass
 

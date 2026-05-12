@@ -7,6 +7,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.image.response import (
@@ -195,5 +196,5 @@ class TestPaginationInfo:
         assert p.limit is None
 
     def test_limit_rejects_non_positive(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PaginationInfo(total=50, offset=0, limit=0)

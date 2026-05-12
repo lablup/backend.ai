@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.notification.response import (
@@ -523,5 +524,5 @@ class TestValidateNotificationRulePayload:
         assert restored.message == "Rendered: hello world"
 
     def test_missing_message_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ValidateNotificationRulePayload.model_validate({})

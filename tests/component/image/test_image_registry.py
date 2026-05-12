@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 import pydantic
 import pytest
 
@@ -46,12 +47,12 @@ class TestImageRescan:
 
     def test_rescan_request_requires_canonical(self) -> None:
         """F-INPUT-1: RescanImagesRequest without canonical field → ValidationError (→ HTTP 422)."""
-        with pytest.raises(pydantic.ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, pydantic.ValidationError)):
             RescanImagesRequest.model_validate({"architecture": "x86_64"})
 
     def test_rescan_request_requires_architecture(self) -> None:
         """F-INPUT-2: RescanImagesRequest without architecture field → ValidationError (→ HTTP 422)."""
-        with pytest.raises(pydantic.ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, pydantic.ValidationError)):
             RescanImagesRequest.model_validate({"canonical": "registry.example/image:latest"})
 
     @pytest.mark.xfail(

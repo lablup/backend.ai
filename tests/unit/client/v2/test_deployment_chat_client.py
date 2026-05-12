@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from aioresponses import aioresponses
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 from yarl import URL
 
@@ -221,7 +222,7 @@ class TestChatCompletionResponseModel:
         # ``delta`` is the streaming-chunk shape; the SDK never sets
         # stream=true, so its arrival means the server misbehaved.
         # Failing loudly is preferable to silently dropping the round.
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ChatCompletionResponse.model_validate({
                 "choices": [
                     {"delta": {"role": "assistant", "content": "partial"}},

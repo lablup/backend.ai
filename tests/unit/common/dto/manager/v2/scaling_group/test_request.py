@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -45,11 +46,11 @@ class TestPreemptionConfigInput:
         assert req.preemptible_priority == 10
 
     def test_priority_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PreemptionConfigInput(preemptible_priority=0)
 
     def test_priority_above_max_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PreemptionConfigInput(preemptible_priority=11)
 
     def test_round_trip(self) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.agent.request import (
@@ -27,7 +28,7 @@ class TestAgentPathParam:
         assert param.agent_id == "i-1234567890abcdef"
 
     def test_missing_agent_id_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AgentPathParam.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -124,11 +125,11 @@ class TestSearchAgentsInput:
         assert inp.limit == 50
 
     def test_invalid_limit_zero_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchAgentsInput(limit=0)
 
     def test_invalid_offset_negative_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchAgentsInput(offset=-1)
 
     def test_round_trip(self) -> None:

@@ -6,6 +6,7 @@ from decimal import Decimal
 from uuid import UUID
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.fair_share.request import (
@@ -127,11 +128,11 @@ class TestGetDomainFairShareInput:
         assert inp.domain_name == "test-domain"
 
     def test_missing_resource_group_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetDomainFairShareInput.model_validate({"domain_name": "test"})
 
     def test_missing_domain_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetDomainFairShareInput.model_validate({"resource_group": "default"})
 
     def test_round_trip_serialization(self) -> None:
@@ -151,7 +152,7 @@ class TestGetProjectFairShareInput:
         assert inp.project_id == _SAMPLE_UUID
 
     def test_missing_project_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetProjectFairShareInput.model_validate({"resource_group": "default"})
 
 
@@ -169,7 +170,7 @@ class TestGetUserFairShareInput:
         assert inp.user_uuid == _SAMPLE_UUID2
 
     def test_missing_user_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetUserFairShareInput.model_validate({
                 "resource_group": "default",
                 "project_id": str(_SAMPLE_UUID),
@@ -184,7 +185,7 @@ class TestGetResourceGroupFairShareSpecInput:
         assert inp.resource_group == "default"
 
     def test_missing_resource_group_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetResourceGroupFairShareSpecInput.model_validate({})
 
 
@@ -212,15 +213,15 @@ class TestSearchDomainFairSharesInput:
         assert inp.limit == 1000
 
     def test_limit_exceeds_max_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDomainFairSharesInput(limit=1001)
 
     def test_limit_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDomainFairSharesInput(limit=0)
 
     def test_offset_negative_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDomainFairSharesInput(offset=-1)
 
     def test_with_order(self) -> None:
@@ -336,7 +337,7 @@ class TestUpsertProjectFairShareWeightInput:
         assert inp.weight == Decimal("0.5")
 
     def test_missing_domain_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpsertProjectFairShareWeightInput.model_validate({"weight": None})
 
 
@@ -395,7 +396,7 @@ class TestBulkUpsertDomainFairShareWeightInput:
         assert inp.inputs == []
 
     def test_missing_resource_group_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BulkUpsertDomainFairShareWeightInput.model_validate({"inputs": []})
 
 

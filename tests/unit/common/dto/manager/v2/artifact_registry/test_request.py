@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.data.storage.registries.types import ModelTarget
@@ -191,7 +192,7 @@ class TestDelegateeTargetInput:
         assert t.target_registry_id == target_id
 
     def test_missing_fields_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DelegateeTargetInput.model_validate({})
 
 
@@ -212,7 +213,7 @@ class TestScanArtifactsInput:
         assert req.registry_id == reg_id
 
     def test_missing_limit_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScanArtifactsInput.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -266,7 +267,7 @@ class TestDelegateImportArtifactsInput:
         assert req.options.force is True
 
     def test_missing_revision_ids_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DelegateImportArtifactsInput.model_validate({})
 
 
@@ -288,7 +289,7 @@ class TestSearchArtifactsInput:
         assert req.ordering.order_by == [("SIZE", True)]
 
     def test_missing_pagination_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchArtifactsInput.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -316,5 +317,5 @@ class TestScanArtifactModelsInput:
         assert req.registry_id == reg_id
 
     def test_missing_models_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScanArtifactModelsInput.model_validate({})

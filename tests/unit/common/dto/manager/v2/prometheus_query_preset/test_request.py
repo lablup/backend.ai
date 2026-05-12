@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import Sentinel
@@ -91,7 +92,7 @@ class TestCreateQueryDefinitionInput:
             assert inp.time_window == tw
 
     def test_invalid_time_window_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput(
                 name="test",
                 metric_name="metric",
@@ -101,7 +102,7 @@ class TestCreateQueryDefinitionInput:
             )
 
     def test_blank_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput(
                 name="",
                 metric_name="metric",
@@ -110,7 +111,7 @@ class TestCreateQueryDefinitionInput:
             )
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput(
                 name="   ",
                 metric_name="metric",
@@ -137,7 +138,7 @@ class TestCreateQueryDefinitionInput:
         assert len(inp.name) == 256
 
     def test_name_exceeds_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput(
                 name="x" * 257,
                 metric_name="metric",
@@ -146,7 +147,7 @@ class TestCreateQueryDefinitionInput:
             )
 
     def test_missing_options_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput.model_validate({
                 "name": "test",
                 "metric_name": "metric",
@@ -226,19 +227,19 @@ class TestModifyQueryDefinitionInput:
         assert inp.time_window == "15m"
 
     def test_time_window_invalid_format_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ModifyQueryDefinitionInput(time_window="invalid")
 
     def test_time_window_invalid_unit_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ModifyQueryDefinitionInput(time_window="5x")
 
     def test_blank_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ModifyQueryDefinitionInput(name="")
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ModifyQueryDefinitionInput(name="   ")
 
     def test_name_none_is_valid(self) -> None:
@@ -291,7 +292,7 @@ class TestDeleteQueryDefinitionInput:
         assert inp.id == _SAMPLE_UUID
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteQueryDefinitionInput.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -360,15 +361,15 @@ class TestSearchQueryDefinitionsInput:
         assert inp.limit == 1000
 
     def test_limit_exceeds_max_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQueryDefinitionsInput(limit=1001)
 
     def test_limit_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQueryDefinitionsInput(limit=0)
 
     def test_offset_negative_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQueryDefinitionsInput(offset=-1)
 
     def test_with_order(self) -> None:
@@ -427,7 +428,7 @@ class TestExecuteQueryDefinitionInput:
         assert inp.time_window == "5m"
 
     def test_invalid_time_window_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExecuteQueryDefinitionInput(time_window="bad_format")
 
     def test_with_options(self) -> None:

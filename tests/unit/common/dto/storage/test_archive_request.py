@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import jwt
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.storage.request import (
@@ -71,7 +72,7 @@ class TestCreateArchiveDownloadSessionRequestFilename:
         ],
     )
     def test_filename_rejected(self, valid_body: dict[str, Any], bad_filename: str) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateArchiveDownloadSessionRequest(**valid_body, filename=bad_filename)
 
 

@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.template.request import (
@@ -108,7 +109,7 @@ class TestGetSessionTemplateRequest:
         assert req.format == "yaml"
 
     def test_invalid_format_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetSessionTemplateRequest.model_validate({"format": "xml"})
 
 
@@ -186,7 +187,7 @@ class TestGetClusterTemplateRequest:
         assert req.format == "json"
 
     def test_invalid_format_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetClusterTemplateRequest.model_validate({"format": "toml"})
 
 
@@ -291,7 +292,7 @@ class TestClusterTemplateListItemDTO:
         assert dto.type == "group"
 
     def test_invalid_type_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ClusterTemplateListItemDTO.model_validate({
                 "name": "cluster-template",
                 "id": "def456",

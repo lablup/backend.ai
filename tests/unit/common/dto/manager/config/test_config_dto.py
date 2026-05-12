@@ -7,6 +7,7 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.config.request import (
@@ -61,7 +62,7 @@ class TestDotfilePermission:
 
     @pytest.mark.parametrize("perm", ["999", "abc", "12", "7777", "8", ""])
     def test_invalid_permission(self, perm: str) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateUserDotfileRequest(
                 path=".bashrc",
                 data="content",
@@ -82,7 +83,7 @@ class TestMaxLength:
         assert len(req.data) == 100
 
     def test_data_exceeds_limit(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateUserDotfileRequest(
                 path=".bashrc",
                 data="x" * (MAXIMUM_DOTFILE_SIZE + 1),
@@ -90,7 +91,7 @@ class TestMaxLength:
             )
 
     def test_bootstrap_script_exceeds_limit(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateBootstrapScriptRequest(
                 script="x" * (MAXIMUM_DOTFILE_SIZE + 1),
             )

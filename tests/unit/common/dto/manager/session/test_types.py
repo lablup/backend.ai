@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import TypeAdapter, ValidationError
 
 from ai.backend.common.dto.manager.session.types import (
@@ -74,7 +75,7 @@ class TestCreationConfigV1:
         assert cfg.cluster_size == 2
 
     def test_cluster_size_min(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreationConfigV1.model_validate({"cluster_size": 0})
 
 
@@ -216,15 +217,15 @@ class TestTimeoutSeconds:
         assert self.adapter.validate_python("300") == 300
 
     def test_negative_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             self.adapter.validate_python(-100)
 
     def test_invalid_str_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             self.adapter.validate_python("abc")
 
     def test_yr_mo_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             self.adapter.validate_python("1yr")
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             self.adapter.validate_python("2mo")

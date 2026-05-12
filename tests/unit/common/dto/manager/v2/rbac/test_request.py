@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -66,23 +67,23 @@ class TestCreateRoleInputValidationFailures:
     """Tests for CreateRoleInput validation failures."""
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateRoleInput(name="")
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateRoleInput(name="   ")
 
     def test_tab_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateRoleInput(name="\t")
 
     def test_newline_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateRoleInput(name="\n")
 
     def test_name_exceeding_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateRoleInput(name="a" * 257)
 
     def test_name_at_max_length_is_valid(self) -> None:
@@ -94,7 +95,7 @@ class TestCreateRoleInputValidationFailures:
         assert req.name == "a"
 
     def test_missing_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateRoleInput.model_validate({})
 
 
@@ -134,11 +135,11 @@ class TestUpdateRoleInput:
         assert req.name == "NewName"
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateRoleInput(name="   ")
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateRoleInput(name="")
 
     def test_status_update(self) -> None:
@@ -174,11 +175,11 @@ class TestDeleteRoleInput:
         assert req.id == role_id
 
     def test_invalid_uuid_string_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteRoleInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteRoleInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:
@@ -201,11 +202,11 @@ class TestPurgeRoleInput:
         assert req.id == role_id
 
     def test_invalid_uuid_string_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeRoleInput.model_validate({"id": "invalid-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeRoleInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:

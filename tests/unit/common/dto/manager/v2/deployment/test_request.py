@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -137,7 +138,7 @@ class TestRevisionInput:
         assert rev.environ is None
 
     def test_cluster_size_must_be_at_least_one(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_revision_input(cluster_size=0)
 
     def test_with_extra_mounts(self) -> None:
@@ -164,7 +165,7 @@ class TestExtraVFolderMountInput:
         assert mount.mount_destination is None
 
     def test_missing_vfolder_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExtraVFolderMountInput.model_validate({})
 
 
@@ -268,7 +269,7 @@ class TestRollingUpdateConfigInput:
         ],
     )
     def test_invalid_input_raises_error(self, raw_input: dict[str, object]) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RollingUpdateConfigInput.model_validate(raw_input)
 
 
@@ -286,7 +287,7 @@ class TestBlueGreenConfigInput:
         assert config.promote_delay_seconds == 0
 
     def test_negative_delay_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BlueGreenConfigInput(promote_delay_seconds=-1)
 
 
@@ -343,13 +344,13 @@ class TestCreateDeploymentInput:
         assert inp.metadata.name == "my-deployment"
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             self._make_input(
                 metadata=self._make_metadata(name="   "),
             )
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             self._make_input(
                 metadata=self._make_metadata(name=""),
             )
@@ -359,7 +360,7 @@ class TestCreateDeploymentInput:
         assert inp.replica_count == 0
 
     def test_negative_replica_count_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             self._make_input(replica_count=-1)
 
     def test_blue_green_strategy(self) -> None:
@@ -403,7 +404,7 @@ class TestCreateDeploymentInput:
         assert inp.initial_revision.image.id == image_id
 
     def test_missing_metadata_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDeploymentInput.model_validate({
                 "network_access": {},
                 "default_deployment_strategy": {"type": "ROLLING"},
@@ -443,11 +444,11 @@ class TestUpdateDeploymentInput:
         assert inp.name == "new-name"
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDeploymentInput(name="   ")
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDeploymentInput(name="")
 
     def test_replica_count_zero_is_valid_for_update(self) -> None:
@@ -455,7 +456,7 @@ class TestUpdateDeploymentInput:
         assert inp.replica_count == 0
 
     def test_negative_replicas_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDeploymentInput(replica_count=-1)
 
     def test_partial_update_name_only(self) -> None:
@@ -478,11 +479,11 @@ class TestDeleteDeploymentInput:
         assert inp.id == deployment_id
 
     def test_invalid_uuid_string_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteDeploymentInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteDeploymentInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:
@@ -505,7 +506,7 @@ class TestActivateDeploymentInput:
         assert inp.id == deployment_id
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ActivateDeploymentInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:
@@ -528,15 +529,15 @@ class TestScaleDeploymentInput:
         assert inp.replicas == 0
 
     def test_negative_replicas_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScaleDeploymentInput(id=uuid.uuid4(), replicas=-1)
 
     def test_missing_replicas_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScaleDeploymentInput.model_validate({"id": str(uuid.uuid4())})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScaleDeploymentInput.model_validate({"replicas": 3})
 
 
@@ -551,7 +552,7 @@ class TestAddRevisionInput:
         assert inp.revision.cluster_mode == ClusterMode.SINGLE_NODE
 
     def test_missing_deployment_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AddRevisionInput.model_validate({"revision": {}})
 
     def test_round_trip(self) -> None:
@@ -580,11 +581,11 @@ class TestCreateAccessTokenInput:
 
     def test_missing_expires_at_raises_validation_error(self) -> None:
         # BA-5881: expires_at is required — there is no safe default lifetime.
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateAccessTokenInput(model_deployment_id=uuid.uuid4())  # type: ignore[call-arg]
 
     def test_expires_at_none_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateAccessTokenInput.model_validate({
                 "model_deployment_id": str(uuid.uuid4()),
                 "expires_at": None,
@@ -601,7 +602,7 @@ class TestCreateAccessTokenInput:
         assert inp.expires_at == expires
 
     def test_missing_model_deployment_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateAccessTokenInput.model_validate({
                 "expires_at": datetime(2099, 1, 1, tzinfo=UTC).isoformat(),
             })

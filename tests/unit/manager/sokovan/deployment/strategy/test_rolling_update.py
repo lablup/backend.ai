@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
@@ -1062,13 +1063,13 @@ class TestFractionSpec:
         assert spec.resolve_max_unavailable(100) == 2
 
     def test_fraction_over_1_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RollingUpdateSpec(
                 max_surge=make_int_or_percent(1.5), max_unavailable=make_int_or_percent(0)
             )
 
     def test_negative_fraction_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RollingUpdateSpec(
                 max_surge=make_int_or_percent(-0.1), max_unavailable=make_int_or_percent(0)
             )

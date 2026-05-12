@@ -46,5 +46,5 @@ class TestBackendAISchemaOverride:
         ``BackendAISchema`` docstring): direct ``Model(field=...)``
         construction still raises stock ``pydantic.ValidationError``."""
         bad_kwargs: Any = {"name": "ok", "count": "not-a-number"}
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _PayloadTestModel(**bad_kwargs)

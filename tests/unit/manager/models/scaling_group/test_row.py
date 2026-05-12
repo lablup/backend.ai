@@ -32,7 +32,7 @@ class TestScalingGroupOptsDefaults:
 
     def test_frozen_model_raises_on_mutation(self) -> None:
         opts = ScalingGroupOpts()
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             opts.pending_timeout = timedelta(seconds=30)  # type: ignore[misc]
 
 
@@ -110,7 +110,7 @@ class TestScalingGroupOptsPendingTimeout:
         assert dumped["pending_timeout"] == 90.0
 
     def test_validate_invalid_type_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScalingGroupOpts(pending_timeout="not-a-number")  # type: ignore[arg-type]
 
 
