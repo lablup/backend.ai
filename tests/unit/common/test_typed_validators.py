@@ -64,5 +64,5 @@ def test_hostport_pair_valid(
     ],
 )
 def test_hostport_pair_invalid(input: str | list[str] | dict[str, str] | int) -> None:
-    with pytest.raises((ValidationError, TypeError)):
+    with pytest.raises((BackendAISchemaValidationFailed, ValidationError, TypeError)):
         HostPortPair.model_validate(input)

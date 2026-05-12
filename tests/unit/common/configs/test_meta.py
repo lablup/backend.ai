@@ -5,8 +5,6 @@ from typing import Annotated
 import pytest
 from pydantic import Field
 
-from ai.backend.common.types import BackendAISchema
-
 from ai.backend.common.meta import (
     BackendAIAPIMeta,
     BackendAIConfigMeta,
@@ -18,6 +16,7 @@ from ai.backend.common.meta import (
     get_field_meta,
     get_field_type,
 )
+from ai.backend.common.types import BackendAISchema
 
 
 class TestConfigExample:

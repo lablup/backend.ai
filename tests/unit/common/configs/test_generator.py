@@ -6,8 +6,6 @@ from typing import Annotated
 import pytest
 from pydantic import Field
 
-from ai.backend.common.types import BackendAISchema
-
 from ai.backend.common.configs.generator import (
     BinarySizeFormatter,
     CompositeFormatter,
@@ -29,6 +27,7 @@ from ai.backend.common.meta import (
     ConfigEnvironment,
     ConfigExample,
 )
+from ai.backend.common.types import BackendAISchema
 
 
 class TestFieldVisibility:
