@@ -57,7 +57,7 @@ from redis.asyncio import Redis
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
     BackendAIError,
-    BackendAIModelValidationFailed,
+    BackendAISchemaValidationFailed,
     GenericNotImplementedError,
     InvalidIpAddressValue,
     InvalidResourceSlotQuantity,
@@ -85,7 +85,7 @@ __all__ = (
     "AutoPullBehavior",
     "AutoScalingMetricComparator",
     "AutoScalingMetricSource",
-    "BackendAIModel",
+    "BackendAISchema",
     "BinarySize",
     "CIStrEnum",
     "CIStrEnumTrafaret",
@@ -187,7 +187,7 @@ current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
 @dataclass(frozen=True)
 class ModelValidationFailureInfo:
     """Pydantic-decoupled view of a failed ``model_validate*`` call,
-    passed to :meth:`BackendAIModel.build_validation_error`.
+    passed to :meth:`BackendAISchema.build_validation_error`.
 
     ``summary`` is ``str(pydantic.ValidationError)``; ``errors`` is
     ``exc.errors()`` as-is.
@@ -197,13 +197,13 @@ class ModelValidationFailureInfo:
     errors: list[ErrorDetails]
 
 
-class BackendAIModel(BaseModel):
+class BackendAISchema(BaseModel):
     """Pydantic base whose ``model_validate`` / ``model_validate_json``
     auto-map ``ValidationError`` to a :class:`BackendAIError` (HTTP 4xx)
     via :meth:`build_validation_error`. Subclasses override the
     classmethod to inject a domain-specific 400::
 
-        class MyConfig(BackendAIModel):
+        class MyConfig(BackendAISchema):
             @override
             @classmethod
             def build_validation_error(
@@ -225,8 +225,8 @@ class BackendAIModel(BaseModel):
     @classmethod
     def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
         """Default override raising the generic
-        :class:`BackendAIModelValidationFailed`."""
-        return BackendAIModelValidationFailed(
+        :class:`BackendAISchemaValidationFailed`."""
+        return BackendAISchemaValidationFailed(
             extra_msg=info.summary,
             extra_data={"errors": info.errors},
         )

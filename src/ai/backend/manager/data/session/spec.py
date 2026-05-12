@@ -30,7 +30,7 @@ from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
-    BackendAIModel,
+    BackendAISchema,
     ModelValidationFailureInfo,
     SessionTypes,
     VFolderMount,
@@ -44,7 +44,7 @@ from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 from ai.backend.manager.models.network import NetworkType
 
 
-class _SpecBaseModel(BackendAIModel):
+class _SpecBaseModel(BackendAISchema):
     """Base for resolved session-spec sub-models.
 
     ``arbitrary_types_allowed`` lets us use ``ResourceSlot`` and other

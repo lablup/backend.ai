@@ -4,13 +4,13 @@ from pydantic import ConfigDict, Field, model_validator
 
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
-    BackendAIModel,
+    BackendAISchema,
     ClusterMode,
     RuntimeVariant,
 )
 
 
-class BaseDependencyModel(BackendAIModel):
+class BaseDependencyModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")

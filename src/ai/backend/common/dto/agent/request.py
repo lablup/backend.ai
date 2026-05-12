@@ -1,9 +1,9 @@
 from pydantic import ConfigDict
 
-from ai.backend.common.types import BackendAIModel
+from ai.backend.common.types import BackendAISchema
 
 
-class BaseAgentRequestModel(BackendAIModel):
+class BaseAgentRequestModel(BackendAISchema):
     """Base class for pydantic request payloads on agent RPC v3 methods.
 
     Mirrors the role of ``ai.backend.common.api_handlers.BaseRequestModel``

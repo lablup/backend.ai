@@ -6,17 +6,17 @@ import pytest
 from aiohttp import web
 from pydantic import ValidationError
 
-from ai.backend.common.exception import BackendAIModelValidationFailed
-from ai.backend.common.types import BackendAIModel
+from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.types import BackendAISchema
 
 
-class _PayloadTestModel(BackendAIModel):
+class _PayloadTestModel(BackendAISchema):
     name: str
     count: int
 
 
 class TestBackendAIModelOverride:
-    """``BackendAIModel`` subclasses get the auto-conversion override
+    """``BackendAISchema`` subclasses get the auto-conversion override
     just by inheriting — no per-call-site ``try / except``."""
 
     def test_model_validate_passes_through_on_success(self) -> None:
@@ -26,7 +26,7 @@ class TestBackendAIModelOverride:
         assert instance.count == 1
 
     def test_model_validate_raises_model_validation_failed(self) -> None:
-        with pytest.raises(BackendAIModelValidationFailed) as excinfo:
+        with pytest.raises(BackendAISchemaValidationFailed) as excinfo:
             _PayloadTestModel.model_validate({"count": "not-a-number"})
 
         err = excinfo.value
@@ -38,12 +38,12 @@ class TestBackendAIModelOverride:
         assert ("count",) in locs
 
     def test_model_validate_json_is_also_overridden(self) -> None:
-        with pytest.raises(BackendAIModelValidationFailed):
+        with pytest.raises(BackendAISchemaValidationFailed):
             _PayloadTestModel.model_validate_json('{"count": "nope"}')
 
     def test_constructor_keeps_stock_pydantic_error(self) -> None:
         """``__init__`` is intentionally NOT overridden (see
-        ``BackendAIModel`` docstring): direct ``Model(field=...)``
+        ``BackendAISchema`` docstring): direct ``Model(field=...)``
         construction still raises stock ``pydantic.ValidationError``."""
         bad_kwargs: Any = {"name": "ok", "count": "not-a-number"}
         with pytest.raises(ValidationError):

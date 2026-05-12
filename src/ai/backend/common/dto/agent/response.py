@@ -6,12 +6,12 @@ from typing import Any, Self, TypeVar, override
 from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common.dto.internal.health import ConnectivityCheckResponse, HealthStatus
-from ai.backend.common.types import BackendAIModel
+from ai.backend.common.types import BackendAISchema
 
 T = TypeVar("T")
 
 
-class BaseAgentResponseModel(BackendAIModel):
+class BaseAgentResponseModel(BackendAISchema):
     """Base class for pydantic response payloads on agent RPC v3 methods.
 
     Counterpart to ``BaseAgentRequestModel`` on the response side.

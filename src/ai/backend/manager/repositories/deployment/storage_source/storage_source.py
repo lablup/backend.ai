@@ -8,12 +8,12 @@ from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
-from ai.backend.common.types import BackendAIModel, ModelValidationFailureInfo, VFolderID
+from ai.backend.common.types import BackendAISchema, ModelValidationFailureInfo, VFolderID
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.models.storage import StorageSessionManager
 
 
-class DeploymentConfigInput(BackendAIModel):
+class DeploymentConfigInput(BackendAISchema):
     """Validated ``deployment-config.yaml`` / ``service-definition.toml`` payload.
 
     Shared shape across the new yaml name and the legacy toml name — storage

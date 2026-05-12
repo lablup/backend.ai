@@ -20,7 +20,7 @@ from pydantic import (
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
-from .types import BackendAIModel, ModelValidationFailureInfo, RedisHelperConfig
+from .types import BackendAISchema, ModelValidationFailureInfo, RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",
@@ -39,7 +39,7 @@ __all__ = (
 )
 
 
-class BaseConfigSchema(BackendAIModel):
+class BaseConfigSchema(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -52,7 +52,7 @@ class BaseConfigSchema(BackendAIModel):
     )
 
 
-class BaseConfigModel(BackendAIModel):
+class BaseConfigModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -542,7 +542,7 @@ class ModelHealthCheckDraft(BaseConfigModel):
         # Drop unset (None) fields so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values.
         # Missing required fields (e.g. ``path``) surface as the strict
-        # type's ``BackendAIModelValidationFailed`` via ``model_validate``.
+        # type's ``BackendAISchemaValidationFailed`` via ``model_validate``.
         return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
 
 
@@ -564,7 +564,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
         # resolve the nested ``health_check`` draft explicitly so its own
         # required-field check (``path``) fires through its own
         # ``model_validate``. Missing required fields (e.g. ``port``)
-        # surface as ``BackendAIModelValidationFailed``.
+        # surface as ``BackendAISchemaValidationFailed``.
         payload = self.model_dump(exclude_none=True, exclude={"health_check"})
         payload["health_check"] = self.health_check.to_resolved() if self.health_check else None
         return ModelServiceConfig.model_validate(payload)

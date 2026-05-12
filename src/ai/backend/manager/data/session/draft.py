@@ -45,7 +45,7 @@ from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    BackendAIModel,
+    BackendAISchema,
     ClusterMode,
     MountInfoEntry,
     ResourceSlotEntry,
@@ -62,7 +62,7 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.models.network import NetworkType
 
 
-class _DraftBaseModel(BackendAIModel):
+class _DraftBaseModel(BackendAISchema):
     """Base for draft sub-models.
 
     Matches the spec's ``_SpecBaseModel`` configuration so

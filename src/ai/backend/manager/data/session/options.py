@@ -23,7 +23,7 @@ from pydantic import ConfigDict, Field
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     AgentId,
-    BackendAIModel,
+    BackendAISchema,
     BinarySizeField,
     ClusterMode,
     MountInfoEntry,
@@ -31,7 +31,7 @@ from ai.backend.common.types import (
 )
 
 
-class _OptionsBaseModel(BackendAIModel):
+class _OptionsBaseModel(BackendAISchema):
     """Base for session-options data types.
 
     ``arbitrary_types_allowed`` lets us use ``ResourceSlot`` (UserDict)

@@ -32,7 +32,7 @@ from .exception import (
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
 )
-from .types import BackendAIModel
+from .types import BackendAISchema
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -46,21 +46,21 @@ class Sentinel(enum.Enum):
 SENTINEL = Sentinel.TOKEN
 
 
-class BaseRequestModel(BackendAIModel):
+class BaseRequestModel(BackendAISchema):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
 
 
-class BaseFieldModel(BackendAIModel):
+class BaseFieldModel(BackendAISchema):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
 
 
-class BaseResponseModel(BackendAIModel):
+class BaseResponseModel(BackendAISchema):
     pass
 
 

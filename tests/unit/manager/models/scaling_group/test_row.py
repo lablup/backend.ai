@@ -7,7 +7,7 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.exception import BackendAIModelValidationFailed
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 
@@ -128,11 +128,11 @@ class TestScalingGroupOptsAllowedSessionTypes:
         assert opts.allowed_session_types == [SessionTypes.INFERENCE]
 
     def test_validate_invalid_session_type_raises(self) -> None:
-        with pytest.raises(BackendAIModelValidationFailed):
+        with pytest.raises(BackendAISchemaValidationFailed):
             ScalingGroupOpts.model_validate({"allowed_session_types": ["not_a_valid_type"]})
 
     def test_validate_non_list_raises(self) -> None:
-        with pytest.raises(BackendAIModelValidationFailed):
+        with pytest.raises(BackendAISchemaValidationFailed):
             ScalingGroupOpts.model_validate({"allowed_session_types": "interactive"})
 
     def test_serialize_to_string_list(self) -> None:

@@ -444,15 +444,15 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class BackendAIModelValidationFailed(BackendAIError, web.HTTPBadRequest):
-    """Default 400 raised by :class:`BackendAIModel.build_validation_error`.
+class BackendAISchemaValidationFailed(BackendAIError, web.HTTPBadRequest):
+    """Default 400 raised by :class:`BackendAISchema.build_validation_error`.
 
     Kept distinct from :class:`InvalidAPIParameters` so handlers can
     catch one without picking up the other.
     """
 
-    error_type = "https://api.backend.ai/probs/model-validation-failed"
-    error_title = "Model validation failed."
+    error_type = "https://api.backend.ai/probs/schema-validation-failed"
+    error_title = "Schema validation failed."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -472,7 +472,7 @@ class BackendAIModelValidationFailed(BackendAIError, web.HTTPBadRequest):
 
 class ModelDefinitionValidationError(BackendAIError, web.HTTPBadRequest):
     """400 raised by ``ModelDefinition.model_validate`` (via its
-    :meth:`BackendAIModel.build_validation_error` override).
+    :meth:`BackendAISchema.build_validation_error` override).
 
     Lives in ``common`` so ``ModelDefinition`` (also in ``common``) can
     construct it without an upward-layer import.
