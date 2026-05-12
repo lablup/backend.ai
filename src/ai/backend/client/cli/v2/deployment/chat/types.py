@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Annotated, Self
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import Field
 
 from ai.backend.client.cli.v2.deployment.chat.utils import (
     CHAT_CACHE_FILE,
@@ -16,7 +16,9 @@ from ai.backend.client.cli.v2.deployment.chat.utils import (
     read_json_file,
     write_json_file,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.types import BackendAISchema
 
 CACHE_ENTRY_TTL = timedelta(hours=24)
 """Endpoint cache entries older than this are treated as a cache miss."""
@@ -36,7 +38,7 @@ user never runs ``chat-history clear``. Older messages are dropped FIFO.
 """
 
 
-class DeploymentChatCacheEntry(BaseModel):
+class DeploymentChatCacheEntry(BackendAISchema):
     """One deployment's auto-managed endpoint metadata."""
 
     endpoint_url: str
@@ -48,7 +50,7 @@ class DeploymentChatCacheEntry(BaseModel):
         return now - self.last_synced_at >= ttl
 
 
-class DeploymentChatCache(BaseModel):
+class DeploymentChatCache(BackendAISchema):
     """In-memory representation of the chat cache file."""
 
     deployments: dict[DeploymentID, DeploymentChatCacheEntry] = Field(default_factory=dict)
@@ -71,7 +73,7 @@ class DeploymentChatCache(BaseModel):
             return cls()
         try:
             return cls.model_validate(raw)
-        except ValidationError:
+        except BackendAISchemaValidationFailed:
             print(
                 f"WARNING: {CHAT_CACHE_FILE} is in an invalid format and was ignored.",
                 file=sys.stderr,
@@ -85,7 +87,7 @@ class DeploymentChatCache(BaseModel):
         write_json_file(CHAT_CACHE_FILE, self.model_dump_json(indent=2))
 
 
-class DeploymentChatConfigEntry(BaseModel):
+class DeploymentChatConfigEntry(BackendAISchema):
     """One deployment's user-managed state.
 
     ``model`` holds the user's explicit ``--model`` choice for a deployment;
@@ -100,7 +102,7 @@ class DeploymentChatConfigEntry(BaseModel):
         return self.token is None and self.model is None
 
 
-class DeploymentChatConfig(BaseModel):
+class DeploymentChatConfig(BackendAISchema):
     """Per-deployment user-managed registry (tokens + chosen model name)."""
 
     deployments: defaultdict[
@@ -163,7 +165,7 @@ class DeploymentChatConfig(BaseModel):
             return cls()
         try:
             return cls.model_validate(raw)
-        except ValidationError:
+        except BackendAISchemaValidationFailed:
             print(
                 f"WARNING: {CHAT_CONFIG_FILE} is in an invalid format and was ignored. "
                 "Re-register tokens with `./bai deployment chat-config set`.",
@@ -178,7 +180,7 @@ class DeploymentChatConfig(BaseModel):
         write_json_file(CHAT_CONFIG_FILE, self.model_dump_json(indent=2))
 
 
-class ChatMessage(BaseModel):
+class ChatMessage(BackendAISchema):
     """One persisted user/assistant turn.
 
     ``created_at`` is local-only metadata for ``chat-history show``; it is
@@ -191,7 +193,7 @@ class ChatMessage(BaseModel):
     created_at: datetime
 
 
-class DeploymentChatHistory(BaseModel):
+class DeploymentChatHistory(BackendAISchema):
     """Per-deployment rolling chat transcripts.
 
     Stored separately from the cache (auto-managed endpoint metadata) and
@@ -241,7 +243,7 @@ class DeploymentChatHistory(BaseModel):
             return cls()
         try:
             return cls.model_validate(raw)
-        except ValidationError:
+        except BackendAISchemaValidationFailed:
             print(
                 f"WARNING: {CHAT_HISTORY_FILE} is in an invalid format and was ignored.",
                 file=sys.stderr,

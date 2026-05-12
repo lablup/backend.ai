@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "ScalingGroupItem",
@@ -13,7 +14,7 @@ __all__ = (
 )
 
 
-class ScalingGroupItem(BaseModel):
+class ScalingGroupItem(BackendAISchema):
     """A single scaling group entry."""
 
     name: str = Field(description="Scaling group name")

@@ -44,7 +44,6 @@ from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
 from callosum.rpc import Peer, RPCMessage
 from etcd_client import WatchEventType
-from pydantic import ValidationError
 from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
@@ -87,7 +86,7 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatedBroadcastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.exception import BackendAISchemaValidationFailed, ConfigurationError
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
@@ -1740,7 +1739,7 @@ def main(
         if server_config.debug.enabled:
             print("== Agent configuration ==")
             pprint(server_config.model_dump(by_alias=True))
-    except ValidationError as e:
+    except BackendAISchemaValidationFailed as e:
         print(
             "ConfigurationError: Agent local config failed validation checks:",
             file=sys.stderr,

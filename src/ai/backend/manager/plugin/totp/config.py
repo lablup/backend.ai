@@ -1,9 +1,11 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ai.backend.common.types import BackendAISchema
 
 _DEFAULT_TOKEN_SECRET = "BACKEND_AI_TOKEN_SECRET"
 
 
-class TOTPConfig(BaseModel):
+class TOTPConfig(BackendAISchema):
     issuer: str = Field(
         default="Backend.AI",
         description="Issuer name for TOTP.",

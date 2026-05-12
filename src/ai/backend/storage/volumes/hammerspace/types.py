@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 
-from pydantic import BaseModel
 from yarl import URL
 
+from ai.backend.common.types import BackendAISchema
 
-class SSLConfig(BaseModel):
+
+class SSLConfig(BackendAISchema):
     cert_file: str | None
     key_file: str | None
 

@@ -1,10 +1,10 @@
 import uuid
 
-from pydantic import BaseModel
+from ai.backend.common.types import BackendAISchema
 
 from .object_type import ObjectType
 
 
-class UOID(BaseModel):
+class UOID(BackendAISchema):
     uuid: uuid.UUID
     objectType: ObjectType

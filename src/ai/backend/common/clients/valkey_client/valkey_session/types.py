@@ -1,7 +1,7 @@
-from pydantic import BaseModel
+from ai.backend.common.types import BackendAISchema
 
 
-class LoginSessionTokenData(BaseModel):
+class LoginSessionTokenData(BackendAISchema):
     type: str
     access_key: str
     secret_key: str
@@ -9,12 +9,12 @@ class LoginSessionTokenData(BaseModel):
     status: str
 
 
-class LoginSessionInner(BaseModel):
+class LoginSessionInner(BackendAISchema):
     authenticated: bool
     token: LoginSessionTokenData
 
 
-class LoginSessionData(BaseModel):
+class LoginSessionData(BackendAISchema):
     created: int
     expiration_dt: int
     session: LoginSessionInner

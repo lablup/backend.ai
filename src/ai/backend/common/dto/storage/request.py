@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import ConfigDict, Field, field_serializer, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
@@ -14,7 +14,7 @@ from ai.backend.common.data.storage.types import (
     ArtifactStorageTarget,
 )
 from ai.backend.common.type_adapters import VFolderIDField
-from ai.backend.common.types import QuotaConfig
+from ai.backend.common.types import BackendAISchema, QuotaConfig
 
 
 class QuotaScopeReq(BaseRequestModel):
@@ -550,7 +550,7 @@ _UNSAFE_FILENAME_RE = re.compile(r"[\x00-\x1f\x7f/\\]")
 
 
 # Client-facing API request models for download archive endpoint
-class ArchiveDownloadTokenData(BaseModel):
+class ArchiveDownloadTokenData(BackendAISchema):
     """Pydantic model for validating the JWT payload of archive download tokens."""
 
     operation: TokenOperationType = Field(

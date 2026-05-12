@@ -1,6 +1,8 @@
 import enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 from .address import IPAddress
 from .uoid import UOID
@@ -69,7 +71,7 @@ class ProductionNodeType(enum.StrEnum):
     DSX = "DSX"
 
 
-class Node(BaseModel):
+class Node(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     uoid: UOID

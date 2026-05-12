@@ -6,10 +6,9 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel
-
 from ai.backend.common.configs.inspector import ConfigInspector, FieldSchema
 from ai.backend.common.meta import CompositeType, ConfigEnvironment, ConfigExample
+from ai.backend.common.types import BackendAISchema
 
 from .formatter import CompositeFormatter, create_default_formatter
 from .types import FieldVisibility, GeneratorConfig
@@ -62,7 +61,7 @@ class TOMLGenerator:
         """The target environment for example values."""
         return self._inspector.env
 
-    def generate(self, model: type[BaseModel]) -> str:
+    def generate(self, model: type[BackendAISchema]) -> str:
         """Generate TOML configuration string from a Pydantic model.
 
         Args:
@@ -77,7 +76,7 @@ class TOMLGenerator:
 
     def generate_to_file(
         self,
-        model: type[BaseModel],
+        model: type[BackendAISchema],
         output_path: str | Path,
         header: str | None = None,
     ) -> None:
@@ -569,7 +568,7 @@ class TOMLGenerator:
 
 
 def generate_sample_toml(
-    model: type[BaseModel],
+    model: type[BackendAISchema],
     output_path: str | Path | None = None,
     header: str | None = None,
 ) -> str:
@@ -595,7 +594,7 @@ def generate_sample_toml(
 
 
 def generate_halfstack_toml(
-    model: type[BaseModel],
+    model: type[BackendAISchema],
     output_path: str | Path | None = None,
     header: str | None = None,
 ) -> str:

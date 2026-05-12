@@ -12,8 +12,6 @@ location, because ``common`` cannot import from ``manager``.
 ``manager.dto.response`` re-exports these models for backward compatibility.
 """
 
-from pydantic import BaseModel
-
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.response import (
     GetPresignedDownloadURLResponse,
@@ -23,6 +21,7 @@ from ai.backend.common.dto.manager.response import (
     ObjectStorageListResponse,
     ObjectStorageResponse,
 )
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # Object storage models (re-exported from common.dto.manager.response)
@@ -51,7 +50,7 @@ __all__ = (
 # ---------------------------------------------------------------------------
 
 
-class VFSStorage(BaseModel):
+class VFSStorage(BackendAISchema):
     name: str
     base_path: str
     host: str

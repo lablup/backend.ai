@@ -7,7 +7,7 @@ from uuid import UUID
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.appproxy.common.types import (
     CORSOptions,
@@ -19,6 +19,7 @@ from ai.backend.appproxy.common.utils import (
 )
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 
 from .utils import auth_required
@@ -26,7 +27,7 @@ from .utils import auth_required
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class SlotResponseModel(BaseModel):
+class SlotResponseModel(BackendAISchema):
     rel: Annotated[UUID, Field(description="Circuit ID.")]
     port: Annotated[int | None, Field(description="Port number.")]
     subdomain: Annotated[str | None, Field(default=None, description="Subdomain for the circuit.")]

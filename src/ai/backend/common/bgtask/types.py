@@ -6,10 +6,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, NewType, Protocol, Self
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pydantic_core import ValidationError
 
 from ai.backend.common.json import dump_json, load_json
+from ai.backend.common.types import BackendAISchema
 
 from .exception import InvalidTaskMetadataError
 
@@ -109,7 +110,7 @@ class TaskStatus(enum.StrEnum):
     FAILURE = "failure"
 
 
-class TaskSubKeyInfo(BaseModel):
+class TaskSubKeyInfo(BackendAISchema):
     """
     Status information for a specific task key.
     """

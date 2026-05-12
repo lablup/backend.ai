@@ -10,7 +10,6 @@ from uuid import UUID
 import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
-from pydantic import BaseModel
 
 from ai.backend.appproxy.common.types import (
     AppMode,
@@ -27,7 +26,7 @@ from ai.backend.common.dto.internal.health import (
     HealthResponse,
     HealthStatus,
 )
-from ai.backend.common.types import ModelServiceStatus
+from ai.backend.common.types import BackendAISchema, ModelServiceStatus
 from ai.backend.logging import BraceStyleAdapter
 
 from .utils import auth_required
@@ -40,7 +39,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # compatibility with external consumers but report routes as `unknown`.
 
 
-class RouteHealthStatusModel(BaseModel):
+class RouteHealthStatusModel(BackendAISchema):
     """Model for individual route health status"""
 
     route_id: UUID
@@ -55,7 +54,7 @@ class RouteHealthStatusModel(BaseModel):
     updated_at: datetime | None
 
 
-class EndpointHealthStatusModel(BaseModel):
+class EndpointHealthStatusModel(BackendAISchema):
     """Model for endpoint health status summary"""
 
     endpoint_id: UUID
@@ -67,7 +66,7 @@ class EndpointHealthStatusModel(BaseModel):
     routes: list[RouteHealthStatusModel]
 
 
-class CircuitHealthStatusModel(BaseModel):
+class CircuitHealthStatusModel(BackendAISchema):
     """Model for circuit health status with route details"""
 
     circuit_id: UUID
@@ -77,7 +76,7 @@ class CircuitHealthStatusModel(BaseModel):
     all_routes: list[RouteHealthStatusModel]
 
 
-class HealthSummaryModel(BaseModel):
+class HealthSummaryModel(BackendAISchema):
     """Model for overall health summary"""
 
     total_endpoints: int
@@ -88,7 +87,7 @@ class HealthSummaryModel(BaseModel):
     unknown_routes: int
 
 
-class HealthStatusResponseModel(BaseModel):
+class HealthStatusResponseModel(BackendAISchema):
     """Response model for health status APIs"""
 
     success: bool
@@ -97,14 +96,14 @@ class HealthStatusResponseModel(BaseModel):
     circuits: list[CircuitHealthStatusModel] | None = None
 
 
-class WorkerInfoModel(BaseModel):
+class WorkerInfoModel(BackendAISchema):
     authority: str
     available_slots: int
     occupied_slots: int
     ha_setup: bool
 
 
-class StatusResponseModel(BaseModel):
+class StatusResponseModel(BackendAISchema):
     coordinator_version: str
     appproxy_api_version: Literal["v2"]
     workers: list[WorkerInfoModel]

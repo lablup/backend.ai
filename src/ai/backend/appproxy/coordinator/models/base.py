@@ -25,7 +25,7 @@ from ai.backend.appproxy.common.errors import InvalidAPIParameters
 from ai.backend.appproxy.common.utils import ensure_json_serializable
 from ai.backend.appproxy.coordinator.errors import InvalidEnumTypeError
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.types import ReadableCIDR
+from ai.backend.common.types import BackendAISchema, ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 
 SAFE_MIN_INT = -9007199254740991
@@ -174,9 +174,9 @@ class StructuredJSONColumn(TypeDecorator[BaseModel]):
 
     impl = JSONB
     cache_ok = True
-    _schema: type[BaseModel]
+    _schema: type[BackendAISchema]
 
-    def __init__(self, schema: type[BaseModel]) -> None:
+    def __init__(self, schema: type[BackendAISchema]) -> None:
         super().__init__()
         self._schema = schema
 
@@ -215,7 +215,7 @@ class StructuredJSONObjectColumn(TypeDecorator[BaseModel]):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: type[BaseModel]) -> None:
+    def __init__(self, schema: type[BackendAISchema]) -> None:
         super().__init__()
         self._schema = schema
 

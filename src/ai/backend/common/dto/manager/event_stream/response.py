@@ -7,7 +7,9 @@ of Server-Sent Events produced by the ``/events/session`` endpoint.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
+
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "SessionEventPayload",
@@ -15,7 +17,7 @@ __all__ = (
 )
 
 
-class SessionEventPayload(BaseModel):
+class SessionEventPayload(BackendAISchema):
     """Payload for session lifecycle SSE events.
 
     Emitted for events such as ``session_enqueued``, ``session_success``,

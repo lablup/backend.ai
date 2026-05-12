@@ -19,7 +19,7 @@ from uuid import UUID
 
 import aiohttp_cors
 import attrs
-from pydantic import AliasChoices, BaseModel, Field, TypeAdapter
+from pydantic import AliasChoices, Field, TypeAdapter
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError, ServiceUnavailable
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
@@ -42,7 +42,7 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
-from ai.backend.common.types import AgentId, RedisConnectionInfo
+from ai.backend.common.types import AgentId, BackendAISchema, RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
 from .config import ServerConfig
@@ -426,7 +426,7 @@ class RootContext:
 type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 
 
-class InferenceAppConfig(BaseModel):
+class InferenceAppConfig(BackendAISchema):
     session_id: Annotated[
         UUID,
         Field(

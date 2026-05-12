@@ -8,6 +8,7 @@ from aiohttp.web_urldispatcher import AbstractResource, DynamicResource
 from pydantic import BaseModel
 
 from ai.backend.appproxy.common.types import PydanticResponse
+from ai.backend.common.types import BackendAISchema
 
 from . import __version__
 
@@ -131,7 +132,7 @@ def generate_openapi(
             route_def["description"] = "\n".join(description)
             type_hints = get_type_hints(route.handler)
 
-            def _parse_schema(model_cls: type[BaseModel]) -> dict[str, Any]:
+            def _parse_schema(model_cls: type[BackendAISchema]) -> dict[str, Any]:
                 if not issubclass(model_cls, BaseModel):
                     raise RuntimeError(f"{model_cls} not considered as a valid response type")
 

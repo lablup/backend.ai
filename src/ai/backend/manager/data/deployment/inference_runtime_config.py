@@ -1,11 +1,13 @@
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from ai.backend.common.types import BackendAISchema
 
-class BaseInferenceRuntimeConfig(BaseModel):
+
+class BaseInferenceRuntimeConfig(BackendAISchema):
     model_config = ConfigDict(alias_generator=to_camel)
 
     @classmethod

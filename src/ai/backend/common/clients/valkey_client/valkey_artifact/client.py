@@ -6,7 +6,6 @@ import time
 from typing import Final, Self, cast
 
 from glide import Batch, ExpirySet, ExpiryType
-from pydantic import ValidationError
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
@@ -17,7 +16,7 @@ from ai.backend.common.data.artifact.types import (
     DownloadProgressData,
     FileDownloadProgressData,
 )
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -254,7 +253,7 @@ class ValkeyArtifactDownloadTrackingClient:
                         previous_data_bytes
                     )
                     previous_current_bytes = previous_data.current_bytes
-                except (ValidationError, UnicodeDecodeError):
+                except (BackendAISchemaValidationFailed, UnicodeDecodeError):
                     log.warning("Failed to parse previous file data for progress update")
 
             # Calculate bytes delta for artifact aggregation
@@ -361,7 +360,7 @@ class ValkeyArtifactDownloadTrackingClient:
 
         try:
             return FileDownloadProgressData.model_validate_json(data_bytes)
-        except (ValidationError, UnicodeDecodeError):
+        except (BackendAISchemaValidationFailed, UnicodeDecodeError):
             log.warning("Failed to parse file progress data")
             return None
 
@@ -398,7 +397,7 @@ class ValkeyArtifactDownloadTrackingClient:
                                     value_bytes
                                 )
                                 file_progress_list.append(file_progress)
-                            except (ValidationError, UnicodeDecodeError):
+                            except (BackendAISchemaValidationFailed, UnicodeDecodeError):
                                 log.warning(
                                     "Failed to parse file progress data for key: {}", key_bytes
                                 )

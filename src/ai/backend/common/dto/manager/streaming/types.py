@@ -11,7 +11,9 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, ConfigDict, Field
+
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # Enums
@@ -114,7 +116,7 @@ class BgtaskSSEEventName(StrEnum):
 # ============================
 
 
-class PtyStdinMessage(BaseModel):
+class PtyStdinMessage(BackendAISchema):
     """Client→server: terminal input data (base64-encoded)."""
 
     model_config = ConfigDict(extra="forbid")
@@ -123,7 +125,7 @@ class PtyStdinMessage(BaseModel):
     chars: str
 
 
-class PtyResizeMessage(BaseModel):
+class PtyResizeMessage(BackendAISchema):
     """Client→server: terminal resize event."""
 
     model_config = ConfigDict(extra="forbid")
@@ -133,7 +135,7 @@ class PtyResizeMessage(BaseModel):
     cols: int
 
 
-class PtyPingMessage(BaseModel):
+class PtyPingMessage(BackendAISchema):
     """Client→server: keepalive ping."""
 
     model_config = ConfigDict(extra="forbid")
@@ -141,7 +143,7 @@ class PtyPingMessage(BaseModel):
     type: Literal[PtyInputMessageType.PING]
 
 
-class PtyRestartMessage(BaseModel):
+class PtyRestartMessage(BackendAISchema):
     """Client→server: kernel restart request."""
 
     model_config = ConfigDict(extra="forbid")
@@ -156,7 +158,7 @@ PtyClientMessage = Annotated[
 """Discriminated union of all client-to-server PTY WebSocket messages."""
 
 
-class PtyOutputMessage(BaseModel):
+class PtyOutputMessage(BackendAISchema):
     """Server→client: terminal output data (base64-encoded)."""
 
     model_config = ConfigDict(extra="forbid")
@@ -170,7 +172,7 @@ class PtyOutputMessage(BaseModel):
 # ============================
 
 
-class ExecuteRequest(BaseModel):
+class ExecuteRequest(BackendAISchema):
     """Client→server: first message to start code execution."""
 
     model_config = ConfigDict(extra="forbid")
@@ -180,7 +182,7 @@ class ExecuteRequest(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
 
 
-class ExecuteResult(BaseModel):
+class ExecuteResult(BackendAISchema):
     """Server→client: code execution result message."""
 
     model_config = ConfigDict(extra="forbid")
@@ -198,7 +200,7 @@ class ExecuteResult(BaseModel):
 # ============================
 
 
-class StreamProxyParams(BaseModel):
+class StreamProxyParams(BackendAISchema):
     """Parameters for stream_proxy / tcpproxy WebSocket endpoints."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -212,7 +214,7 @@ class StreamProxyParams(BaseModel):
     arguments: str | None = Field(default=None, description="Stringified JSON arguments")
 
 
-class StreamAppInfo(BaseModel):
+class StreamAppInfo(BackendAISchema):
     """Information about an available streaming app/service."""
 
     model_config = ConfigDict(extra="forbid")
@@ -230,7 +232,7 @@ class StreamAppInfo(BaseModel):
 # ============================
 
 
-class SessionEventParams(BaseModel):
+class SessionEventParams(BackendAISchema):
     """Parameters for push_session_events SSE endpoint."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -254,7 +256,7 @@ class SessionEventParams(BaseModel):
     scope: str = Field(default="*")
 
 
-class BackgroundTaskEventParams(BaseModel):
+class BackgroundTaskEventParams(BackendAISchema):
     """Parameters for push_background_task_events SSE endpoint."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -269,7 +271,7 @@ class BackgroundTaskEventParams(BaseModel):
 # ============================
 
 
-class BgtaskUpdatedPayload(BaseModel):
+class BgtaskUpdatedPayload(BackendAISchema):
     """Payload for bgtask_updated SSE event."""
 
     model_config = ConfigDict(extra="forbid")
@@ -280,7 +282,7 @@ class BgtaskUpdatedPayload(BaseModel):
     total_progress: float
 
 
-class BgtaskDonePayload(BaseModel):
+class BgtaskDonePayload(BackendAISchema):
     """Payload for bgtask_done SSE event."""
 
     model_config = ConfigDict(extra="forbid")
@@ -289,7 +291,7 @@ class BgtaskDonePayload(BaseModel):
     message: str
 
 
-class BgtaskPartialSuccessPayload(BaseModel):
+class BgtaskPartialSuccessPayload(BackendAISchema):
     """Payload for bgtask_done SSE event with partial success (includes errors)."""
 
     model_config = ConfigDict(extra="forbid")
@@ -299,7 +301,7 @@ class BgtaskPartialSuccessPayload(BaseModel):
     errors: list[str]
 
 
-class BgtaskCancelledPayload(BaseModel):
+class BgtaskCancelledPayload(BackendAISchema):
     """Payload for bgtask_cancelled SSE event."""
 
     model_config = ConfigDict(extra="forbid")
@@ -308,7 +310,7 @@ class BgtaskCancelledPayload(BaseModel):
     message: str
 
 
-class BgtaskFailedPayload(BaseModel):
+class BgtaskFailedPayload(BackendAISchema):
     """Payload for bgtask_failed SSE event."""
 
     model_config = ConfigDict(extra="forbid")

@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 
-class ChatCompletionMessage(BaseModel):
+class ChatCompletionMessage(BackendAISchema):
     """One message inside a chat-completions request."""
 
     role: str
     content: str
 
 
-class ChatCompletionRequest(BaseModel):
+class ChatCompletionRequest(BackendAISchema):
     """Body for ``POST /v1/chat/completions`` (OpenAI-compatible).
 
     Extra fields are forwarded so callers can pass runtime-variant-specific

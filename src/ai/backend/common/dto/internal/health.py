@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ai.backend.common.types import BackendAISchema
 
 
 class HealthStatus(StrEnum):
@@ -14,7 +16,7 @@ class HealthStatus(StrEnum):
     ERROR = "error"
 
 
-class ComponentConnectivityStatus(BaseModel):
+class ComponentConnectivityStatus(BackendAISchema):
     """
     Connectivity status of a single component (for API response).
 
@@ -32,7 +34,7 @@ class ComponentConnectivityStatus(BaseModel):
     )
 
 
-class ConnectivityCheckResponse(BaseModel):
+class ConnectivityCheckResponse(BackendAISchema):
     """
     Connectivity check response containing status of all registered components.
 
@@ -46,7 +48,7 @@ class ConnectivityCheckResponse(BaseModel):
     timestamp: datetime = Field(description="Timestamp when this response was generated")
 
 
-class HealthResponse(BaseModel):
+class HealthResponse(BackendAISchema):
     """
     Standard health check response for all Backend.AI components.
 

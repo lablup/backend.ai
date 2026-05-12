@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "GetQuotaScopeResponse",
@@ -15,7 +16,7 @@ __all__ = (
 )
 
 
-class QuotaScopeDTO(BaseModel):
+class QuotaScopeDTO(BackendAISchema):
     quota_scope_id: str = Field(description="Quota scope ID")
     storage_host_name: str = Field(description="Storage host name")
     usage_bytes: int | None = Field(default=None, description="Current usage in bytes")

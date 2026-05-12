@@ -5,10 +5,11 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AgentDTO",
@@ -19,7 +20,7 @@ __all__ = (
 )
 
 
-class AgentDTO(BaseModel):
+class AgentDTO(BackendAISchema):
     """DTO for agent data."""
 
     id: str = Field(description="Agent ID")

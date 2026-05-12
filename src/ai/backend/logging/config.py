@@ -5,7 +5,6 @@ from typing import Annotated, Any, Self
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ByteSize,
     ConfigDict,
     Field,
@@ -17,6 +16,7 @@ from pydantic import (
 
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import AutoDirectoryPath
+from ai.backend.common.types import BackendAISchema
 
 from .exceptions import ConfigurationError
 from .types import LogFormat, LogLevel, MsgpackOptions
@@ -43,7 +43,7 @@ class LogstashProtocol(StrEnum):
     UDP = "udp"
 
 
-class BaseConfigModel(BaseModel):
+class BaseConfigModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         if string == "class_":

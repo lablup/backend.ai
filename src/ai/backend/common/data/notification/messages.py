@@ -6,7 +6,9 @@ from abc import abstractmethod
 from collections.abc import Mapping
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ai.backend.common.types import BackendAISchema
 
 from .types import NotificationRuleType
 
@@ -22,7 +24,7 @@ __all__ = (
 _MESSAGE_TYPE_REGISTRY: dict[NotificationRuleType, type[NotifiableMessage]] = {}
 
 
-class NotifiableMessage(BaseModel):
+class NotifiableMessage(BackendAISchema):
     """Base class for all notification messages.
 
     All notification messages must inherit from this class and define

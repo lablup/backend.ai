@@ -9,13 +9,14 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     VerificationStepResult,
 )
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # DTOs
@@ -39,7 +40,7 @@ __all__ = (
 # ---------------------------------------------------------------------------
 
 
-class ArtifactRevisionDTO(BaseModel):
+class ArtifactRevisionDTO(BackendAISchema):
     """Artifact revision data (without readme) for API responses."""
 
     id: UUID = Field(description="Revision ID")
@@ -56,7 +57,7 @@ class ArtifactRevisionDTO(BaseModel):
     )
 
 
-class ArtifactDTO(BaseModel):
+class ArtifactDTO(BackendAISchema):
     """Artifact data with revisions (without readme in revisions) for API responses."""
 
     id: UUID = Field(description="Artifact ID")
@@ -77,7 +78,7 @@ class ArtifactDTO(BaseModel):
     )
 
 
-class ArtifactRevisionDataDTO(BaseModel):
+class ArtifactRevisionDataDTO(BackendAISchema):
     """Full artifact revision data including readme."""
 
     id: UUID = Field(description="Revision ID")
@@ -95,7 +96,7 @@ class ArtifactRevisionDataDTO(BaseModel):
     )
 
 
-class ArtifactWithRevisionsDTO(BaseModel):
+class ArtifactWithRevisionsDTO(BackendAISchema):
     """Artifact data with full revisions (including readme) for single-model responses."""
 
     id: UUID = Field(description="Artifact ID")
@@ -116,14 +117,14 @@ class ArtifactWithRevisionsDTO(BaseModel):
     )
 
 
-class ArtifactRevisionImportTaskDTO(BaseModel):
+class ArtifactRevisionImportTaskDTO(BackendAISchema):
     """Import task for an artifact revision."""
 
     task_id: str | None = Field(default=None, description="Background task ID")
     artifact_revision: ArtifactRevisionDTO = Field(description="The artifact revision")
 
 
-class ArtifactRevisionReadmeDTO(BaseModel):
+class ArtifactRevisionReadmeDTO(BackendAISchema):
     """Readme data for an artifact revision."""
 
     readme: str | None = Field(default=None, description="Readme content")

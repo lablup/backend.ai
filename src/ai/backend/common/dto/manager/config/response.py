@@ -5,9 +5,10 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "DotfileItem",
@@ -22,7 +23,7 @@ __all__ = (
 )
 
 
-class DotfileItem(BaseModel):
+class DotfileItem(BackendAISchema):
     """A single dotfile entry."""
 
     path: str = Field(description="Dotfile path")
@@ -30,7 +31,7 @@ class DotfileItem(BaseModel):
     data: str = Field(description="Dotfile content")
 
 
-class DotfileListItem(BaseModel):
+class DotfileListItem(BackendAISchema):
     """A dotfile entry for list responses (backward compatible field names)."""
 
     path: str = Field(description="Dotfile path")

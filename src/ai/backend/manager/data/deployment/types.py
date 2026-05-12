@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
+    BackendAISchema,
     ClusterMode,
     MountInfoEntry,
     MountPermission,
@@ -52,7 +53,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 
 
-class DeploymentConfig(BaseModel):
+class DeploymentConfig(BackendAISchema):
     """``deployment-config.yaml`` payload after repository-side resolution.
 
     The raw yaml carries ``image`` + ``architecture`` strings; the repository
@@ -370,7 +371,7 @@ class ReplicaData:
         return self.replica_count
 
 
-class ConfiguredModel(BaseModel):
+class ConfiguredModel(BackendAISchema):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 

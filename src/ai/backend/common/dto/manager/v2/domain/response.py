@@ -7,10 +7,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchDomainsPayload",
@@ -25,7 +26,7 @@ __all__ = (
 )
 
 
-class DomainBasicInfo(BaseModel):
+class DomainBasicInfo(BackendAISchema):
     """Basic domain information."""
 
     name: str = Field(
@@ -41,7 +42,7 @@ class DomainBasicInfo(BaseModel):
     )
 
 
-class DomainRegistryInfo(BaseModel):
+class DomainRegistryInfo(BackendAISchema):
     """Domain container registry configuration."""
 
     allowed_docker_registries: list[str] = Field(
@@ -52,7 +53,7 @@ class DomainRegistryInfo(BaseModel):
     )
 
 
-class DomainLifecycleInfo(BaseModel):
+class DomainLifecycleInfo(BackendAISchema):
     """Domain lifecycle information."""
 
     is_active: bool = Field(

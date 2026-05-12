@@ -8,7 +8,7 @@ from uuid import UUID
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import AnyUrl, BaseModel, Field
+from pydantic import AnyUrl, Field
 
 from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.types import (
@@ -48,17 +48,18 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     TagsModel,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.types import BackendAISchema
 
 from .types import StubResponseModel
 from .utils import auth_required
 
 
-class EndpointTagConfig(BaseModel):
+class EndpointTagConfig(BackendAISchema):
     session: SessionConfig
     endpoint: EndpointConfig
 
 
-class EndpointCreationRequestModel(BaseModel):
+class EndpointCreationRequestModel(BackendAISchema):
     version: Annotated[str, Field(description="Creation API version")]
     service_name: Annotated[str, Field(description="Name of the model service.")]
     tags: Annotated[
@@ -101,7 +102,7 @@ class EndpointCreationRequestModel(BaseModel):
     ] = None
 
 
-class EndpointCreationResponseModel(BaseModel):
+class EndpointCreationResponseModel(BackendAISchema):
     success: bool
     endpoint: AnyUrl
     health_check_enabled: bool
@@ -211,7 +212,7 @@ async def bulk_unregister_routes(
     return PydanticResponse(BulkUnregisterRoutesResponse(endpoints=items))
 
 
-class UpdateModelHealthCheckRequestModel(BaseModel):
+class UpdateModelHealthCheckRequestModel(BackendAISchema):
     health_check: ModelHealthCheck | None
 
 
@@ -238,7 +239,7 @@ async def inject_health_check_information(
     return PydanticResponse(StubResponseModel(success=True))
 
 
-class EndpointAPITokenGenerationRequestModel(BaseModel):
+class EndpointAPITokenGenerationRequestModel(BackendAISchema):
     user_uuid: UUID
     """
     Token requester's user UUID.
@@ -249,7 +250,7 @@ class EndpointAPITokenGenerationRequestModel(BaseModel):
     """
 
 
-class EndpointAPITokenResponseModel(BaseModel):
+class EndpointAPITokenResponseModel(BackendAISchema):
     token: str
 
 

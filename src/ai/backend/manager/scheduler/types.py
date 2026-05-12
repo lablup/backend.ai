@@ -13,12 +13,12 @@ from typing import (
 )
 
 import attrs
-import pydantic
 import trafaret as t
 
 from ai.backend.common.types import (
     AgentId,
     ArchName,
+    BackendAISchema,
     KernelId,
     ResourceGroupID,
     ResourceSlot,
@@ -178,14 +178,14 @@ class AbstractScheduler(ABC):
         pass
 
 
-class AbstractResourceGroupState(pydantic.BaseModel, ABC):
+class AbstractResourceGroupState(BackendAISchema, ABC):
     @classmethod
     @abstractmethod
     def create_empty_state(cls) -> Self:
         raise NotImplementedError("must use a concrete subclass")
 
 
-class RoundRobinState(pydantic.BaseModel):
+class RoundRobinState(BackendAISchema):
     next_index: int = 0
 
 

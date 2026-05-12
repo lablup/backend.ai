@@ -9,13 +9,14 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.artifact.types import (
     CombinedDownloadProgress,
     VerificationStepResult,
 )
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # DTOs
@@ -35,7 +36,7 @@ __all__ = (
 )
 
 
-class ArtifactRevisionDTO(BaseModel):
+class ArtifactRevisionDTO(BackendAISchema):
     """DTO for artifact revision data."""
 
     id: UUID = Field(description="Artifact revision ID")
@@ -52,7 +53,7 @@ class ArtifactRevisionDTO(BaseModel):
     )
 
 
-class ArtifactDTO(BaseModel):
+class ArtifactDTO(BackendAISchema):
     """DTO for artifact data."""
 
     id: UUID = Field(description="Artifact ID")
@@ -70,7 +71,7 @@ class ArtifactDTO(BaseModel):
     extra: dict[str, Any] | None = Field(default=None, description="Extra metadata")
 
 
-class ArtifactRevisionImportTaskDTO(BaseModel):
+class ArtifactRevisionImportTaskDTO(BackendAISchema):
     """DTO for an artifact revision import task."""
 
     task_id: str | None = Field(default=None, description="Background task ID")
