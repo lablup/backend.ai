@@ -411,16 +411,12 @@ class BackendAIError(web.HTTPError, ABC):
         raise NotImplementedError("Subclasses must implement error_code() method.")
 
     @classmethod
-    def from_pydantic(cls, exc: ValidationError, *, location_prefix: str | None = None) -> Self:
+    def from_pydantic(cls, exc: ValidationError) -> Self:
         """Build an instance from a Pydantic ``ValidationError``,
-        embedding a human-readable summary plus the structured per-field
-        error list. Used by :class:`BackendAIModel.model_validate` and any
-        explicit ``except ValidationError`` site that wants to surface a
-        domain error class."""
-        summary, structured = format_pydantic_validation_errors(
-            exc, location_prefix=location_prefix
-        )
-        return cls(extra_msg=summary, extra_data={"errors": structured})
+        surfacing the original multi-line message as ``extra_msg`` and
+        the raw per-field error list (``loc``/``msg``/``type``/``input``/
+        ``url``) as ``extra_data["errors"]`` — no extra reformatting."""
+        return cls(extra_msg=str(exc), extra_data={"errors": exc.errors()})
 
 
 class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
@@ -457,64 +453,6 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
-
-
-_MAX_INPUT_REPR_LEN = 200
-
-
-def format_pydantic_loc(loc: tuple[Any, ...], location_prefix: str | None = None) -> str:
-    """
-    Render a Pydantic error ``loc`` tuple into a single dotted path,
-    using bracket notation for integer indices (``users[0].email``).
-
-    This matches the convention previously inlined in
-    ``session_spec_preparer._format_loc`` so error messages emitted from
-    different layers read identically.
-    """
-    parts: list[str] = []
-    if location_prefix:
-        parts.append(location_prefix)
-    for item in loc:
-        if isinstance(item, int):
-            parts.append(f"[{item}]")
-        elif parts:
-            parts.append(f".{item}")
-        else:
-            parts.append(str(item))
-    return "".join(parts) if parts else "<root>"
-
-
-def format_pydantic_validation_errors(
-    exc: ValidationError, *, location_prefix: str | None = None
-) -> tuple[str, list[dict[str, Any]]]:
-    """
-    Build a human-readable summary and a structured list of field errors
-    from a Pydantic ValidationError.
-
-    The summary joins each field error as "{loc}: {msg}" with "; ".
-    The structured list keeps loc/msg/type per error and a truncated input
-    repr for diagnostics.
-    """
-    raw_errors = exc.errors()
-    summary_items: list[str] = []
-    structured: list[dict[str, Any]] = []
-    for err in raw_errors:
-        loc = format_pydantic_loc(tuple(err.get("loc", ())), location_prefix)
-        msg = err.get("msg", "validation failed")
-        summary_items.append(f"{loc}: {msg}")
-        entry: dict[str, Any] = {
-            "loc": loc,
-            "msg": msg,
-            "type": err.get("type"),
-        }
-        if "input" in err:
-            input_repr = repr(err["input"])
-            if len(input_repr) > _MAX_INPUT_REPR_LEN:
-                input_repr = input_repr[:_MAX_INPUT_REPR_LEN] + "...<truncated>"
-            entry["input"] = input_repr
-        structured.append(entry)
-    summary = "; ".join(summary_items) if summary_items else "validation failed"
-    return summary, structured
 
 
 class ModelValidationFailed(BackendAIError, web.HTTPBadRequest):

@@ -54,8 +54,6 @@ from pydantic import (
 )
 from redis.asyncio import Redis
 
-from ai.backend.logging import BraceStyleAdapter
-
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
     GenericNotImplementedError,
@@ -179,7 +177,7 @@ if TYPE_CHECKING:
     from .docker import ImageRef
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = logging.getLogger(__spec__.name)
 
 
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
@@ -217,7 +215,7 @@ class BackendAIModel(BaseModel):
         try:
             return super().model_validate(*args, **kwargs)
         except ValidationError as e:
-            log.error("Pydantic validation failed for {}: {}", cls.__name__, e)
+            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
             raise ModelValidationFailed.from_pydantic(e) from e
 
     @classmethod
@@ -225,7 +223,7 @@ class BackendAIModel(BaseModel):
         try:
             return super().model_validate_json(*args, **kwargs)
         except ValidationError as e:
-            log.error("Pydantic validation failed for {}: {}", cls.__name__, e)
+            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
             raise ModelValidationFailed.from_pydantic(e) from e
 
     @classmethod
@@ -233,7 +231,7 @@ class BackendAIModel(BaseModel):
         try:
             return super().model_validate_strings(*args, **kwargs)
         except ValidationError as e:
-            log.error("Pydantic validation failed for {}: {}", cls.__name__, e)
+            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
             raise ModelValidationFailed.from_pydantic(e) from e
 
 
