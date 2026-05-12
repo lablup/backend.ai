@@ -484,7 +484,7 @@ class ModelDefinitionValidationError(BackendAIError, web.HTTPBadRequest):
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.ACCESS,
+            operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
