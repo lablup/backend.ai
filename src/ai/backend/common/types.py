@@ -51,10 +51,12 @@ from pydantic import (
     TypeAdapter,
     ValidationError,
 )
+from pydantic_core import ErrorDetails
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
+    BackendAIError,
     BackendAIModelValidationFailed,
     GenericNotImplementedError,
     InvalidIpAddressValue,
@@ -116,6 +118,7 @@ __all__ = (
     "MetricValue",
     "ModelServiceProfile",
     "ModelServiceStatus",
+    "ModelValidationFailureInfo",
     "MountExpression",
     "MountInfoEntry",
     "MountPermission",
@@ -181,56 +184,70 @@ current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
 )
 
 
-class BackendAIModel(BaseModel):
-    """Project-wide Pydantic base for Backend.AI models.
+@dataclass(frozen=True)
+class ModelValidationFailureInfo:
+    """Pydantic-decoupled view of a failed ``model_validate*`` call,
+    passed to :meth:`BackendAIModel.build_validation_error`.
 
-    Overrides ``model_validate`` / ``model_validate_json`` /
-    ``model_validate_strings`` so a ``ValidationError`` is auto-mapped
-    to :class:`BackendAIModelValidationFailed` (HTTP 400) carrying the structured
-    per-field error list. Call sites get a clean 4xx without repeating
-    ``try / except ValidationError`` at every site.
-
-    Notes:
-
-    * Pydantic v2 routes nested validation through
-      ``__pydantic_validator__`` directly, not the classmethod, so this
-      override only affects explicit ``Model.model_validate(...)``
-      calls — nested models are unaffected.
-    * The ``__init__`` constructor and the compiled validator stay
-      untouched, so internal default-value construction
-      (``Model()`` / ``Model(field=...)``) still works exactly like
-      stock Pydantic.
+    ``summary`` is ``str(pydantic.ValidationError)``; ``errors`` is
+    ``exc.errors()`` as-is.
     """
+
+    summary: str
+    errors: list[ErrorDetails]
+
+
+class BackendAIModel(BaseModel):
+    """Pydantic base whose ``model_validate`` / ``model_validate_json``
+    auto-map ``ValidationError`` to a :class:`BackendAIError` (HTTP 4xx)
+    via :meth:`build_validation_error`. Subclasses override the
+    classmethod to inject a domain-specific 400::
+
+        class MyConfig(BackendAIModel):
+            @override
+            @classmethod
+            def build_validation_error(
+                cls, info: ModelValidationFailureInfo
+            ) -> BackendAIError:
+                return MyConfigParseError(
+                    extra_msg=info.summary,
+                    extra_data={"errors": info.errors},
+                )
+
+    ``__init__`` is left alone: pydantic v2 invokes nested models'
+    ``__init__`` from inside the outer validator, so converting there
+    would break ``loc``-path aggregation. Direct ``Model(field=...)``
+    construction therefore still raises stock ``pydantic.ValidationError``;
+    switch the call site to ``Model.model_validate({...})`` to opt into
+    the override path.
+    """
+
+    @classmethod
+    def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
+        """Default override raising the generic
+        :class:`BackendAIModelValidationFailed`."""
+        return BackendAIModelValidationFailed(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
+    @classmethod
+    def _validation_failure_info(cls, exc: ValidationError) -> ModelValidationFailureInfo:
+        return ModelValidationFailureInfo(summary=str(exc), errors=exc.errors())
 
     @classmethod
     def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
         try:
             return super().model_validate(*args, **kwargs)
         except ValidationError as e:
-            raise BackendAIModelValidationFailed(
-                extra_msg=str(e),
-                extra_data={"errors": e.errors()},
-            ) from e
+            raise cls.build_validation_error(cls._validation_failure_info(e)) from e
 
     @classmethod
     def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
         try:
             return super().model_validate_json(*args, **kwargs)
         except ValidationError as e:
-            raise BackendAIModelValidationFailed(
-                extra_msg=str(e),
-                extra_data={"errors": e.errors()},
-            ) from e
-
-    @classmethod
-    def model_validate_strings(cls, *args: Any, **kwargs: Any) -> Self:
-        try:
-            return super().model_validate_strings(*args, **kwargs)
-        except ValidationError as e:
-            raise BackendAIModelValidationFailed(
-                extra_msg=str(e),
-                extra_data={"errors": e.errors()},
-            ) from e
+            raise cls.build_validation_error(cls._validation_failure_info(e)) from e
 
 
 class aobject:

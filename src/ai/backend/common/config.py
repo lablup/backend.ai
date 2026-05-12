@@ -5,7 +5,7 @@ import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import humps
 import tomli
@@ -19,8 +19,8 @@ from pydantic import (
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
-from .exception import ConfigurationError
-from .types import BackendAIModel, RedisHelperConfig
+from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
+from .types import BackendAIModel, ModelValidationFailureInfo, RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",
@@ -477,6 +477,14 @@ class ModelDefinition(BaseConfigModel):
         description="List of models in the model definition.",
     )
 
+    @override
+    @classmethod
+    def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
     def merge(self, override: ModelDefinition) -> ModelDefinition:
         """Merge the given override into this definition, returning a new instance."""
         return _merge_definition(self, override)
@@ -531,10 +539,10 @@ class ModelHealthCheckDraft(BaseConfigModel):
     initial_delay: float | None = None
 
     def to_resolved(self) -> ModelHealthCheck:
-        if self.path is None:
-            raise ValueError("ModelHealthCheck.path is required")
         # Drop unset (None) fields so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values.
+        # Missing required fields (e.g. ``path``) surface as the strict
+        # type's ``BackendAIModelValidationFailed`` via ``model_validate``.
         return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
 
 
@@ -551,16 +559,15 @@ class ModelServiceConfigDraft(BaseConfigModel):
         return _normalize_start_command(value)
 
     def to_resolved(self) -> ModelServiceConfig:
-        if self.port is None:
-            raise ValueError("ModelServiceConfig.port is required")
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values;
         # resolve the nested ``health_check`` draft explicitly so its own
-        # required-field check (``path``) fires with a clear error message.
-        return ModelServiceConfig(
-            **self.model_dump(exclude_none=True, exclude={"health_check"}),
-            health_check=self.health_check.to_resolved() if self.health_check else None,
-        )
+        # required-field check (``path``) fires through its own
+        # ``model_validate``. Missing required fields (e.g. ``port``)
+        # surface as ``BackendAIModelValidationFailed``.
+        payload = self.model_dump(exclude_none=True, exclude={"health_check"})
+        payload["health_check"] = self.health_check.to_resolved() if self.health_check else None
+        return ModelServiceConfig.model_validate(payload)
 
 
 class ModelConfigDraft(BaseConfigModel):
@@ -663,6 +670,14 @@ class ModelDefinitionDraft(BaseConfigModel):
     """
 
     models: list[ModelConfigDraft] | None = None
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
 
     def merge(self, override: ModelDefinitionDraft) -> ModelDefinitionDraft:
         """Merge ``override`` over ``self`` and return a new draft.

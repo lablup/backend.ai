@@ -169,20 +169,6 @@ class ModelDefinitionInvalidYAMLError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ModelDefinitionValidationError(BackendAIError, web.HTTPBadRequest):
-    """Raised when model definition validation fails."""
-
-    error_type = "https://api.backend.ai/probs/agent/model-definition-validation-failed"
-    error_title = "Model definition validation failed."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
 class ModelFolderNotSpecifiedError(BackendAIError, web.HTTPBadRequest):
     """Raised when no model virtual folder is specified."""
 

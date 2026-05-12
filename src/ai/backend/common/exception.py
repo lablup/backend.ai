@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import enum
-import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Self
 
 from aiohttp import web
+from pydantic_core import ErrorDetails
 
 from .json import dump_json
-
-log = logging.getLogger(__spec__.name)
 
 
 class ConfigurationError(Exception):
@@ -447,13 +445,10 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
 
 
 class BackendAIModelValidationFailed(BackendAIError, web.HTTPBadRequest):
-    """Generic 400 raised when a :class:`BackendAIModel` fails validation.
+    """Default 400 raised by :class:`BackendAIModel.build_validation_error`.
 
-    Distinct from :class:`InvalidAPIParameters` so callers can tell
-    "this came from a Pydantic model validator" apart from "this came
-    from an explicit API parameter check," and so domain-specific
-    handlers can choose to catch and re-wrap one without affecting the
-    other.
+    Kept distinct from :class:`InvalidAPIParameters` so handlers can
+    catch one without picking up the other.
     """
 
     error_type = "https://api.backend.ai/probs/model-validation-failed"
@@ -463,6 +458,33 @@ class BackendAIModelValidationFailed(BackendAIError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+    def errors(self) -> list[ErrorDetails]:
+        """Per-field errors in the same shape as
+        ``pydantic.ValidationError.errors()``. Empty when no
+        ``extra_data["errors"]`` is attached."""
+        if not self.extra_data:
+            return []
+        return list(self.extra_data.get("errors") or [])
+
+
+class ModelDefinitionValidationError(BackendAIError, web.HTTPBadRequest):
+    """400 raised by ``ModelDefinition.model_validate`` (via its
+    :meth:`BackendAIModel.build_validation_error` override).
+
+    Lives in ``common`` so ``ModelDefinition`` (also in ``common``) can
+    construct it without an upward-layer import.
+    """
+
+    error_type = "https://api.backend.ai/probs/model-definition-validation-failed"
+    error_title = "Model definition validation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
