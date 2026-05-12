@@ -1,7 +1,6 @@
 import time
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.model_serving.request import (
@@ -14,6 +13,7 @@ from ai.backend.common.dto.manager.model_serving.request import (
     TokenRequestModel,
     UpdateRouteRequestModel,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestListServeRequestModel:

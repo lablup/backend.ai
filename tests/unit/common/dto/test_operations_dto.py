@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.operations.request import (
@@ -30,6 +29,7 @@ from ai.backend.common.dto.manager.operations.types import (
     ManagerStatus,
     SchedulerOps,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 # -------- SchedulerOps Enum --------
 

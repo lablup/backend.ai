@@ -8,7 +8,6 @@ from decimal import Decimal
 from uuid import UUID
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.fair_share.response import (
@@ -45,6 +44,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceWeightEntryInfo,
     UsageBucketMetadataInfo,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 _UUID1 = UUID("550e8400-e29b-41d4-a716-446655440000")
 _UUID2 = UUID("660e8400-e29b-41d4-a716-446655440001")

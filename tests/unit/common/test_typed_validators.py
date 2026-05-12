@@ -1,10 +1,10 @@
 import datetime
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import BaseModel, ValidationError
 
 from ai.backend.common import typed_validators as tv
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.typed_validators import HostPortPair
 
 

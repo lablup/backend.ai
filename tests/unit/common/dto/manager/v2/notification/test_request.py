@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -30,6 +29,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
 from ai.backend.common.dto.manager.v2.notification.types import (
     NotificationRuleTypeDTO as NotificationRuleType,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _make_webhook_spec() -> NotificationChannelSpecInputDTO:

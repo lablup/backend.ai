@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -40,6 +39,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateDeploymentInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID

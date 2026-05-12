@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -31,6 +30,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     UpdateVFolderInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderPermissionField, VFolderUsageMode
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateVFolderInput:

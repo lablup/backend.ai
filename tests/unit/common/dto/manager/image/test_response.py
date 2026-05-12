@@ -7,7 +7,6 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.image.response import (
@@ -23,6 +22,7 @@ from ai.backend.common.dto.manager.image.response import (
     RescanImagesResponse,
     SearchImagesResponse,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _sample_image_dto() -> ImageDTO:

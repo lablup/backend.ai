@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -19,6 +18,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     UpdateProjectInput,
 )
 from ai.backend.common.dto.manager.v2.group.types import OrderDirection, ProjectOrderField
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateProjectInput:

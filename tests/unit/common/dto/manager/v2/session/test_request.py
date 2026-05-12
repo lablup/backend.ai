@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.session.request import (
@@ -33,6 +32,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionStatusEnum,
     SessionStatusFilter,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSessionPathParam:

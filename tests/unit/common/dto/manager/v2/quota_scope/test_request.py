@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.quota_scope.request import (
     UnsetQuotaInput,
 )
 from ai.backend.common.dto.manager.v2.quota_scope.types import OrderDirection, QuotaScopeOrderField
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSearchQuotaScopesInput:

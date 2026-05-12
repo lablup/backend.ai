@@ -5,7 +5,6 @@ Unit tests for streaming domain Pydantic types.
 from uuid import uuid4
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import TypeAdapter, ValidationError
 
 from ai.backend.common.dto.manager.streaming.types import (
@@ -34,6 +33,7 @@ from ai.backend.common.dto.manager.streaming.types import (
     StreamAppInfo,
     StreamProxyParams,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 _pty_client_adapter: TypeAdapter[PtyClientMessage] = TypeAdapter(PtyClientMessage)
 

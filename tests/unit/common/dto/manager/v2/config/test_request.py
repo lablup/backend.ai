@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.config.request import (
     UpdateDotfileInput,
 )
 from ai.backend.common.dto.manager.v2.config.types import MAXIMUM_DOTFILE_SIZE, DotfileScope
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateDotfileInput:

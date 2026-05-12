@@ -7,7 +7,6 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.config.request import (
@@ -38,6 +37,7 @@ from ai.backend.common.dto.manager.config.response import (
     UpdateDotfileResponse,
 )
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 # ---- DotfilePermission validation ----
 

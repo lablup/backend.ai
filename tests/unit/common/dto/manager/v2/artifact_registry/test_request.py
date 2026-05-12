@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.data.storage.registries.types import ModelTarget
@@ -25,6 +24,7 @@ from ai.backend.common.dto.manager.v2.artifact_registry.request import (
     SearchArtifactsInput,
 )
 from ai.backend.common.dto.manager.v2.artifact_registry.types import ArtifactRegistryType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestForwardPaginationInput:

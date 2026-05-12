@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.error_log.response import (
@@ -18,6 +17,7 @@ from ai.backend.common.dto.manager.v2.error_log.types import (
     ErrorLogContextInfo,
     ErrorLogRequestInfo,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _make_context_info() -> ErrorLogContextInfo:

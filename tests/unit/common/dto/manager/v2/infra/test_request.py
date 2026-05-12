@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.infra.request import (
@@ -17,6 +16,7 @@ from ai.backend.common.dto.manager.v2.infra.request import (
     UsagePerPeriodInput,
     WatcherAgentInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestListScalingGroupsInput:

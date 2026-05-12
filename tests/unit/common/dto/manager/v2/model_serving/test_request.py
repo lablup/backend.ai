@@ -6,7 +6,6 @@ import uuid
 from typing import Any
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.model_serving.request import (
@@ -17,6 +16,7 @@ from ai.backend.common.dto.manager.v2.model_serving.request import (
     ServiceConfigInput,
     UpdateServiceInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import RuntimeVariant
 
 

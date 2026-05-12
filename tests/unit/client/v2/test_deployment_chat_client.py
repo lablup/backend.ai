@@ -5,7 +5,6 @@ from typing import Any
 
 import pytest
 from aioresponses import aioresponses
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 from yarl import URL
 
@@ -14,6 +13,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.deployment_chat import DeploymentChatClient
 from ai.backend.client.v2.exceptions import DeploymentAuthError
 from ai.backend.common.dto.clients.openai_compat import ChatCompletionResponse
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 BASE_URL = "http://infer.test.local"
 CHAT_URL = f"{BASE_URL}/v1/chat/completions"

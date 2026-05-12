@@ -5,7 +5,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
@@ -24,6 +23,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestEnqueueSessionInput:

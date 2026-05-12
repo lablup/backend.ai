@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.configs.service_discovery import (
     ServiceDiscoveryConfig,
     ServiceEndpointConfig,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ServiceDiscoveryType
 
 

@@ -7,7 +7,6 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.notification.response import (
@@ -30,6 +29,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _make_webhook_spec_info() -> WebhookSpecInfo:

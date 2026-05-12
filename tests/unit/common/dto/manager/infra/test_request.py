@@ -7,7 +7,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import BaseModel, ValidationError
 
 from ai.backend.common.dto.manager.infra.request import (
@@ -23,6 +22,7 @@ from ai.backend.common.dto.manager.infra.request import (
     UsagePerPeriodRequest,
     WatcherAgentRequest,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 # --- etcd requests ---
 

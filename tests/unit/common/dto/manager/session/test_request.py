@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
@@ -37,6 +36,7 @@ from ai.backend.common.dto.manager.session.request import (
     SyncAgentRegistryRequest,
     TransitSessionStatusRequest,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ClusterMode, SessionTypes
 
 

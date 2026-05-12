@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -28,6 +27,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SchedulingResultType,
     SessionHistoryOrderField,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSessionHistoryFilter:

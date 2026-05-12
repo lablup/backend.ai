@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.operations.types import (
@@ -23,6 +22,7 @@ from ai.backend.common.dto.manager.v2.operations.request import (
     UpdateAnnouncementInput,
     UpdateManagerStatusInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestAppendErrorLogInput:

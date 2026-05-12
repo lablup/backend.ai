@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.agent.dependencies.bootstrap.config import (
     AgentConfigLoaderDependency,
     AgentConfigLoaderInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.logging.types import LogLevel
 
 

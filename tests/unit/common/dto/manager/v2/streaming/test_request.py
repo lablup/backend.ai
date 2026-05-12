@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import TypeAdapter, ValidationError
 
 from ai.backend.common.dto.manager.v2.streaming.request import (
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.streaming.request import (
     StreamProxyInput,
 )
 from ai.backend.common.dto.manager.v2.streaming.types import ExecuteMode, PtyInputMessageType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestPtyStdinInput:

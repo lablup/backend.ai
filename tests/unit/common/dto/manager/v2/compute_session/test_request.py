@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.compute_session.request import (
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.compute_session.types import (
     ComputeSessionOrderField,
     OrderDirection,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestComputeSessionPathParam:

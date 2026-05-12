@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.auth.request import (
@@ -20,6 +19,7 @@ from ai.backend.common.dto.manager.v2.auth.request import (
     VerifyAuthInput,
 )
 from ai.backend.common.dto.manager.v2.auth.types import AuthTokenType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestAuthorizeInput:

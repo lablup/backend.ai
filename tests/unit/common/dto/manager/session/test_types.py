@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import TypeAdapter, ValidationError
 
 from ai.backend.common.dto.manager.session.types import (
@@ -22,6 +21,7 @@ from ai.backend.common.dto.manager.session.types import (
     ResourceOpts,
     TimeoutSeconds,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import BinarySize, MountPermission, MountTypes
 
 

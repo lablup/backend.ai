@@ -6,7 +6,6 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -22,6 +21,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.types import (
     AutoScalingRuleOrderField,
     OrderDirection,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import AutoScalingMetricSource
 
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -17,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateDomainInput:

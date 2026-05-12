@@ -7,7 +7,6 @@ from typing import Any, Protocol
 from unittest.mock import patch
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.agent.affinity_map import AffinityPolicy
@@ -26,6 +25,7 @@ from ai.backend.agent.config.unified import (
 )
 from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import AgentBackend
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import SlotName
 from ai.backend.logging.config import LoggingConfig, default_pkg_ns

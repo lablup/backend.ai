@@ -5,7 +5,6 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import Sentinel
@@ -27,7 +26,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     OrderDirection,
     QueryDefinitionOrderField,
 )
-from ai.backend.common.exception import InvalidMetricPresetTemplate
+from ai.backend.common.exception import BackendAISchemaValidationFailed, InvalidMetricPresetTemplate
 
 _SAMPLE_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
 

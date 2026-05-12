@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 import pydantic
 import pytest
 
@@ -11,6 +10,7 @@ from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.image.request import RescanImagesRequest
 from ai.backend.common.dto.manager.image.response import RescanImagesResponse
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ResourceLimitInput
 from ai.backend.manager.errors.image import ImageNotFound

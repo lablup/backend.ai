@@ -8,7 +8,6 @@ from uuid import uuid4
 
 import jwt
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.storage.request import (
@@ -16,6 +15,7 @@ from ai.backend.common.dto.storage.request import (
     CreateArchiveDownloadSessionRequest,
     TokenOperationType,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import VFolderID
 
 

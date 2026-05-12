@@ -6,7 +6,6 @@ import json
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.container_registry.response import (
@@ -17,6 +16,7 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _make_registry_node(

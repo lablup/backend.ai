@@ -18,11 +18,11 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId

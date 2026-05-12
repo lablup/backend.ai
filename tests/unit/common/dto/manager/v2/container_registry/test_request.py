@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.container_registry.request import (
@@ -15,6 +14,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestAllowedGroupsInput:

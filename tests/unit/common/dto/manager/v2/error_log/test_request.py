@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.error_log.request import (
@@ -11,6 +10,7 @@ from ai.backend.common.dto.manager.v2.error_log.request import (
     ListErrorLogsInput,
     MarkClearedInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestAppendErrorLogInput:

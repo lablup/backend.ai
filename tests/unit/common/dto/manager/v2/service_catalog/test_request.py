@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
@@ -18,6 +17,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.request import (
     HeartbeatInput,
     UpdateServiceCatalogInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ServiceCatalogStatus
 
 

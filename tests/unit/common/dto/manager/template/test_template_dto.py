@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.template.request import (
@@ -35,6 +34,7 @@ from ai.backend.common.dto.manager.template.response import (
     UpdateClusterTemplateResponse,
     UpdateSessionTemplateResponse,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 _NOW = datetime.now(UTC)
 

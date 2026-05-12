@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.query import StringFilter
@@ -20,6 +19,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     SearchImagesInput,
 )
 from ai.backend.common.dto.manager.v2.image.types import ImageOrderField, OrderDirection
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSearchImagesInput:
