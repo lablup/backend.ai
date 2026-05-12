@@ -496,10 +496,6 @@ class ModelDefinition(BaseConfigModel):
                     return model.service.health_check
         return None
 
-    def is_health_check_enabled(self) -> bool:
-        """Whether any model in this definition declares a health_check block."""
-        return self.health_check_config() is not None
-
     def with_args_appended(self, args: list[str]) -> ModelDefinition:
         """Return a copy with ``args`` appended to each model's
         ``service.start_command`` as separate argv tokens.

@@ -3,7 +3,7 @@
 import logging
 import uuid
 from collections import defaultdict
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
@@ -67,12 +67,14 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -627,30 +629,13 @@ class DeploymentRepository:
     # Route operations
 
     @deployment_repository_resilience.apply()
-    async def search_route_datas(
+    async def get_routes_by_statuses(
         self,
-        querier: BatchQuerier,
+        statuses: list[RouteStatus],
+        health_statuses: list[RouteHealthStatus],
     ) -> list[RouteData]:
-        """Return :class:`RouteData` rows matched by ``querier`` (no joins).
-
-        Session status and revision-level health-check config are not
-        joined — callers fetch them via
-        :meth:`fetch_session_statuses_by_route_ids` and
-        :meth:`fetch_health_check_configs`.
-        """
-        return await self._db_source.search_route_datas(querier)
-
-    @deployment_repository_resilience.apply()
-    async def fetch_health_check_configs(
-        self,
-        revision_ids: Collection[DeploymentRevisionID],
-    ) -> Mapping[DeploymentRevisionID, ModelHealthCheck | None]:
-        """Resolve revision-level ``ModelHealthCheck`` for each id.
-
-        Revisions that opted out of ``service.health_check`` map to
-        ``None``; unknown revision ids are omitted.
-        """
-        return await self._db_source.fetch_health_check_configs(revision_ids)
+        """Get routes by lifecycle and health statuses."""
+        return await self._db_source.get_routes_by_statuses(statuses, health_statuses)
 
     @deployment_repository_resilience.apply()
     async def update_route_status_bulk(
@@ -760,6 +745,14 @@ class DeploymentRepository:
     ) -> None:
         """Update replica_host and replica_port for routes."""
         await self._db_source.update_route_replica_info(updates)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_health_check_configs_by_revision_ids(
+        self,
+        revision_ids: set[DeploymentRevisionID],
+    ) -> dict[DeploymentRevisionID, ModelHealthCheck | None]:
+        """Fetch health check configurations for revisions."""
+        return await self._db_source.fetch_health_check_configs_by_revision_ids(revision_ids)
 
     @deployment_repository_resilience.apply()
     async def delete_routes_by_route_ids(
@@ -1099,6 +1092,17 @@ class DeploymentRepository:
     ) -> Mapping[uuid.UUID, SessionStatus | None]:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_route_connection_infos(
+        self,
+        *,
+        route_querier: BatchQuerier,
+    ) -> Mapping[uuid.UUID, list[AppProxyRouteEntry]]:
+        """Resolve routing-table entries per endpoint via a caller-composed querier."""
+        return await self._db_source.fetch_route_connection_infos(
+            route_querier=route_querier,
+        )
 
     @deployment_repository_resilience.apply()
     async def search_deployment_ids(self, *, querier: BatchQuerier) -> list[DeploymentID]:

@@ -1,8 +1,10 @@
 """Unit tests for HealthCheckRouteHandler.
 
-The handler is a thin pass-through to ``RouteExecutor.check_route_health``;
-the per-revision hc filtering and the register push for first-time
-HEALTHY transitions are exercised in the executor tests.
+The handler delegates the health-check work — including the AppProxy
+register push for first-time HEALTHY transitions — to
+``RouteExecutor.check_route_health``. The push behaviour itself is
+exercised in the executor tests; here we only verify the handler stays
+a thin shim.
 """
 
 from __future__ import annotations
@@ -42,20 +44,27 @@ def _route(health_status: RouteHealthStatus) -> RouteData:
 class TestHealthCheckHandler:
     """Tests for HealthCheckRouteHandler delegation."""
 
-    async def test_execute_forwards_routes_to_executor(self) -> None:
+    async def test_execute_delegates_to_executor_check_route_health(self) -> None:
+        """RR-HC-001: handler.execute is a thin pass-through to check_route_health."""
         executor = AsyncMock()
         check_result = RouteExecutionResult(successes=[], errors=[], stale=[])
         executor.check_route_health = AsyncMock(return_value=check_result)
-        handler = HealthCheckRouteHandler(executor, MagicMock())
-
+        event_producer = MagicMock()
+        handler = HealthCheckRouteHandler(executor, event_producer)
         routes = [_route(RouteHealthStatus.NOT_CHECKED)]
+
         result = await handler.execute(routes)
 
         executor.check_route_health.assert_awaited_once_with(routes)
         assert result is check_result
 
     async def test_post_process_logs_only(self) -> None:
-        """post_process is a logging shim — no executor call here."""
+        """RR-HC-002: post_process is a logging shim — no executor call here.
+
+        The register push for first-time HEALTHY transitions belongs to
+        ``RouteExecutor.check_route_health`` itself; ``post_process``
+        intentionally does no work whose failure must be tolerated.
+        """
         executor = AsyncMock()
         event_producer = MagicMock()
         handler = HealthCheckRouteHandler(executor, event_producer)
@@ -65,5 +74,6 @@ class TestHealthCheckHandler:
             RouteExecutionResult(successes=[success_route], errors=[], stale=[])
         )
 
+        # Nothing besides logging.
         assert executor.method_calls == []
         assert event_producer.method_calls == []

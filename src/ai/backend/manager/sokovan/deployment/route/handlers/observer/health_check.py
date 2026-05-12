@@ -55,13 +55,8 @@ class RouteHealthObserver(RouteObserver):
         if not routes:
             return RouteObservationResult(observed_count=0)
 
-        with_replica = [r for r in routes if r.replica_host and r.replica_port]
-        if not with_replica:
-            return RouteObservationResult(observed_count=0)
-        hc_configs = await self._deployment_repository.fetch_health_check_configs({
-            r.revision_id for r in with_replica
-        })
-        checkable = [r for r in with_replica if hc_configs.get(r.revision_id) is not None]
+        # Filter routes that have replica connection info
+        checkable = [r for r in routes if r.replica_host and r.replica_port]
         if not checkable:
             return RouteObservationResult(observed_count=0)
 

@@ -20,16 +20,11 @@ from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import (
-    RouteHealthStatus,
-    RouteStatus,
-)
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
@@ -202,15 +197,11 @@ class RouteCoordinator:
                 lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
                 await stack.enter_async_context(self._lock_factory(handler.lock_id, lock_lifetime))
 
+            # Get routes by target lifecycle + health statuses
             target = handler.target_statuses()
-            route_conditions: list[QueryCondition] = [
-                RouteConditions.by_lifecycle_statuses(target.lifecycle),
-                RouteConditions.by_health_statuses(target.health),
-            ]
-            if target.traffic is not None:
-                route_conditions.append(RouteConditions.by_traffic_statuses(target.traffic))
-            routes = await self._deployment_repository.search_route_datas(
-                BatchQuerier(pagination=NoPagination(), conditions=route_conditions),
+            routes = await self._deployment_repository.get_routes_by_statuses(
+                target.lifecycle,
+                target.health,
             )
             if not routes:
                 log.trace("No routes to process for handler: {}", handler.name())
@@ -239,14 +230,9 @@ class RouteCoordinator:
         changing route status in DB.
         """
         try:
-            routes = await self._deployment_repository.search_route_datas(
-                BatchQuerier(
-                    pagination=NoPagination(),
-                    conditions=[
-                        RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                        RouteConditions.by_health_statuses(list(RouteHealthStatus)),
-                    ],
-                ),
+            routes = await self._deployment_repository.get_routes_by_statuses(
+                [RouteStatus.RUNNING],
+                list(RouteHealthStatus),
             )
             if not routes:
                 return

@@ -11,7 +11,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteStatusTransitions,
     RouteTargetStatuses,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -57,15 +56,9 @@ class AppProxySyncRouteHandler(RouteHandler):
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:
-        # NOT_CHECKED is included because revisions that omit
-        # ``service.health_check`` stay NOT_CHECKED for life and must
-        # still receive traffic. ``execute`` filters out NOT_CHECKED
-        # rows whose revision DID declare a probe (still waiting on the
-        # first result).
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
-            health=[RouteHealthStatus.HEALTHY, RouteHealthStatus.NOT_CHECKED],
-            traffic=[RouteTrafficStatus.ACTIVE],
+            health=[RouteHealthStatus.HEALTHY],
         )
 
     @classmethod

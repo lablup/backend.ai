@@ -72,6 +72,8 @@ class HealthCheckRouteHandler(RouteHandler):
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for routes."""
         log.debug("Checking health for {} routes", len(routes))
+
+        # Execute route health check logic via executor
         return await self._route_executor.check_route_health(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:

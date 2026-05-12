@@ -48,11 +48,10 @@ def _route_with_replica(
     replica_port: int | None = 8000,
     session_id: SessionId | None = None,
 ) -> RouteData:
-    resolved_session_id = session_id if session_id is not None else SessionId(uuid4())
     return RouteData(
         route_id=uuid4(),
         deployment_id=endpoint_id,
-        session_id=resolved_session_id,
+        session_id=session_id if session_id is not None else SessionId(uuid4()),
         status=RouteStatus.RUNNING,
         health_status=RouteHealthStatus.HEALTHY,
         traffic_ratio=1.0,

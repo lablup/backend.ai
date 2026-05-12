@@ -251,15 +251,10 @@ class DeploymentTargetStatuses:
 
 @dataclass(frozen=True)
 class RouteTargetStatuses:
-    """Target statuses for route handler filtering (lifecycle x health x traffic).
-
-    ``traffic=None`` skips the filter; otherwise the row's
-    ``traffic_status`` column must be in the given list.
-    """
+    """Target statuses for route handler filtering (lifecycle x health)."""
 
     lifecycle: list[RouteStatus]
     health: list[RouteHealthStatus]
-    traffic: list[RouteTrafficStatus] | None = None
 
 
 @dataclass(frozen=True)
