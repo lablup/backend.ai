@@ -2940,6 +2940,8 @@ class ScheduleDBSource:
                 SessionRow.environ,
                 SessionRow.cluster_mode,
                 SessionRow.user_uuid,
+                SessionRow.network_type,
+                SessionRow.network_id,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -2994,6 +2996,8 @@ class ScheduleDBSource:
                     "environ": row.environ,
                     "cluster_mode": row.cluster_mode,
                     "user_uuid": row.user_uuid,
+                    "network_type": row.network_type,
+                    "network_id": row.network_id,
                 }
                 if row.user_uuid:
                     user_uuids.add(row.user_uuid)
@@ -3088,6 +3092,8 @@ class ScheduleDBSource:
                     user_uuid=session_info["user_uuid"],
                     user_email=user_info.email,
                     user_name=user_info.username,
+                    network_type=session_info["network_type"],
+                    network_id=session_info["network_id"],
                 )
             )
 
