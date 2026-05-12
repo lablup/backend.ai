@@ -13,6 +13,7 @@ from ai.backend.common.jwt.signer import JWTSigner
 from ai.backend.common.jwt.types import JWTUserContext
 from ai.backend.common.types import AccessKey
 from ai.backend.common.web.session import get_session
+from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 from . import user_agent
@@ -20,12 +21,9 @@ from . import user_agent
 
 async def get_api_session(
     request: web.Request,
-    override_api_endpoint: str | None = None,
+    acquired: AcquiredEndpoint,
 ) -> APISession:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    api_endpoint = str(config.api.endpoint[0])
-    if override_api_endpoint is not None:
-        api_endpoint = override_api_endpoint
     session = await get_session(request)
     if not session.get("authenticated", False):
         raise web.HTTPUnauthorized(
@@ -56,14 +54,14 @@ async def get_api_session(
     client_pool: ClientPool = request.app["client_pool"]
     client_session = client_pool.load_client_session(
         ClientKey(
-            endpoint=api_endpoint,
+            endpoint=acquired.endpoint,
             domain=config.api.domain,
             access_key=ak,
         )
     )
     api_config = APIConfig(
         domain=config.api.domain,
-        endpoint=api_endpoint,
+        endpoint=acquired.endpoint,
         endpoint_type="api",
         access_key=ak,
         secret_key=sk,
@@ -75,23 +73,20 @@ async def get_api_session(
 
 async def get_anonymous_session(
     request: web.Request,
-    override_api_endpoint: str | None = None,
+    acquired: AcquiredEndpoint,
 ) -> APISession:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    api_endpoint = str(config.api.endpoint[0])
-    if override_api_endpoint is not None:
-        api_endpoint = override_api_endpoint
     client_pool: ClientPool = request.app["client_pool"]
     client_session = client_pool.load_client_session(
         ClientKey(
-            endpoint=api_endpoint,
+            endpoint=acquired.endpoint,
             domain=config.api.domain,
             access_key="",
         )
     )
     api_config = APIConfig(
         domain=config.api.domain,
-        endpoint=api_endpoint,
+        endpoint=acquired.endpoint,
         endpoint_type="api",
         access_key="",
         secret_key="",

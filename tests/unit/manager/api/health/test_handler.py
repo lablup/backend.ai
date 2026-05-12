@@ -101,8 +101,8 @@ class TestPublicHealthHandler:
     """Tests for public HealthHandler (liveness probe only)."""
 
     @pytest.fixture
-    def handler(self) -> HealthHandler:
-        return HealthHandler()
+    def handler(self, mock_health_probe: MagicMock) -> HealthHandler:
+        return HealthHandler(health_probe=mock_health_probe)
 
     async def test_returns_200_with_status_ok(
         self,

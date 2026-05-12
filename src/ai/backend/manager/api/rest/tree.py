@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
         ValkeyRateLimitClient,
     )
+    from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -41,6 +42,7 @@ def build_api_routes(
     valkey_rate_limit: ValkeyRateLimitClient | None,
     root_app: web.Application,
     stream_cleanup_handler: StreamCleanupEventHandler,
+    health_probe: HealthProbe,
     pidx: int = 0,
 ) -> list[RouteRegistry]:
     """Build the full API module tree and return all root-level registries.
@@ -271,7 +273,7 @@ def build_api_routes(
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
 
     # Health handler
-    health_handler = HealthHandler()
+    health_handler = HealthHandler(health_probe=health_probe)
 
     # Spec handler
     spec_handler = SpecHandler(config_provider=config_provider, root_app=root_app)
