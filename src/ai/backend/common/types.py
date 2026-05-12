@@ -226,7 +226,19 @@ class BackendAISchema(BaseModel):
 
     @classmethod
     def _validation_failure_info(cls, exc: ValidationError) -> SchemaValidationFailureInfo:
-        return SchemaValidationFailureInfo(summary=str(exc), errors=exc.errors())
+        # Strip ``input`` and ``ctx`` per-entry. ``ctx`` may carry
+        # non-JSON-serializable objects (e.g. a raised ``ValueError``
+        # from a ``model_validator``), and ``BackendAIError.__init__``
+        # eagerly serializes the response body via orjson, so those
+        # values would crash exception construction itself.
+        sanitized = [
+            cast(
+                ErrorDetails,
+                {k: v for k, v in err.items() if k not in ("input", "ctx")},
+            )
+            for err in exc.errors()
+        ]
+        return SchemaValidationFailureInfo(summary=str(exc), errors=sanitized)
 
     @classmethod
     def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
