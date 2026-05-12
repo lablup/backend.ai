@@ -15,7 +15,7 @@ class _PayloadTestModel(BackendAISchema):
     count: int
 
 
-class TestBackendAIModelOverride:
+class TestBackendAISchemaOverride:
     """``BackendAISchema`` subclasses get the auto-conversion override
     just by inheriting — no per-call-site ``try / except``."""
 
