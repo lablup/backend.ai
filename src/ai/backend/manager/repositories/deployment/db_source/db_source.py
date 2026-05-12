@@ -1584,23 +1584,24 @@ class DeploymentDBSource:
 
     # Route operations
 
-    async def get_routes_by_statuses(
+    async def search_route_datas(
         self,
-        statuses: list[RouteStatus],
-        health_statuses: list[RouteHealthStatus],
+        *,
+        querier: BatchQuerier,
     ) -> list[RouteData]:
-        """Get routes by lifecycle and health statuses."""
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(
-                RoutingRow.status.in_(statuses),
-                RoutingRow.health_status.in_(health_statuses),
-            )
-            result = await db_sess.execute(query)
-            rows: Sequence[RoutingRow] = result.scalars().all()
+        """Search routes via :class:`BatchQuerier`.
 
-            route_data_list: list[RouteData] = []
-            for row in rows:
-                route_data = RouteData(
+        The caller composes ``querier`` with every filter that applies
+        (lifecycle / health / traffic_status / endpoint id set, etc.).
+        Pagination is part of the querier — pass ``NoPagination`` for
+        unbounded scans.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow)
+            query_result = await execute_batch_querier(db_sess, query, querier)
+            route_rows: list[RoutingRow] = [row.RoutingRow for row in query_result.rows]
+            return [
+                RouteData(
                     route_id=row.id,
                     deployment_id=row.endpoint,
                     session_id=SessionId(row.session) if row.session else None,
@@ -1613,9 +1614,8 @@ class DeploymentDBSource:
                     replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
-                route_data_list.append(route_data)
-
-            return route_data_list
+                for row in route_rows
+            ]
 
     async def update_route_status_bulk(
         self,
