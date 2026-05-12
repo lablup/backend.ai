@@ -579,6 +579,10 @@ class ModelConfigDraft(BaseConfigModel):
     def to_resolved(self) -> ModelConfig:
         service = self.service.to_resolved() if self.service else None
         if service is not None and service.start_command and self.model_path is not None:
+            # ``{model_path}`` placeholders in the variant baseline's
+            # ``start_command`` are resolved here, at the same moment the
+            # draft becomes a strict ``ModelConfig`` and ``model_path`` is
+            # finalized. Placeholders therefore never propagate downstream.
             service.start_command = [
                 token.replace("{model_path}", self.model_path) for token in service.start_command
             ]
