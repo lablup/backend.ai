@@ -14,7 +14,7 @@ from typing import (
 )
 
 import sqlalchemy as sa
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import ConfigDict, Field, field_serializer
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -85,7 +85,7 @@ __all__: Sequence[str] = (
 )
 
 
-class PreemptionConfig(BaseModel):
+class PreemptionConfig(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
     preemptible_priority: int = 5

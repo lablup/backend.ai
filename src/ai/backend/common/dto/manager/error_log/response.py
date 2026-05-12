@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "ErrorLogDTO",
@@ -19,7 +20,7 @@ __all__ = (
 )
 
 
-class ErrorLogDTO(BaseModel):
+class ErrorLogDTO(BackendAISchema):
     """DTO representing a single error log entry."""
 
     log_id: str = Field(description="Error log ID")

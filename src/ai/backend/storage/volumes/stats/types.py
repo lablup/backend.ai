@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from pydantic import BaseModel
-
+from ai.backend.common.types import BackendAISchema
 from ai.backend.storage.types import FSPerfMetric
 
 
@@ -17,7 +16,7 @@ class VolumeStatsObserverOptions:
     cache_ttl: float = 30.0
 
 
-class CachedFSPerfMetricData(BaseModel):
+class CachedFSPerfMetricData(BackendAISchema):
     """Cached performance metric with metadata for Redis serialization."""
 
     volume_name: str

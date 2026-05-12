@@ -8,10 +8,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "CreateDomainResponse",
@@ -25,7 +26,7 @@ __all__ = (
 )
 
 
-class DomainDTO(BaseModel):
+class DomainDTO(BackendAISchema):
     """DTO for domain data."""
 
     name: str = Field(description="Domain name (primary key)")

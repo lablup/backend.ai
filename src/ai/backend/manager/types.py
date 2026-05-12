@@ -15,10 +15,10 @@ from typing import (
 
 import attr
 from graphql import UndefinedType
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, Field
 from strawberry.types.unset import UnsetType
 
-from ai.backend.common.types import MountPermission, MountTypes
+from ai.backend.common.types import BackendAISchema, MountPermission, MountTypes
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
@@ -54,7 +54,7 @@ class DistributedLockFactory(Protocol):
     def __call__(self, lock_id: LockID, lifetime_hint: float) -> AbstractDistributedLock: ...
 
 
-class MountOptionModel(BaseModel):
+class MountOptionModel(BackendAISchema):
     mount_destination: Annotated[
         str | None,
         Field(description="Mount destination, defaults to /home/work/{folder_name}.", default=None),

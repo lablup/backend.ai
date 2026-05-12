@@ -4,9 +4,10 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.models.base import (
     GUID,
@@ -17,7 +18,7 @@ from ai.backend.manager.models.base import (
 __all__ = ("PrometheusQueryPresetRow",)
 
 
-class PresetOptions(BaseModel):
+class PresetOptions(BackendAISchema):
     filter_labels: list[str]
     group_labels: list[str]
 

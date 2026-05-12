@@ -7,9 +7,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, Final, Self
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from ai.backend.common.types import ServiceDiscoveryType
+from ai.backend.common.types import BackendAISchema, ServiceDiscoveryType
 from ai.backend.logging.utils import BraceStyleAdapter
 
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
@@ -22,7 +22,7 @@ MODEL_SERVICE_GROUP: Final[str] = "model-services"
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ServiceEndpoint(BaseModel):
+class ServiceEndpoint(BackendAISchema):
     """
     Service endpoint.
     """
@@ -33,7 +33,7 @@ class ServiceEndpoint(BaseModel):
     prometheus_address: str
 
 
-class ModelServiceMetadata(BaseModel):
+class ModelServiceMetadata(BackendAISchema):
     """
     Simplified metadata for model service routes.
     Used for Prometheus service discovery registration.
@@ -80,7 +80,7 @@ class ModelServiceMetadata(BaseModel):
         )
 
 
-class HealthStatus(BaseModel):
+class HealthStatus(BackendAISchema):
     """
     Health status of a service.
     """
@@ -109,7 +109,7 @@ class HealthStatus(BaseModel):
         return self.registration_time == value.registration_time
 
 
-class ServiceMetadata(BaseModel):
+class ServiceMetadata(BackendAISchema):
     """
     Metadata for a service.
     """

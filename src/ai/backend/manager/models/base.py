@@ -39,6 +39,7 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     AbstractPermission,
+    BackendAISchema,
     JSONSerializableMixin,
     KernelId,
     QuotaScopeID,
@@ -837,14 +838,14 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
-class ResourceSlotEntry(BaseModel):
+class ResourceSlotEntry(BackendAISchema):
     """A single resource slot entry for PydanticListColumn storage."""
 
     resource_type: str
     quantity: str
 
 
-class ResourceOptsEntry(BaseModel):
+class ResourceOptsEntry(BackendAISchema):
     """A single resource option entry for PydanticListColumn storage."""
 
     name: str

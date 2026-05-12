@@ -728,7 +728,7 @@ _MOUNT_PERMISSION_ORDER: dict[MountPermission, int] = {
 MountPermissionLiteral = Literal["ro", "rw", "wd"]
 
 
-class MountInfoEntry(BaseModel):
+class MountInfoEntry(BackendAISchema):
     """Revision-stored form of a user-supplied extra mount.
 
     The row column persists only these three fields; everything else
@@ -784,7 +784,7 @@ class VFolderMountRequest:
     options: VFolderMountOptions = attrs.Factory(VFolderMountOptions)
 
 
-class MountPoint(BaseModel):
+class MountPoint(BackendAISchema):
     model_config = ConfigDict(
         validate_by_name=True,
         protected_namespaces=(),
@@ -1332,7 +1332,7 @@ class SlotQuantity:
     quantity: Decimal
 
 
-class ResourceSlotEntry(BaseModel):
+class ResourceSlotEntry(BackendAISchema):
     """List-friendly shared form of a single resource slot allocation.
 
     The preferred replacement for the ``ResourceSlot`` ``UserDict`` in new

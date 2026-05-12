@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Any
 
 import attrs
-from pydantic import BaseModel
 
 from ai.backend.common.asyncio import current_loop
+from ai.backend.common.types import BackendAISchema
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -16,7 +16,7 @@ class DomainSocketProxy:
     proxy_server: asyncio.AbstractServer
 
 
-class DomainSocketPathPair(BaseModel):
+class DomainSocketPathPair(BackendAISchema):
     host_sock_path: Path
     host_proxy_path: Path
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.meta import (
     BackendAIAPIMeta,
@@ -16,6 +16,7 @@ from ai.backend.common.meta import (
     get_field_meta,
     get_field_type,
 )
+from ai.backend.common.types import BackendAISchema
 
 
 class TestConfigExample:
@@ -113,7 +114,7 @@ class TestBackendAIAPIMeta:
 
 class TestGetFieldMeta:
     def test_get_config_meta(self) -> None:
-        class SampleConfig(BaseModel):
+        class SampleConfig(BackendAISchema):
             name: Annotated[
                 str,
                 Field(default="default"),
@@ -130,7 +131,7 @@ class TestGetFieldMeta:
         assert meta.added_version == "25.1.0"
 
     def test_get_api_meta(self) -> None:
-        class SampleRequest(BaseModel):
+        class SampleRequest(BackendAISchema):
             session_name: Annotated[
                 str,
                 Field(),
@@ -148,14 +149,14 @@ class TestGetFieldMeta:
         assert meta.example.local == "my-session"
 
     def test_field_without_meta(self) -> None:
-        class SampleModel(BaseModel):
+        class SampleModel(BackendAISchema):
             plain_field: str = Field(default="value")
 
         meta = get_field_meta(SampleModel, "plain_field")
         assert meta is None
 
     def test_nonexistent_field(self) -> None:
-        class SampleModel(BaseModel):
+        class SampleModel(BackendAISchema):
             name: str
 
         meta = get_field_meta(SampleModel, "nonexistent")
@@ -164,7 +165,7 @@ class TestGetFieldMeta:
 
 class TestGetFieldType:
     def test_annotated_type(self) -> None:
-        class SampleModel(BaseModel):
+        class SampleModel(BackendAISchema):
             count: Annotated[
                 int,
                 Field(),
@@ -175,14 +176,14 @@ class TestGetFieldType:
         assert field_type is int
 
     def test_plain_type(self) -> None:
-        class SampleModel(BaseModel):
+        class SampleModel(BackendAISchema):
             name: str = Field(default="default")
 
         field_type = get_field_type(SampleModel, "name")
         assert field_type is str
 
     def test_nonexistent_field(self) -> None:
-        class SampleModel(BaseModel):
+        class SampleModel(BackendAISchema):
             name: str
 
         field_type = get_field_type(SampleModel, "nonexistent")
@@ -191,7 +192,7 @@ class TestGetFieldType:
 
 class TestGenerateExample:
     def test_simple_example(self) -> None:
-        class SampleModel(BaseModel):
+        class SampleModel(BackendAISchema):
             name: Annotated[
                 str,
                 Field(),
@@ -206,7 +207,7 @@ class TestGenerateExample:
         assert example == "sample-name"
 
     def test_config_example_returns_local_value(self) -> None:
-        class SampleConfig(BaseModel):
+        class SampleConfig(BackendAISchema):
             endpoint: Annotated[
                 str,
                 Field(),
@@ -222,7 +223,7 @@ class TestGenerateExample:
         assert example == "localhost:8080"
 
     def test_no_example_raises_error(self) -> None:
-        class SampleModel(BaseModel):
+        class SampleModel(BackendAISchema):
             name: Annotated[
                 str,
                 Field(),
@@ -236,7 +237,7 @@ class TestGenerateExample:
             generate_example(SampleModel, "name")
 
     def test_field_without_meta_raises_error(self) -> None:
-        class SampleModel(BaseModel):
+        class SampleModel(BackendAISchema):
             name: str = Field(default="value")
 
         with pytest.raises(ValueError, match="has no BackendAI metadata"):
@@ -245,7 +246,7 @@ class TestGenerateExample:
     def test_composite_field_raises_error_without_example(self) -> None:
         """Composite fields require generate_composite_example instead of generate_example."""
 
-        class ChildConfig(BaseModel):
+        class ChildConfig(BackendAISchema):
             cpu: Annotated[
                 int,
                 Field(),
@@ -256,7 +257,7 @@ class TestGenerateExample:
                 ),
             ]
 
-        class ParentConfig(BaseModel):
+        class ParentConfig(BackendAISchema):
             config: Annotated[
                 ChildConfig,
                 Field(),
@@ -275,7 +276,7 @@ class TestGenerateExample:
 
 class TestGenerateCompositeExample:
     def test_flat_model(self) -> None:
-        class SessionConfig(BaseModel):
+        class SessionConfig(BackendAISchema):
             cpu: Annotated[
                 int,
                 Field(),
@@ -299,7 +300,7 @@ class TestGenerateCompositeExample:
         assert result == {"cpu": "4", "memory": "8g"}
 
     def test_nested_composite(self) -> None:
-        class InnerConfig(BaseModel):
+        class InnerConfig(BackendAISchema):
             value: Annotated[
                 str,
                 Field(),
@@ -310,7 +311,7 @@ class TestGenerateCompositeExample:
                 ),
             ]
 
-        class OuterConfig(BaseModel):
+        class OuterConfig(BackendAISchema):
             inner: Annotated[
                 InnerConfig,
                 Field(),
@@ -332,7 +333,7 @@ class TestGenerateCompositeExample:
         assert result == {"inner": {"value": "inner"}, "name": "outer-name"}
 
     def test_skips_fields_without_meta(self) -> None:
-        class MixedConfig(BaseModel):
+        class MixedConfig(BackendAISchema):
             with_meta: Annotated[
                 str,
                 Field(),
@@ -349,7 +350,7 @@ class TestGenerateCompositeExample:
         assert "without_meta" not in result
 
     def test_config_example_in_composite(self) -> None:
-        class EnvConfig(BaseModel):
+        class EnvConfig(BackendAISchema):
             endpoint: Annotated[
                 str,
                 Field(),
@@ -367,7 +368,7 @@ class TestGenerateCompositeExample:
 
 class TestGenerateModelExample:
     def test_full_model_example(self) -> None:
-        class CreateSessionRequest(BaseModel):
+        class CreateSessionRequest(BackendAISchema):
             name: Annotated[
                 str,
                 Field(),
@@ -393,7 +394,7 @@ class TestGenerateModelExample:
     def test_model_with_composite_skips_composite_fields(self) -> None:
         """generate_model_example skips composite fields - use generate_composite_example for them."""
 
-        class ResourceConfig(BaseModel):
+        class ResourceConfig(BackendAISchema):
             cpu: Annotated[
                 int,
                 Field(),
@@ -404,7 +405,7 @@ class TestGenerateModelExample:
                 ),
             ]
 
-        class SessionRequest(BaseModel):
+        class SessionRequest(BackendAISchema):
             name: Annotated[
                 str,
                 Field(),
@@ -430,7 +431,7 @@ class TestGenerateModelExample:
         assert composite_result == {"name": "session-1", "resources": {"cpu": "2"}}
 
     def test_empty_model(self) -> None:
-        class EmptyModel(BaseModel):
+        class EmptyModel(BackendAISchema):
             plain_field: str = "value"
 
         result = generate_model_example(EmptyModel)

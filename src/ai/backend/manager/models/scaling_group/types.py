@@ -3,14 +3,14 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import ConfigDict, Field, field_serializer, field_validator
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import BackendAISchema, ResourceSlot
 
 __all__ = ("FairShareScalingGroupSpec",)
 
 
-class FairShareScalingGroupSpec(BaseModel):
+class FairShareScalingGroupSpec(BackendAISchema):
     """Fair Share calculation configuration for a Resource Group.
 
     Used for Fair Share metric calculation regardless of the scheduler type.

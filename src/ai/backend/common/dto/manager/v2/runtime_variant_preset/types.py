@@ -3,7 +3,9 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
+
+from ai.backend.common.types import BackendAISchema
 
 
 class RuntimeVariantPresetOrderField(StrEnum):
@@ -33,31 +35,31 @@ class UIType(StrEnum):
     TEXT_INPUT = "text_input"
 
 
-class SliderOption(BaseModel):
+class SliderOption(BackendAISchema):
     min: float = Field(description="Minimum value.")
     max: float = Field(description="Maximum value.")
     step: float = Field(default=1, description="Increment step.")
 
 
-class NumberOption(BaseModel):
+class NumberOption(BackendAISchema):
     min: float | None = Field(default=None, description="Minimum value.")
     max: float | None = Field(default=None, description="Maximum value.")
 
 
-class ChoiceItem(BaseModel):
+class ChoiceItem(BackendAISchema):
     value: str = Field(description="Option value.")
     label: str = Field(description="Display label.")
 
 
-class ChoiceOption(BaseModel):
+class ChoiceOption(BackendAISchema):
     items: list[ChoiceItem] = Field(description="List of choices.")
 
 
-class TextOption(BaseModel):
+class TextOption(BackendAISchema):
     placeholder: str | None = Field(default=None, description="Placeholder text.")
 
 
-class UIOption(BaseModel):
+class UIOption(BackendAISchema):
     """UI rendering options. ui_type determines which option field is valid."""
 
     ui_type: UIType = Field(description="UI render type.")

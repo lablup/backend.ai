@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from ai.backend.common.types import CIStrEnum
+from ai.backend.common.types import BackendAISchema, CIStrEnum
 
 
 class NotificationChannelType(CIStrEnum):
@@ -21,7 +21,7 @@ class NotificationRuleType(CIStrEnum):
     ENDPOINT_LIFECYCLE_CHANGED = "endpoint.lifecycle.changed"
 
 
-class WebhookSpec(BaseModel):
+class WebhookSpec(BackendAISchema):
     """Configuration for webhook notification channel."""
 
     url: str = Field(description="Webhook endpoint URL")
@@ -39,7 +39,7 @@ class WebhookSpec(BaseModel):
     )
 
 
-class SMTPAuth(BaseModel):
+class SMTPAuth(BackendAISchema):
     """SMTP authentication credentials."""
 
     username: str | None = Field(default=None, description="SMTP username for authentication")
@@ -49,7 +49,7 @@ class SMTPAuth(BaseModel):
     )
 
 
-class SMTPConnection(BaseModel):
+class SMTPConnection(BackendAISchema):
     """SMTP server connection settings."""
 
     host: str = Field(description="SMTP server host")
@@ -58,7 +58,7 @@ class SMTPConnection(BaseModel):
     timeout: int = Field(default=30, gt=0, description="SMTP connection timeout in seconds")
 
 
-class EmailMessage(BaseModel):
+class EmailMessage(BackendAISchema):
     """Email message settings."""
 
     from_email: str = Field(description="Sender email address")
@@ -69,7 +69,7 @@ class EmailMessage(BaseModel):
     )
 
 
-class EmailSpec(BaseModel):
+class EmailSpec(BackendAISchema):
     """Configuration for email notification channel."""
 
     smtp: SMTPConnection = Field(description="SMTP server connection settings")

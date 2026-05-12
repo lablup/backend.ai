@@ -6,7 +6,7 @@ import aiohttp
 import jwt
 import yarl
 from aiohttp import web
-from pydantic import AnyUrl, BaseModel
+from pydantic import AnyUrl
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
 from tenacity.stop import stop_after_attempt
 
@@ -33,6 +33,7 @@ from ai.backend.appproxy.worker.config import (
 )
 from ai.backend.appproxy.worker.coordinator_client import get_circuit_info
 from ai.backend.appproxy.worker.types import InteractiveAppInfo, RootContext
+from ai.backend.common.types import BackendAISchema
 
 
 def generate_proxy_url(
@@ -87,11 +88,11 @@ async def ensure_traefik_route_set_up(traefik_api_port: int, circuit: Circuit) -
                         raise TryAgain
 
 
-class ProxySetupRequestModel(BaseModel):
+class ProxySetupRequestModel(BackendAISchema):
     token: str
 
 
-class ProxySetupResponseModel(BaseModel):
+class ProxySetupResponseModel(BackendAISchema):
     redirect: AnyUrl
     redirectURI: AnyUrl
 

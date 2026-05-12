@@ -1,11 +1,13 @@
 import uuid
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 from .uoid import UOID
 
 
-class Location(BaseModel):
+class Location(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     uoid: UOID
@@ -15,6 +17,6 @@ class Location(BaseModel):
     placeOnObjectiveUuid: uuid.UUID
 
 
-class LocationList(BaseModel):
+class LocationList(BackendAISchema):
     id: int
     placeOn: list[Location]

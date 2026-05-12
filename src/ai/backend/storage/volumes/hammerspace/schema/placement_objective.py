@@ -1,9 +1,11 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 from .location import Location, LocationList
 
 
-class PlacementObjective(BaseModel):
+class PlacementObjective(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     id: int

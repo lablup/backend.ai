@@ -31,7 +31,6 @@ import trafaret as t
 from aiotools import TaskGroupError
 from dateutil.relativedelta import relativedelta
 from pydantic import (
-    BaseModel,
     Field,
     GetCoreSchemaHandler,
 )
@@ -60,6 +59,7 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.types import (
     AccessKey,
+    BackendAISchema,
     BinarySize,
     ResourceSlot,
     SessionExecutionStatus,
@@ -874,7 +874,7 @@ def _get_resource_name_from_metric_key(name: str) -> str:
     return name
 
 
-class ResourceThresholdValue(BaseModel):
+class ResourceThresholdValue(BackendAISchema):
     average: Annotated[
         int | float | Decimal | None,
         Field(

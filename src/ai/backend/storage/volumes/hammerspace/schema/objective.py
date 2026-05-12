@@ -1,6 +1,8 @@
 import enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 from .placement_objective import PlacementObjective
 from .uoid import UOID
@@ -14,7 +16,7 @@ class Priority(enum.StrEnum):
     HIGH = "HIGH"
 
 
-class SimpleObjective(BaseModel):
+class SimpleObjective(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     uoid: UOID
@@ -24,12 +26,12 @@ class SimpleObjective(BaseModel):
     internalId: int
 
 
-class AppliedObjective(BaseModel):
+class AppliedObjective(BackendAISchema):
     applicability: str
     id: int
 
 
-class Objective(BaseModel):
+class Objective(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     uoid: UOID

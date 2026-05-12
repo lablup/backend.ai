@@ -9,11 +9,11 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.types import AutoScalingMetricSource
+from ai.backend.common.types import AutoScalingMetricSource, BackendAISchema
 
 __all__ = (
     "AutoScalingRuleDTO",
@@ -26,7 +26,7 @@ __all__ = (
 )
 
 
-class AutoScalingRuleDTO(BaseModel):
+class AutoScalingRuleDTO(BackendAISchema):
     """DTO for auto-scaling rule data."""
 
     id: UUID = Field(description="Auto-scaling rule ID")

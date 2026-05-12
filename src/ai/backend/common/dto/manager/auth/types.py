@@ -7,7 +7,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Self
 
-from pydantic import BaseModel
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AuthTokenType",
@@ -36,7 +36,7 @@ class TwoFactorType(StrEnum):
     TOTP = "TOTP"
 
 
-class AuthResponse(BaseModel):
+class AuthResponse(BackendAISchema):
     """Base class for all authorization responses. The response_type discriminator
     determines which subclass the response should be deserialized into."""
 

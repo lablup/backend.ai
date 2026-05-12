@@ -1,17 +1,15 @@
 from collections.abc import Mapping
 from typing import Self
 
-from pydantic import BaseModel
-
 from ai.backend.agent.kernel import KernelOwnershipData
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
 from ai.backend.agent.proxy import DomainSocketPathPair
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.types import AgentId, KernelId, ServicePort, SessionTypes
+from ai.backend.common.types import AgentId, BackendAISchema, KernelId, ServicePort, SessionTypes
 
 
-class KernelRecoveryScratchData(BaseModel):
+class KernelRecoveryScratchData(BackendAISchema):
     """
     Serializable subset of KernelRecoveryData for scratch storage.
     Excludes `resource_spec` and `environ` which are loaded separately.

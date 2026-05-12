@@ -4,7 +4,7 @@ import logging
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.request import BaseAgentRequestModel, GatherHwinfoReq, HealthReq
@@ -18,6 +18,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AgentId,
+    BackendAISchema,
     ClusterInfo,
     ImageConfig,
     KernelCreationConfig,
@@ -43,7 +44,7 @@ agent_client_resilience = Resilience(
 TResp = TypeVar("TResp", bound=BaseAgentResponseModel)
 
 
-class AgentRPCCall(BaseModel):
+class AgentRPCCall(BackendAISchema):
     """Manager-side envelope describing a single v3 agent RPC invocation.
 
     Grouping ``method`` / ``agent_id`` / ``payload`` into one pydantic

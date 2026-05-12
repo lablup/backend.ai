@@ -8,11 +8,10 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from pydantic import BaseModel
-
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
     AccessKey,
+    BackendAISchema,
     CIStrEnum,
     ClusterMode,
     ResourceSlot,
@@ -354,7 +353,7 @@ class PromotionStatusTransitions:
     success: SessionStatus | None = None
 
 
-class SubStepResult(BaseModel):
+class SubStepResult(BackendAISchema):
     """Sub-step result for scheduling history."""
 
     step: str

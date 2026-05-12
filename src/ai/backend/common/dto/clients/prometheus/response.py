@@ -1,9 +1,11 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
+
+from ai.backend.common.types import BackendAISchema
 
 
-class MetricResponseInfo(BaseModel):
+class MetricResponseInfo(BackendAISchema):
     """Metric information from Prometheus response."""
 
     value_type: str | None = Field(default=None)
@@ -32,7 +34,7 @@ class MetricResponseInfo(BaseModel):
 type MetricResponseValue = tuple[float, str]  # (timestamp, value)
 
 
-class MetricResponse(BaseModel):
+class MetricResponse(BackendAISchema):
     """Single metric result from a Prometheus query.
 
     Handles both instant queries (single ``value``) and range queries
@@ -50,7 +52,7 @@ class MetricResponse(BaseModel):
         return data
 
 
-class PrometheusQueryData(BaseModel):
+class PrometheusQueryData(BackendAISchema):
     """Data field from a Prometheus query response."""
 
     result_type: str = Field(validation_alias="resultType")
@@ -59,14 +61,14 @@ class PrometheusQueryData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class PrometheusResponse(BaseModel):
+class PrometheusResponse(BackendAISchema):
     """Response from Prometheus query API (instant or range)."""
 
     status: str
     data: PrometheusQueryData
 
 
-class LabelValueResponse(BaseModel):
+class LabelValueResponse(BackendAISchema):
     """Response from Prometheus label values API."""
 
     status: str

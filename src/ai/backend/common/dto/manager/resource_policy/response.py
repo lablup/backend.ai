@@ -8,11 +8,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.types import DefaultForUnspecified
+from ai.backend.common.types import BackendAISchema, DefaultForUnspecified
 
 __all__ = (
     # Keypair
@@ -44,7 +44,7 @@ __all__ = (
 # ---- Keypair Resource Policy ----
 
 
-class KeypairResourcePolicyDTO(BaseModel):
+class KeypairResourcePolicyDTO(BackendAISchema):
     """DTO for keypair resource policy data."""
 
     name: str = Field(description="Policy name")
@@ -101,7 +101,7 @@ class SearchKeypairResourcePoliciesResponse(BaseResponseModel):
 # ---- User Resource Policy ----
 
 
-class UserResourcePolicyDTO(BaseModel):
+class UserResourcePolicyDTO(BackendAISchema):
     """DTO for user resource policy data."""
 
     name: str = Field(description="Policy name")
@@ -148,7 +148,7 @@ class SearchUserResourcePoliciesResponse(BaseResponseModel):
 # ---- Project Resource Policy ----
 
 
-class ProjectResourcePolicyDTO(BaseModel):
+class ProjectResourcePolicyDTO(BackendAISchema):
     """DTO for project resource policy data."""
 
     name: str = Field(description="Policy name")

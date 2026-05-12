@@ -28,11 +28,13 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
 from ai.backend.common.exception import (
+    BackendAISchemaValidationFailed,
     JWTDecodeError,
     JWTExpiredError,
     JWTInvalidSignatureError,
     JWTPayloadValidationError,
 )
+from ai.backend.common.types import BackendAISchema
 from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
@@ -206,7 +208,7 @@ def _vfolder_name_validator(name: str) -> str:
 VFolderName = Annotated[str, AfterValidator(_vfolder_name_validator)]
 
 
-class HostPortPair(BaseModel):
+class HostPortPair(BackendAISchema):
     host: Annotated[
         str,
         Field(),
@@ -579,5 +581,7 @@ class PydanticJWTValidator:
 
         try:
             return model.model_validate(payload)
-        except ValidationError as e:
+        except (BackendAISchemaValidationFailed, ValidationError) as e:
+            # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+            # skip the ``BackendAISchema`` auto-conversion override.
             raise JWTPayloadValidationError(extra_msg=str(e)) from e

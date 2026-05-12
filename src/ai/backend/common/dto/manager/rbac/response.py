@@ -8,11 +8,12 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 from .types import EntityType, OperationType, RoleSource, RoleStatus
 
@@ -43,7 +44,7 @@ __all__ = (
 )
 
 
-class RoleDTO(BaseModel):
+class RoleDTO(BackendAISchema):
     """DTO for role data."""
 
     id: UUID = Field(description="Role ID")
@@ -56,7 +57,7 @@ class RoleDTO(BaseModel):
     description: str | None = Field(default=None, description="Role description")
 
 
-class AssignedUserDTO(BaseModel):
+class AssignedUserDTO(BackendAISchema):
     """DTO for user assigned to a role."""
 
     user_id: UUID = Field(description="User ID")
@@ -117,7 +118,7 @@ class SearchUsersAssignedToRoleResponse(BaseResponseModel):
     pagination: PaginationInfo = Field(description="Pagination information")
 
 
-class PermissionDTO(BaseModel):
+class PermissionDTO(BackendAISchema):
     """DTO for permission data."""
 
     id: UUID = Field(description="Permission ID")
@@ -125,7 +126,7 @@ class PermissionDTO(BaseModel):
     operation: OperationType = Field(description="Operation type")
 
 
-class ObjectPermissionDTO(BaseModel):
+class ObjectPermissionDTO(BackendAISchema):
     """DTO for object permission data."""
 
     id: UUID = Field(description="Object permission ID")
@@ -165,7 +166,7 @@ class GetScopeTypesResponse(BaseResponseModel):
     items: list[ScopeType] = Field(description="List of available scope types")
 
 
-class ScopeDTO(BaseModel):
+class ScopeDTO(BackendAISchema):
     """DTO for scope data."""
 
     scope_type: ScopeType = Field(description="Scope type")
@@ -186,7 +187,7 @@ class GetEntityTypesResponse(BaseResponseModel):
     items: list[EntityType] = Field(description="List of available entity types")
 
 
-class EntityDTO(BaseModel):
+class EntityDTO(BackendAISchema):
     """DTO for entity data."""
 
     entity_type: EntityType = Field(description="Entity type")

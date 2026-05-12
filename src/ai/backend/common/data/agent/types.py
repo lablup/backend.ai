@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, ConfigDict, Field, field_validator
 
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.types import DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import BackendAISchema, DeviceName, ResourceSlot, SlotName, SlotTypes
 
 
-class ImageOpts(BaseModel):
+class ImageOpts(BackendAISchema):
     compression: str
 
 
-class AgentInfo(BaseModel):
+class AgentInfo(BackendAISchema):
     ip: str
     region: str | None
     scaling_group: str

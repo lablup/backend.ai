@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # Nested DTOs
@@ -43,14 +44,14 @@ __all__ = (
 # --- Nested DTOs ---
 
 
-class NumberFormatDTO(BaseModel):
+class NumberFormatDTO(BackendAISchema):
     """Number formatting configuration for resource slot display."""
 
     binary: bool = Field(description="Whether to use binary (base-2) formatting.")
     round_length: int = Field(description="Number of decimal places to round to.")
 
 
-class AcceleratorMetadataDTO(BaseModel):
+class AcceleratorMetadataDTO(BackendAISchema):
     """Metadata for an accelerator resource slot."""
 
     slot_name: str = Field(description="Internal slot name identifier.")
@@ -61,13 +62,13 @@ class AcceleratorMetadataDTO(BaseModel):
     display_icon: str = Field(description="Icon identifier for UI rendering.")
 
 
-class ScalingGroupDTO(BaseModel):
+class ScalingGroupDTO(BackendAISchema):
     """Minimal scaling group information."""
 
     name: str = Field(description="Name of the scaling group.")
 
 
-class ResourcePresetDTO(BaseModel):
+class ResourcePresetDTO(BackendAISchema):
     """Resource preset configuration."""
 
     name: str = Field(description="Name of the resource preset.")
