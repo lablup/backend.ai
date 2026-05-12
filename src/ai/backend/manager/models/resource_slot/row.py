@@ -42,6 +42,13 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
 
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     slot_type: Mapped[str] = mapped_column("slot_type", sa.String(length=16), nullable=False)
+    required: Mapped[bool] = mapped_column(
+        "required",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
     display_name: Mapped[str] = mapped_column(
         "display_name",
         sa.String(length=128),
