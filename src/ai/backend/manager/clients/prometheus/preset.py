@@ -1,32 +1,12 @@
-import re
 from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Self
 
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.validators import (
+    escape_non_placeholders,
+)
 from ai.backend.common.exception import InvalidMetricPresetTemplate
-
-_PLACEHOLDER_NAMES = frozenset({"labels", "window", "group_by"})
-_BRACE_BLOCK_RE = re.compile(r"\{([^{}]*)\}")
-
-
-def _escape_non_placeholders(template: str) -> str:
-    # Normalize each `{X}` so str.format produces a single PromQL `{value}`
-    # regardless of how many braces the user wrote.
-    def repl(match: re.Match[str]) -> str:
-        name = match.group(1)
-        start, end = match.span()
-        text = match.string
-        already_wrapped = (
-            start > 0 and text[start - 1] == "{" and end < len(text) and text[end] == "}"
-        )
-        if name not in _PLACEHOLDER_NAMES:
-            return match.group(0) if already_wrapped else "{{" + name + "}}"
-        if name != "labels":
-            return match.group(0)
-        return match.group(0) if already_wrapped else "{{" + match.group(0) + "}}"
-
-    return _BRACE_BLOCK_RE.sub(repl, template)
 
 
 class LabelOperator(StrEnum):
@@ -80,7 +60,7 @@ class MetricPreset:
             for key, value in self.labels.items()
         )
         try:
-            return _escape_non_placeholders(self.template).format(
+            return escape_non_placeholders(self.template).format(
                 labels=label_str,
                 window=self.window,
                 group_by=",".join(sorted(self.group_by)),
