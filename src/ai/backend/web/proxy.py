@@ -17,6 +17,7 @@ from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
+from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
@@ -141,6 +142,30 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
+def _pass_through_date_header(
+    frontend_rqst: web.Request,
+    api_session: APISession,
+) -> dict[str, str]:
+    """
+    Build the ``headers`` override for ``Request.fetch()`` that forwards the
+    client's original ``Date`` header when (and only when) the proxy is in
+    pure pass-through mode.
+
+    Forwarding ``Date`` is only safe for anonymous sessions, where the client
+    owns the upstream signature and the ``Date`` it bound the signature to
+    must survive end-to-end. In the re-signing path the proxy signs with its
+    own keypair, so a client-supplied ``Date`` would let the caller dictate
+    the timestamp signed on the wire — keep ``fetch()``'s auto-refreshed
+    ``Date`` there instead.
+    """
+    if not api_session.config.is_anonymous:
+        return {}
+    client_date = frontend_rqst.headers.get("Date")
+    if client_date is None:
+        return {}
+    return {"Date": client_date}
+
+
 def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
     iv, real_payload = payload.split(b":")
     key = (base64.b64encode(endpoint.encode("ascii")) + iv + iv)[:32]
@@ -255,7 +280,14 @@ async def web_handler(
                     continue
                 if (value := frontend_rqst.headers.get(key)) is not None:
                     backend_rqst.headers[key] = value
-            async with backend_rqst.fetch() as backend_resp:
+            # When the proxy is in pure pass-through mode (anonymous session),
+            # the client owns the upstream signature and the Date it was bound
+            # to must survive end-to-end. In the re-signing path the proxy
+            # signs with its own keypair, so a client-supplied Date would let
+            # the caller dictate the timestamp signed on the wire — keep the
+            # auto-refreshed Date there.
+            fetch_header_overrides = _pass_through_date_header(frontend_rqst, api_session)
+            async with backend_rqst.fetch(headers=fetch_header_overrides) as backend_resp:
                 frontend_resp_hdrs = {
                     key: value
                     for key, value in backend_resp.headers.items()
@@ -427,8 +459,11 @@ async def web_handler_with_jwt(
                 if (value := frontend_rqst.headers.get(key)) is not None:
                     backend_rqst.headers[key] = value
 
+            # See `_pass_through_date_header` for why this is gated on
+            # anonymous sessions only.
+            fetch_header_overrides = _pass_through_date_header(frontend_rqst, api_session)
             # Fetch from backend and stream response
-            async with backend_rqst.fetch() as backend_resp:
+            async with backend_rqst.fetch(headers=fetch_header_overrides) as backend_resp:
                 frontend_resp_hdrs = {
                     key: value
                     for key, value in backend_resp.headers.items()
@@ -530,7 +565,10 @@ async def web_plugin_handler(
             for key in HTTP_HEADERS_TO_FORWARD:
                 if (value := frontend_rqst.headers.get(key)) is not None:
                     backend_rqst.headers[key] = value
-            async with backend_rqst.fetch() as backend_resp:
+            # See `_pass_through_date_header` for why this is gated on
+            # anonymous sessions only.
+            fetch_header_overrides = _pass_through_date_header(frontend_rqst, api_session)
+            async with backend_rqst.fetch(headers=fetch_header_overrides) as backend_resp:
                 frontend_resp_hdrs = {
                     key: value
                     for key, value in backend_resp.headers.items()

@@ -23,6 +23,7 @@ import aiohttp.web
 import appdirs
 import attrs
 from aiohttp.client import _RequestContextManager, _WSRequestContextManager
+from dateutil.parser import parse as parse_datetime
 from dateutil.tz import tzutc
 from multidict import CIMultiDict
 from yarl import URL
@@ -277,6 +278,25 @@ class Request:
             return data
         return self._content
 
+    def _apply_header_overrides(self, overrides: Mapping[str, str]) -> None:
+        """
+        Apply caller-supplied header overrides on top of the auto-set headers.
+
+        If ``Date`` is overridden, also parse it back into ``self.date`` so
+        that request signing uses the same value the upstream server will
+        see. If the override value cannot be parsed, the header is still
+        forwarded but ``self.date`` is left untouched; signing should not
+        be enabled in that case (e.g., the proxy gates this on anonymous
+        sessions where ``_sign()`` is skipped).
+        """
+        for key, value in overrides.items():
+            self.headers[key] = value
+            if key.lower() == "date":
+                try:
+                    self.date = parse_datetime(value)
+                except (ValueError, OverflowError):
+                    pass
+
     def _build_url(self) -> URL:
         base_url = self.config.endpoint.path.rstrip("/")
         query_path = self.path.lstrip("/") if self.path is not None and len(self.path) > 0 else ""
@@ -291,7 +311,12 @@ class Request:
 
     # TODO: attach rate-limit information
 
-    def fetch(self, **kwargs: Any) -> FetchContextManager:
+    def fetch(
+        self,
+        *,
+        headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
+    ) -> FetchContextManager:
         """
         Sends the request to the server and reads the response.
 
@@ -307,6 +332,11 @@ class Request:
             rqst = Request('GET', ...)
             async with rqst.fetch() as resp:
               print(await resp.text())
+
+        :param headers: Header overrides applied after the auto-populated
+            headers. Useful for proxy use cases that need to forward the
+            client's original ``Date`` header (and matching signature)
+            instead of having it refreshed.
         """
         if self.method not in self._allowed_methods:
             raise ValueError(f"Disallowed HTTP method: {self.method}")
@@ -316,6 +346,8 @@ class Request:
         self.headers["Date"] = self.date.isoformat()
         if self.content_type is not None and "Content-Type" not in self.headers:
             self.headers["Content-Type"] = self.content_type
+        if headers:
+            self._apply_header_overrides(headers)
         force_anonymous = kwargs.pop("anonymous", False)
 
         def _rqst_ctx_builder() -> _RequestContextManager:
@@ -345,7 +377,11 @@ class Request:
         return FetchContextManager(self.session, _rqst_ctx_builder, self._session_mode, **kwargs)
 
     def connect_websocket(
-        self, protocols: Iterable[str] = tuple(), **kwargs: Any
+        self,
+        protocols: Iterable[str] = tuple(),
+        *,
+        headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
     ) -> WebSocketContextManager:
         """
         Creates a WebSocket connection.
@@ -354,6 +390,9 @@ class Request:
 
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
+
+        :param headers: Header overrides applied after the auto-populated
+            headers. See :meth:`fetch` for details.
         """
         if not isinstance(self.session, AsyncSession):
             raise RuntimeError("Cannot use websockets with sessions in the synchronous mode")
@@ -365,6 +404,8 @@ class Request:
         self.headers["Date"] = self.date.isoformat()
         # websocket is always a "binary" stream.
         self.content_type = "application/octet-stream"
+        if headers:
+            self._apply_header_overrides(headers)
 
         def _ws_ctx_builder() -> _WSRequestContextManager:
             full_url = self._build_url()
@@ -385,7 +426,12 @@ class Request:
 
         return WebSocketContextManager(self.session, _ws_ctx_builder, **kwargs)
 
-    def connect_events(self, **kwargs: Any) -> SSEContextManager:
+    def connect_events(
+        self,
+        *,
+        headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
+    ) -> SSEContextManager:
         """
         Creates a Server-Sent Events connection.
 
@@ -393,6 +439,9 @@ class Request:
 
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
+
+        :param headers: Header overrides applied after the auto-populated
+            headers. See :meth:`fetch` for details.
         """
         if not isinstance(self.session, AsyncSession):
             raise RuntimeError("Cannot use event streams with sessions in the synchronous mode")
@@ -403,6 +452,8 @@ class Request:
             raise RuntimeError("Failed to set request date")
         self.headers["Date"] = self.date.isoformat()
         self.content_type = "application/octet-stream"
+        if headers:
+            self._apply_header_overrides(headers)
 
         def _rqst_ctx_builder() -> _RequestContextManager:
             timeout_config = aiohttp.ClientTimeout(
