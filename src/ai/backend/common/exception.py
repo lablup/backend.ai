@@ -455,7 +455,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ModelValidationFailed(BackendAIError, web.HTTPBadRequest):
+class BackendAIModelValidationFailed(BackendAIError, web.HTTPBadRequest):
     """Generic 400 raised when a :class:`BackendAIModel` fails validation.
 
     Distinct from :class:`InvalidAPIParameters` so callers can tell

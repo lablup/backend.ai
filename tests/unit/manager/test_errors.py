@@ -6,7 +6,7 @@ import pytest
 from aiohttp import web
 from pydantic import BaseModel, ValidationError
 
-from ai.backend.common.exception import ModelValidationFailed
+from ai.backend.common.exception import BackendAIModelValidationFailed
 from ai.backend.common.types import BackendAIModel
 
 
@@ -28,7 +28,7 @@ class _PlainTestModel(BaseModel):
 
 
 class TestBackendAIModelOverride:
-    """Verify that subclasses get automatic ``ModelValidationFailed``
+    """Verify that subclasses get automatic ``BackendAIModelValidationFailed``
     (HTTP 400) conversion on validation failure just by inheriting
     :class:`BackendAIModel` — no per-call-site ``try / except`` and no
     sibling ``bai_validate`` method."""
@@ -43,9 +43,9 @@ class TestBackendAIModelOverride:
 
     def test_model_validate_raises_model_validation_failed(self) -> None:
         """An invalid payload to ``model_validate`` raises
-        :class:`ModelValidationFailed` (HTTP 400) carrying the
+        :class:`BackendAIModelValidationFailed` (HTTP 400) carrying the
         structured per-field error list."""
-        with pytest.raises(ModelValidationFailed) as excinfo:
+        with pytest.raises(BackendAIModelValidationFailed) as excinfo:
             _PayloadTestModel.model_validate({"count": "not-a-number"})
 
         err = excinfo.value
@@ -60,7 +60,7 @@ class TestBackendAIModelOverride:
     def test_model_validate_json_is_also_overridden(self) -> None:
         """The JSON variant must follow the same contract so callers
         decoding raw request bodies aren't an exception to the rule."""
-        with pytest.raises(ModelValidationFailed):
+        with pytest.raises(BackendAIModelValidationFailed):
             _PayloadTestModel.model_validate_json('{"count": "nope"}')
 
     def test_constructor_keeps_stock_pydantic_error(self) -> None:

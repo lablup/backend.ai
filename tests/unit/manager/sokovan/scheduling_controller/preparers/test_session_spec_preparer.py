@@ -21,7 +21,6 @@ from collections.abc import Callable
 
 import pytest
 
-from ai.backend.common.exception import ModelValidationFailed
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -43,6 +42,7 @@ from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
     SessionHandlerOptions,
 )
+from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
@@ -198,7 +198,7 @@ class TestRuleChain:
             _TransformRule("set", log, set_priority),
             _TransformRule("capture", log, capture_priority),
         ])
-        with pytest.raises(ModelValidationFailed):
+        with pytest.raises(IncompleteSessionSpec):
             # Draft stays incomplete (identity / scope / etc. still
             # unset), but the rule chain runs to completion first.
             await preparer.prepare(SessionSpecDraft(), context)
@@ -235,11 +235,11 @@ class TestFinalization:
         context: SessionSpecPreparationContext,
     ) -> None:
         """An empty draft surfaces every required-spec field as a missing path."""
-        with pytest.raises(ModelValidationFailed) as exc_info:
+        with pytest.raises(IncompleteSessionSpec) as exc_info:
             await preparer.prepare(SessionSpecDraft(), context)
         extra_data = exc_info.value.extra_data
         assert extra_data is not None
-        missing: list[str] = [entry["loc"] for entry in extra_data["errors"]]
+        missing: list[str] = extra_data["missing"]
         # Representative sample from every grouping.
         assert "identity.session_id" in missing
         assert "identity.creation_id" in missing
@@ -310,11 +310,11 @@ class TestFinalization:
                 access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
             ),
         )
-        with pytest.raises(ModelValidationFailed) as exc_info:
+        with pytest.raises(IncompleteSessionSpec) as exc_info:
             await preparer.prepare(draft, context)
         extra_data = exc_info.value.extra_data
         assert extra_data is not None
-        missing: list[str] = [entry["loc"] for entry in extra_data["errors"]]
+        missing: list[str] = extra_data["missing"]
         assert "identity.session_name" in missing
         assert "identity.session_id" not in missing
         assert "identity.access_key" not in missing
@@ -338,11 +338,11 @@ class TestFinalization:
             ),
         )
         draft = complete_draft.model_copy(update={"kernel_specs": (broken_kernel,)})
-        with pytest.raises(ModelValidationFailed) as exc_info:
+        with pytest.raises(IncompleteSessionSpec) as exc_info:
             await preparer.prepare(draft, context)
         extra_data = exc_info.value.extra_data
         assert extra_data is not None
-        missing: list[str] = [entry["loc"] for entry in extra_data["errors"]]
+        missing: list[str] = extra_data["missing"]
         assert "kernel_specs[0].cluster_role" in missing
 
     async def test_kernel_execution_spec_nested_path(
@@ -363,9 +363,9 @@ class TestFinalization:
             ),
         )
         draft = complete_draft.model_copy(update={"kernel_specs": (broken_kernel,)})
-        with pytest.raises(ModelValidationFailed) as exc_info:
+        with pytest.raises(IncompleteSessionSpec) as exc_info:
             await preparer.prepare(draft, context)
         extra_data = exc_info.value.extra_data
         assert extra_data is not None
-        missing: list[str] = [entry["loc"] for entry in extra_data["errors"]]
+        missing: list[str] = extra_data["missing"]
         assert "kernel_specs[0].execution_spec.image_id" in missing

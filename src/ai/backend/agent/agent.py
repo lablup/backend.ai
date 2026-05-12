@@ -158,6 +158,7 @@ from ai.backend.common.events.types import (
     AbstractEvent,
 )
 from ai.backend.common.exception import (
+    BackendAIModelValidationFailed,
     ConfigurationError,
     VolumeMountFailed,
 )
@@ -235,6 +236,7 @@ from .errors import (
     ImagePullTimeoutError,
     ModelDefinitionEmptyError,
     ModelDefinitionNotFoundError,
+    ModelDefinitionValidationError,
     ModelFolderNotSpecifiedError,
     PortConflictError,
     ReservedPortError,
@@ -3293,7 +3295,16 @@ class AbstractAgent[
                 f" vFolder {model_folder.name} (ID {model_folder.vfid})",
             )
 
-        parsed = ModelDefinition.model_validate(inlined)
+        try:
+            parsed = ModelDefinition.model_validate(inlined)
+        except BackendAIModelValidationFailed as e:
+            raise ModelDefinitionValidationError(
+                extra_msg=(
+                    "Failed to validate model definition for vFolder"
+                    f" {model_folder.name} (ID {model_folder.vfid})"
+                ),
+                extra_data=e.extra_data,
+            ) from e
         if not parsed.models:
             raise ModelDefinitionEmptyError
         model_definition = parsed.model_dump(mode="json")

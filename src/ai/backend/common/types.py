@@ -56,10 +56,10 @@ from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
+    BackendAIModelValidationFailed,
     GenericNotImplementedError,
     InvalidIpAddressValue,
     InvalidResourceSlotQuantity,
-    ModelValidationFailed,
 )
 
 # Deprecated re-export: new code should import ``ImageID`` from
@@ -190,7 +190,7 @@ class BackendAIModel(BaseModel):
 
     Overrides ``model_validate`` / ``model_validate_json`` /
     ``model_validate_strings`` so a ``ValidationError`` is auto-mapped
-    to :class:`ModelValidationFailed` (HTTP 400) carrying the structured
+    to :class:`BackendAIModelValidationFailed` (HTTP 400) carrying the structured
     per-field error list. Call sites get a clean 4xx without repeating
     ``try / except ValidationError`` at every site.
 
@@ -216,7 +216,7 @@ class BackendAIModel(BaseModel):
             return super().model_validate(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise ModelValidationFailed.from_pydantic(e) from e
+            raise BackendAIModelValidationFailed.from_pydantic(e) from e
 
     @classmethod
     def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
@@ -224,7 +224,7 @@ class BackendAIModel(BaseModel):
             return super().model_validate_json(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise ModelValidationFailed.from_pydantic(e) from e
+            raise BackendAIModelValidationFailed.from_pydantic(e) from e
 
     @classmethod
     def model_validate_strings(cls, *args: Any, **kwargs: Any) -> Self:
@@ -232,7 +232,7 @@ class BackendAIModel(BaseModel):
             return super().model_validate_strings(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise ModelValidationFailed.from_pydantic(e) from e
+            raise BackendAIModelValidationFailed.from_pydantic(e) from e
 
 
 class aobject:
