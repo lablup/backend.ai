@@ -692,13 +692,9 @@ class ModelDefinitionDraft(BaseConfigModel):
         return ModelDefinitionDraft.model_construct(models=merged)
 
     def to_resolved(self) -> ModelDefinition:
-        """Build the strict ``ModelDefinition`` from this draft.
-
-        Each child draft is converted via its own ``to_resolved`` and the
-        strict type's constructor performs Pydantic validation; missing
-        required fields propagate as ``pydantic.ValidationError``.
-        """
-        return ModelDefinition(models=[m.to_resolved() for m in (self.models or [])])
+        return ModelDefinition.model_validate({
+            "models": [m.to_resolved() for m in (self.models or [])],
+        })
 
 
 def find_config_file(daemon_name: str) -> Path:
