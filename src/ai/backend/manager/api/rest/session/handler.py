@@ -78,7 +78,7 @@ from ai.backend.common.dto.manager.session.types import (
     CreationConfigV6Template,
     CreationConfigV7,
 )
-from ai.backend.common.exception import BackendAIError, BackendAIModelValidationFailed
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -223,7 +223,10 @@ def _validate_creation_config(
             else:
                 raise InvalidAPIParameters("API version not supported")
         return model.model_dump(by_alias=False)
-    except BackendAIModelValidationFailed as e:
+    except Exception as e:
+        if isinstance(e, InvalidAPIParameters):
+            raise
+        log.debug("Validation error: {0}", e)
         raise InvalidAPIParameters(
             "Input validation error",
             extra_data={"config": str(e)},
