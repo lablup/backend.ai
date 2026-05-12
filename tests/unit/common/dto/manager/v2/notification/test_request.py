@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
 from ai.backend.common.dto.manager.v2.notification.types import (
     NotificationRuleTypeDTO as NotificationRuleType,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _make_webhook_spec() -> NotificationChannelSpecInputDTO:
@@ -134,7 +135,7 @@ class TestCreateNotificationChannelInputValidationFailures:
     """Tests for CreateNotificationChannelInput validation failures."""
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateNotificationChannelInput(
                 name="",
                 channel_type=NotificationChannelType.WEBHOOK,
@@ -142,7 +143,7 @@ class TestCreateNotificationChannelInputValidationFailures:
             )
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateNotificationChannelInput(
                 name="   ",
                 channel_type=NotificationChannelType.WEBHOOK,
@@ -150,7 +151,7 @@ class TestCreateNotificationChannelInputValidationFailures:
             )
 
     def test_tab_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateNotificationChannelInput(
                 name="\t",
                 channel_type=NotificationChannelType.WEBHOOK,
@@ -158,7 +159,7 @@ class TestCreateNotificationChannelInputValidationFailures:
             )
 
     def test_name_exceeding_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateNotificationChannelInput(
                 name="a" * 257,
                 channel_type=NotificationChannelType.WEBHOOK,
@@ -166,7 +167,7 @@ class TestCreateNotificationChannelInputValidationFailures:
             )
 
     def test_missing_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateNotificationChannelInput.model_validate({
                 "channel_type": "webhook",
                 "spec": {"url": "https://example.com"},
@@ -202,11 +203,11 @@ class TestUpdateNotificationChannelInput:
         assert inp.name == "Updated"
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateNotificationChannelInput(name="   ")
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateNotificationChannelInput(name="")
 
     def test_default_enabled_is_none(self) -> None:
@@ -247,11 +248,11 @@ class TestDeleteNotificationChannelInput:
         assert inp.id == channel_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteNotificationChannelInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteNotificationChannelInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:
@@ -307,7 +308,7 @@ class TestCreateNotificationRuleInput:
         assert inp.name == "Alert Rule"
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateNotificationRuleInput(
                 name="",
                 rule_type=NotificationRuleType.SESSION_STARTED,
@@ -316,7 +317,7 @@ class TestCreateNotificationRuleInput:
             )
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateNotificationRuleInput(
                 name="   ",
                 rule_type=NotificationRuleType.SESSION_STARTED,
@@ -335,7 +336,7 @@ class TestCreateNotificationRuleInput:
         assert len(inp.message_template) == 65536
 
     def test_message_template_exceeding_max_length_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateNotificationRuleInput(
                 name="Rule",
                 rule_type=NotificationRuleType.SESSION_STARTED,
@@ -369,7 +370,7 @@ class TestUpdateNotificationRuleInput:
         assert inp.name == "Updated Rule"
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateNotificationRuleInput(name="   ")
 
     def test_default_message_template_is_none(self) -> None:
@@ -412,11 +413,11 @@ class TestDeleteNotificationRuleInput:
         assert inp.id == rule_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteNotificationRuleInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteNotificationRuleInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:
@@ -443,11 +444,11 @@ class TestValidateNotificationChannelInput:
         assert len(inp.test_message) == 5000
 
     def test_test_message_exceeding_max_length_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ValidateNotificationChannelInput(id=uuid.uuid4(), test_message="x" * 5001)
 
     def test_missing_test_message_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ValidateNotificationChannelInput.model_validate({})
 
 

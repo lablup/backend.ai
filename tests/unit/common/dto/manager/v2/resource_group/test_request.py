@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     DeleteResourceGroupInput,
     UpdateResourceGroupInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateResourceGroupInput:
@@ -47,15 +48,15 @@ class TestCreateResourceGroupInput:
         assert req.name == "my-group"
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateResourceGroupInput(name="", domain_name="default")
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateResourceGroupInput(name="   ", domain_name="default")
 
     def test_name_exceeding_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateResourceGroupInput(name="a" * 257, domain_name="default")
 
     def test_name_at_max_length_is_valid(self) -> None:
@@ -63,7 +64,7 @@ class TestCreateResourceGroupInput:
         assert len(req.name) == 256
 
     def test_missing_domain_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateResourceGroupInput.model_validate({"name": "my-group"})
 
     def test_round_trip(self) -> None:
@@ -144,11 +145,11 @@ class TestDeleteResourceGroupInput:
         assert req.id == group_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteResourceGroupInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteResourceGroupInput.model_validate({})
 
     def test_round_trip(self) -> None:

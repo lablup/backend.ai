@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.quota_scope.request import (
     UnsetQuotaInput,
 )
 from ai.backend.common.dto.manager.v2.quota_scope.types import OrderDirection, QuotaScopeOrderField
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSearchQuotaScopesInput:
@@ -36,11 +37,11 @@ class TestSearchQuotaScopesInput:
         assert req.limit == MAX_PAGE_LIMIT
 
     def test_limit_exceeds_max_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQuotaScopesInput(limit=MAX_PAGE_LIMIT + 1)
 
     def test_limit_below_1_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQuotaScopesInput(limit=0)
 
     def test_offset_default_is_zero(self) -> None:
@@ -48,7 +49,7 @@ class TestSearchQuotaScopesInput:
         assert req.offset == 0
 
     def test_negative_offset_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQuotaScopesInput(offset=-1)
 
     def test_with_filter(self) -> None:
@@ -137,7 +138,7 @@ class TestSetQuotaInput:
         assert req.hard_limit_bytes == 0
 
     def test_negative_hard_limit_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SetQuotaInput(
                 storage_host_name="nfs01",
                 quota_scope_id="user:abc",

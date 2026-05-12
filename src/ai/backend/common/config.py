@@ -5,14 +5,13 @@ import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import humps
 import tomli
 import trafaret as t
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     field_validator,
@@ -20,8 +19,8 @@ from pydantic import (
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
-from .exception import ConfigurationError
-from .types import RedisHelperConfig
+from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
+from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
 __all__ = (
     "ConfigurationError",
@@ -40,7 +39,7 @@ __all__ = (
 )
 
 
-class BaseConfigSchema(BaseModel):
+class BaseConfigSchema(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -53,7 +52,7 @@ class BaseConfigSchema(BaseModel):
     )
 
 
-class BaseConfigModel(BaseModel):
+class BaseConfigModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -478,6 +477,14 @@ class ModelDefinition(BaseConfigModel):
         description="List of models in the model definition.",
     )
 
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
     def merge(self, override: ModelDefinition) -> ModelDefinition:
         """Merge the given override into this definition, returning a new instance."""
         return _merge_definition(self, override)
@@ -532,10 +539,10 @@ class ModelHealthCheckDraft(BaseConfigModel):
     initial_delay: float | None = None
 
     def to_resolved(self) -> ModelHealthCheck:
-        if self.path is None:
-            raise ValueError("ModelHealthCheck.path is required")
         # Drop unset (None) fields so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values.
+        # Missing required fields (e.g. ``path``) surface as the strict
+        # type's ``BackendAISchemaValidationFailed`` via ``model_validate``.
         return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
 
 
@@ -552,16 +559,15 @@ class ModelServiceConfigDraft(BaseConfigModel):
         return _normalize_start_command(value)
 
     def to_resolved(self) -> ModelServiceConfig:
-        if self.port is None:
-            raise ValueError("ModelServiceConfig.port is required")
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values;
         # resolve the nested ``health_check`` draft explicitly so its own
-        # required-field check (``path``) fires with a clear error message.
-        return ModelServiceConfig(
-            **self.model_dump(exclude_none=True, exclude={"health_check"}),
-            health_check=self.health_check.to_resolved() if self.health_check else None,
-        )
+        # required-field check (``path``) fires through its own
+        # ``model_validate``. Missing required fields (e.g. ``port``)
+        # surface as ``BackendAISchemaValidationFailed``.
+        payload = self.model_dump(exclude_none=True, exclude={"health_check"})
+        payload["health_check"] = self.health_check.to_resolved() if self.health_check else None
+        return ModelServiceConfig.model_validate(payload)
 
 
 class ModelConfigDraft(BaseConfigModel):
@@ -571,12 +577,8 @@ class ModelConfigDraft(BaseConfigModel):
     metadata: ModelMetadata | None = None  # ModelMetadata is already all-Optional.
 
     def to_resolved(self) -> ModelConfig:
-        if self.name is None:
-            raise ValueError("ModelConfig.name is required")
-        if self.model_path is None:
-            raise ValueError("ModelConfig.model_path is required")
         service = self.service.to_resolved() if self.service else None
-        if service is not None and service.start_command:
+        if service is not None and service.start_command and self.model_path is not None:
             # ``{model_path}`` placeholders in the variant baseline's
             # ``start_command`` are resolved here, at the same moment the
             # draft becomes a strict ``ModelConfig`` and ``model_path`` is
@@ -584,12 +586,9 @@ class ModelConfigDraft(BaseConfigModel):
             service.start_command = [
                 token.replace("{model_path}", self.model_path) for token in service.start_command
             ]
-        return ModelConfig(
-            name=self.name,
-            model_path=self.model_path,
-            service=service,
-            metadata=self.metadata,
-        )
+        payload = self.model_dump(exclude_none=True, exclude={"service"})
+        payload["service"] = service
+        return ModelConfig.model_validate(payload)
 
 
 def _merge_health_check_draft(
@@ -665,6 +664,14 @@ class ModelDefinitionDraft(BaseConfigModel):
 
     models: list[ModelConfigDraft] | None = None
 
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
     def merge(self, override: ModelDefinitionDraft) -> ModelDefinitionDraft:
         """Merge ``override`` over ``self`` and return a new draft.
 
@@ -689,13 +696,9 @@ class ModelDefinitionDraft(BaseConfigModel):
         return ModelDefinitionDraft.model_construct(models=merged)
 
     def to_resolved(self) -> ModelDefinition:
-        """Build the strict ``ModelDefinition`` from this draft.
-
-        Each child draft is converted via its own ``to_resolved`` and the
-        strict type's constructor performs Pydantic validation; missing
-        required fields propagate as ``pydantic.ValidationError``.
-        """
-        return ModelDefinition(models=[m.to_resolved() for m in (self.models or [])])
+        return ModelDefinition.model_validate({
+            "models": [m.to_resolved() for m in (self.models or [])],
+        })
 
 
 def find_config_file(daemon_name: str) -> Path:

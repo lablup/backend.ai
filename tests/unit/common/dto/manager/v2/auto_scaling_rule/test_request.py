@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.types import (
     AutoScalingRuleOrderField,
     OrderDirection,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import AutoScalingMetricSource
 
 
@@ -75,7 +76,7 @@ class TestCreateAutoScalingRuleInput:
         assert req.step_size == 1
 
     def test_step_size_below_minimum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateAutoScalingRuleInput(
                 model_deployment_id=uuid.uuid4(),
                 metric_source=AutoScalingMetricSource.KERNEL,
@@ -95,7 +96,7 @@ class TestCreateAutoScalingRuleInput:
         assert req.time_window == 1
 
     def test_time_window_below_minimum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateAutoScalingRuleInput(
                 model_deployment_id=uuid.uuid4(),
                 metric_source=AutoScalingMetricSource.KERNEL,
@@ -116,7 +117,7 @@ class TestCreateAutoScalingRuleInput:
         assert req.min_replicas == 0
 
     def test_min_replicas_negative_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateAutoScalingRuleInput(
                 model_deployment_id=uuid.uuid4(),
                 metric_source=AutoScalingMetricSource.KERNEL,
@@ -138,7 +139,7 @@ class TestCreateAutoScalingRuleInput:
         assert req.max_replicas == 1
 
     def test_max_replicas_zero_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateAutoScalingRuleInput(
                 model_deployment_id=uuid.uuid4(),
                 metric_source=AutoScalingMetricSource.KERNEL,
@@ -149,7 +150,7 @@ class TestCreateAutoScalingRuleInput:
             )
 
     def test_empty_metric_name_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateAutoScalingRuleInput(
                 model_deployment_id=uuid.uuid4(),
                 metric_source=AutoScalingMetricSource.KERNEL,
@@ -282,11 +283,11 @@ class TestDeleteAutoScalingRuleInput:
         assert req.id == rule_id
 
     def test_invalid_uuid_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteAutoScalingRuleInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteAutoScalingRuleInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:
@@ -340,15 +341,15 @@ class TestSearchAutoScalingRulesInput:
         assert req.offset == 0
 
     def test_limit_below_minimum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchAutoScalingRulesInput(limit=0)
 
     def test_limit_above_maximum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchAutoScalingRulesInput(limit=1001)
 
     def test_negative_offset_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchAutoScalingRulesInput(offset=-1)
 
     def test_with_filter(self) -> None:

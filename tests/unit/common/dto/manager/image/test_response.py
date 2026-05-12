@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.image.response import (
     RescanImagesResponse,
     SearchImagesResponse,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _sample_image_dto() -> ImageDTO:
@@ -195,5 +196,5 @@ class TestPaginationInfo:
         assert p.limit is None
 
     def test_limit_rejects_non_positive(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PaginationInfo(total=50, offset=0, limit=0)

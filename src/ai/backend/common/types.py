@@ -49,11 +49,15 @@ from pydantic import (
     Field,
     PlainValidator,
     TypeAdapter,
+    ValidationError,
 )
+from pydantic_core import ErrorDetails
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
+    BackendAIError,
+    BackendAISchemaValidationFailed,
     GenericNotImplementedError,
     InvalidIpAddressValue,
     InvalidResourceSlotQuantity,
@@ -81,6 +85,7 @@ __all__ = (
     "AutoPullBehavior",
     "AutoScalingMetricComparator",
     "AutoScalingMetricSource",
+    "BackendAISchema",
     "BinarySize",
     "CIStrEnum",
     "CIStrEnumTrafaret",
@@ -113,6 +118,7 @@ __all__ = (
     "MetricValue",
     "ModelServiceProfile",
     "ModelServiceStatus",
+    "SchemaValidationFailureInfo",
     "MountExpression",
     "MountInfoEntry",
     "MountPermission",
@@ -176,6 +182,77 @@ if TYPE_CHECKING:
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
+
+
+@dataclass(frozen=True)
+class SchemaValidationFailureInfo:
+    """Pydantic-decoupled view of a failed ``model_validate*`` call,
+    passed to :meth:`BackendAISchema.build_validation_error`.
+
+    ``summary`` is ``str(pydantic.ValidationError)``; ``errors`` is
+    ``exc.errors()`` as-is.
+    """
+
+    summary: str
+    errors: list[ErrorDetails]
+
+
+class BackendAISchema(BaseModel):
+    """Pydantic base whose ``model_validate`` / ``model_validate_json``
+    auto-map ``ValidationError`` to a :class:`BackendAIError` (HTTP 4xx)
+    via :meth:`build_validation_error`. Subclasses override the
+    classmethod to inject a domain-specific 400::
+
+        class MyConfig(BackendAISchema):
+            @override
+            @classmethod
+            def build_validation_error(
+                cls, info: SchemaValidationFailureInfo
+            ) -> BackendAIError:
+                return MyConfigParseError(
+                    extra_msg=info.summary,
+                    extra_data={"errors": info.errors},
+                )
+    """
+
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        """Default override raising the generic
+        :class:`BackendAISchemaValidationFailed`."""
+        return BackendAISchemaValidationFailed(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
+    @classmethod
+    def _validation_failure_info(cls, exc: ValidationError) -> SchemaValidationFailureInfo:
+        # Strip ``input`` and ``ctx`` per-entry. ``ctx`` may carry
+        # non-JSON-serializable objects (e.g. a raised ``ValueError``
+        # from a ``model_validator``), and ``BackendAIError.__init__``
+        # eagerly serializes the response body via orjson, so those
+        # values would crash exception construction itself.
+        sanitized = [
+            cast(
+                ErrorDetails,
+                {k: v for k, v in err.items() if k not in ("input", "ctx")},
+            )
+            for err in exc.errors()
+        ]
+        return SchemaValidationFailureInfo(summary=str(exc), errors=sanitized)
+
+    @classmethod
+    def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
+        try:
+            return super().model_validate(*args, **kwargs)
+        except ValidationError as e:
+            raise cls.build_validation_error(cls._validation_failure_info(e)) from e
+
+    @classmethod
+    def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
+        try:
+            return super().model_validate_json(*args, **kwargs)
+        except ValidationError as e:
+            raise cls.build_validation_error(cls._validation_failure_info(e)) from e
 
 
 class aobject:

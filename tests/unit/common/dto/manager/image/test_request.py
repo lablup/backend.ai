@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.image.request import (
 )
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSearchImagesRequest:
@@ -35,13 +36,13 @@ class TestSearchImagesRequest:
         assert req.offset == 25
 
     def test_limit_bounds(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchImagesRequest(limit=0)
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchImagesRequest(limit=1001)
 
     def test_offset_non_negative(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchImagesRequest(offset=-1)
 
     def test_with_filter(self) -> None:
@@ -86,11 +87,11 @@ class TestRescanImagesRequest:
         assert req.architecture == "x86_64"
 
     def test_missing_canonical(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RescanImagesRequest.model_validate({"architecture": "x86_64"})
 
     def test_missing_architecture(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RescanImagesRequest.model_validate({"canonical": "cr.backend.ai/stable/python:3.11"})
 
 
@@ -102,11 +103,11 @@ class TestAliasImageRequest:
         assert req.alias == "python3"
 
     def test_missing_image_id(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AliasImageRequest.model_validate({"alias": "python3"})
 
     def test_missing_alias(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AliasImageRequest.model_validate({"image_id": str(uuid4())})
 
 
@@ -116,7 +117,7 @@ class TestDealiasImageRequest:
         assert req.alias == "python3"
 
     def test_missing_alias(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DealiasImageRequest.model_validate({})
 
 
@@ -127,7 +128,7 @@ class TestForgetImageRequest:
         assert req.image_id == image_id
 
     def test_missing_image_id(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ForgetImageRequest.model_validate({})
 
 
@@ -138,5 +139,5 @@ class TestPurgeImageRequest:
         assert req.image_id == image_id
 
     def test_missing_image_id(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeImageRequest.model_validate({})

@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.infra.request import (
     UsagePerPeriodInput,
     WatcherAgentInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestListScalingGroupsInput:
@@ -46,7 +47,7 @@ class TestListScalingGroupsInput:
         assert req.group == "my-group"
 
     def test_missing_group_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListScalingGroupsInput.model_validate({})
 
     def test_group_as_uuid_instance(self) -> None:
@@ -119,7 +120,7 @@ class TestCheckPresetsInput:
         assert req.scaling_group == "gpu-cluster"
 
     def test_missing_group_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CheckPresetsInput.model_validate({})
 
     def test_default_scaling_group_is_none(self) -> None:
@@ -151,23 +152,23 @@ class TestUsagePerMonthInput:
         assert req.group_ids == ["g1", "g2"]
 
     def test_invalid_month_too_short_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerMonthInput(month="20200")
 
     def test_invalid_month_too_long_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerMonthInput(month="2020060")
 
     def test_invalid_month_with_letters_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerMonthInput(month="2020AB")
 
     def test_invalid_month_with_dashes_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerMonthInput(month="2020-06")
 
     def test_missing_month_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerMonthInput.model_validate({})
 
 
@@ -196,31 +197,31 @@ class TestUsagePerPeriodInput:
         assert req.project_id == "g-001"
 
     def test_invalid_start_date_too_short_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodInput(start_date="2020060", end_date="20200630")
 
     def test_invalid_start_date_too_long_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodInput(start_date="202006010", end_date="20200630")
 
     def test_invalid_start_date_with_letters_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodInput(start_date="2020AB01", end_date="20200630")
 
     def test_invalid_end_date_too_short_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodInput(start_date="20200601", end_date="2020063")
 
     def test_invalid_end_date_with_dashes_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodInput(start_date="20200601", end_date="2020-06-30")
 
     def test_missing_start_date_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodInput.model_validate({"end_date": "20200630"})
 
     def test_missing_end_date_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodInput.model_validate({"start_date": "20200601"})
 
 
@@ -236,7 +237,7 @@ class TestWatcherAgentInput:
         assert req.agent_id == "agent-02"
 
     def test_missing_agent_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             WatcherAgentInput.model_validate({})
 
     def test_agent_id_is_string(self) -> None:

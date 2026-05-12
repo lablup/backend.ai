@@ -7,6 +7,7 @@ from ai.backend.common.configs.service_discovery import (
     ServiceDiscoveryConfig,
     ServiceEndpointConfig,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ServiceDiscoveryType
 
 
@@ -40,7 +41,7 @@ class TestServiceEndpointConfig:
         assert config.metadata == {"weight": "100"}
 
     def test_missing_required_field_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ServiceEndpointConfig.model_validate({
                 "role": "main",
                 "scope": "public",

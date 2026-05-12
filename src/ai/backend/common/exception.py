@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Self
 
 from aiohttp import web
+from pydantic_core import ErrorDetails
 
 from .json import dump_json
 
@@ -438,6 +439,51 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class BackendAISchemaValidationFailed(BackendAIError, web.HTTPBadRequest):
+    """Default 400 raised by :class:`BackendAISchema.build_validation_error`.
+
+    Kept distinct from :class:`InvalidAPIParameters` so handlers can
+    catch one without picking up the other.
+    """
+
+    error_type = "https://api.backend.ai/probs/schema-validation-failed"
+    error_title = "Schema validation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+    def errors(self) -> list[ErrorDetails]:
+        """Per-field errors in the same shape as
+        ``pydantic.ValidationError.errors()``. Empty when no
+        ``extra_data["errors"]`` is attached."""
+        if not self.extra_data:
+            return []
+        return list(self.extra_data.get("errors") or [])
+
+
+class ModelDefinitionValidationError(BackendAIError, web.HTTPBadRequest):
+    """400 raised by ``ModelDefinition.model_validate`` (via its
+    :meth:`BackendAISchema.build_validation_error` override).
+
+    Lives in ``common`` so ``ModelDefinition`` (also in ``common``) can
+    construct it without an upward-layer import.
+    """
+
+    error_type = "https://api.backend.ai/probs/model-definition-validation-failed"
+    error_title = "Model definition validation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

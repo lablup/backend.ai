@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     UpdateProjectInput,
 )
 from ai.backend.common.dto.manager.v2.group.types import OrderDirection, ProjectOrderField
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateProjectInput:
@@ -44,7 +45,7 @@ class TestCreateProjectInput:
         assert req.resource_policy == "research-policy"
 
     def test_name_max_length_64_enforced(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateProjectInput(name="a" * 65, domain_name="default")
 
     def test_name_at_max_length_valid(self) -> None:
@@ -52,11 +53,11 @@ class TestCreateProjectInput:
         assert len(req.name) == 64
 
     def test_missing_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateProjectInput.model_validate({"domain_name": "default"})
 
     def test_missing_domain_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateProjectInput.model_validate({"name": "group"})
 
     def test_round_trip_serialization(self) -> None:
@@ -101,7 +102,7 @@ class TestUpdateProjectInput:
         assert req.name == "new-group-name"
 
     def test_name_max_length_enforced(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateProjectInput(name="a" * 65)
 
     def test_is_active_update(self) -> None:
@@ -149,11 +150,11 @@ class TestDeleteProjectInput:
         assert req.group_id == group_id
 
     def test_invalid_uuid_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteProjectInput.model_validate({"group_id": "not-a-uuid"})
 
     def test_missing_group_id_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteProjectInput.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -178,7 +179,7 @@ class TestPurgeProjectInput:
         assert req.group_id == group_id
 
     def test_invalid_uuid_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeProjectInput.model_validate({"group_id": "not-a-uuid"})
 
     def test_round_trip(self) -> None:
@@ -246,11 +247,11 @@ class TestSearchProjectsRequest:
         assert req.limit >= 1
 
     def test_limit_zero_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchProjectsRequest(limit=0)
 
     def test_negative_offset_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchProjectsRequest(offset=-1)
 
     def test_with_filter_and_order(self) -> None:

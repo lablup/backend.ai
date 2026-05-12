@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.operations.types import (
     ManagerStatus,
     SchedulerOps,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 # -------- SchedulerOps Enum --------
 
@@ -79,7 +80,7 @@ class TestAppendErrorLogRequest:
         assert req.traceback is not None
 
     def test_missing_required_field(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogRequest.model_validate({
                 "severity": "error",
                 "source": "webui",
@@ -103,17 +104,17 @@ class TestListErrorLogsRequest:
     def test_page_size_upper_bound(self) -> None:
         req = ListErrorLogsRequest(page_size=100)
         assert req.page_size == 100
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsRequest(page_size=101)
 
     def test_page_size_lower_bound(self) -> None:
         req = ListErrorLogsRequest(page_size=1)
         assert req.page_size == 1
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsRequest(page_size=0)
 
     def test_page_no_lower_bound(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsRequest(page_no=0)
 
 
@@ -183,7 +184,7 @@ class TestPushBackgroundTaskEventsRequest:
         assert req.task_id == uid
 
     def test_missing_task_id(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PushBackgroundTaskEventsRequest.model_validate({})
 
 

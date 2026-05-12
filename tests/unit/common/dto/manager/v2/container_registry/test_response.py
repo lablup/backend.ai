@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _make_registry_node(
@@ -190,7 +191,7 @@ class TestDeleteContainerRegistryPayload:
         assert payload.id == reg_id
 
     def test_invalid_uuid_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteContainerRegistryPayload.model_validate({"id": "not-a-uuid"})
 
     def test_round_trip_serialization(self) -> None:

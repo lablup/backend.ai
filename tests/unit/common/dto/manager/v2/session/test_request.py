@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionStatusEnum,
     SessionStatusFilter,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSessionPathParam:
@@ -48,7 +49,7 @@ class TestSessionPathParam:
         assert restored.session_name == "test-session"
 
     def test_missing_session_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SessionPathParam.model_validate({})
 
 
@@ -96,11 +97,11 @@ class TestSearchSessionsInput:
         assert inp.limit == 10
 
     def test_invalid_limit_zero_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchSessionsInput(limit=0)
 
     def test_invalid_offset_negative_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchSessionsInput(offset=-1)
 
 
@@ -213,15 +214,15 @@ class TestStartServiceInput:
         assert inp.port == 65535
 
     def test_port_below_1024_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StartServiceInput(app="jupyter", port=80)
 
     def test_port_zero_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StartServiceInput(app="jupyter", port=0)
 
     def test_port_above_65535_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StartServiceInput(app="jupyter", port=65536)
 
     def test_with_all_fields(self) -> None:
@@ -247,7 +248,7 @@ class TestShutdownServiceInput:
         assert inp.service_name == "jupyter"
 
     def test_missing_service_name_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ShutdownServiceInput.model_validate({})
 
 
@@ -263,11 +264,11 @@ class TestRenameSessionInput:
         assert inp.name == "my-session"
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RenameSessionInput(name="")
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RenameSessionInput(name="   ")
 
     def test_round_trip(self) -> None:
@@ -285,7 +286,7 @@ class TestDownloadFilesInput:
         assert inp.files == ["/path/to/file.txt", "/another/file.csv"]
 
     def test_missing_files_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DownloadFilesInput.model_validate({})
 
 

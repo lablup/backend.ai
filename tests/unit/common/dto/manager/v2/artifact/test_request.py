@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     ImportArtifactsOptionsInput,
     UpdateArtifactInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestUpdateArtifactInput:
@@ -101,7 +102,7 @@ class TestImportArtifactsInput:
         assert req.vfolder_id == vfolder_id
 
     def test_missing_artifact_revision_ids_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ImportArtifactsInput.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -135,7 +136,7 @@ class TestCleanupRevisionsInput:
         assert req.artifact_revision_ids == []
 
     def test_missing_ids_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CleanupRevisionsInput.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -165,11 +166,11 @@ class TestCancelImportTaskInput:
         assert req.artifact_revision_id == rev_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CancelImportTaskInput.model_validate({"artifact_revision_id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CancelImportTaskInput.model_validate({})
 
     def test_round_trip_serialization(self) -> None:

@@ -10,6 +10,7 @@ from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.image.request import RescanImagesRequest
 from ai.backend.common.dto.manager.image.response import RescanImagesResponse
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ResourceLimitInput
 from ai.backend.manager.errors.image import ImageNotFound
@@ -46,12 +47,12 @@ class TestImageRescan:
 
     def test_rescan_request_requires_canonical(self) -> None:
         """F-INPUT-1: RescanImagesRequest without canonical field → ValidationError (→ HTTP 422)."""
-        with pytest.raises(pydantic.ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, pydantic.ValidationError)):
             RescanImagesRequest.model_validate({"architecture": "x86_64"})
 
     def test_rescan_request_requires_architecture(self) -> None:
         """F-INPUT-2: RescanImagesRequest without architecture field → ValidationError (→ HTTP 422)."""
-        with pytest.raises(pydantic.ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, pydantic.ValidationError)):
             RescanImagesRequest.model_validate({"canonical": "registry.example/image:latest"})
 
     @pytest.mark.xfail(

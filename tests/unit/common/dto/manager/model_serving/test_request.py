@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.model_serving.request import (
     TokenRequestModel,
     UpdateRouteRequestModel,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestListServeRequestModel:
@@ -56,13 +57,13 @@ class TestSearchServicesRequestModel:
         assert model.limit == 50
 
     def test_offset_must_be_non_negative(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchServicesRequestModel(offset=-1)
 
     def test_limit_bounds(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchServicesRequestModel(limit=0)
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchServicesRequestModel(limit=101)
 
 
@@ -156,7 +157,7 @@ class TestNewServiceRequestModel:
         assert model.bootstrap_script == "pip install deps"
 
     def test_service_name_pattern_validation(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             NewServiceRequestModel.model_validate({
                 "name": "ab",  # too short (min_length=4)
                 "desired_session_count": 1,
@@ -206,7 +207,7 @@ class TestUpdateRouteRequestModel:
         assert model.traffic_ratio == 0.0
 
     def test_negative_traffic_ratio_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateRouteRequestModel(traffic_ratio=-0.1)
 
 

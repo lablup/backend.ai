@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
     GetPresignedUploadURLInput,
     UpdateObjectStorageInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateObjectStorageInput:
@@ -44,7 +45,7 @@ class TestCreateObjectStorageInput:
         assert req.name == "my-storage"
 
     def test_empty_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateObjectStorageInput(
                 name="",
                 host="host",
@@ -55,7 +56,7 @@ class TestCreateObjectStorageInput:
             )
 
     def test_whitespace_only_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateObjectStorageInput(
                 name="   ",
                 host="host",
@@ -66,7 +67,7 @@ class TestCreateObjectStorageInput:
             )
 
     def test_name_exceeding_max_length_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateObjectStorageInput(
                 name="a" * 257,
                 host="host",
@@ -145,7 +146,7 @@ class TestDeleteObjectStorageInput:
         assert req.id == oid
 
     def test_invalid_uuid_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteObjectStorageInput.model_validate({"id": "not-a-uuid"})
 
     def test_round_trip(self) -> None:
@@ -182,7 +183,7 @@ class TestPresignedURLInputs:
         assert req.max_size == 10485760
 
     def test_upload_url_expiration_ge_1(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetPresignedUploadURLInput(
                 artifact_revision_id=uuid.uuid4(),
                 key="obj",
@@ -190,7 +191,7 @@ class TestPresignedURLInputs:
             )
 
     def test_upload_url_min_size_ge_0(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetPresignedUploadURLInput(
                 artifact_revision_id=uuid.uuid4(),
                 key="obj",

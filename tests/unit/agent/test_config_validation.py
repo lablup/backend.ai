@@ -25,6 +25,7 @@ from ai.backend.agent.config.unified import (
 )
 from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import AgentBackend
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import SlotName
 from ai.backend.logging.config import LoggingConfig, default_pkg_ns
@@ -148,14 +149,14 @@ class CoreDumpConfigTest:
     ) -> None:
         # core_pattern with pipe pattern
         with patch("pathlib.Path.read_text", return_value="|/usr/lib/systemd/systemd-coredump"):
-            with pytest.raises(ValidationError) as exc_info:
+            with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
                 CoreDumpConfig.model_validate(default_raw_config, context=default_context)
 
             assert "core_pattern must be an absolute path" in str(exc_info.value)
 
         # core_pattern with relative path
         with patch("pathlib.Path.read_text", return_value="core.%p"):
-            with pytest.raises(ValidationError) as exc_info:
+            with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
                 CoreDumpConfig.model_validate(default_raw_config, context=default_context)
 
             assert "core_pattern must be an absolute path" in str(exc_info.value)
@@ -178,7 +179,7 @@ class CoreDumpConfigTest:
         default_raw_config: RawConfigT,
         default_context: AgentConfigValidationContext,
     ) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             CoreDumpConfig.model_validate(default_raw_config, context=default_context)
 
         assert "only supported in Linux" in str(exc_info.value)
@@ -189,7 +190,7 @@ class CoreDumpConfigTest:
         default_raw_config: RawConfigT,
         default_context: AgentConfigValidationContext,
     ) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             CoreDumpConfig.model_validate(default_raw_config, context=default_context)
 
         assert "only supported in Linux" in str(exc_info.value)
@@ -207,7 +208,7 @@ class CoreDumpConfigTest:
         assert config.enabled is False
 
     def test_coredump_enabled_requires_context(self, default_raw_config: RawConfigT) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             CoreDumpConfig.model_validate(default_raw_config, context=None)
 
         assert "context must be specified" in str(exc_info.value)
@@ -260,7 +261,7 @@ class AgentConfigTest:
         assert config.rpc_listen_addr.host == "::"
 
     def test_rpc_listen_addr_rejects_link_local_ipv4(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentConfig.model_validate({
                 "backend": "docker",
                 "rpc-listen-addr": HostPortPair(host="169.254.1.1", port=6001),
@@ -269,7 +270,7 @@ class AgentConfigTest:
         assert "link-local" in str(exc_info.value)
 
     def test_rpc_listen_addr_rejects_link_local_ipv6(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentConfig.model_validate({
                 "backend": "docker",
                 "rpc-listen-addr": HostPortPair(host="fe80::1", port=6001),
@@ -427,7 +428,7 @@ class ContainerConfigTest:
 
     @patch("ai.backend.agent.utils.get_arch_name", return_value="aarch64")
     def test_sandbox_type_jail_fails_on_arm64(self, make_raw_config: MakeRawConfig) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             raw_config = make_raw_config(sandbox_type=ContainerSandboxType.JAIL)
             ContainerConfig.model_validate(raw_config)
 
@@ -448,7 +449,7 @@ class ContainerConfigTest:
 
     @patch("os.getuid", return_value=NON_ROOT_UID)
     def test_stats_type_cgroup_fails_for_non_root(self, make_raw_config: MakeRawConfig) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             ContainerConfig.model_validate(make_raw_config(stats_type=StatModes.CGROUP))
 
         assert "unless the agent runs as root" in str(exc_info.value)
@@ -467,7 +468,7 @@ class ContainerConfigTest:
 
     @patch("os.getuid", return_value=NON_ROOT_UID)
     def test_scratch_type_hostfile_fails_for_non_root(self, make_raw_config: MakeRawConfig) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             ContainerConfig.model_validate(make_raw_config(scratch_type=ScratchType.HOSTFILE))
 
         assert "unless the agent runs as root" in str(exc_info.value)
@@ -495,7 +496,7 @@ class ContainerConfigTest:
         assert config.port_range == (40000, 41000)
 
     def test_port_range_validation_invalid(self, make_raw_config: MakeRawConfig) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             ContainerConfig.model_validate(
                 make_raw_config(
                     port_range=[30000],  # Only one element
@@ -527,7 +528,7 @@ class TestResourceConfigValidation:
         assert config.affinity_policy == AffinityPolicy.INTERLEAVED
 
     def test_affinity_policy_rejects_invalid_string(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             ResourceConfig.model_validate({
                 "affinity-policy": "invalid_policy",
             })
@@ -564,7 +565,7 @@ class TestAgentUnifiedConfigValidation:
             "scratch-type": "k8s-nfs",
             # Missing scratch-nfs-address and scratch-nfs-options
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "scratch-nfs-address and scratch-nfs-options are required" in str(exc_info.value)
@@ -601,7 +602,7 @@ class TestAgentUnifiedConfigValidation:
             "scratch-nfs-options": "nfsvers=4.1",
             # Missing scratch-nfs-address
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "scratch-nfs-address and scratch-nfs-options are required" in str(exc_info.value)
@@ -616,7 +617,7 @@ class TestAgentUnifiedConfigValidation:
             "scratch-nfs-address": "nfs.example.com:/exports",
             # Missing scratch-nfs-options
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "scratch-nfs-address and scratch-nfs-options are required" in str(exc_info.value)
@@ -718,7 +719,7 @@ class TestAgentUnifiedConfigSingleAgentMode:
                 }
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "should not be specified with only 1 agent" in str(exc_info.value)
@@ -1052,7 +1053,7 @@ class TestMultipleAgentsConfigValidation:
                 {"agent": {"id": "agent-2"}},
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "Field required" in str(exc_info.value)
@@ -1119,7 +1120,7 @@ class TestMultipleAgentsConfigValidation:
             ],
         }
 
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "duplicate" in str(exc_info.value).lower()
@@ -1235,7 +1236,7 @@ class TestResourceAllocationModes:
                 {"agent": {"id": "agent-2"}},
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "must not specify manual resource" in str(exc_info.value)
@@ -1264,7 +1265,7 @@ class TestResourceAllocationModes:
                 {"agent": {"id": "agent-2"}},
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "must not specify manual resource" in str(exc_info.value)
@@ -1308,7 +1309,7 @@ class TestResourceAllocationModes:
                 {"agent": {"id": "agent-2"}},
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "must not specify manual resource" in str(exc_info.value)
@@ -1334,7 +1335,7 @@ class TestResourceAllocationModes:
                 {"agent": {"id": "agent-2"}},
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "Field required" in str(exc_info.value)
@@ -1503,7 +1504,7 @@ class TestResourceAllocationModes:
                 },
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "All agents must have the same slots defined" in str(exc_info.value)
@@ -1543,7 +1544,7 @@ class TestResourceAllocationModes:
                 },
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "All agents must have the same slots defined" in str(exc_info.value)
@@ -1580,7 +1581,7 @@ class TestResourceAllocationModes:
                 },
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "All agents must have the same slots defined" in str(exc_info.value)
@@ -1694,7 +1695,7 @@ class TestResourceAllocationModes:
                 },
             ],
         }
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
         assert "must not be a negative value" in str(exc_info.value)

@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _make_webhook_spec_info() -> WebhookSpecInfo:
@@ -523,5 +524,5 @@ class TestValidateNotificationRulePayload:
         assert restored.message == "Rendered: hello world"
 
     def test_missing_message_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ValidateNotificationRulePayload.model_validate({})

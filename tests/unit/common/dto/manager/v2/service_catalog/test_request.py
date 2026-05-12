@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.request import (
     HeartbeatInput,
     UpdateServiceCatalogInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ServiceCatalogStatus
 
 
@@ -65,11 +66,11 @@ class TestEndpointInput:
         assert inp.metadata == {"region": "us-east"}
 
     def test_port_min_is_1(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_endpoint_input(port=0)
 
     def test_port_max_is_65535(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_endpoint_input(port=65536)
 
     def test_port_at_min_is_valid(self) -> None:
@@ -81,23 +82,23 @@ class TestEndpointInput:
         assert inp.port == 65535
 
     def test_role_max_length_32(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_endpoint_input(role="r" * 33)
 
     def test_role_min_length_1(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_endpoint_input(role="")
 
     def test_scope_max_length_32(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_endpoint_input(scope="s" * 33)
 
     def test_address_max_length_256(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_endpoint_input(address="a" * 257)
 
     def test_protocol_max_length_16(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_endpoint_input(protocol="p" * 17)
 
     def test_round_trip(self) -> None:
@@ -125,11 +126,11 @@ class TestCreateServiceCatalogInput:
         assert inp.display_name == "My Service"
 
     def test_whitespace_only_display_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(display_name="   ")
 
     def test_empty_display_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(display_name="")
 
     def test_labels_defaults_to_empty_dict(self) -> None:
@@ -145,31 +146,31 @@ class TestCreateServiceCatalogInput:
         assert inp.endpoints is None
 
     def test_service_group_min_length_1(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(service_group="")
 
     def test_service_group_max_length_64(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(service_group="g" * 65)
 
     def test_instance_id_min_length_1(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(instance_id="")
 
     def test_instance_id_max_length_128(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(instance_id="i" * 129)
 
     def test_display_name_max_length_256(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(display_name="d" * 257)
 
     def test_version_min_length_1(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(version="")
 
     def test_version_max_length_64(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(version="v" * 65)
 
     def test_with_labels(self) -> None:
@@ -241,11 +242,11 @@ class TestUpdateServiceCatalogInput:
         assert inp.display_name == "Updated Name"
 
     def test_whitespace_only_display_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateServiceCatalogInput(display_name="   ")
 
     def test_empty_display_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateServiceCatalogInput(display_name="")
 
     def test_version_update(self) -> None:
@@ -290,11 +291,11 @@ class TestDeleteServiceCatalogInput:
         assert inp.id == catalog_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteServiceCatalogInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteServiceCatalogInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:
@@ -323,11 +324,11 @@ class TestHeartbeatInput:
         assert inp.id == catalog_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             HeartbeatInput.model_validate({"id": "bad-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             HeartbeatInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:

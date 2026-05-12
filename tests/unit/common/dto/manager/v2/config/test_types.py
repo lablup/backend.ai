@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.config.types import (
     DotfileScope,
     OrderDirection,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class _PermissionModel(BaseModel):
@@ -137,25 +138,25 @@ class TestDotfilePermissionValidation:
         assert m.perm == "000"
 
     def test_invalid_permission_with_9_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _PermissionModel(perm="999")
 
     def test_invalid_permission_with_8_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _PermissionModel(perm="888")
 
     def test_invalid_permission_alpha_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _PermissionModel(perm="abc")
 
     def test_invalid_permission_too_short_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _PermissionModel(perm="77")
 
     def test_invalid_permission_too_long_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _PermissionModel(perm="7777")
 
     def test_invalid_permission_empty_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _PermissionModel(perm="")

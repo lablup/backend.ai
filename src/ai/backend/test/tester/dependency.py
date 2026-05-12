@@ -1,11 +1,16 @@
 from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
-from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES, ClusterMode, RuntimeVariant
+from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
+    BackendAISchema,
+    ClusterMode,
+    RuntimeVariant,
+)
 
 
-class BaseDependencyModel(BaseModel):
+class BaseDependencyModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")

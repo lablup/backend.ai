@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.error_log.types import (
     ErrorLogContextInfo,
     ErrorLogRequestInfo,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 def _make_context_info() -> ErrorLogContextInfo:
@@ -127,7 +128,7 @@ class TestErrorLogNodeCreation:
         assert node.is_cleared is False
 
     def test_missing_required_field_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ErrorLogNode.model_validate({
                 "log_id": "log-004",
                 "severity": "error",
@@ -220,7 +221,7 @@ class TestAppendErrorLogPayload:
         assert payload.success is False
 
     def test_missing_success_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogPayload.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -251,7 +252,7 @@ class TestListErrorLogsPayload:
         assert payload.logs[0].log_id == "log-001"
 
     def test_missing_required_field_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsPayload.model_validate({"logs": []})  # missing count
 
     def test_round_trip_serialization(self) -> None:
@@ -284,7 +285,7 @@ class TestMarkClearedPayload:
         assert payload.success is False
 
     def test_missing_success_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             MarkClearedPayload.model_validate({})
 
     def test_round_trip_serialization(self) -> None:

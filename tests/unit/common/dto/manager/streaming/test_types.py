@@ -33,6 +33,7 @@ from ai.backend.common.dto.manager.streaming.types import (
     StreamAppInfo,
     StreamProxyParams,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 _pty_client_adapter: TypeAdapter[PtyClientMessage] = TypeAdapter(PtyClientMessage)
 
@@ -124,11 +125,11 @@ class TestPtyStdinMessage:
         assert msg.chars == "aGVsbG8="
 
     def test_missing_chars(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PtyStdinMessage(type=PtyInputMessageType.STDIN)  # type: ignore[call-arg]
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PtyStdinMessage(type=PtyInputMessageType.STDIN, chars="abc", extra="bad")  # type: ignore[call-arg]
 
 
@@ -140,11 +141,11 @@ class TestPtyResizeMessage:
         assert msg.cols == 80
 
     def test_missing_dimensions(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PtyResizeMessage(type=PtyInputMessageType.RESIZE, rows=24)  # type: ignore[call-arg]
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PtyResizeMessage(type=PtyInputMessageType.RESIZE, rows=24, cols=80, extra="bad")  # type: ignore[call-arg]
 
 
@@ -154,7 +155,7 @@ class TestPtyPingMessage:
         assert msg.type == PtyInputMessageType.PING
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PtyPingMessage(type=PtyInputMessageType.PING, extra="bad")  # type: ignore[call-arg]
 
 
@@ -182,7 +183,7 @@ class TestPtyClientMessageDiscriminatedUnion:
         assert isinstance(msg, PtyRestartMessage)
 
     def test_invalid_type(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _pty_client_adapter.validate_python({"type": "unknown"})
 
 
@@ -193,7 +194,7 @@ class TestPtyOutputMessage:
         assert msg.data == "aGVsbG8="
 
     def test_missing_data(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PtyOutputMessage(type=PtyOutputMessageType.OUT)  # type: ignore[call-arg]
 
 
@@ -216,15 +217,15 @@ class TestExecuteRequest:
         assert req.options == {"flag": True}
 
     def test_missing_mode(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExecuteRequest()  # type: ignore[call-arg]
 
     def test_invalid_mode(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExecuteRequest(mode="invalid")  # type: ignore[arg-type]
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExecuteRequest(mode=ExecuteMode.QUERY, extra="bad")  # type: ignore[call-arg]
 
 
@@ -248,11 +249,11 @@ class TestExecuteResult:
         assert result.console == [["stdout", "hello\n"]]
 
     def test_missing_status(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExecuteResult()  # type: ignore[call-arg]
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExecuteResult(status="finished", extra="bad")  # type: ignore[call-arg]
 
 
@@ -292,19 +293,19 @@ class TestStreamProxyParams:
         assert params.port == 65535
 
     def test_port_below_min(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StreamProxyParams(app="test", port=1023)
 
     def test_port_above_max(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StreamProxyParams(app="test", port=65536)
 
     def test_missing_app(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StreamProxyParams()  # type: ignore[call-arg]
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StreamProxyParams(app="test", extra="bad")  # type: ignore[call-arg]
 
 
@@ -331,7 +332,7 @@ class TestStreamAppInfo:
         assert info.url_template == "http://localhost:{port}"
 
     def test_missing_required_field(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StreamAppInfo(name="test", protocol="http")  # type: ignore[call-arg]
 
 
@@ -375,7 +376,7 @@ class TestSessionEventParams:
         assert params.group_name == "my-group"
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SessionEventParams.model_validate({"extra": "bad"})
 
 
@@ -391,11 +392,11 @@ class TestBackgroundTaskEventParams:
         assert params.task_id == uid
 
     def test_missing_task_id(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BackgroundTaskEventParams()  # type: ignore[call-arg]
 
     def test_invalid_uuid(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BackgroundTaskEventParams.model_validate({"task_id": "not-a-uuid"})
 
 
@@ -417,7 +418,7 @@ class TestBgtaskUpdatedPayload:
         assert payload.total_progress == 100.0
 
     def test_missing_required(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BgtaskUpdatedPayload(task_id="abc", message="test")  # type: ignore[call-arg]
 
     def test_round_trip(self) -> None:
@@ -452,7 +453,7 @@ class TestBgtaskPartialSuccessPayload:
         assert payload.errors == ["err1", "err2"]
 
     def test_missing_errors(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BgtaskPartialSuccessPayload(task_id="abc", message="partial")  # type: ignore[call-arg]
 
 
@@ -462,7 +463,7 @@ class TestBgtaskCancelledPayload:
         assert payload.task_id == "abc"
 
     def test_rejects_extra_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BgtaskCancelledPayload(
                 task_id="abc",
                 message="cancelled",

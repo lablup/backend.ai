@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestEnqueueSessionInput:
@@ -70,7 +71,7 @@ class TestEnqueueSessionInput:
 
     def test_session_name_too_long(self) -> None:
         """Session name exceeding max_length should fail."""
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             EnqueueSessionInput(
                 session_name="x" * 65,
                 session_type=CreateSessionTypeEnum.INTERACTIVE,
@@ -81,7 +82,7 @@ class TestEnqueueSessionInput:
 
     def test_empty_session_name(self) -> None:
         """Empty session name should fail."""
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             EnqueueSessionInput(
                 session_name="",
                 session_type=CreateSessionTypeEnum.INTERACTIVE,
@@ -92,7 +93,7 @@ class TestEnqueueSessionInput:
 
     def test_cluster_size_zero(self) -> None:
         """Cluster size 0 should fail."""
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             EnqueueSessionInput(
                 session_name="test",
                 session_type=CreateSessionTypeEnum.INTERACTIVE,
@@ -104,7 +105,7 @@ class TestEnqueueSessionInput:
 
     def test_priority_out_of_range(self) -> None:
         """Priority > 100 should fail."""
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             EnqueueSessionInput(
                 session_name="test",
                 session_type=CreateSessionTypeEnum.INTERACTIVE,
@@ -148,7 +149,7 @@ class TestEnqueueSessionInput:
 
     def test_project_id_required(self) -> None:
         """project_id is required."""
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             EnqueueSessionInput.model_validate({
                 "session_name": "test",
                 "session_type": "interactive",
@@ -184,11 +185,11 @@ class TestBatchConfigInput:
         assert config.batch_timeout == 7200
 
     def test_empty_startup_command(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BatchConfigInput(startup_command="")
 
     def test_negative_timeout(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BatchConfigInput(startup_command="echo hi", batch_timeout=-1)
 
     def test_optional_fields_default_none(self) -> None:
@@ -239,11 +240,11 @@ class TestStartSessionServiceInput:
         assert result.arguments == {"--logdir": "/logs"}
 
     def test_port_below_range(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StartSessionServiceInput(service="jupyter", port=80)
 
     def test_port_above_range(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StartSessionServiceInput(service="jupyter", port=70000)
 
 
@@ -268,11 +269,11 @@ class TestUpdateSessionInput:
         assert result.tag == "experiment-1"
 
     def test_name_too_long(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateSessionInput(name="x" * 65)
 
     def test_empty_name(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateSessionInput(name="")
 
     def test_both_none(self) -> None:
