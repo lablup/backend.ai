@@ -677,14 +677,13 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             driver=OptionalState.from_graphql(self.driver),
             driver_opts=OptionalState.from_graphql(self.driver_opts),
         )
-        validated_scheduler_opts: Any
-        if self.scheduler_opts is not None and self.scheduler_opts is not Undefined:
-            validated_scheduler_opts = ScalingGroupOpts.model_validate(self.scheduler_opts)
-        else:
-            validated_scheduler_opts = Undefined
         scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
             scheduler=OptionalState.from_graphql(self.scheduler),
-            scheduler_opts=OptionalState.from_graphql(validated_scheduler_opts),
+            scheduler_opts=OptionalState.from_graphql(
+                ScalingGroupOpts.model_validate(self.scheduler_opts)
+                if self.scheduler_opts is not None and self.scheduler_opts is not Undefined
+                else Undefined
+            ),
         )
         spec = ScalingGroupUpdaterSpec(
             status=status_spec,
@@ -716,7 +715,6 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
         graph_ctx: GraphQueryContext = info.context
-        scheduler_opts = ScalingGroupOpts.model_validate(props.scheduler_opts)
         spec = ScalingGroupCreatorSpec(
             name=name,
             description=props.description,
@@ -727,7 +725,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             driver=props.driver,
             driver_opts=props.driver_opts,
             scheduler=props.scheduler,
-            scheduler_opts=scheduler_opts,
+            scheduler_opts=ScalingGroupOpts.model_validate(props.scheduler_opts),
             use_host_network=bool(props.use_host_network),
         )
         creator = Creator(spec=spec)
