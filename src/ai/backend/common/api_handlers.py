@@ -26,6 +26,7 @@ from ai.backend.common.types import StreamReader
 from ai.backend.logging import BraceStyleAdapter
 
 from .exception import (
+    BackendAIModel,
     InvalidAPIHandlerDefinition,
     InvalidAPIParameters,
     MalformedRequestBody,
@@ -45,21 +46,21 @@ class Sentinel(enum.Enum):
 SENTINEL = Sentinel.TOKEN
 
 
-class BaseRequestModel(BaseModel):
+class BaseRequestModel(BackendAIModel):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
 
 
-class BaseFieldModel(BaseModel):
+class BaseFieldModel(BackendAIModel):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
 
 
-class BaseResponseModel(BaseModel):
+class BaseResponseModel(BackendAIModel):
     pass
 
 

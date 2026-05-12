@@ -517,12 +517,33 @@ def format_pydantic_validation_errors(
     return summary, structured
 
 
+class ModelValidationFailed(BackendAIError, web.HTTPBadRequest):
+    """Generic 400 raised when a :class:`BackendAIModel` fails validation.
+
+    Distinct from :class:`InvalidAPIParameters` so callers can tell
+    "this came from a Pydantic model validator" apart from "this came
+    from an explicit API parameter check," and so domain-specific
+    handlers can choose to catch and re-wrap one without affecting the
+    other.
+    """
+
+    error_type = "https://api.backend.ai/probs/model-validation-failed"
+    error_title = "Model validation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class BackendAIModel(BaseModel):
     """Project-wide Pydantic base for Backend.AI models.
 
     Overrides ``model_validate`` / ``model_validate_json`` /
     ``model_validate_strings`` so a ``ValidationError`` is auto-mapped
-    to :class:`InvalidAPIParameters` (HTTP 400) carrying the structured
+    to :class:`ModelValidationFailed` (HTTP 400) carrying the structured
     per-field error list. Call sites get a clean 4xx without repeating
     ``try / except ValidationError`` at every site.
 
@@ -548,7 +569,7 @@ class BackendAIModel(BaseModel):
             return super().model_validate(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise InvalidAPIParameters.from_pydantic(e) from e
+            raise ModelValidationFailed.from_pydantic(e) from e
 
     @classmethod
     def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
@@ -556,7 +577,7 @@ class BackendAIModel(BaseModel):
             return super().model_validate_json(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise InvalidAPIParameters.from_pydantic(e) from e
+            raise ModelValidationFailed.from_pydantic(e) from e
 
     @classmethod
     def model_validate_strings(cls, *args: Any, **kwargs: Any) -> Self:
@@ -564,7 +585,7 @@ class BackendAIModel(BaseModel):
             return super().model_validate_strings(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise InvalidAPIParameters.from_pydantic(e) from e
+            raise ModelValidationFailed.from_pydantic(e) from e
 
 
 class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):

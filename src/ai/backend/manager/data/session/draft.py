@@ -35,8 +35,9 @@ from typing import Any
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
+from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -61,7 +62,7 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.models.network import NetworkType
 
 
-class _DraftBaseModel(BaseModel):
+class _DraftBaseModel(BackendAIModel):
     """Base for draft sub-models.
 
     Matches the spec's ``_SpecBaseModel`` configuration so

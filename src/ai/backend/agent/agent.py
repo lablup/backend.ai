@@ -159,7 +159,6 @@ from ai.backend.common.events.types import (
 )
 from ai.backend.common.exception import (
     ConfigurationError,
-    InvalidAPIParameters,
     VolumeMountFailed,
 )
 from ai.backend.common.json import (
@@ -236,7 +235,6 @@ from .errors import (
     ImagePullTimeoutError,
     ModelDefinitionEmptyError,
     ModelDefinitionNotFoundError,
-    ModelDefinitionValidationError,
     ModelFolderNotSpecifiedError,
     PortConflictError,
     ReservedPortError,
@@ -3295,16 +3293,7 @@ class AbstractAgent[
                 f" vFolder {model_folder.name} (ID {model_folder.vfid})",
             )
 
-        try:
-            parsed = ModelDefinition.model_validate(inlined)
-        except InvalidAPIParameters as e:
-            raise ModelDefinitionValidationError(
-                extra_msg=(
-                    "Failed to validate model definition for vFolder"
-                    f" {model_folder.name} (ID {model_folder.vfid})"
-                ),
-                extra_data=e.extra_data,
-            ) from e
+        parsed = ModelDefinition.model_validate(inlined)
         if not parsed.models:
             raise ModelDefinitionEmptyError
         model_definition = parsed.model_dump(mode="json")

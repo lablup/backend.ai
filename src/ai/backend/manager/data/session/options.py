@@ -18,7 +18,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.identifier.image import ImageID
@@ -31,7 +31,7 @@ from ai.backend.common.types import (
 )
 
 
-class _OptionsBaseModel(BaseModel):
+class _OptionsBaseModel(BackendAIModel):
     """Base for session-options data types.
 
     ``arbitrary_types_allowed`` lets us use ``ResourceSlot`` (UserDict)
@@ -211,7 +211,7 @@ class SessionHandlerOptions(_OptionsBaseModel):
         )
 
 
-class ResourceOpts(_OptionsBaseModel, BackendAIModel):
+class ResourceOpts(_OptionsBaseModel):
     """Per-kernel qualitative resource hints.
 
     Distinct from ``ResourceSlot`` which carries quantitative slots.

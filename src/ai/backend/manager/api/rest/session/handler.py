@@ -18,7 +18,7 @@ from uuid import UUID
 
 import yarl
 from aiohttp import web
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from ai.backend.common.api_handlers import APIResponse, BaseResponseModel, BodyParam, QueryParam
 from ai.backend.common.contexts.user import current_user
@@ -219,10 +219,7 @@ def _validate_creation_config(
             model_cls = CreationConfigV1
         else:
             raise InvalidAPIParameters("API version not supported")
-    try:
-        model = model_cls.model_validate(config)
-    except ValidationError as e:
-        raise InvalidAPIParameters.from_pydantic(e) from e
+    model = model_cls.model_validate(config)
     return model.model_dump(by_alias=False)
 
 

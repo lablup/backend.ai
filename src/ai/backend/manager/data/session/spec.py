@@ -21,8 +21,9 @@ from typing import Any
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
+from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
@@ -36,7 +37,7 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.models.network import NetworkType
 
 
-class _SpecBaseModel(BaseModel):
+class _SpecBaseModel(BackendAIModel):
     """Base for resolved session-spec sub-models.
 
     ``arbitrary_types_allowed`` lets us use ``ResourceSlot`` and other
