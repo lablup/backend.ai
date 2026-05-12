@@ -70,6 +70,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_vali
 from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
     RequestedSlotTypeRule,
 )
+from ai.backend.manager.sokovan.scheduling_controller.validators.required_resource_slot_rule import (
+    RequiredResourceSlotRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
     ResourceLimitRule,
 )
@@ -167,12 +170,14 @@ def _ctx(
     keypair_policy: KeyPairResourcePolicyData | None = None,
     image_infos: dict[ImageID, ImageInfo] | None = None,
     known_slot_types: dict[SlotName, SlotTypes] | None = None,
+    required_slot_names: frozenset[SlotName] | None = None,
     dotfile_data: DotfileBundle | None = None,
 ) -> SessionSpecValidationContext:
     return SessionSpecValidationContext(
         keypair_resource_policy=keypair_policy,
         image_infos=image_infos or {},
         known_slot_types=known_slot_types or {},
+        required_slot_names=required_slot_names or frozenset(),
         dotfile_data=dotfile_data or DotfileBundle(),
     )
 
@@ -506,3 +511,41 @@ class TestRequestedSlotTypeRule:
         spec = _spec((_kernel_with_resources(img, resources=(("cpu", "1"),)),))
         with pytest.raises(InvalidAPIParameters):
             RequestedSlotTypeRule().validate(spec, _ctx())
+
+
+class TestRequiredResourceSlotRule:
+    @pytest.fixture
+    def image_id(self) -> ImageID:
+        return ImageID(uuid.uuid4())
+
+    @pytest.fixture
+    def required_slot_ctx(self) -> SessionSpecValidationContext:
+        return _ctx(required_slot_names=frozenset({SlotName("cpu"), SlotName("mem")}))
+
+    def test_passes_when_required_slots_present(
+        self,
+        image_id: ImageID,
+        required_slot_ctx: SessionSpecValidationContext,
+    ) -> None:
+        spec = _spec((
+            _kernel_with_resources(image_id, resources=(("cpu", "1"), ("mem", "1073741824"))),
+        ))
+        RequiredResourceSlotRule().validate(spec, required_slot_ctx)
+
+    @pytest.mark.parametrize(
+        ("resources", "expected_missing_slot"),
+        [
+            (((("cpu", "1"),)), "mem"),
+            (((("cpu", "0"), ("mem", "1073741824"))), "cpu"),
+        ],
+    )
+    def test_rejects_missing_or_zero_required_slot(
+        self,
+        image_id: ImageID,
+        required_slot_ctx: SessionSpecValidationContext,
+        resources: tuple[tuple[str, str], ...],
+        expected_missing_slot: str,
+    ) -> None:
+        spec = _spec((_kernel_with_resources(image_id, resources=resources),))
+        with pytest.raises(InvalidAPIParameters, match=expected_missing_slot):
+            RequiredResourceSlotRule().validate(spec, required_slot_ctx)

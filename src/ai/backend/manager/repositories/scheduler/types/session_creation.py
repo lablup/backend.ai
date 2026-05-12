@@ -147,4 +147,5 @@ class SessionSpecContextFetch:
     dotfile_data: DotfileBundle
     keypair_resource_policy: Any | None  # KeyPairResourcePolicyData
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
+    required_slot_names: frozenset[SlotName] = field(default_factory=frozenset)
     active_session_count: int = 0
