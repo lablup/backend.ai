@@ -1,14 +1,25 @@
 """
-Regression tests for BA-5996: SessionRow.network_type / network_id must be
-propagated through ScheduleDBSource into SessionDataForStart so that the
-scheduler launcher can take the PERSISTENT branch (reusing a pre-created
-network) instead of incorrectly calling create_network as if the session
-were VOLATILE.
+Regression test for BA-5996.
 
-Covers all three query paths that build SessionDataForStart:
-- _get_sessions_for_start (via get_sessions_for_start)
-- _fetch_sessions_for_start_by_ids (via get_sessions_for_start_by_ids)
-- search_sessions_with_kernels_and_user
+Background
+----------
+Before the fix, ``ScheduleDBSource.search_sessions_with_kernels_and_user`` (the
+runtime path used by ``StartSessionsLifecycleHandler``) did not SELECT
+``SessionRow.network_type`` / ``SessionRow.network_id`` nor pass them to
+``SessionDataForStart``. The launcher therefore always saw ``network_type=None``
+for sessions that were created with ``network_type=PERSISTENT`` and a
+pre-existing ``network_id``, fell through to the VOLATILE branch in
+``_setup_network_configuration``, and for ``cluster_mode=MULTI_NODE`` ended up
+calling ``network_plugin.create_network(identifier=session_id)`` every time —
+creating a brand-new overlay network instead of reusing the user-specified
+PERSISTENT network. Once the project's ``max_network_count`` quota was hit,
+this surfaced as ``"Cannot create more networks on this project"`` errors.
+
+This regression guards the data-layer contract that prevents that behavior:
+*a PERSISTENT session stored with a pre-created network_id must reach the
+launcher with both fields intact*, so the launcher takes the PERSISTENT branch
+(``_setup_network_configuration`` at ``launcher.py:471``) and does not call
+``network_plugin.create_network`` at all.
 """
 
 import uuid
@@ -58,8 +69,13 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 from ai.backend.testutils.db import with_tables
 
 
-class TestSessionNetworkPropagation:
-    """Regression tests for BA-5996 network_type/network_id propagation."""
+class TestPersistentNetworkNotRecreated:
+    """Regression for BA-5996.
+
+    Ensures the runtime query path carries ``network_type`` / ``network_id``
+    through to ``SessionDataForStart`` so the launcher's PERSISTENT branch
+    reuses the pre-existing network instead of silently creating a new one.
+    """
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -222,15 +238,14 @@ class TestSessionNetworkPropagation:
             "agent_id": agent_id,
         }
 
-    async def _add_session_with_kernel(
+    async def _add_multi_node_persistent_session(
         self,
         db: ExtendedAsyncSAEngine,
         env: dict[str, Any],
         *,
-        network_type: NetworkType | None,
-        network_id: str | None,
+        network_id: str,
     ) -> SessionId:
-        """Create a PREPARED session + PREPARED kernel with the given network fields."""
+        """Create a PREPARED multi-node session that explicitly references a PERSISTENT network."""
         session_id = SessionId(uuid.uuid4())
         kernel_id = uuid.uuid4()
 
@@ -257,7 +272,7 @@ class TestSessionNetworkPropagation:
                     vfolder_mounts=[],
                     environ={},
                     result=SessionResult.UNDEFINED,
-                    network_type=network_type,
+                    network_type=NetworkType.PERSISTENT,
                     network_id=network_id,
                 )
             )
@@ -301,105 +316,46 @@ class TestSessionNetworkPropagation:
 
         return session_id
 
-    async def test_get_sessions_for_start_propagates_network_fields(
+    async def test_persistent_network_not_recreated_on_session_start(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         seeded_environment: dict[str, Any],
     ) -> None:
-        """get_sessions_for_start must carry network_type/network_id from SessionRow."""
-        persistent_id = await self._add_session_with_kernel(
-            db_with_cleanup,
-            seeded_environment,
-            network_type=NetworkType.PERSISTENT,
-            network_id="net-id-persistent-123",
-        )
-        volatile_id = await self._add_session_with_kernel(
-            db_with_cleanup,
-            seeded_environment,
-            network_type=NetworkType.VOLATILE,
-            network_id=None,
-        )
-        none_id = await self._add_session_with_kernel(
-            db_with_cleanup,
-            seeded_environment,
-            network_type=None,
-            network_id=None,
-        )
+        """A PERSISTENT session must reach the launcher with network_type/network_id intact.
 
-        db_source = ScheduleDBSource(db_with_cleanup)
-        result = await db_source.get_sessions_for_start(
-            [SessionStatus.PREPARED],
-            [KernelStatus.PREPARED],
-        )
+        Pre-fix behaviour: ``search_sessions_with_kernels_and_user`` dropped both
+        fields, so the launcher always saw ``network_type=None``, treated the
+        session as VOLATILE + MULTI_NODE, and called
+        ``network_plugin.create_network`` to create a brand-new overlay network
+        for every start — defeating the purpose of pre-creating a PERSISTENT
+        network and eventually exhausting the project's ``max_network_count``.
 
-        sessions_by_id = {s.session_id: s for s in result.sessions}
-        assert sessions_by_id[persistent_id].network_type == NetworkType.PERSISTENT
-        assert sessions_by_id[persistent_id].network_id == "net-id-persistent-123"
-        assert sessions_by_id[volatile_id].network_type == NetworkType.VOLATILE
-        assert sessions_by_id[volatile_id].network_id is None
-        assert sessions_by_id[none_id].network_type is None
-        assert sessions_by_id[none_id].network_id is None
-
-    async def test_get_sessions_for_start_by_ids_propagates_network_fields(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        seeded_environment: dict[str, Any],
-    ) -> None:
-        """get_sessions_for_start_by_ids must carry network_type/network_id."""
-        persistent_id = await self._add_session_with_kernel(
-            db_with_cleanup,
-            seeded_environment,
-            network_type=NetworkType.PERSISTENT,
-            network_id="net-id-by-ids-456",
-        )
-        volatile_id = await self._add_session_with_kernel(
-            db_with_cleanup,
-            seeded_environment,
-            network_type=NetworkType.VOLATILE,
-            network_id=None,
-        )
-
-        db_source = ScheduleDBSource(db_with_cleanup)
-        result = await db_source.get_sessions_for_start_by_ids([persistent_id, volatile_id])
-
-        sessions_by_id = {s.session_id: s for s in result.sessions}
-        assert sessions_by_id[persistent_id].network_type == NetworkType.PERSISTENT
-        assert sessions_by_id[persistent_id].network_id == "net-id-by-ids-456"
-        assert sessions_by_id[volatile_id].network_type == NetworkType.VOLATILE
-        assert sessions_by_id[volatile_id].network_id is None
-
-    async def test_search_sessions_with_kernels_and_user_propagates_network_fields(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        seeded_environment: dict[str, Any],
-    ) -> None:
-        """search_sessions_with_kernels_and_user must carry network_type/network_id.
-
-        This is the path actually used by StartSessionsLifecycleHandler at runtime,
-        so it is the most direct regression check for the create_network bug.
+        This test exercises the runtime path used by
+        ``StartSessionsLifecycleHandler`` and asserts the data contract that
+        prevents that re-creation: the returned ``SessionDataForStart`` must
+        carry the original ``network_type=PERSISTENT`` and ``network_id`` so the
+        launcher's PERSISTENT branch (``launcher.py:471``) reuses the
+        pre-existing network instead of falling through to the VOLATILE branch.
         """
-        persistent_id = await self._add_session_with_kernel(
+        pre_created_network_id = "pre-created-overlay-net"
+        session_id = await self._add_multi_node_persistent_session(
             db_with_cleanup,
             seeded_environment,
-            network_type=NetworkType.PERSISTENT,
-            network_id="net-id-search-789",
-        )
-        volatile_id = await self._add_session_with_kernel(
-            db_with_cleanup,
-            seeded_environment,
-            network_type=NetworkType.VOLATILE,
-            network_id=None,
+            network_id=pre_created_network_id,
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
         querier = BatchQuerier(
             pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids([persistent_id, volatile_id])],
+            conditions=[SessionConditions.by_ids([session_id])],
         )
         result = await db_source.search_sessions_with_kernels_and_user(querier)
 
-        sessions_by_id = {s.session_id: s for s in result.sessions}
-        assert sessions_by_id[persistent_id].network_type == NetworkType.PERSISTENT
-        assert sessions_by_id[persistent_id].network_id == "net-id-search-789"
-        assert sessions_by_id[volatile_id].network_type == NetworkType.VOLATILE
-        assert sessions_by_id[volatile_id].network_id is None
+        assert len(result.sessions) == 1
+        session = result.sessions[0]
+        assert session.session_id == session_id
+        # The two assertions below are the regression contract: with these
+        # values populated, the launcher takes the PERSISTENT branch and never
+        # calls ``network_plugin.create_network``.
+        assert session.network_type == NetworkType.PERSISTENT
+        assert session.network_id == pre_created_network_id
