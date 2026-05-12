@@ -1445,6 +1445,20 @@ class Context(metaclass=ABCMeta):
                             "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64",
                             "x86_64",
                         )
+
+                    if self.install_info.service_config.sftp_agent_enabled:
+                        # Pre-pull the SFTP server image so the first SFTP
+                        # session does not stall on a cold image fetch. The
+                        # tag is single-arch (multi-arch manifest); the
+                        # registered metadata also makes it resolvable for
+                        # storage-proxy when routing SFTP upload sessions.
+                        sftp_image_ref = "cr.backend.ai/stable/sftp-server:24.04-ubuntu24.04"
+                        await self.run_exec([
+                            *self.docker_sudo,
+                            "docker",
+                            "pull",
+                            sftp_image_ref,
+                        ])
                 case ImageSource.DOCKER_HUB:
                     self.log_header(
                         "Scanning and pulling configured Docker Hub container images..."
