@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -71,6 +72,14 @@ def _extract_error_code(exception: BaseException) -> str | None:
     if isinstance(exception, BackendAIError):
         return str(exception.error_code())
     return None
+
+
+@dataclass(frozen=True)
+class _RouteWithHealthCheck:
+    """Bundles a route with its resolved revision-level health-check config."""
+
+    route: RouteData
+    health_check: ModelHealthCheck
 
 
 class RouteExecutor:
@@ -217,15 +226,7 @@ class RouteExecutor:
         )
 
     async def check_running_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Check health status of running routes.
-
-        Args:
-            routes: Routes to check (should be HEALTHY or UNHEALTHY status)
-
-        Returns:
-            Result containing routes with updated health status
-        """
-        # Phase 1: Load status
+        """Check health status of running routes."""
         with RouteRecorderContext.shared_phase("load_status"):
             with RouteRecorderContext.shared_step("load_session_status"):
                 route_ids = {route.route_id for route in routes}
@@ -236,7 +237,6 @@ class RouteExecutor:
         successes: list[RouteData] = []
         errors: list[RouteExecutionError] = []
 
-        # Phase 2: Verify status (per-route)
         for route in routes:
             try:
                 self._verify_route_session_status(route, session_statuses)
@@ -252,17 +252,29 @@ class RouteExecutor:
                     )
                 )
 
-        # Phase 3: Populate replica connection info for routes missing it
-        routes_missing_replica = [r for r in successes if not r.replica_host]
+        if not successes:
+            return RouteExecutionResult(successes=successes, errors=errors)
+
+        hc_configs = await self._deployment_repo.fetch_health_check_configs({
+            r.revision_id for r in successes
+        })
+        hc_pairs: list[_RouteWithHealthCheck] = [
+            _RouteWithHealthCheck(route=r, health_check=hc)
+            for r in successes
+            if (hc := hc_configs.get(r.revision_id)) is not None
+        ]
+
+        # ``_populate_replica_info`` mutates ``replica_host``/``replica_port``
+        # in place so the rows it just populated flow into the Phase-4 filter.
+        routes_missing_replica = [p.route for p in hc_pairs if not p.route.replica_host]
         if routes_missing_replica:
             with RouteRecorderContext.shared_phase("populate_replica_info"):
                 with RouteRecorderContext.shared_step("fetch_kernel_connection_info"):
                     await self._populate_replica_info(routes_missing_replica)
 
-        # Phase 4: Ensure RouteHealthRecords exist in Valkey for routes with replica info
-        routes_with_replica = [r for r in successes if r.replica_host and r.replica_port]
-        if routes_with_replica:
-            await self._ensure_health_records(routes_with_replica)
+        pairs_with_replica = [p for p in hc_pairs if p.route.replica_host and p.route.replica_port]
+        if pairs_with_replica:
+            await self._ensure_health_records(pairs_with_replica)
 
         return RouteExecutionResult(
             successes=successes,
@@ -270,84 +282,64 @@ class RouteExecutor:
         )
 
     async def _populate_replica_info(self, routes: Sequence[RouteData]) -> None:
-        """Fetch kernel host/port, store on route, and initialize RouteHealthRecords in Valkey."""
+        """Fetch kernel host/port, persist to DB, and mutate each route in place."""
         session_ids = [r.session_id for r in routes if r.session_id]
         if not session_ids:
             return
 
         kernel_info = await self._deployment_repo.fetch_kernel_connection_info(session_ids)
         updates: dict[UUID, tuple[str, int]] = {}
-        populated_routes: list[RouteData] = []
         for route in routes:
             if route.session_id and route.session_id in kernel_info:
                 info = kernel_info[route.session_id]
                 if info[0] and info[1]:
                     updates[route.route_id] = info
-                    populated_routes.append(route)
+                    route.replica_host, route.replica_port = info
 
         if updates:
             await self._deployment_repo.update_route_replica_info(updates)
 
-        if populated_routes:
-            await self._initialize_health_records(populated_routes, updates)
-
-    async def _ensure_health_records(self, routes: Sequence[RouteData]) -> None:
-        """Ensure RouteHealthRecords exist in Valkey for routes that already have replica info.
-
-        Routes may already have replica_host/port in DB (set by a previous cycle or legacy code)
-        but lack a RouteHealthRecord in Valkey. This method checks and initializes missing records.
-        """
-        route_id_strs = [str(r.route_id) for r in routes]
+    async def _ensure_health_records(
+        self,
+        pairs: Sequence[_RouteWithHealthCheck],
+    ) -> None:
+        """Initialize any missing Valkey RouteHealthRecords for the given pairs."""
+        route_id_strs = [str(p.route.route_id) for p in pairs]
         existing = await self._valkey_schedule.get_route_health_records_batch(route_id_strs)
-        missing = [r for r in routes if existing.get(str(r.route_id)) is None]
+        missing = [p for p in pairs if existing.get(str(p.route.route_id)) is None]
         if not missing:
             return
         log.warning(
             "RouteHealthRecord missing in Valkey for {} routes, re-initializing: {}",
             len(missing),
-            [str(r.route_id)[:8] for r in missing],
+            [str(p.route.route_id)[:8] for p in missing],
         )
         replica_info = {
-            r.route_id: (r.replica_host, r.replica_port)
-            for r in missing
-            if r.replica_host and r.replica_port
+            p.route.route_id: (p.route.replica_host, p.route.replica_port)
+            for p in missing
+            if p.route.replica_host and p.route.replica_port
         }
         await self._initialize_health_records(missing, replica_info)
 
     async def _initialize_health_records(
         self,
-        routes: Sequence[RouteData],
+        pairs: Sequence[_RouteWithHealthCheck],
         replica_info: Mapping[UUID, tuple[str, int]],
     ) -> None:
-        """Create RouteHealthRecords in Valkey for routes that just got replica info.
-
-        Routes whose revision disabled ``service.health_check`` get no record
-        and no probe — the gating is the route's own ``health_check_config``,
-        loaded eagerly with the route, so no second DB read is needed here.
-        """
-        # Narrow ``health_check_config`` to ``ModelHealthCheck`` once at
-        # the filter step so the per-route loop reads ``hc.path`` /
-        # ``hc.initial_delay`` without re-checking for None.
-        configured: list[tuple[RouteData, ModelHealthCheck]] = [
-            (r, hc) for r in routes if (hc := r.health_check_config) is not None
-        ]
-        if not configured:
+        if not pairs:
             return
 
         redis_time = await self._valkey_schedule.get_redis_time()
-
-        # Read existing running_at values that were set when routes transitioned to RUNNING
-        # These may be in partial hashes (only running_at field), so read raw field directly
         running_at_map = await self._valkey_schedule.get_route_running_at_batch([
-            str(r.route_id) for r, _ in configured
+            str(p.route.route_id) for p in pairs
         ])
 
         records: list[RouteHealthRecord] = []
-        for route, health_config in configured:
+        for pair in pairs:
+            route = pair.route
+            health_config = pair.health_check
             host, port = replica_info[route.route_id]
             created_at = int(route.created_at.timestamp())
-
-            # Use running_at from Valkey (set at RUNNING transition), fallback to redis_time
             route_id_str = str(route.route_id)
             running_at = running_at_map.get(route_id_str) or redis_time
             initial_delay_until = running_at + int(health_config.initial_delay)
@@ -559,19 +551,15 @@ class RouteExecutor:
     async def sync_appproxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Push the routing tables for affected endpoints to AppProxy.
 
-        The input routes are pre-filtered by the coordinator on
-        ``(lifecycle, health, traffic)`` plus the
-        ``include_health_check_disabled`` post-filter, so they already
-        represent the authoritative set to register. Each route's
-        ``replica_host``/``replica_port`` is kept up to date by
-        ``check_running_routes`` and is used directly here — same pattern
-        as :meth:`register_routes_now`. Routes with missing replica info
-        are skipped (they will be picked up once populated). Endpoints
-        are grouped by proxy target so each target receives a single
-        ``bulk_update_routes`` HTTP call.
+        One ``bulk_update_routes`` HTTP call per proxy target. Routes
+        whose session is past CREATING/RUNNING are skipped silently —
+        the next ``check_running_routes`` cycle marks them TERMINATING.
         """
         if not routes:
             return RouteExecutionResult(successes=[], errors=[])
+        session_statuses = await self._deployment_repo.fetch_session_statuses_by_route_ids({
+            r.route_id for r in routes
+        })
 
         routes_by_endpoint: dict[DeploymentID, list[RouteData]] = {}
         for route in routes:
@@ -588,10 +576,6 @@ class RouteExecutor:
             scaling_groups
         )
 
-        # Routes that actually make it onto the wire per endpoint;
-        # routes already added to ``errors`` (no replica info, missing
-        # deployment, no proxy target) are excluded so the response
-        # mapping does not double-count them.
         in_flight_by_endpoint: dict[DeploymentID, list[RouteData]] = {}
         items_by_target: dict[tuple[str, str], list[UpdateRoutesItem]] = {}
         for endpoint_id in endpoint_ids:
@@ -623,7 +607,9 @@ class RouteExecutor:
             entries: list[RouteEntry] = []
             in_flight_routes: list[RouteData] = []
             for route in routes_by_endpoint[endpoint_id]:
-                if route.session_data is None:
+                session_id = route.session_id
+                session_status = session_statuses.get(route.route_id)
+                if session_id is None or session_status is None:
                     errors.append(
                         RouteExecutionError(
                             route_info=route,
@@ -633,13 +619,11 @@ class RouteExecutor:
                         )
                     )
                     continue
-                if route.session_data.status not in (
+                if session_status not in (
                     SessionStatus.RUNNING,
                     SessionStatus.CREATING,
                 ):
-                    # Session is dying/dead — skip silently; the next
-                    # check_running_routes cycle transitions the route
-                    # to TERMINATING and the next sync converges.
+                    # Dying/dead — next check_running_routes cycle moves it to TERMINATING.
                     continue
                 if not route.replica_host or not route.replica_port:
                     errors.append(
@@ -647,7 +631,7 @@ class RouteExecutor:
                             route_info=route,
                             reason="Route has no replica connection info to sync",
                             error_detail=(
-                                f"session_id={route.session_data.session_id} "
+                                f"session_id={session_id} "
                                 f"replica_host={route.replica_host} "
                                 f"replica_port={route.replica_port}"
                             ),
@@ -657,7 +641,7 @@ class RouteExecutor:
                     continue
                 entries.append(
                     RouteEntry(
-                        session_id=route.session_data.session_id,
+                        session_id=session_id,
                         route_id=route.route_id,
                         kernel_host=route.replica_host,
                         kernel_port=route.replica_port,

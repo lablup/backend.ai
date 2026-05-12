@@ -20,8 +20,7 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
-from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionData
+from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
@@ -31,7 +30,7 @@ def _route(health_status: RouteHealthStatus) -> RouteData:
     return RouteData(
         route_id=uuid4(),
         deployment_id=DeploymentID(uuid4()),
-        session_data=RouteSessionData(session_id=SessionId(uuid4()), status=SessionStatus.RUNNING),
+        session_id=SessionId(uuid4()),
         status=RouteStatus.RUNNING,
         health_status=health_status,
         traffic_ratio=1.0,

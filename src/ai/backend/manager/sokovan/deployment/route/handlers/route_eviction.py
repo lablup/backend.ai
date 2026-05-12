@@ -7,7 +7,6 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
-    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -70,10 +69,6 @@ class RouteEvictionHandler(RouteHandler):
             lifecycle=[RouteStatus.PROVISIONING, RouteStatus.RUNNING],
             health=list(RouteHealthStatus),
         )
-
-    @classmethod
-    def health_check_filter(cls) -> RouteHealthCheckFilter:
-        return RouteHealthCheckFilter()
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:

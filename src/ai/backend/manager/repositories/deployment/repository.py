@@ -3,7 +3,7 @@
 import logging
 import uuid
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
@@ -14,7 +14,7 @@ from pydantic import HttpUrl
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import ModelDefinitionDraft, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
@@ -67,11 +67,9 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
-    RouteHealthCheckFilter,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
-    RouteTargetStatuses,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -629,15 +627,30 @@ class DeploymentRepository:
     # Route operations
 
     @deployment_repository_resilience.apply()
-    async def get_routes_by_statuses(
+    async def search_route_datas(
         self,
-        target: RouteTargetStatuses,
-        health_check_filter: RouteHealthCheckFilter,
+        querier: BatchQuerier,
     ) -> list[RouteData]:
-        """Routes matching ``(lifecycle, health, traffic)`` with the
-        in-memory ``health_check_config`` post-filter applied.
+        """Return :class:`RouteData` rows matched by ``querier`` (no joins).
+
+        Session status and revision-level health-check config are not
+        joined — callers fetch them via
+        :meth:`fetch_session_statuses_by_route_ids` and
+        :meth:`fetch_health_check_configs`.
         """
-        return await self._db_source.get_routes_by_statuses(target, health_check_filter)
+        return await self._db_source.search_route_datas(querier)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_health_check_configs(
+        self,
+        revision_ids: Collection[DeploymentRevisionID],
+    ) -> Mapping[DeploymentRevisionID, ModelHealthCheck | None]:
+        """Resolve revision-level ``ModelHealthCheck`` for each id.
+
+        Revisions that opted out of ``service.health_check`` map to
+        ``None``; unknown revision ids are omitted.
+        """
+        return await self._db_source.fetch_health_check_configs(revision_ids)
 
     @deployment_repository_resilience.apply()
     async def update_route_status_bulk(

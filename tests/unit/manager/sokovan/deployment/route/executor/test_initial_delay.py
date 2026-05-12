@@ -23,9 +23,11 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
-from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionData
-from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
+from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.sokovan.deployment.route.executor import (
+    RouteExecutor,
+    _RouteWithHealthCheck,
+)
 from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
 )
@@ -38,10 +40,7 @@ def _make_route(
     return RouteData(
         route_id=uuid4(),
         deployment_id=DeploymentID(uuid4()),
-        session_data=RouteSessionData(
-            session_id=session_id or SessionId(uuid4()),
-            status=SessionStatus.RUNNING,
-        ),
+        session_id=session_id or SessionId(uuid4()),
         status=RouteStatus.RUNNING,
         health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
@@ -49,7 +48,13 @@ def _make_route(
         revision_id=DeploymentRevisionID(uuid4()),
         replica_host="10.0.0.1",
         replica_port=8000,
-        health_check_config=ModelHealthCheck(path="/health", initial_delay=720.0),
+    )
+
+
+def _hc_pair(route: RouteData) -> _RouteWithHealthCheck:
+    return _RouteWithHealthCheck(
+        route=route,
+        health_check=ModelHealthCheck(path="/health", initial_delay=720.0),
     )
 
 
@@ -81,7 +86,7 @@ class TestInitializeHealthRecordsInitialDelay:
         mock_valkey_schedule.get_redis_time.return_value = 5100
 
         await route_executor._initialize_health_records(
-            [route],
+            [_hc_pair(route)],
             {route.route_id: ("10.0.0.1", 8000)},
         )
 
@@ -108,7 +113,7 @@ class TestInitializeHealthRecordsInitialDelay:
         mock_valkey_schedule.get_redis_time.return_value = 6000
 
         await route_executor._initialize_health_records(
-            [route],
+            [_hc_pair(route)],
             {route.route_id: ("10.0.0.1", 8000)},
         )
 
@@ -140,7 +145,7 @@ class TestInitializeHealthRecordsInitialDelay:
         mock_valkey_schedule.get_redis_time.return_value = 1800
 
         await route_executor._initialize_health_records(
-            [route],
+            [_hc_pair(route)],
             {route.route_id: ("10.0.0.1", 8000)},
         )
 

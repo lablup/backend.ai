@@ -254,23 +254,12 @@ class RouteTargetStatuses:
     """Target statuses for route handler filtering (lifecycle x health x traffic).
 
     ``traffic=None`` skips the filter; otherwise the row's
-    ``traffic_status`` column must match.
+    ``traffic_status`` column must be in the given list.
     """
 
     lifecycle: list[RouteStatus]
     health: list[RouteHealthStatus]
-    traffic: RouteTrafficStatus | None = None
-
-
-@dataclass(frozen=True)
-class RouteHealthCheckFilter:
-    """In-memory gating on a revision's ``health_check_config``.
-
-    ``health_check_required=True`` keeps only routes whose revision has
-    a resolved health-check block; ``False`` (default) skips the filter.
-    """
-
-    health_check_required: bool = False
+    traffic: list[RouteTrafficStatus] | None = None
 
 
 @dataclass(frozen=True)

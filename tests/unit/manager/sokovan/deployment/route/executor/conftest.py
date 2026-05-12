@@ -23,8 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
 )
-from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionData
+from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 
 # =============================================================================
@@ -187,21 +186,15 @@ def _create_route_data(
     route_id: UUID | None = None,
     deployment_id: DeploymentID | None = None,
     session_id: SessionId | None = None,
-    session_status: SessionStatus = SessionStatus.RUNNING,
     status: RouteStatus = RouteStatus.PROVISIONING,
     health_status: RouteHealthStatus = RouteHealthStatus.NOT_CHECKED,
     revision_id: DeploymentRevisionID | None = None,
 ) -> RouteData:
     """Create RouteData for tests."""
-    session_data = (
-        RouteSessionData(session_id=session_id, status=session_status)
-        if session_id is not None
-        else None
-    )
     return RouteData(
         route_id=route_id or uuid4(),
         deployment_id=deployment_id or DeploymentID(uuid4()),
-        session_data=session_data,
+        session_id=session_id,
         status=status,
         health_status=health_status,
         traffic_ratio=1.0,

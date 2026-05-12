@@ -47,7 +47,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentPolicyData,
     ModelRevisionData,
-    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteStatus,
     RouteTargetStatuses,
@@ -93,6 +92,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
@@ -105,7 +105,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -3491,13 +3491,13 @@ class TestRouteOperations:
         assert result is False
 
 
-class TestGetRoutesByStatuses:
-    """Test cases for ``DeploymentRepository.get_routes_by_statuses()``.
+class TestSearchRouteDatas:
+    """Test cases for ``DeploymentRepository.search_route_datas()`` and
+    ``fetch_health_check_configs()``.
 
-    Exercises the SQL ``(lifecycle, health, traffic)`` filter, the
-    ``health_check_config`` projection from each revision's
-    ``model_definition``, and the in-memory ``health_check_required``
-    post-filter on ``RouteHealthCheckFilter``.
+    The route fetch path is a flat ``BatchQuerier`` over the
+    ``routings`` table — no joins, no in-memory gates. Revision-level
+    ``ModelHealthCheck`` lookup is a separate batch fetch.
     """
 
     @pytest.fixture
@@ -3682,8 +3682,8 @@ class TestGetRoutesByStatuses:
     ) -> tuple[DeploymentID, DeploymentRevisionID, DeploymentRevisionID]:
         """Create an endpoint and two revisions:
 
-        - ``revision_hc_on``: ``health_check_enabled=True`` with a ``/health`` probe
-        - ``revision_hc_off``: ``health_check_enabled=False`` and ``model_definition=None``
+        - ``revision_hc_on``: ``model_definition`` carries a ``/health`` probe
+        - ``revision_hc_off``: ``model_definition=None`` (opted out)
         """
         endpoint_id = DeploymentID(uuid.uuid4())
         revision_hc_on_id = DeploymentRevisionID(uuid.uuid4())
@@ -3910,6 +3910,16 @@ class TestGetRoutesByStatuses:
             await db_sess.commit()
         return ids
 
+    @staticmethod
+    def _querier(target: RouteTargetStatuses) -> BatchQuerier:
+        conditions = [
+            RouteConditions.by_lifecycle_statuses(target.lifecycle),
+            RouteConditions.by_health_statuses(target.health),
+        ]
+        if target.traffic is not None:
+            conditions.append(RouteConditions.by_traffic_statuses(target.traffic))
+        return BatchQuerier(pagination=NoPagination(), conditions=conditions)
+
     async def test_filter_by_lifecycle_status(
         self,
         deployment_repository: DeploymentRepository,
@@ -3918,12 +3928,13 @@ class TestGetRoutesByStatuses:
         """Lifecycle filter restricts results to rows whose
         ``RoutingRow.status`` is in the target list.
         """
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=list(RouteHealthStatus),
+        result = await deployment_repository.search_route_datas(
+            self._querier(
+                RouteTargetStatuses(
+                    lifecycle=[RouteStatus.RUNNING],
+                    health=list(RouteHealthStatus),
+                )
             ),
-            RouteHealthCheckFilter(),
         )
 
         assert {r.route_id for r in result} == {
@@ -3941,12 +3952,13 @@ class TestGetRoutesByStatuses:
         """Health filter restricts to rows whose ``RoutingRow.health_status`` is
         in the target list.
         """
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=[RouteHealthStatus.HEALTHY],
+        result = await deployment_repository.search_route_datas(
+            self._querier(
+                RouteTargetStatuses(
+                    lifecycle=[RouteStatus.RUNNING],
+                    health=[RouteHealthStatus.HEALTHY],
+                )
             ),
-            RouteHealthCheckFilter(),
         )
 
         assert {r.route_id for r in result} == {
@@ -3959,23 +3971,25 @@ class TestGetRoutesByStatuses:
         deployment_repository: DeploymentRepository,
         populated_routes: dict[str, uuid.UUID],
     ) -> None:
-        """``traffic=INACTIVE`` excludes ACTIVE rows; omitting it (``None``)
+        """``traffic=[INACTIVE]`` excludes ACTIVE rows; omitting it (``None``)
         keeps both ACTIVE and INACTIVE rows in the result set.
         """
-        only_inactive = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=[RouteHealthStatus.HEALTHY],
-                traffic=RouteTrafficStatus.INACTIVE,
+        only_inactive = await deployment_repository.search_route_datas(
+            self._querier(
+                RouteTargetStatuses(
+                    lifecycle=[RouteStatus.RUNNING],
+                    health=[RouteHealthStatus.HEALTHY],
+                    traffic=[RouteTrafficStatus.INACTIVE],
+                )
             ),
-            RouteHealthCheckFilter(),
         )
-        both = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=[RouteHealthStatus.HEALTHY],
+        both = await deployment_repository.search_route_datas(
+            self._querier(
+                RouteTargetStatuses(
+                    lifecycle=[RouteStatus.RUNNING],
+                    health=[RouteHealthStatus.HEALTHY],
+                )
             ),
-            RouteHealthCheckFilter(),
         )
 
         assert {r.route_id for r in only_inactive} == {
@@ -3986,69 +4000,51 @@ class TestGetRoutesByStatuses:
             populated_routes["running_hc_on_healthy_inactive"],
         }
 
-    async def test_health_check_required_keeps_only_configured_revisions(
-        self,
-        deployment_repository: DeploymentRepository,
-        populated_routes: dict[str, uuid.UUID],
-    ) -> None:
-        """``health_check_required=True`` keeps only routes whose revision has
-        a resolved ``ModelHealthCheck``. Implemented in-memory after the SQL
-        fetch — the probe-scheduling path used by ``HealthCheckRouteHandler``.
-        """
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=list(RouteHealthStatus),
-            ),
-            RouteHealthCheckFilter(health_check_required=True),
-        )
-
-        assert {r.route_id for r in result} == {
-            populated_routes["running_hc_on_healthy_active"],
-            populated_routes["running_hc_on_unhealthy_active"],
-            populated_routes["running_hc_on_healthy_inactive"],
-        }
-
-    async def test_health_check_config_projected_from_model_definition(
-        self,
-        deployment_repository: DeploymentRepository,
-        populated_routes: dict[str, uuid.UUID],
-    ) -> None:
-        """``RouteData.health_check_config`` mirrors the revision's
-        ``model_definition.health_check_config()``: a populated
-        :class:`ModelHealthCheck` when the revision declares
-        ``service.health_check``, ``None`` otherwise.
-        """
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=list(RouteHealthStatus),
-            ),
-            RouteHealthCheckFilter(),
-        )
-        by_route = {r.route_id: r for r in result}
-        hc_on = by_route[populated_routes["running_hc_on_healthy_active"]]
-        hc_off = by_route[populated_routes["running_hc_off_not_checked_active"]]
-
-        assert hc_on.health_check_config is not None
-        assert hc_on.health_check_config.path == "/health"
-        assert hc_off.health_check_config is None
-
     async def test_no_matches_returns_empty(
         self,
         deployment_repository: DeploymentRepository,
         populated_routes: dict[str, uuid.UUID],
     ) -> None:
         """Filter that matches no row returns an empty list, not an error."""
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.TERMINATED],
-                health=list(RouteHealthStatus),
+        result = await deployment_repository.search_route_datas(
+            self._querier(
+                RouteTargetStatuses(
+                    lifecycle=[RouteStatus.TERMINATED],
+                    health=list(RouteHealthStatus),
+                )
             ),
-            RouteHealthCheckFilter(),
         )
 
         assert result == []
+
+    async def test_fetch_health_check_configs_maps_per_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        endpoint_and_revisions: tuple[DeploymentID, DeploymentRevisionID, DeploymentRevisionID],
+    ) -> None:
+        """``fetch_health_check_configs`` returns a non-``None``
+        :class:`ModelHealthCheck` for revisions that declare
+        ``service.health_check`` and ``None`` for those that opted out.
+        """
+        _, revision_hc_on_id, revision_hc_off_id = endpoint_and_revisions
+
+        configs = await deployment_repository.fetch_health_check_configs([
+            revision_hc_on_id,
+            revision_hc_off_id,
+        ])
+
+        assert set(configs.keys()) == {revision_hc_on_id, revision_hc_off_id}
+        hc_on_config = configs[revision_hc_on_id]
+        assert hc_on_config is not None
+        assert hc_on_config.path == "/health"
+        assert configs[revision_hc_off_id] is None
+
+    async def test_fetch_health_check_configs_empty_input(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        configs = await deployment_repository.fetch_health_check_configs([])
+        assert configs == {}
 
 
 class TestDeploymentRepositoryDuplicateName:

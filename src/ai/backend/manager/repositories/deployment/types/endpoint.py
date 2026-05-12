@@ -11,13 +11,11 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -60,21 +58,13 @@ class EndpointData:
     resource_opts: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(frozen=True)
-class RouteSessionData:
-    """Session id paired with its current status."""
-
-    session_id: SessionId
-    status: SessionStatus
-
-
 @dataclass
 class RouteData:
     """Data structure for model service route."""
 
     route_id: uuid.UUID
     deployment_id: DeploymentID
-    session_data: RouteSessionData | None
+    session_id: SessionId | None
     status: RouteStatus
     health_status: RouteHealthStatus
     traffic_ratio: float
@@ -84,12 +74,6 @@ class RouteData:
     replica_port: int | None = None
     updated_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
-    health_check_config: ModelHealthCheck | None = None
-
-    @property
-    def session_id(self) -> SessionId | None:
-        """Convenience accessor; reads from ``session_data``."""
-        return self.session_data.session_id if self.session_data else None
 
 
 @dataclass

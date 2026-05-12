@@ -4,7 +4,7 @@ import dataclasses
 import logging
 import uuid
 from collections import Counter, defaultdict
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.config import ModelDefinition, ModelHealthCheck
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
@@ -71,12 +71,10 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
-    RouteHealthCheckFilter,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
-    RouteTargetStatuses,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
@@ -178,7 +176,6 @@ from ai.backend.manager.repositories.deployment.types import (
     ProjectDeploymentSearchScope,
     RouteData,
     RouteServiceDiscoveryInfo,
-    RouteSessionData,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
@@ -202,34 +199,6 @@ class EndpointWithRoutesRawData:
 
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-def _build_session_data(
-    session: uuid.UUID | None,
-    session_status: SessionStatus | None,
-) -> RouteSessionData | None:
-    """Compose ``RouteSessionData`` from a route's joined session columns.
-
-    Returns ``None`` when the route has no session yet (``session IS NULL``)
-    or when the joined session row is missing.
-    """
-    if session is None or session_status is None:
-        return None
-    return RouteSessionData(session_id=SessionId(session), status=session_status)
-
-
-def _project_health_check_config(
-    model_definition: ModelDefinition | None,
-) -> ModelHealthCheck | None:
-    """Project the joined ``model_definition`` to its health-check block.
-
-    ``None`` means the revision opted out of HTTP probing — the manager
-    skips probe scheduling and AppProxy receives traffic as soon as the
-    route reaches RUNNING.
-    """
-    if model_definition is None:
-        return None
-    return model_definition.health_check_config()
 
 
 def _project_preset_slots(
@@ -1009,17 +978,13 @@ class DeploymentDBSource:
     ) -> list[RouteData]:
         """Get all routes for an endpoint."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(RoutingRow, SessionRow.status)
-                .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
-                .where(RoutingRow.endpoint == endpoint_id)
-            )
+            query = sa.select(RoutingRow).where(RoutingRow.endpoint == endpoint_id)
             result = await db_sess.execute(query)
             return [
                 RouteData(
                     route_id=row.id,
                     deployment_id=row.endpoint,
-                    session_data=_build_session_data(row.session, session_status),
+                    session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
                     health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
@@ -1029,7 +994,7 @@ class DeploymentDBSource:
                     replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
-                for row, session_status in result.all()
+                for row in result.scalars().all()
             ]
 
     async def update_route_session(
@@ -1616,61 +1581,63 @@ class DeploymentDBSource:
 
     # Route operations
 
-    async def get_routes_by_statuses(
+    async def search_route_datas(
         self,
-        target: RouteTargetStatuses,
-        health_check_filter: RouteHealthCheckFilter,
+        querier: BatchQuerier,
     ) -> list[RouteData]:
-        """Routes matching ``(lifecycle, health, traffic)`` with
-        revision-level ``health_check_config`` gating applied in memory.
+        """Return :class:`RouteData` rows matched by ``querier`` (no joins).
 
-        ``model_definition`` is selected so the resolved
-        ``ModelHealthCheck`` (or ``None``) is attached to each
-        :class:`RouteData`; ``health_check_filter`` then runs over those
-        materialized rows.
+        Consumers that need session status or revision-level health-check
+        config call :meth:`fetch_session_statuses_by_route_ids` or
+        :meth:`fetch_health_check_configs` separately.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(
-                    RoutingRow,
-                    DeploymentRevisionRow.model_definition,
-                    SessionRow.status,
+            query = sa.select(RoutingRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            return [
+                RouteData(
+                    route_id=row.RoutingRow.id,
+                    deployment_id=row.RoutingRow.endpoint,
+                    session_id=SessionId(row.RoutingRow.session)
+                    if row.RoutingRow.session
+                    else None,
+                    status=row.RoutingRow.status,
+                    health_status=row.RoutingRow.health_status,
+                    traffic_ratio=row.RoutingRow.traffic_ratio,
+                    created_at=row.RoutingRow.created_at,
+                    revision_id=DeploymentRevisionID(row.RoutingRow.revision),
+                    replica_host=row.RoutingRow.replica_host,
+                    replica_port=row.RoutingRow.replica_port,
+                    error_data=row.RoutingRow.error_data or {},
                 )
-                .join(
-                    DeploymentRevisionRow,
-                    DeploymentRevisionRow.id == RoutingRow.revision,
-                )
-                .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
-                .where(
-                    RoutingRow.status.in_(target.lifecycle),
-                    RoutingRow.health_status.in_(target.health),
-                )
-            )
-            if target.traffic is not None:
-                query = query.where(RoutingRow.traffic_status == target.traffic)
+                for row in result.rows
+            ]
+
+    async def fetch_health_check_configs(
+        self,
+        revision_ids: Collection[DeploymentRevisionID],
+    ) -> Mapping[DeploymentRevisionID, ModelHealthCheck | None]:
+        """Resolve revision-level ``ModelHealthCheck`` for each revision id.
+
+        Missing revisions are omitted from the result; revisions that opted
+        out of ``service.health_check`` return ``None``.
+        """
+        if not revision_ids:
+            return {}
+        unique_ids = {uuid.UUID(str(rid)) for rid in revision_ids}
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                DeploymentRevisionRow.id,
+                DeploymentRevisionRow.model_definition,
+            ).where(DeploymentRevisionRow.id.in_(unique_ids))
             result = await db_sess.execute(query)
-            routes: list[RouteData] = []
-            for row, model_definition, session_status in result.all():
-                health_check_config = _project_health_check_config(model_definition)
-                if health_check_filter.health_check_required and health_check_config is None:
-                    continue
-                routes.append(
-                    RouteData(
-                        route_id=row.id,
-                        deployment_id=row.endpoint,
-                        session_data=_build_session_data(row.session, session_status),
-                        status=row.status,
-                        health_status=row.health_status,
-                        traffic_ratio=row.traffic_ratio,
-                        created_at=row.created_at,
-                        revision_id=DeploymentRevisionID(row.revision),
-                        replica_host=row.replica_host,
-                        replica_port=row.replica_port,
-                        error_data=row.error_data or {},
-                        health_check_config=health_check_config,
-                    )
+            configs: dict[DeploymentRevisionID, ModelHealthCheck | None] = {}
+            for revision_id, model_definition in result.all():
+                config = (
+                    model_definition.health_check_config() if model_definition is not None else None
                 )
-            return routes
+                configs[DeploymentRevisionID(revision_id)] = config
+            return configs
 
     async def update_route_status_bulk(
         self,
