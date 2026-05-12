@@ -35,18 +35,26 @@ async def read_json(reader: AsyncReader) -> Any:
     return load_json(data)
 
 
+def _default(o: Any) -> Any:
+    """orjson fallback: stringify anything orjson doesn't know natively
+    (e.g. an exception instance carried in pydantic ``ctx``) so dumps
+    never raises ``TypeError`` at the serialization boundary.
+    """
+    return str(o)
+
+
 def dump_json_str(obj: Any, option: int | None = None) -> str:
     """
     Dumps the given object into a JSON string.
     """
-    return orjson.dumps(obj, option=option).decode("utf-8")
+    return orjson.dumps(obj, default=_default, option=option).decode("utf-8")
 
 
 def dump_json(obj: Any, option: int | None = None) -> bytes:
     """
     Dumps the given object into a JSON bytes.
     """
-    return orjson.dumps(obj, option=option)
+    return orjson.dumps(obj, default=_default, option=option)
 
 
 def pretty_json_str(obj: Any) -> str:
