@@ -89,7 +89,7 @@ class PrometheusClient:
             response = await self._query_instant(preset)
             merged = merged.merged_with(
                 KernelMetricValuesByKernel.from_prometheus_response(response)
-            )        
+            )
         return KernelLiveStatValues.with_capacity_sentinels(merged.values_by_kernel)
 
     async def execute_preset(
