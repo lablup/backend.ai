@@ -11,6 +11,7 @@ from pytest_mock import MockerFixture
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.web.auth import get_anonymous_session, get_api_session
+from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
 
 
 class DummyApiConfig:
@@ -53,6 +54,8 @@ async def test_get_api_session(mocker: MockerFixture, client_pool: ClientPool) -
         "client_pool": client_pool,
     })
 
+    acquired = AcquiredEndpoint(endpoint="https://api.backend.ai")
+
     mock_get_session = AsyncMock(
         return_value={
             "authenticated": False,
@@ -60,7 +63,7 @@ async def test_get_api_session(mocker: MockerFixture, client_pool: ClientPool) -
     )
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
     with pytest.raises(web.HTTPUnauthorized):
-        await get_api_session(mock_request)  # type: ignore
+        await get_api_session(mock_request, acquired)  # type: ignore
     mock_get_session.assert_awaited_once()
 
     mock_get_session = AsyncMock(
@@ -71,7 +74,7 @@ async def test_get_api_session(mocker: MockerFixture, client_pool: ClientPool) -
     )
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
     with pytest.raises(web.HTTPBadRequest):
-        await get_api_session(mock_request)  # type: ignore
+        await get_api_session(mock_request, acquired)  # type: ignore
     mock_get_session.assert_awaited_once()
 
     mock_get_session = AsyncMock(
@@ -81,7 +84,7 @@ async def test_get_api_session(mocker: MockerFixture, client_pool: ClientPool) -
         }
     )
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
-    api_session = await get_api_session(mock_request)  # type: ignore
+    api_session = await get_api_session(mock_request, acquired)  # type: ignore
     mock_get_session.assert_awaited_once()
     async with api_session:
         assert not api_session.config.is_anonymous
@@ -112,7 +115,10 @@ async def test_get_api_session_with_specific_api_endpoint(
     )
     specific_api_endpoint = "https://alternative.backend.ai"
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
-    api_session = await get_api_session(mock_request, specific_api_endpoint)  # type: ignore
+    api_session = await get_api_session(
+        mock_request,  # type: ignore
+        AcquiredEndpoint(endpoint=specific_api_endpoint),
+    )
     mock_get_session.assert_awaited_once()
     async with api_session:
         assert str(api_session.config.endpoint) == specific_api_endpoint
@@ -131,7 +137,10 @@ async def test_get_anonymous_session(mocker: MockerFixture, client_pool: ClientP
     })
     mock_get_session = MagicMock()
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
-    api_session = await get_anonymous_session(mock_request)  # type: ignore
+    api_session = await get_anonymous_session(
+        mock_request,  # type: ignore
+        AcquiredEndpoint(endpoint="https://api.backend.ai"),
+    )
     mock_get_session.assert_not_called()
     async with api_session:
         assert api_session.config.is_anonymous
@@ -157,7 +166,10 @@ async def test_get_anonymous_session_with_specific_api_endpoint(
     specific_api_endpoint = "https://alternative.backend.ai"
     mock_get_session = MagicMock()
     mocker.patch("ai.backend.web.auth.get_session", mock_get_session)
-    api_session = await get_anonymous_session(mock_request, specific_api_endpoint)  # type: ignore
+    api_session = await get_anonymous_session(
+        mock_request,  # type: ignore
+        AcquiredEndpoint(endpoint=specific_api_endpoint),
+    )
     mock_get_session.assert_not_called()
     async with api_session:
         assert str(api_session.config.endpoint) == specific_api_endpoint

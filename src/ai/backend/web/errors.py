@@ -41,3 +41,17 @@ class InvalidTemplateValueError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class ManagerConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
+    """Raised when no Manager endpoint in the pool is currently healthy."""
+
+    error_type = "https://api.backend.ai/probs/webserver/manager-connection-unavailable"
+    error_title = "No healthy Manager endpoint is available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
