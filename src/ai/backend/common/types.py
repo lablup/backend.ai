@@ -216,7 +216,10 @@ class BackendAIModel(BaseModel):
             return super().model_validate(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise BackendAIModelValidationFailed.from_pydantic(e) from e
+            raise BackendAIModelValidationFailed(
+                extra_msg=str(e),
+                extra_data={"errors": e.errors()},
+            ) from e
 
     @classmethod
     def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
@@ -224,7 +227,10 @@ class BackendAIModel(BaseModel):
             return super().model_validate_json(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise BackendAIModelValidationFailed.from_pydantic(e) from e
+            raise BackendAIModelValidationFailed(
+                extra_msg=str(e),
+                extra_data={"errors": e.errors()},
+            ) from e
 
     @classmethod
     def model_validate_strings(cls, *args: Any, **kwargs: Any) -> Self:
@@ -232,7 +238,10 @@ class BackendAIModel(BaseModel):
             return super().model_validate_strings(*args, **kwargs)
         except ValidationError as e:
             log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise BackendAIModelValidationFailed.from_pydantic(e) from e
+            raise BackendAIModelValidationFailed(
+                extra_msg=str(e),
+                extra_data={"errors": e.errors()},
+            ) from e
 
 
 class aobject:

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Any, Self
 
 from aiohttp import web
-from pydantic import ValidationError
 
 from .json import dump_json
 
@@ -409,14 +408,6 @@ class BackendAIError(web.HTTPError, ABC):
         For example, "kernel_create_invalid-image" or "kernel_create_timeout".
         """
         raise NotImplementedError("Subclasses must implement error_code() method.")
-
-    @classmethod
-    def from_pydantic(cls, exc: ValidationError) -> Self:
-        """Build an instance from a Pydantic ``ValidationError``,
-        surfacing the original multi-line message as ``extra_msg`` and
-        the raw per-field error list (``loc``/``msg``/``type``/``input``/
-        ``url``) as ``extra_data["errors"]`` — no extra reformatting."""
-        return cls(extra_msg=str(exc), extra_data={"errors": exc.errors()})
 
 
 class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
