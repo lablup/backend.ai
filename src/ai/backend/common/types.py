@@ -213,13 +213,6 @@ class BackendAISchema(BaseModel):
                     extra_msg=info.summary,
                     extra_data={"errors": info.errors},
                 )
-
-    ``__init__`` is left alone: pydantic v2 invokes nested models'
-    ``__init__`` from inside the outer validator, so converting there
-    would break ``loc``-path aggregation. Direct ``Model(field=...)``
-    construction therefore still raises stock ``pydantic.ValidationError``;
-    switch the call site to ``Model.model_validate({...})`` to opt into
-    the override path.
     """
 
     @classmethod
