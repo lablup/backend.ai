@@ -8,26 +8,6 @@ from ai.backend.common.exception import InvalidMetricPresetTemplate
 
 _PLACEHOLDER_NAMES = frozenset({"labels", "window", "group_by"})
 _BRACE_BLOCK_RE = re.compile(r"\{([^{}]*)\}")
-# `$ident` / `${ident}` — foreign templating syntax (Grafana, shell, etc.)
-# that Backend.AI does not substitute and is almost always unintended in PromQL.
-_UNSUPPORTED_TEMPLATE_VAR_RE = re.compile(r"\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*")
-
-
-def validate_query_template(template: str) -> str:
-    """Reject empty templates, foreign variables, or malformed braces.
-
-    Returns the dry-run rendered template (useful for inspection in tests).
-    """
-    if not template.strip():
-        raise InvalidMetricPresetTemplate("Template must not be empty.")
-    unsupported_vars = _UNSUPPORTED_TEMPLATE_VAR_RE.findall(template)
-    if unsupported_vars:
-        placeholders = ", ".join(f"{{{name}}}" for name in sorted(_PLACEHOLDER_NAMES))
-        raise InvalidMetricPresetTemplate(
-            f"Unsupported template variables: {unsupported_vars}. "
-            f"Use placeholders {placeholders} or literal PromQL values."
-        )
-    return MetricPreset(template=template).render()
 
 
 def _escape_non_placeholders(template: str) -> str:

@@ -8,7 +8,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
 )
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
@@ -30,6 +29,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     MetricResultValue,
 )
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 

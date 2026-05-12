@@ -4,10 +4,6 @@ from unittest.mock import AsyncMock, Mock
 import aiohttp
 import pytest
 
-from ai.backend.common.clients.prometheus import (
-    LabelMatcher,
-    MetricPreset,
-)
 from ai.backend.common.dto.clients.prometheus import (
     LabelValueResponse,
     PrometheusResponse,
@@ -17,6 +13,8 @@ from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionE
 from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
+    LabelMatcher,
+    MetricPreset,
     PrometheusClient,
 )
 

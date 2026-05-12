@@ -7,15 +7,13 @@ from typing import TYPE_CHECKING
 import pytest
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
-from ai.backend.common.clients.prometheus import (
-    LabelMatcher,
-    MetricPreset,
-)
 from ai.backend.common.dto.clients.prometheus import PrometheusResponse, QueryTimeRange
 from ai.backend.common.exception import FailedToGetMetric
 from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
+    LabelMatcher,
+    MetricPreset,
     PrometheusClient,
 )
 

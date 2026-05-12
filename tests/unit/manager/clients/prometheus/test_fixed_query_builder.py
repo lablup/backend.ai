@@ -7,7 +7,6 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
@@ -18,6 +17,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     MetricType,
 )
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.manager.clients.prometheus.types import ValueType
 
 

@@ -3,7 +3,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     CONTAINER_UTILIZATION_METRIC_NAME,
@@ -16,6 +15,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     MetricType,
 )
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.manager.clients.prometheus.querier import ContainerMetricQuerier
 from ai.backend.manager.clients.prometheus.types import ValueType
 
