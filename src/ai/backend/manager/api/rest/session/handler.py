@@ -282,55 +282,6 @@ def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]
     return next_config
 
 
-def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:
-    """Lift UUID-shaped strings from legacy mount buckets onto the UUID-keyed
-    buckets, leaving only name-shaped entries for the name resolver.
-    """
-    legacy_mounts = creation_config.get("mounts") or ()
-    legacy_mount_map = creation_config.get("mount_map") or {}
-    legacy_mount_options = creation_config.get("mount_options") or {}
-
-    mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
-    mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
-    mount_options: dict[Any, Any] = {}
-    name_mounts: list[Any] = []
-    name_mount_map: dict[str, str] = {}
-
-    legacy_mounts_keys = {str(m) for m in legacy_mounts}
-    seen: set[str] = set()
-    for raw in list(legacy_mounts) + list(legacy_mount_map) + list(legacy_mount_options):
-        key = str(raw)
-        if key in seen:
-            continue
-        seen.add(key)
-        dst = legacy_mount_map.get(key)
-        opts = legacy_mount_options.get(key)
-        try:
-            vfid = UUID(key)
-        except (ValueError, TypeError):
-            if key in legacy_mounts_keys:
-                name_mounts.append(raw)
-            if dst is not None:
-                name_mount_map[key] = dst
-            if opts is not None:
-                mount_options[key] = opts
-            continue
-        if vfid not in mount_ids:
-            mount_ids.append(vfid)
-        if dst is not None:
-            mount_id_map.setdefault(vfid, dst)
-        if opts is not None:
-            mount_options.setdefault(vfid, opts)
-
-    next_config = dict(creation_config)
-    next_config["mounts"] = name_mounts
-    next_config["mount_map"] = name_mount_map
-    next_config["mount_options"] = mount_options
-    next_config["mount_ids"] = mount_ids
-    next_config["mount_id_map"] = mount_id_map
-    return next_config
-
-
 def _merge_resolved_legacy_mounts(
     creation_config: dict[str, Any],
     name_to_id: dict[str, UUID],
