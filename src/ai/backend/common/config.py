@@ -20,7 +20,7 @@ from pydantic import (
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
-from .types import BackendAISchema, SchemaValidationFailureInfo, RedisHelperConfig
+from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
 __all__ = (
     "ConfigurationError",
@@ -577,25 +577,14 @@ class ModelConfigDraft(BaseConfigModel):
     metadata: ModelMetadata | None = None  # ModelMetadata is already all-Optional.
 
     def to_resolved(self) -> ModelConfig:
-        if self.name is None:
-            raise ValueError("ModelConfig.name is required")
-        if self.model_path is None:
-            raise ValueError("ModelConfig.model_path is required")
         service = self.service.to_resolved() if self.service else None
-        if service is not None and service.start_command:
-            # ``{model_path}`` placeholders in the variant baseline's
-            # ``start_command`` are resolved here, at the same moment the
-            # draft becomes a strict ``ModelConfig`` and ``model_path`` is
-            # finalized. Placeholders therefore never propagate downstream.
+        if service is not None and service.start_command and self.model_path is not None:
             service.start_command = [
                 token.replace("{model_path}", self.model_path) for token in service.start_command
             ]
-        return ModelConfig(
-            name=self.name,
-            model_path=self.model_path,
-            service=service,
-            metadata=self.metadata,
-        )
+        payload = self.model_dump(exclude_none=True, exclude={"service"})
+        payload["service"] = service
+        return ModelConfig.model_validate(payload)
 
 
 def _merge_health_check_draft(
