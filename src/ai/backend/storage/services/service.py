@@ -126,11 +126,11 @@ class VolumeService:
         volumes = self._volume_pool.list_volumes()
         return [
             VolumeMeta(
-                volume_id=uuid.UUID(volume_id),
+                volume_id=VolumeID(uuid.UUID(volume_id)),
                 backend=info.backend,
                 path=info.path,
                 fsprefix=info.fsprefix,
-                capabilities=await self._get_capabilities(uuid.UUID(volume_id)),
+                capabilities=await self._get_capabilities(VolumeID(uuid.UUID(volume_id))),
             )
             for volume_id, info in volumes.items()
         ]

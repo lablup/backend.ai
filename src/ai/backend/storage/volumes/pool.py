@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
@@ -82,7 +83,7 @@ class VolumePool:
         volumes_by_name: dict[str, AbstractVolume] = {}
         for raw_volume_id, config in local_config.volume.items():
             try:
-                volume_id = VolumeID(raw_volume_id)
+                volume_id = VolumeID(uuid.UUID(raw_volume_id))
             except (ValueError, TypeError):
                 volumes_by_name[raw_volume_id] = await cls._init_volume(
                     config,

@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path, PurePath
 from unittest.mock import AsyncMock, MagicMock
 
@@ -53,7 +54,7 @@ def mock_storage_plugin_ctx() -> AsyncMock:
 
 async def test_get_volume(mock_volume: AsyncMock, mock_storage_plugin_ctx: AsyncMock) -> None:
     # Create a VolumePool with mocked volumes
-    volume_id = VolumeID("550e8400-e29b-41d4-a716-446655440000")
+    volume_id = VolumeID(uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
     volumes = {volume_id: mock_volume}
     volumes_by_name = {"test_volume": mock_volume}
 
@@ -72,7 +73,7 @@ async def test_get_volume(mock_volume: AsyncMock, mock_storage_plugin_ctx: Async
         assert volume is mock_volume
 
     # Test get_volume with invalid volume ID
-    invalid_id = VolumeID("00000000-0000-0000-0000-000000000000")
+    invalid_id = VolumeID(uuid.UUID("00000000-0000-0000-0000-000000000000"))
     with pytest.raises(InvalidVolumeError):
         async with pool.get_volume(invalid_id) as volume:
             pass
