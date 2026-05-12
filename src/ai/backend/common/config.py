@@ -20,7 +20,7 @@ from pydantic import (
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
-from .types import BackendAISchema, ModelValidationFailureInfo, RedisHelperConfig
+from .types import BackendAISchema, SchemaValidationFailureInfo, RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",
@@ -479,7 +479,7 @@ class ModelDefinition(BaseConfigModel):
 
     @override
     @classmethod
-    def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
         return ModelDefinitionValidationError(
             extra_msg=info.summary,
             extra_data={"errors": info.errors},
@@ -673,7 +673,7 @@ class ModelDefinitionDraft(BaseConfigModel):
 
     @override
     @classmethod
-    def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
         return ModelDefinitionValidationError(
             extra_msg=info.summary,
             extra_data={"errors": info.errors},

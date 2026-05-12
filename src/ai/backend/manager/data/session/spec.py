@@ -31,7 +31,7 @@ from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     BackendAISchema,
-    ModelValidationFailureInfo,
+    SchemaValidationFailureInfo,
     SessionTypes,
     VFolderMount,
 )
@@ -149,7 +149,7 @@ class SessionSpec(_SpecBaseModel):
 
     @override
     @classmethod
-    def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
         missing_paths = [cls._format_loc(tuple(err["loc"])) for err in info.errors]
         return IncompleteSessionSpec(
             extra_msg="SessionSpec fields not resolved: " + ", ".join(missing_paths),

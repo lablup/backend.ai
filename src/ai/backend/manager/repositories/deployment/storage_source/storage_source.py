@@ -8,7 +8,7 @@ from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
-from ai.backend.common.types import BackendAISchema, ModelValidationFailureInfo, VFolderID
+from ai.backend.common.types import BackendAISchema, SchemaValidationFailureInfo, VFolderID
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.models.storage import StorageSessionManager
 
@@ -32,7 +32,7 @@ class DeploymentConfigInput(BackendAISchema):
 
     @override
     @classmethod
-    def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
         return InvalidAPIParameters(
             f"Invalid deployment config: {info.summary}",
             extra_data={"errors": info.errors},

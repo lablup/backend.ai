@@ -118,7 +118,7 @@ __all__ = (
     "MetricValue",
     "ModelServiceProfile",
     "ModelServiceStatus",
-    "ModelValidationFailureInfo",
+    "SchemaValidationFailureInfo",
     "MountExpression",
     "MountInfoEntry",
     "MountPermission",
@@ -185,7 +185,7 @@ current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
 
 
 @dataclass(frozen=True)
-class ModelValidationFailureInfo:
+class SchemaValidationFailureInfo:
     """Pydantic-decoupled view of a failed ``model_validate*`` call,
     passed to :meth:`BackendAISchema.build_validation_error`.
 
@@ -207,7 +207,7 @@ class BackendAISchema(BaseModel):
             @override
             @classmethod
             def build_validation_error(
-                cls, info: ModelValidationFailureInfo
+                cls, info: SchemaValidationFailureInfo
             ) -> BackendAIError:
                 return MyConfigParseError(
                     extra_msg=info.summary,
@@ -223,7 +223,7 @@ class BackendAISchema(BaseModel):
     """
 
     @classmethod
-    def build_validation_error(cls, info: ModelValidationFailureInfo) -> BackendAIError:
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
         """Default override raising the generic
         :class:`BackendAISchemaValidationFailed`."""
         return BackendAISchemaValidationFailed(
@@ -232,8 +232,8 @@ class BackendAISchema(BaseModel):
         )
 
     @classmethod
-    def _validation_failure_info(cls, exc: ValidationError) -> ModelValidationFailureInfo:
-        return ModelValidationFailureInfo(summary=str(exc), errors=exc.errors())
+    def _validation_failure_info(cls, exc: ValidationError) -> SchemaValidationFailureInfo:
+        return SchemaValidationFailureInfo(summary=str(exc), errors=exc.errors())
 
     @classmethod
     def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
