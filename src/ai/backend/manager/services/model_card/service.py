@@ -186,8 +186,7 @@ class ModelCardService:
             model_def = ModelDefinition.model_validate(parsed)
         except BackendAIModelValidationFailed as e:
             raise ModelCardParseError(
-                extra_msg=f"invalid model definition in {model_def_filename}",
-                extra_data=e.extra_data,
+                extra_msg=f"invalid model definition in {model_def_filename}: {e}"
             ) from e
         if not model_def.models:
             raise ModelCardParseError(extra_msg=f"no models defined in {model_def_filename}")

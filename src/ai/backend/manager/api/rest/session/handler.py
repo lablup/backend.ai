@@ -224,7 +224,10 @@ def _validate_creation_config(
                 raise InvalidAPIParameters("API version not supported")
         return model.model_dump(by_alias=False)
     except BackendAIModelValidationFailed as e:
-        raise InvalidAPIParameters(extra_msg=e.extra_msg, extra_data=e.extra_data) from e
+        raise InvalidAPIParameters(
+            "Input validation error",
+            extra_data={"config": str(e)},
+        ) from e
 
 
 def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:

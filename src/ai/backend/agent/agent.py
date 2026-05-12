@@ -3299,11 +3299,8 @@ class AbstractAgent[
             parsed = ModelDefinition.model_validate(inlined)
         except BackendAIModelValidationFailed as e:
             raise ModelDefinitionValidationError(
-                extra_msg=(
-                    "Failed to validate model definition for vFolder"
-                    f" {model_folder.name} (ID {model_folder.vfid})"
-                ),
-                extra_data=e.extra_data,
+                "Failed to validate model definition for vFolder"
+                f" {model_folder.name} (ID {model_folder.vfid})",
             ) from e
         if not parsed.models:
             raise ModelDefinitionEmptyError
