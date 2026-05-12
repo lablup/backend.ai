@@ -388,6 +388,19 @@ class RouteExecutor:
         Returns:
             Result with successes (healthy), errors (unhealthy), stale (degraded)
         """
+        if not routes:
+            return RouteExecutionResult(successes=[], errors=[], stale=[])
+
+        # Revisions that opted out of ``service.health_check`` have no
+        # RouteHealthRecord in Valkey; including them would classify
+        # them as stale. Drop them before the probe loop.
+        hc_configs = await self._deployment_repo.fetch_health_check_configs({
+            r.revision_id for r in routes
+        })
+        routes = [r for r in routes if hc_configs.get(r.revision_id) is not None]
+        if not routes:
+            return RouteExecutionResult(successes=[], errors=[], stale=[])
+
         # Phase 1: Load RouteHealthRecords
         with RouteRecorderContext.shared_phase("load_health_status"):
             with RouteRecorderContext.shared_step("query_health_check_results"):

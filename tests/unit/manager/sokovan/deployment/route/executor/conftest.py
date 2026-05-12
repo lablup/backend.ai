@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
@@ -38,7 +39,16 @@ def mock_deployment_repo() -> AsyncMock:
     repo.get_deployments_by_ids = AsyncMock(return_value=[])
     repo.update_route_sessions = AsyncMock(return_value=None)
     repo.fetch_session_statuses_by_route_ids = AsyncMock(return_value={})
-    repo.fetch_health_check_configs = AsyncMock(return_value={})
+
+    # Default to "every revision declared a probe" so tests for paths
+    # that filter on hc_configs (``check_route_health``, ``sync_appproxy``)
+    # see the input route set unchanged unless they override this.
+    async def _default_health_check_configs(
+        revision_ids: set[DeploymentRevisionID],
+    ) -> dict[DeploymentRevisionID, ModelHealthCheck]:
+        return {rid: ModelHealthCheck(path="/health", initial_delay=720.0) for rid in revision_ids}
+
+    repo.fetch_health_check_configs = AsyncMock(side_effect=_default_health_check_configs)
     repo.fetch_route_service_discovery_info = AsyncMock(return_value=[])
     repo.get_scaling_group_cleanup_configs = AsyncMock(return_value={})
     repo.fetch_deployment_context = AsyncMock(return_value=MagicMock())

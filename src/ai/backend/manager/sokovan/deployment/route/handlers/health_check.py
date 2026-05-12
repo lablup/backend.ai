@@ -14,7 +14,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTransitionTarget,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
@@ -31,11 +30,9 @@ class HealthCheckRouteHandler(RouteHandler):
         self,
         route_executor: RouteExecutor,
         event_producer: EventProducer,
-        deployment_repository: DeploymentRepository,
     ) -> None:
         self._route_executor = route_executor
         self._event_producer = event_producer
-        self._deployment_repository = deployment_repository
 
     @classmethod
     def name(cls) -> str:
@@ -73,23 +70,9 @@ class HealthCheckRouteHandler(RouteHandler):
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Execute health check for routes.
-
-        Revisions that opted out of ``service.health_check`` have no
-        ``RouteHealthRecord`` in Valkey — including them would let the
-        executor classify them as stale. Filter on the per-revision
-        config fetched on entry so the probe loop only sees routes that
-        should be probed.
-        """
+        """Execute health check for routes."""
         log.debug("Checking health for {} routes", len(routes))
-        if not routes:
-            return RouteExecutionResult(successes=[], errors=[])
-        revision_ids = {r.revision_id for r in routes}
-        hc_configs = await self._deployment_repository.fetch_health_check_configs(revision_ids)
-        eligible = [r for r in routes if hc_configs.get(r.revision_id) is not None]
-        if not eligible:
-            return RouteExecutionResult(successes=[], errors=[])
-        return await self._route_executor.check_route_health(eligible)
+        return await self._route_executor.check_route_health(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Log health-check results.

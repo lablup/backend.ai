@@ -158,7 +158,6 @@ class RouteCoordinator:
             RouteLifecycleType.HEALTH_CHECK: HealthCheckRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
-                deployment_repository=self._deployment_repository,
             ),
             RouteLifecycleType.ROUTE_EVICTION: RouteEvictionHandler(
                 route_executor=executor,
