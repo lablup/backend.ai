@@ -20,10 +20,10 @@ from typing import Any
 
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     AgentId,
+    BackendAIModel,
     BinarySizeField,
     ClusterMode,
     MountInfoEntry,

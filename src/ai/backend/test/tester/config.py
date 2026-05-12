@@ -1,6 +1,6 @@
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.exception import BackendAIModel
+from ai.backend.common.types import BackendAIModel
 from ai.backend.test.testcases.spec_manager import TestTag
 from ai.backend.test.tester.dependency import TestContextInjectionModel
 

@@ -26,13 +26,13 @@ from ai.backend.common.types import StreamReader
 from ai.backend.logging import BraceStyleAdapter
 
 from .exception import (
-    BackendAIModel,
     InvalidAPIHandlerDefinition,
     InvalidAPIParameters,
     MalformedRequestBody,
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
 )
+from .types import BackendAIModel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

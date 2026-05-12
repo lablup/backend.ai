@@ -2,8 +2,12 @@ from typing import Any, Self
 
 from pydantic import ConfigDict, Field, model_validator
 
-from ai.backend.common.exception import BackendAIModel
-from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES, ClusterMode, RuntimeVariant
+from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
+    BackendAIModel,
+    ClusterMode,
+    RuntimeVariant,
+)
 
 
 class BaseDependencyModel(BackendAIModel):

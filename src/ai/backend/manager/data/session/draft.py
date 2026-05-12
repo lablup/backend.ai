@@ -37,7 +37,6 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.exception import BackendAIModel
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -46,6 +45,7 @@ from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    BackendAIModel,
     ClusterMode,
     MountInfoEntry,
     ResourceSlotEntry,

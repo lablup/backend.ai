@@ -19,8 +19,8 @@ from pydantic import (
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
-from .exception import BackendAIModel, ConfigurationError
-from .types import RedisHelperConfig
+from .exception import ConfigurationError
+from .types import BackendAIModel, RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",

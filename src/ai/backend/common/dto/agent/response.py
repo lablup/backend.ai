@@ -6,7 +6,7 @@ from typing import Any, Self, TypeVar, override
 from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common.dto.internal.health import ConnectivityCheckResponse, HealthStatus
-from ai.backend.common.exception import BackendAIModel
+from ai.backend.common.types import BackendAIModel
 
 T = TypeVar("T")
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Self
 
 from aiohttp import web
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from .json import dump_json
 
@@ -536,56 +536,6 @@ class ModelValidationFailed(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
-
-
-class BackendAIModel(BaseModel):
-    """Project-wide Pydantic base for Backend.AI models.
-
-    Overrides ``model_validate`` / ``model_validate_json`` /
-    ``model_validate_strings`` so a ``ValidationError`` is auto-mapped
-    to :class:`ModelValidationFailed` (HTTP 400) carrying the structured
-    per-field error list. Call sites get a clean 4xx without repeating
-    ``try / except ValidationError`` at every site.
-
-    The raw Pydantic ``ValidationError`` is also logged at ``error``
-    level so operators can see the original message even when the
-    converted ``BackendAIError`` truncates or rephrases it.
-
-    Notes:
-
-    * Pydantic v2 routes nested validation through
-      ``__pydantic_validator__`` directly, not the classmethod, so this
-      override only affects explicit ``Model.model_validate(...)``
-      calls — nested models are unaffected.
-    * The ``__init__`` constructor and the compiled validator stay
-      untouched, so internal default-value construction
-      (``Model()`` / ``Model(field=...)``) still works exactly like
-      stock Pydantic.
-    """
-
-    @classmethod
-    def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
-        try:
-            return super().model_validate(*args, **kwargs)
-        except ValidationError as e:
-            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise ModelValidationFailed.from_pydantic(e) from e
-
-    @classmethod
-    def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
-        try:
-            return super().model_validate_json(*args, **kwargs)
-        except ValidationError as e:
-            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise ModelValidationFailed.from_pydantic(e) from e
-
-    @classmethod
-    def model_validate_strings(cls, *args: Any, **kwargs: Any) -> Self:
-        try:
-            return super().model_validate_strings(*args, **kwargs)
-        except ValidationError as e:
-            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
-            raise ModelValidationFailed.from_pydantic(e) from e
 
 
 class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):

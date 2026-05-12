@@ -1,6 +1,6 @@
 from pydantic import ConfigDict
 
-from ai.backend.common.exception import BackendAIModel
+from ai.backend.common.types import BackendAIModel
 
 
 class BaseAgentRequestModel(BackendAIModel):

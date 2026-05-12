@@ -6,7 +6,8 @@ import pytest
 from aiohttp import web
 from pydantic import BaseModel, ValidationError
 
-from ai.backend.common.exception import BackendAIModel, ModelValidationFailed
+from ai.backend.common.exception import ModelValidationFailed
+from ai.backend.common.types import BackendAIModel
 
 
 class _PayloadTestModel(BackendAIModel):
