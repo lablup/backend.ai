@@ -13,6 +13,7 @@ from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusResponse,
 )
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.metrics.types import CAPACITY_SENTINEL, CAPACITY_SENTINEL_METRICS
 from ai.backend.common.types import KernelId
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "DIFF_METRICS",
     "KernelLiveStatBatchResult",
     "KernelLiveStatEntry",
+    "KernelLiveStatValues",
     "KernelMetricValuesByKernel",
     "MetricValue",
     "MetricResultValue",
@@ -165,6 +167,45 @@ class KernelLiveStatBatchResult:
                 for kid in kernel_ids
             }
         )
+
+
+@dataclass(frozen=True)
+class KernelLiveStatValues:
+    values_by_kernel: Mapping[KernelId, list[MetricValue]]
+
+    @classmethod
+    def with_capacity_sentinels(
+        cls,
+        values_by_kernel: Mapping[KernelId, list[MetricValue]],
+    ) -> Self:
+        """For live metrics without a meaningful capacity, synthesize capacity sentinels."""
+        new_values: dict[KernelId, list[MetricValue]] = {
+            kid: list(vs) for kid, vs in values_by_kernel.items()
+        }
+        for kid, vs in new_values.items():
+            reported_currents: set[str] = {
+                v.metric_name for v in vs if v.value_type is ValueType.CURRENT
+            }
+            sentinel_targets = reported_currents & CAPACITY_SENTINEL_METRICS
+            if not sentinel_targets:
+                continue
+            rewritten: list[MetricValue] = []
+            samples_to_keep = [
+                v
+                for v in vs
+                if not (v.value_type is ValueType.CAPACITY and v.metric_name in sentinel_targets)
+            ]
+            rewritten.extend(samples_to_keep)
+            for metric_name in sentinel_targets:
+                rewritten.append(
+                    MetricValue(
+                        metric_name=metric_name,
+                        value_type=ValueType.CAPACITY,
+                        value=CAPACITY_SENTINEL,
+                    )
+                )
+            new_values[kid] = rewritten
+        return cls(values_by_kernel=new_values)
 
 
 @dataclass(frozen=True)

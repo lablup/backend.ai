@@ -2,11 +2,11 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
-from ai.backend.common.metrics.types import (
-    CAPACITY_SENTINEL,
+from ai.backend.common.clients.prometheus.metric_types import (
     KernelLiveStatValues,
 )
+from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
+from ai.backend.common.metrics.types import CAPACITY_SENTINEL
 from ai.backend.common.types import KernelId
 
 

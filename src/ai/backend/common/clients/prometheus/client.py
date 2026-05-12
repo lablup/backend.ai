@@ -13,6 +13,7 @@ from ai.backend.common.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
     ContainerMetricResult,
+    KernelLiveStatValues,
     KernelMetricValuesByKernel,
     MetricResultValue,
 )
@@ -26,7 +27,6 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
-from ai.backend.common.metrics.types import KernelLiveStatValues
 from ai.backend.common.types import KernelId
 
 from .preset import MetricPreset
