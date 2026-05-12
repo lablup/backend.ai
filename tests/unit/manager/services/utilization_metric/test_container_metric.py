@@ -14,6 +14,7 @@ from ai.backend.common.clients.prometheus.fixed_query_builder import FixedQueryB
 from ai.backend.common.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
+    KernelMetricValuesByKernel,
     MetricType,
     ValueType,
 )
@@ -30,6 +31,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     PrometheusConnectionError,
 )
+from ai.backend.common.types import KernelId
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
@@ -802,6 +804,96 @@ class TestBuiltinQueryProvider:
         rendered_query = query.render()
 
         assert rendered_query == case.expected_query
+
+
+class TestLiveStatQueryProvider:
+    """Characterization tests for container live stat PromQL."""
+
+    def test_stats_queries_render_legacy_labels_from_typed_value_types(self) -> None:
+        kernel_id = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
+        fixed_query_builder = FixedQueryBuilder("5m")
+
+        queries = fixed_query_builder.get_container_live_stat_queries([kernel_id])
+
+        assert queries.max.render() == (
+            "label_replace(max_over_time((sum by (container_metric_name,kernel_id,value_type)("
+            "backendai_container_utilization"
+            '{kernel_id=~"12345678-1234-5678-1234-567812345678",'
+            'container_metric_name=~"io_scratch_size|mem|'
+            '[A-Za-z0-9][A-Za-z0-9_-]*_(mem|power|temperature|util)",'
+            'value_type="current"}))[5m:]),'
+            '"value_type","max","value_type",".*")'
+            " or "
+            "label_replace(max_over_time((sum by (container_metric_name,kernel_id,value_type)(rate("
+            "backendai_container_utilization"
+            '{kernel_id=~"12345678-1234-5678-1234-567812345678",'
+            'container_metric_name=~"cpu_util",value_type="current"}'
+            "[5m])))[5m:]),"
+            '"value_type","max","value_type",".*")'
+        )
+        assert queries.avg.render() == (
+            "label_replace(avg_over_time((sum by (container_metric_name,kernel_id,value_type)("
+            "backendai_container_utilization"
+            '{kernel_id=~"12345678-1234-5678-1234-567812345678",'
+            'container_metric_name=~"[A-Za-z0-9][A-Za-z0-9_-]*_(power|temperature|util)",'
+            'value_type="current"}))[5m:]),'
+            '"value_type","avg","value_type",".*")'
+            " or "
+            "label_replace(avg_over_time((sum by (container_metric_name,kernel_id,value_type)(rate("
+            "backendai_container_utilization"
+            '{kernel_id=~"12345678-1234-5678-1234-567812345678",'
+            'container_metric_name=~"cpu_util",value_type="current"}'
+            "[5m])))[5m:]),"
+            '"value_type","avg","value_type",".*")'
+        )
+
+    def test_rate_stats_query_renders_legacy_stats_rate_label(self) -> None:
+        kernel_id = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
+        fixed_query_builder = FixedQueryBuilder("5m")
+
+        queries = fixed_query_builder.get_container_live_stat_queries([kernel_id])
+
+        assert queries.rate_stats.render() == (
+            "label_replace(sum by (container_metric_name,kernel_id,value_type)("
+            "backendai_container_utilization"
+            '{kernel_id=~"12345678-1234-5678-1234-567812345678",'
+            'container_metric_name=~"net_rx|net_tx",'
+            'value_type="current"}),'
+            '"value_type","rate","value_type",".*")'
+            " or "
+            "label_replace(sum by (container_metric_name,kernel_id,value_type)(rate("
+            "backendai_container_utilization"
+            '{kernel_id=~"12345678-1234-5678-1234-567812345678",'
+            'container_metric_name=~"io_read|io_write",'
+            'value_type="current"}'
+            "[5m])),"
+            '"value_type","rate","value_type",".*")'
+        )
+
+
+class TestKernelMetricValuesByKernel:
+    def test_from_prometheus_response_parses_value_type_into_enum(self) -> None:
+        kernel_id = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
+        response = PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(
+                result_type="vector",
+                result=[
+                    MetricResponse(
+                        metric=MetricResponseInfo(
+                            kernel_id=str(kernel_id),
+                            container_metric_name="mem",
+                            value_type="max",
+                        ),
+                        values=[(1704067200.0, "1024")],
+                    )
+                ],
+            ),
+        )
+
+        result = KernelMetricValuesByKernel.from_prometheus_response(response)
+
+        assert result.values_by_kernel[kernel_id][0].value_type == ValueType.MAX
 
 
 class TestMetricResponseInfoParsing:
