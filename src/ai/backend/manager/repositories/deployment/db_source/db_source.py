@@ -232,20 +232,6 @@ def _project_health_check_config(
     return model_definition.health_check_config()
 
 
-def _passes_health_check(
-    has_health_check_config: bool,
-    health_check_required: bool | None,
-) -> bool:
-    """Whether the revision's ``health_check_config`` presence matches
-    ``health_check_required`` (``None`` skips the check).
-    """
-    if health_check_required is True:
-        return has_health_check_config
-    if health_check_required is False:
-        return not has_health_check_config
-    return True
-
-
 def _project_preset_slots(
     preset_row: DeploymentRevisionPresetRow | None,
     slot_entries: list[tuple[str, Decimal]],
@@ -1666,8 +1652,7 @@ class DeploymentDBSource:
             routes: list[RouteData] = []
             for row, model_definition, session_status in result.all():
                 health_check_config = _project_health_check_config(model_definition)
-                has_config = health_check_config is not None
-                if not _passes_health_check(has_config, health_check_filter.health_check_required):
+                if health_check_filter.health_check_required and health_check_config is None:
                     continue
                 routes.append(
                     RouteData(

@@ -3986,7 +3986,7 @@ class TestGetRoutesByStatuses:
             populated_routes["running_hc_on_healthy_inactive"],
         }
 
-    async def test_health_check_required_true_keeps_only_configured_revisions(
+    async def test_health_check_required_keeps_only_configured_revisions(
         self,
         deployment_repository: DeploymentRepository,
         populated_routes: dict[str, uuid.UUID],
@@ -4009,26 +4009,6 @@ class TestGetRoutesByStatuses:
             populated_routes["running_hc_on_healthy_inactive"],
         }
 
-    async def test_health_check_required_false_keeps_only_unconfigured_revisions(
-        self,
-        deployment_repository: DeploymentRepository,
-        populated_routes: dict[str, uuid.UUID],
-    ) -> None:
-        """``health_check_required=False`` keeps only routes whose revision
-        has no ``ModelHealthCheck``.
-        """
-        result = await deployment_repository.get_routes_by_statuses(
-            RouteTargetStatuses(
-                lifecycle=[RouteStatus.RUNNING],
-                health=list(RouteHealthStatus),
-            ),
-            RouteHealthCheckFilter(health_check_required=False),
-        )
-
-        assert {r.route_id for r in result} == {
-            populated_routes["running_hc_off_not_checked_active"],
-        }
-
     async def test_health_check_config_projected_from_model_definition(
         self,
         deployment_repository: DeploymentRepository,
@@ -4036,7 +4016,8 @@ class TestGetRoutesByStatuses:
     ) -> None:
         """``RouteData.health_check_config`` mirrors the revision's
         ``model_definition.health_check_config()``: a populated
-        :class:`ModelHealthCheck` for hc-enabled revisions, ``None`` otherwise.
+        :class:`ModelHealthCheck` when the revision declares
+        ``service.health_check``, ``None`` otherwise.
         """
         result = await deployment_repository.get_routes_by_statuses(
             RouteTargetStatuses(

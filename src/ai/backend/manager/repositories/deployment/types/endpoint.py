@@ -62,12 +62,7 @@ class EndpointData:
 
 @dataclass(frozen=True)
 class RouteSessionData:
-    """Session id + status snapshot attached to a RouteData.
-
-    ``RoutingRow.session`` has ``ondelete=RESTRICT`` so a route cannot
-    reference a missing session row; ``status`` therefore is always set
-    when ``session_id`` is.
-    """
+    """Session id paired with its current status."""
 
     session_id: SessionId
     status: SessionStatus
@@ -75,13 +70,7 @@ class RouteSessionData:
 
 @dataclass
 class RouteData:
-    """Data structure for model service route.
-
-    ``health_check_config`` is the resolved ``ModelHealthCheck`` from the
-    revision's ``model_definition`` (or ``None`` when the revision opted
-    out). It is loaded eagerly with the route, so consumers do not need
-    to re-query the revision row to know how (or whether) to probe.
-    """
+    """Data structure for model service route."""
 
     route_id: uuid.UUID
     deployment_id: DeploymentID

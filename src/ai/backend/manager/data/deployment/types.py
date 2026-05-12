@@ -266,12 +266,11 @@ class RouteTargetStatuses:
 class RouteHealthCheckFilter:
     """In-memory gating on a revision's ``health_check_config``.
 
-    ``True`` keeps only routes whose revision has a config; ``False``
-    keeps only routes without; ``None`` skips the filter. Anything more
-    specific belongs in the calling handler.
+    ``health_check_required=True`` keeps only routes whose revision has
+    a resolved health-check block; ``False`` (default) skips the filter.
     """
 
-    health_check_required: bool | None = None
+    health_check_required: bool = False
 
 
 @dataclass(frozen=True)

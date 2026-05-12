@@ -72,7 +72,7 @@ class TestAppProxySyncHandler:
         case that AppProxy must skip is rejected in ``execute`` instead.
         """
         filt = AppProxySyncRouteHandler.health_check_filter()
-        assert filt.health_check_required is None
+        assert filt.health_check_required is False
 
     async def test_execute_keeps_healthy_and_unprobed_routes(self) -> None:
         """HEALTHY rows pass through; NOT_CHECKED rows pass only when their
