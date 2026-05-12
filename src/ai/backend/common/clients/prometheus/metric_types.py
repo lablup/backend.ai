@@ -63,18 +63,64 @@ class MetricType(StrEnum):
 
 @dataclass(frozen=True)
 class ContainerLiveStatQueries:
-    """Gauge / diff / rate query preset bundle for container live stats."""
+    """Gauge / diff / rate / max / avg / rate_stats query preset bundle for container live stats."""
 
     gauge: MetricPreset
     diff: MetricPreset
     rate: MetricPreset
+    max: MetricPreset
+    avg: MetricPreset
+    rate_stats: MetricPreset
 
     def to_list(self) -> list[MetricPreset]:
-        return [self.gauge, self.diff, self.rate]
+        return [self.gauge, self.diff, self.rate, self.max, self.avg, self.rate_stats]
+
+
+# Backend.AI accelerator/plugin gauge metric naming convention.
+# Adding a new suffix here is the single edit needed to extend stats.{max,avg}
+# coverage to a new family of accelerator metrics (e.g., adding "clock" auto-
+# covers cuda_clock / gpu_clock / tpu_clock).
+_ACCEL_GAUGE_SUFFIXES_MAX_ONLY: Final[frozenset[str]] = frozenset({"mem"})
+_ACCEL_GAUGE_SUFFIXES_WITH_AVG: Final[frozenset[str]] = frozenset({
+    "util",
+    "power",
+    "temperature",
+})
+
+
+def _accel_suffix_pattern(suffixes: frozenset[str]) -> str:
+    body = "|".join(sorted(suffixes))
+    return rf"[A-Za-z0-9][A-Za-z0-9_-]*_({body})"
 
 
 DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
 RATE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
+
+# Intrinsic gauge metrics that don't follow the accelerator suffix convention.
+STATS_MAX_GAUGE_METRICS: Final[frozenset[str]] = frozenset({
+    "mem",
+    "io_scratch_size",
+})
+STATS_AVG_GAUGE_METRICS: Final[frozenset[str]] = frozenset()
+# Pattern-based gauge coverage for plugin/accelerator metrics.
+STATS_MAX_GAUGE_METRIC_PATTERNS: Final[frozenset[str]] = frozenset({
+    _accel_suffix_pattern(_ACCEL_GAUGE_SUFFIXES_MAX_ONLY | _ACCEL_GAUGE_SUFFIXES_WITH_AVG),
+})
+STATS_AVG_GAUGE_METRIC_PATTERNS: Final[frozenset[str]] = frozenset({
+    _accel_suffix_pattern(_ACCEL_GAUGE_SUFFIXES_WITH_AVG),
+})
+STATS_MAX_OVER_RATE_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
+STATS_AVG_OVER_RATE_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
+
+# stats.rate emission targets the legacy stats.rate live_stat label.
+# Two metric shapes flow in:
+#   * "gauge" set: agent's current_hook already publishes per-second rate as
+#     the metric's `current` value, so we only need to sum across replicas
+#     and relabel to stats.rate (no PromQL rate() wrap).
+#   * "counter" set: the published series is a cumulative byte counter, so
+#     we apply rate(...[window]) to get bytes/sec before relabel.
+STATS_RATE_GAUGE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
+STATS_RATE_COUNTER_METRICS: Final[frozenset[str]] = frozenset({"io_read", "io_write"})
 
 
 @dataclass

@@ -84,13 +84,12 @@ class PrometheusClient:
         kernel_ids: Sequence[KernelId],
     ) -> KernelLiveStatValues:
         queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
-        gauge_response = await self._query_instant(queries.gauge)
-        diff_response = await self._query_instant(queries.diff)
-        rate_response = await self._query_instant(queries.rate)
-        gauge = KernelMetricValuesByKernel.from_prometheus_response(gauge_response)
-        diff = KernelMetricValuesByKernel.from_prometheus_response(diff_response)
-        rate = KernelMetricValuesByKernel.from_prometheus_response(rate_response)
-        merged = gauge.merged_with(diff).merged_with(rate)
+        merged = KernelMetricValuesByKernel(values_by_kernel={})
+        for preset in queries.to_list():
+            response = await self._query_instant(preset)
+            merged = merged.merged_with(
+                KernelMetricValuesByKernel.from_prometheus_response(response)
+            )
         return KernelLiveStatValues.with_capacity_sentinels(merged.values_by_kernel)
 
     async def execute_preset(

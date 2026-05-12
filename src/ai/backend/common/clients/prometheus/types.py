@@ -8,6 +8,9 @@ class ValueType(StrEnum):
     CURRENT = "current"
     CAPACITY = "capacity"
     PCT = "pct"
+    MAX = "max"
+    AVG = "avg"
+    RATE = "rate"
 
 
 @dataclass(frozen=True)

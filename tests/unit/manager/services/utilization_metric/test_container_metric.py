@@ -12,8 +12,10 @@ import pytest
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.fixed_query_builder import FixedQueryBuilder
 from ai.backend.common.clients.prometheus.metric_types import (
+    ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
+    KernelMetricValuesByKernel,
     MetricType,
     ValueType,
 )
@@ -30,6 +32,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     PrometheusConnectionError,
 )
+from ai.backend.common.types import KernelId
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
@@ -802,6 +805,88 @@ class TestBuiltinQueryProvider:
         rendered_query = query.render()
 
         assert rendered_query == case.expected_query
+
+
+class TestLiveStatQueryProvider:
+    """Characterization tests for container live stat PromQL."""
+
+    @pytest.fixture()
+    def queries(self) -> ContainerLiveStatQueries:
+        kernel_id = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
+        fixed_query_builder = FixedQueryBuilder("5m")
+        return fixed_query_builder.get_container_live_stat_queries([kernel_id])
+
+    def test_max_stats_query_keeps_legacy_live_stat_contract(
+        self, queries: ContainerLiveStatQueries
+    ) -> None:
+        query = queries.max.render()
+
+        assert '"value_type","max","value_type",".*"' in query
+        assert "max_over_time" in query
+        assert (
+            'container_metric_name=~"io_scratch_size|mem|'
+            '[A-Za-z0-9][A-Za-z0-9_-]*_(mem|power|temperature|util)"'
+        ) in query
+        assert 'value_type="current"' in query
+        assert 'container_metric_name=~"cpu_util",value_type="current"}[5m]' in query
+
+    def test_avg_stats_query_keeps_legacy_live_stat_contract(
+        self, queries: ContainerLiveStatQueries
+    ) -> None:
+        query = queries.avg.render()
+
+        assert '"value_type","avg","value_type",".*"' in query
+        assert "avg_over_time" in query
+        assert (
+            'container_metric_name=~"[A-Za-z0-9][A-Za-z0-9_-]*_(power|temperature|util)"'
+        ) in query
+        assert 'value_type="current"' in query
+        assert 'container_metric_name=~"cpu_util",value_type="current"}[5m]' in query
+        assert "io_scratch_size|mem" not in query
+
+    def test_rate_stats_query_keeps_legacy_live_stat_contract(
+        self, queries: ContainerLiveStatQueries
+    ) -> None:
+        query = queries.rate_stats.render()
+
+        assert '"value_type","rate","value_type",".*"' in query
+        assert 'container_metric_name=~"net_rx|net_tx"' in query
+        assert 'value_type="current"' in query
+        assert 'container_metric_name=~"io_read|io_write",value_type="current"}[5m]' in query
+
+
+class TestKernelMetricValuesByKernel:
+    @pytest.fixture()
+    def kernel_id(self) -> KernelId:
+        return KernelId(UUID("12345678-1234-5678-1234-567812345678"))
+
+    @pytest.fixture()
+    def response(self, kernel_id: KernelId) -> PrometheusResponse:
+        return PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(
+                result_type="vector",
+                result=[
+                    MetricResponse(
+                        metric=MetricResponseInfo(
+                            kernel_id=str(kernel_id),
+                            container_metric_name="mem",
+                            value_type="max",
+                        ),
+                        values=[(1704067200.0, "1024")],
+                    )
+                ],
+            ),
+        )
+
+    def test_from_prometheus_response_parses_value_type_into_enum(
+        self,
+        kernel_id: KernelId,
+        response: PrometheusResponse,
+    ) -> None:
+        result = KernelMetricValuesByKernel.from_prometheus_response(response)
+
+        assert result.values_by_kernel[kernel_id][0].value_type == ValueType.MAX
 
 
 class TestMetricResponseInfoParsing:
