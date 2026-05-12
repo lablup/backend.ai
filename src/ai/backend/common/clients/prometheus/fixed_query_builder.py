@@ -13,7 +13,6 @@ from ai.backend.common.clients.prometheus.metric_types import (
 from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.clients.prometheus.querier import ContainerMetricQuerier
 from ai.backend.common.clients.prometheus.types import ValueType
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     CONTAINER_UTILIZATION_METRIC_NAME,
@@ -152,5 +151,3 @@ class FixedQueryBuilder:
                 return _RATE_TEMPLATE
             case MetricType.DIFF:
                 return _DIFF_TEMPLATE
-            case _:
-                raise UnreachableError(f"Unknown metric type: {metric_type}")
