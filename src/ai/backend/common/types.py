@@ -5,7 +5,6 @@ import dataclasses
 import enum
 import ipaddress
 import itertools
-import logging
 import math
 import numbers
 import textwrap
@@ -177,9 +176,6 @@ if TYPE_CHECKING:
     from .docker import ImageRef
 
 
-log = logging.getLogger(__spec__.name)
-
-
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
@@ -193,10 +189,6 @@ class BackendAIModel(BaseModel):
     to :class:`BackendAIModelValidationFailed` (HTTP 400) carrying the structured
     per-field error list. Call sites get a clean 4xx without repeating
     ``try / except ValidationError`` at every site.
-
-    The raw Pydantic ``ValidationError`` is also logged at ``error``
-    level so operators can see the original message even when the
-    converted ``BackendAIError`` truncates or rephrases it.
 
     Notes:
 
@@ -215,7 +207,6 @@ class BackendAIModel(BaseModel):
         try:
             return super().model_validate(*args, **kwargs)
         except ValidationError as e:
-            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
             raise BackendAIModelValidationFailed(
                 extra_msg=str(e),
                 extra_data={"errors": e.errors()},
@@ -226,7 +217,6 @@ class BackendAIModel(BaseModel):
         try:
             return super().model_validate_json(*args, **kwargs)
         except ValidationError as e:
-            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
             raise BackendAIModelValidationFailed(
                 extra_msg=str(e),
                 extra_data={"errors": e.errors()},
@@ -237,7 +227,6 @@ class BackendAIModel(BaseModel):
         try:
             return super().model_validate_strings(*args, **kwargs)
         except ValidationError as e:
-            log.error("Pydantic validation failed for %s: %s", cls.__name__, e)
             raise BackendAIModelValidationFailed(
                 extra_msg=str(e),
                 extra_data={"errors": e.errors()},

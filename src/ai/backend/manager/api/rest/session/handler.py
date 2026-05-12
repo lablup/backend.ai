@@ -192,38 +192,88 @@ def _validate_creation_config(
     template: bool = False,
 ) -> dict[str, Any]:
     """Validate creation config dict against the API-version-appropriate Pydantic model."""
-    model_cls: type[BaseModel]
-    if template:
-        if api_version[0] >= 8:
-            model_cls = CreationConfigV6Template
-        elif api_version[0] >= 6:
-            model_cls = CreationConfigV5Template
-        elif api_version[0] >= 5:
-            model_cls = CreationConfigV4Template
-        else:
-            model_cls = CreationConfigV3Template
-    else:
-        if api_version[0] >= 9:
-            model_cls = CreationConfigV7
-        elif api_version[0] >= 8:
-            model_cls = CreationConfigV6
-        elif api_version[0] >= 6:
-            model_cls = CreationConfigV5
-        elif api_version[0] >= 5:
-            model_cls = CreationConfigV4
-        elif api_version >= (4, "20190315"):
-            model_cls = CreationConfigV3
-        elif 2 <= api_version[0] <= 4:
-            model_cls = CreationConfigV2
-        elif api_version[0] == 1:
-            model_cls = CreationConfigV1
-        else:
-            raise InvalidAPIParameters("API version not supported")
     try:
-        model = model_cls.model_validate(config)
+        model: BaseModel
+        if template:
+            if api_version[0] >= 8:
+                model = CreationConfigV6Template.model_validate(config)
+            elif api_version[0] >= 6:
+                model = CreationConfigV5Template.model_validate(config)
+            elif api_version[0] >= 5:
+                model = CreationConfigV4Template.model_validate(config)
+            elif api_version >= (4, "20190315"):
+                model = CreationConfigV3Template.model_validate(config)
+            else:
+                model = CreationConfigV3Template.model_validate(config)
+        else:
+            if api_version[0] >= 9:
+                model = CreationConfigV7.model_validate(config)
+            elif api_version[0] >= 8:
+                model = CreationConfigV6.model_validate(config)
+            elif api_version[0] >= 6:
+                model = CreationConfigV5.model_validate(config)
+            elif api_version[0] >= 5:
+                model = CreationConfigV4.model_validate(config)
+            elif api_version >= (4, "20190315"):
+                model = CreationConfigV3.model_validate(config)
+            elif 2 <= api_version[0] <= 4:
+                model = CreationConfigV2.model_validate(config)
+            elif api_version[0] == 1:
+                model = CreationConfigV1.model_validate(config)
+            else:
+                raise InvalidAPIParameters("API version not supported")
+        return model.model_dump(by_alias=False)
     except BackendAIModelValidationFailed as e:
         raise InvalidAPIParameters(extra_msg=e.extra_msg, extra_data=e.extra_data) from e
-    return model.model_dump(by_alias=False)
+
+
+def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:
+    """Lift UUID-shaped strings from legacy mount buckets onto the UUID-keyed
+    buckets, leaving only name-shaped entries for the name resolver.
+    """
+    legacy_mounts = creation_config.get("mounts") or ()
+    legacy_mount_map = creation_config.get("mount_map") or {}
+    legacy_mount_options = creation_config.get("mount_options") or {}
+
+    mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
+    mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
+    mount_options: dict[Any, Any] = {}
+    name_mounts: list[Any] = []
+    name_mount_map: dict[str, str] = {}
+
+    legacy_mounts_keys = {str(m) for m in legacy_mounts}
+    seen: set[str] = set()
+    for raw in list(legacy_mounts) + list(legacy_mount_map) + list(legacy_mount_options):
+        key = str(raw)
+        if key in seen:
+            continue
+        seen.add(key)
+        dst = legacy_mount_map.get(key)
+        opts = legacy_mount_options.get(key)
+        try:
+            vfid = UUID(key)
+        except (ValueError, TypeError):
+            if key in legacy_mounts_keys:
+                name_mounts.append(raw)
+            if dst is not None:
+                name_mount_map[key] = dst
+            if opts is not None:
+                mount_options[key] = opts
+            continue
+        if vfid not in mount_ids:
+            mount_ids.append(vfid)
+        if dst is not None:
+            mount_id_map.setdefault(vfid, dst)
+        if opts is not None:
+            mount_options.setdefault(vfid, opts)
+
+    next_config = dict(creation_config)
+    next_config["mounts"] = name_mounts
+    next_config["mount_map"] = name_mount_map
+    next_config["mount_options"] = mount_options
+    next_config["mount_ids"] = mount_ids
+    next_config["mount_id_map"] = mount_id_map
+    return next_config
 
 
 def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:
