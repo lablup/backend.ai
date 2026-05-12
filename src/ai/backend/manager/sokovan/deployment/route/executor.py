@@ -255,24 +255,28 @@ class RouteExecutor:
         if not successes:
             return RouteExecutionResult(successes=successes, errors=errors)
 
-        hc_configs = await self._deployment_repo.fetch_health_check_configs({
-            r.revision_id for r in successes
-        })
-        hc_pairs: list[_RouteWithHealthCheck] = [
-            _RouteWithHealthCheck(route=r, health_check=hc)
-            for r in successes
-            if (hc := hc_configs.get(r.revision_id)) is not None
-        ]
-
+        # Replica population is hc-agnostic — opt-out routes still need
+        # host/port for ``sync_appproxy`` to register them with AppProxy.
         # ``_populate_replica_info`` mutates ``replica_host``/``replica_port``
-        # in place so the rows it just populated flow into the Phase-4 filter.
-        routes_missing_replica = [p.route for p in hc_pairs if not p.route.replica_host]
+        # in place so populated rows flow into the hc-pair filter below.
+        routes_missing_replica = [r for r in successes if not r.replica_host]
         if routes_missing_replica:
             with RouteRecorderContext.shared_phase("populate_replica_info"):
                 with RouteRecorderContext.shared_step("fetch_kernel_connection_info"):
                     await self._populate_replica_info(routes_missing_replica)
 
-        pairs_with_replica = [p for p in hc_pairs if p.route.replica_host and p.route.replica_port]
+        # Only revisions that declared ``service.health_check`` get a
+        # RouteHealthRecord in Valkey; opt-out revisions never get probed.
+        hc_configs = await self._deployment_repo.fetch_health_check_configs({
+            r.revision_id for r in successes
+        })
+        pairs_with_replica: list[_RouteWithHealthCheck] = [
+            _RouteWithHealthCheck(route=r, health_check=hc)
+            for r in successes
+            if r.replica_host
+            and r.replica_port
+            and (hc := hc_configs.get(r.revision_id)) is not None
+        ]
         if pairs_with_replica:
             await self._ensure_health_records(pairs_with_replica)
 
