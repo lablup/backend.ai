@@ -67,7 +67,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
-    RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
@@ -629,13 +628,18 @@ class DeploymentRepository:
     # Route operations
 
     @deployment_repository_resilience.apply()
-    async def get_routes_by_statuses(
+    async def search_route_datas(
         self,
-        statuses: list[RouteStatus],
-        health_statuses: list[RouteHealthStatus],
+        *,
+        querier: BatchQuerier,
     ) -> list[RouteData]:
-        """Get routes by lifecycle and health statuses."""
-        return await self._db_source.get_routes_by_statuses(statuses, health_statuses)
+        """Search routes via :class:`BatchQuerier`.
+
+        The caller composes ``querier`` with every filter that applies;
+        pagination is part of the querier (use ``NoPagination`` for
+        unbounded scans).
+        """
+        return await self._db_source.search_route_datas(querier=querier)
 
     @deployment_repository_resilience.apply()
     async def update_route_status_bulk(
