@@ -226,7 +226,19 @@ class BackendAISchema(BaseModel):
 
     @classmethod
     def _validation_failure_info(cls, exc: ValidationError) -> SchemaValidationFailureInfo:
-        return SchemaValidationFailureInfo(summary=str(exc), errors=exc.errors())
+        # Strip ``input`` and ``ctx`` per-error entry: those carry the raw
+        # invalid value and validator-specific context, which can contain
+        # sensitive data (passwords, tokens) and non-JSON-serializable
+        # objects. ``str(exc)`` may still embed input values; callers that
+        # log/return ``summary`` should treat it as opaque.
+        sanitized = [
+            cast(
+                ErrorDetails,
+                {k: v for k, v in err.items() if k not in ("input", "ctx")},
+            )
+            for err in exc.errors()
+        ]
+        return SchemaValidationFailureInfo(summary=str(exc), errors=sanitized)
 
     @classmethod
     def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
