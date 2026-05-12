@@ -38,6 +38,7 @@ def mock_deployment_repo() -> AsyncMock:
     repo.get_deployments_by_ids = AsyncMock(return_value=[])
     repo.update_route_sessions = AsyncMock(return_value=None)
     repo.fetch_session_statuses_by_route_ids = AsyncMock(return_value={})
+    repo.fetch_health_check_configs = AsyncMock(return_value={})
     repo.fetch_route_service_discovery_info = AsyncMock(return_value=[])
     repo.get_scaling_group_cleanup_configs = AsyncMock(return_value={})
     repo.fetch_deployment_context = AsyncMock(return_value=MagicMock())

@@ -175,7 +175,6 @@ class RouteCoordinator:
             RouteLifecycleType.APPPROXY_SYNC: AppProxySyncRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
-                deployment_repository=self._deployment_repository,
             ),
         }
 

@@ -551,18 +551,31 @@ class RouteExecutor:
     async def sync_appproxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Push the routing tables for affected endpoints to AppProxy.
 
-        One ``bulk_update_routes`` HTTP call per proxy target. Routes
-        whose session is past CREATING/RUNNING are skipped silently —
-        the next ``check_running_routes`` cycle marks them TERMINATING.
+        Eligible routes are HEALTHY rows plus NOT_CHECKED rows whose
+        revision opted out of ``service.health_check`` (no probe is ever
+        run — they must still receive traffic). Routes whose session is
+        past CREATING/RUNNING are skipped silently — the next
+        ``check_running_routes`` cycle marks them TERMINATING.
+        One ``bulk_update_routes`` HTTP call per proxy target.
         """
         if not routes:
             return RouteExecutionResult(successes=[], errors=[])
+        hc_configs = await self._deployment_repo.fetch_health_check_configs({
+            r.revision_id for r in routes
+        })
+        eligible = [
+            r
+            for r in routes
+            if r.health_status == RouteHealthStatus.HEALTHY or hc_configs.get(r.revision_id) is None
+        ]
+        if not eligible:
+            return RouteExecutionResult(successes=[], errors=[])
         session_statuses = await self._deployment_repo.fetch_session_statuses_by_route_ids({
-            r.route_id for r in routes
+            r.route_id for r in eligible
         })
 
         routes_by_endpoint: dict[DeploymentID, list[RouteData]] = {}
-        for route in routes:
+        for route in eligible:
             routes_by_endpoint.setdefault(route.deployment_id, []).append(route)
         endpoint_ids = list(routes_by_endpoint.keys())
 
