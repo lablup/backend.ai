@@ -6175,6 +6175,7 @@ type ModelDeploymentMetadata {
 input ModelDeploymentMetadataInput {
   projectId: ID!
   domainName: String!
+  resourceGroup: String!
   name: String = null
   tags: [String!] = null
 }
@@ -9970,8 +9971,6 @@ type ResourceConfig {
 
 """Added in 25.19.0. """
 input ResourceConfigInput {
-  resourceGroup: ResourceGroupInput!
-
   """Added in 26.1.0. Resources allocated for the deployment."""
   resourceSlots: ResourceSlotInput!
 
@@ -10062,11 +10061,6 @@ input ResourceGroupFilter {
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
-}
-
-"""Added in 25.19.0. """
-input ResourceGroupInput {
-  name: String!
 }
 
 """Added in 26.2.0. Metadata for a resource group."""

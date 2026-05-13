@@ -21,6 +21,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, MountPermission, RuntimeVariant
 
@@ -183,6 +184,7 @@ class DeploymentMetadataInput(BaseRequestModel):
 
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
+    resource_group: ResourceGroupName = Field(description="Resource group name")
     name: str | None = Field(default=None, description="Deployment name")
     tags: list[str] | None = Field(default=None, description="Tags for the deployment")
 
@@ -224,7 +226,6 @@ class ClusterConfigInput(BaseRequestModel):
 class ResourceConfigInput(BaseRequestModel):
     """Resource configuration input."""
 
-    resource_group: str = Field(description="Resource group name")
     resource_slots: Mapping[str, Any] = Field(
         description='Resource slots (e.g., {"cpu": "1", "mem": "1073741824"})'
     )

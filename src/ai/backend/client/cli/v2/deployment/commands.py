@@ -117,6 +117,7 @@ def get(deployment_id: str) -> None:
 @click.option("--name", required=True, type=str, help="Deployment name.")
 @click.option("--project-id", required=True, type=str, help="Project (group) UUID.")
 @click.option("--domain-name", default="default", type=str, help="Domain name.")
+@click.option("--resource-group", required=True, type=str, help="Resource group name.")
 @click.option("--replicas", default=0, type=int, help="Number of replicas.")
 @click.option("--open-to-public", default=False, is_flag=True, help="Make publicly accessible.")
 @click.option(
@@ -135,6 +136,7 @@ def create(
     name: str,
     project_id: str,
     domain_name: str,
+    resource_group: str,
     replicas: int,
     open_to_public: bool,
     strategy: str,
@@ -152,6 +154,7 @@ def create(
         ModelDeploymentMetadataInput,
         ModelDeploymentNetworkAccessInput,
     )
+    from ai.backend.common.identifier.resource_group import ResourceGroupName
 
     revision_dto: CreateRevisionInputDTO | None = None
     if initial_revision is not None:
@@ -166,6 +169,7 @@ def create(
         metadata=ModelDeploymentMetadataInput(
             project_id=project_id,
             domain_name=domain_name,
+            resource_group=ResourceGroupName(resource_group),
             name=name,
         ),
         network_access=ModelDeploymentNetworkAccessInput(

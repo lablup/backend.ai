@@ -30,7 +30,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelMountConfigInput,
     ModelRuntimeConfigInput,
     ResourceConfigInput,
-    ResourceGroupInput,
     ResourceSlotEntryInput,
     ResourceSlotInput,
     RevisionInput,
@@ -51,7 +50,6 @@ def _make_revision_input(**kwargs: object) -> RevisionInput:
         "image_id": ImageID(uuid.uuid4()),
         "cluster_mode": ClusterMode.SINGLE_NODE,
         "cluster_size": 1,
-        "resource_group": "default",
         "resource_slots": {"cpu": "2", "mem": "4g"},
         "runtime_variant_id": RuntimeVariantID(uuid.uuid4()),
         "model_vfolder_id": VFolderUUID(uuid.uuid4()),
@@ -66,7 +64,6 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
     defaults: dict[str, Any] = {
         "cluster_config": ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
         "resource_config": ResourceConfigInput(
-            resource_group=ResourceGroupInput(name="default"),
             resource_slots=ResourceSlotInput(
                 entries=[
                     ResourceSlotEntryInput(resource_type="cpu", quantity="2"),
@@ -99,7 +96,6 @@ class TestRevisionInput:
         rev = RevisionInput(
             image_id=image_id,
             cluster_mode=ClusterMode.SINGLE_NODE,
-            resource_group="default",
             resource_slots={"cpu": "2"},
             runtime_variant_id=runtime_variant_id,
             model_vfolder_id=model_id,
@@ -108,7 +104,6 @@ class TestRevisionInput:
         )
         assert rev.image_id == image_id
         assert rev.cluster_mode == ClusterMode.SINGLE_NODE
-        assert rev.resource_group == "default"
         assert rev.model_vfolder_id == model_id
         assert rev.model_definition_path == "/models/def.yaml"
 
@@ -298,6 +293,7 @@ class TestCreateDeploymentInput:
         defaults: dict[str, Any] = {
             "project_id": uuid.uuid4(),
             "domain_name": "default",
+            "resource_group": "default",
         }
         defaults.update(kwargs)
         return ModelDeploymentMetadataInput(**defaults)

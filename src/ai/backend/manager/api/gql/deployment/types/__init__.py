@@ -119,7 +119,6 @@ from .revision import (
     MountPermission,
     ResourceConfig,
     ResourceConfigInput,
-    ResourceGroupInput,
 )
 from .revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -258,7 +257,6 @@ __all__ = [
     "MountPermission",
     "ResourceConfig",
     "ResourceConfigInput",
-    "ResourceGroupInput",
     # Allocated Resource Slot
     "AllocatedResourceSlotFilterGQL",
     "AllocatedResourceSlotGQL",

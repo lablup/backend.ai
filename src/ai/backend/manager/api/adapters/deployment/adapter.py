@@ -474,7 +474,6 @@ class DeploymentAdapter(BaseAdapter):
         """Create a new deployment."""
         initial_revision = input.initial_revision
         model_revision_creator: ModelRevisionCreator | None = None
-        resource_group_name: str | None = None
         if initial_revision is not None:
             mounts_creator = VFolderMountsCreator(
                 model_vfolder_id=initial_revision.model_mount_config.vfolder_id,
@@ -520,7 +519,6 @@ class DeploymentAdapter(BaseAdapter):
                     else None,
                 ),
             )
-            resource_group_name = initial_revision.resource_config.resource_group.name
         strategy = input.default_deployment_strategy
         policy: DeploymentPolicyConfig | None = None
         if strategy.rolling_update is not None:
@@ -550,7 +548,7 @@ class DeploymentAdapter(BaseAdapter):
                 name=meta.name or f"deployment-{created_user_id.hex[:8]}",
                 domain=meta.domain_name,
                 project=meta.project_id,
-                resource_group=resource_group_name or "default",
+                resource_group=meta.resource_group,
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,
