@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import RouteHandlerCategory, RouteStatus
@@ -207,7 +208,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
                 status=ImageStatus.ALIVE,
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             await db_sess.commit()
 
@@ -622,7 +623,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
                 status=ImageStatus.ALIVE,
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             await db_sess.commit()
 
@@ -1096,7 +1097,7 @@ class TestDeploymentHistoryMergeLogic:
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
                 status=ImageStatus.ALIVE,
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
 
             # Create endpoint
@@ -1412,7 +1413,7 @@ class TestRouteHistoryMergeLogic:
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
                 status=ImageStatus.ALIVE,
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
 
             # Create endpoint

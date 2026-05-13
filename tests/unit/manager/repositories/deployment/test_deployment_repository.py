@@ -618,7 +618,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             # Create runtime_variant for revision FK
             db_sess.add(
@@ -847,7 +847,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             runtime_variant_id = uuid.uuid4()
             db_sess.add(

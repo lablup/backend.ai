@@ -27,6 +27,7 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -242,7 +243,7 @@ class KernelRow(Base):  # type: ignore[misc]
     # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
     # Kept as historical audit data; active reference is `image_id`.
     image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
-    image_id: Mapped[uuid.UUID | None] = mapped_column(
+    image_id: Mapped[ImageID | None] = mapped_column(
         "image_id",
         GUID,
         sa.ForeignKey("images.id", ondelete="SET NULL"),
