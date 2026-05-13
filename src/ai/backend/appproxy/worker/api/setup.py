@@ -154,9 +154,7 @@ async def setup(
 
     # Web browsers block redirect between cross-origins if Access-Control-Allow-Origin value is set to a concrete Origin instead of wildcard;
     # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors.
-    # Cache-Control: no-store prevents browsers from caching this redirect — the response carries
-    # a Set-Cookie side effect, so a cached redirect would skip the server and leave no way to
-    # reissue the cookie after it expires. (BA-5995)
+    # `Cache-Control: no-store` keeps the Set-Cookie-bearing redirect uncacheable.
     cors_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "*",
