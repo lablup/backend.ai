@@ -22,7 +22,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.deployment.creators.revision import (
     DeploymentRevisionCreatorSpec,
 )
-from ai.backend.manager.sokovan.deployment.validators.deployment_revision_base import (
+from ai.backend.manager.sokovan.deployment.validators.base import (
     DeploymentRevisionValidationContext,
     DeploymentRevisionValidatorRule,
 )
