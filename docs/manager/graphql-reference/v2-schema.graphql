@@ -9871,6 +9871,7 @@ Added in 25.19.0. This enum represents the provisioning status of a replica.
 """
 enum ReplicaStatus {
   PROVISIONING
+  WARMING_UP
   RUNNING
   TERMINATING
   TERMINATED
@@ -11009,6 +11010,7 @@ input RouteScope {
 """Added in 25.19.0. Lifecycle status of a route."""
 enum RouteStatus {
   PROVISIONING
+  WARMING_UP
   RUNNING
   TERMINATING
   TERMINATED

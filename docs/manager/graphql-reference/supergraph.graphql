@@ -14760,6 +14760,7 @@ enum ReplicaStatus
   @join__type(graph: STRAWBERRY)
 {
   PROVISIONING @join__enumValue(graph: STRAWBERRY)
+  WARMING_UP @join__enumValue(graph: STRAWBERRY)
   RUNNING @join__enumValue(graph: STRAWBERRY)
   TERMINATING @join__enumValue(graph: STRAWBERRY)
   TERMINATED @join__enumValue(graph: STRAWBERRY)
@@ -16237,6 +16238,7 @@ enum RouteStatus
   @join__type(graph: STRAWBERRY)
 {
   PROVISIONING @join__enumValue(graph: STRAWBERRY)
+  WARMING_UP @join__enumValue(graph: STRAWBERRY)
   RUNNING @join__enumValue(graph: STRAWBERRY)
   TERMINATING @join__enumValue(graph: STRAWBERRY)
   TERMINATED @join__enumValue(graph: STRAWBERRY)
