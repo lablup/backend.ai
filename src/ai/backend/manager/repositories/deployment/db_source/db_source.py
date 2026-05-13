@@ -4,7 +4,7 @@ import dataclasses
 import logging
 import uuid
 from collections import Counter, defaultdict
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -2282,7 +2282,7 @@ class DeploymentDBSource:
                 preset_resource_slots=_project_preset_slots(preset_row, preset_slots),
             )
 
-    async def fetch_revision_required_slot_names(self) -> frozenset[SlotName]:
+    async def fetch_revision_required_slot_names(self) -> Iterable[SlotName]:
         """Return the globally required resource slot names"""
         async with self._db.begin_readonly_session_read_committed() as session:
             stmt = sa.select(ResourceSlotTypeRow.slot_name).where(

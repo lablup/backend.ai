@@ -3,7 +3,7 @@
 import logging
 import uuid
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
@@ -1174,7 +1174,7 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
-    async def fetch_revision_required_slot_names(self) -> frozenset[SlotName]:
+    async def fetch_revision_required_slot_names(self) -> Iterable[SlotName]:
         """Globally required resource slot names for revision validation."""
         return await self._db_source.fetch_revision_required_slot_names()
 

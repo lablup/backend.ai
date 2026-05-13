@@ -13,6 +13,7 @@ absent or non-positive:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from decimal import Decimal
 from typing import override
 
@@ -57,13 +58,13 @@ class RequiredResourceSlotRule(DeploymentRevisionValidatorRule):
     def _check_resource_slots(
         self,
         resource_slots: ResourceSlot,
-        required: frozenset[SlotName],
+        required_slot_names: Iterable[SlotName],
     ) -> None:
-        if not required:
+        if not required_slot_names:
             return
         missing = sorted(
             str(slot_name)
-            for slot_name in required
+            for slot_name in required_slot_names
             if resource_slots.get(str(slot_name), Decimal(0)) <= Decimal(0)
         )
         if missing:
