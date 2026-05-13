@@ -184,7 +184,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
-from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound, IncompleteRevisionData
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import EndpointTokenNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
@@ -1076,28 +1076,21 @@ class DeploymentAdapter(BaseAdapter):
         input: AddRevisionGQLInputDTO,
         options: AddRevisionOptions,
     ) -> AddRevisionPayload:
-        """Add a new model revision to a deployment."""
-        # TODO: AddRevisionInput is now a draft (all fields optional). Once
-        # draft-merge logic is implemented, missing fields will be filled from
-        # preset/baseline/existing revision. For now, all fields are still
-        # required at runtime — reject incomplete drafts explicitly.
-        if (
-            input.cluster_config is None
-            or input.resource_config is None
-            or input.image is None
-            or input.model_runtime_config is None
-            or input.model_mount_config is None
-        ):
-            raise IncompleteRevisionData(
-                "AddRevisionInput is missing required fields. "
-                "Draft-merge support is not yet implemented; "
-                "cluster_config, resource_config, image, "
-                "model_runtime_config, and model_mount_config are required."
-            )
+        """Add a new model revision to a deployment.
+
+        ``AddRevisionGQLInputDTO`` is a draft — every sub-config except
+        ``deployment_id`` may be omitted. Missing pieces flow through as
+        ``None`` and are filled downstream (revision preset / existing
+        revision / DB column defaults); see ``ModelRevisionCreator`` for
+        the contract.
+        """
+        mount_config = input.model_mount_config
         mounts_creator = VFolderMountsCreator(
-            model_vfolder_id=input.model_mount_config.vfolder_id,
-            model_definition_path=input.model_mount_config.definition_path,
-            model_mount_destination=input.model_mount_config.mount_destination,
+            model_vfolder_id=mount_config.vfolder_id if mount_config is not None else None,
+            model_definition_path=mount_config.definition_path if mount_config is not None else None,
+            model_mount_destination=mount_config.mount_destination
+            if mount_config is not None
+            else None,
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,
@@ -1107,9 +1100,9 @@ class DeploymentAdapter(BaseAdapter):
                 for m in (input.extra_mounts or [])
             ],
         )
-        adder = ModelRevisionCreator(
-            image_id=input.image.id,
-            resource_spec=ResourceSpec(
+        resource_spec: ResourceSpec | None = None
+        if input.cluster_config is not None and input.resource_config is not None:
+            resource_spec = ResourceSpec(
                 cluster_mode=input.cluster_config.mode,
                 cluster_size=input.cluster_config.size,
                 resource_slots={
@@ -1119,15 +1112,21 @@ class DeploymentAdapter(BaseAdapter):
                 resource_opts={e.name: e.value for e in input.resource_config.resource_opts.entries}
                 if input.resource_config.resource_opts
                 else None,
-            ),
-            mounts=mounts_creator,
-            execution=ExecutionSpec(
+            )
+        execution: ExecutionSpec | None = None
+        if input.model_runtime_config is not None:
+            execution = ExecutionSpec(
                 runtime_variant_id=input.model_runtime_config.runtime_variant_id,
                 environ={e.name: e.value for e in input.model_runtime_config.environ.entries}
                 if input.model_runtime_config.environ
                 else None,
                 inference_runtime_config=input.model_runtime_config.inference_runtime_config,
-            ),
+            )
+        adder = ModelRevisionCreator(
+            image_id=input.image.id if input.image is not None else None,
+            resource_spec=resource_spec,
+            mounts=mounts_creator,
+            execution=execution,
             model_definition=input.model_definition.to_draft()
             if input.model_definition is not None
             else None,

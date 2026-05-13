@@ -496,10 +496,21 @@ class DeploymentController:
             )
             for m in revision.mounts.extra_mounts
         ]
+        # ``model_vfolder_id`` and ``model_mount_destination`` are nullable on
+        # ``VFolderMountsCreator`` so the adapter can accept a partial draft,
+        # but ``MountMetadata`` is strict at the scheduling boundary. A
+        # partial mount draft is not yet supported here — follow-up: fall
+        # back to the deployment's current revision mount when these are
+        # omitted.
+        if revision.mounts.model_vfolder_id is None:
+            raise InvalidAPIParameters(
+                "model_mount_config.vfolder_id is required to add a revision; "
+                "deriving it from the deployment's current revision is not yet supported."
+            )
         mounts = MountMetadata(
             model_vfolder_id=revision.mounts.model_vfolder_id,
             model_definition_path=revision.mounts.model_definition_path,
-            model_mount_destination=revision.mounts.model_mount_destination,
+            model_mount_destination=revision.mounts.model_mount_destination or "/models",
             extra_mounts=extra_mount_entries,
         )
         revision_data = await self.add_revision(
