@@ -72,6 +72,7 @@
       "type": "object",
       "description": "Service configuration that defines how to start and monitor the model service.",
       "required": [
+        "start_command",
         "port"
       ],
       "additionalProperties": true,
@@ -85,20 +86,20 @@
           }
         },
         "start_command": {
-          "description": "Command arguments to start the model service.",
+          "description": "Command to start the model service. Can be a string (executed via shell) or an array of arguments.",
           "oneOf": [
+            {
+              "type": "string"
+            },
             {
               "type": "array",
               "items": {
                 "type": "string"
               }
-            },
-            {
-              "type": "null"
             }
           ],
-          "default": null,
           "examples": [
+            "python service.py",
             [
               "python",
               "service.py"
@@ -107,7 +108,7 @@
         },
         "shell": {
           "type": "string",
-          "description": "Shell configured for the model service.",
+          "description": "Shell to use when start_command is a string.",
           "default": "/bin/bash",
           "examples": [
             "/bin/bash",
