@@ -245,7 +245,7 @@ class KernelRow(Base):  # type: ignore[misc]
     image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
     image_id: Mapped[ImageID | None] = mapped_column(
         "image_id",
-        GUID,
+        GUID(ImageID),
         sa.ForeignKey("images.id", ondelete="SET NULL"),
         nullable=True,
         index=True,

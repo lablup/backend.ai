@@ -320,7 +320,7 @@ class ImageRow(Base):  # type: ignore[misc]
     )
 
     id: Mapped[ImageID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
     project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
@@ -1021,7 +1021,7 @@ class ImageAliasRow(Base):  # type: ignore[misc]
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
     image_id: Mapped[ImageID] = mapped_column(
-        "image", GUID, sa.ForeignKey("images.id"), nullable=False
+        "image", GUID(ImageID), sa.ForeignKey("images.id"), nullable=False
     )
     image: Mapped[ImageRow] = relationship("ImageRow", back_populates="aliases")
 
