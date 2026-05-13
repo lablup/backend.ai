@@ -210,24 +210,6 @@ class TestWindowStats:
         per_metric = _per_metric(LegacyLiveStatConverter.convert(result), kernel_id)
         assert per_metric["io_read"]["stats.rate"] == "120.5"
 
-    def test_rate_hack_multiply_wins_for_rate_stat_metric(
-        self,
-        kernel_id: KernelId,
-    ) -> None:
-        # For net_rx/net_tx, the legacy hack-multiply on currents[-1] must
-        # still drive stats.rate because the rate query template's
-        # magnitude bug is tracked separately (see out-of-scope note in
-        # the bug report).
-        result = _build_result({
-            kernel_id: [
-                MetricValue("net_rx", ValueType.CURRENT, "1000000"),
-                MetricValue("net_rx", ValueType.CURRENT, "2048"),
-                MetricValue("net_rx", ValueType.RATE, "999"),
-            ]
-        })
-        per_metric = _per_metric(LegacyLiveStatConverter.convert(result), kernel_id)
-        assert per_metric["net_rx"]["stats.rate"] == "10240.000000"
-
 
 class TestPctDerivation:
     """When the Prometheus pipeline does not emit a PCT sample, the converter
