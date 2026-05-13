@@ -153,18 +153,22 @@ async def setup(
         raise InvalidAPIParameters("E20011: Not supported for inference apps")
 
     # Web browsers block redirect between cross-origins if Access-Control-Allow-Origin value is set to a concrete Origin instead of wildcard;
-    # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors
+    # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors.
+    # Cache-Control: no-store prevents browsers from caching this redirect — the response carries
+    # a Set-Cookie side effect, so a cached redirect would skip the server and leave no way to
+    # reissue the cookie after it expires. (BA-5995)
     cors_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "*",
         "Access-Control-Expose-Headers": "*",
+        "Cache-Control": "no-store",
     }
     match circuit.protocol:
         case ProxyProtocol.HTTP:
             protocol = "https" if use_tls else "http"
             redirect_path = jwt_body.get("redirect", "")
             proxy_url = generate_proxy_url(port_config, protocol, circuit, redirect_path)
-            response = web.HTTPPermanentRedirect(proxy_url, headers=cors_headers)
+            response = web.HTTPFound(proxy_url, headers=cors_headers)
             cookie_domain = None
             if circuit.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
                 wildcard_info = config.wildcard_domain
@@ -190,7 +194,7 @@ async def setup(
                 "gateway": generate_proxy_url(port_config, protocol, circuit, redirect_path=None),
             }
             if jwt_body["redirect"]:
-                return web.HTTPPermanentRedirect(
+                return web.HTTPFound(
                     f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
                     headers=cors_headers,
                 )
