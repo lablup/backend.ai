@@ -150,7 +150,6 @@ from .types import (
     ReplicaStatusFilter,
     ResourceConfig,
     ResourceConfigInput,
-    ResourceGroupInput,
     RevisionRefreshResult,
     RollingUpdateConfigInputGQL,
     RollingUpdateStrategySpecGQL,
@@ -274,7 +273,6 @@ __all__ = [
     "ProjectDeploymentScopeGQL",
     "ResourceConfig",
     "ResourceConfigInput",
-    "ResourceGroupInput",
     # Route Types
     "Route",
     "RouteConnection",

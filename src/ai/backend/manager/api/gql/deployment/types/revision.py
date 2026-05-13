@@ -66,9 +66,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceConfigInput as ResourceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    ResourceGroupInput as ResourceGroupInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceSlotInput as ResourceSlotInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -696,13 +693,6 @@ class ClusterConfigInput(PydanticInputMixin[ClusterConfigInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="25.19.0"),
-)
-class ResourceGroupInput(PydanticInputMixin[ResourceGroupInputDTO]):
-    name: str
-
-
-@gql_pydantic_input(
     BackendAIGQLMeta(
         description="A collection of compute resource allocations for input.",
         added_version="26.1.0",
@@ -720,7 +710,6 @@ class ResourceSlotInput(PydanticInputMixin[ResourceSlotInputDTO]):
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class ResourceConfigInput(PydanticInputMixin[ResourceConfigInputDTO]):
-    resource_group: ResourceGroupInput
     resource_slots: ResourceSlotInput = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.1.0", description="Resources allocated for the deployment."

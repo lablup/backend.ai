@@ -525,7 +525,7 @@ class CreateDeploymentAdapter:
             name=name,
             domain=request.metadata.domain_name,
             project=request.metadata.project_id,
-            resource_group=request.initial_revision.resource_config.resource_group,
+            resource_group=request.metadata.resource_group,
             created_user=user_uuid,
             session_owner=user_uuid,
             created_at=None,

@@ -46,6 +46,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTO
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -97,7 +98,6 @@ __all__ = (
     "ReplicaStatusFilter",
     "ReplicaTrafficStatusFilter",
     "ResourceConfigInput",
-    "ResourceGroupInput",
     "ResourceSlotEntryInput",
     "ResourceSlotInput",
     "RevisionFilter",
@@ -207,7 +207,6 @@ class ResourceSlotInput(BaseRequestModel):
 class ResourceConfigInput(BaseRequestModel):
     """Resource configuration input for a revision."""
 
-    resource_group: ResourceGroupInput = Field(description="Resource group")
     resource_slots: ResourceSlotInput = Field(description="Resource slot allocations")
     resource_opts: ResourceOptsDTOInput | None = Field(
         default=None, description="Additional resource options"
@@ -363,6 +362,7 @@ class ModelDeploymentMetadataInput(BaseRequestModel):
 
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
+    resource_group: ResourceGroupName = Field(description="Resource group name")
     name: str | None = Field(
         default=None,
         min_length=1,
@@ -458,7 +458,6 @@ class RevisionInput(BaseRequestModel):
     image_id: UUID = Field(description="Container image ID")
     cluster_mode: ClusterMode = Field(description="Cluster mode for the revision")
     cluster_size: int = Field(default=1, ge=1, description="Number of nodes in the cluster")
-    resource_group: str = Field(description="Resource group for allocation")
     resource_slots: Mapping[str, Any] = Field(description="Resource slot requirements")
     resource_opts: Mapping[str, Any] | None = Field(
         default=None, description="Optional resource options"

@@ -48,6 +48,7 @@ def create_deployment_cmd(
         "metadata": {
             "project_id": "uuid",
             "domain_name": "string",
+            "resource_group": "string",
             "name": "optional string",
             "tags": ["optional", "list"]
         },
@@ -62,7 +63,7 @@ def create_deployment_cmd(
         "initial_revision": {
             "name": "optional string",
             "cluster_config": {"mode": "single-node", "size": 1},
-            "resource_config": {"resource_group": "string", "resource_slots": {}},
+            "resource_config": {"resource_slots": {}},
             "image": {"name": "string", "architecture": "x86_64"},
             "model_runtime_config": {"runtime_variant": "CUSTOM"},
             "model_mount_config": {"vfolder_id": "uuid", "definition_path": "string"}
@@ -248,7 +249,7 @@ def add_revision_cmd(
         "revision": {
             "name": "optional string",
             "cluster_config": {"mode": "single-node", "size": 1},
-            "resource_config": {"resource_group": "string", "resource_slots": {}},
+            "resource_config": {"resource_slots": {}},
             "image": {"id": "uuid"},
             "model_runtime_config": {"runtime_variant": "CUSTOM"},
             "model_mount_config": {"vfolder_id": "uuid", "definition_path": "string"},

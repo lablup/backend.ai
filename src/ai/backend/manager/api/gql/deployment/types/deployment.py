@@ -698,6 +698,7 @@ class DeploymentStatusChangedPayload:
 class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInputDTO]):
     project_id: ID
     domain_name: str
+    resource_group: str
     name: str | None = None
     tags: list[str] | None = None
 
