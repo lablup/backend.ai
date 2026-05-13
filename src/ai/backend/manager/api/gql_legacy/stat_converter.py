@@ -64,8 +64,6 @@ class LegacyLiveStatConverter:
     RATE/DIFF metrics the same `(name, CURRENT)` tuple appears twice;
     `currents[0]` is the raw gauge sample, `currents[-1]` is the
     rate/diff query result.
-
-    `stats.max` / `stats.avg` are not populated
     """
 
     @classmethod
@@ -103,6 +101,9 @@ class LegacyLiveStatConverter:
         currents = [s.value for s in samples if s.value_type is ValueType.CURRENT]
         capacities = [s.value for s in samples if s.value_type is ValueType.CAPACITY]
         pcts = [s.value for s in samples if s.value_type is ValueType.PCT]
+        maxes = [s.value for s in samples if s.value_type is ValueType.MAX]
+        avgs = [s.value for s in samples if s.value_type is ValueType.AVG]
+        rates = [s.value for s in samples if s.value_type is ValueType.RATE]
 
         is_rate_metric = metric_name in _RATE_STAT_METRICS
         is_diff_metric = metric_name in _DIFF_STAT_METRICS
@@ -116,6 +117,13 @@ class LegacyLiveStatConverter:
                 out["current"] = currents[0]
         if capacities:
             out["capacity"] = capacities[-1]
+
+        if maxes:
+            out["stats.max"] = maxes[-1]
+        if avgs:
+            out["stats.avg"] = avgs[-1]
+        if rates:
+            out["stats.rate"] = rates[-1]
 
         if is_rate_metric and currents:
             # RATE template applies `/ UTILIZATION_METRIC_INTERVAL`; undo it

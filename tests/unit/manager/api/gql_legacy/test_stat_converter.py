@@ -161,6 +161,74 @@ class TestDiffMetric:
         assert per_metric["cpu_util"][field] == expected
 
 
+class TestWindowStats:
+    """MAX/AVG samples from `_build_window_stats_preset` and RATE samples
+    from `_build_rate_stats_preset` flow into the legacy `stats.max`,
+    `stats.avg`, and `stats.rate` fields. Without these mappings the
+    placeholder `"0"` reaches the GraphQL response unchanged.
+    """
+
+    @pytest.fixture
+    def window_stats_result(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
+        return _build_result({
+            kernel_id: [
+                MetricValue("mem", ValueType.CURRENT, "1024"),
+                MetricValue("mem", ValueType.MAX, "4096"),
+                MetricValue("mem", ValueType.AVG, "2048"),
+            ]
+        })
+
+    @pytest.mark.parametrize(
+        "field, expected",
+        [
+            ("stats.max", "4096"),
+            ("stats.avg", "2048"),
+        ],
+    )
+    def test_window_stats_are_populated(
+        self,
+        kernel_id: KernelId,
+        window_stats_result: KernelLiveStatBatchResult,
+        field: str,
+        expected: str,
+    ) -> None:
+        per_metric = _per_metric(LegacyLiveStatConverter.convert(window_stats_result), kernel_id)
+        assert per_metric["mem"][field] == expected
+
+    def test_rate_sample_populates_stats_rate_for_counter_rate_metric(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        # io_read is in STATS_RATE_COUNTER_METRICS — RATE sample is exposed
+        # directly without the net_rx/net_tx hack-multiply path.
+        result = _build_result({
+            kernel_id: [
+                MetricValue("io_read", ValueType.CURRENT, "5000"),
+                MetricValue("io_read", ValueType.RATE, "120.5"),
+            ]
+        })
+        per_metric = _per_metric(LegacyLiveStatConverter.convert(result), kernel_id)
+        assert per_metric["io_read"]["stats.rate"] == "120.5"
+
+    def test_rate_hack_multiply_wins_for_rate_stat_metric(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        # For net_rx/net_tx, the legacy hack-multiply on currents[-1] must
+        # still drive stats.rate because the rate query template's
+        # magnitude bug is tracked separately (see out-of-scope note in
+        # the bug report).
+        result = _build_result({
+            kernel_id: [
+                MetricValue("net_rx", ValueType.CURRENT, "1000000"),
+                MetricValue("net_rx", ValueType.CURRENT, "2048"),
+                MetricValue("net_rx", ValueType.RATE, "999"),
+            ]
+        })
+        per_metric = _per_metric(LegacyLiveStatConverter.convert(result), kernel_id)
+        assert per_metric["net_rx"]["stats.rate"] == "10240.000000"
+
+
 class TestPctDerivation:
     """When the Prometheus pipeline does not emit a PCT sample, the converter
     derives the percentage from current/capacity, matching the value the
