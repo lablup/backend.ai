@@ -57,6 +57,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -669,9 +670,9 @@ async def resource_policy_fixture(
 async def scaling_group_fixture(
     db_engine: SAEngine,
     domain_fixture: str,
-) -> AsyncIterator[str]:
+) -> AsyncIterator[ResourceGroupName]:
     """Insert a scaling group and its domain association; yield the name."""
-    sgroup_name = f"sgroup-{secrets.token_hex(6)}"
+    sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(scaling_groups).values(

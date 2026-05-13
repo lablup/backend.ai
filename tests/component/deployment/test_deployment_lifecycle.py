@@ -34,6 +34,7 @@ from ai.backend.common.dto.manager.deployment import (
 )
 from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 
@@ -58,6 +59,7 @@ class TestCreateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
+                resource_group=ResourceGroupName("nonexistent-sgroup"),
                 name="test-deployment",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -69,7 +71,6 @@ class TestCreateDeployment:
                 name="rev-1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group="nonexistent-sgroup",
                     resource_slots={"cpu": "1", "mem": "1073741824"},
                 ),
                 image=ImageInput(id=ImageID(uuid.uuid4())),
@@ -90,7 +91,7 @@ class TestCreateDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Creating a deployment with valid config returns deployment with initial status."""
@@ -99,6 +100,7 @@ class TestCreateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
+                resource_group=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -110,7 +112,6 @@ class TestCreateDeployment:
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
                     resource_slots={"cpu": "2", "mem": "2147483648"},
                 ),
                 image=ImageInput(id=image_id),
@@ -158,7 +159,7 @@ class TestUpdateDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Updating deployment config (name, replica_count) succeeds."""
@@ -168,6 +169,7 @@ class TestUpdateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
+                resource_group=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -179,7 +181,6 @@ class TestUpdateDeployment:
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
                     resource_slots={"cpu": "2", "mem": "2147483648"},
                 ),
                 image=ImageInput(id=image_id),
@@ -229,7 +230,7 @@ class TestDestroyDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Destroying a deployment terminates it successfully."""
@@ -239,6 +240,7 @@ class TestDestroyDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
+                resource_group=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -250,7 +252,6 @@ class TestDestroyDeployment:
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
                     resource_slots={"cpu": "2", "mem": "2147483648"},
                 ),
                 image=ImageInput(id=image_id),
@@ -296,7 +297,7 @@ class TestRevisionManagement:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Adding a revision and searching revisions works correctly."""
@@ -305,7 +306,6 @@ class TestRevisionManagement:
             name="v1",
             cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
             resource_config=ResourceConfigInput(
-                resource_group=scaling_group_fixture,
                 resource_slots={"cpu": "2", "mem": "2147483648"},
             ),
             image=ImageInput(id=image_id),
@@ -323,6 +323,7 @@ class TestRevisionManagement:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
+                resource_group=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -343,7 +344,6 @@ class TestRevisionManagement:
                     name="v2",
                     cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                     resource_config=ResourceConfigInput(
-                        resource_group=scaling_group_fixture,
                         resource_slots={"cpu": "2", "mem": "2147483648"},
                     ),
                     image=ImageInput(id=image_id),
@@ -380,7 +380,7 @@ class TestReplicaManagement:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Changing replica_count updates the replica count."""
@@ -389,6 +389,7 @@ class TestReplicaManagement:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
+                resource_group=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -400,7 +401,6 @@ class TestReplicaManagement:
                 name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
                     resource_slots={"cpu": "2", "mem": "2147483648"},
                 ),
                 image=ImageInput(id=image_id),
