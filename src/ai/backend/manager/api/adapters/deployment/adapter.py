@@ -1124,7 +1124,6 @@ class DeploymentAdapter(BaseAdapter):
                 environ={e.name: e.value for e in input.model_runtime_config.environ.entries}
                 if input.model_runtime_config.environ
                 else None,
-                inference_runtime_config=input.model_runtime_config.inference_runtime_config,
             )
             if input.model_runtime_config is not None
             else None,

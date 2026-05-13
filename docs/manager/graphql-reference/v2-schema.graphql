@@ -6535,7 +6535,6 @@ type ModelRuntimeConfig {
 """Added in 25.19.0. """
 input ModelRuntimeConfigInput {
   runtimeVariantId: UUID!
-  inferenceRuntimeConfig: JSON = null
 
   """Environment variables for the service."""
   environ: EnvironmentVariablesInput = null
@@ -9182,10 +9181,10 @@ type Query {
   """
   Added in 25.16.0. Get configuration JSON Schemas for all inference runtimes.
   """
-  inferenceRuntimeConfigs: JSON
+  inferenceRuntimeConfigs: JSON @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
-  inferenceRuntimeConfig(name: String!): JSON
+  inferenceRuntimeConfig(name: String!): JSON @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
 
   """Added in 25.19.0. Get a specific route by ID."""
   route(id: ID!): Route

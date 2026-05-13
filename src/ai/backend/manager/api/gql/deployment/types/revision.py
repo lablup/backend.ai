@@ -764,7 +764,6 @@ class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputD
 )
 class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
     runtime_variant_id: UUID
-    inference_runtime_config: JSON | None = None
     environ: EnvironmentVariablesInputGQL | None = gql_field(
         description="Environment variables for the service.", default=None
     )

@@ -257,9 +257,6 @@ class ModelRuntimeConfigInput(BaseRequestModel):
             " RuntimeVariant resolver service before invoking internal flows."
         ),
     )
-    inference_runtime_config: dict[str, Any] | None = Field(
-        default=None, description="Framework-specific inference runtime configuration"
-    )
     environ: EnvironmentVariablesInput | None = Field(
         default=None, description="Environment variables for the service"
     )
@@ -476,9 +473,6 @@ class RevisionInput(BaseRequestModel):
     )
     runtime_variant_id: RuntimeVariantID | None = Field(
         default=None, description="Runtime variant ID (UUID)"
-    )
-    inference_runtime_config: dict[str, Any] | None = Field(
-        default=None, description="Framework-specific inference runtime configuration"
     )
     model_vfolder_id: VFolderUUID | None = Field(default=None, description="Model VFolder ID")
     model_mount_destination: str | None = Field(
