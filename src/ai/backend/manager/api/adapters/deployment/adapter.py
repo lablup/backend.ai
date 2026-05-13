@@ -184,7 +184,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
-from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound, IncompleteRevisionData
 from ai.backend.manager.errors.service import EndpointTokenNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
@@ -1077,6 +1077,23 @@ class DeploymentAdapter(BaseAdapter):
         options: AddRevisionOptions,
     ) -> AddRevisionPayload:
         """Add a new model revision to a deployment."""
+        # TODO: AddRevisionInput is now a draft (all fields optional). Once
+        # draft-merge logic is implemented, missing fields will be filled from
+        # preset/baseline/existing revision. For now, all fields are still
+        # required at runtime — reject incomplete drafts explicitly.
+        if (
+            input.cluster_config is None
+            or input.resource_config is None
+            or input.image is None
+            or input.model_runtime_config is None
+            or input.model_mount_config is None
+        ):
+            raise IncompleteRevisionData(
+                "AddRevisionInput is missing required fields. "
+                "Draft-merge support is not yet implemented; "
+                "cluster_config, resource_config, image, "
+                "model_runtime_config, and model_mount_config are required."
+            )
         mounts_creator = VFolderMountsCreator(
             model_vfolder_id=input.model_mount_config.vfolder_id,
             model_definition_path=input.model_mount_config.definition_path,

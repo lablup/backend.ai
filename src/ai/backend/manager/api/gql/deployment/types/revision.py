@@ -962,7 +962,6 @@ class AddRevisionOptionsGQL(PydanticInputMixin[AddRevisionOptionsDTO]):
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
-    name: str | None = None
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
@@ -971,11 +970,26 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
         default=None,
     )
     deployment_id: ID
-    cluster_config: ClusterConfigInput
-    resource_config: ResourceConfigInput
-    image: ImageInput
-    model_runtime_config: ModelRuntimeConfigInput
-    model_mount_config: ModelMountConfigInput
+    cluster_config: ClusterConfigInput | None = gql_field(
+        description="Cluster configuration",
+        default=None,
+    )
+    resource_config: ResourceConfigInput | None = gql_field(
+        description="Resource configuration",
+        default=None,
+    )
+    image: ImageInput | None = gql_field(
+        description="Container image",
+        default=None,
+    )
+    model_runtime_config: ModelRuntimeConfigInput | None = gql_field(
+        description="Runtime configuration",
+        default=None,
+    )
+    model_mount_config: ModelMountConfigInput | None = gql_field(
+        description="Model mount configuration",
+        default=None,
+    )
     model_definition: ModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",

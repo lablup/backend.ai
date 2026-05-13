@@ -107,22 +107,21 @@ class TestRevisionInput:
         assert rev.model_vfolder_id == model_id
         assert rev.model_definition_path == "/models/def.yaml"
 
-    def test_default_cluster_size_is_one(self) -> None:
-        rev = _make_revision_input()
-        assert rev.cluster_size == 1
+    def test_all_fields_optional(self) -> None:
+        rev = RevisionInput()
+        assert rev.image_id is None
+        assert rev.cluster_mode is None
+        assert rev.cluster_size is None
+        assert rev.resource_slots is None
+        assert rev.runtime_variant_id is None
+        assert rev.model_vfolder_id is None
+        assert rev.model_mount_destination is None
+        assert rev.model_definition_path is None
 
     def test_runtime_variant_id_is_preserved(self) -> None:
         runtime_variant_id = RuntimeVariantID(uuid.uuid4())
         rev = _make_revision_input(runtime_variant_id=runtime_variant_id)
         assert rev.runtime_variant_id == runtime_variant_id
-
-    def test_default_model_mount_destination(self) -> None:
-        rev = _make_revision_input()
-        assert rev.model_mount_destination == "/models"
-
-    def test_optional_name_defaults_to_none(self) -> None:
-        rev = _make_revision_input()
-        assert rev.name is None
 
     def test_optional_extra_mounts_defaults_to_none(self) -> None:
         rev = _make_revision_input()
@@ -132,7 +131,7 @@ class TestRevisionInput:
         rev = _make_revision_input()
         assert rev.environ is None
 
-    def test_cluster_size_must_be_at_least_one(self) -> None:
+    def test_cluster_size_must_be_at_least_one_when_provided(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_revision_input(cluster_size=0)
 
@@ -545,7 +544,14 @@ class TestAddRevisionInput:
         rev = _make_revision_input()
         inp = AddRevisionInput(deployment_id=deployment_id, revision=rev)
         assert inp.deployment_id == deployment_id
+        assert inp.revision is not None
         assert inp.revision.cluster_mode == ClusterMode.SINGLE_NODE
+
+    def test_revision_defaults_to_none(self) -> None:
+        deployment_id = uuid.uuid4()
+        inp = AddRevisionInput(deployment_id=deployment_id)
+        assert inp.deployment_id == deployment_id
+        assert inp.revision is None
 
     def test_missing_deployment_id_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
@@ -558,6 +564,7 @@ class TestAddRevisionInput:
         json_str = inp.model_dump_json()
         restored = AddRevisionInput.model_validate_json(json_str)
         assert restored.deployment_id == deployment_id
+        assert restored.revision is not None
         assert restored.revision.cluster_mode == ClusterMode.SINGLE_NODE
 
 
