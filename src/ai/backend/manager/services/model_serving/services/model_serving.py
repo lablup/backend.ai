@@ -859,8 +859,10 @@ class ModelServingService:
         if not route_data:
             raise RouteNotFound
 
-        if route_data.status == RouteStatus.PROVISIONING:
-            raise InvalidAPIParameters("Cannot remove route in PROVISIONING status")
+        if route_data.status in RouteStatus.pre_running_statuses():
+            raise InvalidAPIParameters(
+                f"Cannot remove route in {route_data.status.value.upper()} status"
+            )
 
         # Get session for destruction
         route_row = await self._repository.get_route_with_session(action.route_id)

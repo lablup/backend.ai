@@ -10,6 +10,7 @@ class RouteLifecycleType(StrEnum):
     """Types of route lifecycle operations."""
 
     PROVISIONING = "provisioning"
+    WARMING_UP = "warming_up"
     RUNNING = "running"
     HEALTH_CHECK = "health_check"
     ROUTE_EVICTION = "route_eviction"

@@ -58,6 +58,7 @@ class RouteStatus(CIStrEnum):
     """Lifecycle status of a route in the deployment."""
 
     PROVISIONING = "provisioning"
+    WARMING_UP = "warming_up"
     RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"

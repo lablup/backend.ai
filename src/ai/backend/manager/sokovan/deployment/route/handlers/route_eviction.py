@@ -31,10 +31,11 @@ class RouteEvictionHandler(RouteHandler):
 
     - **Health-based**: a RUNNING route whose health status is listed in
       the scaling group's ``cleanup_target_statuses`` (default: UNHEALTHY).
-    - **Orphan revision**: an active (PROVISIONING / RUNNING) route whose
-      ``revision_id`` belongs to neither the endpoint's ``current_revision``
-      nor its ``deploying_revision``. This catches leftovers from a
-      preempted rollout, regardless of endpoint lifecycle.
+    - **Orphan revision**: an active (PROVISIONING / WARMING_UP / RUNNING)
+      route whose ``revision_id`` belongs to neither the endpoint's
+      ``current_revision`` nor its ``deploying_revision``. This catches
+      leftovers from a preempted rollout, regardless of endpoint
+      lifecycle.
     """
 
     def __init__(
@@ -61,12 +62,17 @@ class RouteEvictionHandler(RouteHandler):
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:
-        # The handler runs over every active route (PROVISIONING / RUNNING)
-        # regardless of health, because the orphan-revision check applies
-        # to both lifecycle states. The scaling-group health policy still
-        # filters to UNHEALTHY internally inside the executor.
+        # The handler runs over every active route
+        # (PROVISIONING / WARMING_UP / RUNNING) regardless of health,
+        # because the orphan-revision check applies to all alive lifecycle
+        # states. The scaling-group health policy still filters to
+        # UNHEALTHY internally inside the executor.
         return RouteTargetStatuses(
-            lifecycle=[RouteStatus.PROVISIONING, RouteStatus.RUNNING],
+            lifecycle=[
+                RouteStatus.PROVISIONING,
+                RouteStatus.WARMING_UP,
+                RouteStatus.RUNNING,
+            ],
             health=list(RouteHealthStatus),
         )
 

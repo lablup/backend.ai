@@ -71,6 +71,7 @@ class RouteStatus(enum.Enum):
     """Lifecycle status of a route (independent of health)."""
 
     PROVISIONING = "provisioning"
+    WARMING_UP = "warming_up"
     RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
@@ -81,8 +82,15 @@ class RouteStatus(enum.Enum):
     def active_route_statuses(cls) -> set[RouteStatus]:
         return {
             RouteStatus.PROVISIONING,
+            RouteStatus.WARMING_UP,
             RouteStatus.RUNNING,
         }
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def pre_running_statuses(cls) -> set[RouteStatus]:
+        """Routes that are alive but not yet eligible to receive traffic."""
+        return {RouteStatus.PROVISIONING, RouteStatus.WARMING_UP}
 
     @classmethod
     @lru_cache(maxsize=1)

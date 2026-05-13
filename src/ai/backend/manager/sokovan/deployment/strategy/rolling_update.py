@@ -124,7 +124,11 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                     classified.old_active.append(route)
                 continue
 
-            if route.status == RouteStatus.PROVISIONING:
+            if route.status in RouteStatus.pre_running_statuses():
+                # Routes still in PROVISIONING / WARMING_UP are alive but not
+                # yet eligible to serve traffic; bucket them with the
+                # provisioning count so the strategy waits for them before
+                # counting capacity as healthy.
                 classified.new_provisioning_count += 1
             elif route.status.is_inactive():
                 classified.new_failed_count += 1

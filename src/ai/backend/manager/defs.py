@@ -107,6 +107,7 @@ class LockID(enum.IntEnum):
     LOCKID_DEPLOYMENT_PROVISIONING_ROUTES = 223  # Lock for provisioning routes
     LOCKID_DEPLOYMENT_HEALTH_CHECK_ROUTES = 224  # Lock for health check routes
     LOCKID_DEPLOYMENT_RUNNING_ROUTES = 225  # Lock for running routes
+    LOCKID_DEPLOYMENT_WARMING_UP_ROUTES = 226  # Lock for warming-up routes (first health gate)
     LOCKID_DEPLOYMENT_CHECK_REPLICA = 227  # For operations checking REPLICA sessions
     LOCKID_DEPLOYMENT_DESTROYING = 228  # For operations destroying deployments
     LOCKID_DEPLOYMENT_DEPLOYING = 229  # For operations deploying deployments

@@ -1,4 +1,4 @@
-"""Handler for provisioning routes."""
+"""Handler for warming-up routes (first health check gate)."""
 
 import logging
 from collections.abc import Sequence
@@ -23,8 +23,23 @@ from .base import RouteHandler
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class ProvisioningRouteHandler(RouteHandler):
-    """Handler for provisioning routes (PROVISIONING -> WARMING_UP)."""
+class WarmingUpRouteHandler(RouteHandler):
+    """Handler for warming-up routes (WARMING_UP -> RUNNING).
+
+    A route enters WARMING_UP after its session has been provisioned but
+    before traffic is allowed in. This handler decides when the route is
+    ready to graduate:
+
+    - When the endpoint has no health check configured, the route is
+      considered ready as soon as its session is alive.
+    - Otherwise, the route is held in WARMING_UP until the first healthy
+      probe is observed in Valkey (written by ``RouteHealthObserver``).
+
+    On readiness the route transitions to ``RUNNING`` + ``HEALTHY`` so
+    the next ``AppProxySyncRouteHandler`` cycle picks it up for traffic
+    routing. Sessions that died before becoming healthy fail to
+    ``FAILED_TO_START``.
+    """
 
     def __init__(
         self,
@@ -36,13 +51,11 @@ class ProvisioningRouteHandler(RouteHandler):
 
     @classmethod
     def name(cls) -> str:
-        """Get the name of the handler."""
-        return "provision-routes"
+        return "warming-up-routes"
 
     @property
     def lock_id(self) -> LockID | None:
-        """Lock for provisioning routes."""
-        return LockID.LOCKID_DEPLOYMENT_PROVISIONING_ROUTES
+        return LockID.LOCKID_DEPLOYMENT_WARMING_UP_ROUTES
 
     @classmethod
     def category(cls) -> RouteHandlerCategory:
@@ -51,38 +64,31 @@ class ProvisioningRouteHandler(RouteHandler):
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
-            lifecycle=[RouteStatus.PROVISIONING],
+            lifecycle=[RouteStatus.WARMING_UP],
             health=list(RouteHealthStatus),
         )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Provisioning → WARMING_UP + NOT_CHECKED on success, FAILED_TO_START on failure.
-
-        WARMING_UP holds the route until the dedicated warming-up handler
-        observes the first healthy probe (or accepts immediately when the
-        endpoint has no health check configured).
-        """
         return RouteStatusTransitions(
             success=RouteTransitionTarget(
-                status=RouteStatus.WARMING_UP,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.HEALTHY,
+            ),
+            failure=RouteTransitionTarget(
+                status=RouteStatus.FAILED_TO_START,
                 health_status=RouteHealthStatus.NOT_CHECKED,
             ),
-            failure=RouteTransitionTarget(status=RouteStatus.FAILED_TO_START),
             stale=None,
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Execute provisioning for routes."""
-        log.debug("Provisioning {} routes", len(routes))
-
-        # Execute route provisioning logic via executor
-        return await self._route_executor.provision_routes(routes)
+        log.debug("Evaluating {} warming-up routes", len(routes))
+        return await self._route_executor.check_warming_up_routes(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
-        """Handle post-processing after provisioning routes."""
         log.info(
-            "Provisioned {} routes successfully, {} failed",
+            "Warming-up: {} promoted to RUNNING, {} failed",
             len(result.successes),
             len(result.errors),
         )

@@ -39,6 +39,7 @@ from ai.backend.manager.sokovan.deployment.route.handlers import (
     RouteHandler,
     ServiceDiscoverySyncHandler,
     TerminatingRouteHandler,
+    WarmingUpRouteHandler,
 )
 from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
     RouteHealthObserver,
@@ -147,6 +148,10 @@ class RouteCoordinator:
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
+            RouteLifecycleType.WARMING_UP: WarmingUpRouteHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
             RouteLifecycleType.RUNNING: RunningRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
@@ -240,7 +245,10 @@ class RouteCoordinator:
                 querier=BatchQuerier(
                     pagination=NoPagination(),
                     conditions=[
-                        RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
+                        RouteConditions.by_lifecycle_statuses([
+                            RouteStatus.WARMING_UP,
+                            RouteStatus.RUNNING,
+                        ]),
                         RouteConditions.by_health_statuses(list(RouteHealthStatus)),
                     ],
                 ),
@@ -390,14 +398,16 @@ class RouteCoordinator:
                 batch_updaters, BulkCreator(specs=all_history_specs)
             )
 
-        # Record running_at in Valkey for routes that just transitioned to RUNNING
-        if (
-            transitions.success is not None
-            and transitions.success.status == RouteStatus.RUNNING
-            and result.successes
-        ):
-            for route in result.successes:
-                await self._valkey_schedule.mark_route_running_at(str(route.route_id))
+        # Stamp lifecycle transition timestamps in Valkey: warming_up_at
+        # anchors the health-probe initial_delay window (model loading
+        # happens during WARMING_UP); running_at marks the moment the
+        # first health gate passed and the route is eligible for traffic.
+        if transitions.success is not None and result.successes:
+            success_route_ids = [str(route.route_id) for route in result.successes]
+            if transitions.success.status == RouteStatus.WARMING_UP:
+                await self._valkey_schedule.mark_routes_warming_up_at_batch(success_route_ids)
+            elif transitions.success.status == RouteStatus.RUNNING:
+                await self._valkey_schedule.mark_routes_running_at_batch(success_route_ids)
 
     async def process_if_needed(self, lifecycle_type: RouteLifecycleType) -> None:
         """
@@ -421,6 +431,13 @@ class RouteCoordinator:
             # Provision routes frequently with both short and long cycles
             RouteTaskSpec(
                 RouteLifecycleType.PROVISIONING,
+                short_interval=5.0,
+                long_interval=60.0,
+                initial_delay=10.0,
+            ),
+            # Promote warming-up routes once their first health gate passes.
+            RouteTaskSpec(
+                RouteLifecycleType.WARMING_UP,
                 short_interval=5.0,
                 long_interval=60.0,
                 initial_delay=10.0,

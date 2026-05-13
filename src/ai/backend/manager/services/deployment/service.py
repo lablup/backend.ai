@@ -284,6 +284,7 @@ _HEALTH_STATUS_TO_READINESS: dict[RouteHealthStatus, ReadinessStatus] = {
 _ROUTE_STATUS_TO_LIVENESS: dict[RouteStatus, LivenessStatus] = {
     RouteStatus.RUNNING: LivenessStatus.HEALTHY,
     RouteStatus.PROVISIONING: LivenessStatus.NOT_CHECKED,
+    RouteStatus.WARMING_UP: LivenessStatus.NOT_CHECKED,
     RouteStatus.TERMINATING: LivenessStatus.DEGRADED,
     RouteStatus.TERMINATED: LivenessStatus.UNHEALTHY,
     RouteStatus.FAILED_TO_START: LivenessStatus.UNHEALTHY,

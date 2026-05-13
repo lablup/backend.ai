@@ -1,12 +1,11 @@
-"""Tests for initial_delay calculation based on running_at.
+"""Tests for initial_delay calculation based on warming_up_at.
 
 Test scenarios:
-- ID-001: running_at is set → initial_delay_until based on running_at
-- ID-002: running_at is None → fallback to redis_time
-- ID-003: created_at has expired but running_at has not → still within initial_delay
-- ID-004: running_at has also expired → initial_delay over
-- ID-005: observer ignores failure within initial_delay (running_at based)
-- ID-006: observer writes failure after initial_delay expires (running_at based)
+- ID-001: warming_up_at is set → initial_delay_until based on warming_up_at
+- ID-002: warming_up_at is None → fallback to redis_time
+- ID-003: created_at has expired but warming_up_at has not → still within initial_delay
+- ID-005: observer ignores failure within initial_delay (warming_up_at based)
+- ID-006: observer writes failure after initial_delay expires (warming_up_at based)
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ def _make_route(
         route_id=uuid4(),
         deployment_id=DeploymentID(uuid4()),
         session_id=session_id or SessionId(uuid4()),
-        status=RouteStatus.RUNNING,
+        status=RouteStatus.WARMING_UP,
         health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
         created_at=datetime.fromtimestamp(created_at_ts, tz=tzutc()),
@@ -56,22 +55,22 @@ def _make_route(
 class TestInitializeHealthRecordsInitialDelay:
     """Tests for initial_delay_until calculation in _initialize_health_records."""
 
-    async def test_running_at_present_uses_running_at(
+    async def test_warming_up_at_present_uses_warming_up_at(
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
     ) -> None:
-        """ID-001: When running_at exists in Valkey, initial_delay_until is based on running_at.
+        """ID-001: When warming_up_at exists in Valkey, initial_delay_until is anchored to it.
 
-        Given: Route with running_at=5000 in Valkey, initial_delay=720
+        Given: Route with warming_up_at=5000 in Valkey, initial_delay=720
         When: _initialize_health_records
         Then: initial_delay_until = 5000 + 720 = 5720
         """
         route = _make_route(created_at_ts=1000)
         route_id_str = str(route.route_id)
 
-        mock_valkey_schedule.get_route_running_at_batch.return_value = {
+        mock_valkey_schedule.get_route_warming_up_at_batch.return_value = {
             route_id_str: 5000,
         }
         mock_valkey_schedule.get_redis_time.return_value = 5100
@@ -87,24 +86,24 @@ class TestInitializeHealthRecordsInitialDelay:
         call_args = mock_valkey_schedule.initialize_route_health_records_batch.call_args
         records: list[RouteHealthRecord] = call_args[0][0]
         assert len(records) == 1
-        assert records[0].running_at == 5000
+        assert records[0].warming_up_at == 5000
         assert records[0].initial_delay_until == 5000 + 720
 
-    async def test_running_at_none_falls_back_to_redis_time(
+    async def test_warming_up_at_none_falls_back_to_redis_time(
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
     ) -> None:
-        """ID-002: When running_at is None, fallback to current redis_time.
+        """ID-002: When warming_up_at is None, fallback to current redis_time.
 
-        Given: No existing record in Valkey (running_at not set), redis_time=6000
+        Given: No existing record in Valkey (warming_up_at not set), redis_time=6000
         When: _initialize_health_records
-        Then: initial_delay_until = 6000 + 720 = 6720, running_at = 6000
+        Then: initial_delay_until = 6000 + 720 = 6720, warming_up_at = 6000
         """
         route = _make_route(created_at_ts=1000)
 
-        mock_valkey_schedule.get_route_running_at_batch.return_value = {}
+        mock_valkey_schedule.get_route_warming_up_at_batch.return_value = {}
         mock_valkey_schedule.get_redis_time.return_value = 6000
         mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
             route.revision_id: ModelHealthCheck(path="/health", initial_delay=720.0),
@@ -118,27 +117,27 @@ class TestInitializeHealthRecordsInitialDelay:
         call_args = mock_valkey_schedule.initialize_route_health_records_batch.call_args
         records: list[RouteHealthRecord] = call_args[0][0]
         assert len(records) == 1
-        assert records[0].running_at == 6000
+        assert records[0].warming_up_at == 6000
         assert records[0].initial_delay_until == 6000 + 720
 
-    async def test_created_at_expired_but_running_at_not_expired(
+    async def test_created_at_expired_but_warming_up_at_not_expired(
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
     ) -> None:
-        """ID-003: created_at-based delay would have expired, but running_at-based has not.
+        """ID-003: created_at-based delay would have expired, but warming_up_at-based has not.
 
-        Given: created_at=1000, running_at=5000, initial_delay=720, current_time=1800
+        Given: created_at=1000, warming_up_at=5000, initial_delay=720, current_time=1800
                created_at + 720 = 1720 < 1800 (expired if created_at based)
-               running_at + 720 = 5720 > 1800 (NOT expired with running_at based)
+               warming_up_at + 720 = 5720 > 1800 (NOT expired with warming_up_at based)
         When: _initialize_health_records
-        Then: initial_delay_until = 5720 (based on running_at, not created_at)
+        Then: initial_delay_until = 5720 (based on warming_up_at, not created_at)
         """
         route = _make_route(created_at_ts=1000)
         route_id_str = str(route.route_id)
 
-        mock_valkey_schedule.get_route_running_at_batch.return_value = {
+        mock_valkey_schedule.get_route_warming_up_at_batch.return_value = {
             route_id_str: 5000,
         }
         mock_valkey_schedule.get_redis_time.return_value = 1800
@@ -158,17 +157,17 @@ class TestInitializeHealthRecordsInitialDelay:
 
 
 # =============================================================================
-# RouteHealthObserver: within_initial_delay based on running_at
+# RouteHealthObserver: within_initial_delay based on warming_up_at
 # =============================================================================
 
 
 class TestObserverInitialDelay:
-    """Tests for observer's initial_delay behavior with running_at-based records."""
+    """Tests for observer's initial_delay behavior with warming_up_at-based records."""
 
     async def test_observer_ignores_failure_within_initial_delay(self) -> None:
         """ID-005: Observer does not write failure during initial_delay period.
 
-        Given: running_at=5000, initial_delay=720 → initial_delay_until=5720
+        Given: warming_up_at=5000, initial_delay=720 → initial_delay_until=5720
                current redis_time=5500 (within initial_delay)
                health check fails
         When: Observer runs
@@ -191,7 +190,7 @@ class TestObserverInitialDelay:
             health_path="/health",
             inference_port=8000,
             replica_host="10.0.0.1",
-            running_at=5000,
+            warming_up_at=5000,
         )
         mock_valkey.get_route_health_records_batch.return_value = {route_id_str: record}
         mock_valkey.get_redis_time.return_value = 5500  # Within initial_delay
@@ -213,7 +212,7 @@ class TestObserverInitialDelay:
     async def test_observer_writes_failure_after_initial_delay(self) -> None:
         """ID-006: Observer writes failure after initial_delay expires.
 
-        Given: running_at=5000, initial_delay=720 → initial_delay_until=5720
+        Given: warming_up_at=5000, initial_delay=720 → initial_delay_until=5720
                current redis_time=5800 (past initial_delay)
                health check fails
         When: Observer runs
@@ -236,7 +235,7 @@ class TestObserverInitialDelay:
             health_path="/health",
             inference_port=8000,
             replica_host="10.0.0.1",
-            running_at=5000,
+            warming_up_at=5000,
         )
         mock_valkey.get_route_health_records_batch.return_value = {route_id_str: record}
         mock_valkey.get_redis_time.return_value = 5800  # Past initial_delay
@@ -275,7 +274,7 @@ class TestObserverInitialDelay:
             health_path="/health",
             inference_port=8000,
             replica_host="10.0.0.1",
-            running_at=5000,
+            warming_up_at=5000,
         )
         mock_valkey.get_route_health_records_batch.return_value = {route_id_str: record}
         mock_valkey.get_redis_time.return_value = 5500  # Within initial_delay
@@ -292,15 +291,15 @@ class TestObserverInitialDelay:
 
 
 # =============================================================================
-# RouteHealthRecord serialization: running_at
+# RouteHealthRecord serialization: warming_up_at and running_at
 # =============================================================================
 
 
-class TestRouteHealthRecordRunningAt:
-    """Tests for RouteHealthRecord running_at serialization."""
+class TestRouteHealthRecordTimestamps:
+    """Tests for RouteHealthRecord warming_up_at / running_at serialization."""
 
-    def test_running_at_none_not_in_hash(self) -> None:
-        """running_at=None should not appear in serialized hash."""
+    def test_timestamps_none_not_in_hash(self) -> None:
+        """warming_up_at=None and running_at=None should not appear in serialized hash."""
         record = RouteHealthRecord(
             route_id="r1",
             created_at=1000,
@@ -308,13 +307,13 @@ class TestRouteHealthRecordRunningAt:
             health_path="/health",
             inference_port=8000,
             replica_host="10.0.0.1",
-            running_at=None,
         )
         h = record.to_valkey_hash()
+        assert "warming_up_at" not in h
         assert "running_at" not in h
 
-    def test_running_at_present_in_hash(self) -> None:
-        """running_at with value should appear in serialized hash."""
+    def test_timestamps_present_in_hash(self) -> None:
+        """warming_up_at and running_at with values should appear in serialized hash."""
         record = RouteHealthRecord(
             route_id="r1",
             created_at=1000,
@@ -322,13 +321,15 @@ class TestRouteHealthRecordRunningAt:
             health_path="/health",
             inference_port=8000,
             replica_host="10.0.0.1",
-            running_at=5000,
+            warming_up_at=5000,
+            running_at=5100,
         )
         h = record.to_valkey_hash()
-        assert h["running_at"] == "5000"
+        assert h["warming_up_at"] == "5000"
+        assert h["running_at"] == "5100"
 
-    def test_from_hash_missing_running_at_is_none(self) -> None:
-        """Deserializing hash without running_at field yields None."""
+    def test_from_hash_missing_timestamps_are_none(self) -> None:
+        """Deserializing hash without warming_up_at/running_at fields yields None."""
         data = {
             "route_id": "r1",
             "created_at": "1000",
@@ -338,10 +339,11 @@ class TestRouteHealthRecordRunningAt:
             "replica_host": "10.0.0.1",
         }
         record = RouteHealthRecord.from_valkey_hash(data)
+        assert record.warming_up_at is None
         assert record.running_at is None
 
-    def test_from_hash_zero_running_at_is_none(self) -> None:
-        """Deserializing hash with running_at=0 yields None (backward compat)."""
+    def test_from_hash_zero_timestamps_are_none(self) -> None:
+        """Deserializing hash with timestamp=0 yields None (backward compat)."""
         data = {
             "route_id": "r1",
             "created_at": "1000",
@@ -349,13 +351,15 @@ class TestRouteHealthRecordRunningAt:
             "health_path": "/health",
             "inference_port": "8000",
             "replica_host": "10.0.0.1",
+            "warming_up_at": "0",
             "running_at": "0",
         }
         record = RouteHealthRecord.from_valkey_hash(data)
+        assert record.warming_up_at is None
         assert record.running_at is None
 
-    def test_from_hash_valid_running_at(self) -> None:
-        """Deserializing hash with valid running_at yields int."""
+    def test_from_hash_valid_timestamps(self) -> None:
+        """Deserializing hash with valid timestamps yields ints."""
         data = {
             "route_id": "r1",
             "created_at": "1000",
@@ -363,13 +367,15 @@ class TestRouteHealthRecordRunningAt:
             "health_path": "/health",
             "inference_port": "8000",
             "replica_host": "10.0.0.1",
-            "running_at": "5000",
+            "warming_up_at": "5000",
+            "running_at": "5100",
         }
         record = RouteHealthRecord.from_valkey_hash(data)
-        assert record.running_at == 5000
+        assert record.warming_up_at == 5000
+        assert record.running_at == 5100
 
-    def test_roundtrip_with_running_at(self) -> None:
-        """Serialize → deserialize preserves running_at."""
+    def test_roundtrip_with_timestamps(self) -> None:
+        """Serialize → deserialize preserves warming_up_at and running_at."""
         original = RouteHealthRecord(
             route_id="r1",
             created_at=1000,
@@ -377,14 +383,16 @@ class TestRouteHealthRecordRunningAt:
             health_path="/health",
             inference_port=8000,
             replica_host="10.0.0.1",
-            running_at=5000,
+            warming_up_at=5000,
+            running_at=5100,
         )
         restored = RouteHealthRecord.from_valkey_hash(original.to_valkey_hash())
-        assert restored.running_at == 5000
+        assert restored.warming_up_at == 5000
+        assert restored.running_at == 5100
         assert restored.initial_delay_until == 5720
 
-    def test_roundtrip_without_running_at(self) -> None:
-        """Serialize → deserialize preserves running_at=None."""
+    def test_roundtrip_without_timestamps(self) -> None:
+        """Serialize → deserialize preserves None timestamps."""
         original = RouteHealthRecord(
             route_id="r1",
             created_at=1000,
@@ -392,7 +400,7 @@ class TestRouteHealthRecordRunningAt:
             health_path="/health",
             inference_port=8000,
             replica_host="10.0.0.1",
-            running_at=None,
         )
         restored = RouteHealthRecord.from_valkey_hash(original.to_valkey_hash())
+        assert restored.warming_up_at is None
         assert restored.running_at is None

@@ -7,6 +7,7 @@ from .provisioning import ProvisioningRouteHandler
 from .route_eviction import RouteEvictionHandler
 from .service_discovery_sync import ServiceDiscoverySyncHandler
 from .terminating import TerminatingRouteHandler
+from .warming_up import WarmingUpRouteHandler
 
 __all__ = [
     "AppProxySyncRouteHandler",
@@ -16,4 +17,5 @@ __all__ = [
     "RouteHandler",
     "ServiceDiscoverySyncHandler",
     "TerminatingRouteHandler",
+    "WarmingUpRouteHandler",
 ]

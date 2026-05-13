@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -37,6 +36,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.deployment import (
     EndpointNotFound,
     RouteSessionNotFound,
@@ -218,16 +218,102 @@ class RouteExecutor:
             errors=[],
         )
 
-    async def check_running_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Check health status of running routes.
+    async def check_warming_up_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Decide which warming-up routes are ready to graduate to RUNNING.
 
-        Args:
-            routes: Routes to check (should be HEALTHY or UNHEALTHY status)
-
-        Returns:
-            Result containing routes with updated health status
+        1. Verify session liveness; dead sessions go to FAILED_TO_START.
+        2. Populate replica info and ensure a Valkey health record exists.
+        3. Classify readiness: ready if health check is disabled or a
+           probe has succeeded; otherwise leave for the next cycle.
         """
-        # Phase 1: Load status
+        if not routes:
+            return RouteExecutionResult(successes=[], errors=[])
+
+        # Phase 1: Verify session liveness
+        with RouteRecorderContext.shared_phase("load_status"):
+            with RouteRecorderContext.shared_step("load_session_status"):
+                route_ids = {route.route_id for route in routes}
+                session_statuses = await self._deployment_repo.fetch_session_statuses_by_route_ids(
+                    route_ids
+                )
+
+        alive: list[RouteData] = []
+        errors: list[RouteExecutionError] = []
+        for route in routes:
+            try:
+                self._verify_route_session_status(route, session_statuses)
+                alive.append(route)
+            except (RouteSessionNotFound, RouteSessionTerminated) as e:
+                log.debug("Warming-up route {} session check failed: {}", route.route_id, e)
+                errors.append(
+                    RouteExecutionError(
+                        route_info=route,
+                        reason=e.error_title,
+                        error_detail=str(e),
+                        error_code=_extract_error_code(e),
+                    )
+                )
+
+        # Phase 2: Populate replica info for routes missing it
+        routes_missing_replica = [r for r in alive if not r.replica_host or not r.replica_port]
+        if routes_missing_replica:
+            with RouteRecorderContext.shared_phase("populate_replica_info"):
+                with RouteRecorderContext.shared_step("fetch_kernel_connection_info"):
+                    await self._populate_replica_info(routes_missing_replica)
+
+        # Phase 3: Ensure health records exist for routes with replica info
+        routes_with_replica = [r for r in alive if r.replica_host and r.replica_port]
+        if routes_with_replica:
+            await self._ensure_health_records(routes_with_replica)
+
+        # Phase 4: Pick out routes that have cleared their first health gate
+        successes = await self._classify_warming_up_routes(alive)
+
+        return RouteExecutionResult(successes=successes, errors=errors)
+
+    async def _classify_warming_up_routes(
+        self,
+        routes: Sequence[RouteData],
+    ) -> list[RouteData]:
+        """Return routes that have cleared the first health gate."""
+        if not routes:
+            return []
+
+        revision_ids = {route.revision_id for route in routes}
+        health_configs = await self._deployment_repo.fetch_health_check_configs_by_revision_ids(
+            revision_ids
+        )
+
+        ready: list[RouteData] = []
+        needs_probe: list[RouteData] = []
+        for route in routes:
+            if route.revision_id not in health_configs:
+                # Revision row vanished between fetch and classify — leave the
+                # route in WARMING_UP so route_eviction can clean it up rather
+                # than promoting an orphan to RUNNING.
+                continue
+            if health_configs[route.revision_id] is None:
+                # Endpoint opted out of health checks — accept immediately.
+                ready.append(route)
+            else:
+                needs_probe.append(route)
+
+        if needs_probe:
+            probe_ids = [str(r.route_id) for r in needs_probe]
+            records = await self._valkey_schedule.get_route_health_records_batch(probe_ids)
+            current_time = await self._valkey_schedule.get_redis_time()
+            for route in needs_probe:
+                record = records.get(str(route.route_id))
+                if record is None:
+                    continue
+                if record.last_check > 0 and not record.is_stale(current_time) and record.healthy:
+                    ready.append(route)
+
+        return ready
+
+    async def check_running_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Verify RUNNING routes still have a live session; failures move to TERMINATING."""
+        # Phase 1: Load session statuses
         with RouteRecorderContext.shared_phase("load_status"):
             with RouteRecorderContext.shared_step("load_session_status"):
                 route_ids = {route.route_id for route in routes}
@@ -238,7 +324,7 @@ class RouteExecutor:
         successes: list[RouteData] = []
         errors: list[RouteExecutionError] = []
 
-        # Phase 2: Verify status (per-route)
+        # Phase 2: Verify each session is still alive
         for route in routes:
             try:
                 self._verify_route_session_status(route, session_statuses)
@@ -253,18 +339,6 @@ class RouteExecutor:
                         error_code=_extract_error_code(e),
                     )
                 )
-
-        # Phase 3: Populate replica connection info for routes missing it
-        routes_missing_replica = [r for r in successes if not r.replica_host]
-        if routes_missing_replica:
-            with RouteRecorderContext.shared_phase("populate_replica_info"):
-                with RouteRecorderContext.shared_step("fetch_kernel_connection_info"):
-                    await self._populate_replica_info(routes_missing_replica)
-
-        # Phase 4: Ensure RouteHealthRecords exist in Valkey for routes with replica info
-        routes_with_replica = [r for r in successes if r.replica_host and r.replica_port]
-        if routes_with_replica:
-            await self._ensure_health_records(routes_with_replica)
 
         return RouteExecutionResult(
             successes=successes,
@@ -328,9 +402,11 @@ class RouteExecutor:
         )
         redis_time = await self._valkey_schedule.get_redis_time()
 
-        # Read existing running_at values that were set when routes transitioned to RUNNING
-        # These may be in partial hashes (only running_at field), so read raw field directly
-        running_at_map = await self._valkey_schedule.get_route_running_at_batch([
+        # Anchor initial_delay on warming_up_at — model loading happens
+        # during WARMING_UP, so the grace window starts at WARMING_UP entry.
+        # Falls back to current redis_time if the marker is missing (e.g.
+        # legacy routes from before the WARMING_UP split).
+        warming_up_at_map = await self._valkey_schedule.get_route_warming_up_at_batch([
             str(r.route_id) for r in routes
         ])
 
@@ -343,10 +419,9 @@ class RouteExecutor:
             initial_delay = health_config.initial_delay if health_config else 60.0
             created_at = int(route.created_at.timestamp())
 
-            # Use running_at from Valkey (set at RUNNING transition), fallback to redis_time
             route_id_str = str(route.route_id)
-            running_at = running_at_map.get(route_id_str) or redis_time
-            initial_delay_until = running_at + int(initial_delay)
+            warming_up_at = warming_up_at_map.get(route_id_str) or redis_time
+            initial_delay_until = warming_up_at + int(initial_delay)
 
             records.append(
                 RouteHealthRecord(
@@ -356,7 +431,7 @@ class RouteExecutor:
                     health_path=health_path,
                     inference_port=port,
                     replica_host=host,
-                    running_at=running_at,
+                    warming_up_at=warming_up_at,
                 )
             )
 
@@ -1065,7 +1140,7 @@ class RouteExecutor:
     def _verify_route_session_status(
         self,
         route: RouteData,
-        session_statuses: Mapping[UUID, Any],
+        session_statuses: Mapping[UUID, SessionStatus | None],
     ) -> None:
         """Verify that route's session is in a valid state."""
         pool = RouteRecorderContext.current_pool()
