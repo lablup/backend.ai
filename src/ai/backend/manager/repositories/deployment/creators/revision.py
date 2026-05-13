@@ -41,10 +41,8 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     resource_opts: Mapping[str, Any]
     cluster_mode: str
     cluster_size: int
-    # ``model_vfolder_id`` and ``model_definition_path`` map onto nullable
-    # DB columns. ``model_mount_destination`` maps onto NOT NULL with a
-    # server default — the creator constructing this spec is expected to
-    # fill the default before reaching here, so this stays strict.
+    # ``model_vfolder_id`` is nullable on the ``deployment_revisions.model``
+    # column, so a partial revision draft persists a NULL ``model``.
     model_vfolder_id: VFolderUUID | None
     model_mount_destination: str
     model_definition_path: str | None

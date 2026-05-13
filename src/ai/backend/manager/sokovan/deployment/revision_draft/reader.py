@@ -168,8 +168,9 @@ class RevisionDraftReader:
         """
         if not variant.reads_vfolder_config_files:
             return []
-        # Partial draft / SET NULL state: no model vfolder to read from.
-        # The merge chain stays valid without the overlay.
+        # Partial draft / SET NULL state: no model vfolder to read from,
+        # so the optional vfolder-file overlay layer is simply skipped —
+        # the merge chain stays valid without it.
         vfolder_id = mounts.model_vfolder_id
         if vfolder_id is None:
             return []

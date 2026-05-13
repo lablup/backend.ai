@@ -47,7 +47,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteDeploymentInput,
     DeploymentFilter,
     DeploymentOrder,
-    ModelMountConfigInput,
     ReplaceDeploymentOptionsInput,
     ReplicaFilter,
     ReplicaOrder,
@@ -1079,17 +1078,22 @@ class DeploymentAdapter(BaseAdapter):
     ) -> AddRevisionPayload:
         """Add a new model revision to a deployment.
 
-        ``AddRevisionGQLInputDTO`` is a draft — every sub-config except
-        ``deployment_id`` may be omitted. Missing pieces flow through as
-        ``None`` and are filled downstream (revision preset / existing
-        revision / DB column defaults); see ``ModelRevisionCreator`` for
-        the contract.
+        Every sub-config on ``AddRevisionGQLInputDTO`` is optional. A
+        missing sub-config flows through as ``None`` and is filled by
+        the merge chain in ``DeploymentController.add_revision`` (preset,
+        runtime variant baseline, vfolder config files, existing
+        revision) or by the column server-defaults at DB write time.
         """
-        mount_config = input.model_mount_config or ModelMountConfigInput.default()
         mounts_creator = VFolderMountsCreator(
-            model_vfolder_id=mount_config.vfolder_id,
-            model_definition_path=mount_config.definition_path,
-            model_mount_destination=mount_config.mount_destination,
+            **(
+                {
+                    "model_vfolder_id": input.model_mount_config.vfolder_id,
+                    "model_definition_path": input.model_mount_config.definition_path,
+                    "model_mount_destination": input.model_mount_config.mount_destination,
+                }
+                if input.model_mount_config is not None
+                else {}
+            ),
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,
@@ -1099,9 +1103,9 @@ class DeploymentAdapter(BaseAdapter):
                 for m in (input.extra_mounts or [])
             ],
         )
-        resource_spec: ResourceSpec | None = None
-        if input.cluster_config is not None and input.resource_config is not None:
-            resource_spec = ResourceSpec(
+        adder = ModelRevisionCreator(
+            image_id=input.image.id if input.image is not None else None,
+            resource_spec=ResourceSpec(
                 cluster_mode=input.cluster_config.mode,
                 cluster_size=input.cluster_config.size,
                 resource_slots={
@@ -1112,20 +1116,18 @@ class DeploymentAdapter(BaseAdapter):
                 if input.resource_config.resource_opts
                 else None,
             )
-        execution: ExecutionSpec | None = None
-        if input.model_runtime_config is not None:
-            execution = ExecutionSpec(
+            if input.cluster_config is not None and input.resource_config is not None
+            else None,
+            mounts=mounts_creator,
+            execution=ExecutionSpec(
                 runtime_variant_id=input.model_runtime_config.runtime_variant_id,
                 environ={e.name: e.value for e in input.model_runtime_config.environ.entries}
                 if input.model_runtime_config.environ
                 else None,
                 inference_runtime_config=input.model_runtime_config.inference_runtime_config,
             )
-        adder = ModelRevisionCreator(
-            image_id=input.image.id if input.image is not None else None,
-            resource_spec=resource_spec,
-            mounts=mounts_creator,
-            execution=execution,
+            if input.model_runtime_config is not None
+            else None,
             model_definition=input.model_definition.to_draft()
             if input.model_definition is not None
             else None,

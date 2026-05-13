@@ -268,12 +268,8 @@ class ModelRuntimeConfigInput(BaseRequestModel):
 class ModelMountConfigInput(BaseRequestModel):
     """Model mount configuration input for a revision."""
 
-    vfolder_id: VFolderUUID | None = Field(
-        default=None, description="VFolder ID for the model"
-    )
-    mount_destination: str = Field(
-        default="/models", description="Mount destination path inside container"
-    )
+    vfolder_id: VFolderUUID = Field(description="VFolder ID for the model")
+    mount_destination: str = Field(description="Mount destination path inside container")
     definition_path: str | None = Field(
         default=None,
         description=(
@@ -282,18 +278,6 @@ class ModelMountConfigInput(BaseRequestModel):
             "`model-definition.yml`."
         ),
     )
-
-    @classmethod
-    def default(cls) -> "ModelMountConfigInput":
-        """Return an all-default mount config.
-
-        Used by adapters when the caller submits a partial revision draft
-        without a ``model_mount_config`` block: the resulting instance
-        carries ``vfolder_id=None`` (the DB ``model`` column is nullable),
-        the canonical ``"/models"`` mount destination, and no definition
-        path override.
-        """
-        return cls()
 
 
 class ExtraVFolderMountInput(BaseRequestModel):

@@ -341,12 +341,11 @@ class MountInfo:
 
 @dataclass
 class MountMetadata:
-    # ``model_vfolder_id`` / ``model_definition_path`` map onto nullable
-    # ``deployment_revisions`` columns and stay ``| None``. The other two
-    # map onto NOT NULL columns with server-side defaults; defaults are
-    # filled by the creator that constructs this metadata, so the strict
-    # types here are an invariant: by the time something reaches
-    # scheduling, those values are concrete.
+    # ``model_vfolder_id`` maps onto the nullable ``deployment_revisions.model``
+    # column, so a partial revision draft (or a SET NULL state post-hoc) flows
+    # through with ``None``. The other fields are strict — the creator
+    # (e.g. ``VFolderMountsCreator``) supplies the column defaults before this
+    # metadata is constructed.
     model_vfolder_id: VFolderUUID | None
     model_definition_path: str | None
     model_mount_destination: str
