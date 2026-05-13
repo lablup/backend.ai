@@ -19,8 +19,10 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
+from ai.backend.appproxy.common.config import PermitHashConfig
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.types import (
+    DigestModType,
     FrontendMode,
     FrontendServerMode,
     ProxyProtocol,
@@ -30,7 +32,6 @@ from ai.backend.appproxy.worker.config import PortProxyConfig
 from ai.backend.appproxy.worker.types import InteractiveAppInfo
 
 JWT_SECRET = "test-jwt-secret"
-PERMIT_HASH_SECRET = "test-permit-hash"
 
 
 def _build_circuit() -> MagicMock:
@@ -47,7 +48,10 @@ def _build_circuit() -> MagicMock:
 def _build_root_ctx() -> MagicMock:
     root_ctx = MagicMock()
     root_ctx.local_config.secrets.jwt_secret = JWT_SECRET
-    root_ctx.local_config.permit_hash = PERMIT_HASH_SECRET
+    root_ctx.local_config.permit_hash = PermitHashConfig(
+        secret=b"test-permit-hash",
+        digest_mod=DigestModType.SHA256,
+    )
 
     config = root_ctx.local_config.proxy_worker
     config.frontend_mode = FrontendServerMode.PORT
@@ -59,6 +63,7 @@ def _build_root_ctx() -> MagicMock:
         bind_host="0.0.0.0",
         advertised_host="proxy.test.example",
         bind_port_range=(30000, 31000),
+        advertised_port_range=None,
     )
     return root_ctx
 
@@ -83,7 +88,7 @@ class TestSetupRedirectIsNotCacheable:
     """The Set-Cookie-bearing redirect must not be cacheable."""
 
     @pytest.fixture
-    async def response(self) -> web.StreamResponse:
+    async def response(self) -> web.Response:
         circuit = _build_circuit()
         root_ctx = _build_root_ctx()
         token = _make_token(str(circuit.id))
@@ -97,19 +102,20 @@ class TestSetupRedirectIsNotCacheable:
             "ai.backend.appproxy.worker.api.setup.get_circuit_info",
             AsyncMock(return_value=circuit),
         ):
-            return await inner(request, params)
+            result = await inner(request, params)
+        return cast(web.Response, result)
 
-    async def test_status_is_302_not_308(self, response: web.StreamResponse) -> None:
+    async def test_status_is_302_not_308(self, response: web.Response) -> None:
         # 308 is cacheable by default per RFC 7538 §3; using HTTPFound (302)
         # downgrades from "cacheable by default" to "heuristically cacheable".
         # The Cache-Control header below is what actually guarantees no caching,
         # but pinning the status code prevents accidental reverts.
         assert response.status == 302
 
-    async def test_cache_control_is_no_store(self, response: web.StreamResponse) -> None:
+    async def test_cache_control_is_no_store(self, response: web.Response) -> None:
         assert response.headers.get("Cache-Control") == "no-store"
 
-    async def test_permit_cookie_is_still_issued(self, response: web.StreamResponse) -> None:
+    async def test_permit_cookie_is_still_issued(self, response: web.Response) -> None:
         cookie = response.cookies.get(PERMIT_COOKIE_NAME)
         assert cookie is not None
         assert cookie["max-age"] == "604800"
