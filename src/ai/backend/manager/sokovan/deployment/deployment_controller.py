@@ -255,8 +255,9 @@ class DeploymentController:
         model_revision_spec = merged.to_model_revision_spec(
             mounts=draft.draft_model_revision.mounts
         )
+        validation_ctx = await self._build_deployment_revision_validation_context()
         self._deployment_revision_validator.validate_legacy_revision_spec(
-            model_revision_spec, await self._build_deployment_revision_validation_context()
+            model_revision_spec, validation_ctx
         )
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision_spec(model_revision=model_revision_spec)
@@ -457,9 +458,8 @@ class DeploymentController:
             ],
             revision_preset_id=preset_id,
         )
-        self._deployment_revision_validator.validate(
-            spec, await self._build_deployment_revision_validation_context()
-        )
+        validation_ctx = await self._build_deployment_revision_validation_context()
+        self._deployment_revision_validator.validate(spec, validation_ctx)
         rbac_creator = RBACEntityCreator(
             spec=spec,
             element_type=RBACElementType.DEPLOYMENT_REVISION,
@@ -617,8 +617,9 @@ class DeploymentController:
         )
         merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
         model_revision_spec = merged.to_model_revision_spec(mounts=draft_revision.mounts)
+        validation_ctx = await self._build_deployment_revision_validation_context()
         self._deployment_revision_validator.validate_legacy_revision_spec(
-            model_revision_spec, await self._build_deployment_revision_validation_context()
+            model_revision_spec, validation_ctx
         )
         return model_revision_spec
 
