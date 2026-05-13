@@ -7,11 +7,14 @@ Covers the WARMING_UP graduation pipeline:
 - WU-004: dead session → in errors (handler maps to FAILED_TO_START)
 - WU-005: revision row vanished → not promoted (left for route_eviction)
 - WU-006: empty route list → empty result
+- WU-007: health-disabled route without replica info → stays
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -22,7 +25,12 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    ReplicaConnectionInfo,
+    RouteHealthStatus,
+    RouteStatus,
+    WarmingUpRouteReadBundle,
+)
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
@@ -31,34 +39,26 @@ from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRe
 def _warming_up_route(
     *,
     revision_id: DeploymentRevisionID | None = None,
-) -> RouteData:
-    """WARMING_UP route with replica info pre-populated."""
-    return RouteData(
+    with_replica: bool = True,
+) -> tuple[RouteData, SessionId]:
+    """WARMING_UP route + its session id (returned separately so callers
+    can use the typed ``SessionId`` as a dict key without re-narrowing
+    the ``SessionId | None`` field on ``RouteData``).
+    """
+    session_id = SessionId(uuid4())
+    route = RouteData(
         route_id=uuid4(),
         deployment_id=DeploymentID(uuid4()),
-        session_id=SessionId(uuid4()),
+        session_id=session_id,
         status=RouteStatus.WARMING_UP,
         health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
         revision_id=revision_id or DeploymentRevisionID(uuid4()),
-        replica_host="10.0.0.1",
-        replica_port=8000,
+        replica_host="10.0.0.1" if with_replica else None,
+        replica_port=8000 if with_replica else None,
     )
-
-
-def _live_session_status() -> MagicMock:
-    status = MagicMock()
-    status.is_terminal = MagicMock(return_value=False)
-    status.value = "RUNNING"
-    return status
-
-
-def _terminal_session_status() -> MagicMock:
-    status = MagicMock()
-    status.is_terminal = MagicMock(return_value=True)
-    status.value = "TERMINATED"
-    return status
+    return route, session_id
 
 
 def _stub_health_record(
@@ -80,13 +80,19 @@ def _stub_health_record(
     )
 
 
-def _wire_live_session(
+def _wire_bundle(
     mock_deployment_repo: AsyncMock,
-    routes: list[RouteData],
+    *,
+    session_statuses: Mapping[SessionId, Any],
+    kernel_connection_info: Mapping[SessionId, ReplicaConnectionInfo] | None = None,
+    health_check_configs: Mapping[DeploymentRevisionID, ModelHealthCheck | None] | None = None,
 ) -> None:
-    mock_deployment_repo.fetch_session_statuses_by_route_ids.return_value = {
-        r.route_id: _live_session_status() for r in routes
-    }
+    """Wire ``fetch_warming_up_route_bundle`` to return a pre-built bundle."""
+    mock_deployment_repo.fetch_warming_up_route_bundle.return_value = WarmingUpRouteReadBundle(
+        session_statuses=dict(session_statuses),
+        kernel_connection_info=dict(kernel_connection_info or {}),
+        health_check_configs=dict(health_check_configs or {}),
+    )
 
 
 class TestCheckWarmingUpRoutes:
@@ -102,22 +108,28 @@ class TestCheckWarmingUpRoutes:
 
         assert result.successes == []
         assert result.errors == []
-        mock_deployment_repo.fetch_session_statuses_by_route_ids.assert_not_awaited()
+        mock_deployment_repo.fetch_warming_up_route_bundle.assert_not_awaited()
 
     async def test_health_check_disabled_promotes_immediately(
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
+        session_status_running: MagicMock,
     ) -> None:
-        """WU-001: Endpoint with no health_check config → ready in the first cycle."""
-        route = _warming_up_route()
-        _wire_live_session(mock_deployment_repo, [route])
+        """WU-001: Endpoint with no health_check config → ready in the first cycle.
+
+        Promoted routes get ``running_at`` stamped in Valkey inside
+        ``check_warming_up_routes`` itself (not in handler post_process).
+        """
+        route, session_id = _warming_up_route()
+        _wire_bundle(
+            mock_deployment_repo,
+            session_statuses={session_id: session_status_running},
+            health_check_configs={route.revision_id: None},
+        )
         mock_valkey_schedule.get_route_health_records_batch.return_value = {
             str(route.route_id): _stub_health_record(route),
-        }
-        mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
-            route.revision_id: None,
         }
 
         with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
@@ -125,19 +137,26 @@ class TestCheckWarmingUpRoutes:
 
         assert [r.route_id for r in result.successes] == [route.route_id]
         assert result.errors == []
+        mock_valkey_schedule.mark_routes_running_at_batch.assert_awaited_once_with([
+            str(route.route_id)
+        ])
 
     async def test_health_enabled_and_probe_passed_promotes(
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
+        session_status_running: MagicMock,
     ) -> None:
         """WU-002: Health enabled and a passing probe is recorded → ready."""
-        route = _warming_up_route()
-        _wire_live_session(mock_deployment_repo, [route])
-        mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
-            route.revision_id: ModelHealthCheck(path="/health", initial_delay=60.0),
-        }
+        route, session_id = _warming_up_route()
+        _wire_bundle(
+            mock_deployment_repo,
+            session_statuses={session_id: session_status_running},
+            health_check_configs={
+                route.revision_id: ModelHealthCheck(path="/health", initial_delay=60.0),
+            },
+        )
 
         current_time = 5000
         passing_record = _stub_health_record(
@@ -161,13 +180,17 @@ class TestCheckWarmingUpRoutes:
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
+        session_status_running: MagicMock,
     ) -> None:
         """WU-003: Health enabled but no probe yet → not promoted, no error."""
-        route = _warming_up_route()
-        _wire_live_session(mock_deployment_repo, [route])
-        mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
-            route.revision_id: ModelHealthCheck(path="/health", initial_delay=60.0),
-        }
+        route, session_id = _warming_up_route()
+        _wire_bundle(
+            mock_deployment_repo,
+            session_statuses={session_id: session_status_running},
+            health_check_configs={
+                route.revision_id: ModelHealthCheck(path="/health", initial_delay=60.0),
+            },
+        )
         # Health record exists but no probe has run (last_check=0).
         mock_valkey_schedule.get_route_health_records_batch.return_value = {
             str(route.route_id): _stub_health_record(route),
@@ -184,12 +207,14 @@ class TestCheckWarmingUpRoutes:
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
+        session_status_terminated: MagicMock,
     ) -> None:
         """WU-004: Terminal session yields an error so the handler can fail to FAILED_TO_START."""
-        route = _warming_up_route()
-        mock_deployment_repo.fetch_session_statuses_by_route_ids.return_value = {
-            route.route_id: _terminal_session_status(),
-        }
+        route, session_id = _warming_up_route()
+        _wire_bundle(
+            mock_deployment_repo,
+            session_statuses={session_id: session_status_terminated},
+        )
 
         with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
             result = await route_executor.check_warming_up_routes([route])
@@ -198,20 +223,46 @@ class TestCheckWarmingUpRoutes:
         assert len(result.errors) == 1
         assert result.errors[0].route_info.route_id == route.route_id
 
-    async def test_missing_revision_is_skipped_not_promoted(
+    async def test_missing_revision_treated_as_health_disabled(
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
-        mock_valkey_schedule: AsyncMock,
+        session_status_running: MagicMock,
     ) -> None:
-        """WU-005: Revision row missing from health-config map → leave for route_eviction."""
-        route = _warming_up_route()
-        _wire_live_session(mock_deployment_repo, [route])
-        mock_valkey_schedule.get_route_health_records_batch.return_value = {
-            str(route.route_id): _stub_health_record(route),
-        }
-        # Repo returns an empty map (revision row vanished between fetch and classify).
-        mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {}
+        """WU-005: Revision row missing → treated as health-disabled.
+
+        The orphan route is promoted to RUNNING in this cycle; the
+        ``route_eviction`` handler later removes it because its revision
+        is neither current nor deploying.
+        """
+        route, session_id = _warming_up_route()
+        _wire_bundle(
+            mock_deployment_repo,
+            session_statuses={session_id: session_status_running},
+            health_check_configs={},  # revision vanished between fetch and classify
+        )
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_warming_up_routes([route])
+
+        assert [r.route_id for r in result.successes] == [route.route_id]
+        assert result.errors == []
+
+    async def test_health_disabled_route_without_replica_info_stays(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        session_status_running: MagicMock,
+    ) -> None:
+        """WU-007: A health-check-disabled route with no replica info must not be promoted."""
+        route, session_id = _warming_up_route(with_replica=False)
+        _wire_bundle(
+            mock_deployment_repo,
+            session_statuses={session_id: session_status_running},
+            # Kernel info empty → populate fails → replica_host stays None
+            kernel_connection_info={},
+            health_check_configs={route.revision_id: None},
+        )
 
         with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
             result = await route_executor.check_warming_up_routes([route])
@@ -224,19 +275,22 @@ class TestCheckWarmingUpRoutes:
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
+        session_status_running: MagicMock,
+        session_status_terminated: MagicMock,
     ) -> None:
         """A live + a dead route are classified into successes / errors respectively."""
-        live_route = _warming_up_route()
-        dead_route = _warming_up_route()
-        mock_deployment_repo.fetch_session_statuses_by_route_ids.return_value = {
-            live_route.route_id: _live_session_status(),
-            dead_route.route_id: _terminal_session_status(),
-        }
+        live_route, live_sid = _warming_up_route()
+        dead_route, dead_sid = _warming_up_route()
+        _wire_bundle(
+            mock_deployment_repo,
+            session_statuses={
+                live_sid: session_status_running,
+                dead_sid: session_status_terminated,
+            },
+            health_check_configs={live_route.revision_id: None},
+        )
         mock_valkey_schedule.get_route_health_records_batch.return_value = {
             str(live_route.route_id): _stub_health_record(live_route),
-        }
-        mock_deployment_repo.fetch_health_check_configs_by_revision_ids.return_value = {
-            live_route.revision_id: None,  # disabled → live route promotes
         }
 
         with RouteRecorderContext.scope(

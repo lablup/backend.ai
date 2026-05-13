@@ -398,17 +398,6 @@ class RouteCoordinator:
                 batch_updaters, BulkCreator(specs=all_history_specs)
             )
 
-        # Stamp lifecycle transition timestamps in Valkey: warming_up_at
-        # anchors the health-probe initial_delay window (model loading
-        # happens during WARMING_UP); running_at marks the moment the
-        # first health gate passed and the route is eligible for traffic.
-        if transitions.success is not None and result.successes:
-            success_route_ids = [str(route.route_id) for route in result.successes]
-            if transitions.success.status == RouteStatus.WARMING_UP:
-                await self._valkey_schedule.mark_routes_warming_up_at_batch(success_route_ids)
-            elif transitions.success.status == RouteStatus.RUNNING:
-                await self._valkey_schedule.mark_routes_running_at_batch(success_route_ids)
-
     async def process_if_needed(self, lifecycle_type: RouteLifecycleType) -> None:
         """
         Process route lifecycle operation if needed (based on internal state).

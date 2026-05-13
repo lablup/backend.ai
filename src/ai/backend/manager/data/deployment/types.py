@@ -12,7 +12,7 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
+from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -32,7 +32,11 @@ from ai.backend.manager.data.session.options import HandlerOptions
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
+    from ai.backend.manager.data.session.types import (
+        SchedulingResult,
+        SessionStatus,
+        SubStepResult,
+    )
     from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 from ai.backend.common.types import (
@@ -657,6 +661,45 @@ def _merge_model_definition(
 # every query runs inside one session; the reader layer combines the bundle
 # with storage-backed files (deployment-config.yaml, model-definition.yaml)
 # before assembling the drafts list.
+
+
+@dataclass(frozen=True)
+class ReplicaConnectionInfo:
+    """Inference-port host/port pair for a session's main kernel."""
+
+    host: str
+    port: int
+
+
+@dataclass(frozen=True)
+class WarmingUpRouteReadBundle:
+    """DB reads for a single ``check_warming_up_routes`` cycle.
+
+    Two queries inside one readonly transaction:
+
+    1. ``sessions`` LEFT JOIN ``kernels(cluster_role='main')`` →
+       resolves both the session status and the main kernel's
+       inference host/port (both keyed by session id).
+    2. ``deployment_revisions.model_definition`` → resolves the
+       health-check configuration per revision.
+
+    Callers translate from route to session/revision via
+    :class:`RouteData`.
+
+    Attributes:
+        session_statuses: Session lifecycle status keyed by session
+            id. Sessions whose row is missing are absent from the map.
+        kernel_connection_info: Inference host/port keyed by session
+            id. Sessions whose kernel is not yet up are absent.
+        health_check_configs: Per-revision health-check configuration
+            (``None`` when the revision has no ``service.health_check``
+            defined, which the warming-up handler treats as "opted out
+            of health probes").
+    """
+
+    session_statuses: Mapping[SessionId, SessionStatus]
+    kernel_connection_info: Mapping[SessionId, ReplicaConnectionInfo]
+    health_check_configs: Mapping[DeploymentRevisionID, ModelHealthCheck | None]
 
 
 @dataclass(frozen=True)

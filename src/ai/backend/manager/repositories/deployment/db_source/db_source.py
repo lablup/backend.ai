@@ -70,12 +70,14 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ReplicaConnectionInfo,
     RevisionSearchResult,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
     ScalingGroupCleanupConfig,
+    WarmingUpRouteReadBundle,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -84,6 +86,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
     DeploymentRevisionNotFound,
@@ -2044,6 +2047,89 @@ class DeploymentDBSource:
                 ),
                 resolved_presets=resolved_presets,
             )
+
+    async def fetch_warming_up_route_bundle(
+        self,
+        *,
+        session_ids: list[SessionId],
+        revision_ids: set[DeploymentRevisionID],
+    ) -> WarmingUpRouteReadBundle:
+        """Bundle the DB reads ``check_warming_up_routes`` needs.
+
+        Two queries inside one readonly transaction:
+
+        1. ``sessions`` LEFT JOIN ``kernels(cluster_role='main')`` →
+           ``session_statuses`` + ``kernel_connection_info`` (both
+           keyed by session id).
+        2. ``deployment_revisions.model_definition`` →
+           ``health_check_configs`` (keyed by revision id).
+
+        Empty ``session_ids`` / ``revision_ids`` skip the
+        corresponding query.
+        """
+        session_statuses: dict[SessionId, SessionStatus] = {}
+        kernel_info: dict[SessionId, ReplicaConnectionInfo] = {}
+        health_configs: dict[DeploymentRevisionID, ModelHealthCheck | None] = {}
+
+        if not session_ids and not revision_ids:
+            return WarmingUpRouteReadBundle(
+                session_statuses=session_statuses,
+                kernel_connection_info=kernel_info,
+                health_check_configs=health_configs,
+            )
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            if session_ids:
+                session_query = (
+                    sa.select(
+                        SessionRow.id.label("session_id"),
+                        SessionRow.status.label("session_status"),
+                        KernelRow.kernel_host.label("kernel_host"),
+                        KernelRow.service_ports.label("service_ports"),
+                    )
+                    .select_from(SessionRow)
+                    .outerjoin(
+                        KernelRow,
+                        sa.and_(
+                            KernelRow.session_id == SessionRow.id,
+                            KernelRow.cluster_role == DEFAULT_ROLE,
+                        ),
+                    )
+                    .where(SessionRow.id.in_(session_ids))
+                )
+                result = await db_sess.execute(session_query)
+                for row in result:
+                    sid = SessionId(row.session_id)
+                    session_statuses[sid] = row.session_status
+                    if row.kernel_host and row.service_ports:
+                        for sp in row.service_ports:
+                            if sp.get("is_inference"):
+                                host_ports = sp.get("host_ports", [])
+                                if host_ports:
+                                    kernel_info[sid] = ReplicaConnectionInfo(
+                                        host=row.kernel_host,
+                                        port=host_ports[0],
+                                    )
+                                break
+
+            if revision_ids:
+                health_query = sa.select(
+                    DeploymentRevisionRow.id,
+                    DeploymentRevisionRow.model_definition,
+                ).where(DeploymentRevisionRow.id.in_(revision_ids))
+                result = await db_sess.execute(health_query)
+                for revision_id, model_definition in result.all():
+                    health_configs[DeploymentRevisionID(revision_id)] = (
+                        model_definition.health_check_config()
+                        if model_definition is not None
+                        else None
+                    )
+
+        return WarmingUpRouteReadBundle(
+            session_statuses=session_statuses,
+            kernel_connection_info=kernel_info,
+            health_check_configs=health_configs,
+        )
 
     async def fetch_session_statuses_by_route_ids(
         self,

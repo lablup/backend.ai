@@ -33,15 +33,6 @@ KERNEL_HEALTH_TTL_SEC = 300  # 5 minutes - TTL for kernel health status
 MAX_KERNEL_HEALTH_STALENESS_SEC = 120  # 2 minutes - threshold for kernel health staleness
 AGENT_LAST_CHECK_TTL_SEC = 1200  # 20 minutes - TTL for agent last check timestamp
 ORPHAN_KERNEL_THRESHOLD_SEC = 600  # 10 minutes - threshold for orphan kernel detection
-
-
-class _RouteTimestampField(enum.StrEnum):
-    """Lifecycle transition timestamp fields stored in route health hashes."""
-
-    WARMING_UP_AT = "warming_up_at"
-    RUNNING_AT = "running_at"
-
-
 FORCE_TERMINATED_CLEANUP_TTL_SEC = 1200  # 20 minutes - TTL for force-terminated cleanup queue
 
 
@@ -104,17 +95,14 @@ class RouteHealthRecord:
 
     route_id: str
     created_at: int  # Unix timestamp when route was created
-    initial_delay_until: int  # Unix timestamp = warming_up_at + initial_delay
+    initial_delay_until: int  # Unix timestamp anchored at health-record initialisation
     health_path: str  # extracted from model_definition
     inference_port: int  # extracted from kernel
     replica_host: str  # extracted from kernel
 
-    # Timestamp when route entered WARMING_UP state (set by coordinator).
-    # Anchors the ``initial_delay`` window for health probes since model
-    # loading happens during WARMING_UP.
-    warming_up_at: int | None = None
-    # Timestamp when route entered RUNNING state (set by coordinator).
-    # Marks the moment the route became eligible to receive traffic.
+    # Timestamp when route entered RUNNING state (set by the warming-up
+    # handler after the first health-check pass). Marks the moment the
+    # route became eligible to receive traffic.
     running_at: int | None = None
 
     # Agent check results
@@ -157,8 +145,6 @@ class RouteHealthRecord:
             "manager_healthy": "1" if self.manager_healthy else "0",
             "manager_last_check": str(self.manager_last_check),
         }
-        if self.warming_up_at is not None:
-            data["warming_up_at"] = str(self.warming_up_at)
         if self.running_at is not None:
             data["running_at"] = str(self.running_at)
         return data
@@ -173,7 +159,6 @@ class RouteHealthRecord:
             health_path=data["health_path"],
             inference_port=int(data["inference_port"]),
             replica_host=data["replica_host"],
-            warming_up_at=int(raw) if (raw := data.get("warming_up_at")) and raw != "0" else None,
             running_at=int(raw) if (raw := data.get("running_at")) and raw != "0" else None,
             agent_healthy=data.get("agent_healthy", "0") == "1",
             agent_last_check=int(data.get("agent_last_check", "0")),
@@ -692,36 +677,6 @@ class ValkeyScheduleClient:
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
-    async def _mark_routes_timestamp_batch(
-        self,
-        route_ids: Sequence[str],
-        field: _RouteTimestampField,
-    ) -> None:
-        """Batch-write a single timestamp field to multiple route health hashes."""
-        if not route_ids:
-            return
-
-        current_time = str(await self._get_redis_time())
-        batch = Batch(is_atomic=False)
-        for route_id in route_ids:
-            key = self._get_route_health_key(route_id)
-            batch.hset(key, {field.value: current_time})
-            batch.expire(key, ROUTE_HEALTH_TTL_SEC)
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_schedule_resilience.apply()
-    async def mark_routes_warming_up_at_batch(self, route_ids: Sequence[str]) -> None:
-        """
-        Batch-record the WARMING_UP transition timestamp for multiple routes.
-        Called when routes transition to WARMING_UP status. Anchors the
-        ``initial_delay`` window because model loading happens during
-        WARMING_UP, not after the route reaches RUNNING.
-
-        :param route_ids: Route IDs that entered WARMING_UP state
-        """
-        await self._mark_routes_timestamp_batch(route_ids, _RouteTimestampField.WARMING_UP_AT)
-
     @valkey_schedule_resilience.apply()
     async def mark_routes_running_at_batch(self, route_ids: Sequence[str]) -> None:
         """
@@ -731,48 +686,17 @@ class ValkeyScheduleClient:
 
         :param route_ids: Route IDs that entered RUNNING state
         """
-        await self._mark_routes_timestamp_batch(route_ids, _RouteTimestampField.RUNNING_AT)
-
-    async def _batch_read_route_timestamp(
-        self,
-        route_ids: Sequence[str],
-        field: _RouteTimestampField,
-    ) -> dict[str, int | None]:
-        """Batch read a single timestamp field from route health hashes."""
         if not route_ids:
-            return {}
+            return
 
+        current_time = str(await self._get_redis_time())
         batch = Batch(is_atomic=False)
         for route_id in route_ids:
             key = self._get_route_health_key(route_id)
-            batch.hget(key, field.value)
-
+            batch.hset(key, {"running_at": current_time})
+            batch.expire(key, ROUTE_HEALTH_TTL_SEC)
         async with self._client.client() as conn:
-            results = await conn.exec(batch, raise_on_error=False)
-        if results is None:
-            return dict.fromkeys(route_ids)
-
-        timestamp_map: dict[str, int | None] = {}
-        for i, route_id in enumerate(route_ids):
-            raw = results[i] if len(results) > i else None
-            if raw and raw != b"0":
-                timestamp_map[route_id] = int(raw)
-            else:
-                timestamp_map[route_id] = None
-        return timestamp_map
-
-    @valkey_schedule_resilience.apply()
-    async def get_route_warming_up_at_batch(
-        self, route_ids: Sequence[str]
-    ) -> dict[str, int | None]:
-        """
-        Batch read warming_up_at field from route health hashes.
-        Works even on partial hashes (before full RouteHealthRecord is initialized).
-
-        :param route_ids: Route IDs to look up
-        :return: Mapping of route_id to warming_up_at timestamp (None if not set)
-        """
-        return await self._batch_read_route_timestamp(route_ids, _RouteTimestampField.WARMING_UP_AT)
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def get_route_running_at_batch(self, route_ids: Sequence[str]) -> dict[str, int | None]:
@@ -783,7 +707,27 @@ class ValkeyScheduleClient:
         :param route_ids: Route IDs to look up
         :return: Mapping of route_id to running_at timestamp (None if not set)
         """
-        return await self._batch_read_route_timestamp(route_ids, _RouteTimestampField.RUNNING_AT)
+        if not route_ids:
+            return {}
+
+        batch = Batch(is_atomic=False)
+        for route_id in route_ids:
+            key = self._get_route_health_key(route_id)
+            batch.hget(key, "running_at")
+
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=False)
+        if results is None:
+            return dict.fromkeys(route_ids)
+
+        running_at_map: dict[str, int | None] = {}
+        for i, route_id in enumerate(route_ids):
+            raw = results[i] if len(results) > i else None
+            if raw and raw != b"0":
+                running_at_map[route_id] = int(raw)
+            else:
+                running_at_map[route_id] = None
+        return running_at_map
 
     @valkey_schedule_resilience.apply()
     async def refresh_route_health_ttl(self, route_id: str) -> None:
@@ -986,8 +930,8 @@ class ValkeyScheduleClient:
 
             data = {k.decode(): v.decode() for k, v in raw.items()}
             if "route_id" not in data:
-                # Partial hash (e.g., only warming_up_at set by
-                # mark_routes_warming_up_at_batch before _initialize_health_records runs)
+                # Partial hash (e.g., only running_at set by
+                # mark_routes_running_at_batch before _initialize_health_records runs)
                 records[route_id] = None
                 continue
             records[route_id] = RouteHealthRecord.from_valkey_hash(data)

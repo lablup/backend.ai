@@ -71,6 +71,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteSearchResult,
     RouteStatus,
     ScalingGroupCleanupConfig,
+    WarmingUpRouteReadBundle,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
@@ -1096,6 +1097,19 @@ class DeploymentRepository:
     ) -> Mapping[uuid.UUID, SessionStatus | None]:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_warming_up_route_bundle(
+        self,
+        *,
+        session_ids: list[SessionId],
+        revision_ids: set[DeploymentRevisionID],
+    ) -> WarmingUpRouteReadBundle:
+        """Bundle the DB reads ``check_warming_up_routes`` needs into a single call."""
+        return await self._db_source.fetch_warming_up_route_bundle(
+            session_ids=session_ids,
+            revision_ids=revision_ids,
+        )
 
     @deployment_repository_resilience.apply()
     async def fetch_route_connection_infos(
