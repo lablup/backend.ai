@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager as actxmgr
 from typing import Any
 from uuid import UUID
 
