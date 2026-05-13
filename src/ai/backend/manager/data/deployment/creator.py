@@ -27,15 +27,15 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 
 @dataclass
 class VFolderMountsCreator:
-    # ``model_vfolder_id`` / ``model_mount_destination`` may be ``None`` when
-    # the caller supplies a partial draft (e.g. AddRevisionInput without a
-    # ``model_mount_config`` block). The persisted row's columns are either
-    # nullable (``model``) or carry a server-side default
-    # (``model_mount_destination``), so a NULL here is preserved or filled
-    # by the DB rather than rejected at this layer.
+    # ``model_vfolder_id`` maps onto the nullable ``deployment_revisions.model``
+    # column, so it stays ``| None``: a partial revision draft (no
+    # ``model_mount_config`` block) reaches here with ``None`` and persists
+    # as a NULL ``model``. The remaining fields are strict — callers fill
+    # the canonical defaults (e.g. ``ModelMountConfigInput.default()``)
+    # before constructing this creator.
     model_vfolder_id: VFolderUUID | None
     model_definition_path: str | None
-    model_mount_destination: str | None
+    model_mount_destination: str
     extra_mounts: list[MountInfo]
 
 

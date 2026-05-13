@@ -47,6 +47,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteDeploymentInput,
     DeploymentFilter,
     DeploymentOrder,
+    ModelMountConfigInput,
     ReplaceDeploymentOptionsInput,
     ReplicaFilter,
     ReplicaOrder,
@@ -1084,13 +1085,11 @@ class DeploymentAdapter(BaseAdapter):
         revision / DB column defaults); see ``ModelRevisionCreator`` for
         the contract.
         """
-        mount_config = input.model_mount_config
+        mount_config = input.model_mount_config or ModelMountConfigInput.default()
         mounts_creator = VFolderMountsCreator(
-            model_vfolder_id=mount_config.vfolder_id if mount_config is not None else None,
-            model_definition_path=mount_config.definition_path if mount_config is not None else None,
-            model_mount_destination=mount_config.mount_destination
-            if mount_config is not None
-            else None,
+            model_vfolder_id=mount_config.vfolder_id,
+            model_definition_path=mount_config.definition_path,
+            model_mount_destination=mount_config.mount_destination,
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,

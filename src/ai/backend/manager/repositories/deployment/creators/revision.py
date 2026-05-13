@@ -33,17 +33,19 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     """
 
     deployment_id: DeploymentID
-    # Creating a revision requires an image and a model vfolder; SET NULL
-    # is strictly a post-hoc state on the persisted row (see
-    # ``DeploymentRevisionRow.image`` / ``model``) and never originates
-    # from the creation path.
+    # ``image_id`` is required at the creation path; the persisted row's
+    # ``image`` column going SET NULL is strictly a post-hoc state.
     image_id: ImageID
     resource_group: str
     resource_slots: ResourceSlot
     resource_opts: Mapping[str, Any]
     cluster_mode: str
     cluster_size: int
-    model_vfolder_id: VFolderUUID
+    # ``model_vfolder_id`` and ``model_definition_path`` map onto nullable
+    # DB columns. ``model_mount_destination`` maps onto NOT NULL with a
+    # server default — the creator constructing this spec is expected to
+    # fill the default before reaching here, so this stays strict.
+    model_vfolder_id: VFolderUUID | None
     model_mount_destination: str
     model_definition_path: str | None
     model_definition: ModelDefinition | None
