@@ -215,12 +215,6 @@ class DeploymentStrategyGQL:
 )
 class ReplicaState:
     desired_replica_count: int
-    replica_ids: list[UUID] = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="IDs of the replicas currently tracked for this deployment.",
-        )
-    )
 
 
 @gql_pydantic_type(

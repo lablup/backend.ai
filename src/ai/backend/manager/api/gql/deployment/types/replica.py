@@ -113,7 +113,7 @@ TrafficStatus: type[RouteTrafficStatus] = gql_enum(
     name="TrafficStatus",
 )
 
-ReplicaHealthStatus: type[RouteHealthStatus] = gql_enum(
+ReplicaHealthStatusGQL: type[RouteHealthStatus] = gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description="This enum represents the health check status of a replica.",
@@ -213,7 +213,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
             description="Traffic status of the replica.",
         )
     )
-    health_status: ReplicaHealthStatus = gql_added_field(
+    health_status: ReplicaHealthStatusGQL = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Health check status of the replica.",
