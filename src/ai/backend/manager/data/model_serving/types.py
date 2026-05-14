@@ -13,7 +13,7 @@ from pydantic import HttpUrl
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.model_serving.request import ExtraMountModel
+from ai.backend.common.dto.manager.session.types import MountOption as MountOptionRequest
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -197,8 +197,8 @@ class MountOption:
     subpath: str | None = None
 
     @classmethod
-    def from_model(cls, model: ExtraMountModel) -> MountOption:
-        """Convert a wire-level ``ExtraMountModel`` (DTO) into a ``MountOption``."""
+    def from_model(cls, model: MountOptionRequest) -> MountOption:
+        """Convert the wire-level :class:`MountOption` DTO into a data-layer dataclass."""
         return cls(
             mount_destination=model.mount_destination,
             type=model.type,

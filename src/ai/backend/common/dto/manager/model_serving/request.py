@@ -21,7 +21,8 @@ from pydantic import (
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.types import MountPermission, MountTypes, RuntimeVariant
+from ai.backend.common.dto.manager.session.types import MountOption
+from ai.backend.common.types import RuntimeVariant
 
 __all__ = (
     # Path param models
@@ -31,7 +32,6 @@ __all__ = (
     "ListServeRequestModel",
     "ServiceFilterModel",
     "SearchServicesRequestModel",
-    "ExtraMountModel",
     "ServiceConfigModel",
     "NewServiceRequestModel",
     "ScaleRequestModel",
@@ -61,33 +61,6 @@ class SearchServicesRequestModel(BaseRequestModel):
     filter: ServiceFilterModel | None = Field(default=None)
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=20, ge=1, le=100)
-
-
-class ExtraMountModel(BaseRequestModel):
-    """Per-vfolder extra mount options for model service session creation."""
-
-    mount_destination: str | None = Field(
-        default=None,
-        description="Mount destination inside the container. Defaults to ``/home/work/{folder_name}``.",
-    )
-    type: MountTypes = Field(
-        default=MountTypes.BIND,
-        description="Mount type. Defaults to ``bind``.",
-    )
-    permission: MountPermission | None = Field(
-        default=None,
-        description=(
-            "Permission override. ``null`` (default) inherits the vfolder's stored permission."
-        ),
-    )
-    subpath: str | None = Field(
-        default=None,
-        min_length=1,
-        description=(
-            "Subpath within the vfolder to mount. ``null`` (default) mounts the vfolder root."
-            " Empty string is rejected; omit the field to mount the root."
-        ),
-    )
 
 
 class ServiceConfigModel(BaseRequestModel):
@@ -122,7 +95,7 @@ class ServiceConfigModel(BaseRequestModel):
         alias="vfolderSubpath",
     )
 
-    extra_mounts: dict[uuid.UUID, ExtraMountModel] = Field(
+    extra_mounts: dict[uuid.UUID, MountOption] = Field(
         description=(
             "Specifications about extra VFolders mounted to model service session. "
             "MODEL type VFolders are not allowed to be attached to model service session"
