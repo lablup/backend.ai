@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -25,6 +26,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
     ResourceSlotColumn,
     SlugType,
@@ -68,6 +70,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
     return DomainData(
+        id=row.id,
         name=row.name,
         description=row.description,
         is_active=row.is_active,
@@ -90,8 +93,14 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
 class DomainRow(Base):  # type: ignore[misc]
     __tablename__ = "domains"
 
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     name: Mapped[str] = mapped_column(
-        "name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True
+        "name",
+        SlugType(length=64, allow_unicode=True, allow_dot=True),
+        nullable=False,
+        unique=True,
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)
@@ -149,6 +158,7 @@ domains = DomainRow.__table__
 
 @dataclass
 class DomainModel(RBACModel[DomainPermission]):
+    id: uuid.UUID
     name: str
     description: str | None
     is_active: bool
@@ -196,6 +206,7 @@ class DomainModel(RBACModel[DomainPermission]):
     @classmethod
     def from_row(cls, row: DomainRow, permissions: Iterable[DomainPermission]) -> Self:
         return cls(
+            id=row.id,
             name=row.name,
             description=row.description,
             is_active=row.is_active,

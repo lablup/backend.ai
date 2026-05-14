@@ -27,6 +27,7 @@ class UserInfo:
 
 @dataclass
 class DomainData:
+    id: uuid.UUID
     name: str
     description: str | None
     is_active: bool
