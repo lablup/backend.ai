@@ -11,8 +11,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from http import HTTPStatus
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Final, cast
 from uuid import UUID
 
@@ -233,6 +235,36 @@ def _validate_creation_config(
         ) from e
 
 
+@dataclass(frozen=True, slots=True)
+class LegacyMountResolution:
+    """One resolved legacy name-keyed mount entry.
+
+    Produced by :meth:`SessionHandler._resolve_legacy_name_mounts` and
+    consumed by :func:`_merge_resolved_legacy_mounts`. Carries both the
+    resolved vfolder UUID and any subpath suffix peeled off the legacy
+    ``"name/subpath"`` key so the merge step needs a single map keyed by
+    vfolder name.
+    """
+
+    vfid: UUID
+    subpath: str | None = None
+
+
+def _split_legacy_mount_key(key: str) -> tuple[str, str | None]:
+    """Peel an optional ``/<subpath>`` suffix off a legacy mount key.
+
+    The v1 CLI flattens ``-v vfname/sub:/dest`` into ``source="vfname/sub"``
+    + a separate ``target="/dest"``; the REST payload then carries the
+    ``vfname/sub`` source verbatim across ``mounts`` AND the ``mount_map``
+    / ``mount_options`` keys. This helper recovers the bare vfolder name
+    so name resolution and dst/opts lookup all key off the same string.
+    """
+    name, sep, subpath = key.partition("/")
+    if sep and subpath:
+        return name, subpath
+    return key, None
+
+
 def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:
     """Lift UUID-shaped strings from legacy mount buckets onto the UUID-keyed
     buckets, leaving only name-shaped entries for the name resolver.
@@ -284,25 +316,23 @@ def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]
 
 def _merge_resolved_legacy_mounts(
     creation_config: dict[str, Any],
-    name_to_id: dict[str, UUID],
-    name_to_subpath: Mapping[str, str] | None = None,
+    resolutions: Mapping[str, LegacyMountResolution],
 ) -> dict[str, Any]:
-    """Merge a ``name → UUID`` resolution into the UUID-keyed buckets of
-    ``creation_config`` and drop the now-resolved name-keyed legacy keys.
+    """Merge resolved legacy name-keyed mounts into the UUID-keyed buckets
+    of ``creation_config`` and drop the now-resolved name-keyed legacy keys.
 
     The resolved ids are appended to ``mount_ids`` (skipping duplicates),
     and entries from the name-keyed ``mount_map`` / ``mount_options``
     dicts are re-keyed onto the resolved UUIDs without overwriting an
     explicit UUID-keyed entry the caller already supplied.
 
-    When the caller passed a legacy ``mounts`` entry in the
-    ``"vfname/subdir"`` shape, ``name_to_subpath`` carries that parsed
-    subpath suffix for the matching name; it is injected into
-    ``mount_options[uuid]["subpath"]`` so the downstream UUID-keyed
+    When a resolution carries a ``subpath`` (the caller passed a legacy
+    ``mounts`` entry in the ``"vfname/subdir"`` shape), it is injected
+    into ``mount_options[uuid]["subpath"]`` so the downstream UUID-keyed
     consumer (``prepare_vfolder_mounts``) sees the same shape as a
     modern caller supplying ``mount_options`` directly.
     """
-    if not name_to_id:
+    if not resolutions:
         return creation_config
 
     merged_mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
@@ -316,23 +346,36 @@ def _merge_resolved_legacy_mounts(
     merged_mount_options: dict[Any, Any] = dict(creation_config.get("mount_options") or {})
     legacy_mount_map = creation_config.get("mount_map") or {}
     legacy_mount_options = creation_config.get("mount_options") or {}
-    subpath_by_name = dict(name_to_subpath or {})
 
-    for name, vfid in name_to_id.items():
+    # Re-key legacy mount_map/mount_options entries onto the bare vfolder
+    # name so a CLI-shaped ``{"vfname/sub": "/dest"}`` resolves alongside
+    # the bare-name lookup. First-wins if both shapes appear for one name.
+    mount_map_by_name: dict[str, str] = {}
+    for raw, dst in legacy_mount_map.items():
+        name, _ = _split_legacy_mount_key(str(raw))
+        mount_map_by_name.setdefault(name, dst)
+
+    mount_options_by_name: dict[str, Any] = {}
+    for raw, opts in legacy_mount_options.items():
+        name, _ = _split_legacy_mount_key(str(raw))
+        mount_options_by_name.setdefault(name, opts)
+
+    for name, res in resolutions.items():
+        vfid = res.vfid
         if vfid not in existing_uuid_set:
             merged_mount_ids.append(vfid)
             existing_uuid_set.add(vfid)
-        if (dst := legacy_mount_map.get(name)) and vfid not in merged_mount_id_map:
+        if (dst := mount_map_by_name.get(name)) and vfid not in merged_mount_id_map:
             merged_mount_id_map[vfid] = dst
-        if (opts := legacy_mount_options.get(name)) and vfid not in merged_mount_options:
+        if (opts := mount_options_by_name.get(name)) and vfid not in merged_mount_options:
             merged_mount_options[vfid] = opts
-        if (sub := subpath_by_name.get(name)) is not None:
+        if res.subpath is not None:
             existing_opts = merged_mount_options.get(vfid) or {}
             # Do not clobber a subpath explicitly supplied via the modern
             # UUID-keyed ``mount_options`` surface for the same vfolder —
             # the explicit value wins over the legacy name/subpath form.
             if "subpath" not in existing_opts:
-                merged_mount_options[vfid] = {**existing_opts, "subpath": sub}
+                merged_mount_options[vfid] = {**existing_opts, "subpath": res.subpath}
 
     next_config = dict(creation_config)
     next_config["mount_ids"] = merged_mount_ids
@@ -373,90 +416,75 @@ class SessionHandler:
         if not (legacy_mounts or legacy_mount_map or legacy_mount_options):
             return validated_config
         validated_config = _route_legacy_uuid_mounts(validated_config)
-        name_to_id, name_to_subpath = await self._resolve_legacy_name_mounts(
+        resolutions = await self._resolve_legacy_name_mounts(
             validated_config.get("mounts") or (),
             validated_config.get("mount_map") or {},
             validated_config.get("mount_options") or {},
         )
-        return _merge_resolved_legacy_mounts(validated_config, name_to_id, name_to_subpath)
+        return _merge_resolved_legacy_mounts(validated_config, resolutions)
 
     async def _resolve_legacy_name_mounts(
         self,
         mounts: Sequence[str],
         mount_map: Mapping[str, str],
         mount_options: Mapping[str, Any],
-    ) -> tuple[dict[str, UUID], dict[str, str]]:
-        """Resolve legacy v1 CLI name-keyed mount surfaces into a unified
-        ``name → UUID`` mapping, plus extract any ``name/subpath`` suffix
-        the caller embedded in the ``mounts`` list.
+    ) -> dict[str, LegacyMountResolution]:
+        """Resolve legacy v1 CLI name-keyed mount surfaces into a map
+        ``name → LegacyMountResolution(vfid, subpath_or_None)``.
 
         ``mounts`` (list of names, optionally ``"<name>/<subpath>"``),
-        ``mount_map`` (dict keyed by name), and ``mount_options`` (dict
-        keyed by name) are all name-based legacy inputs populated
-        together by ``-v`` on the v1 CLI; they must be re-keyed onto
-        UUIDs together so a name that appears only in ``mount_map`` or
-        ``mount_options`` is not silently dropped downstream.
+        ``mount_map`` (dict keyed by name, optionally with the same
+        ``"<name>/<subpath>"`` suffix), and ``mount_options`` (same key
+        shape) are all name-based legacy inputs populated together by
+        ``-v vfname[/sub][:dst][,opt]`` on the v1 CLI; the CLI keeps the
+        slash-with-subpath in the source string verbatim, so the same
+        ``"<name>/<sub>"`` key can appear across all three surfaces.
 
-        Legacy ``mounts`` entries of the form ``"vfname/subdir"`` are
-        split here so the lookup uses only the vfolder name; the parsed
-        subpath suffix is returned in the second tuple element so the
-        merge step (:func:`_merge_resolved_legacy_mounts`) can inject it
-        into ``mount_options[uuid]["subpath"]``. Escape validation on the
-        subpath value is performed downstream by ``prepare_vfolder_mounts``
-        once the UUID-keyed shape is assembled.
+        We peel that suffix off every key, resolve only the bare vfolder
+        name, and attach the parsed subpath to the resolution so
+        :func:`_merge_resolved_legacy_mounts` can inject it into
+        ``mount_options[uuid]["subpath"]``. Escape validation on the
+        subpath value is performed downstream by ``prepare_vfolder_mounts``.
         """
         if not mounts and not mount_map and not mount_options:
-            return {}, {}
+            return {}
 
         names_to_resolve: list[str] = []
         seen: set[str] = set()
-        name_to_subpath: dict[str, str] = {}
+        subpath_by_name: dict[str, str] = {}
 
-        # ``mounts`` may carry "<name>/<subpath>" — partition off the
-        # subpath suffix and remember it keyed by the resolved name. The
-        # subpath itself is validated downstream against root-escape via
-        # ``_normalize_mount_subpath``.
-        for raw in mounts:
-            entry = str(raw)
-            name, sep, subpath = entry.partition("/")
-            if sep and subpath:
-                name_to_subpath[name] = subpath
-            if name in seen:
-                continue
-            seen.add(name)
-            names_to_resolve.append(name)
-
-        # ``mount_map`` keys are plain names (no subpath syntax).
-        for raw in mount_map.keys():
-            name = str(raw)
-            if name in seen:
-                continue
-            seen.add(name)
-            names_to_resolve.append(name)
-
-        # ``mount_options`` is the single polymorphic field shared by
-        # both legacy (name-keyed) and modern (UUID-string-keyed)
-        # callers; skip keys that already parse as UUID strings since
-        # they are not vfolder names to resolve.
-        for raw in mount_options.keys():
-            name = str(raw)
-            if name in seen:
-                continue
+        # Walk the three legacy name-keyed surfaces, peel any
+        # ``"name/subpath"`` suffix, and skip keys whose bare-name parses
+        # as a UUID — those represent UUID-keyed entries that
+        # ``_route_legacy_uuid_mounts`` should already have lifted, or
+        # malformed ``<UUID>/<sub>`` inputs outside the legacy contract.
+        for raw in chain(mounts, mount_map.keys(), mount_options.keys()):
+            name, subpath = _split_legacy_mount_key(str(raw))
             try:
                 UUID(name)
                 continue
             except (ValueError, TypeError):
                 pass
+            if subpath is not None:
+                # The same ``-v`` flag populates mounts/mount_map/mount_options
+                # with the same source, so the subpath should agree across all
+                # three; if a caller supplies divergent forms, first-wins.
+                subpath_by_name.setdefault(name, subpath)
+            if name in seen:
+                continue
             seen.add(name)
             names_to_resolve.append(name)
 
         if not names_to_resolve:
-            return {}, name_to_subpath
+            return {}
 
         result = await self._vfolder.resolve_vfolder_ids_by_names.wait_for_complete(
             ResolveIdsByNamesAction(vfolder_names=names_to_resolve)
         )
-        return dict(result.name_to_id), name_to_subpath
+        return {
+            name: LegacyMountResolution(vfid=vfid, subpath=subpath_by_name.get(name))
+            for name, vfid in result.name_to_id.items()
+        }
 
     # ------------------------------------------------------------------
     # create_from_template (POST /_/create-from-template)

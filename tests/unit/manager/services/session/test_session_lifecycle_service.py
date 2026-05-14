@@ -27,6 +27,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.api.rest.session.handler import (
+    LegacyMountResolution,
     SessionHandler,
     _merge_resolved_legacy_mounts,
     _route_legacy_uuid_mounts,
@@ -1067,12 +1068,12 @@ class TestCreateFromParams:
             "mount_map": {"vf-a": "/data"},
             "mount_options": {"vf-a": {"permission": "ro", "type": "bind"}},
         }
-        name_to_id, name_to_subpath = await handler._resolve_legacy_name_mounts(
+        resolutions = await handler._resolve_legacy_name_mounts(
             legacy_config["mounts"],
             legacy_config["mount_map"],
             legacy_config["mount_options"],
         )
-        resolved_config = _merge_resolved_legacy_mounts(legacy_config, name_to_id, name_to_subpath)
+        resolved_config = _merge_resolved_legacy_mounts(legacy_config, resolutions)
 
         # Step 2: feed the resolved config to the service and verify it
         # arrives at AgentRegistry.create_session intact.
@@ -1195,15 +1196,16 @@ class TestCreateFromParams:
             "mount_map": {"vf-a": "/data"},
             "mount_options": {},
         }
-        name_to_id, name_to_subpath = await handler._resolve_legacy_name_mounts(
+        resolutions = await handler._resolve_legacy_name_mounts(
             legacy_config["mounts"],
             legacy_config["mount_map"],
             legacy_config["mount_options"],
         )
-        assert name_to_id == {"vf-a": vfid}
-        assert name_to_subpath == {"vf-a": "weights/v2"}
+        assert resolutions == {
+            "vf-a": LegacyMountResolution(vfid=vfid, subpath="weights/v2"),
+        }
 
-        resolved = _merge_resolved_legacy_mounts(legacy_config, name_to_id, name_to_subpath)
+        resolved = _merge_resolved_legacy_mounts(legacy_config, resolutions)
         assert resolved["mount_ids"] == [vfid]
         assert resolved["mount_id_map"] == {vfid: "/data"}
         assert resolved["mount_options"] == {vfid: {"subpath": "weights/v2"}}
@@ -1238,12 +1240,62 @@ class TestCreateFromParams:
         # Step 1: lift UUID-shaped entries onto mount_ids/mount_options.
         routed = _route_legacy_uuid_mounts(legacy_config)
         # Step 2: name resolution + subpath extraction from name-form.
-        name_to_id, name_to_subpath = await handler._resolve_legacy_name_mounts(
+        resolutions = await handler._resolve_legacy_name_mounts(
             routed["mounts"], routed["mount_map"], routed["mount_options"]
         )
         # Step 3: merge — explicit UUID-keyed subpath must persist.
-        merged = _merge_resolved_legacy_mounts(routed, name_to_id, name_to_subpath)
+        merged = _merge_resolved_legacy_mounts(routed, resolutions)
         assert merged["mount_options"][vfid] == {"subpath": "uuid-form-subpath"}
+
+    async def test_legacy_cli_colon_form_carries_dst_and_subpath(self) -> None:
+        """Regression for BA-6022: the v1 CLI flattens ``-v vfname/sub:/dest``
+        into ``mounts=['vfname/sub']`` AND ``mount_map={'vfname/sub': '/dest'}``
+        — the same slash-with-subpath string appears as both a list entry
+        and a dict key. The handler must peel the subpath off both surfaces
+        so the bare name resolves, the destination lands on the UUID-keyed
+        ``mount_id_map``, and the subpath lands on
+        ``mount_options[uuid]['subpath']``."""
+        vfid = UUID("55555555-5555-5555-5555-555555555555")
+
+        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
+            # The bare name must be resolved — not the slashed source.
+            assert list(action.vfolder_names) == ["vf-a"]
+            return ResolveIdsByNamesActionResult(name_to_id={"vf-a": vfid})
+
+        resolver = MagicMock()
+        resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
+        vfolder_pkg = MagicMock()
+        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
+        handler = SessionHandler.__new__(SessionHandler)
+        handler._vfolder = vfolder_pkg
+
+        # Shape produced by ``prepare_mount_arg("vf-a/weights/v2:/data")``.
+        legacy_config: dict[str, Any] = {
+            "mounts": ["vf-a/weights/v2"],
+            "mount_map": {"vf-a/weights/v2": "/data"},
+            "mount_options": {"vf-a/weights/v2": {"permission": "ro"}},
+        }
+        resolutions = await handler._resolve_legacy_name_mounts(
+            legacy_config["mounts"],
+            legacy_config["mount_map"],
+            legacy_config["mount_options"],
+        )
+        assert resolutions == {
+            "vf-a": LegacyMountResolution(vfid=vfid, subpath="weights/v2"),
+        }
+
+        resolved = _merge_resolved_legacy_mounts(legacy_config, resolutions)
+        assert resolved["mount_ids"] == [vfid]
+        # The destination from ``vf-a/weights/v2:/data`` must survive
+        # the re-keying onto the UUID-keyed mount_id_map.
+        assert resolved["mount_id_map"] == {vfid: "/data"}
+        # Pre-existing options (permission) merge with the parsed subpath.
+        assert resolved["mount_options"][vfid] == {
+            "permission": "ro",
+            "subpath": "weights/v2",
+        }
+        assert "mounts" not in resolved
+        assert "mount_map" not in resolved
 
     async def test_owner_access_key_uses_owner_user_scope(
         self,
