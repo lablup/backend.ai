@@ -2,7 +2,6 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
@@ -11,10 +10,6 @@ from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
-)
-from ai.backend.manager.services.model_serving.actions.create_model_service import (
-    CreateModelServiceAction,
-    CreateModelServiceActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
@@ -70,10 +65,6 @@ from ai.backend.manager.services.model_serving.services.model_serving import (
 
 
 class ModelServingProcessors(AbstractProcessorPackage):
-    # Scope actions (with RBAC)
-    create_model_service: ScopeActionProcessor[
-        CreateModelServiceAction, CreateModelServiceActionResult
-    ]
     list_model_service: ActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
     search_services: ActionProcessor[SearchServicesAction, SearchServicesActionResult]
 
@@ -104,10 +95,6 @@ class ModelServingProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        # Scope actions with RBAC validator
-        self.create_model_service = ScopeActionProcessor(
-            service.create, action_monitors, validators=[validators.rbac.scope]
-        )
         self.list_model_service = ActionProcessor(service.list_serve, action_monitors)
         self.search_services = ActionProcessor(service.search_services, action_monitors)
 
@@ -154,7 +141,6 @@ class ModelServingProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
-            CreateModelServiceAction.spec(),
             ListModelServiceAction.spec(),
             DeleteModelServiceAction.spec(),
             DryRunModelServiceAction.spec(),
