@@ -375,10 +375,18 @@ def _merge_resolved_legacy_mounts(
             if "subpath" not in existing_opts:
                 merged_mount_options[vfid] = {**existing_opts, "subpath": res.subpath}
 
+    # Drop any leftover name-keyed entries from ``mount_options`` — once
+    # they have been re-keyed onto the resolved UUID, the original
+    # name-keyed copy is dead weight that downstream consumers (which
+    # look up by UUID only) would never read.
+    uuid_keyed_mount_options: dict[UUID, Any] = {
+        k: v for k, v in merged_mount_options.items() if isinstance(k, UUID)
+    }
+
     next_config = dict(creation_config)
     next_config["mount_ids"] = merged_mount_ids
     next_config["mount_id_map"] = merged_mount_id_map
-    next_config["mount_options"] = merged_mount_options
+    next_config["mount_options"] = uuid_keyed_mount_options
     next_config.pop("mounts", None)
     next_config.pop("mount_map", None)
     return next_config
