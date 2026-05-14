@@ -35,7 +35,6 @@ if TYPE_CHECKING:
 __all__ = [
     "EndpointAccessValidationData",
     "EndpointAutoScalingRuleData",
-    "EndpointAutoScalingRuleListResult",
     "EndpointData",
     "EndpointLifecycle",
     "EndpointTokenData",
@@ -142,16 +141,6 @@ class EndpointAutoScalingRuleData:
 
 
 @dataclass
-class EndpointAutoScalingRuleListResult:
-    """Search result with total count for endpoint auto scaling rules."""
-
-    items: list[EndpointAutoScalingRuleData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass
 class UserData:
     uuid: uuid.UUID
     email: str
@@ -215,13 +204,6 @@ class RouteInfo:
     route_id: uuid.UUID
     session_id: uuid.UUID | None
     traffic_ratio: float
-
-
-@dataclass
-class RouteConnectionInfo:
-    app: str
-    kernel_host: str
-    kernel_port: int
 
 
 @dataclass(frozen=True)
@@ -310,16 +292,6 @@ class ServiceSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-
-@dataclass
-class RequesterCtx:
-    """Deprecated: Use UserData from ai.backend.common.data.user.types instead."""
-
-    is_authorized: bool | None
-    user_id: uuid.UUID
-    user_role: UserRole
-    domain_name: str
 
 
 @dataclass
