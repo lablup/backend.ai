@@ -93,14 +93,15 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
 class DomainRow(Base):  # type: ignore[misc]
     __tablename__ = "domains"
 
-    id: Mapped[DomainID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
-    )
     name: Mapped[str] = mapped_column(
-        "name",
-        SlugType(length=64, allow_unicode=True, allow_dot=True),
+        "name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True
+    )
+    id: Mapped[DomainID] = mapped_column(
+        "id",
+        GUID,
         nullable=False,
         unique=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)

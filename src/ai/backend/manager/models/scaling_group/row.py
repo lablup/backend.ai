@@ -268,10 +268,14 @@ def _get_resource_preset_join_condition() -> Any:
 
 class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
+    name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
     id: Mapped[ResourceGroupID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id",
+        GUID,
+        nullable=False,
+        unique=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
-    name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool | None] = mapped_column(
         "is_active", sa.Boolean, index=True, default=True

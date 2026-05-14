@@ -1,13 +1,10 @@
-"""add ``id`` UUID column to ``scaling_groups`` and demote ``name`` to unique
+"""add ``id`` UUID column to ``scaling_groups``
 
-Adds a UUID ``id`` column as the new primary key of the ``scaling_groups``
-table. The legacy ``name`` column becomes a UNIQUE column so existing
-foreign-key references continue to function.
-
-PostgreSQL tracks foreign-key dependencies on the primary-key index, so the
-swap requires temporarily dropping and recreating every FK that points to
-``scaling_groups.name``. The FK definitions are restored with identical
-semantics (column, target column, and ON UPDATE/DELETE rules unchanged).
+Adds a UUID ``id`` column to the ``scaling_groups`` table as a UNIQUE
+alternate key. The existing ``name`` column remains the primary key in
+this migration; the PK swap is deferred to the FK migration step so it
+can land atomically with the FK column transition (``scaling_group`` /
+``resource_group`` → ``scaling_group_id``).
 
 Revision ID: b2d4f6e8c1a3
 Revises: a1c3e5d7b9f2
@@ -16,8 +13,6 @@ Create Date: 2026-05-15
 """
 
 # Part of: 26.5.0
-
-from dataclasses import dataclass
 
 import sqlalchemy as sa
 from alembic import op
@@ -31,56 +26,6 @@ branch_labels = None
 depends_on = None
 
 
-@dataclass(frozen=True)
-class _FKRef:
-    table: str
-    constraint: str
-    column: str
-    on_update: str | None
-    on_delete: str | None
-
-
-_SCALING_GROUP_FK_REFS: tuple[_FKRef, ...] = (
-    _FKRef("agents", "fk_agents_scaling_group_scaling_groups", "scaling_group", None, None),
-    _FKRef(
-        "endpoints",
-        "fk_endpoints_resource_group_scaling_groups",
-        "resource_group",
-        None,
-        "RESTRICT",
-    ),
-    _FKRef("kernels", "fk_kernels_scaling_group_scaling_groups", "scaling_group", None, None),
-    _FKRef(
-        "sessions",
-        "fk_sessions_scaling_group_name_scaling_groups",
-        "scaling_group_name",
-        None,
-        None,
-    ),
-    _FKRef(
-        "sgroups_for_domains",
-        "fk_sgroups_for_domains_scaling_group_scaling_groups",
-        "scaling_group",
-        "CASCADE",
-        "CASCADE",
-    ),
-    _FKRef(
-        "sgroups_for_groups",
-        "fk_sgroups_for_groups_scaling_group_scaling_groups",
-        "scaling_group",
-        "CASCADE",
-        "CASCADE",
-    ),
-    _FKRef(
-        "sgroups_for_keypairs",
-        "fk_sgroups_for_keypairs_scaling_group_scaling_groups",
-        "scaling_group",
-        "CASCADE",
-        "CASCADE",
-    ),
-)
-
-
 def upgrade() -> None:
     op.add_column(
         "scaling_groups",
@@ -91,42 +36,9 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-
-    for ref in _SCALING_GROUP_FK_REFS:
-        op.drop_constraint(ref.constraint, ref.table, type_="foreignkey")
-
-    op.create_unique_constraint("uq_scaling_groups_name", "scaling_groups", ["name"])
-    op.drop_constraint("pk_scaling_groups", "scaling_groups", type_="primary")
-    op.create_primary_key("pk_scaling_groups", "scaling_groups", ["id"])
-
-    for ref in _SCALING_GROUP_FK_REFS:
-        op.create_foreign_key(
-            ref.constraint,
-            ref.table,
-            "scaling_groups",
-            [ref.column],
-            ["name"],
-            onupdate=ref.on_update,
-            ondelete=ref.on_delete,
-        )
+    op.create_unique_constraint("uq_scaling_groups_id", "scaling_groups", ["id"])
 
 
 def downgrade() -> None:
-    for ref in _SCALING_GROUP_FK_REFS:
-        op.drop_constraint(ref.constraint, ref.table, type_="foreignkey")
-
-    op.drop_constraint("pk_scaling_groups", "scaling_groups", type_="primary")
-    op.drop_constraint("uq_scaling_groups_name", "scaling_groups", type_="unique")
-    op.create_primary_key("pk_scaling_groups", "scaling_groups", ["name"])
+    op.drop_constraint("uq_scaling_groups_id", "scaling_groups", type_="unique")
     op.drop_column("scaling_groups", "id")
-
-    for ref in _SCALING_GROUP_FK_REFS:
-        op.create_foreign_key(
-            ref.constraint,
-            ref.table,
-            "scaling_groups",
-            [ref.column],
-            ["name"],
-            onupdate=ref.on_update,
-            ondelete=ref.on_delete,
-        )

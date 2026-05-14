@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
@@ -47,6 +48,7 @@ def _make_domain_data(
 ) -> DomainData:
     now = datetime.now(tz=UTC)
     return DomainData(
+        id=DomainID(uuid.uuid4()),
         name=name,
         description=description,
         is_active=is_active,
