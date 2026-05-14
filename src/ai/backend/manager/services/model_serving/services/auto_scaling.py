@@ -169,4 +169,3 @@ class AutoScalingService:
         return DeleteEndpointAutoScalingRuleActionResult(
             success=True,
         )
-
