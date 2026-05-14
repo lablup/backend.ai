@@ -44,6 +44,7 @@ from ai.backend.client.utils import (
 from ai.backend.client.utils import dedent as _d
 from ai.backend.client.versioning import get_id_or_name, get_naming
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import ClusterMode, SessionTypes
 
 from .base import BaseFunction, api_function
@@ -210,7 +211,7 @@ class ComputeSession(BaseFunction):
         mount_map: Mapping[str, str] | None = None,
         mount_ids: list[UUID] | None = None,
         mount_id_map: Mapping[UUID, str] | None = None,
-        mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        mount_options: Mapping[str, MountOption] | None = None,
         envs: Mapping[str, str] | None = None,
         startup_command: str | None = None,
         batch_timeout: str | int | None = None,
@@ -365,7 +366,9 @@ class ComputeSession(BaseFunction):
             params["config"].update({
                 "mount_map": mount_map,
                 "mount_id_map": mount_id_map,
-                "mount_options": mount_options,
+                "mount_options": {
+                    k: v.model_dump(exclude_none=True) for k, v in mount_options.items()
+                },
                 "preopen_ports": preopen_ports,
             })
             if assign_agent is not None:
@@ -1421,7 +1424,7 @@ class InferenceSession(BaseFunction):
         callback_url: str | None = None,
         mounts: list[str] | None = None,
         mount_map: Mapping[str, str] | None = None,
-        mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        mount_options: Mapping[str, MountOption] | None = None,
         mount_ids: list[UUID] | None = None,
         mount_id_map: Mapping[UUID, str] | None = None,
         envs: Mapping[str, str] | None = None,

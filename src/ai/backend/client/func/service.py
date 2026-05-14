@@ -19,10 +19,7 @@ from ai.backend.common.types import RuntimeVariant
 
 from .base import BaseFunction, api_function
 
-__all__ = (
-    "MountOption",
-    "Service",
-)
+__all__ = ("Service",)
 
 
 _default_fields: Sequence[FieldSpec] = (
