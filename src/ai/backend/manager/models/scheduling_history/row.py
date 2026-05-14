@@ -11,7 +11,12 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentHistoryData,
+    RouteHandlerCategory,
+    RouteHealthStatus,
     RouteHistoryData,
+    RouteStatus,
+    RouteSubStatus,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.data.kernel.types import (
     KernelSchedulingHistoryData,
@@ -252,19 +257,36 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
         "deployment_id", GUID, nullable=False, index=True
     )
 
-    category: Mapped[str] = mapped_column(
-        "category", sa.String(length=32), nullable=False, server_default=sa.text("'lifecycle'")
+    category: Mapped[RouteHandlerCategory] = mapped_column(
+        "category",
+        StrEnumType(RouteHandlerCategory),
+        nullable=False,
+        server_default=sa.text("'lifecycle'"),
     )
     phase: Mapped[str] = mapped_column("phase", sa.String(length=64), nullable=False)
-    from_status: Mapped[str | None] = mapped_column(
-        "from_status", sa.String(length=64), nullable=True
+    from_status: Mapped[RouteStatus | None] = mapped_column(
+        "from_status", StrEnumType(RouteStatus, use_name=False), nullable=True
     )
-    to_status: Mapped[str | None] = mapped_column("to_status", sa.String(length=64), nullable=True)
-    from_health_status: Mapped[str | None] = mapped_column(
-        "from_health_status", sa.String(length=64), nullable=True
+    to_status: Mapped[RouteStatus | None] = mapped_column(
+        "to_status", StrEnumType(RouteStatus, use_name=False), nullable=True
     )
-    to_health_status: Mapped[str | None] = mapped_column(
-        "to_health_status", sa.String(length=64), nullable=True
+    from_health_status: Mapped[RouteHealthStatus | None] = mapped_column(
+        "from_health_status", StrEnumType(RouteHealthStatus), nullable=True
+    )
+    to_health_status: Mapped[RouteHealthStatus | None] = mapped_column(
+        "to_health_status", StrEnumType(RouteHealthStatus), nullable=True
+    )
+    from_sub_status: Mapped[RouteSubStatus | None] = mapped_column(
+        "from_sub_status", StrEnumType(RouteSubStatus, use_name=False), nullable=True
+    )
+    to_sub_status: Mapped[RouteSubStatus | None] = mapped_column(
+        "to_sub_status", StrEnumType(RouteSubStatus, use_name=False), nullable=True
+    )
+    from_traffic_status: Mapped[RouteTrafficStatus | None] = mapped_column(
+        "from_traffic_status", StrEnumType(RouteTrafficStatus, use_name=False), nullable=True
+    )
+    to_traffic_status: Mapped[RouteTrafficStatus | None] = mapped_column(
+        "to_traffic_status", StrEnumType(RouteTrafficStatus, use_name=False), nullable=True
     )
 
     result: Mapped[str] = mapped_column("result", sa.String(length=32), nullable=False)
@@ -300,6 +322,7 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
 
         Merge conditions:
         - Same category, phase, error_code
+        - No change in sub_status or traffic_status
         - For lifecycle category: same to_status
         - For health category: same to_health_status
         """
@@ -307,26 +330,29 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
             return False
         if self.phase != new_row.phase or self.error_code != new_row.error_code:
             return False
-        if self.category == "health":
+        if self.to_sub_status != new_row.to_sub_status:
+            return False
+        if self.to_traffic_status != new_row.to_traffic_status:
+            return False
+        if self.category == RouteHandlerCategory.HEALTH:
             return self.to_health_status == new_row.to_health_status
         return self.to_status == new_row.to_status
 
     def to_data(self) -> RouteHistoryData:
-        # API exposes unified from_status/to_status based on category
-        if self.category == "health":
-            from_val = self.from_health_status
-            to_val = self.to_health_status
-        else:
-            from_val = self.from_status
-            to_val = self.to_status
         return RouteHistoryData(
             id=self.id,
             route_id=self.route_id,
             deployment_id=self.deployment_id,
             category=self.category,
             phase=self.phase,
-            from_status=from_val,
-            to_status=to_val,
+            from_status=self.from_status,
+            to_status=self.to_status,
+            from_health_status=self.from_health_status,
+            to_health_status=self.to_health_status,
+            from_sub_status=self.from_sub_status,
+            to_sub_status=self.to_sub_status,
+            from_traffic_status=self.from_traffic_status,
+            to_traffic_status=self.to_traffic_status,
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,

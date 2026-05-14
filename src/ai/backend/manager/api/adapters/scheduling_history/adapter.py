@@ -758,8 +758,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
             deployment_id=data.deployment_id,
             category=data.category,
             phase=data.phase,
-            from_status=data.from_status,
-            to_status=data.to_status,
+            from_status=data.from_status.value if data.from_status else None,
+            to_status=data.to_status.value if data.to_status else None,
+            from_health_status=data.from_health_status.value if data.from_health_status else None,
+            to_health_status=data.to_health_status.value if data.to_health_status else None,
+            from_sub_status=data.from_sub_status.value if data.from_sub_status else None,
+            to_sub_status=data.to_sub_status.value if data.to_sub_status else None,
+            from_traffic_status=data.from_traffic_status.value
+            if data.from_traffic_status
+            else None,
+            to_traffic_status=data.to_traffic_status.value if data.to_traffic_status else None,
             result=data.result.value,
             error_code=data.error_code,
             message=data.message,

@@ -265,23 +265,26 @@ class DeploymentTargetStatuses:
 
 @dataclass(frozen=True)
 class RouteTargetStatuses:
-    """Target statuses for route handler filtering (lifecycle x health x traffic).
+    """Target statuses for route handler filtering.
 
-    ``traffic=None`` skips the traffic-status predicate. Pass a non-empty list
-    to restrict to specific ``RouteTrafficStatus`` values.
+    Each axis is optional — ``None`` skips that predicate entirely.
+    Pass a non-empty list to restrict to specific values on that axis.
     """
 
-    lifecycle: list[RouteStatus]
-    health: list[RouteHealthStatus]
+    lifecycle: list[RouteStatus] | None = None
+    health: list[RouteHealthStatus] | None = None
     traffic: list[RouteTrafficStatus] | None = None
+    sub_status: list[RouteSubStatus] | None = None
 
 
 @dataclass(frozen=True)
 class RouteTransitionTarget:
-    """Target state for a route transition (lifecycle + health)."""
+    """Target state for a route transition."""
 
     status: RouteStatus | None = None
     health_status: RouteHealthStatus | None = None
+    sub_status: RouteSubStatus | None = None
+    traffic_status: RouteTrafficStatus | None = None
 
 
 @dataclass(frozen=True)
@@ -1145,21 +1148,22 @@ class DeploymentHistoryData:
 
 @dataclass
 class RouteHistoryData:
-    """Domain model for route history.
-
-    from_status/to_status contain the relevant status for the category:
-    - category=lifecycle: lifecycle status values (provisioning, running, etc.)
-    - category=health: health status values (healthy, unhealthy, etc.)
-    """
+    """Domain model for route history."""
 
     id: UUID
     route_id: UUID
     deployment_id: UUID
 
-    category: str  # RouteHandlerCategory value
+    category: RouteHandlerCategory
     phase: str  # RouteLifecycleType value
-    from_status: str | None
-    to_status: str | None
+    from_status: RouteStatus | None
+    to_status: RouteStatus | None
+    from_health_status: RouteHealthStatus | None
+    to_health_status: RouteHealthStatus | None
+    from_sub_status: RouteSubStatus | None
+    to_sub_status: RouteSubStatus | None
+    from_traffic_status: RouteTrafficStatus | None
+    to_traffic_status: RouteTrafficStatus | None
 
     result: SchedulingResult
     error_code: str | None

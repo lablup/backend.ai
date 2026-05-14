@@ -68,6 +68,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHandlerCategory,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
@@ -641,6 +642,17 @@ class DeploymentRepository:
         unbounded scans).
         """
         return await self._db_source.search_route_datas(querier=querier)
+
+    async def search_route_datas_with_last_history(
+        self,
+        *,
+        querier: BatchQuerier,
+        category: RouteHandlerCategory,
+    ) -> list[RouteData]:
+        """Search routes with last history per category attached."""
+        return await self._db_source.search_route_datas_with_last_history(
+            querier=querier, category=category
+        )
 
     @deployment_repository_resilience.apply()
     async def update_route_status_bulk(

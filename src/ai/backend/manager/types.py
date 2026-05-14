@@ -120,6 +120,13 @@ class TriState[TVal]:
         return cls.update(value)
 
     @classmethod
+    def from_nullable(cls, value: TVal | None) -> TriState[TVal]:
+        """None → nop (leave unchanged, not nullify), value → update."""
+        if value is None:
+            return cls.nop()
+        return cls.update(value)
+
+    @classmethod
     def update(cls, value: TVal) -> TriState[TVal]:
         return cls(state=_TriStateEnum.UPDATE, value=value)
 
@@ -208,6 +215,13 @@ class OptionalState[TVal]:
         if value is None:
             raise ValueError("OptionalState cannot be NULLIFY")
         return OptionalState.update(value)
+
+    @classmethod
+    def from_nullable(cls, value: TVal | None) -> OptionalState[TVal]:
+        """None → nop (leave unchanged), value → update."""
+        if value is None:
+            return cls.nop()
+        return cls.update(value)
 
     @classmethod
     def update(cls, value: TVal) -> OptionalState[TVal]:

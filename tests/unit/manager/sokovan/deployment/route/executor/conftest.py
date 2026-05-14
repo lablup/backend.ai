@@ -22,6 +22,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaData,
     RouteHealthStatus,
     RouteStatus,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -200,6 +201,7 @@ def _create_route_data(
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
         revision_id=revision_id or DeploymentRevisionID(uuid4()),
+        traffic_status=RouteTrafficStatus.INACTIVE,
     )
 
 

@@ -22,7 +22,11 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
@@ -43,6 +47,7 @@ def _make_route(
         traffic_ratio=1.0,
         created_at=datetime.fromtimestamp(created_at_ts, tz=tzutc()),
         revision_id=DeploymentRevisionID(uuid4()),
+        traffic_status=RouteTrafficStatus.INACTIVE,
         replica_host="10.0.0.1",
         replica_port=8000,
     )
