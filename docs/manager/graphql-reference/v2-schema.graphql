@@ -6371,6 +6371,17 @@ type ModelReplica implements Node {
   """Whether the replica is actively receiving traffic."""
   activenessStatus: ActivenessStatus!
 
+  """
+  Added in UNRELEASED. Provisioning status of the replica (mirrors the underlying route status).
+  """
+  status: ReplicaStatus!
+
+  """Added in UNRELEASED. Traffic status of the replica."""
+  trafficStatus: TrafficStatus!
+
+  """Added in UNRELEASED. Health check status of the replica."""
+  healthStatus: ReplicaHealthStatus!
+
   """Timestamp when the replica was created."""
   createdAt: DateTime!
 
@@ -9860,6 +9871,16 @@ input ReplicaFilter {
   NOT: [ReplicaFilter!] = null
 }
 
+"""
+Added in UNRELEASED. This enum represents the health check status of a replica.
+"""
+enum ReplicaHealthStatus {
+  NOT_CHECKED
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
+}
+
 """Added in 25.19.0. """
 input ReplicaOrderBy {
   field: ReplicaOrderField!
@@ -9876,6 +9897,7 @@ Added in 25.19.0. Represents the current replica state of a deployment, includin
 """
 type ReplicaState {
   desiredReplicaCount: Int!
+  replicaIds: [UUID!]!
 }
 
 """
