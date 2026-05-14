@@ -105,6 +105,7 @@ def _make_deployment_metadata(**kwargs: object) -> DeploymentMetadataInfoDTO:
         "name": "test-deployment",
         "status": ModelDeploymentStatus.READY,
         "tags": [],
+        "resource_group": "default",
         "created_at": now,
         "updated_at": now,
     }

@@ -231,6 +231,12 @@ class ModelDeploymentMetadata:
     tags: list[str]
     created_at: datetime
     updated_at: datetime
+    resource_group: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Name of the resource group (scaling group) this deployment runs in.",
+        )
+    )
 
     @gql_field(
         description="The project of this entity.",

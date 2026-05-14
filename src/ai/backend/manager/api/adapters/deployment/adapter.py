@@ -2178,6 +2178,7 @@ class DeploymentAdapter(BaseAdapter):
                 name=data.metadata.name,
                 status=data.metadata.status,
                 tags=data.metadata.tags,
+                resource_group=data.metadata.resource_group,
                 created_at=data.metadata.created_at,
                 updated_at=data.metadata.updated_at,
             ),
