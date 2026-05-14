@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Final, Self
@@ -190,18 +190,22 @@ class KernelLiveStatBatchResult:
         response: PrometheusResponse,
         *,
         value_type: str | None = None,
-    ) -> Iterator[tuple[KernelId, MetricName, LiveStatRawValue]]:
+    ) -> list[tuple[KernelId, MetricName, LiveStatRawValue]]:
+        samples: list[tuple[KernelId, MetricName, LiveStatRawValue]] = []
         for metric in response.data.result:
             info = metric.metric
+            # The instant query mixes value_type=current and capacity in one response; this filter picks one.
             if value_type is not None and info.value_type != value_type:
                 continue
+            # Skip rows missing the (kernel, metric_name) identity or carrying no sample at all.
             if info.kernel_id is None or info.container_metric_name is None or not metric.values:
                 continue
+            # Skip when the kernel_id label is not a parseable UUID (defensive against malformed series).
             try:
                 kernel_id = KernelId(UUID(info.kernel_id))
             except ValueError:
                 continue
-            # Instant queries are normalized into a one-element list, and range
-            # queries are ordered by time, so the last sample is the newest one.
+            # Instant queries return a one-element list; range queries are time-ordered, so [-1] is newest.
             _, raw_value = metric.values[-1]
-            yield kernel_id, info.container_metric_name, raw_value
+            samples.append((kernel_id, info.container_metric_name, raw_value))
+        return samples
