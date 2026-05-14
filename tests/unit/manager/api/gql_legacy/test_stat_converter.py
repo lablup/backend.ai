@@ -224,6 +224,31 @@ class TestCapacitySentinel:
         )
         assert per_metric["io_read"]["capacity"] == CAPACITY_SENTINEL
 
+    @pytest.fixture
+    def sentinel_raw_with_reported_capacity(
+        self, kernel_id: KernelId
+    ) -> KernelLiveStatBatchResult:
+        return _wrap({
+            kernel_id: KernelLiveStatValues(
+                instant_current={"net_rx": "0"},
+                instant_capacity={"net_rx": "9999"},
+            ),
+        })
+
+    def test_sentinel_overrides_reported_capacity(
+        self,
+        kernel_id: KernelId,
+        sentinel_raw_with_reported_capacity: KernelLiveStatBatchResult,
+    ) -> None:
+        """Agent may emit a bogus capacity sample for unbounded metrics
+        (initialized via `measure.value`); the converter must overwrite it
+        with the sentinel rather than preserve the meaningless value."""
+        per_metric = _per_metric(
+            LegacyLiveStatConverter.convert([kernel_id], sentinel_raw_with_reported_capacity),
+            kernel_id,
+        )
+        assert per_metric["net_rx"]["capacity"] == CAPACITY_SENTINEL
+
 
 class TestUnknownMetric:
     """An unregistered metric falls back to its own name as the unit_hint

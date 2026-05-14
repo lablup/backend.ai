@@ -109,8 +109,10 @@ class LegacyLiveStatConverter:
         max_value = values.rate_max.get(name) or values.max.get(name)
         avg_value = values.rate_avg.get(name) or values.avg.get(name)
 
-        # Synthesize capacity for unbounded metrics that don't expose one.
-        if capacity is None and current is not None and name in CAPACITY_SENTINEL_METRICS:
+        # Force capacity sentinel for unbounded metrics. The agent may emit a
+        # non-null `capacity` sample for these (initialized from `measure.value`),
+        # but the value has no meaning as a ceiling, so we always overwrite.
+        if current is not None and name in CAPACITY_SENTINEL_METRICS:
             capacity = CAPACITY_SENTINEL
 
         if current is not None:
