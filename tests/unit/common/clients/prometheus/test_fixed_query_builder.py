@@ -124,8 +124,8 @@ class TestGetContainerLiveStatQueries:
 
         result = builder.get_container_live_stat_queries([kid])
 
-        assert "sum by (kernel_id,container_metric_name)" in result.max.render()
-        assert "sum by (kernel_id,container_metric_name)" in result.avg.render()
+        assert "sum by (container_metric_name,kernel_id)" in result.max.render()
+        assert "sum by (container_metric_name,kernel_id)" in result.avg.render()
         assert 'value_type="current"' in result.max.render()
         assert 'value_type="current"' in result.avg.render()
         assert "rate(" not in result.max.render()
@@ -138,11 +138,11 @@ class TestGetContainerLiveStatQueries:
         result = builder.get_container_live_stat_queries([kid])
 
         assert (
-            "max_over_time((sum by (kernel_id,container_metric_name)(rate("
+            "max_over_time((sum by (container_metric_name,kernel_id)(rate("
             in result.rate_max.render()
         )
         assert (
-            "avg_over_time((sum by (kernel_id,container_metric_name)(rate("
+            "avg_over_time((sum by (container_metric_name,kernel_id)(rate("
             in result.rate_avg.render()
         )
         assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in result.rate_max.render()

@@ -822,7 +822,7 @@ class TestContainerLiveStatQueries:
         rendered = queries.instant.render()
 
         assert "backendai_container_utilization" in rendered
-        assert "sum by (kernel_id,container_metric_name,value_type)" in rendered
+        assert "sum by (container_metric_name,kernel_id,value_type)" in rendered
         assert 'value_type=~"current|capacity"' in rendered
         assert "pct" not in rendered
 
@@ -831,7 +831,7 @@ class TestContainerLiveStatQueries:
 
         assert "label_replace" not in rendered
         assert "max_over_time" in rendered
-        assert "sum by (kernel_id,container_metric_name)" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
         assert 'value_type="current"' in rendered
         assert "rate(" not in rendered
         assert "backendai_container_utilization" in rendered
@@ -841,7 +841,7 @@ class TestContainerLiveStatQueries:
 
         assert "label_replace" not in rendered
         assert "max_over_time" in rendered
-        assert "sum by (kernel_id,container_metric_name)" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
         assert "rate(" in rendered
         assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
         assert 'value_type="current"' in rendered
@@ -851,7 +851,7 @@ class TestContainerLiveStatQueries:
 
         assert "label_replace" not in rendered
         assert "avg_over_time" in rendered
-        assert "sum by (kernel_id,container_metric_name)" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
         assert 'value_type="current"' in rendered
         assert "rate(" not in rendered
         assert "backendai_container_utilization" in rendered
@@ -861,7 +861,7 @@ class TestContainerLiveStatQueries:
 
         assert "label_replace" not in rendered
         assert "avg_over_time" in rendered
-        assert "sum by (kernel_id,container_metric_name)" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
         assert "rate(" in rendered
         assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
         assert 'value_type="current"' in rendered
