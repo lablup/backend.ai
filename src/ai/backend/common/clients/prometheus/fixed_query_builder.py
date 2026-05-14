@@ -31,6 +31,42 @@ _DIFF_TEMPLATE: Final[str] = (
     f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
 )
 
+_LIVE_STAT_RATE_METRICS: Final[frozenset[str]] = RATE_METRICS | DIFF_METRICS
+
+_LIVE_STAT_INSTANT_TEMPLATE: Final[str] = (
+    f"sum by (kernel_id,container_metric_name,value_type)({CONTAINER_UTILIZATION_METRIC_NAME}"
+    '{{kernel_id=~"{kernel_ids}",value_type=~"{value_types}"}})'
+)
+
+_LIVE_STAT_RATE_CURRENT_TEMPLATE: Final[str] = (
+    f"sum by (kernel_id,container_metric_name)(rate("
+    f"{CONTAINER_UTILIZATION_METRIC_NAME}"
+    '{{kernel_id=~"{kernel_ids}",container_metric_name=~"{metric_names}",value_type="{value_type}"}}'
+    "[{window}]))"
+)
+
+_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = (
+    f"max_over_time(({_LIVE_STAT_RATE_CURRENT_TEMPLATE})[{{window}}:])"
+)
+
+_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = (
+    f"avg_over_time(({_LIVE_STAT_RATE_CURRENT_TEMPLATE})[{{window}}:])"
+)
+
+_LIVE_STAT_MAX_TEMPLATE: Final[str] = (
+    "max_over_time(("
+    f"sum by (kernel_id,container_metric_name)({CONTAINER_UTILIZATION_METRIC_NAME}"
+    '{{kernel_id=~"{kernel_ids}",value_type="{value_type}"}}'
+    "))[{window}:])"
+)
+
+_LIVE_STAT_AVG_TEMPLATE: Final[str] = (
+    "avg_over_time(("
+    f"sum by (kernel_id,container_metric_name)({CONTAINER_UTILIZATION_METRIC_NAME}"
+    '{{kernel_id=~"{kernel_ids}",value_type="{value_type}"}}'
+    "))[{window}:])"
+)
+
 
 @dataclass(frozen=True)
 class LabelValuesQuery:
@@ -44,38 +80,6 @@ def _regex_union(values: Sequence[str]) -> str:
 
 def _value_type_regex(value_types: Sequence[ValueType]) -> str:
     return _regex_union([value_type.value for value_type in value_types])
-
-
-_LIVE_STAT_INSTANT_TEMPLATE: Final[str] = (
-    f"sum by (kernel_id,container_metric_name,value_type)({CONTAINER_UTILIZATION_METRIC_NAME}"
-    '{{kernel_id=~"{kernel_ids}",value_type=~"{value_types}"}})'
-)
-_LIVE_STAT_RATE_METRICS: Final[frozenset[str]] = RATE_METRICS | DIFF_METRICS
-
-_LIVE_STAT_RATE_CURRENT_TEMPLATE: Final[str] = (
-    f"sum by (kernel_id,container_metric_name)(rate("
-    f"{CONTAINER_UTILIZATION_METRIC_NAME}"
-    '{{kernel_id=~"{kernel_ids}",container_metric_name=~"{metric_names}",value_type="{value_type}"}}'
-    "[{window}]))"
-)
-_LIVE_STAT_MAX_TEMPLATE: Final[str] = (
-    "max_over_time(("
-    f"sum by (kernel_id,container_metric_name)({CONTAINER_UTILIZATION_METRIC_NAME}"
-    '{{kernel_id=~"{kernel_ids}",value_type="{value_type}"}}'
-    "))[{window}:])"
-)
-_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = (
-    f"max_over_time(({_LIVE_STAT_RATE_CURRENT_TEMPLATE})[{{window}}:])"
-)
-_LIVE_STAT_AVG_TEMPLATE: Final[str] = (
-    "avg_over_time(("
-    f"sum by (kernel_id,container_metric_name)({CONTAINER_UTILIZATION_METRIC_NAME}"
-    '{{kernel_id=~"{kernel_ids}",value_type="{value_type}"}}'
-    "))[{window}:])"
-)
-_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = (
-    f"avg_over_time(({_LIVE_STAT_RATE_CURRENT_TEMPLATE})[{{window}}:])"
-)
 
 
 class FixedQueryBuilder:
