@@ -184,7 +184,7 @@ class DeploymentMetadataInput(BaseRequestModel):
 
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
-    resource_group: ResourceGroupName = Field(description="Resource group name")
+    resource_group_name: ResourceGroupName = Field(description="Resource group name")
     name: str | None = Field(default=None, description="Deployment name")
     tags: list[str] | None = Field(default=None, description="Tags for the deployment")
 

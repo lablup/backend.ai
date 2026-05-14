@@ -169,7 +169,7 @@ def create(
         metadata=ModelDeploymentMetadataInput(
             project_id=project_id,
             domain_name=domain_name,
-            resource_group=ResourceGroupName(resource_group),
+            resource_group_name=ResourceGroupName(resource_group),
             name=name,
         ),
         network_access=ModelDeploymentNetworkAccessInput(

@@ -9392,7 +9392,7 @@ input ModelDeploymentMetadataInput
 {
   projectId: ID!
   domainName: String!
-  resourceGroup: String!
+  resourceGroupName: String!
   name: String = null
   tags: [String!] = null
 }
