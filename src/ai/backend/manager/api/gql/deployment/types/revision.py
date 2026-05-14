@@ -383,8 +383,14 @@ class ModelServiceConfigGQL:
     pre_start_actions: list[PreStartActionGQL] = gql_field(
         description="List of pre-start actions to execute before starting the model service."
     )
-    start_command: list[str] | None = gql_field(
-        description="Command to start the model service.", default=None
+    start_command: JSON | None = gql_field(
+        description=(
+            "Command to start the model service. A JSON array (``list[str]``) "
+            "is exec'ed directly as argv; a JSON string is wrapped as "
+            "``[shell, '-c', str]`` by the kernel runner so shell semantics "
+            "(line continuations, ``$VAR`` expansion, pipes) apply."
+        ),
+        default=None,
     )
     shell: str = gql_field(description="Shell configured for the model service.")
     port: int = gql_field(description="Port number for the model service.")
@@ -891,8 +897,14 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
         description="List of pre-start actions to execute before starting the model service.",
         default=None,
     )
-    start_command: list[str] | None = gql_field(
-        description="Command to start the model service.", default=None
+    start_command: JSON | None = gql_field(
+        description=(
+            "Command to start the model service. A JSON array (``list[str]``) "
+            "is exec'ed directly as argv; a JSON string is wrapped as "
+            "``[shell, '-c', str]`` by the kernel runner so shell semantics "
+            "(line continuations, ``$VAR`` expansion, pipes) apply."
+        ),
+        default=None,
     )
     shell: str | None = gql_field(
         description="Shell configured for the model service.", default=None

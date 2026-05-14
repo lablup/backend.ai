@@ -148,7 +148,7 @@ class ModelMetadataInput(BaseRequestModel):
 
 class ModelServiceConfigInput(BaseRequestModel):
     pre_start_actions: list[PreStartAction] | None = None
-    start_command: list[str] | None = None
+    start_command: str | list[str] | None = None
     shell: str | None = None
     port: int | None = None
     health_check: ModelHealthCheckInput | None = None

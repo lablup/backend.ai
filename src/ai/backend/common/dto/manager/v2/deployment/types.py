@@ -299,8 +299,14 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: list[str] | None = Field(
-        default=None, description="Command to start the model service."
+    start_command: str | list[str] | None = Field(
+        default=None,
+        description=(
+            "Command to start the model service. A list is exec'ed directly "
+            "as argv; a string is wrapped as ``[shell, '-c', str]`` by the "
+            "kernel runner so shell semantics (line continuations, ``$VAR`` "
+            "expansion, pipes) apply."
+        ),
     )
     shell: str = Field(
         default="/bin/bash",

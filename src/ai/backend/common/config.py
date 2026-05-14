@@ -14,7 +14,6 @@ from pydantic import (
     AliasChoices,
     ConfigDict,
     Field,
-    field_validator,
 )
 
 from . import validators as tx
@@ -144,16 +143,6 @@ agent_selector_globalconfig_iv = t.Dict({}).allow_extra("*")
 agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 
 
-def _normalize_start_command(value: Any) -> Any:
-    """Coerce legacy ``str`` ``start_command`` into argv list via
-    :func:`shlex.split`. Lists, ``None``, and other types pass through so
-    the schema's strict check rejects them.
-    """
-    if isinstance(value, str):
-        return shlex.split(value)
-    return value
-
-
 model_definition_iv = t.Dict({
     t.Key("models"): t.List(
         t.Dict({
@@ -170,8 +159,9 @@ model_definition_iv = t.Dict({
                         t.Key("args"): t.Dict().allow_extra("*"),
                     })
                 ),
-                t.Key("start_command", default=None): (t.Null | t.String | t.List(t.String))
-                >> _normalize_start_command,
+                # A ``str`` ``start_command`` is preserved as-is so the
+                # kernel runner can wrap it as ``[shell, "-c", str]``.
+                t.Key("start_command", default=None): t.Null | t.String | t.List(t.String),
                 t.Key("shell", default="/bin/bash"): t.String,
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
@@ -258,14 +248,23 @@ class ModelServiceConfig(BaseConfigModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: list[str] | None = Field(
+    start_command: str | list[str] | None = Field(
         default=None,
         description=(
-            "Argv list to start the model service. ``{model_path}`` in any "
-            "token is replaced per-token with the resolved ``model_path`` "
-            "before launch. ``None`` falls back to the image's default CMD."
+            "Command to start the model service. Two forms are accepted: "
+            "an argv list (``list[str]``) which is exec'ed directly, or a "
+            "single shell script string which the kernel runner wraps as "
+            "``[shell, '-c', str]`` (giving the user full shell semantics "
+            "such as line continuations, ``$VAR`` expansion, and pipes). "
+            "``{model_path}`` is replaced with the resolved ``model_path`` "
+            "before launch — per-token for the list form, in-place for the "
+            "string form. ``None`` falls back to the image's default CMD."
         ),
-        examples=[["python", "service.py"], ["vllm", "serve", "{model_path}"]],
+        examples=[
+            ["python", "service.py"],
+            ["vllm", "serve", "{model_path}"],
+            "vllm serve {model_path} --tensor-parallel-size 2",
+        ],
     )
     shell: str = Field(
         default="/bin/bash",
@@ -281,11 +280,6 @@ class ModelServiceConfig(BaseConfigModel):
         default=None,
         description="Health check configuration for the model service.",
     )
-
-    @field_validator("start_command", mode="before")
-    @classmethod
-    def _coerce_start_command(cls, value: Any) -> Any:
-        return _normalize_start_command(value)
 
 
 class ModelMetadata(BaseConfigModel):
@@ -498,7 +492,12 @@ class ModelDefinition(BaseConfigModel):
 
     def with_args_appended(self, args: list[str]) -> ModelDefinition:
         """Return a copy with ``args`` appended to each model's
-        ``service.start_command`` as separate argv tokens.
+        ``service.start_command``.
+
+        For the list form, ``args`` are concatenated as separate argv
+        tokens.  For the string form, ``args`` are shell-quoted via
+        :func:`shlex.join` and appended after a single space so they are
+        parsed by the same shell that runs the user's script.
 
         Models with ``service is None`` are passed through unchanged;
         a model whose ``start_command`` is ``None`` receives ``args``
@@ -512,9 +511,14 @@ class ModelDefinition(BaseConfigModel):
             if model.service is None:
                 new_models.append(model)
                 continue
-            existing = model.service.start_command or []
+            existing = model.service.start_command
+            merged: str | list[str]
+            if isinstance(existing, str):
+                merged = f"{existing} {shlex.join(args)}"
+            else:
+                merged = (existing or []) + args
             new_service = model.service.model_copy(
-                update={"start_command": existing + args},
+                update={"start_command": merged},
             )
             new_models.append(model.model_copy(update={"service": new_service}))
         return self.model_copy(update={"models": new_models})
@@ -548,15 +552,10 @@ class ModelHealthCheckDraft(BaseConfigModel):
 
 class ModelServiceConfigDraft(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
-    start_command: list[str] | None = None
+    start_command: str | list[str] | None = None
     shell: str | None = None
     port: int | None = None
     health_check: ModelHealthCheckDraft | None = None
-
-    @field_validator("start_command", mode="before")
-    @classmethod
-    def _coerce_start_command(cls, value: Any) -> Any:
-        return _normalize_start_command(value)
 
     def to_resolved(self) -> ModelServiceConfig:
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
@@ -583,9 +582,15 @@ class ModelConfigDraft(BaseConfigModel):
             # ``start_command`` are resolved here, at the same moment the
             # draft becomes a strict ``ModelConfig`` and ``model_path`` is
             # finalized. Placeholders therefore never propagate downstream.
-            service.start_command = [
-                token.replace("{model_path}", self.model_path) for token in service.start_command
-            ]
+            if isinstance(service.start_command, str):
+                service.start_command = service.start_command.replace(
+                    "{model_path}", self.model_path
+                )
+            else:
+                service.start_command = [
+                    token.replace("{model_path}", self.model_path)
+                    for token in service.start_command
+                ]
         payload = self.model_dump(exclude_none=True, exclude={"service"})
         payload["service"] = service
         return ModelConfig.model_validate(payload)

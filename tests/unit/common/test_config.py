@@ -304,6 +304,45 @@ class TestModelConfigs:
         assert service is not None
         assert service.start_command == ["my-server", "--bind", "0.0.0.0"]
 
+    def test_to_resolved_preserves_str_start_command(self) -> None:
+        # When ``start_command`` is given as a single shell-script string,
+        # the validator must NOT split it into argv tokens; the kernel
+        # runner is responsible for wrapping it via ``[shell, "-c", str]``.
+        # This protects copy-pasted multi-line vendor recipes (e.g. vLLM)
+        # where backslash-newline must be interpreted by the shell, not
+        # by ``shlex.split``.
+        script = "vllm serve {model_path} \\\n  --tensor-parallel-size 2"
+        draft = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "demo",
+                    "model_path": "/data",
+                    "service": {
+                        "start_command": script,
+                        "port": 8000,
+                    },
+                }
+            ]
+        })
+
+        resolved = draft.to_resolved()
+
+        service = resolved.models[0].service
+        assert service is not None
+        assert isinstance(service.start_command, str)
+        assert service.start_command == ("vllm serve /data \\\n  --tensor-parallel-size 2")
+
+    def test_model_service_config_accepts_str_start_command(self) -> None:
+        # Strict ``ModelServiceConfig`` (post-merge) accepts the str form
+        # too — required so the resolved revision can carry it all the
+        # way to the agent and kernel runner unchanged.
+        service = ModelServiceConfig.model_validate({
+            "start_command": "python -m foo --bar",
+            "port": 8000,
+        })
+
+        assert service.start_command == "python -m foo --bar"
+
 
 class TestModelDefinitionWithArgsAppended:
     @pytest.fixture
@@ -438,3 +477,27 @@ class TestModelDefinitionWithArgsAppended:
         assert first is not None and second is not None
         assert first.start_command == ["a", "--shared", "true"]
         assert second.start_command == ["b", "--shared", "true"]
+
+    async def test_appends_args_to_str_start_command_with_shell_quoting(self) -> None:
+        # Preset ARGS are appended to a string ``start_command`` after a
+        # single space, with each argument passed through ``shlex.join``
+        # so values containing whitespace or quotes are safely parsed by
+        # the same shell that will run the script.
+        definition = ModelDefinition(
+            models=[
+                ModelConfig(
+                    name="demo",
+                    model_path="/models",
+                    service=ModelServiceConfig(
+                        port=8000,
+                        start_command="vllm serve /models",
+                    ),
+                )
+            ]
+        )
+
+        result = definition.with_args_appended(["--prompt", "hello world"])
+
+        service = result.models[0].service
+        assert service is not None
+        assert service.start_command == "vllm serve /models --prompt 'hello world'"
