@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
 
 from ai.backend.common import msgpack
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
@@ -93,7 +93,7 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
 class DomainRow(Base):  # type: ignore[misc]
     __tablename__ = "domains"
 
-    id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[DomainID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column(
@@ -158,7 +158,7 @@ domains = DomainRow.__table__
 
 @dataclass
 class DomainModel(RBACModel[DomainPermission]):
-    id: uuid.UUID
+    id: DomainID
     name: str
     description: str | None
     is_active: bool

@@ -31,6 +31,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     BackendAISchema,
@@ -267,7 +268,7 @@ def _get_resource_preset_join_condition() -> Any:
 
 class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
-    id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[ResourceGroupID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False, unique=True)
@@ -428,7 +429,7 @@ scaling_groups = ScalingGroupRow.__table__
 
 @dataclass
 class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
-    id: uuid.UUID
+    id: ResourceGroupID
     name: str
     description: str | None
     is_active: bool
