@@ -1,0 +1,70 @@
+"""Valkey data types for route health management."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from uuid import UUID
+
+from ai.backend.common.identifier.replica import ReplicaID
+
+
+@dataclass
+class RouteProbeTarget:
+    """Probe configuration for a route stored in Valkey.
+
+    Stored as a hash at key `route_probe:{route_id}`.
+    Written once by the coordinator when the route enters WARMING_UP (host/port available).
+    Read by RouteHealthObserver to know what endpoint to probe.
+    """
+
+    route_id: ReplicaID
+    health_path: str
+    inference_port: int
+    replica_host: str
+
+    def to_valkey_hash(self) -> Mapping[str, str]:
+        return {
+            "route_id": str(self.route_id),
+            "health_path": self.health_path,
+            "inference_port": str(self.inference_port),
+            "replica_host": self.replica_host,
+        }
+
+    @classmethod
+    def from_valkey_hash(cls, data: Mapping[str, str]) -> RouteProbeTarget:
+        return cls(
+            route_id=ReplicaID(UUID(data["route_id"])),
+            health_path=data["health_path"],
+            inference_port=int(data["inference_port"]),
+            replica_host=data["replica_host"],
+        )
+
+
+@dataclass
+class RouteHealthStatus:
+    """Health check result for a route stored in Valkey.
+
+    Stored as a hash at key `route_health:{replica_id}`.
+    Written by RouteHealthObserver after each HTTP probe.
+    Short TTL — key expiry signals DEGRADED (no recent check).
+    """
+
+    replica_id: ReplicaID
+    healthy: bool
+    last_check: int  # Unix timestamp (Redis time)
+
+    def to_valkey_hash(self) -> Mapping[str, str]:
+        return {
+            "replica_id": str(self.replica_id),
+            "healthy": "1" if self.healthy else "0",
+            "last_check": str(self.last_check),
+        }
+
+    @classmethod
+    def from_valkey_hash(cls, data: Mapping[str, str]) -> RouteHealthStatus:
+        return cls(
+            replica_id=ReplicaID(UUID(data["replica_id"])),
+            healthy=data.get("healthy", "0") == "1",
+            last_check=int(data.get("last_check", "0")),
+        )
