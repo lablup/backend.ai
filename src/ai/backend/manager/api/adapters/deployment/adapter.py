@@ -1084,24 +1084,23 @@ class DeploymentAdapter(BaseAdapter):
         runtime variant baseline, vfolder config files, existing
         revision) or by the column server-defaults at DB write time.
         """
-        mounts_creator = VFolderMountsCreator(
-            **(
-                {
-                    "model_vfolder_id": input.model_mount_config.vfolder_id,
-                    "model_definition_path": input.model_mount_config.definition_path,
-                    "model_mount_destination": input.model_mount_config.mount_destination,
-                }
-                if input.model_mount_config is not None
-                else {}
-            ),
-            extra_mounts=[
-                MountInfo(
-                    vfolder_id=m.vfolder_id,
-                    mount_destination=m.mount_destination,
-                    mount_perm=m.mount_perm,
-                )
-                for m in (input.extra_mounts or [])
-            ],
+        extra_mounts = [
+            MountInfo(
+                vfolder_id=m.vfolder_id,
+                mount_destination=m.mount_destination,
+                mount_perm=m.mount_perm,
+            )
+            for m in (input.extra_mounts or [])
+        ]
+        mounts_creator = (
+            VFolderMountsCreator(
+                model_vfolder_id=input.model_mount_config.vfolder_id,
+                model_definition_path=input.model_mount_config.definition_path,
+                model_mount_destination=input.model_mount_config.mount_destination,
+                extra_mounts=extra_mounts,
+            )
+            if input.model_mount_config is not None
+            else VFolderMountsCreator(extra_mounts=extra_mounts)
         )
         adder = ModelRevisionCreator(
             image_id=input.image.id if input.image is not None else None,

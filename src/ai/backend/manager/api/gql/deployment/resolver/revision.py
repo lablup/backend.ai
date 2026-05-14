@@ -110,8 +110,7 @@ async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | 
         added_version="25.16.0", description="Get JSON Schema for inference runtime configuration"
     ),
     deprecation_reason=(
-        f"Deprecated since {NEXT_RELEASE_VERSION}. "
-        "Use the runtime_variant resources instead."
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use the runtime_variant resources instead."
     ),
 )  # type: ignore[misc]
 async def inference_runtime_config(name: str) -> JSON | None:
@@ -139,8 +138,7 @@ async def inference_runtime_config(name: str) -> JSON | None:
         description="Get configuration JSON Schemas for all inference runtimes.",
     ),
     deprecation_reason=(
-        f"Deprecated since {NEXT_RELEASE_VERSION}. "
-        "Use the runtime_variant resources instead."
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use the runtime_variant resources instead."
     ),
 )  # type: ignore[misc]
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON | None:
