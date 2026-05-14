@@ -225,9 +225,7 @@ class TestCapacitySentinel:
         assert per_metric["io_read"]["capacity"] == CAPACITY_SENTINEL
 
     @pytest.fixture
-    def sentinel_raw_with_reported_capacity(
-        self, kernel_id: KernelId
-    ) -> KernelLiveStatBatchResult:
+    def sentinel_raw_with_reported_capacity(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
         return _wrap({
             kernel_id: KernelLiveStatValues(
                 instant_current={"net_rx": "0"},
