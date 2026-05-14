@@ -84,18 +84,8 @@ class RouteHistoryNode(BaseResponseModel):
     phase: str = Field(description="Scheduling phase")
     from_status: str | None = Field(default=None, description="Lifecycle status before transition")
     to_status: str | None = Field(default=None, description="Lifecycle status after transition")
-    from_health_status: str | None = Field(
-        default=None, description="Health status before transition"
-    )
-    to_health_status: str | None = Field(default=None, description="Health status after transition")
     from_sub_status: str | None = Field(default=None, description="Sub-status before transition")
     to_sub_status: str | None = Field(default=None, description="Sub-status after transition")
-    from_traffic_status: str | None = Field(
-        default=None, description="Traffic status before transition"
-    )
-    to_traffic_status: str | None = Field(
-        default=None, description="Traffic status after transition"
-    )
     result: str = Field(description="Result of the scheduling attempt")
     error_code: str | None = Field(default=None, description="Error code if scheduling failed")
     message: str | None = Field(default=None, description="Human-readable message or error detail")

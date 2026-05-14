@@ -503,8 +503,8 @@ class TestSchedulingHistoryRepository:
                 route_id=route_id,
                 deployment_id=deployment_id,
                 phase="PROVISION",
-                from_status=RouteStatus.PROVISIONING,
-                to_status=RouteStatus.RUNNING,
+                from_status=RouteStatus.PROVISIONING.value,
+                to_status=RouteStatus.RUNNING.value,
                 result=str(SchedulingResult.SUCCESS),
                 message="Route provisioned",
                 attempts=1,
@@ -522,8 +522,8 @@ class TestSchedulingHistoryRepository:
 
         assert result.total_count == 1
         item = result.items[0]
-        assert item.from_status == RouteStatus.PROVISIONING
-        assert item.to_status == RouteStatus.RUNNING
+        assert item.from_status == RouteStatus.PROVISIONING.value
+        assert item.to_status == RouteStatus.RUNNING.value
 
     async def test_search_route_history_by_deployment_id(
         self,

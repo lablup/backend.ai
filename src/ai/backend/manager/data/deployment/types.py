@@ -1156,14 +1156,10 @@ class RouteHistoryData:
 
     category: RouteHandlerCategory
     phase: str  # RouteLifecycleType value
-    from_status: RouteStatus | None
-    to_status: RouteStatus | None
-    from_health_status: RouteHealthStatus | None
-    to_health_status: RouteHealthStatus | None
-    from_sub_status: RouteSubStatus | None
-    to_sub_status: RouteSubStatus | None
-    from_traffic_status: RouteTrafficStatus | None
-    to_traffic_status: RouteTrafficStatus | None
+    from_status: str | None
+    to_status: str | None
+    from_sub_status: str | None
+    to_sub_status: str | None
 
     result: SchedulingResult
     error_code: str | None

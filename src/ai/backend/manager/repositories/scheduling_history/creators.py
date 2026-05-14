@@ -12,10 +12,8 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     RouteHandlerCategory,
-    RouteHealthStatus,
     RouteStatus,
     RouteSubStatus,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
@@ -137,12 +135,8 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
     message: str
     from_status: RouteStatus | None = None
     to_status: RouteStatus | None = None
-    from_health_status: RouteHealthStatus | None = None
-    to_health_status: RouteHealthStatus | None = None
     from_sub_status: RouteSubStatus | None = None
     to_sub_status: RouteSubStatus | None = None
-    from_traffic_status: RouteTrafficStatus | None = None
-    to_traffic_status: RouteTrafficStatus | None = None
     error_code: str | None = None
     sub_steps: list[SubStepResult] = field(default_factory=list)
 
@@ -153,14 +147,10 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
             deployment_id=self.deployment_id,
             category=self.category,
             phase=self.phase,
-            from_status=self.from_status,
-            to_status=self.to_status,
-            from_health_status=self.from_health_status,
-            to_health_status=self.to_health_status,
-            from_sub_status=self.from_sub_status,
-            to_sub_status=self.to_sub_status,
-            from_traffic_status=self.from_traffic_status,
-            to_traffic_status=self.to_traffic_status,
+            from_status=self.from_status.value if self.from_status else None,
+            to_status=self.to_status.value if self.to_status else None,
+            from_sub_status=self.from_sub_status.value if self.from_sub_status else None,
+            to_sub_status=self.to_sub_status.value if self.to_sub_status else None,
             result=str(self.result),
             error_code=self.error_code,
             message=self.message,

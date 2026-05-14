@@ -1,4 +1,4 @@
-"""Add sub_status and traffic_status columns to route_history.
+"""Add sub_status columns to route_history and drop health_status columns.
 
 Revision ID: b2c3d4e5f6a7
 Revises: a1b2c3d4e5f7
@@ -19,22 +19,19 @@ depends_on = None
 
 def upgrade() -> None:
     conn = op.get_bind()
-    for col in (
-        "from_sub_status",
-        "to_sub_status",
-        "from_traffic_status",
-        "to_traffic_status",
-    ):
+    for col in ("from_sub_status", "to_sub_status"):
         conn.exec_driver_sql(
             f"ALTER TABLE route_history ADD COLUMN IF NOT EXISTS {col} VARCHAR(64)"
         )
+    for col in ("from_health_status", "to_health_status"):
+        conn.exec_driver_sql(f"ALTER TABLE route_history DROP COLUMN IF EXISTS {col}")
 
 
 def downgrade() -> None:
-    for col in (
-        "to_traffic_status",
-        "from_traffic_status",
-        "to_sub_status",
-        "from_sub_status",
-    ):
+    conn = op.get_bind()
+    for col in ("to_sub_status", "from_sub_status"):
         op.drop_column("route_history", col)
+    for col in ("from_health_status", "to_health_status"):
+        conn.exec_driver_sql(
+            f"ALTER TABLE route_history ADD COLUMN IF NOT EXISTS {col} VARCHAR(64)"
+        )

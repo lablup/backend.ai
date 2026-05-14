@@ -12,11 +12,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentHistoryData,
     RouteHandlerCategory,
-    RouteHealthStatus,
     RouteHistoryData,
-    RouteStatus,
-    RouteSubStatus,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.data.kernel.types import (
     KernelSchedulingHistoryData,
@@ -264,29 +260,15 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
         server_default=sa.text("'lifecycle'"),
     )
     phase: Mapped[str] = mapped_column("phase", sa.String(length=64), nullable=False)
-    from_status: Mapped[RouteStatus | None] = mapped_column(
-        "from_status", StrEnumType(RouteStatus, use_name=False), nullable=True
+    from_status: Mapped[str | None] = mapped_column(
+        "from_status", sa.String(length=64), nullable=True
     )
-    to_status: Mapped[RouteStatus | None] = mapped_column(
-        "to_status", StrEnumType(RouteStatus, use_name=False), nullable=True
+    to_status: Mapped[str | None] = mapped_column("to_status", sa.String(length=64), nullable=True)
+    from_sub_status: Mapped[str | None] = mapped_column(
+        "from_sub_status", sa.String(length=64), nullable=True
     )
-    from_health_status: Mapped[RouteHealthStatus | None] = mapped_column(
-        "from_health_status", StrEnumType(RouteHealthStatus), nullable=True
-    )
-    to_health_status: Mapped[RouteHealthStatus | None] = mapped_column(
-        "to_health_status", StrEnumType(RouteHealthStatus), nullable=True
-    )
-    from_sub_status: Mapped[RouteSubStatus | None] = mapped_column(
-        "from_sub_status", StrEnumType(RouteSubStatus, use_name=False), nullable=True
-    )
-    to_sub_status: Mapped[RouteSubStatus | None] = mapped_column(
-        "to_sub_status", StrEnumType(RouteSubStatus, use_name=False), nullable=True
-    )
-    from_traffic_status: Mapped[RouteTrafficStatus | None] = mapped_column(
-        "from_traffic_status", StrEnumType(RouteTrafficStatus, use_name=False), nullable=True
-    )
-    to_traffic_status: Mapped[RouteTrafficStatus | None] = mapped_column(
-        "to_traffic_status", StrEnumType(RouteTrafficStatus, use_name=False), nullable=True
+    to_sub_status: Mapped[str | None] = mapped_column(
+        "to_sub_status", sa.String(length=64), nullable=True
     )
 
     result: Mapped[str] = mapped_column("result", sa.String(length=32), nullable=False)
@@ -318,25 +300,11 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
     )
 
     def should_merge_with(self, new_row: RouteHistoryRow) -> bool:
-        """Check if a new entry should be merged with this one.
-
-        Merge conditions:
-        - Same category, phase, error_code
-        - No change in sub_status or traffic_status
-        - For lifecycle category: same to_status
-        - For health category: same to_health_status
-        """
-        if self.category != new_row.category:
-            return False
-        if self.phase != new_row.phase or self.error_code != new_row.error_code:
-            return False
-        if self.to_sub_status != new_row.to_sub_status:
-            return False
-        if self.to_traffic_status != new_row.to_traffic_status:
-            return False
-        if self.category == RouteHandlerCategory.HEALTH:
-            return self.to_health_status == new_row.to_health_status
-        return self.to_status == new_row.to_status
+        return (
+            self.category == new_row.category
+            and self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+        )
 
     def to_data(self) -> RouteHistoryData:
         return RouteHistoryData(
@@ -347,12 +315,8 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
             phase=self.phase,
             from_status=self.from_status,
             to_status=self.to_status,
-            from_health_status=self.from_health_status,
-            to_health_status=self.to_health_status,
             from_sub_status=self.from_sub_status,
             to_sub_status=self.to_sub_status,
-            from_traffic_status=self.from_traffic_status,
-            to_traffic_status=self.to_traffic_status,
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,

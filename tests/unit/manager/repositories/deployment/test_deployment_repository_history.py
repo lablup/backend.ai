@@ -1457,8 +1457,8 @@ class TestRouteHistoryMergeLogic:
                     route_id=route_id,
                     deployment_id=endpoint_id,
                     phase="provisioning",
-                    from_status=RouteStatus.PROVISIONING,
-                    to_status=RouteStatus.PROVISIONING,
+                    from_status=RouteStatus.PROVISIONING.value,
+                    to_status=RouteStatus.PROVISIONING.value,
                     result=str(SchedulingResult.FAILURE),
                     error_code="SESSION_CREATION_FAILED",
                     message="Session creation failed",
@@ -1577,7 +1577,7 @@ class TestRouteHistoryMergeLogic:
 
             # Should be 2 records
             assert len(histories) == 2
-            assert histories[0].to_status == RouteStatus.PROVISIONING
+            assert histories[0].to_status == RouteStatus.PROVISIONING.value
             assert histories[0].attempts == 1
-            assert histories[1].to_status == RouteStatus.RUNNING
+            assert histories[1].to_status == RouteStatus.RUNNING.value
             assert histories[1].attempts == 1

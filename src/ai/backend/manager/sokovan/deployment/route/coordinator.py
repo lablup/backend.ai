@@ -304,11 +304,8 @@ class RouteCoordinator:
                     message=f"{handler_name} completed successfully",
                     from_status=from_status,
                     to_status=to_status,
-                    to_health_status=transitions.success.health_status,
                     from_sub_status=r.sub_status,
                     to_sub_status=transitions.success.sub_status,
-                    from_traffic_status=r.traffic_status,
-                    to_traffic_status=transitions.success.traffic_status,
                     sub_steps=extract_sub_steps_for_entity(r.route_id, records),
                 )
                 for r in result.successes
@@ -341,11 +338,8 @@ class RouteCoordinator:
                     message=e.reason,
                     from_status=from_status,
                     to_status=to_status,
-                    to_health_status=transitions.failure.health_status,
                     from_sub_status=e.route_info.sub_status,
                     to_sub_status=transitions.failure.sub_status,
-                    from_traffic_status=e.route_info.traffic_status,
-                    to_traffic_status=transitions.failure.traffic_status,
                     error_code=e.error_code,
                     sub_steps=extract_sub_steps_for_entity(e.route_info.route_id, records),
                 )
@@ -382,11 +376,8 @@ class RouteCoordinator:
                     message=f"{handler_name} marked route as stale",
                     from_status=from_status,
                     to_status=to_status,
-                    to_health_status=transitions.stale.health_status,
                     from_sub_status=r.sub_status,
                     to_sub_status=transitions.stale.sub_status,
-                    from_traffic_status=r.traffic_status,
-                    to_traffic_status=transitions.stale.traffic_status,
                     sub_steps=extract_sub_steps_for_entity(r.route_id, records),
                 )
                 for r in result.stale
