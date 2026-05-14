@@ -134,13 +134,15 @@ class ContainerMetricResult:
 
 @dataclass
 class KernelLiveStatValues:
-    """Per-kernel live-stat values normalized for legacy live_stat conversion."""
+    """Per-kernel live-stat values partitioned by source query."""
 
     instant_current: dict[MetricName, LiveStatRawValue] = field(default_factory=dict)
     instant_capacity: dict[MetricName, LiveStatRawValue] = field(default_factory=dict)
     rate_current: dict[MetricName, LiveStatRawValue] = field(default_factory=dict)
     max: dict[MetricName, LiveStatRawValue] = field(default_factory=dict)
+    rate_max: dict[MetricName, LiveStatRawValue] = field(default_factory=dict)
     avg: dict[MetricName, LiveStatRawValue] = field(default_factory=dict)
+    rate_avg: dict[MetricName, LiveStatRawValue] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -160,7 +162,9 @@ class KernelLiveStatBatchResult:
         instant: PrometheusResponse,
         rate_current: PrometheusResponse,
         max: PrometheusResponse,
+        rate_max: PrometheusResponse,
         avg: PrometheusResponse,
+        rate_avg: PrometheusResponse,
     ) -> Self:
         by_kernel: defaultdict[KernelId, KernelLiveStatValues] = defaultdict(KernelLiveStatValues)
 
@@ -172,8 +176,12 @@ class KernelLiveStatBatchResult:
             by_kernel[kid].rate_current[name] = raw
         for kid, name, raw in cls._parse_samples(max):
             by_kernel[kid].max[name] = raw
+        for kid, name, raw in cls._parse_samples(rate_max):
+            by_kernel[kid].rate_max[name] = raw
         for kid, name, raw in cls._parse_samples(avg):
             by_kernel[kid].avg[name] = raw
+        for kid, name, raw in cls._parse_samples(rate_avg):
+            by_kernel[kid].rate_avg[name] = raw
 
         return cls(by_kernel=dict(by_kernel))
 

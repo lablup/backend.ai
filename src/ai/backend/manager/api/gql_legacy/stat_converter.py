@@ -91,19 +91,23 @@ class LegacyLiveStatConverter:
             | values.instant_capacity.keys()
             | values.rate_current.keys()
             | values.max.keys()
+            | values.rate_max.keys()
             | values.avg.keys()
+            | values.rate_avg.keys()
         )
 
     @staticmethod
     def _convert_one(values: KernelLiveStatValues, name: str) -> MetricValue:
         out = _make_default_metric_value(_resolve_unit_hint(name))
 
-        # rate_current overrides instant_current for RATE/DIFF metrics; for the
-        # rest only instant_current contains a value.
+        # `rate_X or X` works because the rate queries only emit rows for
+        # cumulative counter metrics (cpu_util/net_rx/net_tx) where the rate-based
+        # value is the meaningful one; gauge metrics never appear in rate_*, so
+        # the fallback to the raw source is correct by construction.
         current = values.rate_current.get(name) or values.instant_current.get(name)
         capacity = values.instant_capacity.get(name)
-        max_value = values.max.get(name)
-        avg_value = values.avg.get(name)
+        max_value = values.rate_max.get(name) or values.max.get(name)
+        avg_value = values.rate_avg.get(name) or values.avg.get(name)
 
         # Synthesize capacity for unbounded metrics that don't expose one.
         if capacity is None and current is not None and name in CAPACITY_SENTINEL_METRICS:

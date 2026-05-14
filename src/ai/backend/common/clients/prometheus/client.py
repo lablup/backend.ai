@@ -20,7 +20,6 @@ from ai.backend.common.clients.prometheus.preset import LabelMatcher
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
-    PrometheusQueryData,
     PrometheusResponse,
 )
 from ai.backend.common.exception import (
@@ -85,37 +84,16 @@ class PrometheusClient:
     ) -> KernelLiveStatBatchResult:
         queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
 
-        instant_res = await self._query_instant(queries.instant)
-        rate_current_res = await self._query_instant(queries.rate_current)
         # max/rate_max and avg/rate_avg are split: gauge metrics can be aggregated
         # directly, but cumulative counters (cpu_util/net_rx/net_tx) need rate() first.
-        max_res = await self._query_instant(queries.max)
-        rate_max_res = await self._query_instant(queries.rate_max)
-        avg_res = await self._query_instant(queries.avg)
-        rate_avg_res = await self._query_instant(queries.rate_avg)
-
-        # The max/rate_max and avg/rate_avg queries read the same "current"
-        # series, so we merge each pair to cover all data points regardless of
-        # individual query result types.
         return KernelLiveStatBatchResult.from_responses(
-            instant=instant_res,
-            rate_current=rate_current_res,
-            max=self._merge_prometheus_responses(
-                max_res, rate_max_res, final_result_type=max_res.data.result_type
-            ),
-            avg=self._merge_prometheus_responses(
-                avg_res, rate_avg_res, final_result_type=avg_res.data.result_type
-            ),
+            instant=await self._query_instant(queries.instant),
+            rate_current=await self._query_instant(queries.rate_current),
+            max=await self._query_instant(queries.max),
+            rate_max=await self._query_instant(queries.rate_max),
+            avg=await self._query_instant(queries.avg),
+            rate_avg=await self._query_instant(queries.rate_avg),
         )
-
-    def _merge_prometheus_responses(
-        self, first: PrometheusResponse, second: PrometheusResponse, *, final_result_type: str
-    ) -> PrometheusResponse:
-        data = PrometheusQueryData(
-            result_type=final_result_type,
-            result=[*first.data.result, *second.data.result],
-        )
-        return first.model_copy(update={"data": data})
 
     async def execute_preset(
         self,

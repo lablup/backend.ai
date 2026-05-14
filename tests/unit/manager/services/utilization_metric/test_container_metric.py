@@ -908,7 +908,9 @@ class TestKernelLiveStatBatchResultFromLiveStatResponse:
             instant=instant,
             rate_current=empty,
             max=empty,
+            rate_max=empty,
             avg=empty,
+            rate_avg=empty,
         )
 
         assert batch.by_kernel[kernel_id].instant_current["mem"] == "1024"
@@ -941,7 +943,9 @@ class TestKernelLiveStatBatchResultFromLiveStatResponse:
             instant=empty,
             rate_current=empty,
             max=max_response,
+            rate_max=empty,
             avg=empty,
+            rate_avg=empty,
         )
 
         assert batch.by_kernel[kernel_id].max["mem"] == "9001"
