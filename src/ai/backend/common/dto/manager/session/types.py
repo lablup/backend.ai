@@ -154,7 +154,17 @@ class MountOption(BaseFieldModel):
 
     mount_destination: str | None = Field(
         default=None,
-        description="Mount destination inside the container. Defaults to ``/home/work/{folder_name}``.",
+        deprecated=(
+            "Inline mount_destination is supported only by the inference service creation"
+            " wire schema (``ServiceConfigModel.extra_mounts``) for legacy reasons. Session"
+            " creation (``CreationConfigV*.mount_options``) does NOT read this field — use"
+            " ``mount_map`` / ``mount_id_map`` to specify destinations for sessions."
+        ),
+        description=(
+            "Mount destination inside the container. Defaults to ``/home/work/{folder_name}``."
+            " **Service creation only** — ignored on session creation paths; supply session"
+            " destinations via ``mount_map`` / ``mount_id_map`` instead."
+        ),
     )
     type: MountTypes = MountTypes.BIND
     permission: MountPermission | None = Field(
