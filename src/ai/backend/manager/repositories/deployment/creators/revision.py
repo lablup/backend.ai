@@ -33,16 +33,12 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     """
 
     deployment_id: DeploymentID
-    # ``image_id`` is required at the creation path; the persisted row's
-    # ``image`` column going SET NULL is strictly a post-hoc state.
     image_id: ImageID
     resource_group: str
     resource_slots: ResourceSlot
     resource_opts: Mapping[str, Any]
     cluster_mode: str
     cluster_size: int
-    # ``model_vfolder_id`` is nullable on the ``deployment_revisions.model``
-    # column, so a partial revision draft persists a NULL ``model``.
     model_vfolder_id: VFolderUUID | None
     model_mount_destination: str
     model_definition_path: str | None
