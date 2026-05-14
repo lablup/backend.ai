@@ -21,13 +21,14 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import RouteHealthR
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionKernelInfo
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
@@ -39,7 +40,7 @@ def _make_route(
     session_id: SessionId | None = None,
 ) -> RouteData:
     return RouteData(
-        route_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
         deployment_id=DeploymentID(uuid4()),
         session_id=session_id or SessionId(uuid4()),
         status=RouteStatus.RUNNING,
@@ -86,7 +87,7 @@ class TestInitializeHealthRecordsInitialDelay:
 
         await route_executor._initialize_health_records(
             [route],
-            {route.route_id: ("10.0.0.1", 8000)},
+            {route.route_id: RouteSessionKernelInfo(replica_host="10.0.0.1", replica_port=8000)},
         )
 
         call_args = mock_valkey_schedule.initialize_route_health_records_batch.call_args
@@ -117,7 +118,7 @@ class TestInitializeHealthRecordsInitialDelay:
 
         await route_executor._initialize_health_records(
             [route],
-            {route.route_id: ("10.0.0.1", 8000)},
+            {route.route_id: RouteSessionKernelInfo(replica_host="10.0.0.1", replica_port=8000)},
         )
 
         call_args = mock_valkey_schedule.initialize_route_health_records_batch.call_args
@@ -153,7 +154,7 @@ class TestInitializeHealthRecordsInitialDelay:
 
         await route_executor._initialize_health_records(
             [route],
-            {route.route_id: ("10.0.0.1", 8000)},
+            {route.route_id: RouteSessionKernelInfo(replica_host="10.0.0.1", replica_port=8000)},
         )
 
         call_args = mock_valkey_schedule.initialize_route_health_records_batch.call_args

@@ -40,14 +40,16 @@ from ai.backend.manager.sokovan.deployment.route.handlers import (
     ProvisioningRouteHandler,
     RouteEvictionHandler,
     RouteHandler,
+    RunningRouteHandler,
     ServiceDiscoverySyncHandler,
+    StartingRouteHandler,
     TerminatingRouteHandler,
+    WarmingUpRouteHandler,
 )
 from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
     RouteHealthObserver,
     RouteObserver,
 )
-from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
 from ai.backend.manager.sokovan.deployment.route.recorder import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionResult,
@@ -147,6 +149,14 @@ class RouteCoordinator:
         """Initialize and return the mapping of route lifecycle types to their handlers."""
         return {
             RouteLifecycleType.PROVISIONING: ProvisioningRouteHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.CHECK_STARTING: StartingRouteHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.CHECK_WARMING_UP: WarmingUpRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
@@ -429,7 +439,21 @@ class RouteCoordinator:
                 long_interval=60.0,
                 initial_delay=10.0,
             ),
-            # Check running routes frequently with both short and long cycles
+            # Check STARTING routes: wait for replica host/port
+            RouteTaskSpec(
+                RouteLifecycleType.CHECK_STARTING,
+                short_interval=5.0,
+                long_interval=60.0,
+                initial_delay=10.0,
+            ),
+            # Check WARMING_UP routes: initial health probe
+            RouteTaskSpec(
+                RouteLifecycleType.CHECK_WARMING_UP,
+                short_interval=5.0,
+                long_interval=60.0,
+                initial_delay=15.0,
+            ),
+            # Check RUNNING routes session liveness
             RouteTaskSpec(
                 RouteLifecycleType.RUNNING,
                 short_interval=10.0,

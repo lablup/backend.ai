@@ -29,6 +29,7 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -179,6 +180,8 @@ from ai.backend.manager.repositories.deployment.types import (
     ProjectDeploymentSearchScope,
     RouteData,
     RouteServiceDiscoveryInfo,
+    RouteSessionInfo,
+    RouteSessionKernelInfo,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
@@ -1208,7 +1211,7 @@ class DeploymentDBSource:
 
     async def fetch_route_service_discovery_info(
         self,
-        route_ids: set[uuid.UUID],
+        route_ids: set[ReplicaID],
     ) -> list[RouteServiceDiscoveryInfo]:
         """Fetch service discovery information for routes.
 
@@ -1770,9 +1773,9 @@ class DeploymentDBSource:
     async def _get_last_route_histories_by_category(
         self,
         db_sess: SASession,
-        route_ids: list[uuid.UUID],
+        route_ids: list[ReplicaID],
         category: RouteHandlerCategory,
-    ) -> dict[uuid.UUID, RouteHistoryRow]:
+    ) -> dict[ReplicaID, RouteHistoryRow]:
         """Get last history records per route filtered by handler category."""
         if not route_ids:
             return {}
@@ -1796,8 +1799,8 @@ class DeploymentDBSource:
     async def _get_last_route_histories_bulk(
         self,
         db_sess: SASession,
-        route_ids: list[uuid.UUID],
-    ) -> dict[uuid.UUID, RouteHistoryRow]:
+        route_ids: list[ReplicaID],
+    ) -> dict[ReplicaID, RouteHistoryRow]:
         """Get last history records for multiple routes efficiently."""
         if not route_ids:
             return {}
@@ -1927,15 +1930,15 @@ class DeploymentDBSource:
 
     async def update_route_replica_info(
         self,
-        updates: dict[uuid.UUID, tuple[str, int]],
+        updates: dict[ReplicaID, RouteSessionKernelInfo],
     ) -> None:
         """Update replica_host and replica_port for routes."""
         async with self._begin_session_read_committed() as db_sess:
-            for route_id, (host, port) in updates.items():
+            for route_id, kernel in updates.items():
                 query = (
                     sa.update(RoutingRow)
                     .where(RoutingRow.id == route_id)
-                    .values(replica_host=host, replica_port=port)
+                    .values(replica_host=kernel.replica_host, replica_port=kernel.replica_port)
                 )
                 await db_sess.execute(query)
 
@@ -2129,8 +2132,8 @@ class DeploymentDBSource:
 
     async def fetch_session_statuses_by_route_ids(
         self,
-        route_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, SessionStatus | None]:
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, SessionStatus | None]:
         """Fetch session statuses for multiple routes.
 
         Args:
@@ -2158,11 +2161,82 @@ class DeploymentDBSource:
             rows = result.all()
 
             # 결과를 매핑으로 변환
-            status_map: dict[uuid.UUID, SessionStatus | None] = {}
+            status_map: dict[ReplicaID, SessionStatus | None] = {}
             for route_id, session_status in rows:
-                status_map[route_id] = session_status
+                status_map[ReplicaID(route_id)] = session_status
 
             return status_map
+
+    async def fetch_route_session_kernel_infos(
+        self,
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, RouteSessionInfo | None]:
+        """Fetch session status and kernel connection info for multiple routes.
+
+        Args:
+            route_ids: Set of route IDs to fetch information for
+
+        Returns:
+            Mapping of route_id to RouteSessionInfo:
+            - None → route has no session linked
+            - RouteSessionInfo(status=TERMINAL, kernel=None) → session terminated
+            - RouteSessionInfo(status=RUNNING, kernel=RouteSessionKernelInfo(host, port)) → ready
+            - RouteSessionInfo(status=PREPARING, kernel=None) → not yet running
+        """
+        if not route_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(
+                    RoutingRow.id,
+                    SessionRow.status,
+                    KernelRow.kernel_host,
+                    KernelRow.service_ports,
+                )
+                .select_from(RoutingRow)
+                .outerjoin(SessionRow, RoutingRow.session == SessionRow.id)
+                .outerjoin(
+                    KernelRow,
+                    sa.and_(
+                        KernelRow.session_id == RoutingRow.session,
+                        KernelRow.cluster_role == "main",
+                    ),
+                )
+                .where(RoutingRow.id.in_(route_ids))
+            )
+
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            info_map: dict[ReplicaID, RouteSessionInfo | None] = {}
+            for row in rows:
+                route_id = ReplicaID(row.id)
+                if row.status is None:
+                    info_map[route_id] = None
+                    continue
+
+                kernel: RouteSessionKernelInfo | None = None
+                if row.kernel_host and row.service_ports:
+                    inference_port: int | None = None
+                    for port_info in row.service_ports:
+                        if port_info.get("is_inference", False):
+                            host_ports = port_info.get("host_ports", [])
+                            if host_ports:
+                                inference_port = host_ports[0]
+                            break
+                    if inference_port is not None:
+                        kernel = RouteSessionKernelInfo(
+                            replica_host=row.kernel_host,
+                            replica_port=inference_port,
+                        )
+
+                info_map[route_id] = RouteSessionInfo(
+                    status=row.status,
+                    kernel=kernel,
+                )
+
+            return info_map
 
     async def fetch_route_connection_infos(
         self,

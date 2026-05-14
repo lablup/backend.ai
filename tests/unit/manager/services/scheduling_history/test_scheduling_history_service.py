@@ -12,6 +12,7 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -282,7 +283,7 @@ class TestSearchRouteScopedHistoryAction:
         mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
-        route_id = uuid4()
+        route_id = ReplicaID(uuid4())
         history_item = _make_route_history()
         mock_repository.search_route_scoped_history.return_value = RouteHistoryListResult(
             items=[history_item],

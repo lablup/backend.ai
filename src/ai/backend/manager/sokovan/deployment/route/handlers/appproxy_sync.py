@@ -52,7 +52,7 @@ class AppProxySyncRouteHandler(RouteHandler):
 
     @classmethod
     def category(cls) -> RouteHandlerCategory:
-        return RouteHandlerCategory.HEALTH
+        return RouteHandlerCategory.SYNC
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:

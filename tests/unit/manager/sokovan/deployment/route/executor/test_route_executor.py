@@ -29,6 +29,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import UpdatedRoutesItem
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
@@ -578,7 +579,7 @@ class TestCleanupRoutesByConfig:
         current_revision_id = DeploymentRevisionID(uuid4())
         deploying_revision_id = DeploymentRevisionID(uuid4())
         orphan_route = RouteData(
-            route_id=uuid4(),
+            route_id=ReplicaID(uuid4()),
             deployment_id=deployment_id,
             session_id=SessionId(uuid4()),
             status=RouteStatus.RUNNING,
@@ -622,7 +623,7 @@ class TestCleanupRoutesByConfig:
         deployment_id = DeploymentID(uuid4())
         deploying_revision_id = DeploymentRevisionID(uuid4())
         provisioning_route = RouteData(
-            route_id=uuid4(),
+            route_id=ReplicaID(uuid4()),
             deployment_id=deployment_id,
             session_id=None,
             status=RouteStatus.PROVISIONING,
@@ -666,7 +667,7 @@ class TestCleanupRoutesByConfig:
         """
         deployment_id = DeploymentID(uuid4())
         bootstrap_route = RouteData(
-            route_id=uuid4(),
+            route_id=ReplicaID(uuid4()),
             deployment_id=deployment_id,
             session_id=SessionId(uuid4()),
             status=RouteStatus.RUNNING,
@@ -920,7 +921,7 @@ class TestSyncServiceDiscovery:
 
 def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
     return RouteData(
-        route_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
         deployment_id=endpoint_id,
         session_id=SessionId(uuid4()),
         status=RouteStatus.RUNNING,

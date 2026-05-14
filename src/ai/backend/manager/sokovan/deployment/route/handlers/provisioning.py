@@ -7,9 +7,9 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
-    RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
+    RouteSubStatus,
     RouteTargetStatuses,
     RouteTransitionTarget,
 )
@@ -24,7 +24,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class ProvisioningRouteHandler(RouteHandler):
-    """Handler for provisioning routes (PROVISIONING -> UNHEALTHY)."""
+    """Handler for provisioning routes: enqueues sessions (PROVISIONING+PENDING → STARTING)."""
 
     def __init__(
         self,
@@ -52,18 +52,19 @@ class ProvisioningRouteHandler(RouteHandler):
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.PROVISIONING],
-            health=list(RouteHealthStatus),
+            sub_status=[RouteSubStatus.PENDING],
         )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Provisioning → RUNNING + NOT_CHECKED on success, FAILED_TO_START on failure."""
+        """Session enqueued → sub_status=STARTING; enqueue failed → FAILED_TO_START."""
         return RouteStatusTransitions(
             success=RouteTransitionTarget(
-                status=RouteStatus.RUNNING,
-                health_status=RouteHealthStatus.NOT_CHECKED,
+                sub_status=RouteSubStatus.STARTING,
             ),
-            failure=RouteTransitionTarget(status=RouteStatus.FAILED_TO_START),
+            failure=RouteTransitionTarget(
+                status=RouteStatus.FAILED_TO_START,
+            ),
             stale=None,
         )
 

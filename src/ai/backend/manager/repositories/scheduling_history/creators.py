@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -127,7 +127,7 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
 class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
     """CreatorSpec for route history."""
 
-    route_id: UUID
+    route_id: ReplicaID
     deployment_id: DeploymentID
     category: RouteHandlerCategory
     phase: str  # RouteLifecycleType value

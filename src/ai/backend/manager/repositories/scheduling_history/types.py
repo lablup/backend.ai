@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound
@@ -100,7 +101,7 @@ class RouteHistorySearchScope(SearchScope):
     Used for entity-scoped queries where route_id is the scope parameter.
     """
 
-    route_id: UUID
+    route_id: ReplicaID
     """Required. The route to search history for."""
 
     def to_condition(self) -> QueryCondition:

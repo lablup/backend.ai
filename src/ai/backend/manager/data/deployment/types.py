@@ -110,6 +110,7 @@ class RouteHandlerCategory(enum.StrEnum):
 
     LIFECYCLE = "lifecycle"
     HEALTH = "health"
+    SYNC = "sync"
 
 
 class DeploymentHandlerCategory(enum.StrEnum):
@@ -290,9 +291,6 @@ class RouteTransitionTarget:
 @dataclass(frozen=True)
 class RouteStatusTransitions:
     """Status transitions for route handlers.
-
-    Route handlers have success/failure/stale outcomes (no expired/give_up).
-    Each outcome can change lifecycle status, health status, or both.
 
     Attributes:
         success: Target state when handler succeeds, None means no change
