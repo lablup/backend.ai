@@ -6167,13 +6167,9 @@ type ModelDeploymentMetadata {
   name: String!
   status: DeploymentStatus!
   tags: [String!]!
+  resourceGroup: String!
   createdAt: DateTime!
   updatedAt: DateTime!
-
-  """
-  Added in UNRELEASED. Name of the resource group (scaling group) this deployment runs in.
-  """
-  resourceGroup: String!
 }
 
 """Added in 25.19.0. """
