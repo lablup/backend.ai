@@ -14,12 +14,12 @@ from ai.backend.client.cli.session.execute import (
 )
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.exceptions import BackendError
-from ai.backend.client.func.service import ExtraMountOption
 from ai.backend.client.output.fields import routing_fields, service_fields
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 from .extensions import pass_ctx_obj
@@ -326,7 +326,7 @@ def create(
     parsed_resources = prepare_resource_arg(resources)
     parsed_resource_opts = prepare_resource_arg(resource_opts)
     extra_mount_options = {
-        key: ExtraMountOption.model_validate(opts) for key, opts in mount_options.items()
+        key: MountOption.model_validate(opts) for key, opts in mount_options.items()
     }
     body = {
         "service_name": name,

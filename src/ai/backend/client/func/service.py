@@ -13,31 +13,13 @@ from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 from ai.backend.client.utils import dedent as _d
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
-from ai.backend.common.types import BackendAISchema, RuntimeVariant
+from ai.backend.common.types import RuntimeVariant
 
 from .base import BaseFunction, api_function
 
-__all__ = (
-    "ExtraMountOption",
-    "Service",
-)
-
-
-class ExtraMountOption(BackendAISchema):
-    """Per-vfolder option overrides for ``Service.create`` extra mounts.
-
-    Keys in the parent mapping must match the entries passed to
-    ``extra_mounts`` (either a vfolder UUID string or a vfolder name).
-
-    Note: ``mount_destination`` lives on the separate ``extra_mount_map``
-    parameter, not here — keeping the destination override outside this
-    model leaves a single source of truth on the SDK surface.
-    """
-
-    type: str | None = None
-    permission: str | None = None
-    subpath: str | None = None
+__all__ = ("Service",)
 
 
 _default_fields: Sequence[FieldSpec] = (
@@ -122,7 +104,7 @@ class Service(BaseFunction):
         scaling_group: str,
         extra_mounts: Sequence[str] | None = None,
         extra_mount_map: Mapping[str, str] | None = None,
-        extra_mount_options: Mapping[str, ExtraMountOption] | None = None,
+        extra_mount_options: Mapping[str, MountOption] | None = None,
         service_name: str | None = None,
         model_version: str | None = None,
         _dependencies: Sequence[str] | None = None,
@@ -201,7 +183,7 @@ class Service(BaseFunction):
                     if mount not in vfolder_name_to_id:
                         raise BackendClientError(f"VFolder (name: {mount}) not found") from e
                     vfolder_id = vfolder_name_to_id[mount]
-                options = extra_mount_options.get(mount) or ExtraMountOption()
+                options = extra_mount_options.get(mount) or MountOption()
                 body = options.model_dump(exclude_none=True)
                 if (dest := extra_mount_map.get(mount)) is not None:
                     body["mount_destination"] = dest

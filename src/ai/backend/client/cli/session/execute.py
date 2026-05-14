@@ -41,6 +41,7 @@ from ai.backend.client.session import AsyncSession
 if TYPE_CHECKING:
     from ai.backend.client.func.session import ComputeSession
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import ClusterMode, MountExpression
 
 from .args import click_start_option
@@ -474,7 +475,10 @@ def run(
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
-    mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
+    mount, mount_map, raw_mount_options = prepare_mount_arg(mount, escape=True)
+    mount_options = {
+        key: MountOption.model_validate(opts) for key, opts in raw_mount_options.items()
+    }
 
     env_ranges: dict[str, Any] = {v: r for v, r in env_range}  # type: ignore[has-type]
     build_ranges: dict[str, Any] = {v: r for v, r in build_range}  # type: ignore[has-type]

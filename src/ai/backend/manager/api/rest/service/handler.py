@@ -675,7 +675,7 @@ class ServiceHandler:
                 model_mount_destination=params.config.model_mount_destination,
                 vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts={
-                    k: MountOption.from_model(v) for k, v in params.config.extra_mounts.items()
+                    k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
                 scaling_group=params.config.scaling_group,
@@ -777,7 +777,7 @@ class ServiceHandler:
                 model_mount_destination=params.config.model_mount_destination,
                 vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts={
-                    k: MountOption.from_model(v) for k, v in params.config.extra_mounts.items()
+                    k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
                 scaling_group=params.config.scaling_group,
