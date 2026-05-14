@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
@@ -55,6 +56,7 @@ from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -109,6 +111,15 @@ TrafficStatus: type[RouteTrafficStatus] = gql_enum(
     ),
     RouteTrafficStatus,
     name="TrafficStatus",
+)
+
+ReplicaHealthStatus: type[RouteHealthStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="This enum represents the health check status of a replica.",
+    ),
+    RouteHealthStatus,
+    name="ReplicaHealthStatus",
 )
 
 
@@ -189,6 +200,24 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     )
     activeness_status: ActivenessStatus = gql_field(
         description="Whether the replica is actively receiving traffic."
+    )
+    status: ReplicaStatus = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Provisioning status of the replica (mirrors the underlying route status).",
+        )
+    )
+    traffic_status: TrafficStatus = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Traffic status of the replica.",
+        )
+    )
+    health_status: ReplicaHealthStatus = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Health check status of the replica.",
+        )
     )
     created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 

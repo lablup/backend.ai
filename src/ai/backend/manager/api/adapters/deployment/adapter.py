@@ -437,6 +437,40 @@ def _status_to_lifecycles(status: ModelDeploymentStatus) -> list[EndpointLifecyc
     return _STATUS_TO_LIFECYCLE.get(status, [])
 
 
+def _to_common_route_status(value: ManagerRouteStatus) -> RouteStatus:
+    match value:
+        case ManagerRouteStatus.PROVISIONING:
+            return RouteStatus.PROVISIONING
+        case ManagerRouteStatus.RUNNING:
+            return RouteStatus.RUNNING
+        case ManagerRouteStatus.TERMINATING:
+            return RouteStatus.TERMINATING
+        case ManagerRouteStatus.TERMINATED:
+            return RouteStatus.TERMINATED
+        case ManagerRouteStatus.FAILED_TO_START:
+            return RouteStatus.FAILED_TO_START
+
+
+def _to_common_route_traffic_status(value: ManagerRouteTrafficStatus) -> RouteTrafficStatus:
+    match value:
+        case ManagerRouteTrafficStatus.ACTIVE:
+            return RouteTrafficStatus.ACTIVE
+        case ManagerRouteTrafficStatus.INACTIVE:
+            return RouteTrafficStatus.INACTIVE
+
+
+def _to_common_route_health_status(value: ManagerRouteHealthStatus) -> RouteHealthStatus:
+    match value:
+        case ManagerRouteHealthStatus.NOT_CHECKED:
+            return RouteHealthStatus.NOT_CHECKED
+        case ManagerRouteHealthStatus.HEALTHY:
+            return RouteHealthStatus.HEALTHY
+        case ManagerRouteHealthStatus.UNHEALTHY:
+            return RouteHealthStatus.UNHEALTHY
+        case ManagerRouteHealthStatus.DEGRADED:
+            return RouteHealthStatus.DEGRADED
+
+
 def _statuses_to_lifecycles(
     statuses: Collection[ModelDeploymentStatus],
 ) -> list[EndpointLifecycle]:
@@ -2378,5 +2412,8 @@ class DeploymentAdapter(BaseAdapter):
             readiness_status=data.readiness_status,
             liveness_status=data.liveness_status,
             activeness_status=data.activeness_status,
+            status=_to_common_route_status(data.status),
+            traffic_status=_to_common_route_traffic_status(data.traffic_status),
+            health_status=_to_common_route_health_status(data.health_status),
             created_at=data.created_at,
         )
