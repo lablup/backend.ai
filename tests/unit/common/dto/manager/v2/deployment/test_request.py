@@ -293,7 +293,7 @@ class TestCreateDeploymentInput:
         defaults: dict[str, Any] = {
             "project_id": uuid.uuid4(),
             "domain_name": "default",
-            "resource_group": "default",
+            "resource_group_name": "default",
         }
         defaults.update(kwargs)
         return ModelDeploymentMetadataInput(**defaults)
