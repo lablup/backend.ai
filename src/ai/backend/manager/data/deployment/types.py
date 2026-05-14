@@ -879,6 +879,9 @@ class ModelReplicaData:
     readiness_status: ReadinessStatus
     liveness_status: LivenessStatus
     activeness_status: ActivenessStatus
+    status: RouteStatus
+    traffic_status: RouteTrafficStatus
+    health_status: RouteHealthStatus
     detail: dict[str, Any]
     created_at: datetime
 

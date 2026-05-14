@@ -323,6 +323,9 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
         readiness_status=readiness,
         liveness_status=liveness,
         activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),
+        status=route.status,
+        traffic_status=route.traffic_status,
+        health_status=route.health_status,
         detail=route.error_data,
         created_at=route.created_at,
     )

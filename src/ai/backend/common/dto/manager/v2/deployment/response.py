@@ -437,6 +437,9 @@ class ReplicaNode(BaseResponseModel):
     readiness_status: ReadinessStatus = Field(description="Readiness status")
     liveness_status: LivenessStatus = Field(description="Liveness status")
     activeness_status: ActivenessStatus = Field(description="Activeness status")
+    status: RouteStatus = Field(description="Provisioning status of the replica")
+    traffic_status: RouteTrafficStatus = Field(description="Traffic status of the replica")
+    health_status: RouteHealthStatus = Field(description="Health check status of the replica")
     created_at: datetime = Field(description="Creation timestamp")
 
 
