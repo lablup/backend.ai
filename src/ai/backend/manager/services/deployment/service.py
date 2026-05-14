@@ -252,6 +252,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             tags=[info.metadata.tag] if info.metadata.tag else [],
             project_id=info.metadata.project,
             domain_name=info.metadata.domain,
+            resource_group_name=info.metadata.resource_group,
             created_at=info.metadata.created_at or datetime.now(UTC),
             updated_at=info.metadata.created_at or datetime.now(UTC),
         ),

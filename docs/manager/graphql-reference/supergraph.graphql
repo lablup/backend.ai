@@ -9350,6 +9350,11 @@ Added in 25.19.0. Contains metadata information for a model deployment including
 type ModelDeploymentMetadata
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Added in UNRELEASED. The resource group this deployment runs in, resolved via DataLoader.
+  """
+  resourceGroup: ResourceGroup
+
   """The project of this entity."""
   project: GroupNode @deprecated(reason: "Use project_v2 instead.")
 
@@ -9370,6 +9375,7 @@ type ModelDeploymentMetadata
   name: String!
   status: DeploymentStatus!
   tags: [String!]!
+  resourceGroupName: String!
   createdAt: DateTime!
   updatedAt: DateTime!
 }

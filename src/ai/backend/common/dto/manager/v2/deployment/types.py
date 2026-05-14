@@ -434,6 +434,7 @@ class DeploymentMetadataInfoDTO(BaseResponseModel):
     name: str
     status: ModelDeploymentStatus
     tags: list[str]
+    resource_group_name: str
     created_at: datetime
     updated_at: datetime
 
