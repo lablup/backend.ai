@@ -18,6 +18,8 @@ Create Date: 2026-05-15
 
 # Part of: 26.5.0
 
+from dataclasses import dataclass
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -30,24 +32,38 @@ branch_labels = None
 depends_on = None
 
 
-# (referencing_table, fk_constraint_name, fk_column, on_update, on_delete)
-_DOMAIN_FK_REFS: tuple[tuple[str, str, str, str | None, str | None], ...] = (
-    ("endpoint_tokens", "fk_endpoint_tokens_domain_domains", "domain", None, "CASCADE"),
-    ("endpoints", "fk_endpoints_domain_domains", "domain", None, "RESTRICT"),
-    ("groups", "fk_groups_domain_name_domains", "domain_name", "CASCADE", "CASCADE"),
-    ("kernels", "fk_kernels_domain_name_domains", "domain_name", None, None),
-    ("model_cards", "fk_model_cards_domain_domains", "domain", None, "RESTRICT"),
-    ("routings", "fk_routings_domain_domains", "domain", None, "RESTRICT"),
-    ("session_templates", "fk_session_templates_domain_name_domains", "domain_name", None, None),
-    ("sessions", "fk_sessions_domain_name_domains", "domain_name", None, None),
-    (
+@dataclass(frozen=True)
+class _FKRef:
+    table: str
+    constraint: str
+    column: str
+    on_update: str | None
+    on_delete: str | None
+
+
+_DOMAIN_FK_REFS: tuple[_FKRef, ...] = (
+    _FKRef("endpoint_tokens", "fk_endpoint_tokens_domain_domains", "domain", None, "CASCADE"),
+    _FKRef("endpoints", "fk_endpoints_domain_domains", "domain", None, "RESTRICT"),
+    _FKRef("groups", "fk_groups_domain_name_domains", "domain_name", "CASCADE", "CASCADE"),
+    _FKRef("kernels", "fk_kernels_domain_name_domains", "domain_name", None, None),
+    _FKRef("model_cards", "fk_model_cards_domain_domains", "domain", None, "RESTRICT"),
+    _FKRef("routings", "fk_routings_domain_domains", "domain", None, "RESTRICT"),
+    _FKRef(
+        "session_templates",
+        "fk_session_templates_domain_name_domains",
+        "domain_name",
+        None,
+        None,
+    ),
+    _FKRef("sessions", "fk_sessions_domain_name_domains", "domain_name", None, None),
+    _FKRef(
         "sgroups_for_domains",
         "fk_sgroups_for_domains_domain_domains",
         "domain",
         "CASCADE",
         "CASCADE",
     ),
-    ("users", "fk_users_domain_name_domains", "domain_name", None, None),
+    _FKRef("users", "fk_users_domain_name_domains", "domain_name", None, None),
 )
 
 
@@ -62,41 +78,41 @@ def upgrade() -> None:
         ),
     )
 
-    for table, fk_name, _column, _on_update, _on_delete in _DOMAIN_FK_REFS:
-        op.drop_constraint(fk_name, table, type_="foreignkey")
+    for ref in _DOMAIN_FK_REFS:
+        op.drop_constraint(ref.constraint, ref.table, type_="foreignkey")
 
     op.create_unique_constraint("uq_domains_name", "domains", ["name"])
     op.drop_constraint("pk_domains", "domains", type_="primary")
     op.create_primary_key("pk_domains", "domains", ["id"])
 
-    for table, fk_name, column, on_update, on_delete in _DOMAIN_FK_REFS:
+    for ref in _DOMAIN_FK_REFS:
         op.create_foreign_key(
-            fk_name,
-            table,
+            ref.constraint,
+            ref.table,
             "domains",
-            [column],
+            [ref.column],
             ["name"],
-            onupdate=on_update,
-            ondelete=on_delete,
+            onupdate=ref.on_update,
+            ondelete=ref.on_delete,
         )
 
 
 def downgrade() -> None:
-    for table, fk_name, _column, _on_update, _on_delete in _DOMAIN_FK_REFS:
-        op.drop_constraint(fk_name, table, type_="foreignkey")
+    for ref in _DOMAIN_FK_REFS:
+        op.drop_constraint(ref.constraint, ref.table, type_="foreignkey")
 
     op.drop_constraint("pk_domains", "domains", type_="primary")
     op.drop_constraint("uq_domains_name", "domains", type_="unique")
     op.create_primary_key("pk_domains", "domains", ["name"])
     op.drop_column("domains", "id")
 
-    for table, fk_name, column, on_update, on_delete in _DOMAIN_FK_REFS:
+    for ref in _DOMAIN_FK_REFS:
         op.create_foreign_key(
-            fk_name,
-            table,
+            ref.constraint,
+            ref.table,
             "domains",
-            [column],
+            [ref.column],
             ["name"],
-            onupdate=on_update,
-            ondelete=on_delete,
+            onupdate=ref.on_update,
+            ondelete=ref.on_delete,
         )

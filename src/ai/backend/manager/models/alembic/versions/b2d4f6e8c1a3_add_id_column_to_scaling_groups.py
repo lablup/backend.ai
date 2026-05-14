@@ -17,6 +17,8 @@ Create Date: 2026-05-15
 
 # Part of: 26.5.0
 
+from dataclasses import dataclass
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -29,39 +31,47 @@ branch_labels = None
 depends_on = None
 
 
-# (referencing_table, fk_constraint_name, fk_column, on_update, on_delete)
-_SCALING_GROUP_FK_REFS: tuple[tuple[str, str, str, str | None, str | None], ...] = (
-    ("agents", "fk_agents_scaling_group_scaling_groups", "scaling_group", None, None),
-    (
+@dataclass(frozen=True)
+class _FKRef:
+    table: str
+    constraint: str
+    column: str
+    on_update: str | None
+    on_delete: str | None
+
+
+_SCALING_GROUP_FK_REFS: tuple[_FKRef, ...] = (
+    _FKRef("agents", "fk_agents_scaling_group_scaling_groups", "scaling_group", None, None),
+    _FKRef(
         "endpoints",
         "fk_endpoints_resource_group_scaling_groups",
         "resource_group",
         None,
         "RESTRICT",
     ),
-    ("kernels", "fk_kernels_scaling_group_scaling_groups", "scaling_group", None, None),
-    (
+    _FKRef("kernels", "fk_kernels_scaling_group_scaling_groups", "scaling_group", None, None),
+    _FKRef(
         "sessions",
         "fk_sessions_scaling_group_name_scaling_groups",
         "scaling_group_name",
         None,
         None,
     ),
-    (
+    _FKRef(
         "sgroups_for_domains",
         "fk_sgroups_for_domains_scaling_group_scaling_groups",
         "scaling_group",
         "CASCADE",
         "CASCADE",
     ),
-    (
+    _FKRef(
         "sgroups_for_groups",
         "fk_sgroups_for_groups_scaling_group_scaling_groups",
         "scaling_group",
         "CASCADE",
         "CASCADE",
     ),
-    (
+    _FKRef(
         "sgroups_for_keypairs",
         "fk_sgroups_for_keypairs_scaling_group_scaling_groups",
         "scaling_group",
@@ -82,41 +92,41 @@ def upgrade() -> None:
         ),
     )
 
-    for table, fk_name, _column, _on_update, _on_delete in _SCALING_GROUP_FK_REFS:
-        op.drop_constraint(fk_name, table, type_="foreignkey")
+    for ref in _SCALING_GROUP_FK_REFS:
+        op.drop_constraint(ref.constraint, ref.table, type_="foreignkey")
 
     op.create_unique_constraint("uq_scaling_groups_name", "scaling_groups", ["name"])
     op.drop_constraint("pk_scaling_groups", "scaling_groups", type_="primary")
     op.create_primary_key("pk_scaling_groups", "scaling_groups", ["id"])
 
-    for table, fk_name, column, on_update, on_delete in _SCALING_GROUP_FK_REFS:
+    for ref in _SCALING_GROUP_FK_REFS:
         op.create_foreign_key(
-            fk_name,
-            table,
+            ref.constraint,
+            ref.table,
             "scaling_groups",
-            [column],
+            [ref.column],
             ["name"],
-            onupdate=on_update,
-            ondelete=on_delete,
+            onupdate=ref.on_update,
+            ondelete=ref.on_delete,
         )
 
 
 def downgrade() -> None:
-    for table, fk_name, _column, _on_update, _on_delete in _SCALING_GROUP_FK_REFS:
-        op.drop_constraint(fk_name, table, type_="foreignkey")
+    for ref in _SCALING_GROUP_FK_REFS:
+        op.drop_constraint(ref.constraint, ref.table, type_="foreignkey")
 
     op.drop_constraint("pk_scaling_groups", "scaling_groups", type_="primary")
     op.drop_constraint("uq_scaling_groups_name", "scaling_groups", type_="unique")
     op.create_primary_key("pk_scaling_groups", "scaling_groups", ["name"])
     op.drop_column("scaling_groups", "id")
 
-    for table, fk_name, column, on_update, on_delete in _SCALING_GROUP_FK_REFS:
+    for ref in _SCALING_GROUP_FK_REFS:
         op.create_foreign_key(
-            fk_name,
-            table,
+            ref.constraint,
+            ref.table,
             "scaling_groups",
-            [column],
+            [ref.column],
             ["name"],
-            onupdate=on_update,
-            ondelete=on_delete,
+            onupdate=ref.on_update,
+            ondelete=ref.on_delete,
         )
