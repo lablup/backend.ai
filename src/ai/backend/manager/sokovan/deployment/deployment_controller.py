@@ -84,6 +84,11 @@ from ai.backend.manager.sokovan.deployment.types import (
     ActivateRevisionResult,
     DeploymentLifecycleType,
 )
+from ai.backend.manager.sokovan.deployment.validators import (
+    DeploymentRevisionValidationContext,
+    DeploymentRevisionValidator,
+    RequiredResourceSlotRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 from ai.backend.manager.types import OptionalState
@@ -130,6 +135,7 @@ class DeploymentController:
     _valkey_schedule: ValkeyScheduleClient
     _revision_draft_reader: RevisionDraftReader
     _deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
+    _deployment_revision_validator: DeploymentRevisionValidator
 
     def __init__(self, args: DeploymentControllerArgs) -> None:
         """Initialize the deployment controller with required services."""
@@ -141,6 +147,9 @@ class DeploymentController:
         self._valkey_schedule = args.valkey_schedule
         self._revision_draft_reader = args.revision_draft_reader
         self._deployment_revision_preset_repository = args.deployment_revision_preset_repository
+        self._deployment_revision_validator = DeploymentRevisionValidator([
+            RequiredResourceSlotRule(),
+        ])
 
     async def create_deployment(
         self,
@@ -245,6 +254,10 @@ class DeploymentController:
         merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
         model_revision_spec = merged.to_model_revision_spec(
             mounts=draft.draft_model_revision.mounts
+        )
+        validation_ctx = await self._build_deployment_revision_validation_context()
+        self._deployment_revision_validator.validate_legacy_revision_spec(
+            model_revision_spec, validation_ctx
         )
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision_spec(model_revision=model_revision_spec)
@@ -445,6 +458,8 @@ class DeploymentController:
             ],
             revision_preset_id=preset_id,
         )
+        validation_ctx = await self._build_deployment_revision_validation_context()
+        self._deployment_revision_validator.validate(spec, validation_ctx)
         rbac_creator = RBACEntityCreator(
             spec=spec,
             element_type=RBACElementType.DEPLOYMENT_REVISION,
@@ -601,9 +616,26 @@ class DeploymentController:
             preset_id=None,
         )
         merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
-        return merged.to_model_revision_spec(mounts=draft_revision.mounts)
+        model_revision_spec = merged.to_model_revision_spec(mounts=draft_revision.mounts)
+        validation_ctx = await self._build_deployment_revision_validation_context()
+        self._deployment_revision_validator.validate_legacy_revision_spec(
+            model_revision_spec, validation_ctx
+        )
+        return model_revision_spec
 
     # ========== Revision Private Helpers ==========
+
+    async def _build_deployment_revision_validation_context(
+        self,
+    ) -> DeploymentRevisionValidationContext:
+        """Assemble the global config consumed by ``_deployment_revision_validator``.
+
+        Carries orthogonal global validation prerequisites (e.g.
+        ``resource_slot_types.required``) that are not derivable from the
+        per-request creator spec.
+        """
+        required_slot_names = await self._deployment_repository.fetch_revision_required_slot_names()
+        return DeploymentRevisionValidationContext(required_slot_names=required_slot_names)
 
     async def _resolve_draft_image_id(
         self,

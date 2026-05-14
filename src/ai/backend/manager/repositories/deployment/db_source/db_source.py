@@ -4,7 +4,7 @@ import dataclasses
 import logging
 import uuid
 from collections import Counter, defaultdict
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -37,6 +37,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     SessionId,
+    SlotName,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -2280,6 +2281,15 @@ class DeploymentDBSource:
                 preset=preset_row.to_data() if preset_row is not None else None,
                 preset_resource_slots=_project_preset_slots(preset_row, preset_slots),
             )
+
+    async def fetch_revision_required_slot_names(self) -> Iterable[SlotName]:
+        """Return the globally required resource slot names"""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(ResourceSlotTypeRow.slot_name).where(
+                ResourceSlotTypeRow.required.is_(True)
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+        return frozenset(SlotName(slot_name) for slot_name in rows)
 
     @staticmethod
     async def _fetch_runtime_variant_by_id(
