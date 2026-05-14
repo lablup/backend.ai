@@ -431,7 +431,12 @@ class Context(metaclass=ABCMeta):
             await wget(url, dst_supergraph)
             self.log_header(f"Downloaded supergraph.graphql -> {dst_supergraph}")
 
-        dst_compose_path = self.copy_config("docker-compose.halfstack.current.yml")
+        # Copy from install package as docker-compose.yml, then rename to
+        # docker-compose.halfstack.current.yml so the file name matches the convention
+        # used by other dev scripts (start-dev.sh, refresh-graphql-gateway.sh, etc.).
+        src_compose_path = self.copy_config("docker-compose.yml")
+        dst_compose_path = src_compose_path.with_name("docker-compose.halfstack.current.yml")
+        src_compose_path.rename(dst_compose_path)
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
         self.copy_config("grafana-provisioning")
