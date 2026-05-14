@@ -13,19 +13,19 @@ from ai.backend.common.identifier.replica import ReplicaID
 class RouteProbeTarget:
     """Probe configuration for a route stored in Valkey.
 
-    Stored as a hash at key `route_probe:{route_id}`.
+    Stored as a hash at key `route_probe:{replica_id}`.
     Written once by the coordinator when the route enters WARMING_UP (host/port available).
     Read by RouteHealthObserver to know what endpoint to probe.
     """
 
-    route_id: ReplicaID
+    replica_id: ReplicaID
     health_path: str
     inference_port: int
     replica_host: str
 
     def to_valkey_hash(self) -> Mapping[str, str]:
         return {
-            "route_id": str(self.route_id),
+            "replica_id": str(self.replica_id),
             "health_path": self.health_path,
             "inference_port": str(self.inference_port),
             "replica_host": self.replica_host,
@@ -34,7 +34,7 @@ class RouteProbeTarget:
     @classmethod
     def from_valkey_hash(cls, data: Mapping[str, str]) -> RouteProbeTarget:
         return cls(
-            route_id=ReplicaID(UUID(data["route_id"])),
+            replica_id=ReplicaID(UUID(data["replica_id"])),
             health_path=data["health_path"],
             inference_port=int(data["inference_port"]),
             replica_host=data["replica_host"],
