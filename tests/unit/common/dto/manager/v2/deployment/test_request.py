@@ -107,17 +107,6 @@ class TestRevisionInput:
         assert rev.model_vfolder_id == model_id
         assert rev.model_definition_path == "/models/def.yaml"
 
-    def test_all_fields_optional(self) -> None:
-        rev = RevisionInput()
-        assert rev.image_id is None
-        assert rev.cluster_mode is None
-        assert rev.cluster_size is None
-        assert rev.resource_slots is None
-        assert rev.runtime_variant_id is None
-        assert rev.model_vfolder_id is None
-        assert rev.model_mount_destination is None
-        assert rev.model_definition_path is None
-
     def test_runtime_variant_id_is_preserved(self) -> None:
         runtime_variant_id = RuntimeVariantID(uuid.uuid4())
         rev = _make_revision_input(runtime_variant_id=runtime_variant_id)
@@ -546,12 +535,6 @@ class TestAddRevisionInput:
         assert inp.deployment_id == deployment_id
         assert inp.revision is not None
         assert inp.revision.cluster_mode == ClusterMode.SINGLE_NODE
-
-    def test_revision_defaults_to_none(self) -> None:
-        deployment_id = uuid.uuid4()
-        inp = AddRevisionInput(deployment_id=deployment_id)
-        assert inp.deployment_id == deployment_id
-        assert inp.revision is None
 
     def test_missing_deployment_id_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):

@@ -279,7 +279,6 @@ class ExtraVFolderMountInput(BaseRequestModel):
 class RevisionInput(BaseRequestModel):
     """Revision input for creating a new revision."""
 
-    name: str | None = Field(default=None, description="Revision name")
     cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
     resource_config: ResourceConfigInput = Field(description="Resource configuration")
     image: ImageInput = Field(description="Container image")

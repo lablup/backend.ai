@@ -472,7 +472,7 @@ class RevisionInput(BaseRequestModel):
     runtime_variant_id: RuntimeVariantID | None = Field(
         default=None, description="Runtime variant ID (UUID)"
     )
-    model_vfolder_id: VFolderUUID | None = Field(default=None, description="Model VFolder ID")
+    model_vfolder_id: VFolderUUID = Field(description="Model VFolder ID")
     model_mount_destination: str | None = Field(
         default=None, description="Mount destination for model vfolder"
     )
