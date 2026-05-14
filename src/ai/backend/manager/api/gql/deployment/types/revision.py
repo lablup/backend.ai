@@ -282,6 +282,13 @@ class ModelMountConfig:
     definition_path: str = gql_field(
         description="Path to the model definition file within the mounted folder."
     )
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Subpath within the model vfolder. ``null`` means the vfolder root.",
+        ),
+        default=None,
+    )
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
@@ -311,6 +318,13 @@ class ExtraVFolderMountInfoGQL:
                 "later vfolder permission changes do not retroactively affect it."
             ),
         ),
+    )
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Subpath within the vfolder. ``null`` means the vfolder root.",
+        ),
+        default=None,
     )
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
@@ -778,6 +792,15 @@ class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
     vfolder_id: ID
     mount_destination: str
     definition_path: str | None = None
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Subpath within the model vfolder. ``null`` (default) mounts the vfolder root."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -786,6 +809,13 @@ class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
 class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
     vfolder_id: ID
     mount_destination: str | None
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=("Subpath within the vfolder. ``null`` (default) mounts the vfolder root."),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(

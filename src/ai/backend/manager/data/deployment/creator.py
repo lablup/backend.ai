@@ -36,6 +36,8 @@ class VFolderMountsCreator:
     model_definition_path: str | None
     model_mount_destination: str
     extra_mounts: list[MountInfo]
+    # Subpath within the model vfolder. ``None`` means the vfolder root.
+    vfolder_subpath: str | None = None
 
 
 @dataclass

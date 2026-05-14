@@ -38,6 +38,7 @@ def _creator_spec(resource_slots: dict[str, int]) -> DeploymentRevisionCreatorSp
         cluster_size=1,
         model_vfolder_id=VFolderUUID(uuid4()),
         model_mount_destination="/models",
+        vfolder_subpath=None,
         model_definition_path=None,
         model_definition=None,
         startup_command=None,

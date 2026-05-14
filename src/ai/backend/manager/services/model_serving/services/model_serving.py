@@ -936,6 +936,7 @@ class ModelServingService:
                 mount_destination=v.mount_destination,
                 type=v.type,
                 permission=v.permission,
+                subpath=v.subpath,
             )
             for k, v in action.config.extra_mounts.items()
         }

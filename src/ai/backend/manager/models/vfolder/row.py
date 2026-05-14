@@ -897,6 +897,27 @@ def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) ->
                 )
 
 
+def _normalize_mount_subpath(raw_subpath: str | None) -> str:
+    """Normalize a UUID-keyed mount's ``subpath`` option and reject any
+    attempt to escape the vfolder root.
+
+    Returns the normalized subpath (or ``"."`` when nothing was supplied).
+    Raises :class:`InvalidAPIParameters` when the normalized form would
+    leave the vfolder root via ``..``, ``../…``, or an absolute path.
+
+    Note: ``PurePosixPath('..').is_relative_to('.')`` is ``True`` in
+    Python ≥ 3.12, so the ``is_relative_to`` shorthand cannot be used
+    as the escape guard — the explicit checks below are required.
+    """
+    candidate = raw_subpath if raw_subpath else "."
+    normed = os.path.normpath(candidate)
+    if normed == ".." or normed.startswith("../") or PurePosixPath(normed).is_absolute():
+        raise InvalidAPIParameters(
+            f"The subpath '{candidate}' must not escape the vfolder root.",
+        )
+    return normed
+
+
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -947,7 +968,10 @@ async def prepare_vfolder_mounts(
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
         _already_resolved.add(name)
     for vfolder_uuid, value in requested_mount_map.items():
-        requested_vfolder_subpaths[vfolder_uuid] = "."
+        uuid_opts = requested_mount_options.get(vfolder_uuid)
+        requested_vfolder_subpaths[vfolder_uuid] = _normalize_mount_subpath(
+            uuid_opts.subpath if uuid_opts else None
+        )
         requested_vfolder_dstpaths[vfolder_uuid] = value
     for key, value in requested_mount_name_map.items():
         requested_vfolder_dstpaths[key] = value
@@ -1015,7 +1039,10 @@ async def prepare_vfolder_mounts(
         name = row["name"]
         if vfid in requested_vfolder_ids:
             requested_vfolder_names[vfid] = name
-            requested_vfolder_subpaths[vfid] = "."
+            vfid_opts = requested_mount_options.get(vfid)
+            requested_vfolder_subpaths[vfid] = _normalize_mount_subpath(
+                vfid_opts.subpath if vfid_opts else None
+            )
         if name in _already_resolved:
             continue
         if name not in requested_names:

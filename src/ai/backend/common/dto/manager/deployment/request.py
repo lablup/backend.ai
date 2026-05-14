@@ -247,6 +247,12 @@ class ModelMountConfigInput(BaseRequestModel):
             "`model-definition.yml`."
         ),
     )
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            "Subpath within the model vfolder to mount. ``null`` (default) mounts the vfolder root."
+        ),
+    )
 
 
 class ModelRuntimeConfigInput(BaseRequestModel):
@@ -272,6 +278,12 @@ class ExtraVFolderMountInput(BaseRequestModel):
             "Optional permission override. ``null`` (default) uses the vfolder's own "
             "stored permission; a concrete value (e.g. ``ro``) forces that permission "
             "regardless of what the vfolder grants."
+        ),
+    )
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            "Subpath within the vfolder to mount. ``null`` (default) mounts the vfolder root."
         ),
     )
 

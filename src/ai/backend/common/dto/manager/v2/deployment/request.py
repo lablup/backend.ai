@@ -272,6 +272,14 @@ class ModelMountConfigInput(BaseRequestModel):
             "`model-definition.yml`."
         ),
     )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the model vfolder to mount. ``null`` (default) mounts the vfolder root."
+            " Empty string is rejected; omit the field to mount the root."
+        ),
+    )
 
 
 class ExtraVFolderMountInput(BaseRequestModel):
@@ -285,6 +293,14 @@ class ExtraVFolderMountInput(BaseRequestModel):
             "Optional permission override. ``null`` (default) uses the vfolder's own "
             "stored permission; a concrete value (e.g. ``ro``) forces that permission "
             "regardless of what the vfolder grants."
+        ),
+    )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the vfolder to mount. ``null`` (default) mounts the vfolder root."
+            " Empty string is rejected; omit the field to mount the root."
         ),
     )
 
