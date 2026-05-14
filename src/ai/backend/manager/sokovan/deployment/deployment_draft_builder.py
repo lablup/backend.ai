@@ -44,6 +44,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.deployment import RevisionMissingModelVFolder
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
@@ -80,6 +81,18 @@ class DeploymentSessionDraftBuilder:
             raise RevisionMissingModelVFolder(
                 f"Revision {target_revision.id} has no model vfolder; cannot build session draft"
             )
+        kernel_groups = cls._resolve_kernel_groups(
+            cluster_size=target_revision.cluster_config.size,
+            execution_spec=KernelExecutionSpecDraft(
+                image_id=target_revision.image_id,
+                resources=resource_entries,
+                resource_opts=resource_opts,
+                environ=environ,
+                mounts=mounts,
+                startup_command=startup_command,
+                bootstrap_script=(target_revision.execution.bootstrap_script or None),
+            ),
+        )
 
         return SessionSpecDraft(
             identity=SessionIdentityDraft(
@@ -106,21 +119,7 @@ class DeploymentSessionDraftBuilder:
                 cluster_mode=target_revision.cluster_config.mode,
                 cluster_size=target_revision.cluster_config.size,
                 scheduling_target=SchedulingTargetDraft(),
-                kernel_groups=(
-                    KernelGroupDraft(
-                        role="main",
-                        replica_count=target_revision.cluster_config.size,
-                        execution_spec=KernelExecutionSpecDraft(
-                            image_id=target_revision.image_id,
-                            resources=resource_entries,
-                            resource_opts=resource_opts,
-                            environ=environ,
-                            mounts=mounts,
-                            startup_command=startup_command,
-                            bootstrap_script=(target_revision.execution.bootstrap_script or None),
-                        ),
-                    ),
-                ),
+                kernel_groups=kernel_groups,
                 handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
@@ -129,6 +128,29 @@ class DeploymentSessionDraftBuilder:
                 model_definition=model_definition_payload,
             ),
         )
+
+    @staticmethod
+    def _resolve_kernel_groups(
+        cluster_size: int,
+        execution_spec: KernelExecutionSpecDraft,
+    ) -> tuple[KernelGroupDraft, ...]:
+        # 1 main + (cluster_size - 1) sub, matching legacy registry Shape (a).
+        groups: tuple[KernelGroupDraft, ...] = (
+            KernelGroupDraft(
+                role=DEFAULT_ROLE,
+                replica_count=1,
+                execution_spec=execution_spec,
+            ),
+        )
+        if cluster_size > 1:
+            groups += (
+                KernelGroupDraft(
+                    role="sub",
+                    replica_count=cluster_size - 1,
+                    execution_spec=execution_spec,
+                ),
+            )
+        return groups
 
     @staticmethod
     def _resolve_environ(

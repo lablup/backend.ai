@@ -11,6 +11,8 @@ from ai.backend.common.config import (
     ModelServiceConfig,
 )
 from ai.backend.manager.data.deployment.types import ModelRevisionData
+from ai.backend.manager.data.session.draft import KernelExecutionSpecDraft
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     DeploymentContext,
     ResolvedPresetValues,
@@ -118,3 +120,54 @@ class TestModelDefinitionPayload:
         cmd = payload["models"][0]["service"]["start_command"]
         assert cmd == ["vllm", "serve", "/models", *tokens]
         assert all(" " not in token for token in cmd)
+
+
+class TestKernelGroups:
+    """Multi-node deployment lays out 1 main + (cluster_size - 1) sub."""
+
+    @pytest.fixture
+    def execution_spec(self) -> KernelExecutionSpecDraft:
+        return KernelExecutionSpecDraft()
+
+    @pytest.fixture
+    def kernel_draft_builder(self) -> DeploymentSessionDraftBuilder:
+        return DeploymentSessionDraftBuilder()
+
+    def test_single_node_yields_one_main_group(
+        self,
+        execution_spec: KernelExecutionSpecDraft,
+        kernel_draft_builder: DeploymentSessionDraftBuilder,
+    ) -> None:
+        groups = kernel_draft_builder._resolve_kernel_groups(
+            cluster_size=1, execution_spec=execution_spec
+        )
+
+        assert len(groups) == 1
+        assert groups[0].role == DEFAULT_ROLE
+        assert groups[0].replica_count == 1
+
+    @pytest.mark.parametrize(
+        ("cluster_size", "expected_sub_replicas"),
+        [
+            pytest.param(2, 1, id="size-2"),
+            pytest.param(3, 2, id="size-3"),
+            pytest.param(5, 4, id="size-5"),
+        ],
+    )
+    def test_multi_node_splits_main_and_sub(
+        self,
+        execution_spec: KernelExecutionSpecDraft,
+        cluster_size: int,
+        expected_sub_replicas: int,
+        kernel_draft_builder: DeploymentSessionDraftBuilder,
+    ) -> None:
+        groups = kernel_draft_builder._resolve_kernel_groups(
+            cluster_size=cluster_size, execution_spec=execution_spec
+        )
+
+        assert len(groups) == 2
+        main, sub = groups
+        assert main.role == DEFAULT_ROLE
+        assert main.replica_count == 1
+        assert sub.role == "sub"
+        assert sub.replica_count == expected_sub_replicas

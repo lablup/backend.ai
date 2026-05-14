@@ -84,6 +84,7 @@ from ai.backend.manager.data.session.options import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
@@ -439,6 +440,18 @@ class ModelServingService:
         resource_opts = ResourceOpts.model_validate(action.config.resource_opts or {})
         environ = dict(action.config.environ or {})
         callback_url = URL(action.callback_url.unicode_string()) if action.callback_url else None
+        kernel_groups = await self._resolve_kernel_groups(
+            cluster_size=action.cluster_size,
+            execution_spec=KernelExecutionSpecDraft(
+                image_id=ImageID(image_data.id),
+                resources=resource_entries,
+                resource_opts=resource_opts,
+                environ=environ,
+                mounts=mount_entries,
+                startup_command=action.startup_command,
+                bootstrap_script=action.bootstrap_script or None,
+            ),
+        )
 
         if service_prepare_ctx.scaling_group:
             resource_group_name = ResourceGroupName(service_prepare_ctx.scaling_group)
@@ -474,21 +487,7 @@ class ModelServingService:
                 cluster_mode=action.cluster_mode,
                 cluster_size=action.cluster_size,
                 scheduling_target=SchedulingTargetDraft(),
-                kernel_groups=(
-                    KernelGroupDraft(
-                        role="main",
-                        replica_count=action.cluster_size,
-                        execution_spec=KernelExecutionSpecDraft(
-                            image_id=ImageID(image_data.id),
-                            resources=resource_entries,
-                            resource_opts=resource_opts,
-                            environ=environ,
-                            mounts=mount_entries,
-                            startup_command=action.startup_command,
-                            bootstrap_script=action.bootstrap_script or None,
-                        ),
-                    ),
-                ),
+                kernel_groups=kernel_groups,
                 handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
@@ -537,6 +536,29 @@ class ModelServingService:
 
         task_id = await self._background_task_manager.start(_task)
         return DryRunModelServiceActionResult(task_id)
+
+    async def _resolve_kernel_groups(
+        self,
+        cluster_size: int,
+        execution_spec: KernelExecutionSpecDraft,
+    ) -> tuple[KernelGroupDraft, ...]:
+        # 1 main + (cluster_size - 1) sub, matching legacy registry Shape (a).
+        groups: tuple[KernelGroupDraft, ...] = (
+            KernelGroupDraft(
+                role=DEFAULT_ROLE,
+                replica_count=1,
+                execution_spec=execution_spec,
+            ),
+        )
+        if cluster_size > 1:
+            groups += (
+                KernelGroupDraft(
+                    role="sub",
+                    replica_count=cluster_size - 1,
+                    execution_spec=execution_spec,
+                ),
+            )
+        return groups
 
     async def get_model_service_info(
         self, action: GetModelServiceInfoAction

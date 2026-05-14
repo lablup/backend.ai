@@ -68,6 +68,7 @@ from ai.backend.manager.data.session.options import (
     SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -1599,6 +1600,21 @@ class SessionService:
                 domain_name=domain_name,
                 project_id=ProjectID(action.group_id),
             )
+        kernel_groups = await self._resolve_kernel_groups(
+            cluster_size=action.resource.cluster_size,
+            preopen_ports=preopen_ports,
+            execution_spec=KernelExecutionSpecDraft(
+                image_id=ImageID(action.image_id),
+                resources=resource_entries,
+                resource_opts=resource_opts,
+                environ=environ,
+                mounts=mount_entries,
+                startup_command=startup_command,
+                bootstrap_script=bootstrap_script,
+                starts_at=starts_at,
+                batch_timeout_sec=batch_timeout_sec,
+            ),
+        )
 
         draft = SessionSpecDraft(
             identity=SessionIdentityDraft(
@@ -1636,24 +1652,7 @@ class SessionService:
                         AgentId(a) for a in (action.scheduling.agent_list or ())
                     ),
                 ),
-                kernel_groups=(
-                    KernelGroupDraft(
-                        role="main",
-                        replica_count=action.resource.cluster_size,
-                        preopen_ports=preopen_ports,
-                        execution_spec=KernelExecutionSpecDraft(
-                            image_id=ImageID(action.image_id),
-                            resources=resource_entries,
-                            resource_opts=resource_opts,
-                            environ=environ,
-                            mounts=mount_entries,
-                            startup_command=startup_command,
-                            bootstrap_script=bootstrap_script,
-                            starts_at=starts_at,
-                            batch_timeout_sec=batch_timeout_sec,
-                        ),
-                    ),
-                ),
+                kernel_groups=kernel_groups,
                 handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
@@ -1666,3 +1665,29 @@ class SessionService:
         session_data = await self._session_repository.get_session_data_by_id(session_id)
 
         return EnqueueSessionActionResult(session_data=session_data)
+
+    async def _resolve_kernel_groups(
+        self,
+        cluster_size: int,
+        preopen_ports: tuple[int, ...],
+        execution_spec: KernelExecutionSpecDraft,
+    ) -> tuple[KernelGroupDraft, ...]:
+        # 1 main + (cluster_size - 1) sub, matching legacy registry Shape (a).
+        groups: tuple[KernelGroupDraft, ...] = (
+            KernelGroupDraft(
+                role=DEFAULT_ROLE,
+                replica_count=1,
+                preopen_ports=preopen_ports,
+                execution_spec=execution_spec,
+            ),
+        )
+        if cluster_size > 1:
+            groups += (
+                KernelGroupDraft(
+                    role="sub",
+                    replica_count=cluster_size - 1,
+                    preopen_ports=preopen_ports,
+                    execution_spec=execution_spec,
+                ),
+            )
+        return groups
