@@ -431,7 +431,7 @@ class Context(metaclass=ABCMeta):
             await wget(url, dst_supergraph)
             self.log_header(f"Downloaded supergraph.graphql -> {dst_supergraph}")
 
-        dst_compose_path = self.copy_config("docker-compose.yml")
+        dst_compose_path = self.copy_config("docker-compose.halfstack.current.yml")
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
         self.copy_config("grafana-provisioning")
@@ -466,12 +466,13 @@ class Context(metaclass=ABCMeta):
         if self.install_variable.enable_storage:
             profile_args_list.append("--profile storage")
         profile_args = " ".join(profile_args_list)
+        compose_file_arg = "-f docker-compose.halfstack.current.yml"
         await self.run_shell(
             f"""
-        {sudo} docker compose {profile_args} pull && \\
-        {sudo} docker compose {profile_args} up -d --wait backendai-half-db && \\
-        {sudo} docker compose {profile_args} up -d --wait && \\
-        {sudo} docker compose {profile_args} ps
+        {sudo} docker compose {compose_file_arg} {profile_args} pull && \\
+        {sudo} docker compose {compose_file_arg} {profile_args} up -d --wait backendai-half-db && \\
+        {sudo} docker compose {compose_file_arg} {profile_args} up -d --wait && \\
+        {sudo} docker compose {compose_file_arg} {profile_args} ps
         """,
             cwd=self.install_info.base_path,
         )
