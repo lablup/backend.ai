@@ -9897,7 +9897,6 @@ Added in 25.19.0. Represents the current replica state of a deployment, includin
 """
 type ReplicaState {
   desiredReplicaCount: Int!
-  replicaIds: [UUID!]!
 }
 
 """
