@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -115,6 +116,7 @@ class ScalingGroupSchedulerConfig:
 
 @dataclass
 class ScalingGroupData:
+    id: uuid.UUID
     name: str
     status: ScalingGroupStatus
     metadata: ScalingGroupMetadata
