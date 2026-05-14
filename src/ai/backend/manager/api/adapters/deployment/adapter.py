@@ -35,7 +35,7 @@ from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo, Resou
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AccessTokenFilter,
     ActivateRevisionInput,
-    AddRevisionGQLInputDTO,
+    AddRevisionInput,
     AddRevisionOptions,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
@@ -1073,12 +1073,12 @@ class DeploymentAdapter(BaseAdapter):
 
     async def add_revision(
         self,
-        input: AddRevisionGQLInputDTO,
+        input: AddRevisionInput,
         options: AddRevisionOptions,
     ) -> AddRevisionPayload:
         """Add a new model revision to a deployment.
 
-        Every sub-config on ``AddRevisionGQLInputDTO`` is optional. A
+        Every sub-config on ``AddRevisionInput`` is optional. A
         missing sub-config flows through as ``None`` and is filled by
         the merge chain in ``DeploymentController.add_revision`` (preset,
         runtime variant baseline, vfolder config files, existing
@@ -1092,39 +1092,55 @@ class DeploymentAdapter(BaseAdapter):
             )
             for m in (input.extra_mounts or [])
         ]
+
         mounts_creator = VFolderMountsCreator(
             model_vfolder_id=input.model_mount_config.vfolder_id,
             model_definition_path=input.model_mount_config.definition_path,
             model_mount_destination=input.model_mount_config.mount_destination,
             extra_mounts=extra_mounts,
         )
-        adder = ModelRevisionCreator(
-            image_id=input.image.id if input.image is not None else None,
-            resource_spec=ResourceSpec(
+
+        image_id = input.image.id if input.image is not None else None
+
+        resource_spec = None
+        if input.cluster_config is not None and input.resource_config is not None:
+            resource_opts = (
+                {e.name: e.value for e in input.resource_config.resource_opts.entries}
+                if input.resource_config.resource_opts
+                else None
+            )
+            resource_spec = ResourceSpec(
                 cluster_mode=input.cluster_config.mode,
                 cluster_size=input.cluster_config.size,
                 resource_slots={
                     e.resource_type: e.quantity
                     for e in input.resource_config.resource_slots.entries
                 },
-                resource_opts={e.name: e.value for e in input.resource_config.resource_opts.entries}
-                if input.resource_config.resource_opts
-                else None,
+                resource_opts=resource_opts,
             )
-            if input.cluster_config is not None and input.resource_config is not None
-            else None,
-            mounts=mounts_creator,
-            execution=ExecutionSpec(
-                runtime_variant_id=input.model_runtime_config.runtime_variant_id,
-                environ={e.name: e.value for e in input.model_runtime_config.environ.entries}
+
+        execution = None
+        if input.model_runtime_config is not None:
+            environ = (
+                {e.name: e.value for e in input.model_runtime_config.environ.entries}
                 if input.model_runtime_config.environ
-                else None,
+                else None
             )
-            if input.model_runtime_config is not None
-            else None,
-            model_definition=input.model_definition.to_draft()
-            if input.model_definition is not None
-            else None,
+            execution = ExecutionSpec(
+                runtime_variant_id=input.model_runtime_config.runtime_variant_id,
+                environ=environ,
+            )
+
+        model_definition = (
+            input.model_definition.to_draft() if input.model_definition is not None else None
+        )
+
+        adder = ModelRevisionCreator(
+            image_id=image_id,
+            resource_spec=resource_spec,
+            mounts=mounts_creator,
+            execution=execution,
+            model_definition=model_definition,
             revision_preset_id=input.revision_preset_id,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(

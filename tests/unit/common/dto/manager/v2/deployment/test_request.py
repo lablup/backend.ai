@@ -14,12 +14,11 @@ from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateDeploymentInput,
-    AddRevisionInput,
     BlueGreenConfigInput,
     ClusterConfigInput,
     CreateAccessTokenInput,
     CreateDeploymentInput,
-    CreateRevisionInputDTO,
+    CreateRevisionInput,
     DeleteDeploymentInput,
     DeploymentStrategyInput,
     ExtraVFolderMountInput,
@@ -32,7 +31,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceConfigInput,
     ResourceSlotEntryInput,
     ResourceSlotInput,
-    RevisionInput,
     RollingUpdateConfigInput,
     ScaleDeploymentInput,
     UpdateDeploymentInput,
@@ -45,22 +43,7 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 
 
-def _make_revision_input(**kwargs: object) -> RevisionInput:
-    defaults: dict[str, Any] = {
-        "image_id": ImageID(uuid.uuid4()),
-        "cluster_mode": ClusterMode.SINGLE_NODE,
-        "cluster_size": 1,
-        "resource_slots": {"cpu": "2", "mem": "4g"},
-        "runtime_variant_id": RuntimeVariantID(uuid.uuid4()),
-        "model_vfolder_id": VFolderUUID(uuid.uuid4()),
-        "model_definition_path": "/models/model.yaml",
-        "model_definition": ModelDefinitionInput(),
-    }
-    defaults.update(kwargs)
-    return RevisionInput(**defaults)
-
-
-def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
+def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInput:
     defaults: dict[str, Any] = {
         "cluster_config": ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
         "resource_config": ResourceConfigInput(
@@ -83,55 +66,7 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
         "model_definition": ModelDefinitionInput(),
     }
     defaults.update(kwargs)
-    return CreateRevisionInputDTO(**defaults)
-
-
-class TestRevisionInput:
-    """Tests for RevisionInput model creation and validation."""
-
-    def test_valid_creation_with_required_fields(self) -> None:
-        image_id = ImageID(uuid.uuid4())
-        model_id = VFolderUUID(uuid.uuid4())
-        runtime_variant_id = RuntimeVariantID(uuid.uuid4())
-        rev = RevisionInput(
-            image_id=image_id,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            resource_slots={"cpu": "2"},
-            runtime_variant_id=runtime_variant_id,
-            model_vfolder_id=model_id,
-            model_definition_path="/models/def.yaml",
-            model_definition=ModelDefinitionInput(),
-        )
-        assert rev.image_id == image_id
-        assert rev.cluster_mode == ClusterMode.SINGLE_NODE
-        assert rev.model_vfolder_id == model_id
-        assert rev.model_definition_path == "/models/def.yaml"
-
-    def test_runtime_variant_id_is_preserved(self) -> None:
-        runtime_variant_id = RuntimeVariantID(uuid.uuid4())
-        rev = _make_revision_input(runtime_variant_id=runtime_variant_id)
-        assert rev.runtime_variant_id == runtime_variant_id
-
-    def test_optional_extra_mounts_defaults_to_none(self) -> None:
-        rev = _make_revision_input()
-        assert rev.extra_mounts is None
-
-    def test_optional_environ_defaults_to_none(self) -> None:
-        rev = _make_revision_input()
-        assert rev.environ is None
-
-    def test_cluster_size_must_be_at_least_one_when_provided(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            _make_revision_input(cluster_size=0)
-
-    def test_with_extra_mounts(self) -> None:
-        mount = ExtraVFolderMountInput(
-            vfolder_id=VFolderUUID(uuid.uuid4()), mount_destination="/data"
-        )
-        rev = _make_revision_input(extra_mounts=[mount])
-        assert rev.extra_mounts is not None
-        assert len(rev.extra_mounts) == 1
-        assert rev.extra_mounts[0].mount_destination == "/data"
+    return CreateRevisionInput(**defaults)
 
 
 class TestExtraVFolderMountInput:
@@ -523,32 +458,6 @@ class TestScaleDeploymentInput:
     def test_missing_id_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScaleDeploymentInput.model_validate({"replicas": 3})
-
-
-class TestAddRevisionInput:
-    """Tests for AddRevisionInput model creation and validation."""
-
-    def test_valid_creation(self) -> None:
-        deployment_id = uuid.uuid4()
-        rev = _make_revision_input()
-        inp = AddRevisionInput(deployment_id=deployment_id, revision=rev)
-        assert inp.deployment_id == deployment_id
-        assert inp.revision is not None
-        assert inp.revision.cluster_mode == ClusterMode.SINGLE_NODE
-
-    def test_missing_deployment_id_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            AddRevisionInput.model_validate({"revision": {}})
-
-    def test_round_trip(self) -> None:
-        deployment_id = uuid.uuid4()
-        rev = _make_revision_input()
-        inp = AddRevisionInput(deployment_id=deployment_id, revision=rev)
-        json_str = inp.model_dump_json()
-        restored = AddRevisionInput.model_validate_json(json_str)
-        assert restored.deployment_id == deployment_id
-        assert restored.revision is not None
-        assert restored.revision.cluster_mode == ClusterMode.SINGLE_NODE
 
 
 class TestCreateAccessTokenInput:

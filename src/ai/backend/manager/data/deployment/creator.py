@@ -27,15 +27,15 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 
 @dataclass
 class VFolderMountsCreator:
-    # ``model_vfolder_id`` is required: ``AddRevisionInput`` makes
-    # ``model_mount_config`` a required input (the revision preset does not
-    # carry a model vfolder), so the write path always supplies a concrete
-    # vfolder id. The other fields keep server-side column defaults so a
-    # partial mount config still produces a valid row.
+    # All fields are required: ``AddRevisionInput`` mandates
+    # ``model_mount_config`` (the revision preset does not carry a model
+    # vfolder), so the write path always supplies a concrete vfolder id
+    # and mount destination. Callers fill ``model_definition_path=None``
+    # and ``extra_mounts=[]`` explicitly when those are absent.
     model_vfolder_id: VFolderUUID
-    model_definition_path: str | None = None
-    model_mount_destination: str = "/models"
-    extra_mounts: list[MountInfo] = field(default_factory=list)
+    model_definition_path: str | None
+    model_mount_destination: str
+    extra_mounts: list[MountInfo]
 
 
 @dataclass

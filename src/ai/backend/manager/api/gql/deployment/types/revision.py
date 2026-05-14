@@ -20,14 +20,16 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    AddRevisionGQLInputDTO,
-    CreateRevisionInputDTO,
+    AddRevisionInput as AddRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionOptions as AddRevisionOptionsDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ClusterConfigInput as ClusterConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    CreateRevisionInput as CreateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     EnvironmentVariableEntryInput as EnvironmentVariableEntryInputDTO,
@@ -917,7 +919,6 @@ class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionInputDTO]):
     ),
 )
 class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
-    name: str | None = None
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
@@ -960,7 +961,7 @@ class AddRevisionOptionsGQL(PydanticInputMixin[AddRevisionOptionsDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
+class AddRevisionInput(PydanticInputMixin[AddRevisionInputDTO]):
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
