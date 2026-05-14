@@ -87,8 +87,8 @@ class PrometheusClient:
 
         instant_res = await self._query_instant(queries.instant)
         rate_current_res = await self._query_instant(queries.rate_current)
-        # rate_max/rate_avg wrap rate() first because cpu_util/net_rx/net_tx are cumulative counters
-        # aggregating their raw values would just track the running total.
+        # max/rate_max and avg/rate_avg are split: gauge metrics can be aggregated
+        # directly, but cumulative counters (cpu_util/net_rx/net_tx) need rate() first.
         max_res = await self._query_instant(queries.max)
         rate_max_res = await self._query_instant(queries.rate_max)
         avg_res = await self._query_instant(queries.avg)
