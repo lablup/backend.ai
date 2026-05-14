@@ -1002,7 +1002,7 @@ class ModelDeploymentMetadataInfo:
     tags: list[str]
     project_id: UUID
     domain_name: str
-    resource_group: str
+    resource_group_name: str
     created_at: datetime
     updated_at: datetime
 

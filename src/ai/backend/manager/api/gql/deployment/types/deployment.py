@@ -167,6 +167,7 @@ from ai.backend.manager.data.deployment.types import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
@@ -231,12 +232,29 @@ class ModelDeploymentMetadata:
     tags: list[str]
     created_at: datetime
     updated_at: datetime
-    resource_group: str = gql_added_field(
+    resource_group_name: str = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Name of the resource group (scaling group) this deployment runs in.",
         )
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The resource group this deployment runs in, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def resource_group(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
     @gql_field(
         description="The project of this entity.",
