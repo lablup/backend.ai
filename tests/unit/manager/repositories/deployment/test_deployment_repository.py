@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -736,7 +737,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         """Test fetching service discovery info for a single route with inference port."""
         kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
 
-        result = await deployment_repository.fetch_route_service_discovery_info({test_route_id})
+        result = await deployment_repository.fetch_route_service_discovery_info({
+            ReplicaID(test_route_id)
+        })
 
         assert len(result) == 1
         info = result[0]
@@ -777,7 +780,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(route)
             await db_sess.flush()
 
-        result = await deployment_repository.fetch_route_service_discovery_info({route_id})
+        result = await deployment_repository.fetch_route_service_discovery_info({
+            ReplicaID(route_id)
+        })
 
         # Should return empty list because kernel has no inference port
         assert len(result) == 0
@@ -796,7 +801,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that nonexistent route IDs return empty list."""
-        nonexistent_id = uuid.uuid4()
+        nonexistent_id = ReplicaID(uuid.uuid4())
 
         result = await deployment_repository.fetch_route_service_discovery_info({nonexistent_id})
 
@@ -815,7 +820,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     ) -> None:
         """Test fetching service discovery info for multiple routes."""
         # Create 3 sets of endpoint/session/kernel/route
-        route_ids = set()
+        route_ids: set[ReplicaID] = set()
         endpoint_ids = []
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -969,7 +974,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 db_sess.add(kernel)
 
                 # Create route
-                route_id = uuid.uuid4()
+                route_id = ReplicaID(uuid.uuid4())
                 route = RoutingRow(
                     id=route_id,
                     endpoint=endpoint_id,

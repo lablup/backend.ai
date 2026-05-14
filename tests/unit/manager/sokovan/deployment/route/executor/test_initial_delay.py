@@ -21,6 +21,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import RouteHealthR
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
@@ -39,7 +40,7 @@ def _make_route(
     session_id: SessionId | None = None,
 ) -> RouteData:
     return RouteData(
-        route_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
         deployment_id=DeploymentID(uuid4()),
         session_id=session_id or SessionId(uuid4()),
         status=RouteStatus.RUNNING,

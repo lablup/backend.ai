@@ -34,6 +34,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
@@ -53,7 +54,7 @@ def _route_with_replica(
     session_id: SessionId | None = None,
 ) -> RouteData:
     return RouteData(
-        route_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
         deployment_id=endpoint_id,
         session_id=session_id if session_id is not None else SessionId(uuid4()),
         status=RouteStatus.RUNNING,

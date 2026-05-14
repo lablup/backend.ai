@@ -17,6 +17,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
@@ -32,7 +33,7 @@ from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResu
 
 def _route(health_status: RouteHealthStatus) -> RouteData:
     return RouteData(
-        route_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
         deployment_id=DeploymentID(uuid4()),
         session_id=SessionId(uuid4()),
         status=RouteStatus.RUNNING,

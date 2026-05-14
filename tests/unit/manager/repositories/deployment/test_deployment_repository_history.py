@@ -14,6 +14,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import RouteHandlerCategory, RouteStatus
@@ -882,7 +883,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         ]
         history_specs = [
             RouteHistoryCreatorSpec(
-                route_id=test_provisioning_route_id,
+                route_id=ReplicaID(test_provisioning_route_id),
                 deployment_id=test_endpoint_id,
                 category=RouteHandlerCategory.LIFECYCLE,
                 phase="provisioning",
@@ -1507,7 +1508,7 @@ class TestRouteHistoryMergeLogic:
         ]
         history_specs = [
             RouteHistoryCreatorSpec(
-                route_id=route_id,
+                route_id=ReplicaID(route_id),
                 deployment_id=endpoint_id,
                 category=RouteHandlerCategory.LIFECYCLE,
                 phase="provisioning",  # Same
@@ -1550,7 +1551,7 @@ class TestRouteHistoryMergeLogic:
         ]
         history_specs = [
             RouteHistoryCreatorSpec(
-                route_id=route_id,
+                route_id=ReplicaID(route_id),
                 deployment_id=endpoint_id,
                 category=RouteHandlerCategory.LIFECYCLE,
                 phase="provisioning",  # Same

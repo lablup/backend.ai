@@ -13,6 +13,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -178,7 +179,7 @@ def _create_route_data(
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
-        route_id=route_id or uuid4(),
+        route_id=ReplicaID(route_id) if route_id is not None else ReplicaID(uuid4()),
         deployment_id=DeploymentID(endpoint_id or uuid4()),
         session_id=None,
         status=status,

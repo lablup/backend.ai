@@ -12,6 +12,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
     RouteHealthStatus,
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
 def sample_route_data() -> RouteData:
     """Sample RouteData for testing."""
     return RouteData(
-        route_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
         deployment_id=DeploymentID(uuid4()),
         session_id=None,
         status=RouteStatus.PROVISIONING,
@@ -389,7 +390,7 @@ class TestProcessRouteLifecycle:
         mock_deployment_repository.search_route_datas_with_last_history = AsyncMock(
             return_value=[
                 RouteData(
-                    route_id=uuid4(),
+                    route_id=ReplicaID(uuid4()),
                     deployment_id=DeploymentID(uuid4()),
                     session_id=None,
                     status=RouteStatus.RUNNING,
