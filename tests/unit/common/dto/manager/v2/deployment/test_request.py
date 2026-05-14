@@ -14,6 +14,7 @@ from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateDeploymentInput,
+    AddRevisionInput,
     BlueGreenConfigInput,
     ClusterConfigInput,
     CreateAccessTokenInput,
@@ -458,6 +459,117 @@ class TestScaleDeploymentInput:
     def test_missing_id_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScaleDeploymentInput.model_validate({"replicas": 3})
+
+
+def _make_model_mount_config_input(**kwargs: object) -> ModelMountConfigInput:
+    defaults: dict[str, Any] = {
+        "vfolder_id": VFolderUUID(uuid.uuid4()),
+        "mount_destination": "/models",
+        "definition_path": "/models/model.yaml",
+    }
+    defaults.update(kwargs)
+    return ModelMountConfigInput(**defaults)
+
+
+class TestCreateRevisionInput:
+    """Tests for CreateRevisionInput model creation and validation.
+
+    All five sub-configs (cluster_config, resource_config, image,
+    model_runtime_config, model_mount_config) are required.
+    """
+
+    def test_valid_creation_with_required_fields(self) -> None:
+        rev = _make_create_revision_input_dto()
+        assert rev.cluster_config.mode == ClusterMode.SINGLE_NODE
+        assert rev.image.id is not None
+        assert rev.model_mount_config.vfolder_id is not None
+
+    def test_missing_model_mount_config_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateRevisionInput.model_validate({
+                "cluster_config": {"mode": "SINGLE_NODE", "size": 1},
+                "resource_config": {
+                    "resource_slots": {"entries": [{"resource_type": "cpu", "quantity": "1"}]}
+                },
+                "image": {"id": str(uuid.uuid4())},
+                "model_runtime_config": {"runtime_variant_id": str(uuid.uuid4())},
+            })
+
+    def test_missing_image_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateRevisionInput.model_validate({
+                "cluster_config": {"mode": "SINGLE_NODE", "size": 1},
+                "resource_config": {
+                    "resource_slots": {"entries": [{"resource_type": "cpu", "quantity": "1"}]}
+                },
+                "model_runtime_config": {"runtime_variant_id": str(uuid.uuid4())},
+                "model_mount_config": {
+                    "vfolder_id": str(uuid.uuid4()),
+                    "mount_destination": "/models",
+                },
+            })
+
+    def test_auto_activate_defaults_to_false(self) -> None:
+        rev = _make_create_revision_input_dto()
+        assert rev.auto_activate is False
+
+    def test_round_trip(self) -> None:
+        rev = _make_create_revision_input_dto()
+        restored = CreateRevisionInput.model_validate_json(rev.model_dump_json())
+        assert restored.cluster_config.mode == ClusterMode.SINGLE_NODE
+        assert restored.model_mount_config.vfolder_id == rev.model_mount_config.vfolder_id
+
+
+class TestAddRevisionInput:
+    """Tests for AddRevisionInput model creation and validation.
+
+    ``deployment_id`` and ``model_mount_config`` are required; every
+    other sub-config is optional (the revision merge chain fills in
+    missing fields from preset / runtime variant baseline / existing
+    revision).
+    """
+
+    def test_valid_creation_with_only_required_fields(self) -> None:
+        deployment_id = uuid.uuid4()
+        mount_config = _make_model_mount_config_input()
+        inp = AddRevisionInput(deployment_id=deployment_id, model_mount_config=mount_config)
+        assert inp.deployment_id == deployment_id
+        assert inp.model_mount_config.vfolder_id == mount_config.vfolder_id
+
+    def test_optional_sub_configs_default_to_none(self) -> None:
+        inp = AddRevisionInput(
+            deployment_id=uuid.uuid4(),
+            model_mount_config=_make_model_mount_config_input(),
+        )
+        assert inp.cluster_config is None
+        assert inp.resource_config is None
+        assert inp.image is None
+        assert inp.model_runtime_config is None
+        assert inp.model_definition is None
+        assert inp.extra_mounts is None
+        assert inp.options is None
+        assert inp.revision_preset_id is None
+
+    def test_missing_model_mount_config_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            AddRevisionInput.model_validate({"deployment_id": str(uuid.uuid4())})
+
+    def test_missing_deployment_id_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            AddRevisionInput.model_validate({
+                "model_mount_config": {
+                    "vfolder_id": str(uuid.uuid4()),
+                    "mount_destination": "/models",
+                }
+            })
+
+    def test_round_trip(self) -> None:
+        deployment_id = uuid.uuid4()
+        mount_config = _make_model_mount_config_input()
+        inp = AddRevisionInput(deployment_id=deployment_id, model_mount_config=mount_config)
+        restored = AddRevisionInput.model_validate_json(inp.model_dump_json())
+        assert restored.deployment_id == deployment_id
+        assert restored.model_mount_config.vfolder_id == mount_config.vfolder_id
 
 
 class TestCreateAccessTokenInput:
