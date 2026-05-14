@@ -41,6 +41,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     cluster_size: int
     model_vfolder_id: VFolderUUID
     model_mount_destination: str
+    vfolder_subpath: str | None
     model_definition_path: str | None
     model_definition: ModelDefinition | None
     startup_command: str | None
@@ -67,6 +68,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             image=self.image_id,
             model=self.model_vfolder_id,
             model_mount_destination=self.model_mount_destination,
+            vfolder_subpath=self.vfolder_subpath,
             model_definition_path=self.model_definition_path,
             model_definition=self.model_definition,
             resource_group=self.resource_group,

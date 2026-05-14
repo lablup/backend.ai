@@ -56,8 +56,6 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     MountInfoEntry,
-    MountPermission,
-    MountTypes,
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -675,15 +673,9 @@ class ServiceHandler:
                 model_definition_path=params.config.model_definition_path,
                 model_version=params.config.model_version,
                 model_mount_destination=params.config.model_mount_destination,
+                vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts={
-                    k: MountOption(
-                        mount_destination=v.get("mount_destination"),
-                        type=MountTypes(v["type"]) if v.get("type") else MountTypes.BIND,
-                        permission=MountPermission(v["permission"])
-                        if v.get("permission")
-                        else None,
-                    )
-                    for k, v in params.config.extra_mounts.items()
+                    k: MountOption.from_model(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
                 scaling_group=params.config.scaling_group,
@@ -725,11 +717,13 @@ class ServiceHandler:
                 model_vfolder_id=validation_result.model_vfolder_id,
                 model_definition_path=validation_result.model_definition_path,
                 model_mount_destination=params.config.model_mount_destination,
+                vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts=[
                     MountInfoEntry(
                         vfolder_id=VFolderUUID(m.vfid.folder_id),
                         mount_destination=m.kernel_path.as_posix(),
                         mount_perm=m.mount_perm,
+                        subpath=str(m.vfsubpath),
                     )
                     for m in validation_result.extra_mounts
                 ],
@@ -781,15 +775,9 @@ class ServiceHandler:
                 model_definition_path=params.config.model_definition_path,
                 model_version=params.config.model_version,
                 model_mount_destination=params.config.model_mount_destination,
+                vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts={
-                    k: MountOption(
-                        mount_destination=v.get("mount_destination"),
-                        type=MountTypes(v["type"]) if v.get("type") else MountTypes.BIND,
-                        permission=MountPermission(v["permission"])
-                        if v.get("permission")
-                        else None,
-                    )
-                    for k, v in params.config.extra_mounts.items()
+                    k: MountOption.from_model(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
                 scaling_group=params.config.scaling_group,

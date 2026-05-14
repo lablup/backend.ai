@@ -185,6 +185,7 @@ class DeploymentSessionDraftBuilder:
                     target_revision.model_mount_config.mount_destination or "/models"
                 ),
                 mount_perm=MountPermission.READ_ONLY,
+                subpath=target_revision.model_mount_config.subpath,
             ),
             *target_revision.model_mount_config.extra_mounts,
         )

@@ -94,6 +94,10 @@ class ExtraVFolderMountNode(BaseResponseModel):
             "later vfolder permission changes do not retroactively affect it."
         ),
     )
+    subpath: str | None = Field(
+        default=None,
+        description=("Subpath within the vfolder. ``None`` means the vfolder root."),
+    )
 
 
 class RevisionNode(BaseResponseModel):

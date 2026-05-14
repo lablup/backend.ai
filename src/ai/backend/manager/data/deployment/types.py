@@ -346,11 +346,15 @@ class MountInfo:
     the override directly. Resolved to a concrete ``MountInfoEntry``
     (non-nullable ``mount_perm``) before persisting so the stored row
     becomes an immutable permission snapshot.
+
+    ``subpath`` is the path within the vfolder to mount. ``None`` means
+    the vfolder root.
     """
 
     vfolder_id: VFolderUUID
     mount_destination: str | None = None
     mount_perm: MountPermission | None = None
+    subpath: str | None = None
 
 
 @dataclass
@@ -364,6 +368,8 @@ class MountMetadata:
     model_definition_path: str | None
     model_mount_destination: str
     extra_mounts: list[MountInfoEntry]
+    # Subpath within the model vfolder. ``None`` means the vfolder root.
+    vfolder_subpath: str | None = None
 
 
 @dataclass
@@ -906,6 +912,8 @@ class ModelMountConfigData:
     # this data-layer projection — keeps ``mount_perm`` visible end-to-end
     # so modify flows can carry it over without information loss.
     extra_mounts: list[MountInfoEntry]
+    # Subpath within the model vfolder. ``None`` means the vfolder root.
+    subpath: str | None = None
 
 
 @dataclass

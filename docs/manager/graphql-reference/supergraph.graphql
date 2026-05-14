@@ -6778,6 +6778,11 @@ type ExtraVFolderMountInfoGQL
   The concrete permission snapshot fixed at revision-write time. ``INHERIT`` policies are resolved against the vfolder's current permission at that point, so this value is immutable and does not change when the vfolder's permission later changes. ``None`` when the caller left it unset to inherit the vfolder's stored permission at session-creation time (task #83).
   """
   mountPerm: MountPermission!
+
+  """
+  Added in UNRELEASED. Subpath within the vfolder. ``None`` means the vfolder root.
+  """
+  subpath: String
 }
 
 """Added in 25.19.0. """
@@ -6786,6 +6791,11 @@ input ExtraVFolderMountInput
 {
   vfolderId: ID!
   mountDestination: String
+
+  """
+  Added in UNRELEASED. Subpath within the vfolder. ``null`` (default) mounts the vfolder root.
+  """
+  subpath: String = null
 }
 
 """
@@ -9563,6 +9573,11 @@ type ModelMountConfig
   vfolderId: ID!
   mountDestination: String!
   definitionPath: String!
+
+  """
+  Added in UNRELEASED. Subpath within the model vfolder. ``None`` means the vfolder root.
+  """
+  subpath: String
 }
 
 """Added in 25.19.0. """
@@ -9572,6 +9587,11 @@ input ModelMountConfigInput
   vfolderId: ID!
   mountDestination: String!
   definitionPath: String = null
+
+  """
+  Added in UNRELEASED. Subpath within the model vfolder. ``null`` (default) mounts the vfolder root.
+  """
+  subpath: String = null
 }
 
 """

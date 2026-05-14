@@ -454,6 +454,7 @@ def build_revision_creator(
                 vfolder_id=mount.vfolder_id,
                 mount_destination=mount.mount_destination,
                 mount_perm=mount.mount_perm,
+                subpath=mount.subpath,
             )
             for mount in revision_input.extra_mounts
         ]
@@ -463,6 +464,7 @@ def build_revision_creator(
         model_definition_path=revision_input.model_mount_config.definition_path,
         model_mount_destination=revision_input.model_mount_config.mount_destination,
         extra_mounts=extra_mounts,
+        vfolder_subpath=revision_input.model_mount_config.subpath,
     )
 
     execution = ExecutionSpec(

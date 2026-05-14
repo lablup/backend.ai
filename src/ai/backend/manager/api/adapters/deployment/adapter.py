@@ -484,9 +484,11 @@ class DeploymentAdapter(BaseAdapter):
                         vfolder_id=m.vfolder_id,
                         mount_destination=m.mount_destination,
                         mount_perm=m.mount_perm,
+                        subpath=m.subpath,
                     )
                     for m in (initial_revision.extra_mounts or [])
                 ],
+                vfolder_subpath=initial_revision.model_mount_config.subpath,
             )
             model_revision_creator = ModelRevisionCreator(
                 image_id=initial_revision.image.id,
@@ -1089,6 +1091,7 @@ class DeploymentAdapter(BaseAdapter):
                 vfolder_id=m.vfolder_id,
                 mount_destination=m.mount_destination,
                 mount_perm=m.mount_perm,
+                subpath=m.subpath,
             )
             for m in (input.extra_mounts or [])
         ]
@@ -1098,6 +1101,7 @@ class DeploymentAdapter(BaseAdapter):
             model_definition_path=input.model_mount_config.definition_path,
             model_mount_destination=input.model_mount_config.mount_destination,
             extra_mounts=extra_mounts,
+            vfolder_subpath=input.model_mount_config.subpath,
         )
 
         image_id = input.image.id if input.image is not None else None
@@ -2245,6 +2249,7 @@ class DeploymentAdapter(BaseAdapter):
                 vfolder_id=str(data.model_mount_config.vfolder_id),
                 mount_destination=data.model_mount_config.mount_destination,
                 definition_path=data.model_mount_config.definition_path,
+                subpath=data.model_mount_config.subpath,
             )
         return RevisionNode(
             id=data.id,
@@ -2296,6 +2301,7 @@ class DeploymentAdapter(BaseAdapter):
                     vfolder_id=str(m.vfolder_id),
                     mount_destination=m.mount_destination,
                     mount_perm=m.mount_perm,
+                    subpath=m.subpath,
                 )
                 for m in data.model_mount_config.extra_mounts
             ],

@@ -250,12 +250,15 @@ class AgentRegistry:
                     perm = MountPermission(raw_perm)
                 except ValueError:
                     perm = None
+            raw_subpath = opts.get("subpath")
+            subpath_value = str(raw_subpath) if raw_subpath is not None else None
             dst_path = mount_id_map.get(vfolder_uuid) or mount_id_map.get(raw_id)
             entries.append(
                 MountInfoEntry(
                     vfolder_id=VFolderUUID(vfolder_uuid),
                     mount_destination=dst_path,
                     mount_perm=perm,
+                    subpath=subpath_value,
                 )
             )
         return tuple(entries)

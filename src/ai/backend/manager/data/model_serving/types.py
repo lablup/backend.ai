@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ from pydantic import HttpUrl
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.model_serving.request import ExtraMountModel
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -187,16 +189,28 @@ class ModelServicePrepareCtx:
 
 @dataclass
 class MountOption:
+    """Per-vfolder extra mount option."""
+
     mount_destination: str | None
     type: MountTypes
     permission: MountPermission | None
+    subpath: str | None = None
+
+    @classmethod
+    def from_model(cls, model: ExtraMountModel) -> MountOption:
+        """Convert a wire-level ``ExtraMountModel`` (DTO) into a ``MountOption``."""
+        return cls(
+            mount_destination=model.mount_destination,
+            type=model.type,
+            permission=model.permission,
+            subpath=model.subpath,
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "mount_destination": self.mount_destination,
-            "type": self.type.value,
-            "permission": self.permission.value if self.permission else None,
-        }
+        # ``MountTypes`` / ``MountPermission`` are ``StrEnum``s, so the enum
+        # instances ``dataclasses.asdict`` returns serialise as their string
+        # value under ``json.dumps`` — no manual ``.value`` extraction needed.
+        return dataclasses.asdict(self)
 
 
 @dataclass
@@ -233,12 +247,14 @@ class ServiceConfig:
     scaling_group: str
     resources: dict[str, str | int | float] | None
     resource_opts: dict[str, str | int | bool] | None
+    vfolder_subpath: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "model": self.model,
             "model_definition_path": self.model_definition_path,
             "model_mount_destination": self.model_mount_destination,
+            "vfolder_subpath": self.vfolder_subpath,
             "extra_mounts": {key: value.to_dict() for key, value in self.extra_mounts.items()},
             "environ": self.environ if self.environ is not None else {},
             "scaling_group": self.scaling_group,

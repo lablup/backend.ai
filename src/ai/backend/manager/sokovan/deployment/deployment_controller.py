@@ -280,6 +280,7 @@ class DeploymentController:
                 vfolder_id=m.vfolder_id,
                 mount_destination=m.mount_destination,
                 mount_perm=m.mount_perm,
+                subpath=m.subpath,
             )
             for m in draft.draft_model_revision.mounts.extra_mounts
         ]
@@ -291,6 +292,7 @@ class DeploymentController:
                 model_definition_path=model_revision_spec.mounts.model_definition_path,
                 model_mount_destination=model_revision_spec.mounts.model_mount_destination,
                 extra_mounts=legacy_extra_mounts,
+                vfolder_subpath=model_revision_spec.mounts.vfolder_subpath,
             ),
             execution=model_revision_spec.execution,
             model_definition=merged.model_definition,
@@ -444,6 +446,7 @@ class DeploymentController:
             cluster_size=merged.cluster_size or 1,
             model_vfolder_id=mounts.model_vfolder_id,
             model_mount_destination=mounts.model_mount_destination,
+            vfolder_subpath=mounts.vfolder_subpath,
             model_definition_path=mounts.model_definition_path,
             model_definition=resolved_model_definition,
             startup_command=merged.startup_command,
@@ -508,6 +511,7 @@ class DeploymentController:
                 vfolder_id=m.vfolder_id,
                 mount_destination=m.mount_destination,
                 mount_perm=vfolder_perms[m.vfolder_id].cap(m.mount_perm),
+                subpath=m.subpath,
             )
             for m in revision.mounts.extra_mounts
         ]
@@ -516,6 +520,7 @@ class DeploymentController:
             model_definition_path=revision.mounts.model_definition_path,
             model_mount_destination=revision.mounts.model_mount_destination,
             extra_mounts=extra_mount_entries,
+            vfolder_subpath=revision.mounts.vfolder_subpath,
         )
         revision_data = await self.add_revision(
             endpoint_id=deployment_id,

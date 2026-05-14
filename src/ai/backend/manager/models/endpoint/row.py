@@ -1180,6 +1180,7 @@ class ModelServiceHelper:
                 dst_path=options.mount_destination,
                 options=VFolderMountOptions(
                     permission=options.permission,
+                    subpath=options.subpath,
                 ),
             )
             for folder_id, options in extra_mounts.items()

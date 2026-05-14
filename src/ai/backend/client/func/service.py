@@ -14,11 +14,31 @@ from ai.backend.client.session import api_session
 from ai.backend.client.utils import dedent as _d
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
-from ai.backend.common.types import RuntimeVariant
+from ai.backend.common.types import BackendAISchema, RuntimeVariant
 
 from .base import BaseFunction, api_function
 
-__all__ = ("Service",)
+__all__ = (
+    "ExtraMountOption",
+    "Service",
+)
+
+
+class ExtraMountOption(BackendAISchema):
+    """Per-vfolder option overrides for ``Service.create`` extra mounts.
+
+    Keys in the parent mapping must match the entries passed to
+    ``extra_mounts`` (either a vfolder UUID string or a vfolder name).
+
+    Note: ``mount_destination`` lives on the separate ``extra_mount_map``
+    parameter, not here — keeping the destination override outside this
+    model leaves a single source of truth on the SDK surface.
+    """
+
+    type: str | None = None
+    permission: str | None = None
+    subpath: str | None = None
+
 
 _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
@@ -102,11 +122,12 @@ class Service(BaseFunction):
         scaling_group: str,
         extra_mounts: Sequence[str] | None = None,
         extra_mount_map: Mapping[str, str] | None = None,
-        extra_mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        extra_mount_options: Mapping[str, ExtraMountOption] | None = None,
         service_name: str | None = None,
         model_version: str | None = None,
         _dependencies: Sequence[str] | None = None,
         model_mount_destination: str | None = None,
+        vfolder_subpath: str | None = None,
         envs: Mapping[str, str] | None = None,
         startup_command: str | None = None,
         cluster_size: int = 1,
@@ -159,7 +180,7 @@ class Service(BaseFunction):
             faker = Faker()
             service_name = f"bai-serve-{faker.user_name()}"[:SESSION_NAME_MAX_LENGTH]
 
-        extra_mount_body = {}
+        extra_mount_body: dict[str, dict[str, Any]] = {}
         if extra_mounts:
             vfolder_id_to_name: dict[UUID, str] = {}
             vfolder_name_to_id: dict[str, UUID] = {}
@@ -180,14 +201,15 @@ class Service(BaseFunction):
                     if mount not in vfolder_name_to_id:
                         raise BackendClientError(f"VFolder (name: {mount}) not found") from e
                     vfolder_id = vfolder_name_to_id[mount]
-                extra_mount_body[str(vfolder_id)] = {
-                    "mount_destination": extra_mount_map.get(mount),
-                }
-                if mount_type := extra_mount_options.get(mount, {}).get("type"):
-                    extra_mount_body[str(vfolder_id)]["type"] = mount_type
+                options = extra_mount_options.get(mount) or ExtraMountOption()
+                body = options.model_dump(exclude_none=True)
+                if (dest := extra_mount_map.get(mount)) is not None:
+                    body["mount_destination"] = dest
+                extra_mount_body[str(vfolder_id)] = body
         model_config = {
             "model": model_id_or_name,
             "model_mount_destination": model_mount_destination,
+            "vfolder_subpath": vfolder_subpath,
             "extra_mounts": extra_mount_body,
             "environ": envs,
             "scaling_group": scaling_group,
@@ -245,6 +267,7 @@ class Service(BaseFunction):
         model_version: str | None = None,
         _dependencies: Sequence[str] | None = None,
         model_mount_destination: str | None = None,
+        vfolder_subpath: str | None = None,
         envs: Mapping[str, str] | None = None,
         startup_command: str | None = None,
         cluster_size: int = 1,
@@ -306,6 +329,7 @@ class Service(BaseFunction):
                 "model": model_id_or_name,
                 "model_version": model_version,
                 "model_mount_destination": model_mount_destination,
+                "vfolder_subpath": vfolder_subpath,
                 "environ": envs,
                 "scaling_group": scaling_group,
                 "resources": resources,

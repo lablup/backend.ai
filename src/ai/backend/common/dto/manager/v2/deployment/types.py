@@ -23,6 +23,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import (
     BackendAISchema,
     ClusterMode,
@@ -397,6 +398,13 @@ class ModelMountConfigInfoDTO(BaseResponseModel):
     vfolder_id: str
     mount_destination: str
     definition_path: str
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. "
+            "Subpath within the model vfolder. ``None`` means the vfolder root."
+        ),
+    )
 
 
 class ExtraVFolderMountGQLDTO(BaseResponseModel):
@@ -417,6 +425,13 @@ class ExtraVFolderMountGQLDTO(BaseResponseModel):
             "not change when the vfolder's permission later changes. ``None`` "
             "when the caller left it unset to inherit the vfolder's stored "
             "permission at session-creation time (task #83)."
+        ),
+    )
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. "
+            "Subpath within the vfolder. ``None`` means the vfolder root."
         ),
     )
 

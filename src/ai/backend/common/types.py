@@ -731,10 +731,9 @@ MountPermissionLiteral = Literal["ro", "rw", "wd"]
 class MountInfoEntry(BackendAISchema):
     """Revision-stored form of a user-supplied extra mount.
 
-    The row column persists only these three fields; everything else
-    (``name``, ``vfsubpath``, ``host_path``, ``usage_mode``) that
-    ``VFolderMount`` carries is re-derived at session creation via
-    ``prepare_vfolder_mounts``, so storing it would just be dead weight.
+    The row column persists these fields; the remaining ``VFolderMount``
+    fields (``name``, ``host_path``, ``usage_mode``) are re-derived at
+    session creation via ``prepare_vfolder_mounts``.
 
     ``mount_destination`` is ``None`` when the caller did not provide one —
     ``prepare_vfolder_mounts`` then defaults it to ``/home/work/{vfolder_name}``
@@ -749,6 +748,9 @@ class MountInfoEntry(BackendAISchema):
     and is frozen onto deployment revision rows so later vfolder
     permission changes cannot retroactively alter already-spawned
     sessions.
+
+    ``subpath`` is the path within the vfolder to mount. ``None`` (or the
+    string ``"."``) means mount the vfolder root.
     """
 
     vfolder_id: VFolderUUID
@@ -757,6 +759,7 @@ class MountInfoEntry(BackendAISchema):
         default=None,
     )
     mount_perm: MountPermission | None = Field(default=None)
+    subpath: str | None = Field(default=None)
 
 
 class MountTypes(enum.StrEnum):
@@ -773,6 +776,7 @@ class VFolderMountOptions:
     """Typed mount options for a single vfolder mount request."""
 
     permission: MountPermission | None = None
+    subpath: str | None = None
 
 
 @attrs.define(slots=True)

@@ -58,6 +58,7 @@ class SessionValidationSpec:
                         model_revision.model_mount_config.mount_destination or "/models"
                     ),
                     mount_perm=MountPermission.READ_ONLY,
+                    subpath=model_revision.model_mount_config.subpath,
                 ),
                 *model_revision.model_mount_config.extra_mounts,
             ],
@@ -95,6 +96,7 @@ class SessionValidationSpec:
                 vfolder_id=model_revision.mounts.model_vfolder_id,
                 mount_destination=model_revision.mounts.model_mount_destination,
                 mount_perm=MountPermission.READ_ONLY,
+                subpath=model_revision.mounts.vfolder_subpath,
             )
         ]
         mount_entries.extend(model_revision.mounts.extra_mounts)

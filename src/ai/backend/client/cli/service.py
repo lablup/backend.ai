@@ -14,6 +14,7 @@ from ai.backend.client.cli.session.execute import (
 )
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.exceptions import BackendError
+from ai.backend.client.func.service import ExtraMountOption
 from ai.backend.client.output.fields import routing_fields, service_fields
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import AsyncSession, Session
@@ -324,13 +325,16 @@ def create(
     mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
     parsed_resources = prepare_resource_arg(resources)
     parsed_resource_opts = prepare_resource_arg(resource_opts)
+    extra_mount_options = {
+        key: ExtraMountOption.model_validate(opts) for key, opts in mount_options.items()
+    }
     body = {
         "service_name": name,
         "model_version": model_version,
         "envs": envs,
         "extra_mounts": mount,
         "extra_mount_map": mount_map,
-        "extra_mount_options": mount_options,
+        "extra_mount_options": extra_mount_options,
         "startup_command": startup_command,
         "resources": parsed_resources,
         "resource_opts": parsed_resource_opts,

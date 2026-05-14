@@ -133,6 +133,12 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         default="/models",
         server_default="/models",
     )
+    # Subpath within the model vfolder. ``NULL`` (default) mounts the
+    # vfolder root; same semantics as ``MountInfoEntry.subpath`` for
+    # extra mounts.
+    vfolder_subpath: Mapped[str | None] = mapped_column(
+        "vfolder_subpath", sa.String(length=1024), nullable=True
+    )
     model_definition_path: Mapped[str | None] = mapped_column(
         "model_definition_path", sa.String(length=128), nullable=True
     )
@@ -179,9 +185,9 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     )
 
     # Mount configuration.
-    # Stores only the 3 fields that session creation actually consumes
-    # (``vfolder_id``, ``mount_destination``, ``mount_perm``); the other
-    # ``VFolderMount`` fields (``name``, ``vfsubpath``, ``host_path``,
+    # Stores only the fields that session creation actually consumes
+    # (``vfolder_id``, ``mount_destination``, ``mount_perm``, ``subpath``);
+    # the other ``VFolderMount`` fields (``name``, ``host_path``,
     # ``usage_mode``) are re-derived by ``prepare_vfolder_mounts`` at each
     # session creation, so persisting them would only be dead weight.
     extra_mounts: Mapped[list[MountInfoEntry]] = mapped_column(
@@ -281,6 +287,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             model_mount_config=ModelMountConfigData(
                 vfolder_id=self.model,
                 mount_destination=self.model_mount_destination,
+                subpath=self.vfolder_subpath,
                 definition_path=self.model_definition_path or "",
                 extra_mounts=list(self.extra_mounts),
             ),

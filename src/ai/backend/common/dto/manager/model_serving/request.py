@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Self
+from typing import Self
 
 from pydantic import (
     AliasChoices,
@@ -21,7 +21,7 @@ from pydantic import (
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.types import RuntimeVariant
+from ai.backend.common.types import MountPermission, MountTypes, RuntimeVariant
 
 __all__ = (
     # Path param models
@@ -31,6 +31,7 @@ __all__ = (
     "ListServeRequestModel",
     "ServiceFilterModel",
     "SearchServicesRequestModel",
+    "ExtraMountModel",
     "ServiceConfigModel",
     "NewServiceRequestModel",
     "ScaleRequestModel",
@@ -62,6 +63,33 @@ class SearchServicesRequestModel(BaseRequestModel):
     limit: int = Field(default=20, ge=1, le=100)
 
 
+class ExtraMountModel(BaseRequestModel):
+    """Per-vfolder extra mount options for model service session creation."""
+
+    mount_destination: str | None = Field(
+        default=None,
+        description="Mount destination inside the container. Defaults to ``/home/work/{folder_name}``.",
+    )
+    type: MountTypes = Field(
+        default=MountTypes.BIND,
+        description="Mount type. Defaults to ``bind``.",
+    )
+    permission: MountPermission | None = Field(
+        default=None,
+        description=(
+            "Permission override. ``null`` (default) inherits the vfolder's stored permission."
+        ),
+    )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the vfolder to mount. ``null`` (default) mounts the vfolder root."
+            " Empty string is rejected; omit the field to mount the root."
+        ),
+    )
+
+
 class ServiceConfigModel(BaseRequestModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -84,8 +112,17 @@ class ServiceConfigModel(BaseRequestModel):
         ),
         alias="modelMountDestination",
     )
+    vfolder_subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the model VFolder to mount. ``null`` (default) mounts the vfolder root."
+            " Empty string is rejected; omit the field to mount the root."
+        ),
+        alias="vfolderSubpath",
+    )
 
-    extra_mounts: dict[uuid.UUID, dict[str, Any]] = Field(
+    extra_mounts: dict[uuid.UUID, ExtraMountModel] = Field(
         description=(
             "Specifications about extra VFolders mounted to model service session. "
             "MODEL type VFolders are not allowed to be attached to model service session"
