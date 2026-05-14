@@ -27,7 +27,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionKernelInfo
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
@@ -86,7 +86,7 @@ class TestInitializeHealthRecordsInitialDelay:
 
         await route_executor._initialize_health_records(
             [route],
-            {route.route_id: ("10.0.0.1", 8000)},
+            {route.route_id: RouteSessionKernelInfo(replica_host="10.0.0.1", replica_port=8000)},
         )
 
         call_args = mock_valkey_schedule.initialize_route_health_records_batch.call_args
@@ -117,7 +117,7 @@ class TestInitializeHealthRecordsInitialDelay:
 
         await route_executor._initialize_health_records(
             [route],
-            {route.route_id: ("10.0.0.1", 8000)},
+            {route.route_id: RouteSessionKernelInfo(replica_host="10.0.0.1", replica_port=8000)},
         )
 
         call_args = mock_valkey_schedule.initialize_route_health_records_batch.call_args
@@ -153,7 +153,7 @@ class TestInitializeHealthRecordsInitialDelay:
 
         await route_executor._initialize_health_records(
             [route],
-            {route.route_id: ("10.0.0.1", 8000)},
+            {route.route_id: RouteSessionKernelInfo(replica_host="10.0.0.1", replica_port=8000)},
         )
 
         call_args = mock_valkey_schedule.initialize_route_health_records_batch.call_args

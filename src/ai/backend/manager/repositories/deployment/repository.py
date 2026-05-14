@@ -21,6 +21,7 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -104,7 +105,13 @@ from ai.backend.manager.repositories.scheduling_history.creators import Deployme
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
-from .types import ProjectDeploymentSearchScope, RouteData, RouteServiceDiscoveryInfo
+from .types import (
+    ProjectDeploymentSearchScope,
+    RouteData,
+    RouteServiceDiscoveryInfo,
+    RouteSessionInfo,
+    RouteSessionKernelInfo,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -758,7 +765,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_route_replica_info(
         self,
-        updates: dict[uuid.UUID, tuple[str, int]],
+        updates: dict[ReplicaID, RouteSessionKernelInfo],
     ) -> None:
         """Update replica_host and replica_port for routes."""
         await self._db_source.update_route_replica_info(updates)
@@ -1105,10 +1112,26 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def fetch_session_statuses_by_route_ids(
         self,
-        route_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, SessionStatus | None]:
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, SessionStatus | None]:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_route_session_kernel_infos(
+        self,
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, RouteSessionInfo | None]:
+        """Fetch session status and kernel connection info for multiple routes.
+
+        Returns:
+            Mapping of route_id to RouteSessionInfo:
+            - None → route has no session linked
+            - RouteSessionInfo(status=TERMINAL, kernel=None) → session terminated
+            - RouteSessionInfo(status=RUNNING, kernel=RouteSessionKernelInfo(host, port)) → ready
+            - RouteSessionInfo(status=PREPARING, kernel=None) → not yet running
+        """
+        return await self._db_source.fetch_route_session_kernel_infos(route_ids)
 
     @deployment_repository_resilience.apply()
     async def fetch_route_connection_infos(
@@ -1150,7 +1173,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def fetch_route_service_discovery_info(
         self,
-        route_ids: set[uuid.UUID],
+        route_ids: set[ReplicaID],
     ) -> list[RouteServiceDiscoveryInfo]:
         """Fetch service discovery information for routes.
 

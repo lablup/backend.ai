@@ -39,13 +39,13 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     @override
     def build_row(self) -> RoutingRow:
         return RoutingRow(
-            id=uuid.uuid4(),
             endpoint=self.deployment_id,
             session=None,
             session_owner=self.session_owner_id,
             domain=self.domain,
             project=self.project_id,
             status=RouteStatus.PROVISIONING,
+            sub_status=RouteSubStatus.PENDING,
             traffic_ratio=self.traffic_ratio,
             revision=self.revision_id,
             traffic_status=self.traffic_status,

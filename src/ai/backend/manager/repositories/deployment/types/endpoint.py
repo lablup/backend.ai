@@ -14,6 +14,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
@@ -21,6 +22,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteSubStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -67,7 +69,7 @@ class EndpointData:
 class RouteData:
     """Data structure for model service route."""
 
-    route_id: uuid.UUID
+    route_id: ReplicaID
     deployment_id: DeploymentID
     session_id: SessionId | None
     status: RouteStatus
@@ -84,11 +86,27 @@ class RouteData:
     error_data: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class RouteSessionKernelInfo:
+    """Kernel connection info — only present when session is RUNNING with inference port."""
+
+    replica_host: str
+    replica_port: int
+
+
+@dataclass(frozen=True)
+class RouteSessionInfo:
+    """Session state for a STARTING route. kernel is None when not yet RUNNING or no port."""
+
+    status: SessionStatus
+    kernel: RouteSessionKernelInfo | None
+
+
 @dataclass
 class RouteServiceDiscoveryInfo:
     """Service discovery information for a model service route."""
 
-    route_id: uuid.UUID
+    route_id: ReplicaID
     deployment_id: DeploymentID
     endpoint_name: str
     runtime_variant: str

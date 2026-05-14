@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -248,7 +249,7 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    route_id: Mapped[uuid.UUID] = mapped_column("route_id", GUID, nullable=False, index=True)
+    route_id: Mapped[ReplicaID] = mapped_column("route_id", GUID, nullable=False, index=True)
     deployment_id: Mapped[uuid.UUID] = mapped_column(
         "deployment_id", GUID, nullable=False, index=True
     )

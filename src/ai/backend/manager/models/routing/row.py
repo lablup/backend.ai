@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -53,7 +54,7 @@ class RoutingRow(Base):  # type: ignore[misc]
         sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[ReplicaID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
@@ -236,30 +237,6 @@ class RoutingRow(Base):  # type: ignore[misc]
         if row is None:
             raise NoResultFound
         return row
-
-    def __init__(
-        self,
-        id: uuid.UUID,
-        endpoint: DeploymentID,
-        session: uuid.UUID | None,
-        session_owner: uuid.UUID,
-        domain: str,
-        project: uuid.UUID,
-        revision: uuid.UUID,
-        status: RouteStatus = RouteStatus.PROVISIONING,
-        traffic_ratio: float = 1.0,
-        traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE,
-    ) -> None:
-        self.id = id
-        self.endpoint = endpoint
-        self.session = session
-        self.session_owner = session_owner
-        self.domain = domain
-        self.project = project
-        self.status = status
-        self.traffic_ratio = traffic_ratio
-        self.revision = revision
-        self.traffic_status = traffic_status
 
     def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
         self.session_owner = user_uuid
