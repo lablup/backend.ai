@@ -2431,8 +2431,6 @@ input CreateResourcePresetV2Input {
 Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
 input CreateRevisionInput {
-  name: String = null
-
   """
   Added in 26.4.2. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
   """
