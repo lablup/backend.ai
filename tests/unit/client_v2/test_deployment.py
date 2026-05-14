@@ -164,7 +164,7 @@ class TestDeploymentCRUD:
             metadata=DeploymentMetadataInput(
                 project_id=_SAMPLE_PROJECT_ID,
                 domain_name="default",
-                resource_group=ResourceGroupName("default"),
+                resource_group_name=ResourceGroupName("default"),
                 name="my-deployment",
             ),
             network_access=NetworkAccessInput(open_to_public=False),

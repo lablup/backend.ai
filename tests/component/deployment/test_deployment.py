@@ -107,7 +107,7 @@ class TestSearchDeployments:
                 metadata=DeploymentMetadataInput(
                     project_id=group_fixture,
                     domain_name=domain_fixture,
-                    resource_group=scaling_group_fixture,
+                    resource_group_name=scaling_group_fixture,
                     name=f"test-deployment-{i}-{secrets.token_hex(4)}",
                 ),
                 network_access=NetworkAccessInput(open_to_public=False),
@@ -167,7 +167,7 @@ class TestGetDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
-                resource_group=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -279,7 +279,7 @@ class TestSearchRoutes:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
-                resource_group=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -376,7 +376,7 @@ class TestDeploymentAdapterFilter:
             metadata=DeploymentMetadataInput(
                 project_id=project_id,
                 domain_name=domain,
-                resource_group=scaling_group,
+                resource_group_name=scaling_group,
                 name=name or f"test-deployment-{secrets.token_hex(4)}",
                 tags=tags,
             ),

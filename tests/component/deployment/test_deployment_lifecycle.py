@@ -59,7 +59,7 @@ class TestCreateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
-                resource_group=ResourceGroupName("nonexistent-sgroup"),
+                resource_group_name=ResourceGroupName("nonexistent-sgroup"),
                 name="test-deployment",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -100,7 +100,7 @@ class TestCreateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
-                resource_group=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -169,7 +169,7 @@ class TestUpdateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
-                resource_group=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -240,7 +240,7 @@ class TestDestroyDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
-                resource_group=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -323,7 +323,7 @@ class TestRevisionManagement:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
-                resource_group=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -389,7 +389,7 @@ class TestReplicaManagement:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture,
-                resource_group=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
