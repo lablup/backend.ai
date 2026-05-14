@@ -346,7 +346,7 @@ class MountMetadata:
     # through with ``None``. The other fields are strict — the creator
     # (e.g. ``VFolderMountsCreator``) supplies the column defaults before this
     # metadata is constructed.
-    model_vfolder_id: VFolderUUID | None
+    model_vfolder_id: VFolderUUID
     model_definition_path: str | None
     model_mount_destination: str
     extra_mounts: list[MountInfoEntry]

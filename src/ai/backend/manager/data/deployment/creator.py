@@ -32,7 +32,7 @@ class VFolderMountsCreator:
     # default get that default. A partial revision draft (e.g. AddRevisionInput
     # without ``model_mount_config``) constructs an empty
     # ``VFolderMountsCreator()`` and the values flow through to the row as-is.
-    model_vfolder_id: VFolderUUID | None = None
+    model_vfolder_id: VFolderUUID
     model_definition_path: str | None = None
     model_mount_destination: str = "/models"
     extra_mounts: list[MountInfo] = field(default_factory=list)

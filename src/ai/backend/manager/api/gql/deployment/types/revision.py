@@ -985,9 +985,8 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
         description="Runtime configuration",
         default=None,
     )
-    model_mount_config: ModelMountConfigInput | None = gql_field(
+    model_mount_config: ModelMountConfigInput = gql_field(
         description="Model mount configuration",
-        default=None,
     )
     model_definition: ModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
