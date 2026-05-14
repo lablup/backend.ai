@@ -47,6 +47,11 @@ extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
 attempts_default = 3
 timeout_default = 180
 
+[lint]
+# Batch more files per linter invocation to reduce ruff process startup overhead.
+# Default is 128; raising it cuts the number of spawned ruff processes ~8x.
+batch_size = 1024
+
 [python]
 enable_resolves = true
 # When changing this main Python version:
