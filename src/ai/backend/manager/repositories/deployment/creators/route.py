@@ -32,7 +32,7 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     project_id: uuid.UUID
     revision_id: DeploymentRevisionID
     traffic_ratio: float = 1.0
-    traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE
+    traffic_status: RouteTrafficStatus = RouteTrafficStatus.INACTIVE
 
     @override
     def build_row(self) -> RoutingRow:
