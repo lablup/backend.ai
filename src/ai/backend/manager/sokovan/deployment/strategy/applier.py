@@ -17,6 +17,7 @@ from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.types import OptionalState
 
 from .types import StrategyEvaluationSummary
 
@@ -75,9 +76,8 @@ class StrategyResultApplier:
         if changes.drain_route_ids:
             drain = BatchUpdater(
                 spec=RouteBatchUpdaterSpec(
-                    status=RouteStatus.TERMINATING,
-                    traffic_ratio=0.0,
-                    traffic_status=RouteTrafficStatus.INACTIVE,
+                    status=OptionalState.update(RouteStatus.TERMINATING),
+                    traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
                 ),
                 conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
             )

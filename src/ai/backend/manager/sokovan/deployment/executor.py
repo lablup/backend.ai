@@ -66,6 +66,7 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.types import OptionalState
 
 from .types import (
     DeploymentExecutionError,
@@ -380,9 +381,8 @@ class DeploymentExecutor:
         if scale_in_route_ids:
             scale_in_updater = BatchUpdater(
                 spec=RouteBatchUpdaterSpec(
-                    status=RouteStatus.TERMINATING,
-                    traffic_ratio=0.0,
-                    traffic_status=RouteTrafficStatus.INACTIVE,
+                    status=OptionalState.update(RouteStatus.TERMINATING),
+                    traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
                 ),
                 conditions=[RouteConditions.by_ids(scale_in_route_ids)],
             )

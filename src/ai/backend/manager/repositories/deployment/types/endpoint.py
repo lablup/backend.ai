@@ -15,7 +15,12 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteSubStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -70,9 +75,12 @@ class RouteData:
     traffic_ratio: float
     created_at: datetime
     revision_id: DeploymentRevisionID
+    traffic_status: RouteTrafficStatus
     replica_host: str | None = None
     replica_port: int | None = None
     updated_at: datetime | None = None
+    sub_status: RouteSubStatus | None = None
+    last_transition_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 
 

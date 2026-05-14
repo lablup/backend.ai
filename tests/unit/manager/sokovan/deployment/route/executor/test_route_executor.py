@@ -30,7 +30,11 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import Updated
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -582,6 +586,7 @@ class TestCleanupRoutesByConfig:
             traffic_ratio=1.0,
             created_at=datetime.now(tzutc()),
             revision_id=DeploymentRevisionID(uuid4()),  # neither current nor deploying
+            traffic_status=RouteTrafficStatus.ACTIVE,
         )
 
         deployment = MagicMock()
@@ -625,6 +630,7 @@ class TestCleanupRoutesByConfig:
             traffic_ratio=1.0,
             created_at=datetime.now(tzutc()),
             revision_id=deploying_revision_id,
+            traffic_status=RouteTrafficStatus.INACTIVE,
         )
 
         deployment = MagicMock()
@@ -668,6 +674,7 @@ class TestCleanupRoutesByConfig:
             traffic_ratio=1.0,
             created_at=datetime.now(tzutc()),
             revision_id=DeploymentRevisionID(uuid4()),
+            traffic_status=RouteTrafficStatus.ACTIVE,
         )
 
         deployment = MagicMock()
@@ -921,6 +928,7 @@ def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
         traffic_ratio=1.0,
         revision_id=DeploymentRevisionID(uuid4()),
         created_at=datetime.now(tzutc()),
+        traffic_status=RouteTrafficStatus.ACTIVE,
     )
 
 

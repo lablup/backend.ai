@@ -72,6 +72,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHandlerCategory,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
@@ -994,8 +995,11 @@ class DeploymentDBSource:
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=DeploymentRevisionID(row.revision),
+                    traffic_status=row.traffic_status,
                     replica_host=row.replica_host,
                     replica_port=row.replica_port,
+                    updated_at=row.updated_at,
+                    sub_status=row.sub_status,
                     error_data=row.error_data or {},
                 )
                 for row in rows
@@ -1611,8 +1615,59 @@ class DeploymentDBSource:
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=DeploymentRevisionID(row.revision),
+                    traffic_status=row.traffic_status,
                     replica_host=row.replica_host,
                     replica_port=row.replica_port,
+                    updated_at=row.updated_at,
+                    sub_status=row.sub_status,
+                    error_data=row.error_data or {},
+                )
+                for row in route_rows
+            ]
+
+    async def search_route_datas_with_last_history(
+        self,
+        *,
+        querier: BatchQuerier,
+        category: RouteHandlerCategory,
+    ) -> list[RouteData]:
+        """Search routes and attach the last history row per ``category``.
+
+        Mirrors :meth:`search_deployments_with_last_history` for the route layer.
+        ``last_transition_at`` on each :class:`RouteData` is the ``created_at``
+        of the most recent history record matching the given category, or
+        ``None`` if no history exists yet.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow)
+            query_result = await execute_batch_querier(db_sess, query, querier)
+            route_rows: list[RoutingRow] = [row.RoutingRow for row in query_result.rows]
+            if not route_rows:
+                return []
+
+            route_ids = [row.id for row in route_rows]
+            history_map = await self._get_last_route_histories_by_category(
+                db_sess, route_ids, category=category
+            )
+
+            return [
+                RouteData(
+                    route_id=row.id,
+                    deployment_id=row.endpoint,
+                    session_id=SessionId(row.session) if row.session else None,
+                    status=row.status,
+                    health_status=row.health_status,
+                    traffic_ratio=row.traffic_ratio,
+                    created_at=row.created_at,
+                    revision_id=DeploymentRevisionID(row.revision),
+                    traffic_status=row.traffic_status,
+                    replica_host=row.replica_host,
+                    replica_port=row.replica_port,
+                    updated_at=row.updated_at,
+                    sub_status=row.sub_status,
+                    last_transition_at=history_map[row.id].created_at
+                    if row.id in history_map
+                    else None,
                     error_data=row.error_data or {},
                 )
                 for row in route_rows
@@ -1711,6 +1766,32 @@ class DeploymentDBSource:
                 await db_sess.flush()
 
             return total_updated
+
+    async def _get_last_route_histories_by_category(
+        self,
+        db_sess: SASession,
+        route_ids: list[uuid.UUID],
+        category: RouteHandlerCategory,
+    ) -> dict[uuid.UUID, RouteHistoryRow]:
+        """Get last history records per route filtered by handler category."""
+        if not route_ids:
+            return {}
+
+        query = (
+            sa.select(RouteHistoryRow)
+            .where(
+                RouteHistoryRow.route_id.in_(route_ids),
+                RouteHistoryRow.category == category,
+            )
+            .distinct(RouteHistoryRow.route_id)
+            .order_by(
+                RouteHistoryRow.route_id,
+                RouteHistoryRow.created_at.desc(),
+            )
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+        return {row.route_id: row for row in rows}
 
     async def _get_last_route_histories_bulk(
         self,

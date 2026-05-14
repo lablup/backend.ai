@@ -760,6 +760,8 @@ class SchedulingHistoryAdapter(BaseAdapter):
             phase=data.phase,
             from_status=data.from_status,
             to_status=data.to_status,
+            from_sub_status=data.from_sub_status,
+            to_sub_status=data.to_sub_status,
             result=data.result.value,
             error_code=data.error_code,
             message=data.message,

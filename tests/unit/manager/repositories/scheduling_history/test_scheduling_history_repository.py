@@ -15,7 +15,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
@@ -503,8 +503,8 @@ class TestSchedulingHistoryRepository:
                 route_id=route_id,
                 deployment_id=deployment_id,
                 phase="PROVISION",
-                from_status=str(RouteStatus.PROVISIONING.value),
-                to_status=str(RouteHealthStatus.HEALTHY.value),
+                from_status=RouteStatus.PROVISIONING.value,
+                to_status=RouteStatus.RUNNING.value,
                 result=str(SchedulingResult.SUCCESS),
                 message="Route provisioned",
                 attempts=1,
@@ -523,7 +523,7 @@ class TestSchedulingHistoryRepository:
         assert result.total_count == 1
         item = result.items[0]
         assert item.from_status == RouteStatus.PROVISIONING.value
-        assert item.to_status == RouteHealthStatus.HEALTHY.value
+        assert item.to_status == RouteStatus.RUNNING.value
 
     async def test_search_route_history_by_deployment_id(
         self,
