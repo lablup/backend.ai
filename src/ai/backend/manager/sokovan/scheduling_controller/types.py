@@ -90,18 +90,13 @@ class SessionValidationSpec:
         # Write-side counterpart for the legacy bridge: the draft pipeline
         # builds a ``ModelRevisionSpec`` before any row is persisted, so
         # there is no ``ModelRevisionData`` to validate against yet.
-        # When the revision was built from a partial draft without a model
-        # vfolder, the model mount entry is dropped and only the extra
-        # mounts make it into the session spec.
-        mount_entries: list[MountInfoEntry] = []
-        if model_revision.mounts.model_vfolder_id is not None:
-            mount_entries.append(
-                MountInfoEntry(
-                    vfolder_id=model_revision.mounts.model_vfolder_id,
-                    mount_destination=model_revision.mounts.model_mount_destination,
-                    mount_perm=MountPermission.READ_ONLY,
-                )
+        mount_entries: list[MountInfoEntry] = [
+            MountInfoEntry(
+                vfolder_id=model_revision.mounts.model_vfolder_id,
+                mount_destination=model_revision.mounts.model_mount_destination,
+                mount_perm=MountPermission.READ_ONLY,
             )
+        ]
         mount_entries.extend(model_revision.mounts.extra_mounts)
         return cls(
             mount_entries=mount_entries,

@@ -39,7 +39,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     resource_opts: Mapping[str, Any]
     cluster_mode: str
     cluster_size: int
-    model_vfolder_id: VFolderUUID | None
+    model_vfolder_id: VFolderUUID
     model_mount_destination: str
     model_definition_path: str | None
     model_definition: ModelDefinition | None

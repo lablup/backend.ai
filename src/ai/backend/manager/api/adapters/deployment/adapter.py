@@ -1092,15 +1092,11 @@ class DeploymentAdapter(BaseAdapter):
             )
             for m in (input.extra_mounts or [])
         ]
-        mounts_creator = (
-            VFolderMountsCreator(
-                model_vfolder_id=input.model_mount_config.vfolder_id,
-                model_definition_path=input.model_mount_config.definition_path,
-                model_mount_destination=input.model_mount_config.mount_destination,
-                extra_mounts=extra_mounts,
-            )
-            if input.model_mount_config is not None
-            else VFolderMountsCreator(extra_mounts=extra_mounts)
+        mounts_creator = VFolderMountsCreator(
+            model_vfolder_id=input.model_mount_config.vfolder_id,
+            model_definition_path=input.model_mount_config.definition_path,
+            model_mount_destination=input.model_mount_config.mount_destination,
+            extra_mounts=extra_mounts,
         )
         adder = ModelRevisionCreator(
             image_id=input.image.id if input.image is not None else None,

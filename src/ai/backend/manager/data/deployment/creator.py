@@ -27,11 +27,11 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 
 @dataclass
 class VFolderMountsCreator:
-    # Every field carries a default that matches the underlying DB column —
-    # nullable columns get ``None``, NOT NULL columns with a server-side
-    # default get that default. A partial revision draft (e.g. AddRevisionInput
-    # without ``model_mount_config``) constructs an empty
-    # ``VFolderMountsCreator()`` and the values flow through to the row as-is.
+    # ``model_vfolder_id`` is required: ``AddRevisionInput`` makes
+    # ``model_mount_config`` a required input (the revision preset does not
+    # carry a model vfolder), so the write path always supplies a concrete
+    # vfolder id. The other fields keep server-side column defaults so a
+    # partial mount config still produces a valid row.
     model_vfolder_id: VFolderUUID
     model_definition_path: str | None = None
     model_mount_destination: str = "/models"
