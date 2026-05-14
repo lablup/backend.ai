@@ -335,14 +335,12 @@ def _merge_resolved_legacy_mounts(
     if not resolutions:
         return creation_config
 
-    merged_mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
-    existing_uuid_set: set[UUID] = set()
-    for rid in merged_mount_ids:
-        try:
-            existing_uuid_set.add(UUID(str(rid)))
-        except (ValueError, TypeError):
-            continue
-    merged_mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
+    # ``mount_ids``/``mount_id_map`` are Pydantic-validated to ``list[UUID]``
+    # / ``dict[UUID, str]`` upstream and ``_route_legacy_uuid_mounts`` only
+    # ever appends ``UUID`` instances, so trust the typing here.
+    merged_mount_ids: list[UUID] = list(creation_config.get("mount_ids") or [])
+    existing_uuid_set: set[UUID] = set(merged_mount_ids)
+    merged_mount_id_map: dict[UUID, str] = dict(creation_config.get("mount_id_map") or {})
     merged_mount_options: dict[Any, Any] = dict(creation_config.get("mount_options") or {})
     legacy_mount_map = creation_config.get("mount_map") or {}
     legacy_mount_options = creation_config.get("mount_options") or {}
