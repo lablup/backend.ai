@@ -37,7 +37,7 @@ def add(deployment_id: str, config: str, preset_id: str | None, auto_activate: b
     """Add a new revision to a deployment."""
 
     from ai.backend.common.dto.manager.v2.deployment.request import (
-        AddRevisionGQLInputDTO,
+        AddRevisionInput,
     )
 
     if config.startswith("@"):
@@ -50,7 +50,7 @@ def add(deployment_id: str, config: str, preset_id: str | None, auto_activate: b
     if preset_id is not None:
         data["revision_preset_id"] = preset_id
     data["auto_activate"] = auto_activate
-    body = AddRevisionGQLInputDTO.model_validate(data)
+    body = AddRevisionInput.model_validate(data)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

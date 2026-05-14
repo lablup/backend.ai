@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ClusterConfigInput,
     CreateAccessTokenInput,
     CreateDeploymentInput,
-    CreateRevisionInputDTO,
+    CreateRevisionInput,
     DeleteDeploymentInput,
     DeploymentStrategyInput,
     ExtraVFolderMountInput,
@@ -32,7 +32,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceConfigInput,
     ResourceSlotEntryInput,
     ResourceSlotInput,
-    RevisionInput,
     RollingUpdateConfigInput,
     ScaleDeploymentInput,
     UpdateDeploymentInput,
@@ -45,22 +44,7 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 
 
-def _make_revision_input(**kwargs: object) -> RevisionInput:
-    defaults: dict[str, Any] = {
-        "image_id": ImageID(uuid.uuid4()),
-        "cluster_mode": ClusterMode.SINGLE_NODE,
-        "cluster_size": 1,
-        "resource_slots": {"cpu": "2", "mem": "4g"},
-        "runtime_variant_id": RuntimeVariantID(uuid.uuid4()),
-        "model_vfolder_id": VFolderUUID(uuid.uuid4()),
-        "model_definition_path": "/models/model.yaml",
-        "model_definition": ModelDefinitionInput(),
-    }
-    defaults.update(kwargs)
-    return RevisionInput(**defaults)
-
-
-def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
+def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInput:
     defaults: dict[str, Any] = {
         "cluster_config": ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
         "resource_config": ResourceConfigInput(
@@ -83,67 +67,7 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
         "model_definition": ModelDefinitionInput(),
     }
     defaults.update(kwargs)
-    return CreateRevisionInputDTO(**defaults)
-
-
-class TestRevisionInput:
-    """Tests for RevisionInput model creation and validation."""
-
-    def test_valid_creation_with_required_fields(self) -> None:
-        image_id = ImageID(uuid.uuid4())
-        model_id = VFolderUUID(uuid.uuid4())
-        runtime_variant_id = RuntimeVariantID(uuid.uuid4())
-        rev = RevisionInput(
-            image_id=image_id,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            resource_slots={"cpu": "2"},
-            runtime_variant_id=runtime_variant_id,
-            model_vfolder_id=model_id,
-            model_definition_path="/models/def.yaml",
-            model_definition=ModelDefinitionInput(),
-        )
-        assert rev.image_id == image_id
-        assert rev.cluster_mode == ClusterMode.SINGLE_NODE
-        assert rev.model_vfolder_id == model_id
-        assert rev.model_definition_path == "/models/def.yaml"
-
-    def test_default_cluster_size_is_one(self) -> None:
-        rev = _make_revision_input()
-        assert rev.cluster_size == 1
-
-    def test_runtime_variant_id_is_preserved(self) -> None:
-        runtime_variant_id = RuntimeVariantID(uuid.uuid4())
-        rev = _make_revision_input(runtime_variant_id=runtime_variant_id)
-        assert rev.runtime_variant_id == runtime_variant_id
-
-    def test_default_model_mount_destination(self) -> None:
-        rev = _make_revision_input()
-        assert rev.model_mount_destination == "/models"
-
-    def test_optional_name_defaults_to_none(self) -> None:
-        rev = _make_revision_input()
-        assert rev.name is None
-
-    def test_optional_extra_mounts_defaults_to_none(self) -> None:
-        rev = _make_revision_input()
-        assert rev.extra_mounts is None
-
-    def test_optional_environ_defaults_to_none(self) -> None:
-        rev = _make_revision_input()
-        assert rev.environ is None
-
-    def test_cluster_size_must_be_at_least_one(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            _make_revision_input(cluster_size=0)
-
-    def test_with_extra_mounts(self) -> None:
-        mount = ExtraVFolderMountInput(
-            vfolder_id=VFolderUUID(uuid.uuid4()), mount_destination="/data"
-        )
-        rev = _make_revision_input(extra_mounts=[mount])
-        assert rev.extra_mounts is not None
-        assert len(rev.extra_mounts) == 1
-        assert rev.extra_mounts[0].mount_destination == "/data"
+    return CreateRevisionInput(**defaults)
 
 
 class TestExtraVFolderMountInput:
@@ -537,28 +461,115 @@ class TestScaleDeploymentInput:
             ScaleDeploymentInput.model_validate({"replicas": 3})
 
 
-class TestAddRevisionInput:
-    """Tests for AddRevisionInput model creation and validation."""
+def _make_model_mount_config_input(**kwargs: object) -> ModelMountConfigInput:
+    defaults: dict[str, Any] = {
+        "vfolder_id": VFolderUUID(uuid.uuid4()),
+        "mount_destination": "/models",
+        "definition_path": "/models/model.yaml",
+    }
+    defaults.update(kwargs)
+    return ModelMountConfigInput(**defaults)
 
-    def test_valid_creation(self) -> None:
+
+class TestCreateRevisionInput:
+    """Tests for CreateRevisionInput model creation and validation.
+
+    All five sub-configs (cluster_config, resource_config, image,
+    model_runtime_config, model_mount_config) are required.
+    """
+
+    def test_valid_creation_with_required_fields(self) -> None:
+        rev = _make_create_revision_input_dto()
+        assert rev.cluster_config.mode == ClusterMode.SINGLE_NODE
+        assert rev.image.id is not None
+        assert rev.model_mount_config.vfolder_id is not None
+
+    def test_missing_model_mount_config_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateRevisionInput.model_validate({
+                "cluster_config": {"mode": "SINGLE_NODE", "size": 1},
+                "resource_config": {
+                    "resource_slots": {"entries": [{"resource_type": "cpu", "quantity": "1"}]}
+                },
+                "image": {"id": str(uuid.uuid4())},
+                "model_runtime_config": {"runtime_variant_id": str(uuid.uuid4())},
+            })
+
+    def test_missing_image_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateRevisionInput.model_validate({
+                "cluster_config": {"mode": "SINGLE_NODE", "size": 1},
+                "resource_config": {
+                    "resource_slots": {"entries": [{"resource_type": "cpu", "quantity": "1"}]}
+                },
+                "model_runtime_config": {"runtime_variant_id": str(uuid.uuid4())},
+                "model_mount_config": {
+                    "vfolder_id": str(uuid.uuid4()),
+                    "mount_destination": "/models",
+                },
+            })
+
+    def test_auto_activate_defaults_to_false(self) -> None:
+        rev = _make_create_revision_input_dto()
+        assert rev.auto_activate is False
+
+    def test_round_trip(self) -> None:
+        rev = _make_create_revision_input_dto()
+        restored = CreateRevisionInput.model_validate_json(rev.model_dump_json())
+        assert restored.cluster_config.mode == ClusterMode.SINGLE_NODE
+        assert restored.model_mount_config.vfolder_id == rev.model_mount_config.vfolder_id
+
+
+class TestAddRevisionInput:
+    """Tests for AddRevisionInput model creation and validation.
+
+    ``deployment_id`` and ``model_mount_config`` are required; every
+    other sub-config is optional (the revision merge chain fills in
+    missing fields from preset / runtime variant baseline / existing
+    revision).
+    """
+
+    def test_valid_creation_with_only_required_fields(self) -> None:
         deployment_id = uuid.uuid4()
-        rev = _make_revision_input()
-        inp = AddRevisionInput(deployment_id=deployment_id, revision=rev)
+        mount_config = _make_model_mount_config_input()
+        inp = AddRevisionInput(deployment_id=deployment_id, model_mount_config=mount_config)
         assert inp.deployment_id == deployment_id
-        assert inp.revision.cluster_mode == ClusterMode.SINGLE_NODE
+        assert inp.model_mount_config.vfolder_id == mount_config.vfolder_id
+
+    def test_optional_sub_configs_default_to_none(self) -> None:
+        inp = AddRevisionInput(
+            deployment_id=uuid.uuid4(),
+            model_mount_config=_make_model_mount_config_input(),
+        )
+        assert inp.cluster_config is None
+        assert inp.resource_config is None
+        assert inp.image is None
+        assert inp.model_runtime_config is None
+        assert inp.model_definition is None
+        assert inp.extra_mounts is None
+        assert inp.options is None
+        assert inp.revision_preset_id is None
+
+    def test_missing_model_mount_config_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            AddRevisionInput.model_validate({"deployment_id": str(uuid.uuid4())})
 
     def test_missing_deployment_id_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            AddRevisionInput.model_validate({"revision": {}})
+            AddRevisionInput.model_validate({
+                "model_mount_config": {
+                    "vfolder_id": str(uuid.uuid4()),
+                    "mount_destination": "/models",
+                }
+            })
 
     def test_round_trip(self) -> None:
         deployment_id = uuid.uuid4()
-        rev = _make_revision_input()
-        inp = AddRevisionInput(deployment_id=deployment_id, revision=rev)
-        json_str = inp.model_dump_json()
-        restored = AddRevisionInput.model_validate_json(json_str)
+        mount_config = _make_model_mount_config_input()
+        inp = AddRevisionInput(deployment_id=deployment_id, model_mount_config=mount_config)
+        restored = AddRevisionInput.model_validate_json(inp.model_dump_json())
         assert restored.deployment_id == deployment_id
-        assert restored.revision.cluster_mode == ClusterMode.SINGLE_NODE
+        assert restored.model_mount_config.vfolder_id == mount_config.vfolder_id
 
 
 class TestCreateAccessTokenInput:

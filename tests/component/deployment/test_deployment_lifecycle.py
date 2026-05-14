@@ -68,7 +68,6 @@ class TestCreateDeployment:
             ),
             replica_count=1,
             initial_revision=RevisionInput(
-                name="rev-1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
                     resource_slots={"cpu": "1", "mem": "1073741824"},
@@ -109,7 +108,6 @@ class TestCreateDeployment:
             ),
             replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
                     resource_slots={"cpu": "2", "mem": "2147483648"},
@@ -178,7 +176,6 @@ class TestUpdateDeployment:
             ),
             replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
                     resource_slots={"cpu": "2", "mem": "2147483648"},
@@ -249,7 +246,6 @@ class TestDestroyDeployment:
             ),
             replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
                     resource_slots={"cpu": "2", "mem": "2147483648"},
@@ -303,7 +299,6 @@ class TestRevisionManagement:
         """Adding a revision and searching revisions works correctly."""
         image_id, vfolder_id = deployment_seed_data
         revision_input = RevisionInput(
-            name="v1",
             cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
             resource_config=ResourceConfigInput(
                 resource_slots={"cpu": "2", "mem": "2147483648"},
@@ -341,7 +336,6 @@ class TestRevisionManagement:
             deployment.id,
             AddRevisionRequest(
                 revision=RevisionInput(
-                    name="v2",
                     cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                     resource_config=ResourceConfigInput(
                         resource_slots={"cpu": "2", "mem": "2147483648"},
@@ -398,7 +392,6 @@ class TestReplicaManagement:
             ),
             replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
                     resource_slots={"cpu": "2", "mem": "2147483648"},

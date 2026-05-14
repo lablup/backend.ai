@@ -20,14 +20,16 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    AddRevisionGQLInputDTO,
-    CreateRevisionInputDTO,
+    AddRevisionInput as AddRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionOptions as AddRevisionOptionsDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ClusterConfigInput as ClusterConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    CreateRevisionInput as CreateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     EnvironmentVariableEntryInput as EnvironmentVariableEntryInputDTO,
@@ -764,7 +766,6 @@ class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputD
 )
 class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
     runtime_variant_id: UUID
-    inference_runtime_config: JSON | None = None
     environ: EnvironmentVariablesInputGQL | None = gql_field(
         description="Environment variables for the service.", default=None
     )
@@ -918,7 +919,6 @@ class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionInputDTO]):
     ),
 )
 class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
-    name: str | None = None
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
@@ -961,8 +961,7 @@ class AddRevisionOptionsGQL(PydanticInputMixin[AddRevisionOptionsDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
-    name: str | None = None
+class AddRevisionInput(PydanticInputMixin[AddRevisionInputDTO]):
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
@@ -971,11 +970,25 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
         default=None,
     )
     deployment_id: ID
-    cluster_config: ClusterConfigInput
-    resource_config: ResourceConfigInput
-    image: ImageInput
-    model_runtime_config: ModelRuntimeConfigInput
-    model_mount_config: ModelMountConfigInput
+    cluster_config: ClusterConfigInput | None = gql_field(
+        description="Cluster configuration",
+        default=None,
+    )
+    resource_config: ResourceConfigInput | None = gql_field(
+        description="Resource configuration",
+        default=None,
+    )
+    image: ImageInput | None = gql_field(
+        description="Container image",
+        default=None,
+    )
+    model_runtime_config: ModelRuntimeConfigInput | None = gql_field(
+        description="Runtime configuration",
+        default=None,
+    )
+    model_mount_config: ModelMountConfigInput = gql_field(
+        description="Model mount configuration",
+    )
     model_definition: ModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",

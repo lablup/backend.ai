@@ -168,16 +168,15 @@ class RevisionDraftReader:
         """
         if not variant.reads_vfolder_config_files:
             return []
+        vfolder_id = mounts.model_vfolder_id
 
         drafts: list[RevisionDraft] = []
         try:
-            config = await self._deployment_repository.fetch_deployment_config(
-                mounts.model_vfolder_id
-            )
+            config = await self._deployment_repository.fetch_deployment_config(vfolder_id)
         except Exception:
             log.warning(
                 "Failed to read deployment config from vfolder {}, skipping",
-                mounts.model_vfolder_id,
+                vfolder_id,
                 exc_info=True,
             )
             config = None
@@ -193,13 +192,13 @@ class RevisionDraftReader:
 
         try:
             model_def = await self._deployment_repository.fetch_model_definition(
-                vfolder_id=mounts.model_vfolder_id,
+                vfolder_id=vfolder_id,
                 model_definition_path=mounts.model_definition_path,
             )
         except Exception:
             log.warning(
                 "Failed to read model-definition.yaml from vfolder {}, skipping",
-                mounts.model_vfolder_id,
+                vfolder_id,
                 exc_info=True,
             )
             model_def = None

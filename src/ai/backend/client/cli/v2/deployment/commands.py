@@ -149,21 +149,21 @@ def create(
     from ai.backend.common.data.model_deployment.types import DeploymentStrategy
     from ai.backend.common.dto.manager.v2.deployment.request import (
         CreateDeploymentInput,
-        CreateRevisionInputDTO,
+        CreateRevisionInput,
         DeploymentStrategyInput,
         ModelDeploymentMetadataInput,
         ModelDeploymentNetworkAccessInput,
     )
     from ai.backend.common.identifier.resource_group import ResourceGroupName
 
-    revision_dto: CreateRevisionInputDTO | None = None
+    revision_dto: CreateRevisionInput | None = None
     if initial_revision is not None:
         if initial_revision.startswith("@"):
             with Path(initial_revision[1:]).open() as f:
                 rev_data = json.load(f)
         else:
             rev_data = json.loads(initial_revision)
-        revision_dto = CreateRevisionInputDTO.model_validate(rev_data)
+        revision_dto = CreateRevisionInput.model_validate(rev_data)
 
     body = CreateDeploymentInput(
         metadata=ModelDeploymentMetadataInput(

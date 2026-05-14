@@ -116,7 +116,6 @@ class TestSearchDeployments:
                 ),
                 replica_count=1,
                 initial_revision=RevisionInput(
-                    name="v1",
                     cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                     resource_config=ResourceConfigInput(
                         resource_slots={"cpu": "2", "mem": "2147483648"},
@@ -176,7 +175,6 @@ class TestGetDeployment:
             ),
             replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
                     resource_slots={"cpu": "2", "mem": "2147483648"},
@@ -288,7 +286,6 @@ class TestSearchRoutes:
             ),
             replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
                     resource_slots={"cpu": "2", "mem": "2147483648"},
@@ -386,7 +383,6 @@ class TestDeploymentAdapterFilter:
             ),
             replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
                     resource_slots={"cpu": "2", "mem": "2147483648"},

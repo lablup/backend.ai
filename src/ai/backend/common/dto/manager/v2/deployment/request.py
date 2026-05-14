@@ -4,7 +4,6 @@ Request DTOs for Deployment DTO v2.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -61,7 +60,6 @@ __all__ = (
     "AccessTokenOrder",
     "ActivateDeploymentInput",
     "ActivateRevisionInput",
-    "AddRevisionGQLInputDTO",
     "AddRevisionInput",
     "AdminSearchDeploymentsInput",
     "AdminSearchRevisionsInput",
@@ -69,7 +67,7 @@ __all__ = (
     "AutoScalingRuleOrder",
     "BlueGreenConfigInput",
     "ClusterConfigInput",
-    "CreateRevisionInputDTO",
+    "CreateRevisionInput",
     "CreateAccessTokenInput",
     "CreateAutoScalingRuleInput",
     "CreateDeploymentInput",
@@ -101,7 +99,6 @@ __all__ = (
     "ResourceSlotEntryInput",
     "ResourceSlotInput",
     "RevisionFilter",
-    "RevisionInput",
     "RevisionOrder",
     "ReplaceDeploymentOptionsGQLInput",
     "ReplaceDeploymentOptionsInput",
@@ -257,9 +254,6 @@ class ModelRuntimeConfigInput(BaseRequestModel):
             " RuntimeVariant resolver service before invoking internal flows."
         ),
     )
-    inference_runtime_config: dict[str, Any] | None = Field(
-        default=None, description="Framework-specific inference runtime configuration"
-    )
     environ: EnvironmentVariablesInput | None = Field(
         default=None, description="Environment variables for the service"
     )
@@ -295,10 +289,9 @@ class ExtraVFolderMountInput(BaseRequestModel):
     )
 
 
-class CreateRevisionInputDTO(BaseRequestModel):
+class CreateRevisionInput(BaseRequestModel):
     """Input for a deployment revision (nested structure matching GQL CreateRevisionInput)."""
 
-    name: str | None = Field(default=None, description="Revision name")
     revision_preset_id: DeploymentPresetID | None = Field(
         default=None,
         description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
@@ -330,19 +323,24 @@ class AddRevisionOptions(BaseRequestModel):
     )
 
 
-class AddRevisionGQLInputDTO(BaseRequestModel):
+class AddRevisionInput(BaseRequestModel):
     """Input for adding a revision. Used by both GQL and REST v2 APIs."""
 
-    name: str | None = Field(default=None, description="Revision name")
     revision_preset_id: DeploymentPresetID | None = Field(
         default=None,
         description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
     )
     deployment_id: UUID = Field(description="Deployment ID")
-    cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
-    resource_config: ResourceConfigInput = Field(description="Resource configuration")
-    image: ImageInput = Field(description="Container image")
-    model_runtime_config: ModelRuntimeConfigInput = Field(description="Runtime configuration")
+    cluster_config: ClusterConfigInput | None = Field(
+        default=None, description="Cluster configuration"
+    )
+    resource_config: ResourceConfigInput | None = Field(
+        default=None, description="Resource configuration"
+    )
+    image: ImageInput | None = Field(default=None, description="Container image")
+    model_runtime_config: ModelRuntimeConfigInput | None = Field(
+        default=None, description="Runtime configuration"
+    )
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
     model_definition: ModelDefinitionInput | None = Field(
         default=None,
@@ -447,40 +445,6 @@ class DeploymentStrategyInput(BaseRequestModel):
     )
 
 
-class RevisionInput(BaseRequestModel):
-    """Input for a deployment revision."""
-
-    name: str | None = Field(default=None, description="Revision name")
-    revision_preset_id: DeploymentPresetID | None = Field(
-        default=None,
-        description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
-    )
-    image_id: UUID = Field(description="Container image ID")
-    cluster_mode: ClusterMode = Field(description="Cluster mode for the revision")
-    cluster_size: int = Field(default=1, ge=1, description="Number of nodes in the cluster")
-    resource_slots: Mapping[str, Any] = Field(description="Resource slot requirements")
-    resource_opts: Mapping[str, Any] | None = Field(
-        default=None, description="Optional resource options"
-    )
-    runtime_variant_id: RuntimeVariantID = Field(description="Runtime variant ID (UUID)")
-    inference_runtime_config: dict[str, Any] | None = Field(
-        default=None, description="Framework-specific inference runtime configuration"
-    )
-    model_vfolder_id: VFolderUUID = Field(description="Model VFolder ID")
-    model_mount_destination: str = Field(
-        default="/models", description="Mount destination for model vfolder"
-    )
-    model_definition_path: str = Field(description="Path to model definition file")
-    model_definition: ModelDefinitionInput | None = Field(
-        default=None,
-        description="Model definition to override the default values generated by the server",
-    )
-    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
-        default=None, description="Additional vfolder mounts"
-    )
-    environ: Mapping[str, str] | None = Field(default=None, description="Environment variables")
-
-
 class CreateDeploymentInput(BaseRequestModel):
     """Input for creating a deployment."""
 
@@ -492,7 +456,7 @@ class CreateDeploymentInput(BaseRequestModel):
         description="Deployment strategy configuration"
     )
     replica_count: int = Field(ge=0, description="Number of replicas")
-    initial_revision: CreateRevisionInputDTO | None = Field(
+    initial_revision: CreateRevisionInput | None = Field(
         default=None,
         description="Initial revision configuration. If omitted, deployment is created without a revision and must be added later via add_revision.",
     )
@@ -544,13 +508,6 @@ class ScaleDeploymentInput(BaseRequestModel):
 
     id: UUID = Field(description="Deployment ID to scale")
     replicas: int = Field(ge=0, description="Target replica count")
-
-
-class AddRevisionInput(BaseRequestModel):
-    """Input for adding a revision to a deployment."""
-
-    deployment_id: UUID = Field(description="Deployment ID")
-    revision: RevisionInput = Field(description="Revision configuration")
 
 
 # ---------------------------------------------------------------------------

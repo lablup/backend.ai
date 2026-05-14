@@ -341,11 +341,11 @@ class MountInfo:
 
 @dataclass
 class MountMetadata:
-    # Non-nullable by design. ``MountMetadata`` is only constructed inside
-    # scheduling / deployment-building paths where a real model vfolder is
-    # guaranteed — callers must raise before reaching here when the vfolder
-    # is missing (SET NULL state on the persisted row is represented by
-    # ``ModelMountConfigData.vfolder_id``, not here).
+    # Write-path metadata for the model vfolder. ``AddRevisionInput`` requires
+    # ``model_mount_config`` so the caller always supplies ``model_vfolder_id``;
+    # the underlying ``deployment_revisions.model`` column stays nullable to
+    # represent post-hoc SET NULL on vfolder deletion, but no write path
+    # constructs this dataclass with ``None``.
     model_vfolder_id: VFolderUUID
     model_definition_path: str | None
     model_mount_destination: str

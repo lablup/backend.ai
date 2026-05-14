@@ -33,10 +33,6 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     """
 
     deployment_id: DeploymentID
-    # Creating a revision requires an image and a model vfolder; SET NULL
-    # is strictly a post-hoc state on the persisted row (see
-    # ``DeploymentRevisionRow.image`` / ``model``) and never originates
-    # from the creation path.
     image_id: ImageID
     resource_group: str
     resource_slots: ResourceSlot

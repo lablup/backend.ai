@@ -151,17 +151,25 @@ type ActiveResourceOverview
 input AddRevisionInput
   @join__type(graph: STRAWBERRY)
 {
-  name: String = null
-
   """
   Added in 26.4.2. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
   """
   revisionPresetId: UUID = null
   deploymentId: ID!
-  clusterConfig: ClusterConfigInput!
-  resourceConfig: ResourceConfigInput!
-  image: ImageInput!
-  modelRuntimeConfig: ModelRuntimeConfigInput!
+
+  """Cluster configuration"""
+  clusterConfig: ClusterConfigInput = null
+
+  """Resource configuration"""
+  resourceConfig: ResourceConfigInput = null
+
+  """Container image"""
+  image: ImageInput = null
+
+  """Runtime configuration"""
+  modelRuntimeConfig: ModelRuntimeConfigInput = null
+
+  """Model mount configuration"""
   modelMountConfig: ModelMountConfigInput!
 
   """
@@ -3843,8 +3851,6 @@ Added in 25.19.0. Input for specifying revision configuration within a deploymen
 input CreateRevisionInput
   @join__type(graph: STRAWBERRY)
 {
-  name: String = null
-
   """
   Added in 26.4.2. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
   """
@@ -9778,7 +9784,6 @@ input ModelRuntimeConfigInput
   @join__type(graph: STRAWBERRY)
 {
   runtimeVariantId: UUID!
-  inferenceRuntimeConfig: JSON = null
 
   """Environment variables for the service."""
   environ: EnvironmentVariablesInput = null
@@ -14056,10 +14061,10 @@ type Query
   """
   Added in 25.16.0. Get configuration JSON Schemas for all inference runtimes.
   """
-  inferenceRuntimeConfigs: JSON @join__field(graph: STRAWBERRY)
+  inferenceRuntimeConfigs: JSON @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
-  inferenceRuntimeConfig(name: String!): JSON @join__field(graph: STRAWBERRY)
+  inferenceRuntimeConfig(name: String!): JSON @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
 
   """Added in 25.19.0. Get a specific route by ID."""
   route(id: ID!): Route @join__field(graph: STRAWBERRY)

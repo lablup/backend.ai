@@ -27,10 +27,11 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 
 @dataclass
 class VFolderMountsCreator:
-    # Creators describe an intent to persist a revision, so the model
-    # vfolder must always be supplied here; a post-hoc SET NULL on the
-    # persisted row is the only way ``model`` should become NULL (see
-    # ``MountMetadata.model_vfolder_id`` for the read-side counterpart).
+    # All fields are required: ``AddRevisionInput`` mandates
+    # ``model_mount_config`` (the revision preset does not carry a model
+    # vfolder), so the write path always supplies a concrete vfolder id
+    # and mount destination. Callers fill ``model_definition_path=None``
+    # and ``extra_mounts=[]`` explicitly when those are absent.
     model_vfolder_id: VFolderUUID
     model_definition_path: str | None
     model_mount_destination: str

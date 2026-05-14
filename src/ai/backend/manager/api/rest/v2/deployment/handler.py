@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
-    AddRevisionGQLInputDTO,
+    AddRevisionInput,
     AddRevisionOptions,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
@@ -173,7 +173,7 @@ class V2DeploymentHandler:
     async def add_revision(
         self,
         path: PathParam[DeploymentIdPathParam],
-        body: BodyParam[AddRevisionGQLInputDTO],
+        body: BodyParam[AddRevisionInput],
     ) -> APIResponse:
         """Add a new model revision to a deployment."""
         result = await self._adapter.add_revision(
