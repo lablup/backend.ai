@@ -6592,8 +6592,10 @@ type ModelServiceConfig {
   """
   preStartActions: [PreStartAction!]!
 
-  """Command to start the model service."""
-  startCommand: [String!]
+  """
+  Command to start the model service. A list is exec'ed directly as argv; a string is wrapped as ``[shell, '-c', str]`` by the kernel runner so shell semantics (line continuations, ``$VAR`` expansion, pipes) apply.
+  """
+  startCommand: JSON
 
   """Shell configured for the model service."""
   shell: String!
@@ -6614,8 +6616,10 @@ input ModelServiceConfigInput {
   """
   preStartActions: [PreStartActionInput!] = null
 
-  """Command to start the model service."""
-  startCommand: [String!] = null
+  """
+  Command to start the model service. A JSON array (``list[str]``) is exec'ed directly as argv; a JSON string is wrapped as ``[shell, '-c', str]`` by the kernel runner so shell semantics (line continuations, ``$VAR`` expansion, pipes) apply.
+  """
+  startCommand: JSON = null
 
   """Shell configured for the model service."""
   shell: String = null
