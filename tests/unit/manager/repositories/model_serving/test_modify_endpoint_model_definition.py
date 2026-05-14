@@ -18,6 +18,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
@@ -242,7 +243,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "64m"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             sess.add(image)
             await sess.flush()
         return image_id
