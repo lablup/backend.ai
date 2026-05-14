@@ -1,10 +1,12 @@
-from collections.abc import Iterable
+from collections.abc import Sequence
+from decimal import Decimal, InvalidOperation
 from typing import Final
 
-from ai.backend.common.clients.prometheus.metric_types import KernelLiveStatBatchResult
-from ai.backend.common.clients.prometheus.types import MetricValue as PrometheusMetricValue
-from ai.backend.common.clients.prometheus.types import ValueType
-from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
+from ai.backend.common.clients.prometheus.metric_types import (
+    KernelLiveStatBatchResult,
+    KernelLiveStatValues,
+)
+from ai.backend.common.metrics.types import CAPACITY_SENTINEL, CAPACITY_SENTINEL_METRICS
 from ai.backend.common.types import KernelId, MetricValue
 
 # Metric-name classification used only while adapting Prometheus samples back
@@ -60,91 +62,76 @@ class LegacyLiveStatConverter:
     """Adapt `KernelLiveStatBatchResult` into the legacy
     `dict[metric_name, MetricValue]` shape consumed by GQL/WebUI.
 
-    Merge order from upstream is gauge -> diff -> rate, so for
-    RATE/DIFF metrics the same `(name, CURRENT)` tuple appears twice;
-    `currents[0]` is the raw gauge sample, `currents[-1]` is the
-    rate/diff query result.
-
-    `stats.max` / `stats.avg` are not populated
+    The batch result carries per-kernel raw samples partitioned by query type;
+    mapping them to legacy ``stats.*`` fields (with rate-over-non-rate
+    fallback priority and capacity sentinels for unbounded metrics) is
+    performed here.
     """
 
     @classmethod
     def convert(
-        cls, result: KernelLiveStatBatchResult
+        cls,
+        kernel_ids: Sequence[KernelId],
+        raw: KernelLiveStatBatchResult,
     ) -> dict[KernelId, dict[str, MetricValue] | None]:
         out: dict[KernelId, dict[str, MetricValue] | None] = {}
-        for kernel_id, entry in result.entries.items():
-            if not entry.values:
-                out[kernel_id] = None
+        for kid in kernel_ids:
+            values = raw.by_kernel.get(kid)
+            metric_names = cls._metric_names(values) if values is not None else set()
+            if not metric_names or values is None:
+                out[kid] = None
                 continue
-            out[kernel_id] = cls._convert_one_kernel(entry.values)
+            out[kid] = {name: cls._convert_one(values, name) for name in sorted(metric_names)}
         return out
 
-    @classmethod
-    def _convert_one_kernel(cls, values: Iterable[PrometheusMetricValue]) -> dict[str, MetricValue]:
-        grouped: dict[str, list[PrometheusMetricValue]] = {}
-        for v in values:
-            grouped.setdefault(v.metric_name, []).append(v)
-
-        per_metric: dict[str, MetricValue] = {}
-        for name, samples in grouped.items():
-            per_metric[name] = cls._convert_metric_samples(name, samples)
-        return per_metric
+    @staticmethod
+    def _metric_names(values: KernelLiveStatValues) -> set[str]:
+        return (
+            values.instant_current.keys()
+            | values.instant_capacity.keys()
+            | values.rate_current.keys()
+            | values.max.keys()
+            | values.avg.keys()
+        )
 
     @staticmethod
-    def _convert_metric_samples(
-        metric_name: str, samples: list[PrometheusMetricValue]
-    ) -> MetricValue:
-        # `_resolve_unit_hint` falls back to naming conventions and finally
-        # the metric_name itself for unregistered plugin metrics.
-        unit_hint = _resolve_unit_hint(metric_name)
-        out = _make_default_metric_value(unit_hint=unit_hint)
+    def _convert_one(values: KernelLiveStatValues, name: str) -> MetricValue:
+        out = _make_default_metric_value(_resolve_unit_hint(name))
 
-        currents = [s.value for s in samples if s.value_type is ValueType.CURRENT]
-        capacities = [s.value for s in samples if s.value_type is ValueType.CAPACITY]
-        pcts = [s.value for s in samples if s.value_type is ValueType.PCT]
+        # rate_current overrides instant_current for RATE/DIFF metrics; for the
+        # rest only instant_current contains a value.
+        current = values.rate_current.get(name) or values.instant_current.get(name)
+        capacity = values.instant_capacity.get(name)
+        max_value = values.max.get(name)
+        avg_value = values.avg.get(name)
 
-        is_rate_metric = metric_name in _RATE_STAT_METRICS
-        is_diff_metric = metric_name in _DIFF_STAT_METRICS
+        # Synthesize capacity for unbounded metrics that don't expose one.
+        if capacity is None and current is not None and name in CAPACITY_SENTINEL_METRICS:
+            capacity = CAPACITY_SENTINEL
 
-        if currents:
-            # RATE/DIFF: prefer the rate/diff query result over the raw gauge,
-            # mirroring the legacy `current_hook=stats.rate|diff` behavior.
-            if (is_rate_metric or is_diff_metric) and len(currents) > 1:
-                out["current"] = currents[-1]
-            else:
-                out["current"] = currents[0]
-        if capacities:
-            out["capacity"] = capacities[-1]
+        if current is not None:
+            out["current"] = current
+        if capacity is not None:
+            out["capacity"] = capacity
+        if max_value is not None:
+            out["stats.max"] = max_value
+        if avg_value is not None:
+            out["stats.avg"] = avg_value
 
-        if is_rate_metric and currents:
-            # RATE template applies `/ UTILIZATION_METRIC_INTERVAL`; undo it
-            # here to recover the per-second magnitude legacy `stats.rate` had.
-            # TODO: separate the rate query from the gauge query so this
-            #       hack-multiply isn't needed.
-            try:
-                rate_value = float(currents[-1]) * UTILIZATION_METRIC_INTERVAL
-                out["stats.rate"] = f"{rate_value:.6f}"
-            except ValueError:
-                out["stats.rate"] = currents[-1]
-        if is_diff_metric and currents:
-            # Per-second rate, not the legacy per-5s delta — GQL consumers
-            # only read `cpu_util.pct`, so magnitude mismatch is acceptable.
-            out["stats.diff"] = currents[-1]
+        if name in _RATE_STAT_METRICS and current is not None:
+            out["stats.rate"] = current
+        if name in _DIFF_STAT_METRICS and current is not None:
+            out["stats.diff"] = current
 
-        # Derive pct from current/capacity when no PCT sample was emitted.
-        if pcts:
-            out["pct"] = pcts[-1]
-        else:
-            try:
-                current_value = float(out["current"])
-                capacity = out["capacity"]
-                if capacity is None:
-                    return out
-                capacity_value = float(capacity)
-                if capacity_value > 0:
-                    out["pct"] = f"{current_value / capacity_value * 100:.2f}"
-            except ValueError:
-                pass
+        try:
+            current_value = Decimal(out["current"])
+            cap = out["capacity"]
+            if cap is None:
+                return out
+            capacity_value = Decimal(cap)
+            if capacity_value > 0:
+                out["pct"] = f"{current_value / capacity_value * 100:.2f}"
+        except InvalidOperation:
+            pass
 
         return out

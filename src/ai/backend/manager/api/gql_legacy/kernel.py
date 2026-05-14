@@ -78,7 +78,7 @@ async def _batch_load_kernel_live_stat(
     action_result = await ctx.processors.metric.query_container_live_stat.wait_for_complete(
         ContainerLiveStatAction(kernel_ids=list(kernel_ids))
     )
-    converted = LegacyLiveStatConverter.convert(action_result.stats)
+    converted = LegacyLiveStatConverter.convert(kernel_ids, action_result.stats)
     return [converted.get(kid) for kid in kernel_ids]
 
 

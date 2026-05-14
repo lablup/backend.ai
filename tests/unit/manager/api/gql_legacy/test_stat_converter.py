@@ -1,11 +1,14 @@
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import cast
 
 import pytest
 
-from ai.backend.common.clients.prometheus.metric_types import KernelLiveStatBatchResult
-from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
+from ai.backend.common.clients.prometheus.metric_types import (
+    KernelLiveStatBatchResult,
+    KernelLiveStatValues,
+)
+from ai.backend.common.metrics.types import CAPACITY_SENTINEL
 from ai.backend.common.types import KernelId
 from ai.backend.common.types import MetricValue as LegacyMetricValue
 from ai.backend.manager.api.gql_legacy.stat_converter import LegacyLiveStatConverter
@@ -21,13 +24,8 @@ def two_kernel_ids() -> tuple[KernelId, KernelId]:
     return KernelId(uuid.uuid4()), KernelId(uuid.uuid4())
 
 
-def _build_result(
-    samples_by_kernel: Mapping[KernelId, Sequence[MetricValue]],
-) -> KernelLiveStatBatchResult:
-    return KernelLiveStatBatchResult.from_metric_values(
-        list(samples_by_kernel.keys()),
-        {k: list(v) for k, v in samples_by_kernel.items()},
-    )
+def _wrap(by_kernel: Mapping[KernelId, KernelLiveStatValues]) -> KernelLiveStatBatchResult:
+    return KernelLiveStatBatchResult(by_kernel=dict(by_kernel))
 
 
 def _per_metric(
@@ -44,27 +42,19 @@ def _per_metric(
 
 
 class TestEmptyKernel:
-    @pytest.fixture
-    def empty_result(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
-        return KernelLiveStatBatchResult.empty([kernel_id])
-
-    def test_kernel_with_no_samples_yields_none(
-        self,
-        kernel_id: KernelId,
-        empty_result: KernelLiveStatBatchResult,
-    ) -> None:
-        assert LegacyLiveStatConverter.convert(empty_result) == {kernel_id: None}
+    def test_kernel_with_no_samples_yields_none(self, kernel_id: KernelId) -> None:
+        raw = KernelLiveStatBatchResult.empty([kernel_id])
+        assert LegacyLiveStatConverter.convert([kernel_id], raw) == {kernel_id: None}
 
 
 class TestGaugeMetric:
     @pytest.fixture
-    def gauge_result(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
-        return _build_result({
-            kernel_id: [
-                MetricValue("mem", ValueType.CURRENT, "1024"),
-                MetricValue("mem", ValueType.CAPACITY, "8192"),
-                MetricValue("mem", ValueType.PCT, "12.5"),
-            ]
+    def gauge_raw(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
+        return _wrap({
+            kernel_id: KernelLiveStatValues(
+                instant_current={"mem": "1024"},
+                instant_capacity={"mem": "8192"},
+            )
         })
 
     @pytest.mark.parametrize(
@@ -72,108 +62,92 @@ class TestGaugeMetric:
         [
             ("current", "1024"),
             ("capacity", "8192"),
-            ("pct", "12.5"),
+            ("pct", "12.50"),
             ("unit_hint", "bytes"),
         ],
     )
     def test_legacy_field_is_populated(
         self,
         kernel_id: KernelId,
-        gauge_result: KernelLiveStatBatchResult,
+        gauge_raw: KernelLiveStatBatchResult,
         field: str,
         expected: str,
     ) -> None:
-        per_metric = _per_metric(LegacyLiveStatConverter.convert(gauge_result), kernel_id)
+        per_metric = _per_metric(LegacyLiveStatConverter.convert([kernel_id], gauge_raw), kernel_id)
         assert per_metric["mem"][field] == expected
 
 
 class TestRateMetric:
-    """For a RATE_STAT_METRICS entry the rate-of-change sample (currents[-1])
-    is what the WebUI expects in `current` (legacy Valkey behavior). The
-    cumulative gauge (currents[0]) is discarded because the WebUI never
-    consumed it on the Valkey path. `stats.rate` is hack-multiplied by
-    `UTILIZATION_METRIC_INTERVAL` to recover the per-second magnitude that
-    legacy `MovingStatistics.rate` produced (the rate query template applies
-    `/ UTILIZATION_METRIC_INTERVAL` so its `current` matches the per-window
-    legacy magnitude; the converter undoes that scaling for `stats.rate`).
+    """For a RATE_STAT_METRICS entry the rate-of-change sample is what the
+    WebUI expects in `current` and `stats.rate`.
     """
 
     @pytest.fixture
-    def rate_result(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
-        return _build_result({
-            kernel_id: [
-                MetricValue("net_rx", ValueType.CURRENT, "1000000"),
-                MetricValue("net_rx", ValueType.CURRENT, "2048"),
-            ]
+    def rate_raw(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
+        return _wrap({
+            kernel_id: KernelLiveStatValues(rate_current={"net_rx": "2048"}),
         })
 
     @pytest.mark.parametrize(
         "field, expected",
         [
             ("current", "2048"),
-            ("stats.rate", "10240.000000"),
+            ("stats.rate", "2048"),
             ("unit_hint", "bps"),
         ],
     )
     def test_legacy_field_is_populated(
         self,
         kernel_id: KernelId,
-        rate_result: KernelLiveStatBatchResult,
+        rate_raw: KernelLiveStatBatchResult,
         field: str,
         expected: str,
     ) -> None:
-        per_metric = _per_metric(LegacyLiveStatConverter.convert(rate_result), kernel_id)
+        per_metric = _per_metric(LegacyLiveStatConverter.convert([kernel_id], rate_raw), kernel_id)
         assert per_metric["net_rx"][field] == expected
 
 
 class TestDiffMetric:
-    """For a DIFF_STAT_METRICS entry the diff-over-window sample (currents[-1])
-    is exposed as `current` (legacy Valkey behavior) and mirrored to
-    `stats.diff`. The cumulative gauge (currents[0]) is dropped
+    """For a DIFF_STAT_METRICS entry the rate-converted sample feeds `current`
+    and is mirrored to `stats.diff`.
     """
 
     @pytest.fixture
-    def diff_result(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
-        return _build_result({
-            kernel_id: [
-                MetricValue("cpu_util", ValueType.CURRENT, "5000000"),
-                MetricValue("cpu_util", ValueType.PCT, "37.0"),
-                MetricValue("cpu_util", ValueType.CURRENT, "150"),
-            ]
+    def diff_raw(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
+        return _wrap({
+            kernel_id: KernelLiveStatValues(
+                rate_current={"cpu_util": "150"},
+                instant_capacity={"cpu_util": "1000"},
+            ),
         })
 
     @pytest.mark.parametrize(
         "field, expected",
         [
             ("current", "150"),
-            ("pct", "37.0"),
+            ("pct", "15.00"),
             ("stats.diff", "150"),
         ],
     )
     def test_legacy_field_is_populated(
         self,
         kernel_id: KernelId,
-        diff_result: KernelLiveStatBatchResult,
+        diff_raw: KernelLiveStatBatchResult,
         field: str,
         expected: str,
     ) -> None:
-        per_metric = _per_metric(LegacyLiveStatConverter.convert(diff_result), kernel_id)
+        per_metric = _per_metric(LegacyLiveStatConverter.convert([kernel_id], diff_raw), kernel_id)
         assert per_metric["cpu_util"][field] == expected
 
 
 class TestPctDerivation:
-    """When the Prometheus pipeline does not emit a PCT sample, the converter
-    derives the percentage from current/capacity, matching the value the
-    Valkey baseline produced via the agent's MovingStatistics.
-    """
-
     @pytest.fixture
     def gauge_with_capacity(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
-        return _build_result({
-            kernel_id: [
-                MetricValue("mem", ValueType.CURRENT, "200"),
-                MetricValue("mem", ValueType.CAPACITY, "800"),
-            ]
+        return _wrap({
+            kernel_id: KernelLiveStatValues(
+                instant_current={"mem": "200"},
+                instant_capacity={"mem": "800"},
+            ),
         })
 
     def test_pct_is_computed_from_current_and_capacity(
@@ -181,41 +155,74 @@ class TestPctDerivation:
         kernel_id: KernelId,
         gauge_with_capacity: KernelLiveStatBatchResult,
     ) -> None:
-        per_metric = _per_metric(LegacyLiveStatConverter.convert(gauge_with_capacity), kernel_id)
+        per_metric = _per_metric(
+            LegacyLiveStatConverter.convert([kernel_id], gauge_with_capacity), kernel_id
+        )
         assert per_metric["mem"]["pct"] == "25.00"
 
-    def test_explicit_pct_sample_wins_over_derivation(
+
+class TestDerivedStats:
+    def test_maps_derived_value_types_to_legacy_stats_fields(
         self,
         kernel_id: KernelId,
     ) -> None:
-        result = _build_result({
-            kernel_id: [
-                MetricValue("mem", ValueType.CURRENT, "200"),
-                MetricValue("mem", ValueType.CAPACITY, "800"),
-                MetricValue("mem", ValueType.PCT, "30.0"),
-            ]
+        raw = _wrap({
+            kernel_id: KernelLiveStatValues(
+                instant_current={"mem": "200"},
+                max={"mem": "300"},
+                avg={"mem": "250"},
+            ),
         })
-        per_metric = _per_metric(LegacyLiveStatConverter.convert(result), kernel_id)
-        assert per_metric["mem"]["pct"] == "30.0"
+
+        per_metric = _per_metric(LegacyLiveStatConverter.convert([kernel_id], raw), kernel_id)
+
+        assert per_metric["mem"]["stats.max"] == "300"
+        assert per_metric["mem"]["stats.avg"] == "250"
 
 
 class TestCapacityDefault:
-    """The legacy Valkey shape always carried a string `capacity`. The
-    converter mirrors that — when the Prometheus pipeline emits no CAPACITY
-    sample, capacity stays at the `"0"` default rather than `null`.
+    """For metrics not in CAPACITY_SENTINEL_METRICS, capacity defaults to "0"
+    when the Prometheus pipeline emits no CAPACITY sample.
     """
 
     @pytest.fixture
     def gauge_no_capacity(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
-        return _build_result({kernel_id: [MetricValue("io_read", ValueType.CURRENT, "0")]})
+        return _wrap({
+            kernel_id: KernelLiveStatValues(instant_current={"io_scratch_size": "0"}),
+        })
 
     def test_capacity_defaults_to_zero_string(
         self,
         kernel_id: KernelId,
         gauge_no_capacity: KernelLiveStatBatchResult,
     ) -> None:
-        per_metric = _per_metric(LegacyLiveStatConverter.convert(gauge_no_capacity), kernel_id)
-        assert per_metric["io_read"]["capacity"] == "0"
+        per_metric = _per_metric(
+            LegacyLiveStatConverter.convert([kernel_id], gauge_no_capacity), kernel_id
+        )
+        assert per_metric["io_scratch_size"]["capacity"] == "0"
+
+
+class TestCapacitySentinel:
+    """Unbounded metrics (cpu_used / net_rx / net_tx / io_read / io_write)
+    get a synthesized capacity sentinel when the Prometheus pipeline emits no
+    CAPACITY sample, preserving the BA-5806 invariant for legacy consumers.
+    """
+
+    @pytest.fixture
+    def sentinel_raw(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
+        return _wrap({
+            kernel_id: KernelLiveStatValues(instant_current={"io_read": "0"}),
+        })
+
+    def test_capacity_is_sentinel_for_unbounded_metric(
+        self,
+        kernel_id: KernelId,
+        sentinel_raw: KernelLiveStatBatchResult,
+    ) -> None:
+        per_metric = _per_metric(
+            LegacyLiveStatConverter.convert([kernel_id], sentinel_raw), kernel_id
+        )
+        assert per_metric["io_read"]["capacity"] == CAPACITY_SENTINEL
 
 
 class TestUnknownMetric:
@@ -225,37 +232,41 @@ class TestUnknownMetric:
     """
 
     @pytest.fixture
-    def unknown_metric_result(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
-        return _build_result({kernel_id: [MetricValue("brand_new_metric", ValueType.CURRENT, "1")]})
+    def unknown_metric_raw(self, kernel_id: KernelId) -> KernelLiveStatBatchResult:
+        return _wrap({
+            kernel_id: KernelLiveStatValues(instant_current={"brand_new_metric": "1"}),
+        })
 
     def test_unknown_metric_uses_name_as_unit_hint(
         self,
         kernel_id: KernelId,
-        unknown_metric_result: KernelLiveStatBatchResult,
+        unknown_metric_raw: KernelLiveStatBatchResult,
     ) -> None:
-        per_metric = _per_metric(LegacyLiveStatConverter.convert(unknown_metric_result), kernel_id)
+        per_metric = _per_metric(
+            LegacyLiveStatConverter.convert([kernel_id], unknown_metric_raw), kernel_id
+        )
         assert per_metric["brand_new_metric"]["unit_hint"] == "brand_new_metric"
         assert per_metric["brand_new_metric"]["current"] == "1"
 
 
 class TestMultiKernelIsolation:
     @pytest.fixture
-    def two_kernel_result(
+    def two_kernel_raw(
         self, two_kernel_ids: tuple[KernelId, KernelId]
     ) -> KernelLiveStatBatchResult:
         a, b = two_kernel_ids
-        return _build_result({
-            a: [MetricValue("mem", ValueType.CURRENT, "10")],
-            b: [MetricValue("mem", ValueType.CURRENT, "20")],
+        return _wrap({
+            a: KernelLiveStatValues(instant_current={"mem": "10"}),
+            b: KernelLiveStatValues(instant_current={"mem": "20"}),
         })
 
     def test_per_kernel_values_do_not_leak(
         self,
         two_kernel_ids: tuple[KernelId, KernelId],
-        two_kernel_result: KernelLiveStatBatchResult,
+        two_kernel_raw: KernelLiveStatBatchResult,
     ) -> None:
         a, b = two_kernel_ids
-        out = LegacyLiveStatConverter.convert(two_kernel_result)
+        out = LegacyLiveStatConverter.convert([a, b], two_kernel_raw)
         per_metric_a = _per_metric(out, a)
         per_metric_b = _per_metric(out, b)
         assert per_metric_a["mem"]["current"] == "10"

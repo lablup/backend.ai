@@ -13,14 +13,14 @@ from ai.backend.common.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
     ContainerMetricResult,
-    KernelLiveStatValues,
-    KernelMetricValuesByKernel,
+    KernelLiveStatBatchResult,
     MetricResultValue,
 )
 from ai.backend.common.clients.prometheus.preset import LabelMatcher
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
+    PrometheusQueryData,
     PrometheusResponse,
 )
 from ai.backend.common.exception import (
@@ -82,15 +82,40 @@ class PrometheusClient:
     async def fetch_container_live_stats(
         self,
         kernel_ids: Sequence[KernelId],
-    ) -> KernelLiveStatValues:
+    ) -> KernelLiveStatBatchResult:
         queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
-        merged = KernelMetricValuesByKernel(values_by_kernel={})
-        for preset in queries.to_list():
-            response = await self._query_instant(preset)
-            merged = merged.merged_with(
-                KernelMetricValuesByKernel.from_prometheus_response(response)
-            )
-        return KernelLiveStatValues.with_capacity_sentinels(merged.values_by_kernel)
+
+        instant_res = await self._query_instant(queries.instant)
+        rate_current_res = await self._query_instant(queries.rate_current)
+        # rate_max/rate_avg wrap rate() first because cpu_util/net_rx/net_tx are cumulative counters
+        # aggregating their raw values would just track the running total.
+        max_res = await self._query_instant(queries.max)
+        rate_max_res = await self._query_instant(queries.rate_max)
+        avg_res = await self._query_instant(queries.avg)
+        rate_avg_res = await self._query_instant(queries.rate_avg)
+
+        # The max/rate_max and avg/rate_avg queries read the same "current"
+        # series, so we merge each pair to cover all data points regardless of
+        # individual query result types.
+        return KernelLiveStatBatchResult.from_responses(
+            instant=instant_res,
+            rate_current=rate_current_res,
+            max=self._merge_prometheus_responses(
+                max_res, rate_max_res, final_result_type=max_res.data.result_type
+            ),
+            avg=self._merge_prometheus_responses(
+                avg_res, rate_avg_res, final_result_type=avg_res.data.result_type
+            ),
+        )
+
+    def _merge_prometheus_responses(
+        self, first: PrometheusResponse, second: PrometheusResponse, *, final_result_type: str
+    ) -> PrometheusResponse:
+        data = PrometheusQueryData(
+            result_type=final_result_type,
+            result=[*first.data.result, *second.data.result],
+        )
+        return first.model_copy(update={"data": data})
 
     async def execute_preset(
         self,

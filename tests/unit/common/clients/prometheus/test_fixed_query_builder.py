@@ -3,7 +3,6 @@ Tests for FixedQueryBuilder: query building, metric type classification,
 and live stat query construction.
 """
 
-import re
 from uuid import UUID
 
 import pytest
@@ -16,7 +15,7 @@ from ai.backend.common.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     MetricType,
 )
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, LabelOperator, MetricPreset
+from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.clients.prometheus.types import ValueType
 from ai.backend.common.types import KernelId
 
@@ -103,42 +102,53 @@ class TestGetContainerLiveStatQueries:
         kid2 = KernelId(UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"))
 
         result = builder.get_container_live_stat_queries([kid1, kid2])
+        rendered = "\n".join(
+            query.render()
+            for query in (
+                result.instant,
+                result.rate_current,
+                result.max,
+                result.rate_max,
+                result.avg,
+                result.rate_avg,
+            )
+        )
 
-        matcher = result.gauge.labels["kernel_id"]
-        assert matcher.operator == LabelOperator.REGEX
-        pattern = re.compile(matcher.value)
-        assert pattern.fullmatch(str(kid1))
-        assert pattern.fullmatch(str(kid2))
-        assert not pattern.fullmatch("cccccccc-cccc-cccc-cccc-cccccccccccc")
+        assert str(kid1) in rendered
+        assert str(kid2) in rendered
+        assert "cccccccc-cccc-cccc-cccc-cccccccccccc" not in rendered
 
-    @pytest.mark.parametrize(
-        ("preset_attr", "expected_metrics"),
-        [
-            ("diff", ["cpu_util"]),
-            ("rate", ["net_rx", "net_tx"]),
-        ],
-    )
-    def test_preset_filters_by_metric_name_and_value_type(
-        self, preset_attr: str, expected_metrics: list[str]
-    ) -> None:
-        builder = FixedQueryBuilder("1m")
-        kid = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
-
-        result = builder.get_container_live_stat_queries([kid])
-        labels = getattr(result, preset_attr).labels
-
-        assert labels["container_metric_name"].operator == LabelOperator.REGEX
-        for metric in expected_metrics:
-            assert metric in labels["container_metric_name"].value
-        assert labels["value_type"] == LabelMatcher.exact("current")
-
-    def test_gauge_has_no_metric_name_filter(self) -> None:
+    def test_window_queries_read_current_series(self) -> None:
         builder = FixedQueryBuilder("1m")
         kid = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
 
         result = builder.get_container_live_stat_queries([kid])
 
-        assert "container_metric_name" not in result.gauge.labels
+        assert "sum by (kernel_id,container_metric_name)" in result.max.render()
+        assert "sum by (kernel_id,container_metric_name)" in result.avg.render()
+        assert 'value_type="current"' in result.max.render()
+        assert 'value_type="current"' in result.avg.render()
+        assert "rate(" not in result.max.render()
+        assert "rate(" not in result.avg.render()
+
+    def test_rate_window_queries_read_rate_series(self) -> None:
+        builder = FixedQueryBuilder("1m")
+        kid = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
+
+        result = builder.get_container_live_stat_queries([kid])
+
+        assert (
+            "max_over_time((sum by (kernel_id,container_metric_name)(rate("
+            in result.rate_max.render()
+        )
+        assert (
+            "avg_over_time((sum by (kernel_id,container_metric_name)(rate("
+            in result.rate_avg.render()
+        )
+        assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in result.rate_max.render()
+        assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in result.rate_avg.render()
+        assert 'value_type="current"' in result.rate_max.render()
+        assert 'value_type="current"' in result.rate_avg.render()
 
 
 class TestRegexUnion:

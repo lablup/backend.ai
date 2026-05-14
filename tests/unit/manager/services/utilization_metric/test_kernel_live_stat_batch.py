@@ -3,8 +3,10 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.clients.prometheus.metric_types import KernelLiveStatBatchResult
-from ai.backend.common.clients.prometheus.types import MetricValue, ValueType
+from ai.backend.common.clients.prometheus.metric_types import (
+    KernelLiveStatBatchResult,
+    KernelLiveStatValues,
+)
 from ai.backend.common.types import KernelId
 from ai.backend.manager.services.metric.actions.live_stat import ContainerLiveStatAction
 from ai.backend.manager.services.metric.service import MetricService
@@ -23,101 +25,82 @@ class TestKernelLiveStatBatch:
             metric_repository=mock_metric_repository,
         )
 
-    async def test_collects_and_assembles_batch_result(
+    async def test_passes_raw_result_through(
         self,
         mock_metric_repository: Mock,
         metric_service: MetricService,
     ) -> None:
-        """Service assembles KernelLiveStatBatchResult from repository response."""
+        """Service simply propagates the repository's raw result."""
         kid = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
 
-        batch_result = KernelLiveStatBatchResult.from_metric_values(
-            [kid],
-            {
-                kid: [
-                    MetricValue(
-                        metric_name="mem", value_type=ValueType.CURRENT, value="5368709120"
-                    ),
-                    MetricValue(
-                        metric_name="mem", value_type=ValueType.CAPACITY, value="8589934592"
-                    ),
-                    MetricValue(metric_name="cpu_util", value_type=ValueType.CURRENT, value="50.0"),
-                ],
+        raw = KernelLiveStatBatchResult(
+            by_kernel={
+                kid: KernelLiveStatValues(
+                    instant_current={"mem": "5368709120", "cpu_util": "999"},
+                    instant_capacity={"mem": "8589934592"},
+                    rate_current={"cpu_util": "50.0"},
+                ),
             },
         )
-        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=batch_result)
+        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=raw)
 
         result = await metric_service.query_container_live_stats(
             ContainerLiveStatAction(kernel_ids=[kid])
         )
-        entry = result.stats.entries[kid]
-        values_by_key = {(v.metric_name, v.value_type): v.value for v in entry.values}
 
-        assert values_by_key[("mem", ValueType.CURRENT)] == "5368709120"
-        assert values_by_key[("mem", ValueType.CAPACITY)] == "8589934592"
-        assert values_by_key[("cpu_util", ValueType.CURRENT)] == "50.0"
+        assert result.stats is raw
+        assert result.stats.by_kernel[kid].instant_current["mem"] == "5368709120"
+        assert result.stats.by_kernel[kid].rate_current["cpu_util"] == "50.0"
 
-    async def test_empty_kernel_returns_empty_entry(
+    async def test_empty_kernel_returns_empty_bags(
         self,
         mock_metric_repository: Mock,
         metric_service: MetricService,
     ) -> None:
-        """A kernel with no Prometheus samples must yield an empty entry."""
+        """Repository may return an empty result for kernels without samples."""
         empty_kernel = KernelId(UUID("00000000-0000-0000-0000-000000000000"))
-        batch_result = KernelLiveStatBatchResult.from_metric_values([empty_kernel], {})
-        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=batch_result)
+        raw = KernelLiveStatBatchResult.empty([empty_kernel])
+        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=raw)
 
         result = await metric_service.query_container_live_stats(
             ContainerLiveStatAction(kernel_ids=[empty_kernel])
         )
-        entry = result.stats.entries[empty_kernel]
-        assert entry.values == []
+        assert result.stats.by_kernel == {empty_kernel: KernelLiveStatValues()}
 
     async def test_empty_kernel_ids_returns_empty_result(
         self,
         mock_metric_repository: Mock,
         metric_service: MetricService,
     ) -> None:
-        """No kernel_ids -> empty result from repository."""
-        batch_result = KernelLiveStatBatchResult.empty([])
-        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=batch_result)
+        """No kernel_ids -> repository hands back an empty result."""
+        raw = KernelLiveStatBatchResult.empty([])
+        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=raw)
 
         result = await metric_service.query_container_live_stats(
             ContainerLiveStatAction(kernel_ids=[])
         )
-        assert result.stats.entries == {}
+        assert result.stats is raw
 
     async def test_multiple_kernels_grouped_correctly(
         self,
         mock_metric_repository: Mock,
         metric_service: MetricService,
     ) -> None:
-        """Values from multiple kernels are grouped into separate entries."""
+        """Values from multiple kernels remain separated in the result."""
         kid1 = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
         kid2 = KernelId(UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"))
 
-        batch_result = KernelLiveStatBatchResult.from_metric_values(
-            [kid1, kid2],
-            {
-                kid1: [
-                    MetricValue(metric_name="mem", value_type=ValueType.CURRENT, value="100"),
-                ],
-                kid2: [
-                    MetricValue(metric_name="mem", value_type=ValueType.CURRENT, value="200"),
-                ],
+        raw = KernelLiveStatBatchResult(
+            by_kernel={
+                kid1: KernelLiveStatValues(instant_current={"mem": "100"}),
+                kid2: KernelLiveStatValues(instant_current={"mem": "200"}),
             },
         )
-        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=batch_result)
+        mock_metric_repository.query_container_live_stats = AsyncMock(return_value=raw)
 
         result = await metric_service.query_container_live_stats(
             ContainerLiveStatAction(kernel_ids=[kid1, kid2])
         )
 
-        values1 = {
-            (v.metric_name, v.value_type): v.value for v in result.stats.entries[kid1].values
-        }
-        values2 = {
-            (v.metric_name, v.value_type): v.value for v in result.stats.entries[kid2].values
-        }
-        assert values1[("mem", ValueType.CURRENT)] == "100"
-        assert values2[("mem", ValueType.CURRENT)] == "200"
+        assert result.stats.by_kernel[kid1].instant_current["mem"] == "100"
+        assert result.stats.by_kernel[kid2].instant_current["mem"] == "200"
