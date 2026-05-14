@@ -150,6 +150,20 @@ class RouteTrafficStatus(enum.StrEnum):
     INACTIVE = "inactive"
 
 
+class RouteSubStatus(enum.StrEnum):
+    """Sub-status for routes in the PROVISIONING lifecycle stage.
+
+    Tracks fine-grained progress within the provisioning pipeline:
+    - PENDING: session has been enqueued, waiting for scheduler
+    - STARTING: session is running, waiting for replica host/port
+    - WARMING_UP: replica is up, waiting for health check to pass
+    """
+
+    PENDING = "pending"
+    STARTING = "starting"
+    WARMING_UP = "warming_up"
+
+
 # ========== Status Transition Types (BEP-1030) ==========
 
 

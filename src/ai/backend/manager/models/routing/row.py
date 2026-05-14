@@ -19,6 +19,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
+    RouteSubStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
@@ -114,8 +115,22 @@ class RoutingRow(Base):  # type: ignore[misc]
         "traffic_status",
         StrEnumType(RouteTrafficStatus, use_name=False),
         nullable=False,
-        server_default=sa.text("'active'"),
-        default=RouteTrafficStatus.ACTIVE,
+        server_default=sa.text("'inactive'"),
+        default=RouteTrafficStatus.INACTIVE,
+    )
+    sub_status: Mapped[RouteSubStatus | None] = mapped_column(
+        "sub_status",
+        StrEnumType(RouteSubStatus, use_name=False),
+        nullable=True,
+        default=None,
+        server_default=sa.text("'pending'"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.text("now()"),
+        onupdate=sa.func.now(),
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
