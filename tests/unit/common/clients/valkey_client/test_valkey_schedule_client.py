@@ -22,7 +22,10 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     HealthCheckStatus,
     ValkeyScheduleClient,
 )
-from ai.backend.common.clients.valkey_client.valkey_schedule.types import ReplicaProbeTarget
+from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
+    ReplicaHealthResult,
+    ReplicaProbeTarget,
+)
 from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -1022,7 +1025,9 @@ class TestReplicaHealthStatusClient:
         valkey_schedule_client: ValkeyScheduleClient,
         replica_id: ReplicaID,
     ) -> None:
-        await valkey_schedule_client.record_route_health_status(replica_id, healthy=True)
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=True)
+        ])
         results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
         status = results[replica_id]
         assert status is not None
@@ -1034,7 +1039,9 @@ class TestReplicaHealthStatusClient:
         valkey_schedule_client: ValkeyScheduleClient,
         replica_id: ReplicaID,
     ) -> None:
-        await valkey_schedule_client.record_route_health_status(replica_id, healthy=False)
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=False)
+        ])
         results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
         status = results[replica_id]
         assert status is not None
@@ -1061,7 +1068,9 @@ class TestReplicaHealthStatusClient:
         replica_id: ReplicaID,
     ) -> None:
         """Deleting the key (simulating TTL expiry) results in None → DEGRADED."""
-        await valkey_schedule_client.record_route_health_status(replica_id, healthy=True)
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=True)
+        ])
         key = valkey_schedule_client._get_route_health_status_key(replica_id)
         async with valkey_schedule_client._client.client() as conn:
             await conn.delete([key])
@@ -1074,7 +1083,9 @@ class TestReplicaHealthStatusClient:
     ) -> None:
         replica_ids = [ReplicaID(uuid4()) for _ in range(3)]
         for rid in replica_ids:
-            await valkey_schedule_client.record_route_health_status(rid, healthy=True)
+            await valkey_schedule_client.record_route_health_statuses_batch([
+                ReplicaHealthResult(replica_id=rid, healthy=True)
+            ])
         results = await valkey_schedule_client.get_route_health_statuses_batch(replica_ids)
         assert len(results) == 3
         for rid in replica_ids:
@@ -1087,8 +1098,12 @@ class TestReplicaHealthStatusClient:
         valkey_schedule_client: ValkeyScheduleClient,
         replica_id: ReplicaID,
     ) -> None:
-        await valkey_schedule_client.record_route_health_status(replica_id, healthy=True)
-        await valkey_schedule_client.record_route_health_status(replica_id, healthy=False)
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=True)
+        ])
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=False)
+        ])
         results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
         status = results[replica_id]
         assert status is not None
