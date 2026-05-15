@@ -51,6 +51,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -533,9 +534,12 @@ class SessionMountItemInputGQL(PydanticInputMixin[MountItemInputDTO]):
     vfolder_id: ID = gql_field(description="Virtual folder UUID.")
     mount_path: str | None = gql_field(default=None, description="Custom mount path.")
     permission: str | None = gql_field(default=None, description="Mount permission ('rw' or 'ro').")
-    subpath: str | None = gql_field(
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Subpath within the vfolder to mount. Null mounts the vfolder root.",
+        ),
         default=None,
-        description="Subpath within the vfolder to mount. Null mounts the vfolder root.",
     )
 
 

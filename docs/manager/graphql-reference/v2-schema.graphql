@@ -11637,7 +11637,9 @@ input SessionMountItemInput {
   """Mount permission ('rw' or 'ro')."""
   permission: String = null
 
-  """Subpath within the vfolder to mount. Null mounts the vfolder root."""
+  """
+  Added in UNRELEASED. Subpath within the vfolder to mount. Null mounts the vfolder root.
+  """
   subpath: String = null
 }
 
