@@ -184,7 +184,6 @@ from .models.utils import (
 from .models.vfolder import (
     verify_vfolder_name,
 )
-from .scheduler.types import KernelAgentBinding
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
@@ -1382,47 +1381,6 @@ class AgentRegistry:
         verified_agent_id = await self.get_instance(agent_id)
         async with self._agent_client_pool.acquire(verified_agent_id) as client:
             await client.update_scaling_group(scaling_group)
-
-    async def settle_agent_alloc(
-        self,
-        kernel_agent_bindings: Sequence[KernelAgentBinding],
-    ) -> None:
-        """
-        Tries to settle down agent row's occupied_slots with real value. This must be called
-        after kernel creation is completed, to prevent fraction of resource dropped by agent scheduler
-        during kernel creation still being reported as used.
-        """
-
-        keyfunc = lambda item: item.agent_alloc_ctx.agent_id
-        for agent_id, group_iterator in itertools.groupby(
-            sorted(kernel_agent_bindings, key=keyfunc),
-            key=keyfunc,
-        ):
-            actual_allocated_slots = ResourceSlot()
-            requested_slots = ResourceSlot()
-
-            for kernel_agent_binding in group_iterator:
-                # this value must be set while running _post_create_kernel
-                actual_allocated_slot = self._kernel_actual_allocated_resources.get(
-                    kernel_agent_binding.kernel.id
-                )
-                requested_slots += kernel_agent_binding.kernel.requested_slots
-                if actual_allocated_slot is not None:
-                    actual_allocated_slots += ResourceSlot.from_json(actual_allocated_slot)
-                    del self._kernel_actual_allocated_resources[kernel_agent_binding.kernel.id]
-                else:  # something's wrong; just fall back to requested slot value
-                    actual_allocated_slots += kernel_agent_binding.kernel.requested_slots
-
-            # Phase 3 (BA-4308): Legacy JSONB write to agents.occupied_slots removed.
-            # Agent occupied slots are now solely managed by the normalized
-            # agent_resources table.  The agents.occupied_slots JSONB column is
-            # retained for historical audit but no longer written to.
-            if actual_allocated_slots != requested_slots:
-                log.debug(
-                    "agent {} has slot calibration diff (requested != actual); "
-                    "agent_resources table is the source of truth",
-                    agent_id,
-                )
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:

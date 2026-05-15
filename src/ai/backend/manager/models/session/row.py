@@ -553,7 +553,7 @@ class SessionRow(Base):  # type: ignore[misc]
     #         // an ISO 8601 formatted timestamp of the last attempt
     #     "failed_predicates": [
     #       { "name": "concurrency", "msg": "You cannot run more than 30 concurrent sessions." },
-    #           // see the manager.scheduler.predicates module for possible messages
+    #           // see the sokovan scheduler validator modules for possible messages
     #       ...
     #     ],
     #     "passed_predicates": [ {"name": "reserved_time"}, ... ],  // names only
