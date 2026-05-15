@@ -8,7 +8,10 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
 )
-from ai.backend.common.clients.prometheus.fixed_query_builder import FixedQueryBuilder
+from ai.backend.common.clients.prometheus.fixed_query_builder import (
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
+)
 from ai.backend.common.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
@@ -39,23 +42,26 @@ class PrometheusClient:
     _client_pool: ClientPool
     _client_key: ClientKey
     _timeout: aiohttp.ClientTimeout
-    _fixed_query_builder: FixedQueryBuilder
+    _container_metric_query_builder: ContainerMetricQueryBuilder
+    _container_live_stat_query_builder: ContainerLiveStatQueryBuilder
 
     def __init__(
         self,
         endpoint: str,
         client_pool: ClientPool,
         *,
-        fixed_query_builder: FixedQueryBuilder,
+        container_metric_query_builder: ContainerMetricQueryBuilder,
+        container_live_stat_query_builder: ContainerLiveStatQueryBuilder,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         self._client_pool = client_pool
         self._client_key = ClientKey(endpoint=endpoint, domain="prometheus")
         self._timeout = aiohttp.ClientTimeout(total=timeout)
-        self._fixed_query_builder = fixed_query_builder
+        self._container_metric_query_builder = container_metric_query_builder
+        self._container_live_stat_query_builder = container_live_stat_query_builder
 
     async def fetch_available_container_metric_names(self) -> list[str]:
-        query = self._fixed_query_builder.get_container_metric_metadata_query()
+        query = self._container_metric_query_builder.get_container_metric_metadata_query()
         result = await self._query_label_values(
             label_name=query.label_name,
             metric_match=query.metric_match,
@@ -68,7 +74,7 @@ class PrometheusClient:
         label: ContainerMetricOptionalLabel,
         time_range: QueryTimeRange,
     ) -> list[ContainerMetricResult]:
-        query = self._fixed_query_builder.get_container_metric_query(metric_name, label)
+        query = self._container_metric_query_builder.get_container_metric_query(metric_name, label)
         response = await self._query_range(query, time_range)
         return [
             ContainerMetricResult(
@@ -82,7 +88,9 @@ class PrometheusClient:
         self,
         kernel_ids: Sequence[KernelId],
     ) -> KernelLiveStatBatchResult:
-        queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
+        queries = self._container_live_stat_query_builder.get_container_live_stat_queries(
+            kernel_ids
+        )
 
         # max/rate_max and avg/rate_avg are split: gauge metrics can be aggregated
         # directly, but cumulative counters (cpu_util/net_rx/net_tx) need rate() first.

@@ -5,7 +5,8 @@ import aiohttp
 import pytest
 
 from ai.backend.common.clients.prometheus import (
-    FixedQueryBuilder,
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
     LabelMatcher,
     MetricPreset,
     PrometheusClient,
@@ -58,7 +59,8 @@ def prometheus_client(mock_pool: Mock) -> PrometheusClient:
     return PrometheusClient(
         endpoint="http://localhost:9090/api/v1",
         client_pool=mock_pool,
-        fixed_query_builder=FixedQueryBuilder("1m"),
+        container_metric_query_builder=ContainerMetricQueryBuilder("1m"),
+        container_live_stat_query_builder=ContainerLiveStatQueryBuilder("1m"),
     )
 
 
@@ -400,7 +402,8 @@ class TestTimeout:
         return PrometheusClient(
             endpoint="http://localhost:9090/api/v1",
             client_pool=mock_pool,
-            fixed_query_builder=FixedQueryBuilder("1m"),
+            container_metric_query_builder=ContainerMetricQueryBuilder("1m"),
+            container_live_stat_query_builder=ContainerLiveStatQueryBuilder("1m"),
             timeout=5.0,
         )
 

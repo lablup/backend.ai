@@ -10,7 +10,10 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.fixed_query_builder import FixedQueryBuilder
+from ai.backend.common.clients.prometheus.fixed_query_builder import (
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
+)
 from ai.backend.common.clients.prometheus.metric_types import (
     ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
@@ -63,7 +66,10 @@ def _make_metric_repository(
     *,
     timewindow: str = "1m",
 ) -> MetricRepository:
-    mock_prometheus_client._fixed_query_builder = FixedQueryBuilder(timewindow)
+    mock_prometheus_client._container_metric_query_builder = ContainerMetricQueryBuilder(timewindow)
+    mock_prometheus_client._container_live_stat_query_builder = ContainerLiveStatQueryBuilder(
+        timewindow
+    )
     return MetricRepository(
         db=MagicMock(),
         prometheus_client=mock_prometheus_client,
@@ -86,7 +92,8 @@ class TestContainerMetricRepositoryQueries:
         return PrometheusClient(
             endpoint="http://localhost:9090/api/v1",
             client_pool=MagicMock(),
-            fixed_query_builder=FixedQueryBuilder("1m"),
+            container_metric_query_builder=ContainerMetricQueryBuilder("1m"),
+            container_live_stat_query_builder=ContainerLiveStatQueryBuilder("1m"),
         )
 
     @pytest.fixture
@@ -539,29 +546,31 @@ class TestMetricTypeDetection:
     """Test metric type detection logic."""
 
     @pytest.fixture
-    def fixed_query_builder(self) -> FixedQueryBuilder:
-        return FixedQueryBuilder("1m")
+    def query_builder(self) -> ContainerMetricQueryBuilder:
+        return ContainerMetricQueryBuilder("1m")
 
-    def test_cpu_util_detected_as_diff_type(self, fixed_query_builder: FixedQueryBuilder) -> None:
-        metric_type = fixed_query_builder.get_container_metric_type(
+    def test_cpu_util_detected_as_diff_type(
+        self, query_builder: ContainerMetricQueryBuilder
+    ) -> None:
+        metric_type = query_builder.get_container_metric_type(
             "cpu_util", ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
         )
         assert metric_type == MetricType.DIFF
 
     def test_network_metrics_detected_as_rate_type(
-        self, fixed_query_builder: FixedQueryBuilder
+        self, query_builder: ContainerMetricQueryBuilder
     ) -> None:
         for metric_name in ["net_rx", "net_tx"]:
-            metric_type = fixed_query_builder.get_container_metric_type(
+            metric_type = query_builder.get_container_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
             assert metric_type == MetricType.RATE
 
     def test_memory_metrics_detected_as_gauge_type(
-        self, fixed_query_builder: FixedQueryBuilder
+        self, query_builder: ContainerMetricQueryBuilder
     ) -> None:
         for metric_name in ["container_memory_used_bytes", "container_gpu_percent"]:
-            metric_type = fixed_query_builder.get_container_metric_type(
+            metric_type = query_builder.get_container_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
             assert metric_type == MetricType.GAUGE
@@ -626,8 +635,8 @@ class TestTimewindowInitialization:
 
     @pytest.mark.parametrize("timewindow", ["30s", "1m", "5m", "15m", "1h"])
     async def test_timewindow_stored_correctly(self, timewindow: str) -> None:
-        fixed_query_builder = FixedQueryBuilder(timewindow)
-        assert fixed_query_builder._timewindow == timewindow
+        query_builder = ContainerMetricQueryBuilder(timewindow)
+        assert query_builder._timewindow == timewindow
 
     @pytest.mark.parametrize(
         "metric_name,value_type",
@@ -640,10 +649,10 @@ class TestTimewindowInitialization:
     async def test_timewindow_applied_to_query(
         self, metric_name: str, value_type: ValueType
     ) -> None:
-        fixed_query_builder = FixedQueryBuilder("3m")
+        query_builder = ContainerMetricQueryBuilder("3m")
         label = ContainerMetricOptionalLabel(value_type=value_type)
 
-        query = fixed_query_builder.get_container_metric_query(metric_name, label)
+        query = query_builder.get_container_metric_query(metric_name, label)
 
         assert query.window == "3m"
 
@@ -799,9 +808,9 @@ class TestBuiltinQueryProvider:
         ids=lambda c: c.id,
     )
     async def test_build_query_renders_expected_promql(self, case: BuiltinQueryTestCase) -> None:
-        fixed_query_builder = FixedQueryBuilder(case.timewindow)
+        query_builder = ContainerMetricQueryBuilder(case.timewindow)
 
-        query = fixed_query_builder.get_container_metric_query(case.metric_name, case.labels)
+        query = query_builder.get_container_metric_query(case.metric_name, case.labels)
         rendered_query = query.render()
 
         assert rendered_query == case.expected_query
@@ -813,8 +822,8 @@ class TestContainerLiveStatQueries:
     @pytest.fixture()
     def queries(self) -> ContainerLiveStatQueries:
         kernel_id = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
-        fixed_query_builder = FixedQueryBuilder("5m")
-        return fixed_query_builder.get_container_live_stat_queries([kernel_id])
+        query_builder = ContainerLiveStatQueryBuilder("5m")
+        return query_builder.get_container_live_stat_queries([kernel_id])
 
     def test_instant_query_fetches_live_stat_fields(
         self, queries: ContainerLiveStatQueries

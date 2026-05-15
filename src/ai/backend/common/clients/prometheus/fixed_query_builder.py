@@ -67,7 +67,10 @@ _INSTANT_VALUE_TYPE_REGEX: Final[str] = _value_type_regex([
 ])
 
 
-class FixedQueryBuilder:
+class ContainerMetricQueryBuilder:
+    """Builds PromQL queries for individual container-metric retrieval
+    (`fetch_available_container_metric_names` / `fetch_container_metric`)."""
+
     _timewindow: str
 
     def __init__(self, timewindow: str) -> None:
@@ -111,6 +114,25 @@ class FixedQueryBuilder:
             group_by=querier.group_by_labels(),
             window=self._timewindow,
         )
+
+    def _get_template(self, metric_type: MetricType) -> str:
+        match metric_type:
+            case MetricType.GAUGE:
+                return _GAUGE_TEMPLATE
+            case MetricType.RATE:
+                return _RATE_TEMPLATE
+            case MetricType.DIFF:
+                return _DIFF_TEMPLATE
+
+
+class ContainerLiveStatQueryBuilder:
+    """Builds the per-query PromQL batch backing the legacy `live_stat`
+    payload (`fetch_container_live_stats`)."""
+
+    _timewindow: str
+
+    def __init__(self, timewindow: str) -> None:
+        self._timewindow = timewindow
 
     def get_container_live_stat_queries(
         self,
@@ -169,12 +191,3 @@ class FixedQueryBuilder:
                 window=self._timewindow,
             ),
         )
-
-    def _get_template(self, metric_type: MetricType) -> str:
-        match metric_type:
-            case MetricType.GAUGE:
-                return _GAUGE_TEMPLATE
-            case MetricType.RATE:
-                return _RATE_TEMPLATE
-            case MetricType.DIFF:
-                return _DIFF_TEMPLATE

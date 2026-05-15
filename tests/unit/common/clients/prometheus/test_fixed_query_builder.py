@@ -1,6 +1,6 @@
 """
-Tests for FixedQueryBuilder: query building, metric type classification,
-and live stat query construction.
+Tests for the container-metric and live-stat query builders:
+query building, metric type classification, and live stat query construction.
 """
 
 from uuid import UUID
@@ -8,7 +8,8 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.clients.prometheus import (
-    FixedQueryBuilder,
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
 )
 from ai.backend.common.clients.prometheus.fixed_query_builder import _regex_union
 from ai.backend.common.clients.prometheus.metric_types import (
@@ -22,8 +23,8 @@ from ai.backend.common.types import KernelId
 
 class TestGetContainerMetricType:
     @pytest.fixture
-    def builder(self) -> FixedQueryBuilder:
-        return FixedQueryBuilder("1m")
+    def builder(self) -> ContainerMetricQueryBuilder:
+        return ContainerMetricQueryBuilder("1m")
 
     @pytest.mark.parametrize(
         ("metric_name", "value_type", "expected"),
@@ -46,7 +47,7 @@ class TestGetContainerMetricType:
     )
     def test_metric_type_classification(
         self,
-        builder: FixedQueryBuilder,
+        builder: ContainerMetricQueryBuilder,
         metric_name: str,
         value_type: ValueType,
         expected: MetricType,
@@ -57,10 +58,10 @@ class TestGetContainerMetricType:
 
 class TestGetContainerMetricQuery:
     @pytest.fixture
-    def builder(self) -> FixedQueryBuilder:
-        return FixedQueryBuilder("5m")
+    def builder(self) -> ContainerMetricQueryBuilder:
+        return ContainerMetricQueryBuilder("5m")
 
-    def test_gauge_query_preset(self, builder: FixedQueryBuilder) -> None:
+    def test_gauge_query_preset(self, builder: ContainerMetricQueryBuilder) -> None:
         label = ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
 
         result = builder.get_container_metric_query("mem", label)
@@ -73,7 +74,7 @@ class TestGetContainerMetricQuery:
 
     @pytest.mark.parametrize("metric_name", ["net_rx", "cpu_util"])
     def test_rate_based_query_uses_rate_function(
-        self, builder: FixedQueryBuilder, metric_name: str
+        self, builder: ContainerMetricQueryBuilder, metric_name: str
     ) -> None:
         label = ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
 
@@ -82,7 +83,7 @@ class TestGetContainerMetricQuery:
         assert "rate(" in rendered
         assert "[5m]" in rendered
 
-    def test_query_with_optional_labels(self, builder: FixedQueryBuilder) -> None:
+    def test_query_with_optional_labels(self, builder: ContainerMetricQueryBuilder) -> None:
         kid = UUID("12345678-1234-5678-1234-567812345678")
         label = ContainerMetricOptionalLabel(
             value_type=ValueType.CURRENT,
@@ -97,7 +98,7 @@ class TestGetContainerMetricQuery:
 
 class TestGetContainerLiveStatQueries:
     def test_kernel_id_regex_filter(self) -> None:
-        builder = FixedQueryBuilder("1m")
+        builder = ContainerLiveStatQueryBuilder("1m")
         kid1 = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
         kid2 = KernelId(UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"))
 
@@ -119,7 +120,7 @@ class TestGetContainerLiveStatQueries:
         assert "cccccccc-cccc-cccc-cccc-cccccccccccc" not in rendered
 
     def test_window_queries_read_current_series(self) -> None:
-        builder = FixedQueryBuilder("1m")
+        builder = ContainerLiveStatQueryBuilder("1m")
         kid = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
 
         result = builder.get_container_live_stat_queries([kid])
@@ -132,7 +133,7 @@ class TestGetContainerLiveStatQueries:
         assert "rate(" not in result.avg.render()
 
     def test_rate_window_queries_read_rate_series(self) -> None:
-        builder = FixedQueryBuilder("1m")
+        builder = ContainerLiveStatQueryBuilder("1m")
         kid = KernelId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
 
         result = builder.get_container_live_stat_queries([kid])

@@ -8,7 +8,8 @@ import pytest
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.common.clients.prometheus import (
-    FixedQueryBuilder,
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
     LabelMatcher,
     MetricPreset,
     PrometheusClient,
@@ -31,7 +32,8 @@ async def prometheus_client(
     client = PrometheusClient(
         endpoint=f"http://{hostport.host}:{hostport.port}/api/v1/",
         client_pool=pool,
-        fixed_query_builder=FixedQueryBuilder("1m"),
+        container_metric_query_builder=ContainerMetricQueryBuilder("1m"),
+        container_live_stat_query_builder=ContainerLiveStatQueryBuilder("1m"),
     )
     try:
         yield client
