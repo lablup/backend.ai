@@ -11,13 +11,23 @@ from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
-from ai.backend.manager.data.deployment.types import RevisionDraft
+from ai.backend.manager.data.deployment.types import MountMetadata, RevisionDraft
 from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
 
 
 def _merge_all(*drafts: RevisionDraft) -> RevisionDraft:
     return functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
+
+
+def _mounts(model_definition_path: str | None) -> MountMetadata:
+    return MountMetadata(
+        model_vfolder_id=VFolderUUID(uuid4()),
+        model_definition_path=model_definition_path,
+        model_mount_destination="/models",
+        extra_mounts=[],
+    )
 
 
 class TestRevisionDraftMerge:
@@ -141,3 +151,12 @@ class TestRevisionDraftMerge:
         assert merged.model_definition.models is not None
         assert merged.model_definition.models[0].name == "override"
         assert merged.model_definition.models[0].model_path == "/mnt/models"
+
+    def test_mount_definition_path_preserves_lower_value_when_higher_omits_it(self) -> None:
+        base = RevisionDraft(mounts=_mounts("model-definition.yml"))
+        override = RevisionDraft(mounts=_mounts(None))
+
+        merged = base.merge(override)
+
+        assert merged.mounts is not None
+        assert merged.mounts.model_definition_path == "model-definition.yml"

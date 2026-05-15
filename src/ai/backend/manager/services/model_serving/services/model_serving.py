@@ -829,7 +829,20 @@ class ModelServingService:
         if spec.has_revision_changes():
             latest_rev = await self._deployment_repository.get_latest_revision(action.deployment_id)
             latest_draft = latest_rev.to_draft()
+            if latest_draft.mounts is None:
+                raise InvalidAPIParameters("model vfolder id is missing on the latest revision")
             override_draft = await self._build_revision_overrides_from_spec(spec)
+            definition_path_override = spec.model_definition_path.optional_value()
+            draft_with_definition_path_override = RevisionDraft(
+                mounts=MountMetadata(
+                    model_vfolder_id=latest_draft.mounts.model_vfolder_id,
+                    model_definition_path=definition_path_override,
+                    model_mount_destination=latest_draft.mounts.model_mount_destination,
+                    extra_mounts=list(latest_draft.mounts.extra_mounts),
+                    vfolder_subpath=latest_draft.mounts.vfolder_subpath,
+                )
+            )
+            override_draft = override_draft.merge(draft_with_definition_path_override)
             # Legacy ``ModifyEndpoint`` semantics preserve untouched fields by
             # layering overrides on top of the existing revision. The
             # controller's ``add_revision`` no longer accepts a caller-provided
@@ -837,30 +850,9 @@ class ModelServingService:
             # request-level override draft.
             overrides = latest_draft.merge(override_draft)
 
-            vfolder_id = latest_rev.model_mount_config.vfolder_id
-            if vfolder_id is None:
-                raise InvalidAPIParameters("model vfolder id is missing on the latest revision")
-            definition_path_override = spec.model_definition_path.optional_value()
-            mounts = MountMetadata(
-                model_vfolder_id=vfolder_id,
-                model_definition_path=(
-                    definition_path_override
-                    if definition_path_override is not None
-                    else latest_rev.model_mount_config.definition_path
-                ),
-                model_mount_destination=latest_rev.model_mount_config.mount_destination
-                or "/models",
-                # Carry over the latest revision's extra mounts so that an
-                # otherwise unrelated modify (e.g. replica-count) does not
-                # strip them; ``mount_perm`` survives because the
-                # revision-side projection uses the same ``MountInfoEntry``
-                # shape.
-                extra_mounts=list(latest_rev.model_mount_config.extra_mounts),
-            )
             revision = await self._deployment_controller.add_revision(
                 endpoint_id=action.deployment_id,
                 overrides=overrides,
-                mounts=mounts,
             )
             await self._deployment_controller.activate_revision(action.deployment_id, revision.id)
         elif spec.replica_count_modified():

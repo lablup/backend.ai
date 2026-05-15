@@ -14,7 +14,7 @@ from pydantic import HttpUrl
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.config import ModelDefinitionDraft, ModelHealthCheck
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
@@ -64,6 +64,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentRevisionReadBundle,
     DeploymentSummarySearchResult,
     DeploymentWithHistory,
+    FetchedModelDefinition,
     LegacyRevisionCreateReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
@@ -485,12 +486,13 @@ class DeploymentRepository:
         self,
         vfolder_id: VFolderUUID,
         model_definition_path: str | None,
-    ) -> ModelDefinitionDraft | None:
+    ) -> FetchedModelDefinition | None:
         """Fetch and validate the model-definition file from the model vfolder.
 
-        Returns a ``ModelDefinitionDraft`` because the file is user-authored
+        Returns a ``FetchedModelDefinition`` because the file is user-authored
         and may omit optional fields; strict-field validation is deferred to
-        the persistence boundary where the merged result is resolved.
+        the persistence boundary where the merged result is resolved. The
+        result also carries the exact candidate path that matched.
         Returns ``None`` when no candidate file exists.
         """
         vfolder_location = await self._db_source.get_vfolder_by_id(vfolder_id)
