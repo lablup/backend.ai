@@ -104,6 +104,13 @@ class RevisionNode(BaseResponseModel):
     """Node model representing a deployment revision."""
 
     id: UUID = Field(description="Revision ID")
+    deployment_id: UUID = Field(
+        description=(
+            "ID of the parent deployment that owns this revision. "
+            "Exposed alongside the resolved deployment node so clients can "
+            "navigate without re-fetching."
+        ),
+    )
     revision_number: int = Field(
         description=(
             "Per-deployment sequential revision number assigned at insert "
