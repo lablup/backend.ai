@@ -13,8 +13,11 @@ route mutations) or COMPLETED.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import cast
+from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -33,6 +36,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
+    ModelRevisionData,
     ReplicaData,
     RouteHealthStatus,
     RouteInfo,
@@ -101,6 +105,10 @@ def make_deployment(
     current_revision_id: UUID = OLD_REV,
     endpoint_id: UUID = ENDPOINT_ID,
 ) -> DeploymentInfo:
+    deploying_mock = MagicMock()
+    deploying_mock.id = DeploymentRevisionID(deploying_revision_id)
+    current_mock = MagicMock()
+    current_mock.id = DeploymentRevisionID(current_revision_id)
     return DeploymentInfo(
         id=DeploymentID(endpoint_id),
         metadata=DeploymentMetadata(
@@ -125,10 +133,9 @@ def make_deployment(
         network=DeploymentNetworkData(
             open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
         ),
-        model_revisions=[],
         options=DeploymentOptions(),
-        current_revision_id=DeploymentRevisionID(current_revision_id),
-        deploying_revision_id=DeploymentRevisionID(deploying_revision_id),
+        current_revision=cast(ModelRevisionData, current_mock),
+        deploying_revision=cast(ModelRevisionData, deploying_mock),
     )
 
 
@@ -745,7 +752,7 @@ class TestEdgeCases:
 
     def test_deploying_rev_none_rejected(self) -> None:
         """If deploying_revision_id is None, evaluate_cycle raises."""
-        deployment = make_deployment(desired=1, deploying_revision_id=None)  # type: ignore[arg-type]
+        deployment = dataclasses.replace(make_deployment(desired=1), deploying_revision=None)
         spec = RollingUpdateSpec(
             max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
         )

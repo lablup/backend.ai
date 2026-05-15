@@ -3359,6 +3359,7 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
             traffic_ratio=1.0,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
@@ -3393,6 +3394,7 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3441,6 +3443,7 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
         )
         creator = RBACEntityCreator(
             spec=spec,

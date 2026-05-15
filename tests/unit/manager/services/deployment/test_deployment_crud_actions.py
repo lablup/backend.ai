@@ -155,7 +155,6 @@ class DeploymentCRUDBaseFixtures:
             network=DeploymentNetworkData(
                 open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
             ),
-            model_revisions=[],
             options=DeploymentOptions(),
         )
 

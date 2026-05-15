@@ -384,7 +384,6 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
             network=DeploymentNetworkData(
                 open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
             ),
-            model_revisions=[],
             options=DeploymentOptions(),
         )
 
@@ -560,7 +559,6 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
             network=DeploymentNetworkData(
                 open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
             ),
-            model_revisions=[],
             options=DeploymentOptions(),
         )
 
@@ -726,10 +724,9 @@ class TestConvertDeploymentInfoToData:
             network=DeploymentNetworkData(
                 open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
             ),
-            model_revisions=[deploying_data, current_data],
             options=DeploymentOptions(),
-            current_revision_id=DeploymentRevisionID(current_data.id),
-            deploying_revision_id=DeploymentRevisionID(deploying_data.id),
+            current_revision=current_data,
+            deploying_revision=deploying_data,
         )
 
         deployment_data = _convert_deployment_info_to_data(deployment_info)
