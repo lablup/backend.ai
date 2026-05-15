@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import inspect
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -27,6 +28,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.api.rest.session.handler import (
+    LegacyMountResolution,
     SessionHandler,
     _merge_resolved_legacy_mounts,
     _route_legacy_uuid_mounts,
@@ -1067,12 +1069,12 @@ class TestCreateFromParams:
             "mount_map": {"vf-a": "/data"},
             "mount_options": {"vf-a": {"permission": "ro", "type": "bind"}},
         }
-        name_to_id = await handler._resolve_legacy_name_mounts(
+        resolutions = await handler._resolve_legacy_name_mounts(
             legacy_config["mounts"],
             legacy_config["mount_map"],
             legacy_config["mount_options"],
         )
-        resolved_config = _merge_resolved_legacy_mounts(legacy_config, name_to_id)
+        resolved_config = _merge_resolved_legacy_mounts(legacy_config, resolutions)
 
         # Step 2: feed the resolved config to the service and verify it
         # arrives at AgentRegistry.create_session intact.
@@ -1167,6 +1169,129 @@ class TestCreateFromParams:
         assert routed["mount_options"] == {legacy_uuid_mount_vfid: {"permission": "ro"}}
         assert routed["mount_ids"] == [legacy_uuid_mount_vfid]
         assert routed["mount_id_map"] == {legacy_uuid_mount_vfid: "/data"}
+
+    @dataclass(frozen=True)
+    class ExpectedLegacyMount:
+        """Expected post-merge state across the UUID-keyed buckets.
+
+        ``subpath`` is what the resolver returns on
+        :class:`LegacyMountResolution`. ``mount_id_map`` and ``mount_options``
+        mirror the full UUID-keyed dicts ``_merge_resolved_legacy_mounts``
+        should produce — keys are vfolder UUIDs since all legacy name-keyed
+        entries have been resolved by the time we assert.
+        """
+
+        subpath: str | None
+        mount_id_map: dict[UUID, str] = field(default_factory=dict)
+        mount_options: dict[UUID, dict[str, Any]] = field(default_factory=dict)
+
+    @dataclass(frozen=True)
+    class LegacyMountCase:
+        """One legacy-mount route → resolve → merge scenario."""
+
+        case_id: str
+        legacy_config: dict[str, Any]
+        expected: TestCreateFromParams.ExpectedLegacyMount
+
+    LEGACY_MOUNT_VFID = UUID("33333333-3333-3333-3333-333333333333")
+
+    LEGACY_MOUNT_CASES = [
+        # BA-6022 base case: mounts=[vfname/sub] gets parsed and the subpath
+        # lands on mount_options[uuid][subpath]; mount_map keyed by plain name
+        # supplies the destination. Previously rejected with 400 by PR #11434.
+        LegacyMountCase(
+            case_id="mounts_subpath_with_plain_mount_map",
+            legacy_config={
+                "mounts": ["vf-a/weights/v2"],
+                "mount_map": {"vf-a": "/data"},
+                "mount_options": {},
+            },
+            expected=ExpectedLegacyMount(
+                subpath="weights/v2",
+                mount_id_map={LEGACY_MOUNT_VFID: "/data"},
+                mount_options={LEGACY_MOUNT_VFID: {"subpath": "weights/v2"}},
+            ),
+        ),
+        # v1 CLI flattens ``-v vfname/sub:/dest,permission=ro`` into the same
+        # slash-with-subpath source string across all three surfaces. The
+        # handler must peel the suffix off every key so dst and per-mount opts
+        # survive the re-keying onto the UUID-keyed buckets.
+        LegacyMountCase(
+            case_id="cli_colon_form_slashy_keys_in_all_surfaces",
+            legacy_config={
+                "mounts": ["vf-a/weights/v2"],
+                "mount_map": {"vf-a/weights/v2": "/data"},
+                "mount_options": {"vf-a/weights/v2": {"permission": "ro"}},
+            },
+            expected=ExpectedLegacyMount(
+                subpath="weights/v2",
+                mount_id_map={LEGACY_MOUNT_VFID: "/data"},
+                mount_options={
+                    LEGACY_MOUNT_VFID: {"permission": "ro", "subpath": "weights/v2"},
+                },
+            ),
+        ),
+        # An explicit UUID-keyed ``mount_options[uuid][subpath]`` must beat
+        # a competing legacy ``mounts=[vfname/sub]`` for the same vfolder —
+        # the legacy name form does NOT clobber the modern surface.
+        LegacyMountCase(
+            case_id="explicit_uuid_subpath_wins_over_legacy_form",
+            legacy_config={
+                "mounts": ["vf-a/legacy-form-subpath"],
+                "mount_map": {},
+                "mount_options": {
+                    str(LEGACY_MOUNT_VFID): {"subpath": "uuid-form-subpath"},
+                },
+            },
+            expected=ExpectedLegacyMount(
+                subpath="legacy-form-subpath",
+                mount_options={LEGACY_MOUNT_VFID: {"subpath": "uuid-form-subpath"}},
+            ),
+        ),
+    ]
+
+    @pytest.mark.parametrize(
+        "case",
+        LEGACY_MOUNT_CASES,
+        ids=[c.case_id for c in LEGACY_MOUNT_CASES],
+    )
+    async def test_legacy_mount_route_resolve_merge(self, case: LegacyMountCase) -> None:
+        """End-to-end ``_route_legacy_uuid_mounts`` → ``_resolve_legacy_name_mounts``
+        → ``_merge_resolved_legacy_mounts`` for the legacy mount surfaces.
+
+        Every scenario resolves ``vf-a`` to ``LEGACY_MOUNT_VFID`` and asserts
+        that the UUID-keyed buckets carry the expected destination + subpath +
+        per-mount options on the resolved vfolder id.
+        """
+        vfid = self.LEGACY_MOUNT_VFID
+
+        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
+            # The bare name must be resolved — not the slashed source — and
+            # UUID-shaped keys must already have been lifted by the route step.
+            assert list(action.vfolder_names) == ["vf-a"]
+            return ResolveIdsByNamesActionResult(name_to_id={"vf-a": vfid})
+
+        resolver = MagicMock()
+        resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
+        vfolder_pkg = MagicMock()
+        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
+        handler = SessionHandler.__new__(SessionHandler)
+        handler._vfolder = vfolder_pkg
+
+        routed = _route_legacy_uuid_mounts(case.legacy_config)
+        resolutions = await handler._resolve_legacy_name_mounts(
+            routed["mounts"], routed["mount_map"], routed["mount_options"]
+        )
+        assert resolutions == {
+            "vf-a": LegacyMountResolution(vfid=vfid, subpath=case.expected.subpath),
+        }
+
+        merged = _merge_resolved_legacy_mounts(routed, resolutions)
+        assert merged["mount_ids"] == [vfid]
+        assert merged["mount_id_map"] == case.expected.mount_id_map
+        assert merged["mount_options"] == case.expected.mount_options
+        assert "mounts" not in merged
+        assert "mount_map" not in merged
 
     async def test_owner_access_key_uses_owner_user_scope(
         self,
