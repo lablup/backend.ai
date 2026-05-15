@@ -31,6 +31,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     BackendAISchema,
@@ -268,6 +269,13 @@ def _get_resource_preset_join_condition() -> Any:
 class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
     name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
+    id: Mapped[ResourceGroupID] = mapped_column(
+        "id",
+        GUID,
+        nullable=False,
+        unique=True,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool | None] = mapped_column(
         "is_active", sa.Boolean, index=True, default=True
@@ -359,6 +367,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         )
 
         return ScalingGroupData(
+            id=self.id,
             name=self.name,
             status=ScalingGroupStatus(
                 is_active=self.is_active if self.is_active is not None else True,
@@ -424,6 +433,7 @@ scaling_groups = ScalingGroupRow.__table__
 
 @dataclass
 class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
+    id: ResourceGroupID
     name: str
     description: str | None
     is_active: bool
@@ -448,6 +458,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
     @classmethod
     def from_row(cls, row: ScalingGroupRow, permissions: Iterable[ScalingGroupPermission]) -> Self:
         return cls(
+            id=row.id,
             name=row.name,
             description=row.description,
             is_active=row.is_active if row.is_active is not None else True,
