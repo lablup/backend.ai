@@ -49,7 +49,8 @@ def add(deployment_id: str, config: str, preset_id: str | None, auto_activate: b
     data["deployment_id"] = deployment_id
     if preset_id is not None:
         data["revision_preset_id"] = preset_id
-    data["auto_activate"] = auto_activate
+    if auto_activate:
+        data.setdefault("options", {})["auto_activate"] = True
     body = AddRevisionInput.model_validate(data)
 
     async def _run() -> None:

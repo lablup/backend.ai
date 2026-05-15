@@ -271,5 +271,6 @@ class RoutingRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             revision_id=self.revision,
             traffic_status=self.traffic_status,
+            health_check=self.health_check,
             error_data=self.error_data or {},
         )

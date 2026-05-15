@@ -129,7 +129,11 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             elif route.status.is_inactive():
                 classified.new_failed_count += 1
             elif route.status == RouteStatus.RUNNING:
-                if route.health_status == RouteHealthStatus.HEALTHY:
+                if route.health_status == RouteHealthStatus.HEALTHY or route.health_check is None:
+                    # Routes without a health check have no probe data, so we treat them
+                    # as ready once their process is RUNNING (health_status stays DEGRADED
+                    # in DB because no Valkey entry exists — that is correct behaviour, but
+                    # it must not block the DEPLOYING → READY transition).
                     classified.new_healthy_count += 1
                 else:
                     # UNHEALTHY / DEGRADED / NOT_CHECKED all count here:

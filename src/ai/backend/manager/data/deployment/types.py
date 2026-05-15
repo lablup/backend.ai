@@ -12,7 +12,7 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
+from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -802,6 +802,7 @@ class RouteInfo:
     created_at: datetime
     revision_id: UUID
     traffic_status: RouteTrafficStatus
+    health_check: ModelHealthCheck | None
     error_data: dict[str, Any] = field(default_factory=dict)
 
     @property

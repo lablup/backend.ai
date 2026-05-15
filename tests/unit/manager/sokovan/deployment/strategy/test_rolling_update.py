@@ -23,6 +23,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import BackendAISchemaValidationFailed
@@ -61,6 +62,7 @@ def make_int_or_percent(value: int | float) -> IntOrPercent:
 
 
 OLD_REV = UUID("11111111-1111-1111-1111-111111111111")
+_STUB_HEALTH_CHECK = ModelHealthCheck(path="/health", interval=10.0, initial_delay=30.0)
 NEW_REV = UUID("22222222-2222-2222-2222-222222222222")
 PROJECT_ID = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
 USER_ID = UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
@@ -146,6 +148,7 @@ def make_route(
     health_status: RouteHealthStatus = RouteHealthStatus.HEALTHY,
     endpoint_id: UUID = ENDPOINT_ID,
     route_id: UUID | None = None,
+    health_check: ModelHealthCheck | None = _STUB_HEALTH_CHECK,
 ) -> RouteInfo:
     return RouteInfo(
         route_id=route_id or uuid4(),
@@ -159,6 +162,7 @@ def make_route(
         traffic_status=RouteTrafficStatus.ACTIVE
         if status.is_active()
         else RouteTrafficStatus.INACTIVE,
+        health_check=health_check,
     )
 
 
@@ -1132,3 +1136,70 @@ class TestFractionStrategy:
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 1
+
+
+# ===========================================================================
+# No-health-check scenario
+# ===========================================================================
+
+
+class TestNoHealthCheck:
+    """Routes without health_check stay DEGRADED in DB but must allow READY transition."""
+
+    def test_running_degraded_no_health_check_completes(self) -> None:
+        """RUNNING + DEGRADED + no health_check → counts as healthy → COMPLETED."""
+        deployment = make_deployment(desired=1)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.DEGRADED,
+                health_check=None,
+            )
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
+
+    def test_running_degraded_with_health_check_does_not_complete(self) -> None:
+        """RUNNING + DEGRADED + has health_check → still unhealthy → PROVISIONING."""
+        deployment = make_deployment(desired=1)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.DEGRADED,
+                health_check=_STUB_HEALTH_CHECK,
+            )
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
+
+    def test_multiple_replicas_no_health_check_completes(self) -> None:
+        """2 desired, 2 RUNNING DEGRADED no-health-check → COMPLETED."""
+        deployment = make_deployment(desired=2)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.DEGRADED,
+                health_check=None,
+            )
+            for _ in range(2)
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
