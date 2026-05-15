@@ -266,17 +266,25 @@ def _split_legacy_mount_key(key: str) -> tuple[str, str | None]:
 
 
 def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:
-    """Lift UUID-shaped strings from legacy mount buckets onto the UUID-keyed
-    buckets, leaving only name-shaped entries for the name resolver.
+    """Split mixed legacy mount input by key shape so legacy buckets
+    (``mounts`` / ``mount_map``) carry only names and id buckets
+    (``mount_ids`` / ``mount_id_map``) carry only UUIDs.
+
+    Each entry's key may be a vfolder name or a UUID-shaped string;
+    UUID-shaped keys are parsed to ``UUID`` and lifted into the id
+    buckets, names stay in the legacy buckets for the async resolver.
+    ``mount_options`` is the one exception — both halves coexist on
+    output until :func:`_merge_resolved_legacy_mounts` re-keys the
+    name half onto the resolved UUIDs.
     """
     legacy_mounts = creation_config.get("mounts") or ()
     legacy_mount_map = creation_config.get("mount_map") or {}
     legacy_mount_options = creation_config.get("mount_options") or {}
 
-    mount_ids: list[Any] = list(creation_config.get("mount_ids") or [])
-    mount_id_map: dict[Any, str] = dict(creation_config.get("mount_id_map") or {})
-    mount_options: dict[Any, Any] = {}
-    name_mounts: list[Any] = []
+    mount_ids: list[UUID] = list(creation_config.get("mount_ids") or [])
+    mount_id_map: dict[UUID, str] = dict(creation_config.get("mount_id_map") or {})
+    mount_options: dict[str | UUID, Any] = {}
+    name_mounts: list[str] = []
     name_mount_map: dict[str, str] = {}
 
     legacy_mounts_keys = {str(m) for m in legacy_mounts}
@@ -341,7 +349,7 @@ def _merge_resolved_legacy_mounts(
     merged_mount_ids: list[UUID] = list(creation_config.get("mount_ids") or [])
     existing_uuid_set: set[UUID] = set(merged_mount_ids)
     merged_mount_id_map: dict[UUID, str] = dict(creation_config.get("mount_id_map") or {})
-    merged_mount_options: dict[Any, Any] = dict(creation_config.get("mount_options") or {})
+    merged_mount_options: dict[str | UUID, Any] = dict(creation_config.get("mount_options") or {})
     legacy_mount_map = creation_config.get("mount_map") or {}
     legacy_mount_options = creation_config.get("mount_options") or {}
 
