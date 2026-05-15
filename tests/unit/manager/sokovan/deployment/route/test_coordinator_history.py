@@ -54,6 +54,7 @@ def sample_route_data() -> RouteData:
         created_at=datetime.now(tzutc()),
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
+        health_check=None,
     )
 
 
@@ -399,6 +400,7 @@ class TestProcessRouteLifecycle:
                     created_at=datetime.now(tzutc()),
                     revision_id=DeploymentRevisionID(uuid4()),
                     traffic_status=RouteTrafficStatus.ACTIVE,
+                    health_check=None,
                 )
             ]
         )

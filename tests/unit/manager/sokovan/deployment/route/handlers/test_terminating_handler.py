@@ -40,6 +40,7 @@ def _terminating_route() -> RouteData:
         traffic_ratio=1.0,
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
+        health_check=None,
         replica_host="10.0.0.1",
         replica_port=8000,
         created_at=datetime.now(tzutc()),

@@ -96,7 +96,7 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         """
         log.debug("Checking deployment replicas")
 
-        scalable = [d for d in deployments if d.deployment_info.current_revision_id is not None]
+        scalable = [d for d in deployments if d.deployment_info.current_revision is not None]
         if len(scalable) != len(deployments):
             skipped = len(deployments) - len(scalable)
             log.debug(

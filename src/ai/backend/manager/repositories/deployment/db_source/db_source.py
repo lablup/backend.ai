@@ -332,13 +332,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                     selectinload(EndpointRow.deployment_policy),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -393,12 +389,8 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                     selectinload(EndpointRow.deployment_policy),
                 )
             )
@@ -428,12 +420,8 @@ class DeploymentDBSource:
                     )
                 )
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                     selectinload(EndpointRow.deployment_policy),
                 )
             )
@@ -518,7 +506,8 @@ class DeploymentDBSource:
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.current_revision_row),
+                selectinload(EndpointRow.deploying_revision_row),
                 selectinload(EndpointRow.deployment_policy),
             )
             query_result = await execute_batch_querier(db_sess, query, querier)
@@ -567,12 +556,8 @@ class DeploymentDBSource:
                     EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
                 )
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                 )
             )
 
@@ -635,9 +620,8 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                     selectinload(EndpointRow.deployment_policy),
                 )
             )
@@ -674,13 +658,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == updater.pk_value)
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                     selectinload(EndpointRow.deployment_policy),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
                 )
             )
             query_result = await db_sess.execute(stmt)
@@ -999,6 +979,7 @@ class DeploymentDBSource:
                     created_at=row.created_at,
                     revision_id=DeploymentRevisionID(row.revision),
                     traffic_status=row.traffic_status,
+                    health_check=row.health_check,
                     replica_host=row.replica_host,
                     replica_port=row.replica_port,
                     updated_at=row.updated_at,
@@ -1141,8 +1122,8 @@ class DeploymentDBSource:
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.current_revision_row),
+                selectinload(EndpointRow.deploying_revision_row),
                 selectinload(EndpointRow.deployment_policy),
             )
 
@@ -1356,9 +1337,8 @@ class DeploymentDBSource:
                     EndpointRow.id == EndpointAutoScalingRuleRow.endpoint_id,
                 )
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                 )
                 .distinct()
             )
@@ -1619,6 +1599,7 @@ class DeploymentDBSource:
                     created_at=row.created_at,
                     revision_id=DeploymentRevisionID(row.revision),
                     traffic_status=row.traffic_status,
+                    health_check=row.health_check,
                     replica_host=row.replica_host,
                     replica_port=row.replica_port,
                     updated_at=row.updated_at,
@@ -1664,6 +1645,7 @@ class DeploymentDBSource:
                     created_at=row.created_at,
                     revision_id=DeploymentRevisionID(row.revision),
                     traffic_status=row.traffic_status,
+                    health_check=row.health_check,
                     replica_host=row.replica_host,
                     replica_port=row.replica_port,
                     updated_at=row.updated_at,
@@ -2729,12 +2711,8 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == updater.pk_value)
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                     selectinload(EndpointRow.deployment_policy),
                 )
             )

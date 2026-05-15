@@ -491,12 +491,15 @@ class TestCleanupRoutesByConfig:
         Then: Route in successes (marked for cleanup)
         """
         # Arrange
+        current_revision_mock = MagicMock()
+        current_revision_mock.id = unhealthy_route.revision_id
+
         deployment = MagicMock()
         deployment.id = unhealthy_route.deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = unhealthy_route.revision_id
-        deployment.deploying_revision_id = None
+        deployment.current_revision = current_revision_mock
+        deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -524,12 +527,15 @@ class TestCleanupRoutesByConfig:
         Then: Route not in successes
         """
         # Arrange
+        current_revision_mock = MagicMock()
+        current_revision_mock.id = healthy_route.revision_id
+
         deployment = MagicMock()
         deployment.id = healthy_route.deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = healthy_route.revision_id
-        deployment.deploying_revision_id = None
+        deployment.current_revision = current_revision_mock
+        deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -588,14 +594,20 @@ class TestCleanupRoutesByConfig:
             created_at=datetime.now(tzutc()),
             revision_id=DeploymentRevisionID(uuid4()),  # neither current nor deploying
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
+
+        current_revision_mock = MagicMock()
+        current_revision_mock.id = current_revision_id
+        deploying_revision_mock = MagicMock()
+        deploying_revision_mock.id = deploying_revision_id
 
         deployment = MagicMock()
         deployment.id = deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = current_revision_id
-        deployment.deploying_revision_id = deploying_revision_id
+        deployment.current_revision = current_revision_mock
+        deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -632,14 +644,18 @@ class TestCleanupRoutesByConfig:
             created_at=datetime.now(tzutc()),
             revision_id=deploying_revision_id,
             traffic_status=RouteTrafficStatus.INACTIVE,
+            health_check=None,
         )
+
+        deploying_revision_mock = MagicMock()
+        deploying_revision_mock.id = deploying_revision_id
 
         deployment = MagicMock()
         deployment.id = deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = None
-        deployment.deploying_revision_id = deploying_revision_id
+        deployment.current_revision = None
+        deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -676,14 +692,15 @@ class TestCleanupRoutesByConfig:
             created_at=datetime.now(tzutc()),
             revision_id=DeploymentRevisionID(uuid4()),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
 
         deployment = MagicMock()
         deployment.id = deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = None
-        deployment.deploying_revision_id = None
+        deployment.current_revision = None
+        deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -930,6 +947,7 @@ def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
         revision_id=DeploymentRevisionID(uuid4()),
         created_at=datetime.now(tzutc()),
         traffic_status=RouteTrafficStatus.ACTIVE,
+        health_check=None,
     )
 
 

@@ -167,11 +167,8 @@ def _serve_info_from_dto(dto: ServiceInfo, runtime_variant_name: RuntimeVariant)
 
 
 def _resolve_target_revision_data(info: DeploymentInfo) -> ModelRevisionData | None:
-    """Resolve the target revision data by id (current first, then deploying)."""
-    target_id = info.current_revision_id or info.deploying_revision_id
-    if target_id is None:
-        return None
-    return next((r for r in info.model_revisions if r.id == target_id), None)
+    """Resolve the target revision data (current first, then deploying)."""
+    return info.current_revision or info.deploying_revision
 
 
 def _serve_info_from_deployment_info(

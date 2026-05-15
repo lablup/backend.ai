@@ -173,9 +173,7 @@ def _create_deployment_info(
             url="http://test.endpoint",
             preferred_domain_name=None,
         ),
-        model_revisions=[],
         options=DeploymentOptions(),
-        current_revision_id=DeploymentRevisionID(uuid4()),
     )
 
 
@@ -203,6 +201,7 @@ def _create_route_data(
         created_at=datetime.now(tzutc()),
         revision_id=revision_id or DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
+        health_check=None,
     )
 
 

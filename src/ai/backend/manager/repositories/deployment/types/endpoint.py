@@ -11,6 +11,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
@@ -78,6 +79,7 @@ class RouteData:
     created_at: datetime
     revision_id: DeploymentRevisionID
     traffic_status: RouteTrafficStatus
+    health_check: ModelHealthCheck | None
     replica_host: str | None = None
     replica_port: int | None = None
     updated_at: datetime | None = None

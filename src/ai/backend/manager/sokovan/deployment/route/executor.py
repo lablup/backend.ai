@@ -7,7 +7,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
-    RouteHealthRecord,
+    RouteProbeTarget,
     ValkeyScheduleClient,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
@@ -242,7 +242,7 @@ class RouteExecutor:
         if not routes:
             return RouteExecutionResult(successes=[], errors=[])
 
-        route_ids = {ReplicaID(route.route_id) for route in routes}
+        route_ids = {route.route_id for route in routes}
         session_infos: dict[ReplicaID, RouteSessionInfo | None] = dict(
             await self._deployment_repo.fetch_route_session_kernel_infos(route_ids)
         )
@@ -252,7 +252,7 @@ class RouteExecutor:
         updates: dict[ReplicaID, RouteSessionKernelInfo] = {}
 
         for route in routes:
-            replica_id = ReplicaID(route.route_id)
+            replica_id = route.route_id
             info = session_infos.get(replica_id)
 
             if info is None:
@@ -293,7 +293,7 @@ class RouteExecutor:
 
         if updates:
             await self._deployment_repo.update_route_replica_info(updates)
-            await self._initialize_health_records(successes, updates)
+            await self._register_route_probe_targets(successes, updates)
 
         return RouteExecutionResult(
             successes=successes,
@@ -341,48 +341,66 @@ class RouteExecutor:
             errors=errors,
         )
 
-    async def _initialize_health_records(
+    async def _register_route_probe_targets(
         self,
         routes: Sequence[RouteData],
         replica_info: Mapping[ReplicaID, RouteSessionKernelInfo],
     ) -> None:
-        """Create RouteHealthRecords in Valkey for routes that just got replica info."""
-        revision_ids = {r.revision_id for r in routes}
-        health_configs = await self._deployment_repo.fetch_health_check_configs_by_revision_ids(
-            revision_ids
-        )
-        route_id_strs = [str(r.route_id) for r in routes]
-        existing_running_at = await self._valkey_schedule.get_route_running_at_batch(route_id_strs)
-        current_time = await self._valkey_schedule.get_redis_time()
-
-        records: list[RouteHealthRecord] = []
+        """Register RouteProbeTargets in Valkey for routes that just got replica info."""
+        targets: list[RouteProbeTarget] = []
         for route in routes:
-            kernel = replica_info[route.route_id]
-            health_config = health_configs.get(route.revision_id)
-
-            health_path = health_config.path if health_config else "/"
-            initial_delay = health_config.initial_delay if health_config else 60.0
-            created_at = int(route.created_at.timestamp())
-
-            route_id_str = str(route.route_id)
-            running_at = existing_running_at.get(route_id_str) or current_time
-            initial_delay_until = running_at + int(initial_delay)
-
-            records.append(
-                RouteHealthRecord(
-                    route_id=route_id_str,
-                    created_at=created_at,
-                    initial_delay_until=initial_delay_until,
+            replica_id = route.route_id
+            kernel = replica_info[replica_id]
+            health_path = route.health_check.path if route.health_check else "/"
+            targets.append(
+                RouteProbeTarget(
+                    replica_id=replica_id,
                     health_path=health_path,
                     inference_port=kernel.replica_port,
                     replica_host=kernel.replica_host,
-                    running_at=running_at,
                 )
             )
 
-        if records:
-            await self._valkey_schedule.initialize_route_health_records_batch(records)
-            log.debug("Initialized {} RouteHealthRecords in Valkey", len(records))
+        if targets:
+            await self._valkey_schedule.register_route_probe_targets_batch(targets)
+            log.debug("Registered {} RouteProbeTargets in Valkey", len(targets))
+
+    async def sync_route_probe_targets(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Sync RouteProbeTargets to Valkey for routes with known replica info.
+
+        Handles two cases:
+        - Valkey data lost (restart, eviction) → re-registers probe targets
+        - TTL refresh for long-running routes
+
+        Routes without replica_host/replica_port are skipped silently.
+        """
+        routes_with_info = [route for route in routes if route.replica_host and route.replica_port]
+        if not routes_with_info:
+            return RouteExecutionResult(successes=[], errors=[])
+
+        # Build probe targets (no phase — health config comes from RouteData)
+        targets: list[RouteProbeTarget] = []
+        for route in routes_with_info:
+            health_path = route.health_check.path if route.health_check else "/"
+            targets.append(
+                RouteProbeTarget(
+                    replica_id=route.route_id,
+                    health_path=health_path,
+                    inference_port=route.replica_port,  # type: ignore[arg-type]
+                    replica_host=route.replica_host,  # type: ignore[arg-type]
+                )
+            )
+
+        if targets:
+            with RouteRecorderContext.shared_phase(
+                "register_probe_targets",
+                entity_ids={t.replica_id for t in targets},
+            ):
+                with RouteRecorderContext.shared_step("write_probe_targets"):
+                    await self._valkey_schedule.register_route_probe_targets_batch(targets)
+            log.debug("Synced {} RouteProbeTargets to Valkey", len(targets))
+
+        return RouteExecutionResult(successes=[], errors=[])
 
     async def check_warming_up_health(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Check health of PROVISIONING+WARMING_UP routes for initial activation.
@@ -1056,10 +1074,10 @@ class RouteExecutor:
             else:
                 deployment_cleanup_config[deployment.id] = set()
             valid_revisions: set[DeploymentRevisionID] = set()
-            if deployment.current_revision_id is not None:
-                valid_revisions.add(deployment.current_revision_id)
-            if deployment.deploying_revision_id is not None:
-                valid_revisions.add(deployment.deploying_revision_id)
+            if deployment.current_revision is not None:
+                valid_revisions.add(deployment.current_revision.id)
+            if deployment.deploying_revision is not None:
+                valid_revisions.add(deployment.deploying_revision.id)
             deployment_valid_revisions[deployment.id] = valid_revisions
 
         successes: list[RouteData] = []

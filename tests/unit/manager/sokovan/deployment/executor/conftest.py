@@ -165,9 +165,8 @@ def _create_deployment_info(
             url=None,
             preferred_domain_name=None,
         ),
-        model_revisions=[cast(ModelRevisionData, revision)] if has_revision else [],
-        current_revision_id=DeploymentRevisionID(rev_id) if has_revision else None,
         options=DeploymentOptions(),
+        current_revision=cast(ModelRevisionData, revision) if has_revision else None,
     )
 
 
@@ -188,6 +187,7 @@ def _create_route_data(
         created_at=datetime.now(tzutc()),
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
+        health_check=None,
     )
 
 
