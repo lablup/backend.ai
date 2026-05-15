@@ -6476,6 +6476,11 @@ type ModelRevision implements Node {
   """
   revisionPresetId: UUID
 
+  """
+  Added in UNRELEASED. ID of the parent deployment that owns this revision. Exposed alongside the resolved ``deployment`` node so clients can navigate without re-fetching.
+  """
+  deploymentId: ID!
+
   """Timestamp when the revision was created."""
   createdAt: DateTime!
 
@@ -6491,6 +6496,11 @@ type ModelRevision implements Node {
   Added in UNRELEASED. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
   """
   revisionPreset: DeploymentRevisionPreset
+
+  """
+  Added in UNRELEASED. The parent deployment owning this revision, resolved via DataLoader.
+  """
+  deployment: ModelDeployment
 
   """Added in 26.4.2. Resource slot allocations for this revision."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]

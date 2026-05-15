@@ -509,6 +509,16 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         ),
         default=None,
     )
+    deployment_id: ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "ID of the parent deployment that owns this revision. "
+                "Exposed alongside the resolved ``deployment`` node so "
+                "clients can navigate without re-fetching."
+            ),
+        ),
+    )
     created_at: datetime = gql_field(description="Timestamp when the revision was created.")
 
     @gql_field(
@@ -564,6 +574,17 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         if self.revision_preset_id is None:
             return None
         return await info.context.data_loaders.revision_preset_loader.load(self.revision_preset_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The parent deployment owning this revision, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def deployment(
+        self, info: Info[StrawberryGQLContext]
+    ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")] | None:
+        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
 
     @gql_added_field(
         BackendAIGQLMeta(

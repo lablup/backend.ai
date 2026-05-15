@@ -143,6 +143,7 @@ def _make_deployment_strategy(**kwargs: object) -> DeploymentStrategyInfoDTO:
 def _make_revision_node(**kwargs: object) -> RevisionNode:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
+        "deployment_id": uuid.uuid4(),
         "revision_number": 1,
         "image_id": ImageID(uuid.uuid4()),
         "cluster_config": _make_cluster_config(),
@@ -212,9 +213,11 @@ class TestRevisionNode:
 
     def test_creation_with_all_fields(self) -> None:
         revision_id = uuid.uuid4()
+        deployment_id = uuid.uuid4()
         now = datetime.now(tz=UTC)
         node = RevisionNode(
             id=revision_id,
+            deployment_id=deployment_id,
             revision_number=1,
             image_id=ImageID(uuid.uuid4()),
             cluster_config=_make_cluster_config(),
@@ -224,12 +227,14 @@ class TestRevisionNode:
             extra_mounts=[],
         )
         assert node.id == revision_id
+        assert node.deployment_id == deployment_id
         assert node.created_at == now
         assert node.extra_mounts == []
 
     def test_extra_mounts_defaults_to_empty_list(self) -> None:
         node = RevisionNode(
             id=uuid.uuid4(),
+            deployment_id=uuid.uuid4(),
             revision_number=1,
             image_id=ImageID(uuid.uuid4()),
             cluster_config=_make_cluster_config(),

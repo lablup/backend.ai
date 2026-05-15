@@ -2287,6 +2287,7 @@ class DeploymentAdapter(BaseAdapter):
             )
         return RevisionNode(
             id=data.id,
+            deployment_id=data.deployment_id,
             revision_number=data.revision_number,
             image_id=data.image_id,
             cluster_config=ClusterConfigInfoDTO(
