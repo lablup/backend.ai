@@ -251,6 +251,7 @@ class SessionAdapter(BaseAdapter):
                     vfolder_id=VFolderUUID(m.vfolder_id),
                     mount_destination=m.mount_path,
                     mount_perm=(MountPermission(m.permission) if m.permission else None),
+                    subpath=m.subpath,
                 )
                 for m in input.mounts
             ]

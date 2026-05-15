@@ -200,6 +200,7 @@ def _mount_items_to_entries(items: Sequence[MountItemInput]) -> list[MountInfoEn
                 vfolder_id=VFolderUUID(item.vfolder_id),
                 mount_destination=item.mount_path,
                 mount_perm=perm or MountPermission.READ_WRITE,
+                subpath=item.subpath,
             )
         )
     return result

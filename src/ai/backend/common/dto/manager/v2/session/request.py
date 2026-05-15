@@ -261,6 +261,14 @@ class MountItemInput(BaseRequestModel):
     permission: str | None = Field(
         default=None, description="Mount permission override ('rw' or 'ro')."
     )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the vfolder to mount. Omit (null) to mount the vfolder root."
+            " Empty string is rejected."
+        ),
+    )
 
 
 class BatchConfigInput(BaseRequestModel):

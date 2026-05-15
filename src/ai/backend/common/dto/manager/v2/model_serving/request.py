@@ -4,12 +4,12 @@ Request DTOs for Model Serving DTO v2.
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import RuntimeVariant
 
 __all__ = (
@@ -36,9 +36,12 @@ class ServiceConfigInput(BaseRequestModel):
         default="/models",
         description="Mount destination for the model VFolder inside the inference session",
     )
-    extra_mounts: dict[UUID, Any] = Field(
+    extra_mounts: dict[UUID, MountOption] = Field(
         default_factory=dict,
-        description="Extra VFolders mounted to model service session",
+        description=(
+            "Extra VFolders mounted to the model service session, keyed by vfolder UUID."
+            " Each value carries per-mount options (mount destination, permission, subpath)."
+        ),
     )
     environ: dict[str, str] | None = Field(
         default=None,

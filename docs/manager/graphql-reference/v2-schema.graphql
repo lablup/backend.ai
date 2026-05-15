@@ -11636,6 +11636,11 @@ input SessionMountItemInput {
 
   """Mount permission ('rw' or 'ro')."""
   permission: String = null
+
+  """
+  Added in UNRELEASED. Subpath within the vfolder to mount. Null mounts the vfolder root.
+  """
+  subpath: String = null
 }
 
 """Added in 26.4.2. Additional resource options for session creation."""
