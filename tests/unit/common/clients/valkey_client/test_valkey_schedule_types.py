@@ -1,4 +1,4 @@
-"""Unit tests for RouteProbeTarget and RouteHealthStatus Valkey type serialization."""
+"""Unit tests for ReplicaProbeTarget and ReplicaHealthStatus Valkey type serialization."""
 
 from __future__ import annotations
 
@@ -7,27 +7,27 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
-    RouteHealthStatus,
-    RouteProbeTarget,
+    ReplicaHealthStatus,
+    ReplicaProbeTarget,
 )
 from ai.backend.common.identifier.replica import ReplicaID
 
 
-class TestRouteProbeTargetSerialization:
+class TestReplicaProbeTargetSerialization:
     @pytest.fixture
     def replica_id(self) -> ReplicaID:
         return ReplicaID(uuid4())
 
     @pytest.fixture
-    def target(self, replica_id: ReplicaID) -> RouteProbeTarget:
-        return RouteProbeTarget(
+    def target(self, replica_id: ReplicaID) -> ReplicaProbeTarget:
+        return ReplicaProbeTarget(
             replica_id=replica_id,
             health_path="/health",
             inference_port=8080,
             replica_host="10.0.0.1",
         )
 
-    def test_to_valkey_hash(self, target: RouteProbeTarget) -> None:
+    def test_to_valkey_hash(self, target: ReplicaProbeTarget) -> None:
         h = target.to_valkey_hash()
         assert h["replica_id"] == str(target.replica_id)
         assert h["health_path"] == "/health"
@@ -41,38 +41,38 @@ class TestRouteProbeTargetSerialization:
             "inference_port": "9000",
             "replica_host": "192.168.1.100",
         }
-        target = RouteProbeTarget.from_valkey_hash(data)
+        target = ReplicaProbeTarget.from_valkey_hash(data)
         assert target.replica_id == replica_id
         assert target.health_path == "/healthz"
         assert target.inference_port == 9000
         assert target.replica_host == "192.168.1.100"
 
-    def test_round_trip(self, target: RouteProbeTarget) -> None:
-        restored = RouteProbeTarget.from_valkey_hash(target.to_valkey_hash())
+    def test_round_trip(self, target: ReplicaProbeTarget) -> None:
+        restored = ReplicaProbeTarget.from_valkey_hash(target.to_valkey_hash())
         assert restored == target
 
 
-class TestRouteHealthStatusSerialization:
+class TestReplicaHealthStatusSerialization:
     @pytest.fixture
     def replica_id(self) -> ReplicaID:
         return ReplicaID(uuid4())
 
     @pytest.fixture
-    def healthy_status(self, replica_id: ReplicaID) -> RouteHealthStatus:
-        return RouteHealthStatus(
+    def healthy_status(self, replica_id: ReplicaID) -> ReplicaHealthStatus:
+        return ReplicaHealthStatus(
             replica_id=replica_id,
             healthy=True,
             last_check=1700000000,
         )
 
-    def test_to_valkey_hash_healthy(self, healthy_status: RouteHealthStatus) -> None:
+    def test_to_valkey_hash_healthy(self, healthy_status: ReplicaHealthStatus) -> None:
         h = healthy_status.to_valkey_hash()
         assert h["replica_id"] == str(healthy_status.replica_id)
         assert h["healthy"] == "1"
         assert h["last_check"] == "1700000000"
 
     def test_to_valkey_hash_unhealthy(self, replica_id: ReplicaID) -> None:
-        status = RouteHealthStatus(
+        status = ReplicaHealthStatus(
             replica_id=replica_id,
             healthy=False,
             last_check=1700000000,
@@ -85,17 +85,17 @@ class TestRouteHealthStatusSerialization:
             "healthy": "1",
             "last_check": "1700000000",
         }
-        status = RouteHealthStatus.from_valkey_hash(data)
+        status = ReplicaHealthStatus.from_valkey_hash(data)
         assert status.replica_id == replica_id
         assert status.healthy is True
         assert status.last_check == 1700000000
 
     def test_from_valkey_hash_missing_optional_fields(self, replica_id: ReplicaID) -> None:
         """Missing healthy/last_check fields default to safe values."""
-        status = RouteHealthStatus.from_valkey_hash({"replica_id": str(replica_id)})
+        status = ReplicaHealthStatus.from_valkey_hash({"replica_id": str(replica_id)})
         assert status.healthy is False
         assert status.last_check == 0
 
-    def test_round_trip(self, healthy_status: RouteHealthStatus) -> None:
-        restored = RouteHealthStatus.from_valkey_hash(healthy_status.to_valkey_hash())
+    def test_round_trip(self, healthy_status: ReplicaHealthStatus) -> None:
+        restored = ReplicaHealthStatus.from_valkey_hash(healthy_status.to_valkey_hash())
         assert restored == healthy_status

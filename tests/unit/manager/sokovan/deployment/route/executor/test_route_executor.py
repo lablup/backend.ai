@@ -23,7 +23,7 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
-    RouteHealthStatus as ValkeyRouteHealthStatus,
+    ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
@@ -213,7 +213,7 @@ class TestCheckRouteHealth:
         When: Check route health
         Then: Route in successes list
         """
-        status = ValkeyRouteHealthStatus(
+        status = ValkeyReplicaHealthStatus(
             replica_id=healthy_route.route_id,
             healthy=True,
             last_check=995,
@@ -242,7 +242,7 @@ class TestCheckRouteHealth:
         When: Check route health
         Then: Route in errors list
         """
-        status = ValkeyRouteHealthStatus(
+        status = ValkeyReplicaHealthStatus(
             replica_id=healthy_route.route_id,
             healthy=False,
             last_check=995,

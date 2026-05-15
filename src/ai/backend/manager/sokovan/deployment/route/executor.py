@@ -7,7 +7,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
-    RouteProbeTarget,
+    ReplicaProbeTarget,
     ValkeyScheduleClient,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
@@ -341,55 +341,49 @@ class RouteExecutor:
             errors=errors,
         )
 
+    @staticmethod
+    def _build_probe_target(route: RouteData) -> ReplicaProbeTarget | None:
+        """Build a ReplicaProbeTarget from a route, or None if any required field is absent."""
+        if route.health_check is None or route.replica_host is None or route.replica_port is None:
+            return None
+        return ReplicaProbeTarget(
+            replica_id=route.route_id,
+            health_path=route.health_check.path,
+            inference_port=route.replica_port,
+            replica_host=route.replica_host,
+        )
+
     async def _register_route_probe_targets(
         self,
         routes: Sequence[RouteData],
         replica_info: Mapping[ReplicaID, RouteSessionKernelInfo],
     ) -> None:
-        """Register RouteProbeTargets in Valkey for routes that just got replica info."""
-        targets: list[RouteProbeTarget] = []
-        for route in routes:
-            replica_id = route.route_id
-            kernel = replica_info[replica_id]
-            health_path = route.health_check.path if route.health_check else "/"
-            targets.append(
-                RouteProbeTarget(
-                    replica_id=replica_id,
-                    health_path=health_path,
-                    inference_port=kernel.replica_port,
-                    replica_host=kernel.replica_host,
-                )
+        """Register ReplicaProbeTargets in Valkey for routes that just got replica info."""
+        targets: list[ReplicaProbeTarget] = [
+            ReplicaProbeTarget(
+                replica_id=route.route_id,
+                health_path=route.health_check.path,
+                inference_port=replica_info[route.route_id].replica_port,
+                replica_host=replica_info[route.route_id].replica_host,
             )
+            for route in routes
+            if route.health_check is not None
+        ]
 
         if targets:
             await self._valkey_schedule.register_route_probe_targets_batch(targets)
-            log.debug("Registered {} RouteProbeTargets in Valkey", len(targets))
+            log.debug("Registered {} ReplicaProbeTargets in Valkey", len(targets))
 
     async def sync_route_probe_targets(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Sync RouteProbeTargets to Valkey for routes with known replica info.
+        """Sync ReplicaProbeTargets to Valkey for routes with known replica info.
 
         Handles two cases:
         - Valkey data lost (restart, eviction) → re-registers probe targets
         - TTL refresh for long-running routes
 
-        Routes without replica_host/replica_port are skipped silently.
+        Routes without health_check/replica_host/replica_port are skipped silently.
         """
-        routes_with_info = [route for route in routes if route.replica_host and route.replica_port]
-        if not routes_with_info:
-            return RouteExecutionResult(successes=[], errors=[])
-
-        # Build probe targets (no phase — health config comes from RouteData)
-        targets: list[RouteProbeTarget] = []
-        for route in routes_with_info:
-            health_path = route.health_check.path if route.health_check else "/"
-            targets.append(
-                RouteProbeTarget(
-                    replica_id=route.route_id,
-                    health_path=health_path,
-                    inference_port=route.replica_port,  # type: ignore[arg-type]
-                    replica_host=route.replica_host,  # type: ignore[arg-type]
-                )
-            )
+        targets = [t for route in routes if (t := self._build_probe_target(route)) is not None]
 
         if targets:
             with RouteRecorderContext.shared_phase(
@@ -398,7 +392,7 @@ class RouteExecutor:
             ):
                 with RouteRecorderContext.shared_step("write_probe_targets"):
                     await self._valkey_schedule.register_route_probe_targets_batch(targets)
-            log.debug("Synced {} RouteProbeTargets to Valkey", len(targets))
+            log.debug("Synced {} ReplicaProbeTargets to Valkey", len(targets))
 
         return RouteExecutionResult(successes=[], errors=[])
 

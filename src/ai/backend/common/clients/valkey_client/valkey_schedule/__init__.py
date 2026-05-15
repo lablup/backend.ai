@@ -5,14 +5,15 @@ from .client import (
     RouteHealthRecord,
     ValkeyScheduleClient,
 )
-from .types import RouteHealthStatus, RouteProbeTarget
+from .types import ReplicaHealthResult, ReplicaHealthStatus, ReplicaProbeTarget
 
 __all__ = [
     "HealthCheckStatus",
     "HealthStatus",
     "KernelStatus",
     "RouteHealthRecord",
-    "RouteHealthStatus",
-    "RouteProbeTarget",
+    "ReplicaHealthResult",
+    "ReplicaHealthStatus",
+    "ReplicaProbeTarget",
     "ValkeyScheduleClient",
 ]

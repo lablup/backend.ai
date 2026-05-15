@@ -22,7 +22,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     HealthCheckStatus,
     ValkeyScheduleClient,
 )
-from ai.backend.common.clients.valkey_client.valkey_schedule.types import RouteProbeTarget
+from ai.backend.common.clients.valkey_client.valkey_schedule.types import ReplicaProbeTarget
 from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -902,8 +902,8 @@ class TestForceTerminatedCleanupQueue:
         assert result == [sid_keep]
 
 
-class TestRouteProbeTargetClient:
-    """Test ValkeyScheduleClient methods for RouteProbeTarget."""
+class TestReplicaProbeTargetClient:
+    """Test ValkeyScheduleClient methods for ReplicaProbeTarget."""
 
     @pytest.fixture
     async def valkey_schedule_client(
@@ -925,8 +925,8 @@ class TestRouteProbeTargetClient:
     def replica_id(self) -> ReplicaID:
         return ReplicaID(uuid4())
 
-    def _make_target(self, replica_id: ReplicaID) -> RouteProbeTarget:
-        return RouteProbeTarget(
+    def _make_target(self, replica_id: ReplicaID) -> ReplicaProbeTarget:
+        return ReplicaProbeTarget(
             replica_id=replica_id,
             health_path="/health",
             inference_port=8080,
@@ -983,7 +983,7 @@ class TestRouteProbeTargetClient:
         await valkey_schedule_client.register_route_probe_targets_batch([
             self._make_target(replica_id)
         ])
-        updated = RouteProbeTarget(
+        updated = ReplicaProbeTarget(
             replica_id=replica_id,
             health_path="/healthz",
             inference_port=9000,
@@ -994,8 +994,8 @@ class TestRouteProbeTargetClient:
         assert results[replica_id] == updated
 
 
-class TestRouteHealthStatusClient:
-    """Test ValkeyScheduleClient methods for RouteHealthStatus."""
+class TestReplicaHealthStatusClient:
+    """Test ValkeyScheduleClient methods for ReplicaHealthStatus."""
 
     @pytest.fixture
     async def valkey_schedule_client(

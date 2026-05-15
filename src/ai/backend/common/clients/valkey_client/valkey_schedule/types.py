@@ -10,7 +10,7 @@ from ai.backend.common.identifier.replica import ReplicaID
 
 
 @dataclass
-class RouteProbeTarget:
+class ReplicaProbeTarget:
     """Probe configuration for a route stored in Valkey.
 
     Stored as a hash at key `route_probe:{replica_id}`.
@@ -32,7 +32,7 @@ class RouteProbeTarget:
         }
 
     @classmethod
-    def from_valkey_hash(cls, data: Mapping[str, str]) -> RouteProbeTarget:
+    def from_valkey_hash(cls, data: Mapping[str, str]) -> ReplicaProbeTarget:
         return cls(
             replica_id=ReplicaID(UUID(data["replica_id"])),
             health_path=data["health_path"],
@@ -42,7 +42,19 @@ class RouteProbeTarget:
 
 
 @dataclass
-class RouteHealthStatus:
+class ReplicaHealthResult:
+    """Input type for recording a health check outcome.
+
+    Passed to ``record_route_health_statuses_batch``; ``last_check`` is
+    assigned by the client using the current Redis time.
+    """
+
+    replica_id: ReplicaID
+    healthy: bool
+
+
+@dataclass
+class ReplicaHealthStatus:
     """Health check result for a route stored in Valkey.
 
     Stored as a hash at key `route_health:{replica_id}`.
@@ -62,7 +74,7 @@ class RouteHealthStatus:
         }
 
     @classmethod
-    def from_valkey_hash(cls, data: Mapping[str, str]) -> RouteHealthStatus:
+    def from_valkey_hash(cls, data: Mapping[str, str]) -> ReplicaHealthStatus:
         return cls(
             replica_id=ReplicaID(UUID(data["replica_id"])),
             healthy=data.get("healthy", "0") == "1",

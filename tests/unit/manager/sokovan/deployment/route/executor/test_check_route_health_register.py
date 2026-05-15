@@ -17,7 +17,7 @@ from uuid import uuid4
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
-    RouteHealthStatus as ValkeyRouteHealthStatus,
+    ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
@@ -51,16 +51,16 @@ def _route(health_status: RouteHealthStatus) -> RouteData:
     )
 
 
-def _healthy_status(route: RouteData) -> ValkeyRouteHealthStatus:
-    return ValkeyRouteHealthStatus(
+def _healthy_status(route: RouteData) -> ValkeyReplicaHealthStatus:
+    return ValkeyReplicaHealthStatus(
         replica_id=route.route_id,
         healthy=True,
         last_check=999,
     )
 
 
-def _unhealthy_status(route: RouteData) -> ValkeyRouteHealthStatus:
-    return ValkeyRouteHealthStatus(
+def _unhealthy_status(route: RouteData) -> ValkeyReplicaHealthStatus:
+    return ValkeyReplicaHealthStatus(
         replica_id=route.route_id,
         healthy=False,
         last_check=999,

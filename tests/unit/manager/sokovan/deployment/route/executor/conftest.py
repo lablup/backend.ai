@@ -72,7 +72,8 @@ def mock_valkey_schedule() -> AsyncMock:
     """Mock ValkeyScheduleClient."""
     client = AsyncMock()
     client.get_route_health_records_batch = AsyncMock(return_value={})
-    client.get_redis_time = AsyncMock(return_value=1000)
+    client.get_route_health_statuses_batch = AsyncMock(return_value={})
+    client.get_route_probe_targets_batch = AsyncMock(return_value={})
     return client
 
 
