@@ -86,13 +86,20 @@ class PrometheusClient:
 
         # max/rate_max and avg/rate_avg are split: gauge metrics can be aggregated
         # directly, but cumulative counters (cpu_util/net_rx/net_tx) need rate() first.
+        instant_res = await self._query_instant(queries.instant)
+        rate_current_res = await self._query_instant(queries.rate_current)
+        max_res = await self._query_instant(queries.max)
+        rate_max_res = await self._query_instant(queries.rate_max)
+        avg_res = await self._query_instant(queries.avg)
+        rate_avg_res = await self._query_instant(queries.rate_avg)
+
         return KernelLiveStatBatchResult.from_responses(
-            instant=await self._query_instant(queries.instant),
-            rate_current=await self._query_instant(queries.rate_current),
-            max=await self._query_instant(queries.max),
-            rate_max=await self._query_instant(queries.rate_max),
-            avg=await self._query_instant(queries.avg),
-            rate_avg=await self._query_instant(queries.rate_avg),
+            instant=instant_res,
+            rate_current=rate_current_res,
+            max=max_res,
+            rate_max=rate_max_res,
+            avg=avg_res,
+            rate_avg=rate_avg_res,
         )
 
     async def execute_preset(
