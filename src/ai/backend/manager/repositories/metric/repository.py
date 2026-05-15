@@ -69,10 +69,7 @@ class MetricRepository:
         if not kernel_ids:
             return KernelLiveStatBatchResult.empty(kernel_ids)
         try:
-            live_values = await self._prometheus_client.fetch_container_live_stats(kernel_ids)
+            return await self._prometheus_client.fetch_container_live_stats(kernel_ids)
         except (PrometheusConnectionError, FailedToGetMetric) as e:
             log.warning("Failed to query metrics for kernel live stats: {!r}", e)
             return KernelLiveStatBatchResult.empty(kernel_ids)
-        return KernelLiveStatBatchResult.from_metric_values(
-            kernel_ids, live_values.values_by_kernel
-        )

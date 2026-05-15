@@ -25,7 +25,7 @@ The Metric Repository provides the data access layer for metric-related operatio
 ### Metric data types
 
 - Metric DTOs live in `ai.backend.common.clients.prometheus.metric_types`
-- `KernelMetricValuesByKernel`: Groups Prometheus response samples by kernel ID
+- `KernelLiveStatBatchResult`: Groups live-stat query results by kernel ID
 
 ## Usage
 

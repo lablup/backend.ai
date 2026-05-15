@@ -10,12 +10,15 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.fixed_query_builder import FixedQueryBuilder
+from ai.backend.common.clients.prometheus.fixed_query_builder import (
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
+)
 from ai.backend.common.clients.prometheus.metric_types import (
     ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
-    KernelMetricValuesByKernel,
+    KernelLiveStatBatchResult,
     MetricType,
     ValueType,
 )
@@ -63,7 +66,10 @@ def _make_metric_repository(
     *,
     timewindow: str = "1m",
 ) -> MetricRepository:
-    mock_prometheus_client._fixed_query_builder = FixedQueryBuilder(timewindow)
+    mock_prometheus_client._container_metric_query_builder = ContainerMetricQueryBuilder(timewindow)
+    mock_prometheus_client._container_live_stat_query_builder = ContainerLiveStatQueryBuilder(
+        timewindow
+    )
     return MetricRepository(
         db=MagicMock(),
         prometheus_client=mock_prometheus_client,
@@ -86,7 +92,8 @@ class TestContainerMetricRepositoryQueries:
         return PrometheusClient(
             endpoint="http://localhost:9090/api/v1",
             client_pool=MagicMock(),
-            fixed_query_builder=FixedQueryBuilder("1m"),
+            container_metric_query_builder=ContainerMetricQueryBuilder("1m"),
+            container_live_stat_query_builder=ContainerLiveStatQueryBuilder("1m"),
         )
 
     @pytest.fixture
@@ -539,29 +546,31 @@ class TestMetricTypeDetection:
     """Test metric type detection logic."""
 
     @pytest.fixture
-    def fixed_query_builder(self) -> FixedQueryBuilder:
-        return FixedQueryBuilder("1m")
+    def query_builder(self) -> ContainerMetricQueryBuilder:
+        return ContainerMetricQueryBuilder("1m")
 
-    def test_cpu_util_detected_as_diff_type(self, fixed_query_builder: FixedQueryBuilder) -> None:
-        metric_type = fixed_query_builder.get_container_metric_type(
+    def test_cpu_util_detected_as_diff_type(
+        self, query_builder: ContainerMetricQueryBuilder
+    ) -> None:
+        metric_type = query_builder.get_container_metric_type(
             "cpu_util", ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
         )
         assert metric_type == MetricType.DIFF
 
     def test_network_metrics_detected_as_rate_type(
-        self, fixed_query_builder: FixedQueryBuilder
+        self, query_builder: ContainerMetricQueryBuilder
     ) -> None:
         for metric_name in ["net_rx", "net_tx"]:
-            metric_type = fixed_query_builder.get_container_metric_type(
+            metric_type = query_builder.get_container_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
             assert metric_type == MetricType.RATE
 
     def test_memory_metrics_detected_as_gauge_type(
-        self, fixed_query_builder: FixedQueryBuilder
+        self, query_builder: ContainerMetricQueryBuilder
     ) -> None:
         for metric_name in ["container_memory_used_bytes", "container_gpu_percent"]:
-            metric_type = fixed_query_builder.get_container_metric_type(
+            metric_type = query_builder.get_container_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
             assert metric_type == MetricType.GAUGE
@@ -626,8 +635,8 @@ class TestTimewindowInitialization:
 
     @pytest.mark.parametrize("timewindow", ["30s", "1m", "5m", "15m", "1h"])
     async def test_timewindow_stored_correctly(self, timewindow: str) -> None:
-        fixed_query_builder = FixedQueryBuilder(timewindow)
-        assert fixed_query_builder._timewindow == timewindow
+        query_builder = ContainerMetricQueryBuilder(timewindow)
+        assert query_builder._timewindow == timewindow
 
     @pytest.mark.parametrize(
         "metric_name,value_type",
@@ -640,10 +649,10 @@ class TestTimewindowInitialization:
     async def test_timewindow_applied_to_query(
         self, metric_name: str, value_type: ValueType
     ) -> None:
-        fixed_query_builder = FixedQueryBuilder("3m")
+        query_builder = ContainerMetricQueryBuilder("3m")
         label = ContainerMetricOptionalLabel(value_type=value_type)
 
-        query = fixed_query_builder.get_container_metric_query(metric_name, label)
+        query = query_builder.get_container_metric_query(metric_name, label)
 
         assert query.window == "3m"
 
@@ -716,7 +725,7 @@ class TestBuiltinQueryProvider:
                     'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
                 ),
             ),
-            # RATE - uses window and interval divisor
+            # RATE - rate() already returns per-second values.
             BuiltinQueryTestCase(
                 id="rate_net_rx_current",
                 metric_name="net_rx",
@@ -724,7 +733,7 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (value_type)(rate(backendai_container_utilization"
-                    '{container_metric_name="net_rx",value_type="current"}[5m])) / 5.0'
+                    '{container_metric_name="net_rx",value_type="current"}[5m]))'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -738,7 +747,7 @@ class TestBuiltinQueryProvider:
                 expected_query=(
                     "sum by (user_id,value_type)(rate(backendai_container_utilization"
                     '{container_metric_name="net_tx",value_type="current",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m])) / 5.0'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m]))'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -752,7 +761,7 @@ class TestBuiltinQueryProvider:
                 expected_query=(
                     "sum by (user_id,value_type)(rate(backendai_container_utilization"
                     '{container_metric_name="net_rx",value_type="capacity",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m])) / 5.0'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m]))'
                 ),
             ),
             # DIFF - uses window but no interval divisor
@@ -799,70 +808,84 @@ class TestBuiltinQueryProvider:
         ids=lambda c: c.id,
     )
     async def test_build_query_renders_expected_promql(self, case: BuiltinQueryTestCase) -> None:
-        fixed_query_builder = FixedQueryBuilder(case.timewindow)
+        query_builder = ContainerMetricQueryBuilder(case.timewindow)
 
-        query = fixed_query_builder.get_container_metric_query(case.metric_name, case.labels)
+        query = query_builder.get_container_metric_query(case.metric_name, case.labels)
         rendered_query = query.render()
 
         assert rendered_query == case.expected_query
 
 
-class TestLiveStatQueryProvider:
+class TestContainerLiveStatQueries:
     """Characterization tests for container live stat PromQL."""
 
     @pytest.fixture()
     def queries(self) -> ContainerLiveStatQueries:
         kernel_id = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
-        fixed_query_builder = FixedQueryBuilder("5m")
-        return fixed_query_builder.get_container_live_stat_queries([kernel_id])
+        query_builder = ContainerLiveStatQueryBuilder("5m")
+        return query_builder.get_container_live_stat_queries([kernel_id])
 
-    def test_max_stats_query_keeps_legacy_live_stat_contract(
+    def test_instant_query_fetches_live_stat_fields(
         self, queries: ContainerLiveStatQueries
     ) -> None:
-        query = queries.max.render()
+        rendered = queries.instant.render()
 
-        assert '"value_type","max","value_type",".*"' in query
-        assert "max_over_time" in query
-        assert (
-            'container_metric_name=~"io_scratch_size|mem|'
-            '[A-Za-z0-9][A-Za-z0-9_-]*_(mem|power|temperature|util)"'
-        ) in query
-        assert 'value_type="current"' in query
-        assert 'container_metric_name=~"cpu_util",value_type="current"}[5m]' in query
+        assert "backendai_container_utilization" in rendered
+        assert "sum by (container_metric_name,kernel_id,value_type)" in rendered
+        assert 'value_type=~"current|capacity"' in rendered
+        assert "pct" not in rendered
 
-    def test_avg_stats_query_keeps_legacy_live_stat_contract(
-        self, queries: ContainerLiveStatQueries
-    ) -> None:
-        query = queries.avg.render()
+    def test_max_query_reads_current_series(self, queries: ContainerLiveStatQueries) -> None:
+        rendered = queries.max.render()
 
-        assert '"value_type","avg","value_type",".*"' in query
-        assert "avg_over_time" in query
-        assert (
-            'container_metric_name=~"[A-Za-z0-9][A-Za-z0-9_-]*_(power|temperature|util)"'
-        ) in query
-        assert 'value_type="current"' in query
-        assert 'container_metric_name=~"cpu_util",value_type="current"}[5m]' in query
-        assert "io_scratch_size|mem" not in query
+        assert "label_replace" not in rendered
+        assert "max_over_time" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
+        assert 'value_type="current"' in rendered
+        assert "rate(" not in rendered
+        assert "backendai_container_utilization" in rendered
 
-    def test_rate_stats_query_keeps_legacy_live_stat_contract(
-        self, queries: ContainerLiveStatQueries
-    ) -> None:
-        query = queries.rate_stats.render()
+    def test_rate_max_query_reads_rate_series(self, queries: ContainerLiveStatQueries) -> None:
+        rendered = queries.rate_max.render()
 
-        assert '"value_type","rate","value_type",".*"' in query
-        assert 'container_metric_name=~"net_rx|net_tx"' in query
-        assert 'value_type="current"' in query
-        assert 'container_metric_name=~"io_read|io_write",value_type="current"}[5m]' in query
+        assert "label_replace" not in rendered
+        assert "max_over_time" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
+        assert "rate(" in rendered
+        assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
+        assert 'value_type="current"' in rendered
+
+    def test_avg_query_reads_current_series(self, queries: ContainerLiveStatQueries) -> None:
+        rendered = queries.avg.render()
+
+        assert "label_replace" not in rendered
+        assert "avg_over_time" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
+        assert 'value_type="current"' in rendered
+        assert "rate(" not in rendered
+        assert "backendai_container_utilization" in rendered
+
+    def test_rate_avg_query_reads_rate_series(self, queries: ContainerLiveStatQueries) -> None:
+        rendered = queries.rate_avg.render()
+
+        assert "label_replace" not in rendered
+        assert "avg_over_time" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
+        assert "rate(" in rendered
+        assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
+        assert 'value_type="current"' in rendered
 
 
-class TestKernelMetricValuesByKernel:
+class TestKernelLiveStatBatchResultFromLiveStatResponse:
     @pytest.fixture()
     def kernel_id(self) -> KernelId:
         return KernelId(UUID("12345678-1234-5678-1234-567812345678"))
 
-    @pytest.fixture()
-    def response(self, kernel_id: KernelId) -> PrometheusResponse:
-        return PrometheusResponse(
+    def test_splits_instant_into_current_and_capacity(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        instant = PrometheusResponse(
             status="success",
             data=PrometheusQueryData(
                 result_type="vector",
@@ -871,22 +894,71 @@ class TestKernelMetricValuesByKernel:
                         metric=MetricResponseInfo(
                             kernel_id=str(kernel_id),
                             container_metric_name="mem",
-                            value_type="max",
+                            value_type="capacity",
+                        ),
+                        values=[(1704067200.0, "8192")],
+                    ),
+                    MetricResponse(
+                        metric=MetricResponseInfo(
+                            kernel_id=str(kernel_id),
+                            container_metric_name="mem",
+                            value_type="current",
                         ),
                         values=[(1704067200.0, "1024")],
+                    ),
+                ],
+            ),
+        )
+        empty = PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(result_type="vector", result=[]),
+        )
+        batch = KernelLiveStatBatchResult.from_responses(
+            instant=instant,
+            rate_current=empty,
+            max=empty,
+            rate_max=empty,
+            avg=empty,
+            rate_avg=empty,
+        )
+
+        assert batch.by_kernel[kernel_id].instant_current["mem"] == "1024"
+        assert batch.by_kernel[kernel_id].instant_capacity["mem"] == "8192"
+
+    def test_routes_non_instant_response_into_named_slot(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        max_response = PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(
+                result_type="vector",
+                result=[
+                    MetricResponse(
+                        metric=MetricResponseInfo(
+                            kernel_id=str(kernel_id),
+                            container_metric_name="mem",
+                        ),
+                        values=[(1704067200.0, "9001")],
                     )
                 ],
             ),
         )
+        empty = PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(result_type="vector", result=[]),
+        )
+        batch = KernelLiveStatBatchResult.from_responses(
+            instant=empty,
+            rate_current=empty,
+            max=max_response,
+            rate_max=empty,
+            avg=empty,
+            rate_avg=empty,
+        )
 
-    def test_from_prometheus_response_parses_value_type_into_enum(
-        self,
-        kernel_id: KernelId,
-        response: PrometheusResponse,
-    ) -> None:
-        result = KernelMetricValuesByKernel.from_prometheus_response(response)
-
-        assert result.values_by_kernel[kernel_id][0].value_type == ValueType.MAX
+        assert batch.by_kernel[kernel_id].max["mem"] == "9001"
+        assert batch.by_kernel[kernel_id].instant_current == {}
 
 
 class TestMetricResponseInfoParsing:
