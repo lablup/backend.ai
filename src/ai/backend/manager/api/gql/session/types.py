@@ -533,6 +533,10 @@ class SessionMountItemInputGQL(PydanticInputMixin[MountItemInputDTO]):
     vfolder_id: ID = gql_field(description="Virtual folder UUID.")
     mount_path: str | None = gql_field(default=None, description="Custom mount path.")
     permission: str | None = gql_field(default=None, description="Mount permission ('rw' or 'ro').")
+    subpath: str | None = gql_field(
+        default=None,
+        description="Subpath within the vfolder to mount. Null mounts the vfolder root.",
+    )
 
 
 @gql_pydantic_input(
