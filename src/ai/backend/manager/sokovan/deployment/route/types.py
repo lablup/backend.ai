@@ -19,6 +19,7 @@ class RouteLifecycleType(StrEnum):
     SERVICE_DISCOVERY_SYNC = "service_discovery_sync"
     APPPROXY_SYNC = "appproxy_sync"
     OBSERVE_HEALTH = "observe_health"
+    PROBE_TARGET_SYNC = "probe_target_sync"
 
 
 @dataclass

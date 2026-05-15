@@ -72,7 +72,8 @@ def mock_valkey_schedule() -> AsyncMock:
     """Mock ValkeyScheduleClient."""
     client = AsyncMock()
     client.get_route_health_records_batch = AsyncMock(return_value={})
-    client.get_redis_time = AsyncMock(return_value=1000)
+    client.get_route_health_statuses_batch = AsyncMock(return_value={})
+    client.get_route_probe_targets_batch = AsyncMock(return_value={})
     return client
 
 
@@ -173,9 +174,7 @@ def _create_deployment_info(
             url="http://test.endpoint",
             preferred_domain_name=None,
         ),
-        model_revisions=[],
         options=DeploymentOptions(),
-        current_revision_id=DeploymentRevisionID(uuid4()),
     )
 
 
@@ -203,6 +202,7 @@ def _create_route_data(
         created_at=datetime.now(tzutc()),
         revision_id=revision_id or DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
+        health_check=None,
     )
 
 

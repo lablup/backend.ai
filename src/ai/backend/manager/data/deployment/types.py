@@ -12,7 +12,7 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
+from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -29,7 +29,6 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.session.options import HandlerOptions
-from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
@@ -713,25 +712,11 @@ class DeploymentInfo:
     state: DeploymentState
     replica: ReplicaData
     network: DeploymentNetworkData
-    model_revisions: list[ModelRevisionData]
     options: DeploymentOptions
-    current_revision_id: DeploymentRevisionID | None = None
+    current_revision: ModelRevisionData | None = None
     policy: DeploymentPolicyData | None = None
-    deploying_revision_id: DeploymentRevisionID | None = None
+    deploying_revision: ModelRevisionData | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
-
-    def resolve_revision_data(self, revision_id: DeploymentRevisionID) -> ModelRevisionData:
-        """Find a ``ModelRevisionData`` by id from ``model_revisions``.
-
-        Raises:
-            DeploymentRevisionNotFound: If the revision is not found.
-        """
-        for revision in self.model_revisions:
-            if revision.id == revision_id:
-                return revision
-        raise DeploymentRevisionNotFound(
-            f"Revision {revision_id} not found in model_revisions of deployment {self.id}"
-        )
 
 
 @dataclass(frozen=True)
@@ -817,6 +802,7 @@ class RouteInfo:
     created_at: datetime
     revision_id: UUID
     traffic_status: RouteTrafficStatus
+    health_check: ModelHealthCheck | None
     error_data: dict[str, Any] = field(default_factory=dict)
 
     @property

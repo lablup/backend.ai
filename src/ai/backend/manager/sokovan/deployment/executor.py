@@ -40,6 +40,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    ModelRevisionData,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
@@ -47,7 +48,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.errors.deployment import ReplicaCountMismatch
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound, ReplicaCountMismatch
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -304,7 +305,7 @@ class DeploymentExecutor:
             # the handler to attempt scaling would permanently wedge the
             # deployment in SCALING because scale_deployment() would then
             # refuse to act on a None revision id.
-            if deployment.deployment_info.current_revision_id is None:
+            if deployment.deployment_info.current_revision is None:
                 skipped.append(deployment)
                 continue
             try:
@@ -351,12 +352,12 @@ class DeploymentExecutor:
         # Phase 2: Evaluate scaling (per-deployment)
         for deployment in deployments:
             info = deployment.deployment_info
-            if info.current_revision_id is None:
+            if info.current_revision is None:
                 skipped.append(deployment)
                 continue
             try:
                 out_creators, in_route_ids = self._evaluate_deployment_scaling(
-                    info, route_map, info.current_revision_id
+                    info, route_map, info.current_revision.id
                 )
                 if out_creators or in_route_ids:
                     scale_out_creators.extend(out_creators)
@@ -442,7 +443,7 @@ class DeploymentExecutor:
         # the two stay in lock-step.
         deployments_to_calculate: list[DeploymentWithHistory] = []
         for deployment in deployments:
-            if deployment.deployment_info.current_revision_id is None:
+            if deployment.deployment_info.current_revision is None:
                 skipped.append(deployment)
                 continue
             deployments_to_calculate.append(deployment)
@@ -615,7 +616,20 @@ class DeploymentExecutor:
         Resolves the runtime variant id to a name at this boundary since
         the AppProxy wire API still keys on the variant name string.
         """
-        target_revision = deployment.resolve_revision_data(revision_id)
+        if (
+            deployment.current_revision is not None
+            and deployment.current_revision.id == revision_id
+        ):
+            target_revision = deployment.current_revision
+        elif (
+            deployment.deploying_revision is not None
+            and deployment.deploying_revision.id == revision_id
+        ):
+            target_revision = deployment.deploying_revision
+        else:
+            raise DeploymentRevisionNotFound(
+                f"Revision {revision_id} not found in deployment {deployment.id}"
+            )
 
         health_check_config = None
         if target_revision.model_definition:
@@ -687,6 +701,19 @@ class DeploymentExecutor:
                 if len(routes) < target_count:
                     # Build creators for scale out
                     new_replica_count = target_count - len(routes)
+                    revision_data: ModelRevisionData | None
+                    if (
+                        deployment.current_revision is not None
+                        and deployment.current_revision.id == revision_id
+                    ):
+                        revision_data = deployment.current_revision
+                    else:
+                        revision_data = deployment.deploying_revision
+                    health_check = (
+                        revision_data.model_definition.health_check_config()
+                        if revision_data is not None and revision_data.model_definition
+                        else None
+                    )
                     for _ in range(new_replica_count):
                         creator_spec = RouteCreatorSpec(
                             deployment_id=deployment.id,
@@ -694,6 +721,7 @@ class DeploymentExecutor:
                             domain=deployment.metadata.domain,
                             project_id=deployment.metadata.project,
                             revision_id=revision_id,
+                            health_check=health_check,
                         )
                         scale_out_creators.append(
                             RBACEntityCreator(

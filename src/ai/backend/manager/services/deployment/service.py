@@ -224,21 +224,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
 
     Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
     """
-    revision: ModelRevisionData | None = None
-    if info.current_revision_id is not None:
-        revision = next(
-            (r for r in info.model_revisions if r.id == info.current_revision_id),
-            None,
-        )
-        if revision is None:
-            log.error(
-                "Deployment {} has current_revision_id {} but no matching "
-                "ModelRevisionData was found in DeploymentInfo.model_revisions; "
-                "current_revision will be reported as null. This usually means "
-                "EndpointRow.revisions was not eagerly loaded by the caller.",
-                info.id,
-                info.current_revision_id,
-            )
+    revision: ModelRevisionData | None = info.current_revision
 
     desired_count = info.replica.desired_replica_count
     if desired_count is None:
@@ -257,10 +243,14 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             updated_at=info.metadata.created_at or datetime.now(UTC),
         ),
         network_access=info.network,
-        revision_history_ids=[info.current_revision_id] if info.current_revision_id else [],
+        revision_history_ids=[info.current_revision.id]
+        if info.current_revision is not None
+        else [],
         revision=revision,
-        current_revision_id=info.current_revision_id,
-        deploying_revision_id=info.deploying_revision_id,
+        current_revision_id=info.current_revision.id if info.current_revision is not None else None,
+        deploying_revision_id=info.deploying_revision.id
+        if info.deploying_revision is not None
+        else None,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
             desired_replica_count=desired_count,

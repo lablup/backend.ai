@@ -160,9 +160,9 @@ class DeployingProvisioningHandler(DeploymentHandler):
             info = deployment.deployment_info
             if info.network.url:
                 continue
-            if info.deploying_revision_id is None:
+            if info.deploying_revision is None:
                 continue
-            entries.append((deployment, info.deploying_revision_id))
+            entries.append((deployment, info.deploying_revision.id))
 
         if not entries:
             return set()
@@ -186,7 +186,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
                 d.deployment_info.id
                 for d in deployments
                 if not d.deployment_info.network.url
-                and d.deployment_info.deploying_revision_id is not None
+                and d.deployment_info.deploying_revision is not None
             }
         if failed_registration_ids:
             deployments = [

@@ -87,13 +87,13 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         if not isinstance(spec, RollingUpdateSpec):
             raise TypeError(f"Expected RollingUpdateSpec, got {type(spec).__name__}")
         desired = deployment.replica.target_replica_count
-        deploying_revision_id = deployment.deploying_revision_id
-        if deploying_revision_id is None:
+        deploying_revision = deployment.deploying_revision
+        if deploying_revision is None:
             raise InvalidEndpointState(
                 f"Deployment {deployment.id} has DEPLOYING lifecycle but deploying_revision_id is None. "
                 "This indicates an inconsistent state — the deployment will be skipped."
             )
-        classified = self._classify_routes(routes, deploying_revision_id)
+        classified = self._classify_routes(routes, deploying_revision.id)
         log.info(
             "deployment {}: sub_step={}, routes total={}, "
             "old_active={}, new_prov={}, new_healthy={}, new_unhealthy={}, new_failed={}",
@@ -129,7 +129,11 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             elif route.status.is_inactive():
                 classified.new_failed_count += 1
             elif route.status == RouteStatus.RUNNING:
-                if route.health_status == RouteHealthStatus.HEALTHY:
+                if route.health_status == RouteHealthStatus.HEALTHY or route.health_check is None:
+                    # Routes without a health check have no probe data, so we treat them
+                    # as ready once their process is RUNNING (health_status stays DEGRADED
+                    # in DB because no Valkey entry exists — that is correct behaviour, but
+                    # it must not block the DEPLOYING → READY transition).
                     classified.new_healthy_count += 1
                 else:
                     # UNHEALTHY / DEGRADED / NOT_CHECKED all count here:
@@ -267,10 +271,16 @@ def _build_route_creators(
     count: int,
 ) -> list[RBACEntityCreator[RoutingRow]]:
     """Build route creator specs for new revision routes."""
-    if deployment.deploying_revision_id is None:
+    if deployment.deploying_revision is None:
         raise DeploymentHasNoTargetRevision(
             f"Cannot create routes: deployment {deployment.id} has no deploying revision"
         )
+    revision_data = deployment.deploying_revision
+    health_check = (
+        revision_data.model_definition.health_check_config()
+        if revision_data.model_definition
+        else None
+    )
     creators: list[RBACEntityCreator[RoutingRow]] = []
     for _ in range(count):
         spec = RouteCreatorSpec(
@@ -278,7 +288,8 @@ def _build_route_creators(
             session_owner_id=deployment.metadata.session_owner,
             domain=deployment.metadata.domain,
             project_id=deployment.metadata.project,
-            revision_id=deployment.deploying_revision_id,
+            revision_id=deployment.deploying_revision.id,
+            health_check=health_check,
         )
         creators.append(
             RBACEntityCreator(

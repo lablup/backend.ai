@@ -38,6 +38,7 @@ from ai.backend.manager.sokovan.deployment.route.handlers import (
     AppProxySyncRouteHandler,
     HealthCheckRouteHandler,
     ProvisioningRouteHandler,
+    ReplicaProbeTargetSyncHandler,
     RouteEvictionHandler,
     RouteHandler,
     RunningRouteHandler,
@@ -183,6 +184,9 @@ class RouteCoordinator:
             RouteLifecycleType.APPPROXY_SYNC: AppProxySyncRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.PROBE_TARGET_SYNC: ReplicaProbeTargetSyncHandler(
+                route_executor=executor,
             ),
         }
 
@@ -504,6 +508,13 @@ class RouteCoordinator:
                 short_interval=None,
                 long_interval=30.0,
                 initial_delay=15.0,
+            ),
+            # Probe target sync - refresh ReplicaProbeTarget TTL and recover lost Valkey entries
+            RouteTaskSpec(
+                RouteLifecycleType.PROBE_TARGET_SYNC,
+                short_interval=None,
+                long_interval=60.0,
+                initial_delay=30.0,
             ),
         ]
 

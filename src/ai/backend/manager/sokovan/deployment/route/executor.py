@@ -7,7 +7,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
-    RouteHealthRecord,
+    ReplicaProbeTarget,
     ValkeyScheduleClient,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
@@ -242,7 +242,7 @@ class RouteExecutor:
         if not routes:
             return RouteExecutionResult(successes=[], errors=[])
 
-        route_ids = {ReplicaID(route.route_id) for route in routes}
+        route_ids = {route.route_id for route in routes}
         session_infos: dict[ReplicaID, RouteSessionInfo | None] = dict(
             await self._deployment_repo.fetch_route_session_kernel_infos(route_ids)
         )
@@ -252,7 +252,7 @@ class RouteExecutor:
         updates: dict[ReplicaID, RouteSessionKernelInfo] = {}
 
         for route in routes:
-            replica_id = ReplicaID(route.route_id)
+            replica_id = route.route_id
             info = session_infos.get(replica_id)
 
             if info is None:
@@ -293,7 +293,7 @@ class RouteExecutor:
 
         if updates:
             await self._deployment_repo.update_route_replica_info(updates)
-            await self._initialize_health_records(successes, updates)
+            await self._register_route_probe_targets(successes, updates)
 
         return RouteExecutionResult(
             successes=successes,
@@ -341,90 +341,99 @@ class RouteExecutor:
             errors=errors,
         )
 
-    async def _initialize_health_records(
+    @staticmethod
+    def _build_probe_target(route: RouteData) -> ReplicaProbeTarget | None:
+        """Build a ReplicaProbeTarget from a route, or None if any required field is absent."""
+        if route.health_check is None or route.replica_host is None or route.replica_port is None:
+            return None
+        return ReplicaProbeTarget(
+            replica_id=route.route_id,
+            health_path=route.health_check.path,
+            inference_port=route.replica_port,
+            replica_host=route.replica_host,
+        )
+
+    async def _register_route_probe_targets(
         self,
         routes: Sequence[RouteData],
         replica_info: Mapping[ReplicaID, RouteSessionKernelInfo],
     ) -> None:
-        """Create RouteHealthRecords in Valkey for routes that just got replica info."""
-        revision_ids = {r.revision_id for r in routes}
-        health_configs = await self._deployment_repo.fetch_health_check_configs_by_revision_ids(
-            revision_ids
-        )
-        route_id_strs = [str(r.route_id) for r in routes]
-        existing_running_at = await self._valkey_schedule.get_route_running_at_batch(route_id_strs)
-        current_time = await self._valkey_schedule.get_redis_time()
-
-        records: list[RouteHealthRecord] = []
-        for route in routes:
-            kernel = replica_info[route.route_id]
-            health_config = health_configs.get(route.revision_id)
-
-            health_path = health_config.path if health_config else "/"
-            initial_delay = health_config.initial_delay if health_config else 60.0
-            created_at = int(route.created_at.timestamp())
-
-            route_id_str = str(route.route_id)
-            running_at = existing_running_at.get(route_id_str) or current_time
-            initial_delay_until = running_at + int(initial_delay)
-
-            records.append(
-                RouteHealthRecord(
-                    route_id=route_id_str,
-                    created_at=created_at,
-                    initial_delay_until=initial_delay_until,
-                    health_path=health_path,
-                    inference_port=kernel.replica_port,
-                    replica_host=kernel.replica_host,
-                    running_at=running_at,
-                )
+        """Register ReplicaProbeTargets in Valkey for routes that just got replica info."""
+        targets: list[ReplicaProbeTarget] = [
+            ReplicaProbeTarget(
+                replica_id=route.route_id,
+                health_path=route.health_check.path,
+                inference_port=replica_info[route.route_id].replica_port,
+                replica_host=replica_info[route.route_id].replica_host,
             )
+            for route in routes
+            if route.health_check is not None
+        ]
 
-        if records:
-            await self._valkey_schedule.initialize_route_health_records_batch(records)
-            log.debug("Initialized {} RouteHealthRecords in Valkey", len(records))
+        if targets:
+            await self._valkey_schedule.register_route_probe_targets_batch(targets)
+            log.debug("Registered {} ReplicaProbeTargets in Valkey", len(targets))
+
+    async def sync_route_probe_targets(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Sync ReplicaProbeTargets to Valkey for routes with known replica info.
+
+        Handles two cases:
+        - Valkey data lost (restart, eviction) → re-registers probe targets
+        - TTL refresh for long-running routes
+
+        Routes without health_check/replica_host/replica_port are skipped silently.
+        """
+        targets = [t for route in routes if (t := self._build_probe_target(route)) is not None]
+
+        if targets:
+            with RouteRecorderContext.shared_phase(
+                "register_probe_targets",
+                entity_ids={t.replica_id for t in targets},
+            ):
+                with RouteRecorderContext.shared_step("write_probe_targets"):
+                    await self._valkey_schedule.register_route_probe_targets_batch(targets)
+            log.debug("Synced {} ReplicaProbeTargets to Valkey", len(targets))
+
+        return RouteExecutionResult(successes=[], errors=[])
 
     async def check_warming_up_health(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Check health of PROVISIONING+WARMING_UP routes for initial activation.
 
         - success: health probe passed, or no health check configured → RUNNING+ACTIVE
-        - failure: initial_delay exceeded without a passing probe → TERMINATING
-        - (no transition): still within initial_delay → route stays WARMING_UP
+        - failure: last_transition_at + initial_delay exceeded without a passing probe → TERMINATING
+        - (no transition): still within initial_delay, or last_transition_at unknown → stay WARMING_UP
         """
-        route_id_strs = [str(r.route_id) for r in routes]
-        revision_ids = {r.revision_id for r in routes}
-
-        records = await self._valkey_schedule.get_route_health_records_batch(route_id_strs)
-        health_configs = await self._deployment_repo.fetch_health_check_configs_by_revision_ids(
-            revision_ids
-        )
-        current_time = await self._valkey_schedule.get_redis_time()
+        statuses = await self._valkey_schedule.get_route_health_statuses_batch([
+            route.route_id for route in routes
+        ])
+        now = await self._deployment_repo.get_db_now()
 
         successes: list[RouteData] = []
         errors: list[RouteExecutionError] = []
 
         for route in routes:
-            health_config = health_configs.get(route.revision_id)
-            if health_config is None:
+            if route.health_check is None:
                 successes.append(route)
                 continue
 
-            route_id_str = str(route.route_id)
-            record = records.get(route_id_str)
-
-            if record is None:
-                continue
-
-            if record.last_check > 0 and not record.is_stale(current_time) and record.healthy:
+            status = statuses.get(route.route_id)
+            if status is not None and status.healthy:
                 successes.append(route)
                 continue
 
-            if current_time > record.initial_delay_until:
+            if route.last_transition_at is None:
+                continue
+
+            elapsed = (now - route.last_transition_at).total_seconds()
+            if elapsed > route.health_check.initial_delay:
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
                         reason="Route warming-up timed out waiting for healthy probe",
-                        error_detail=f"Elapsed {current_time - record.initial_delay_until}s after initial_delay",
+                        error_detail=(
+                            f"Elapsed {elapsed:.0f}s exceeds "
+                            f"initial_delay {route.health_check.initial_delay}s"
+                        ),
                     )
                 )
 
@@ -432,25 +441,16 @@ class RouteExecutor:
 
     async def check_route_health(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """
-        Check health status of routes and push newly-healthy ones to AppProxy.
+        Check health status of RUNNING routes and push newly-healthy ones to AppProxy.
 
-        Reads RouteHealthRecord and classifies based on computed healthy/stale:
-        - HEALTHY: record.healthy is True
-        - UNHEALTHY: record.healthy is False and not stale (only past initial_delay)
-        - DEGRADED: record is stale or missing (only past initial_delay)
-        - (no transition): within initial_delay without a successful probe yet —
-          the route keeps whatever health_status it already has so a transient
-          warmup failure does not downgrade it prematurely.
+        Reads RouteHealthStatus from Valkey and classifies:
+        - HEALTHY:   status.healthy is True
+        - UNHEALTHY: status.healthy is False
+        - DEGRADED:  status absent (key missing or TTL expired — no recent check)
 
         Routes whose pre-execute health_status was not HEALTHY but whose
-        probe just passed are pushed to AppProxy synchronously via
-        :meth:`register_routes_now` so traffic can flow without waiting
-        for the long-cycle ``AppProxySyncRouteHandler`` fallback. Push
-        failures are logged and swallowed — the fallback converges
-        state, and a stuck health-check tick would block all later
-        observations. The handler keeps ``post_process`` to a thin
-        logging shim because all the work that changes external state
-        belongs here in the executor.
+        probe just passed are pushed to AppProxy synchronously so traffic
+        can flow without waiting for the long-cycle fallback.
 
         Args:
             routes: Routes to check health for
@@ -458,12 +458,12 @@ class RouteExecutor:
         Returns:
             Result with successes (healthy), errors (unhealthy), stale (degraded)
         """
-        # Phase 1: Load RouteHealthRecords
+        # Phase 1: Load RouteHealthStatuses
         with RouteRecorderContext.shared_phase("load_health_status"):
             with RouteRecorderContext.shared_step("query_health_check_results"):
-                route_ids = [str(route.route_id) for route in routes]
-                records = await self._valkey_schedule.get_route_health_records_batch(route_ids)
-                current_time = await self._valkey_schedule.get_redis_time()
+                statuses = await self._valkey_schedule.get_route_health_statuses_batch([
+                    route.route_id for route in routes
+                ])
 
         successes: list[RouteData] = []
         errors: list[RouteExecutionError] = []
@@ -471,45 +471,24 @@ class RouteExecutor:
 
         # Phase 2: Classify health state (per-route)
         for route in routes:
-            route_id_str = str(route.route_id)
-            record = records.get(route_id_str)
+            status = statuses.get(route.route_id)
 
-            if record is None:
-                # No RouteHealthRecord — not yet initialized
+            if status is None:
+                # Key absent or TTL expired → DEGRADED
                 stale.append(route)
                 continue
 
-            within_initial_delay = current_time < record.initial_delay_until
-
-            # Success path always wins — a healthy probe transitions the route
-            # to HEALTHY even if initial_delay has not elapsed, so the kernel
-            # can start receiving traffic as soon as it is ready.
-            if record.last_check > 0 and not record.is_stale(current_time) and record.healthy:
+            if status.healthy:
                 successes.append(route)
-                continue
-
-            # Within initial_delay and no successful probe yet — hold the
-            # existing health_status (NOT_CHECKED/HEALTHY/UNHEALTHY/DEGRADED)
-            # by skipping classification entirely.
-            if within_initial_delay:
-                continue
-
-            if record.last_check == 0:
-                stale.append(route)
-                continue
-
-            if record.is_stale(current_time):
-                stale.append(route)
-                continue
-
-            errors.append(
-                RouteExecutionError(
-                    route_info=route,
-                    reason="Route health check failed",
-                    error_detail="RouteHealthRecord reports unhealthy",
-                    error_code=None,
+            else:
+                errors.append(
+                    RouteExecutionError(
+                        route_info=route,
+                        reason="Route health check failed",
+                        error_detail="RouteHealthStatus reports unhealthy",
+                        error_code=None,
+                    )
                 )
-            )
 
         # Phase 3: Push newly-healthy routes to AppProxy.
         # ``successes`` carries the pre-execute RouteData snapshot; routes
@@ -1056,10 +1035,10 @@ class RouteExecutor:
             else:
                 deployment_cleanup_config[deployment.id] = set()
             valid_revisions: set[DeploymentRevisionID] = set()
-            if deployment.current_revision_id is not None:
-                valid_revisions.add(deployment.current_revision_id)
-            if deployment.deploying_revision_id is not None:
-                valid_revisions.add(deployment.deploying_revision_id)
+            if deployment.current_revision is not None:
+                valid_revisions.add(deployment.current_revision.id)
+            if deployment.deploying_revision is not None:
+                valid_revisions.add(deployment.deploying_revision.id)
             deployment_valid_revisions[deployment.id] = valid_revisions
 
         successes: list[RouteData] = []

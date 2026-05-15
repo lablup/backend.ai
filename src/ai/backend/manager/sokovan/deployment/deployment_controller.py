@@ -320,12 +320,11 @@ class DeploymentController:
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
             endpoint_id=endpoint_id, updater=updater
         )
-        if modified_endpoint.current_revision_id is not None:
-            current_revision = await self._deployment_repository.get_revision(
-                modified_endpoint.current_revision_id
-            )
+        if modified_endpoint.current_revision is not None:
             await self._scheduling_controller.validate_session_spec(
-                SessionValidationSpec.from_revision(model_revision=current_revision)
+                SessionValidationSpec.from_revision(
+                    model_revision=modified_endpoint.current_revision
+                )
             )
         res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:
@@ -557,7 +556,10 @@ class DeploymentController:
 
         # 2. Validate deployment state
         deployment_info = await self._deployment_repository.get_endpoint_info(deployment_id)
-        if deployment_info.current_revision_id == revision_id:
+        if (
+            deployment_info.current_revision is not None
+            and deployment_info.current_revision.id == revision_id
+        ):
             raise InvalidEndpointState(
                 f"Revision {revision_id} is already the current revision "
                 f"of deployment {deployment_id}."

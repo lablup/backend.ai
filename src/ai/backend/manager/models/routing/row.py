@@ -12,6 +12,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
@@ -27,6 +28,7 @@ from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    PydanticColumn,
     StrEnumType,
 )
 
@@ -109,6 +111,11 @@ class RoutingRow(Base):  # type: ignore[misc]
         "replica_host", sa.String(length=256), nullable=True
     )
     replica_port: Mapped[int | None] = mapped_column("replica_port", sa.Integer, nullable=True)
+
+    # Health check config (copied from revision at creation; None = no health check)
+    health_check: Mapped[ModelHealthCheck | None] = mapped_column(
+        "health_check", PydanticColumn(ModelHealthCheck), nullable=True, default=None
+    )
 
     # Revision reference without FK (relationship only)
     revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
@@ -264,5 +271,6 @@ class RoutingRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             revision_id=self.revision,
             traffic_status=self.traffic_status,
+            health_check=self.health_check,
             error_data=self.error_data or {},
         )

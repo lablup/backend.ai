@@ -71,7 +71,6 @@ def sample_deployment_info() -> DeploymentInfo:
             url=None,
             preferred_domain_name=None,
         ),
-        model_revisions=[],
         options=DeploymentOptions(),
     )
 

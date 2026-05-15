@@ -12,7 +12,13 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
+    ReplicaHealthResult,
+    ReplicaHealthStatus,
+    ReplicaProbeTarget,
+)
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -34,6 +40,8 @@ MAX_KERNEL_HEALTH_STALENESS_SEC = 120  # 2 minutes - threshold for kernel health
 AGENT_LAST_CHECK_TTL_SEC = 1200  # 20 minutes - TTL for agent last check timestamp
 ORPHAN_KERNEL_THRESHOLD_SEC = 600  # 10 minutes - threshold for orphan kernel detection
 FORCE_TERMINATED_CLEANUP_TTL_SEC = 1200  # 20 minutes - TTL for force-terminated cleanup queue
+ROUTE_PROBE_TTL_SEC = 3600  # 1 hour - TTL for route probe targets
+ROUTE_HEALTH_STATUS_TTL_SEC = 120  # 2 minutes - TTL for route health status (expiry = DEGRADED)
 
 
 class HealthCheckStatus(enum.StrEnum):
@@ -82,87 +90,6 @@ class HealthStatus:
         """
         # TODO: Use liveness too after applying liveness checks in agent
         return self.readiness
-
-
-@dataclass
-class RouteHealthRecord:
-    """Health record for a route stored in Valkey.
-
-    Stored as a hash at key `route_health:{route_id}`.
-    Created when replica_host/port become available (session RUNNING).
-    Agent and Manager each update their own fields independently.
-    """
-
-    route_id: str
-    created_at: int  # Unix timestamp when route was created
-    initial_delay_until: int  # Unix timestamp = running_at + initial_delay
-    health_path: str  # extracted from model_definition
-    inference_port: int  # extracted from kernel
-    replica_host: str  # extracted from kernel
-
-    # Timestamp when route entered RUNNING state (set by coordinator)
-    running_at: int | None = None
-
-    # Agent check results
-    agent_healthy: bool = False
-    agent_last_check: int = 0  # Unix timestamp
-
-    # Manager check results
-    manager_healthy: bool = False
-    manager_last_check: int = 0  # Unix timestamp
-
-    @property
-    def last_check(self) -> int:
-        """Most recent check timestamp from either agent or manager."""
-        return max(self.agent_last_check, self.manager_last_check)
-
-    @property
-    def healthy(self) -> bool:
-        """Health based on the most recent checker (agent or manager)."""
-        if self.agent_last_check >= self.manager_last_check:
-            return self.agent_healthy
-        return self.manager_healthy
-
-    def is_stale(self, current_time: int, staleness_sec: int = MAX_HEALTH_STALENESS_SEC) -> bool:
-        """Check if health data is stale (no recent check from either side)."""
-        if self.last_check == 0:
-            return False  # Never checked yet — not stale, just NOT_CHECKED
-        return (current_time - self.last_check) > staleness_sec
-
-    def to_valkey_hash(self) -> Mapping[str, str]:
-        """Serialize to Valkey hash fields."""
-        data: dict[str, str] = {
-            "route_id": self.route_id,
-            "created_at": str(self.created_at),
-            "initial_delay_until": str(self.initial_delay_until),
-            "health_path": self.health_path,
-            "inference_port": str(self.inference_port),
-            "replica_host": self.replica_host,
-            "agent_healthy": "1" if self.agent_healthy else "0",
-            "agent_last_check": str(self.agent_last_check),
-            "manager_healthy": "1" if self.manager_healthy else "0",
-            "manager_last_check": str(self.manager_last_check),
-        }
-        if self.running_at is not None:
-            data["running_at"] = str(self.running_at)
-        return data
-
-    @classmethod
-    def from_valkey_hash(cls, data: Mapping[str, str]) -> RouteHealthRecord:
-        """Deserialize from Valkey hash fields."""
-        return cls(
-            route_id=data["route_id"],
-            created_at=int(data["created_at"]),
-            initial_delay_until=int(data["initial_delay_until"]),
-            health_path=data["health_path"],
-            inference_port=int(data["inference_port"]),
-            replica_host=data["replica_host"],
-            running_at=int(raw) if (raw := data.get("running_at")) and raw != "0" else None,
-            agent_healthy=data.get("agent_healthy", "0") == "1",
-            agent_last_check=int(data.get("agent_last_check", "0")),
-            manager_healthy=data.get("manager_healthy", "0") == "1",
-            manager_last_check=int(data.get("manager_last_check", "0")),
-        )
 
 
 @dataclass
@@ -259,6 +186,12 @@ class ValkeyScheduleClient:
         :return: The formatted key string
         """
         return f"kernel:presence:{kernel_id}"
+
+    def _get_route_probe_key(self, replica_id: ReplicaID) -> str:
+        return f"route_probe:{replica_id}"
+
+    def _get_route_health_status_key(self, replica_id: ReplicaID) -> str:
+        return f"route_health:{replica_id}"
 
     def _get_agent_last_check_key(self, agent_id: AgentId) -> str:
         """
@@ -676,86 +609,6 @@ class ValkeyScheduleClient:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
-    async def mark_route_running_at(self, route_id: str) -> None:
-        """
-        Record the RUNNING transition timestamp for a route.
-        Called when a route transitions to RUNNING status.
-        Uses Redis time for consistency with health check comparisons.
-
-        :param route_id: The route ID that entered RUNNING state
-        """
-        key = self._get_route_health_key(route_id)
-        current_time = str(await self._get_redis_time())
-        async with self._client.client() as conn:
-            await conn.hset(key, {"running_at": current_time})
-            await conn.expire(key, ROUTE_HEALTH_TTL_SEC)
-
-    @valkey_schedule_resilience.apply()
-    async def get_route_running_at_batch(self, route_ids: Sequence[str]) -> dict[str, int | None]:
-        """
-        Batch read running_at field from route health hashes.
-        Works even on partial hashes (before full RouteHealthRecord is initialized).
-
-        :param route_ids: Route IDs to look up
-        :return: Mapping of route_id to running_at timestamp (None if not set)
-        """
-        if not route_ids:
-            return {}
-
-        batch = Batch(is_atomic=False)
-        for route_id in route_ids:
-            key = self._get_route_health_key(route_id)
-            batch.hget(key, "running_at")
-
-        async with self._client.client() as conn:
-            results = await conn.exec(batch, raise_on_error=False)
-        if results is None:
-            return dict.fromkeys(route_ids)
-
-        running_at_map: dict[str, int | None] = {}
-        for i, route_id in enumerate(route_ids):
-            raw = results[i] if len(results) > i else None
-            if raw and raw != b"0":
-                running_at_map[route_id] = int(raw)
-            else:
-                running_at_map[route_id] = None
-        return running_at_map
-
-    @valkey_schedule_resilience.apply()
-    async def refresh_route_health_ttl(self, route_id: str) -> None:
-        """
-        Refresh TTL for a route health record without changing any data.
-        Called by observer on every check to prevent key expiry.
-
-        :param route_id: The route ID to refresh
-        """
-        key = self._get_route_health_key(route_id)
-        async with self._client.client() as conn:
-            await conn.expire(key, ROUTE_HEALTH_TTL_SEC)
-
-    @valkey_schedule_resilience.apply()
-    async def update_route_manager_health(self, route_id: str, healthy: bool) -> None:
-        """
-        Update manager health check result for a route.
-        Called by RouteHealthObserver after HTTP health check.
-
-        :param route_id: The route ID to update
-        :param healthy: Whether the route passed the health check
-        """
-        key = self._get_route_health_key(route_id)
-        current_time = str(await self._get_redis_time())
-        data: Mapping[str | bytes, str | bytes] = {
-            "manager_healthy": "1" if healthy else "0",
-            "manager_last_check": current_time,
-        }
-
-        batch = Batch(is_atomic=False)
-        batch.hset(key, data)
-        batch.expire(key, ROUTE_HEALTH_TTL_SEC)
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_schedule_resilience.apply()
     async def check_route_health_status(
         self, route_ids: list[str]
     ) -> Mapping[str, HealthStatus | None]:
@@ -842,92 +695,133 @@ class ValkeyScheduleClient:
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
-    # ==================== RouteHealthRecord Methods ====================
+    # ==================== ReplicaProbeTarget / ReplicaHealthStatus Methods ====================
 
     @valkey_schedule_resilience.apply()
-    async def initialize_route_health_records_batch(
-        self, records: Sequence[RouteHealthRecord]
+    async def register_route_probe_targets_batch(
+        self, targets: Sequence[ReplicaProbeTarget]
     ) -> None:
         """
-        Batch initialize RouteHealthRecord entries in Valkey.
-        Called when replica info becomes available (session RUNNING + kernel host/port known).
+        Batch register ReplicaProbeTarget entries in Valkey.
+        Called by coordinator when route enters WARMING_UP and replica host/port are known.
 
-        :param records: RouteHealthRecord instances to store
+        :param targets: ReplicaProbeTarget instances to store
         """
-        if not records:
+        if not targets:
             return
 
         batch = Batch(is_atomic=False)
-        for record in records:
-            key = self._get_route_health_key(record.route_id)
-            batch.hset(key, record.to_valkey_hash())
-            batch.expire(key, ROUTE_HEALTH_TTL_SEC)
+        for target in targets:
+            key = self._get_route_probe_key(target.replica_id)
+            batch.hset(key, target.to_valkey_hash())
+            batch.expire(key, ROUTE_PROBE_TTL_SEC)
 
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
-    async def get_route_health_record(self, route_id: str) -> RouteHealthRecord | None:
+    async def get_route_probe_targets_batch(
+        self, replica_ids: Sequence[ReplicaID]
+    ) -> Mapping[ReplicaID, ReplicaProbeTarget | None]:
         """
-        Get a RouteHealthRecord from Valkey.
+        Batch get ReplicaProbeTargets from Valkey.
 
-        :param route_id: The route ID to look up
-        :return: RouteHealthRecord or None if not found
+        :param replica_ids: Replica IDs to look up
+        :return: Mapping of replica_id to ReplicaProbeTarget (None if missing or expired)
         """
-        key = self._get_route_health_key(route_id)
-        async with self._client.client() as conn:
-            result = await conn.hgetall(key)
-        if not result:
-            return None
-
-        data = {k.decode(): v.decode() for k, v in result.items()}
-        if "route_id" not in data:
-            return None
-        return RouteHealthRecord.from_valkey_hash(data)
-
-    @valkey_schedule_resilience.apply()
-    async def get_route_health_records_batch(
-        self, route_ids: Sequence[str]
-    ) -> Mapping[str, RouteHealthRecord | None]:
-        """
-        Batch get RouteHealthRecords from Valkey.
-
-        :param route_ids: Route IDs to look up
-        :return: Mapping of route_id to RouteHealthRecord (None if missing)
-        """
-        if not route_ids:
+        if not replica_ids:
             return {}
 
         batch = Batch(is_atomic=False)
-        for route_id in route_ids:
-            key = self._get_route_health_key(route_id)
-            batch.hgetall(key)
+        for replica_id in replica_ids:
+            batch.hgetall(self._get_route_probe_key(replica_id))
 
         async with self._client.client() as conn:
             results = await conn.exec(batch, raise_on_error=False)
         if results is None:
-            return dict.fromkeys(route_ids)
+            return dict.fromkeys(replica_ids)
 
-        records: dict[str, RouteHealthRecord | None] = {}
-        for i, route_id in enumerate(route_ids):
+        targets: dict[ReplicaID, ReplicaProbeTarget | None] = {}
+        for i, replica_id in enumerate(replica_ids):
             hgetall_result = results[i] if len(results) > i else None
             if not hgetall_result:
-                records[route_id] = None
+                targets[replica_id] = None
                 continue
-
             raw = cast(dict[bytes, bytes], hgetall_result)
-            if not raw:
-                records[route_id] = None
+            if not raw or b"replica_id" not in raw:
+                targets[replica_id] = None
                 continue
-
             data = {k.decode(): v.decode() for k, v in raw.items()}
-            if "route_id" not in data:
-                # Partial hash (e.g., only running_at set by mark_route_running_at)
-                records[route_id] = None
-                continue
-            records[route_id] = RouteHealthRecord.from_valkey_hash(data)
+            targets[replica_id] = ReplicaProbeTarget.from_valkey_hash(data)
 
-        return records
+        return targets
+
+    @valkey_schedule_resilience.apply()
+    async def record_route_health_statuses_batch(
+        self, results: Sequence[ReplicaHealthResult]
+    ) -> None:
+        """
+        Batch record health check results for multiple routes.
+        Fetches Redis time once and writes all statuses in a single pipeline.
+        Refreshes TTL on every call; key expiry signals DEGRADED.
+
+        :param results: Sequence of ReplicaHealthResult instances
+        """
+        if not results:
+            return
+
+        current_time = str(await self._get_redis_time())
+        batch = Batch(is_atomic=False)
+        for result in results:
+            key = self._get_route_health_status_key(result.replica_id)
+            data: Mapping[str | bytes, str | bytes] = {
+                "replica_id": str(result.replica_id),
+                "healthy": "1" if result.healthy else "0",
+                "last_check": current_time,
+            }
+            batch.hset(key, data)
+            batch.expire(key, ROUTE_HEALTH_STATUS_TTL_SEC)
+
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
+
+    @valkey_schedule_resilience.apply()
+    async def get_route_health_statuses_batch(
+        self, replica_ids: Sequence[ReplicaID]
+    ) -> Mapping[ReplicaID, ReplicaHealthStatus | None]:
+        """
+        Batch get ReplicaHealthStatus from Valkey.
+        None means no recent health check (key missing or TTL expired) → DEGRADED.
+
+        :param replica_ids: Replica IDs to look up
+        :return: Mapping of replica_id to ReplicaHealthStatus (None if missing or expired)
+        """
+        if not replica_ids:
+            return {}
+
+        batch = Batch(is_atomic=False)
+        for replica_id in replica_ids:
+            batch.hgetall(self._get_route_health_status_key(replica_id))
+
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=False)
+        if results is None:
+            return dict.fromkeys(replica_ids)
+
+        statuses: dict[ReplicaID, ReplicaHealthStatus | None] = {}
+        for i, replica_id in enumerate(replica_ids):
+            hgetall_result = results[i] if len(results) > i else None
+            if not hgetall_result:
+                statuses[replica_id] = None
+                continue
+            raw = cast(dict[bytes, bytes], hgetall_result)
+            if not raw or b"replica_id" not in raw:
+                statuses[replica_id] = None
+                continue
+            data = {k.decode(): v.decode() for k, v in raw.items()}
+            statuses[replica_id] = ReplicaHealthStatus.from_valkey_hash(data)
+
+        return statuses
 
     @valkey_schedule_resilience.apply()
     async def close(self) -> None:

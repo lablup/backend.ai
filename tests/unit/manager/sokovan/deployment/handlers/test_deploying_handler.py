@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import datetime
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -26,6 +27,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
+    ModelRevisionData,
     ReplicaData,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
@@ -133,9 +135,8 @@ class TestDeployingProvisioningHandler:
                     url=None,
                     preferred_domain_name=None,
                 ),
-                model_revisions=[revision],
-                current_revision_id=None,
-                deploying_revision_id=deploying_rev_id,
+                current_revision=None,
+                deploying_revision=cast(ModelRevisionData, revision),
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
                 options=DeploymentOptions(),
             ),
@@ -158,7 +159,7 @@ class TestDeployingProvisioningHandler:
         dep, revision_id = call_args[0]
         info = deployment_created_without_revision.deployment_info
         assert dep is deployment_created_without_revision
-        assert revision_id == info.deploying_revision_id
+        assert revision_id == info.deploying_revision.id  # type: ignore[union-attr]
 
     async def test_deployment_already_with_url_is_not_reregistered(
         self,
@@ -186,7 +187,7 @@ class TestDeployingProvisioningHandler:
     ) -> None:
         """Deployments with no deploying_revision_id must be filtered out."""
         info = deployment_created_without_revision.deployment_info
-        info_no_rev = dataclasses.replace(info, deploying_revision_id=None)
+        info_no_rev = dataclasses.replace(info, deploying_revision=None)
         deployment = DeploymentWithHistory(deployment_info=info_no_rev, last_history=None)
 
         await handler.execute([deployment])

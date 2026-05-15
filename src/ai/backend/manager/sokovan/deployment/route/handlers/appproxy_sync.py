@@ -7,10 +7,10 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
-    RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
     RouteTargetStatuses,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -58,7 +58,7 @@ class AppProxySyncRouteHandler(RouteHandler):
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
-            health=[RouteHealthStatus.HEALTHY],
+            traffic=[RouteTrafficStatus.ACTIVE],
         )
 
     @classmethod

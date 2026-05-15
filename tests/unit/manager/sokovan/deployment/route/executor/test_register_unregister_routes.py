@@ -62,6 +62,7 @@ def _route_with_replica(
         traffic_ratio=1.0,
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.ACTIVE,
+        health_check=None,
         replica_host=replica_host,
         replica_port=replica_port,
         created_at=datetime.now(tzutc()),

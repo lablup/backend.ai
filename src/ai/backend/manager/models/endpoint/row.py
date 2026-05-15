@@ -69,6 +69,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkData,
     DeploymentOptions,
+    DeploymentPolicyData,
     DeploymentState,
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
@@ -130,6 +131,18 @@ def _get_endpoint_revisions_join_condition() -> Any:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
     return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
+
+
+def _get_current_revision_row_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return EndpointRow.current_revision == DeploymentRevisionRow.id
+
+
+def _get_deploying_revision_row_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return EndpointRow.deploying_revision == DeploymentRevisionRow.id
 
 
 def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
@@ -292,6 +305,20 @@ class EndpointRow(Base):  # type: ignore[misc]
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_revisions_join_condition,
         order_by="DeploymentRevisionRow.revision_number.desc()",
+    )
+    current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_current_revision_row_join_condition,
+        foreign_keys="EndpointRow.current_revision",
+        viewonly=True,
+        uselist=False,
+    )
+    deploying_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_deploying_revision_row_join_condition,
+        foreign_keys="EndpointRow.deploying_revision",
+        viewonly=True,
+        uselist=False,
     )
 
     auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
@@ -729,24 +756,23 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     def to_deployment_info(self) -> DeploymentInfo:
         """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
-        policy_data = None
-        if self.deployment_policy is not None:
-            policy_data = self.deployment_policy.to_data()
+        return self._build_deployment_info(
+            current_revision=(
+                self.current_revision_row.to_data() if self.current_revision_row else None
+            ),
+            deploying_revision=(
+                self.deploying_revision_row.to_data() if self.deploying_revision_row else None
+            ),
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+        )
 
-        model_revisions: list[ModelRevisionData] = []
-        for rev_row in self.revisions:
-            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                model_revisions.append(rev_row.to_data())
-
-        info = self._to_deployment_info_with_revisions(model_revisions)
-        info.policy = policy_data
-        return info
-
-    def _to_deployment_info_with_revisions(
+    def _build_deployment_info(
         self,
-        model_revisions: list[ModelRevisionData],
+        current_revision: ModelRevisionData | None,
+        deploying_revision: ModelRevisionData | None,
+        policy: DeploymentPolicyData | None = None,
     ) -> DeploymentInfo:
-        """Build DeploymentInfo with pre-built model_revisions dict."""
+        """Build DeploymentInfo with current and deploying revision data."""
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
@@ -775,12 +801,11 @@ class EndpointRow(Base):  # type: ignore[misc]
                 url=self.url,
                 preferred_domain_name=None,
             ),
-            model_revisions=list(model_revisions),
             options=self.options,
-            current_revision_id=self.current_revision,
-            deploying_revision_id=self.deploying_revision,
+            current_revision=current_revision,
+            deploying_revision=deploying_revision,
             sub_step=self.sub_step,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+            policy=policy,
         )
 
 

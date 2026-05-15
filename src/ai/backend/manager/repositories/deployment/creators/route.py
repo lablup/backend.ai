@@ -6,6 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import (
@@ -33,6 +34,7 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     domain: str
     project_id: uuid.UUID
     revision_id: DeploymentRevisionID
+    health_check: ModelHealthCheck | None
     traffic_ratio: float = 1.0
     traffic_status: RouteTrafficStatus = RouteTrafficStatus.INACTIVE
 
@@ -49,6 +51,7 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
             traffic_ratio=self.traffic_ratio,
             revision=self.revision_id,
             traffic_status=self.traffic_status,
+            health_check=self.health_check,
         )
 
 

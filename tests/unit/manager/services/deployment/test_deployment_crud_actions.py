@@ -155,7 +155,6 @@ class DeploymentCRUDBaseFixtures:
             network=DeploymentNetworkData(
                 open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
             ),
-            model_revisions=[],
             options=DeploymentOptions(),
         )
 
@@ -315,6 +314,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
 
     async def test_existing_replica_returns_data(
@@ -365,6 +365,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.INACTIVE,
+            health_check=None,
         )
         mock_deployment_repository.get_route = AsyncMock(return_value=inactive_route)
 
@@ -392,6 +393,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
         mock_deployment_repository.get_route = AsyncMock(return_value=route)
 
@@ -417,6 +419,7 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
 
     async def test_default_pagination(
