@@ -14,6 +14,7 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
 )
@@ -60,6 +61,7 @@ _WITH_TABLES = [
     KeyPairRow,
     GroupRow,
     AssocGroupUserRow,
+    ContainerRegistryRow,
     ImageRow,
     VFolderRow,
     EndpointRow,

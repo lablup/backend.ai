@@ -28,6 +28,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef, RBACElement
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -123,6 +124,7 @@ class TestModelCardDelete:
                 KeyPairRow,
                 GroupRow,
                 AgentRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 SessionRow,

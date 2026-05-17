@@ -17,6 +17,7 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -79,6 +80,7 @@ class TestRoleAssignment:
                 KeyPairRow,
                 GroupRow,
                 AssociationScopesEntitiesRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,

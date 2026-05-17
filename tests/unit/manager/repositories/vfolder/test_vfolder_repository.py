@@ -35,6 +35,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -139,6 +140,7 @@ class TestVfolderRepository:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -1348,6 +1350,7 @@ class TestVFolderRepositoryTrashAndRestore:
                 KeyPairRow,
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
                 AgentRow,

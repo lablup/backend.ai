@@ -18,6 +18,7 @@ from ai.backend.manager.errors.role_invitation import (
     RoleInvitationNotFound,
 )
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -80,6 +81,7 @@ async def db(
             GroupRow,
             AssocGroupUserRow,
             AssociationScopesEntitiesRow,
+            ContainerRegistryRow,
             ImageRow,
             VFolderRow,
             EndpointRow,

@@ -25,6 +25,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -95,6 +96,7 @@ class TestDeploymentRevisionRow:
                 GroupRow,
                 AgentRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourcePresetRow,
                 ResourceSlotTypeRow,
