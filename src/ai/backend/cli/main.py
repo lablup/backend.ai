@@ -5,6 +5,7 @@ import click
 from .completion import get_completion_command
 from .extensions import ExtendedCommandGroup
 from .types import CliContextInfo
+from .version import print_version
 
 
 @click.group(
@@ -12,6 +13,14 @@ from .types import CliContextInfo
     context_settings={
         "help_option_names": ["-h", "--help"],
     },
+)
+@click.option(
+    "--version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=print_version,
+    help="Show versions of backend.ai-* packages in the current environment and exit.",
 )
 @click.option(
     "--skip-sslcert-validation",
