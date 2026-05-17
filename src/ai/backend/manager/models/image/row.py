@@ -334,7 +334,13 @@ class ImageRow(Base):  # type: ignore[misc]
     )
     tag: Mapped[str | None] = mapped_column("tag", sa.TEXT, nullable=True)
     registry: Mapped[str] = mapped_column("registry", sa.String, nullable=False, index=True)
-    registry_id: Mapped[UUID] = mapped_column("registry_id", GUID, nullable=False, index=True)
+    registry_id: Mapped[UUID] = mapped_column(
+        "registry_id",
+        GUID,
+        sa.ForeignKey("container_registries.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     architecture: Mapped[str] = mapped_column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
