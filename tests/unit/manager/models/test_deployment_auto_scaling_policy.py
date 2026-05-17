@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
@@ -226,13 +227,23 @@ class TestDeploymentAutoScalingPolicyRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ImageRow, None]:
         """Create test image."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=registry_id,
+                    url="https://docker.io",
+                    registry_name=f"reg-{uuid.uuid4().hex[:8]}",
+                    type=ContainerRegistryType.DOCKER,
+                )
+            )
+            await db_sess.flush()
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
