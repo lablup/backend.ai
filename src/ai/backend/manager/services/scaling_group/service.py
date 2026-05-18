@@ -95,6 +95,10 @@ from ai.backend.manager.services.scaling_group.actions.replace_default_session_o
     ReplaceDefaultSessionOptionsAction,
     ReplaceDefaultSessionOptionsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
+    ResolveResourceGroupIDByNameAction,
+    ResolveResourceGroupIDByNameActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -172,6 +176,12 @@ class ScalingGroupService:
         )
         status = await client.fetch_status()
         return GetWsproxyVersionActionResult(wsproxy_version=status.api_version)
+
+    async def resolve_resource_group_id_by_name(
+        self, action: ResolveResourceGroupIDByNameAction
+    ) -> ResolveResourceGroupIDByNameActionResult:
+        resource_group_id = await self._repository.get_resource_group_id_by_name(action.name)
+        return ResolveResourceGroupIDByNameActionResult(resource_group_id=resource_group_id)
 
     async def search_scaling_groups(
         self, action: SearchScalingGroupsAction

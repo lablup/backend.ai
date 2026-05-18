@@ -12,6 +12,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -26,6 +27,7 @@ from ai.backend.manager.errors.resource import (
     DomainHasGroups,
     DomainHasUsers,
 )
+from ai.backend.manager.errors.resource import DomainNotFound as ResourceDomainNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -681,3 +683,18 @@ class TestDomainRepository:
         # Try to purge domain (should fail due to active kernels)
         with pytest.raises(DomainHasActiveKernels):
             await domain_repository.purge_domain(domain_with_active_kernel)
+
+    async def test_get_domain_id_by_name_success(
+        self,
+        domain_repository: DomainRepository,
+        sample_domain: DomainData,
+    ) -> None:
+        domain_id = await domain_repository.get_domain_id_by_name(DomainName(sample_domain.name))
+        assert domain_id == sample_domain.id
+
+    async def test_get_domain_id_by_name_not_found(
+        self,
+        domain_repository: DomainRepository,
+    ) -> None:
+        with pytest.raises(ResourceDomainNotFound):
+            await domain_repository.get_domain_id_by_name(DomainName("nonexistent-domain"))

@@ -35,6 +35,10 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
+from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
+    ResolveDomainIDByNameAction,
+    ResolveDomainIDByNameActionResult,
+)
 from ai.backend.manager.services.domain.actions.search_domains import (
     SearchDomainsAction,
     SearchDomainsActionResult,
@@ -125,6 +129,12 @@ class DomainService:
         return ModifyDomainNodeActionResult(
             domain_data=domain_data,
         )
+
+    async def resolve_domain_id_by_name(
+        self, action: ResolveDomainIDByNameAction
+    ) -> ResolveDomainIDByNameActionResult:
+        domain_id = await self._repository.get_domain_id_by_name(action.name)
+        return ResolveDomainIDByNameActionResult(domain_id=domain_id)
 
     async def get_domain(self, action: GetDomainAction) -> GetDomainActionResult:
         """Get a single domain by name.
