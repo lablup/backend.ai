@@ -420,6 +420,7 @@ class LayerType(enum.StrEnum):
     AUDIT_LOG_REPOSITORY = "audit_log_repository"
     CONTAINER_REGISTRY_REPOSITORY = "container_registry_repository"
     DEPLOYMENT_REPOSITORY = "deployment_repository"
+    DEPLOYMENT_ADMIN_REPOSITORY = "deployment_admin_repository"
     DOMAIN_REPOSITORY = "domain_repository"
     DOTFILE_REPOSITORY = "dotfile_repository"
     ETCD_CONFIG_REPOSITORY = "etcd_config_repository"

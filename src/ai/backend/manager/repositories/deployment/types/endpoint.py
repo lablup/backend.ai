@@ -144,3 +144,26 @@ class ProjectDeploymentSearchScope(SearchScope):
                 error=ProjectNotFound(str(self.project_id)),
             ),
         ]
+
+
+@dataclass(frozen=True)
+class UserDeploymentSearchScope(SearchScope):
+    """Required scope for searching deployments created by a given user.
+
+    Backs the v2 adapter's ``my_search`` path; the adapter resolves the
+    current user and constructs the scope before invoking the action.
+    """
+
+    user_id: UUID
+
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.created_user == user_id
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        return []

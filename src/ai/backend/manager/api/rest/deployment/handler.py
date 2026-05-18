@@ -32,7 +32,7 @@ from ai.backend.common.dto.manager.deployment import (
     RevisionPathParam,
     RouteFilter,
     RoutePathParam,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
     UpdateDeploymentRequest,
@@ -53,6 +53,9 @@ from ai.backend.manager.data.deployment.types import RouteTrafficStatus as Manag
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.deployment.types import (
+    ProjectDeploymentSearchScope,
+)
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
     DeploymentUpdaterSpec,
@@ -89,8 +92,8 @@ from ai.backend.manager.services.deployment.actions.route import (
     SearchRoutesAction,
     UpdateRouteTrafficStatusAction,
 )
-from ai.backend.manager.services.deployment.actions.search_deployments import (
-    SearchDeploymentsAction,
+from ai.backend.manager.services.deployment.actions.search_project_deployments import (
+    SearchProjectDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentAction,
@@ -194,18 +197,23 @@ class DeploymentAPIHandler:
 
     async def search_deployments(
         self,
-        body: BodyParam[SearchDeploymentsRequest],
+        body: BodyParam[SearchLegacyDeploymentsRequest],
     ) -> APIResponse:
-        """Search deployments with filters, orders, and pagination."""
-        # Build querier using adapter
-        querier = self._deployment_adapter.build_querier(body.parsed)
+        """Search deployments with filters, orders, and pagination.
 
-        # Call service action
-        action_result = await self._deployment.search_deployments.wait_for_complete(
-            SearchDeploymentsAction(querier=querier)
+        Legacy v1 contract — the project scope is carried inline on the body
+        rather than as a path segment so existing clients keep their request
+        shape. The handler resolves it to ``ProjectDeploymentSearchScope``
+        and routes through the v2-shared ``search_project_deployments``
+        processor.
+        """
+        querier = self._deployment_adapter.build_querier(body.parsed)
+        scope = ProjectDeploymentSearchScope(project_id=body.parsed.project_id)
+
+        action_result = await self._deployment.search_project_deployments.wait_for_complete(
+            SearchProjectDeploymentsAction(scope=scope, querier=querier)
         )
 
-        # Build response
         deployment_dtos = [await self._deployment_dto(dep) for dep in action_result.data]
         resp = ListDeploymentsResponse(
             deployments=deployment_dtos,

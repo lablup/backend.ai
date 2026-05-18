@@ -93,31 +93,28 @@ def create_deployment_cmd(
 
 @deployment.command("list")
 @pass_ctx_obj
-@click.option("--project-id", type=str, default=None, help="Filter by project ID")
+@click.option("--project-id", type=str, required=True, help="Project ID to search within")
 @click.option("--limit", type=int, default=50, help="Maximum items to return")
 @click.option("--offset", type=int, default=0, help="Number of items to skip")
 def list_deployments_cmd(
     ctx: CLIContext,
-    project_id: str | None,
+    project_id: str,
     limit: int,
     offset: int,
 ) -> None:
-    """List all deployments."""
+    """List deployments within a project."""
     from uuid import UUID
 
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.deployment import (
-        DeploymentFilter,
-        SearchDeploymentsRequest,
-    )
+    from ai.backend.common.dto.manager.deployment import SearchLegacyDeploymentsRequest
 
     with Session() as session:
         try:
-            filter_cond = None
-            if project_id:
-                filter_cond = DeploymentFilter(project_id=UUID(project_id))
-
-            request = SearchDeploymentsRequest(filter=filter_cond, limit=limit, offset=offset)
+            request = SearchLegacyDeploymentsRequest(
+                project_id=UUID(project_id),
+                limit=limit,
+                offset=offset,
+            )
             result = session.Deployment.search(request)
 
             deployments = result.deployments

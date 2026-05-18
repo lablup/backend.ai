@@ -1,4 +1,4 @@
-"""Tests for search_deployments_in_project functionality in DeploymentRepository."""
+"""Tests for search_project_deployment_summary functionality in DeploymentRepository."""
 
 from __future__ import annotations
 
@@ -60,8 +60,8 @@ class TestData:
     endpoint_ids_in_b: list[uuid.UUID]
 
 
-class TestEndpointSearchInProject:
-    """Test cases for search_deployments_in_project in DeploymentRepository."""
+class TestSearchProjectDeploymentSummary:
+    """Test cases for search_project_deployment_summary in DeploymentRepository."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -296,7 +296,7 @@ class TestEndpointSearchInProject:
         )
         scope = ProjectDeploymentSearchScope(project_id=test_data.project_a_id)
 
-        result = await deployment_repository.search_deployments_in_project(querier, scope)
+        result = await deployment_repository.search_project_deployment_summary(querier, scope)
 
         assert isinstance(result, DeploymentSummarySearchResult)
         assert result.total_count == 2
@@ -316,7 +316,7 @@ class TestEndpointSearchInProject:
         )
         scope = ProjectDeploymentSearchScope(project_id=test_data.project_b_id)
 
-        result = await deployment_repository.search_deployments_in_project(querier, scope)
+        result = await deployment_repository.search_project_deployment_summary(querier, scope)
 
         assert result.total_count == 1
         assert len(result.items) == 1
@@ -335,7 +335,7 @@ class TestEndpointSearchInProject:
         )
         scope = ProjectDeploymentSearchScope(project_id=test_data.project_a_id)
 
-        result = await deployment_repository.search_deployments_in_project(querier, scope)
+        result = await deployment_repository.search_project_deployment_summary(querier, scope)
 
         assert result.has_next_page is False
         assert result.has_previous_page is False

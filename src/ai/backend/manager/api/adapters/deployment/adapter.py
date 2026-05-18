@@ -9,8 +9,6 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-import sqlalchemy as sa
-
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
@@ -37,7 +35,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
     AddRevisionInput,
     AddRevisionOptions,
-    AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     AutoScalingRuleFilter,
     BulkDeleteAccessTokensInput,
@@ -57,6 +54,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
+    SearchDeploymentsInput,
     SearchReplicasInput,
     SearchRoutesInput,
     SyncReplicaInput,
@@ -68,7 +66,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateRevisionPayload,
     AddRevisionPayload,
     AdminRefreshDeploymentRevisionsPayload,
-    AdminSearchDeploymentsPayload,
     AdminSearchRevisionsPayload,
     AutoScalingRuleNode,
     BulkDeleteAccessTokensPayload,
@@ -92,6 +89,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     SearchAccessTokensPayload,
     SearchAutoScalingRulesPayload,
     SearchDeploymentPoliciesPayload,
+    SearchDeploymentsPayload,
     SearchReplicasPayload,
     SearchRoutesPayload,
     SyncReplicaPayload,
@@ -228,6 +226,10 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.deployment.types import (
+    ProjectDeploymentSearchScope,
+    UserDeploymentSearchScope,
+)
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
     DeploymentNetworkSpecUpdaterSpec,
@@ -248,6 +250,9 @@ from ai.backend.manager.services.deployment.actions.access_token.get_access_toke
 )
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.admin_search_deployments import (
+    AdminSearchDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
@@ -311,10 +316,13 @@ from ai.backend.manager.services.deployment.actions.route.search_routes import S
 from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
     UpdateRouteTrafficStatusAction,
 )
-from ai.backend.manager.services.deployment.actions.search_deployments import (
-    SearchDeploymentsAction,
+from ai.backend.manager.services.deployment.actions.search_project_deployments import (
+    SearchProjectDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import SearchReplicasAction
+from ai.backend.manager.services.deployment.actions.search_user_deployments import (
+    SearchUserDeploymentsAction,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -611,14 +619,16 @@ class DeploymentAdapter(BaseAdapter):
 
     async def admin_search(
         self,
-        input: AdminSearchDeploymentsInput,
-    ) -> AdminSearchDeploymentsPayload:
+        input: SearchDeploymentsInput,
+    ) -> SearchDeploymentsPayload:
         """Search deployments (admin, no scope)."""
         querier = self._build_deployment_querier(input)
-        action_result = await self._processors.deployment.search_deployments.wait_for_complete(
-            SearchDeploymentsAction(querier=querier)
+        action_result = (
+            await self._processors.deployment_admin.admin_search_deployments.wait_for_complete(
+                AdminSearchDeploymentsAction(querier=querier)
+            )
         )
-        return AdminSearchDeploymentsPayload(
+        return SearchDeploymentsPayload(
             items=[self._deployment_data_to_dto(item) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
@@ -627,22 +637,19 @@ class DeploymentAdapter(BaseAdapter):
 
     async def my_search(
         self,
-        input: AdminSearchDeploymentsInput,
-    ) -> AdminSearchDeploymentsPayload:
+        input: SearchDeploymentsInput,
+    ) -> SearchDeploymentsPayload:
         """Search deployments owned by the current user."""
         user = current_user()
         if user is None:
             raise RuntimeError("No authenticated user in context")
+        scope = UserDeploymentSearchScope(user_id=user.user_id)
         conditions: list[QueryCondition] = []
         if input.filter:
             conditions.extend(self._convert_deployment_filter(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
-
-        def _by_created_user() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.created_user == user.user_id
-
         querier = self._build_querier(
             conditions=conditions,
             orders=orders,
@@ -653,12 +660,11 @@ class DeploymentAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=[_by_created_user],
         )
-        action_result = await self._processors.deployment.search_deployments.wait_for_complete(
-            SearchDeploymentsAction(querier=querier)
+        action_result = await self._processors.deployment.search_user_deployments.wait_for_complete(
+            SearchUserDeploymentsAction(scope=scope, querier=querier)
         )
-        return AdminSearchDeploymentsPayload(
+        return SearchDeploymentsPayload(
             items=[self._deployment_data_to_dto(item) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
@@ -668,19 +674,16 @@ class DeploymentAdapter(BaseAdapter):
     async def project_search(
         self,
         project_id: UUID,
-        input: AdminSearchDeploymentsInput,
-    ) -> AdminSearchDeploymentsPayload:
+        input: SearchDeploymentsInput,
+    ) -> SearchDeploymentsPayload:
         """Search deployments within a specific project."""
+        scope = ProjectDeploymentSearchScope(project_id=project_id)
         conditions: list[QueryCondition] = []
         if input.filter:
             conditions.extend(self._convert_deployment_filter(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
-
-        def _by_project_id() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.project == project_id
-
         querier = self._build_querier(
             conditions=conditions,
             orders=orders,
@@ -691,12 +694,13 @@ class DeploymentAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=[_by_project_id],
         )
-        action_result = await self._processors.deployment.search_deployments.wait_for_complete(
-            SearchDeploymentsAction(querier=querier)
+        action_result = (
+            await self._processors.deployment.search_project_deployments.wait_for_complete(
+                SearchProjectDeploymentsAction(scope=scope, querier=querier)
+            )
         )
-        return AdminSearchDeploymentsPayload(
+        return SearchDeploymentsPayload(
             items=[self._deployment_data_to_dto(item) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
@@ -1352,7 +1356,15 @@ class DeploymentAdapter(BaseAdapter):
     ) -> list[DeploymentNode | None]:
         """Batch load deployments by ID for DataLoader use.
 
-        Returns DeploymentNode DTOs in the same order as the input deployment_ids list.
+        Routed through ``admin_search_deployments`` — the only remaining
+        unscoped search after the legacy path was removed. The ``by_ids``
+        filter is the bound on the result set; the parent resolver has
+        already authorised access to whatever entity references these IDs,
+        and the action is unscoped at the service layer (the admin label
+        is enforced at the resolver, not here).
+
+        Output is aligned with the input ``deployment_ids`` order; missing
+        IDs come back as ``None``.
         """
         if not deployment_ids:
             return []
@@ -1360,8 +1372,10 @@ class DeploymentAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(deployment_ids)),
             conditions=[DeploymentConditions.by_ids(deployment_ids)],
         )
-        action_result = await self._processors.deployment.search_deployments.wait_for_complete(
-            SearchDeploymentsAction(querier=querier)
+        action_result = (
+            await self._processors.deployment_admin.admin_search_deployments.wait_for_complete(
+                AdminSearchDeploymentsAction(querier=querier)
+            )
         )
         deployment_map = {
             data.id: self._deployment_data_to_dto(data) for data in action_result.data
@@ -1635,7 +1649,7 @@ class DeploymentAdapter(BaseAdapter):
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
 
-    def _build_deployment_querier(self, input: AdminSearchDeploymentsInput) -> BatchQuerier:
+    def _build_deployment_querier(self, input: SearchDeploymentsInput) -> BatchQuerier:
         conditions: list[QueryCondition] = []
         if input.filter:
             conditions.extend(self._convert_deployment_filter(input.filter))

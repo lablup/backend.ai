@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
     AddRevisionInput,
     AddRevisionOptions,
-    AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     BulkDeleteAccessTokensInput,
     CreateAccessTokenInput,
@@ -30,6 +29,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
+    SearchDeploymentsInput,
     SearchReplicasInput,
     SearchRoutesInput,
     SyncReplicaInput,
@@ -90,7 +90,7 @@ class V2DeploymentHandler:
 
     async def admin_search(
         self,
-        body: BodyParam[AdminSearchDeploymentsInput],
+        body: BodyParam[SearchDeploymentsInput],
     ) -> APIResponse:
         """Search deployments with admin scope."""
         result = await self._adapter.admin_search(body.parsed)
@@ -99,7 +99,7 @@ class V2DeploymentHandler:
     async def project_search(
         self,
         path: PathParam[ProjectIdPathParam],
-        body: BodyParam[AdminSearchDeploymentsInput],
+        body: BodyParam[SearchDeploymentsInput],
     ) -> APIResponse:
         """Search deployments within a project."""
         result = await self._adapter.project_search(path.parsed.project_id, body.parsed)
@@ -107,7 +107,7 @@ class V2DeploymentHandler:
 
     async def my_search(
         self,
-        body: BodyParam[AdminSearchDeploymentsInput],
+        body: BodyParam[SearchDeploymentsInput],
     ) -> APIResponse:
         """Search deployments owned by the current user."""
         result = await self._adapter.my_search(body.parsed)

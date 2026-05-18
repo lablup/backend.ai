@@ -27,7 +27,7 @@ from ai.backend.common.dto.manager.deployment import (
     ListDeploymentsResponse,
     ListRevisionsResponse,
     ListRoutesResponse,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
     UpdateDeploymentRequest,
@@ -204,7 +204,9 @@ class TestDeploymentCRUD:
         mock_session = _make_request_session(resp)
         dc = _make_deployment_client(mock_session)
 
-        result = await dc.search_deployments(SearchDeploymentsRequest())
+        result = await dc.search_deployments(
+            SearchLegacyDeploymentsRequest(project_id=_SAMPLE_PROJECT_ID)
+        )
 
         assert isinstance(result, ListDeploymentsResponse)
         assert len(result.deployments) == 1
@@ -212,6 +214,7 @@ class TestDeploymentCRUD:
         assert method == "POST"
         assert url.endswith("/deployments/search")
         assert body is not None
+        assert body["project_id"] == str(_SAMPLE_PROJECT_ID)
 
     async def test_get_deployment(self) -> None:
         resp = _json_response({"deployment": _SAMPLE_DEPLOYMENT_DTO})

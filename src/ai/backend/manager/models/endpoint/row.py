@@ -29,6 +29,10 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
+from ai.backend.common.data.model_deployment.types import (
+    DeploymentStrategy,
+    ModelDeploymentStatus,
+)
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.project import ProjectID
@@ -68,8 +72,11 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentState,
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
+    ModelDeploymentMetadataInfo,
     ModelRevisionData,
     ReplicaData,
+    ReplicaStateData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -102,6 +109,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
     from ai.backend.manager.models.routing import RoutingRow
     from ai.backend.manager.models.user import UserRow
+
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
@@ -800,6 +808,65 @@ class EndpointRow(Base):  # type: ignore[misc]
             deploying_revision=deploying_revision,
             sub_step=self.sub_step,
             policy=policy,
+        )
+
+    def to_model_deployment_data(self) -> ModelDeploymentData:
+        """Project the row to the API-shaped ``ModelDeploymentData``.
+
+        Eager-load requirements: ``current_revision_row`` (and
+        ``deploying_revision_row`` if the spec is needed) plus
+        ``deployment_policy``. Mirrors the relationship usage in
+        ``to_deployment_info`` so the projection follows the same
+        column-direct lookup as the BA-6056 split — no list scan over
+        ``revisions``. ``current_revision_id`` / ``deploying_revision_id``
+        surface directly from the row columns; the joined ``revision``
+        spec is ``None`` when the row was not eager-loaded (callers can
+        still act on the ID).
+        """
+        revision: ModelRevisionData | None = None
+        if self.current_revision_row is not None:
+            revision = self.current_revision_row.to_data()
+
+        desired_count = (
+            self.desired_replicas if self.desired_replicas is not None else self.replicas
+        )
+        policy_data = (
+            self.deployment_policy.to_data() if self.deployment_policy is not None else None
+        )
+
+        return ModelDeploymentData(
+            id=self.id,
+            metadata=ModelDeploymentMetadataInfo(
+                name=self.name,
+                status=ModelDeploymentStatus.from_lifecycle(self.lifecycle_stage),
+                tags=[self.tag] if self.tag else [],
+                project_id=self.project,
+                domain_name=self.domain,
+                resource_group_name=self.resource_group,
+                created_at=self.created_at,
+                updated_at=self.created_at,
+            ),
+            network_access=DeploymentNetworkData(
+                open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                access_token_ids=None,
+                url=self.url,
+                preferred_domain_name=None,
+            ),
+            revision_history_ids=[self.current_revision] if self.current_revision else [],
+            revision=revision,
+            current_revision_id=self.current_revision,
+            deploying_revision_id=self.deploying_revision,
+            scaling_rule_ids=[],
+            replica_state=ReplicaStateData(
+                desired_replica_count=desired_count,
+                replica_ids=[],
+            ),
+            default_deployment_strategy=DeploymentStrategy.ROLLING,
+            created_user_id=self.created_user,
+            options=self.options,
+            scaling_state=self.scaling_state,
+            policy=policy_data,
+            sub_step=self.sub_step,
         )
 
 

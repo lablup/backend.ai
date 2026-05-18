@@ -48,7 +48,6 @@ __all__ = (
     "ActivateRevisionPayload",
     "AddRevisionPayload",
     "AdminRefreshDeploymentRevisionsPayload",
-    "AdminSearchDeploymentsPayload",
     "AdminSearchRevisionsPayload",
     "AutoScalingRuleNode",
     "CreateAccessTokenPayload",
@@ -71,6 +70,7 @@ __all__ = (
     "SearchAccessTokensPayload",
     "SearchAutoScalingRulesPayload",
     "SearchDeploymentPoliciesPayload",
+    "SearchDeploymentsPayload",
     "SearchReplicasPayload",
     "SearchRoutesPayload",
     "RevisionRefreshResultInfo",
@@ -312,8 +312,12 @@ class DeploymentPolicyNode(BaseResponseModel):
 # ---------------------------------------------------------------------------
 
 
-class AdminSearchDeploymentsPayload(BaseResponseModel):
-    """Payload for admin deployment search result."""
+class SearchDeploymentsPayload(BaseResponseModel):
+    """Payload for deployment search result.
+
+    Shared across the admin, project-scoped, and self-service search paths
+    — the result shape is identical for all three.
+    """
 
     items: list[DeploymentNode] = Field(description="Deployment list")
     total_count: int = Field(description="Total count")

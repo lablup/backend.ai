@@ -41,9 +41,9 @@ def search(
 
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.deployment.request import (
-        AdminSearchDeploymentsInput,
         DeploymentFilter,
         DeploymentStatusFilter,
+        SearchDeploymentsInput,
     )
 
     filter_dto: DeploymentFilter | None = None
@@ -56,7 +56,7 @@ def search(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = AdminSearchDeploymentsInput(
+            request = SearchDeploymentsInput(
                 filter=filter_dto,
                 first=first,
                 after=after,

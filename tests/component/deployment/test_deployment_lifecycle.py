@@ -28,7 +28,7 @@ from ai.backend.common.dto.manager.deployment import (
     NetworkAccessInput,
     ResourceConfigInput,
     RevisionInput,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     UpdateDeploymentRequest,
 )
@@ -431,10 +431,12 @@ class TestUserAccessDeployment:
     async def test_user_searches_empty_deployments(
         self,
         user_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        regular_user_project_model_deployment_read_permission: None,
     ) -> None:
-        """Regular user can search deployments and gets empty results."""
+        """Regular user with project model-deployment read role gets empty results."""
         result = await user_registry.deployment.search_deployments(
-            SearchDeploymentsRequest(),
+            SearchLegacyDeploymentsRequest(project_id=group_fixture),
         )
         assert isinstance(result, ListDeploymentsResponse)
         assert result.deployments == []

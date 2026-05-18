@@ -61,7 +61,6 @@ __all__ = (
     "ActivateDeploymentInput",
     "ActivateRevisionInput",
     "AddRevisionInput",
-    "AdminSearchDeploymentsInput",
     "AdminSearchRevisionsInput",
     "AutoScalingRuleFilter",
     "AutoScalingRuleOrder",
@@ -111,6 +110,7 @@ __all__ = (
     "SearchAccessTokensInput",
     "SearchAutoScalingRulesInput",
     "SearchDeploymentPoliciesInput",
+    "SearchDeploymentsInput",
     "SearchReplicasInput",
     "SearchRoutesInput",
     "SyncReplicaInput",
@@ -770,8 +770,13 @@ class ReplicaOrder(BaseRequestModel):
 # ---------------------------------------------------------------------------
 
 
-class AdminSearchDeploymentsInput(BaseRequestModel):
-    """Input for searching deployments (admin, no scope)."""
+class SearchDeploymentsInput(BaseRequestModel):
+    """Input for searching deployments.
+
+    Shared across the admin, project-scoped, and self-service search paths
+    — the input shape is identical for all three. Scope is conveyed via
+    the URL path / handler choice rather than a body field.
+    """
 
     filter: DeploymentFilter | None = Field(default=None, description="Filter criteria")
     order: list[DeploymentOrder] | None = Field(default=None, description="Sort order")

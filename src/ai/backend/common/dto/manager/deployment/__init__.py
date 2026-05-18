@@ -28,7 +28,7 @@ from .request import (
     RouteFilter,
     RoutePathParam,
     SearchDeploymentPoliciesRequest,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
     UpdateDeploymentRequest,
@@ -90,11 +90,12 @@ __all__ = (
     # Request DTOs - Path params
     "DeploymentPathParam",
     "DeploymentPolicyPathParam",
+    "DeploymentProjectSearchPathParam",
     "RevisionPathParam",
     "RoutePathParam",
     # Request DTOs - Search/List
     "SearchDeploymentPoliciesRequest",
-    "SearchDeploymentsRequest",
+    "SearchLegacyDeploymentsRequest",
     "SearchRevisionsRequest",
     "SearchRoutesRequest",
     # Request DTOs - Create inputs

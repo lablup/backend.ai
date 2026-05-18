@@ -7,7 +7,6 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
@@ -81,10 +80,7 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import (
-    DeploymentService,
-    _convert_deployment_info_to_data,
-)
+from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment import DeploymentController
 
 
@@ -656,85 +652,3 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         creator = cast(RBACEntityCreator[object], repo_call.args[0])
         spec = cast(EndpointTokenCreatorSpec, creator.spec)
         assert spec.token == sample_coordinator_jwt
-
-
-class TestConvertDeploymentInfoToData:
-    """Regression test for ``_convert_deployment_info_to_data`` (BA-5963)."""
-
-    @pytest.fixture
-    def make_revision_data(self) -> Callable[[int], ModelRevisionData]:
-        def make(revision_number: int) -> ModelRevisionData:
-            return ModelRevisionData(
-                id=DeploymentRevisionID(uuid.uuid4()),
-                deployment_id=DeploymentID(uuid.uuid4()),
-                revision_number=revision_number,
-                cluster_config=ClusterConfigData(
-                    mode=ClusterMode.SINGLE_NODE,
-                    size=1,
-                ),
-                resource_config=ResourceConfigData(
-                    resource_group_name="default",
-                    resource_slot=ResourceSlot({"cpu": "1"}),
-                ),
-                model_runtime_config=ModelRuntimeConfigData(
-                    runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
-                ),
-                model_mount_config=ModelMountConfigData(
-                    vfolder_id=VFolderUUID(uuid.uuid4()),
-                    mount_destination="/models",
-                    definition_path="model-definition.yaml",
-                    extra_mounts=[],
-                ),
-                created_at=datetime(2024, 1, 1, tzinfo=UTC),
-                image_id=ImageID(uuid.uuid4()),
-                execution=ExecutionData(
-                    startup_command=None,
-                    bootstrap_script=None,
-                    callback_url=None,
-                ),
-                preset=PresetAttributionData(preset_id=None, values=[]),
-            )
-
-        return make
-
-    def test_current_revision_resolved_by_id_match_not_list_order(
-        self,
-        make_revision_data: Callable[[int], ModelRevisionData],
-    ) -> None:
-        """Pin: revision lookup must use explicit ``current_revision_id``, not list[0]."""
-        deploying_data = make_revision_data(1)
-        current_data = make_revision_data(2)
-
-        deployment_info = DeploymentInfo(
-            id=DeploymentID(uuid.uuid4()),
-            metadata=DeploymentMetadata(
-                name="ba5963-test",
-                domain="default",
-                project=uuid.uuid4(),
-                resource_group="default",
-                created_user=uuid.uuid4(),
-                session_owner=uuid.uuid4(),
-                created_at=datetime(2024, 1, 1, tzinfo=UTC),
-                revision_history_limit=10,
-            ),
-            state=DeploymentState(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                scaling_state=ScalingState.STABLE,
-                retry_count=0,
-            ),
-            replica=ReplicaData(replica_count=1, desired_replica_count=None),
-            network=DeploymentNetworkData(
-                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
-            ),
-            options=DeploymentOptions(),
-            current_revision=current_data,
-            deploying_revision=deploying_data,
-        )
-
-        deployment_data = _convert_deployment_info_to_data(deployment_info)
-
-        assert deployment_data.current_revision_id == current_data.id
-        assert deployment_data.deploying_revision_id == deploying_data.id
-        assert deployment_data.current_revision_id != deployment_data.deploying_revision_id
-        assert deployment_data.revision is not None
-        assert deployment_data.revision.id == current_data.id

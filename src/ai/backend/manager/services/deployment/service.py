@@ -8,9 +8,7 @@ from uuid import UUID
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
-    DeploymentStrategy,
     LivenessStatus,
-    ModelDeploymentStatus,
     ReadinessStatus,
 )
 from ai.backend.common.data.permission.types import RBACElementType
@@ -25,14 +23,10 @@ from ai.backend.manager.data.deployment.creator import (
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     ExecutionSpec,
     ModelDeploymentAccessTokenData,
-    ModelDeploymentData,
-    ModelDeploymentMetadataInfo,
     ModelReplicaData,
     ModelRevisionData,
-    ReplicaStateData,
     ResourceSpec,
     RevisionRefreshResult,
     RouteHealthStatus,
@@ -169,17 +163,21 @@ from ai.backend.manager.services.deployment.actions.route import (
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
-from ai.backend.manager.services.deployment.actions.search_deployments import (
-    SearchDeploymentsAction,
-    SearchDeploymentsActionResult,
+from ai.backend.manager.services.deployment.actions.search_project_deployment_summary import (
+    SearchProjectDeploymentSummaryAction,
+    SearchProjectDeploymentSummaryActionResult,
 )
-from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
-    SearchDeploymentsInProjectAction,
-    SearchDeploymentsInProjectActionResult,
+from ai.backend.manager.services.deployment.actions.search_project_deployments import (
+    SearchProjectDeploymentsAction,
+    SearchProjectDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
+)
+from ai.backend.manager.services.deployment.actions.search_user_deployments import (
+    SearchUserDeploymentsAction,
+    SearchUserDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
@@ -193,76 +191,6 @@ from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentStatus:
-    """Map EndpointLifecycle to ModelDeploymentStatus for the v2 status surface.
-
-    The lifecycle axis is monotonic (PENDING → DEPLOYING → READY → DESTROYING
-    → DESTROYED); v2 exposes replica reconciliation as the orthogonal
-    ``scaling_state`` field on the deployment node. ``SCALING`` is therefore
-    no longer surfaced through ``ModelDeploymentStatus`` — a legacy
-    ``lifecycle=SCALING`` row folds into ``READY`` so clients only have to
-    consult ``scaling_state`` to decide whether a replica reconcile is in
-    flight. Legacy ``CREATED`` (never-deployed) folds into ``PENDING``.
-    """
-    match lifecycle:
-        case EndpointLifecycle.PENDING | EndpointLifecycle.CREATED:
-            return ModelDeploymentStatus.PENDING
-        case EndpointLifecycle.READY | EndpointLifecycle.SCALING:
-            return ModelDeploymentStatus.READY
-        case EndpointLifecycle.DEPLOYING:
-            return ModelDeploymentStatus.DEPLOYING
-        case EndpointLifecycle.DESTROYING:
-            return ModelDeploymentStatus.STOPPING
-        case EndpointLifecycle.DESTROYED:
-            return ModelDeploymentStatus.STOPPED
-
-
-def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
-    """Convert DeploymentInfo to ModelDeploymentData.
-
-    Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
-    """
-    revision: ModelRevisionData | None = info.current_revision
-
-    desired_count = info.replica.desired_replica_count
-    if desired_count is None:
-        desired_count = info.replica.replica_count
-
-    return ModelDeploymentData(
-        id=info.id,
-        metadata=ModelDeploymentMetadataInfo(
-            name=info.metadata.name,
-            status=_map_lifecycle_to_status(info.state.lifecycle),
-            tags=[info.metadata.tag] if info.metadata.tag else [],
-            project_id=info.metadata.project,
-            domain_name=info.metadata.domain,
-            resource_group_name=info.metadata.resource_group,
-            created_at=info.metadata.created_at or datetime.now(UTC),
-            updated_at=info.metadata.created_at or datetime.now(UTC),
-        ),
-        network_access=info.network,
-        revision_history_ids=[info.current_revision.id]
-        if info.current_revision is not None
-        else [],
-        revision=revision,
-        current_revision_id=info.current_revision.id if info.current_revision is not None else None,
-        deploying_revision_id=info.deploying_revision.id
-        if info.deploying_revision is not None
-        else None,
-        scaling_rule_ids=[],  # Not available in DeploymentInfo
-        replica_state=ReplicaStateData(
-            desired_replica_count=desired_count,
-            replica_ids=[],  # Not available in DeploymentInfo
-        ),
-        default_deployment_strategy=DeploymentStrategy.ROLLING,
-        created_user_id=info.metadata.created_user,
-        options=info.options,
-        scaling_state=info.state.scaling_state,
-        policy=info.policy,
-        sub_step=info.sub_step,
-    )
 
 
 _HEALTH_STATUS_TO_READINESS: dict[RouteHealthStatus, ReadinessStatus] = {
@@ -411,12 +339,8 @@ class DeploymentService:
                 revision=action.creator.model_revision,
                 auto_activate=action.auto_activate,
             )
-        updated_deployment_info = await self._deployment_repository.get_endpoint_info(
-            deployment_info.id
-        )
-        return CreateDeploymentActionResult(
-            data=_convert_deployment_info_to_data(updated_deployment_info)
-        )
+        deployment_data = await self._deployment_repository.get_deployment_data(deployment_info.id)
+        return CreateDeploymentActionResult(data=deployment_data)
 
     async def create_legacy_deployment(
         self, action: CreateLegacyDeploymentAction
@@ -456,8 +380,9 @@ class DeploymentService:
         log.info("Updating deployment with ID: {}", action.updater.pk_value)
         endpoint_id = DeploymentID(cast(UUID, action.updater.pk_value))
         spec = cast(DeploymentUpdaterSpec, action.updater.spec)
-        deployment_info = await self._deployment_controller.update_deployment(endpoint_id, spec)
-        return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
+        await self._deployment_controller.update_deployment(endpoint_id, spec)
+        deployment_data = await self._deployment_repository.get_deployment_data(endpoint_id)
+        return UpdateDeploymentActionResult(data=deployment_data)
 
     async def replace_deployment_options(
         self, action: ReplaceDeploymentOptionsAction
@@ -498,34 +423,42 @@ class DeploymentService:
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
         return DestroyDeploymentActionResult(success=success)
 
-    async def search_deployments(
-        self, action: SearchDeploymentsAction
-    ) -> SearchDeploymentsActionResult:
-        """Search deployments with filtering and pagination.
-
-        Args:
-            action: Action containing BatchQuerier for filtering and pagination
-
-        Returns:
-            SearchDeploymentsActionResult: Result containing list of deployments and pagination info
-        """
-        result = await self._deployment_repository.search_endpoints(action.querier)
-        deployments = [_convert_deployment_info_to_data(info) for info in result.items]
-        return SearchDeploymentsActionResult(
-            data=deployments,
+    async def search_user_deployments(
+        self, action: SearchUserDeploymentsAction
+    ) -> SearchUserDeploymentsActionResult:
+        """Search the current user's deployments — backs ``my_search``."""
+        result = await self._deployment_repository.search_user_deployments(
+            action.querier, action.scope
+        )
+        return SearchUserDeploymentsActionResult(
+            data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
 
-    async def search_deployments_in_project(
-        self, action: SearchDeploymentsInProjectAction
-    ) -> SearchDeploymentsInProjectActionResult:
-        """Search deployments within a project scope."""
-        result = await self._deployment_repository.search_deployments_in_project(
+    async def search_project_deployments(
+        self, action: SearchProjectDeploymentsAction
+    ) -> SearchProjectDeploymentsActionResult:
+        """Search deployments inside a project, returning full ``ModelDeploymentData``."""
+        result = await self._deployment_repository.search_project_deployments(
             action.querier, action.scope
         )
-        return SearchDeploymentsInProjectActionResult(
+        return SearchProjectDeploymentsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_project_deployment_summary(
+        self, action: SearchProjectDeploymentSummaryAction
+    ) -> SearchProjectDeploymentSummaryActionResult:
+        """Search lightweight deployment summaries within a project scope."""
+        result = await self._deployment_repository.search_project_deployment_summary(
+            action.querier, action.scope
+        )
+        return SearchProjectDeploymentSummaryActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -546,8 +479,10 @@ class DeploymentService:
         Raises:
             EndpointNotFound: If the deployment does not exist
         """
-        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
-        return GetDeploymentByIdActionResult(data=_convert_deployment_info_to_data(deployment_info))
+        deployment_data = await self._deployment_repository.get_deployment_data(
+            action.deployment_id
+        )
+        return GetDeploymentByIdActionResult(data=deployment_data)
 
     async def get_deployment_policy(
         self, action: GetDeploymentPolicyAction
@@ -646,8 +581,11 @@ class DeploymentService:
         result = await self._deployment_controller.activate_revision(
             action.deployment_id, action.revision_id
         )
+        deployment_data = await self._deployment_repository.get_deployment_data(
+            action.deployment_id
+        )
         return ActivateRevisionActionResult(
-            deployment=_convert_deployment_info_to_data(result.deployment_info),
+            deployment=deployment_data,
             previous_revision_id=result.previous_revision_id,
             activated_revision_id=result.activated_revision_id,
             deployment_policy=result.deployment_policy,

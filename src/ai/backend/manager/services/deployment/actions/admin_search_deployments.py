@@ -8,8 +8,15 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
-@dataclass
-class SearchDeploymentsAction(DeploymentBaseAction):
+@dataclass(frozen=True)
+class AdminSearchDeploymentsAction(DeploymentBaseAction):
+    """Search every deployment with no scope (superadmin path).
+
+    Routed through ``DeploymentAdminProcessors`` so callers make the
+    admin intent explicit; scope-restricted variants live on the regular
+    ``DeploymentService`` and ``DeploymentRepository``.
+    """
+
     querier: BatchQuerier
 
     @override
@@ -22,8 +29,8 @@ class SearchDeploymentsAction(DeploymentBaseAction):
         return ActionOperationType.SEARCH
 
 
-@dataclass
-class SearchDeploymentsActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class AdminSearchDeploymentsActionResult(BaseActionResult):
     data: list[ModelDeploymentData]
     total_count: int
     has_next_page: bool

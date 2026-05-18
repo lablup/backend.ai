@@ -36,17 +36,17 @@ from ai.backend.common.dto.manager.deployment import (
     NetworkAccessInput,
     ResourceConfigInput,
     RevisionInput,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
 )
 from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    AdminSearchDeploymentsInput,
+    DeploymentFilter as DeploymentFilterV2,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    DeploymentFilter as DeploymentFilterV2,
+    SearchDeploymentsInput,
 )
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
@@ -54,7 +54,6 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import _map_lifecycle_to_status
 from ai.backend.manager.services.processors import Processors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -66,10 +65,11 @@ class TestSearchDeployments:
     async def test_search_deployments_empty(
         self,
         admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
     ) -> None:
         """Search with no data returns an empty list and pagination total=0."""
         result = await admin_registry.deployment.search_deployments(
-            SearchDeploymentsRequest(),
+            SearchLegacyDeploymentsRequest(project_id=group_fixture),
         )
         assert isinstance(result, ListDeploymentsResponse)
         assert result.deployments == []
@@ -78,10 +78,12 @@ class TestSearchDeployments:
     async def test_search_deployments_with_filter(
         self,
         admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
     ) -> None:
         """Search with a name filter on empty data returns an empty list."""
         result = await admin_registry.deployment.search_deployments(
-            SearchDeploymentsRequest(
+            SearchLegacyDeploymentsRequest(
+                project_id=group_fixture,
                 filter=DeploymentFilter(
                     name=StringFilter(contains="nonexistent"),
                 ),
@@ -136,7 +138,7 @@ class TestSearchDeployments:
 
         # Search with pagination
         result = await admin_registry.deployment.search_deployments(
-            SearchDeploymentsRequest(limit=2, offset=0),
+            SearchLegacyDeploymentsRequest(project_id=group_fixture, limit=2, offset=0),
         )
         assert isinstance(result, ListDeploymentsResponse)
         assert len(result.deployments) >= 2
@@ -447,7 +449,7 @@ class TestDeploymentAdapterFilter:
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+                SearchDeploymentsInput(filter=filter_input, limit=50),
             )
 
         assert payload.total_count == 1
@@ -499,7 +501,7 @@ class TestDeploymentAdapterFilter:
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+                SearchDeploymentsInput(filter=filter_input, limit=50),
             )
 
         assert payload.total_count == 2
@@ -576,7 +578,7 @@ class TestDeploymentAdapterFilter:
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+                SearchDeploymentsInput(filter=filter_input, limit=50),
             )
 
         assert payload.total_count == 2
@@ -621,7 +623,7 @@ class TestDeploymentAdapterFilter:
         ):
             payload = await deployment_adapter.project_search(
                 group_fixture,
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+                SearchDeploymentsInput(filter=filter_input, limit=50),
             )
 
         assert payload.total_count == 1
@@ -650,7 +652,7 @@ class TestStatusMapping:
         }
 
         for lifecycle, expected_status in mapping.items():
-            actual_status = _map_lifecycle_to_status(lifecycle)
+            actual_status = ModelDeploymentStatus.from_lifecycle(lifecycle)
             assert actual_status == expected_status, (
                 f"EndpointLifecycle.{lifecycle.name} should map to "
                 f"ModelDeploymentStatus.{expected_status.name}, got {actual_status.name}"

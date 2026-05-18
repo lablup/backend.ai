@@ -1261,10 +1261,14 @@ class DeploymentSearchResult:
 
 
 @dataclass
-class DeploymentInfoSearchResult:
-    """Search result with pagination for deployment info."""
+class ModelDeploymentDataSearchResult:
+    """Search result with pagination for the API-shaped ``ModelDeploymentData``.
 
-    items: list[DeploymentInfo]
+    Returned by repository methods that project ``EndpointRow`` straight to
+    ``ModelDeploymentData`` without going through ``DeploymentInfo``.
+    """
+
+    items: list[ModelDeploymentData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

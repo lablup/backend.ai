@@ -55,7 +55,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentConfig,
     DeploymentHandlerCategory,
     DeploymentInfo,
-    DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
     DeploymentOptions,
     DeploymentPolicyData,
@@ -68,6 +67,8 @@ from ai.backend.manager.data.deployment.types import (
     LegacyRevisionCreateReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
+    ModelDeploymentDataSearchResult,
     ModelRevisionData,
     RevisionSearchResult,
     RouteHandlerCategory,
@@ -112,6 +113,7 @@ from .types import (
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
     RouteSessionKernelInfo,
+    UserDeploymentSearchScope,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -167,7 +169,7 @@ class DeploymentRepository:
         valkey_live: ValkeyLiveClient,
         valkey_schedule: ValkeyScheduleClient,
     ) -> None:
-        self._db_source = DeploymentDBSource(db, storage_manager)
+        self._db_source = DeploymentDBSource(db)
         self._storage_source = DeploymentStorageSource(storage_manager)
         self._valkey_stat = valkey_stat
         self._valkey_live = valkey_live
@@ -351,6 +353,25 @@ class DeploymentRepository:
             EndpointNotFound: If the endpoint does not exist
         """
         return await self._db_source.get_endpoint(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_deployment_data(
+        self,
+        endpoint_id: DeploymentID,
+    ) -> ModelDeploymentData:
+        """Fetch a deployment as the API-shaped ``ModelDeploymentData``.
+
+        Bypasses ``DeploymentInfo`` so the API path's revision-id columns
+        flow through unchanged from the DB row. Prefer this over
+        ``get_endpoint_info`` + a service-side conversion when the caller
+        produces an API response — there is no ordering ambiguity to
+        resolve and dangling references surface as ``revision=None`` with
+        the column ID still populated.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+        """
+        return await self._db_source.get_deployment_data(endpoint_id)
 
     @deployment_repository_resilience.apply()
     async def destroy_endpoint(
@@ -1524,28 +1545,31 @@ class DeploymentRepository:
         return await self._db_source.get_route(route_id)
 
     @deployment_repository_resilience.apply()
-    async def search_endpoints(
+    async def search_user_deployments(
         self,
         querier: BatchQuerier,
-    ) -> DeploymentInfoSearchResult:
-        """Search endpoints with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination
-
-        Returns:
-            DeploymentInfoSearchResult with items, total_count, and pagination info
-        """
-        return await self._db_source.search_endpoints(querier)
+        scope: UserDeploymentSearchScope,
+    ) -> ModelDeploymentDataSearchResult:
+        """Search a user's own deployments — backs the v2 ``my_search`` path."""
+        return await self._db_source.search_user_deployments(querier, scope)
 
     @deployment_repository_resilience.apply()
-    async def search_deployments_in_project(
+    async def search_project_deployments(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectDeploymentSearchScope,
+    ) -> ModelDeploymentDataSearchResult:
+        """Search a project's deployments returning full ``ModelDeploymentData``."""
+        return await self._db_source.search_project_deployments(querier, scope)
+
+    @deployment_repository_resilience.apply()
+    async def search_project_deployment_summary(
         self,
         querier: BatchQuerier,
         scope: ProjectDeploymentSearchScope,
     ) -> DeploymentSummarySearchResult:
-        """Search endpoints within a project scope with pagination and filtering."""
-        return await self._db_source.search_deployments_in_project(querier, scope)
+        """Search lightweight deployment summaries within a project scope."""
+        return await self._db_source.search_project_deployment_summary(querier, scope)
 
     # ========== Access Token Operations ==========
 

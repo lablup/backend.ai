@@ -57,7 +57,6 @@ from ai.backend.manager.data.deployment.types import (
     AutoScalingRuleSearchResult,
     DeploymentHandlerCategory,
     DeploymentInfo,
-    DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
     DeploymentLastHistory,
     DeploymentLifecycleSubStep,
@@ -71,6 +70,8 @@ from ai.backend.manager.data.deployment.types import (
     LegacyRevisionCreateReadBundle,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
+    ModelDeploymentDataSearchResult,
     ModelRevisionData,
     RevisionSearchResult,
     RouteHandlerCategory,
@@ -140,7 +141,6 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
 )
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -182,6 +182,7 @@ from ai.backend.manager.repositories.deployment.types import (
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
     RouteSessionKernelInfo,
+    UserDeploymentSearchScope,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
@@ -222,15 +223,12 @@ class DeploymentDBSource:
     """Database source for deployment-related operations."""
 
     _db: ExtendedAsyncSAEngine
-    _storage_manager: StorageSessionManager
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db
-        self._storage_manager = storage_manager
 
     @actxmgr
     async def _begin_readonly_read_committed(self) -> AsyncIterator[SAConnection]:
@@ -401,6 +399,37 @@ class DeploymentDBSource:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
             return row.to_deployment_info()
+
+    async def get_deployment_data(
+        self,
+        endpoint_id: DeploymentID,
+    ) -> ModelDeploymentData:
+        """Fetch a deployment as the API-shaped ``ModelDeploymentData``.
+
+        Bypasses the ``DeploymentInfo`` intermediate so the API path's
+        revision-id columns flow through unchanged from the DB row.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .options(
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                    selectinload(EndpointRow.deployment_policy),
+                )
+            )
+            result = await db_sess.execute(query)
+            row: EndpointRow | None = result.scalar_one_or_none()
+
+            if not row:
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
+
+            return row.to_model_deployment_data()
 
     async def get_deployments_by_ids(
         self,
@@ -1108,17 +1137,16 @@ class DeploymentDBSource:
                 return None
             return row.to_route_info()
 
-    async def search_endpoints(
+    async def admin_search_deployments(
         self,
         querier: BatchQuerier,
-    ) -> DeploymentInfoSearchResult:
-        """Search endpoints with pagination and filtering.
+    ) -> ModelDeploymentDataSearchResult:
+        """Search every endpoint without a scope filter, projecting each row
+        directly to ``ModelDeploymentData``.
 
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination
-
-        Returns:
-            DeploymentInfoSearchResult with items, total_count, and pagination info
+        Backs ``DeploymentAdminRepository.admin_search_deployments`` — the
+        admin label makes the unscoped intent explicit at every layer of
+        the stack (db_source → repository → service).
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(
@@ -1133,21 +1161,89 @@ class DeploymentDBSource:
                 querier,
             )
 
-            items = [row.EndpointRow.to_deployment_info() for row in result.rows]
+            items = [row.EndpointRow.to_model_deployment_data() for row in result.rows]
 
-            return DeploymentInfoSearchResult(
+            return ModelDeploymentDataSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_deployments_in_project(
+    async def search_user_deployments(
+        self,
+        querier: BatchQuerier,
+        scope: UserDeploymentSearchScope,
+    ) -> ModelDeploymentDataSearchResult:
+        """Search deployments owned by a specific user, returning ``ModelDeploymentData``.
+
+        Backs the v2 adapter's ``my_search`` path. Scope filter
+        (``EndpointRow.created_user == user_id``) is injected via
+        ``execute_batch_querier``'s ``scope`` argument.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointRow).options(
+                selectinload(EndpointRow.current_revision_row),
+                selectinload(EndpointRow.deploying_revision_row),
+                selectinload(EndpointRow.deployment_policy),
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
+            )
+
+            items = [row.EndpointRow.to_model_deployment_data() for row in result.rows]
+
+            return ModelDeploymentDataSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_project_deployments(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectDeploymentSearchScope,
+    ) -> ModelDeploymentDataSearchResult:
+        """Search deployments in a project, returning ``ModelDeploymentData``.
+
+        Distinct from :meth:`search_project_deployment_summary`, which
+        returns the lighter-weight ``DeploymentSummaryData`` for project
+        admin list pages. Backs the v2 adapter's ``project_search`` path.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointRow).options(
+                selectinload(EndpointRow.current_revision_row),
+                selectinload(EndpointRow.deploying_revision_row),
+                selectinload(EndpointRow.deployment_policy),
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
+            )
+
+            items = [row.EndpointRow.to_model_deployment_data() for row in result.rows]
+
+            return ModelDeploymentDataSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_project_deployment_summary(
         self,
         querier: BatchQuerier,
         scope: ProjectDeploymentSearchScope,
     ) -> DeploymentSummarySearchResult:
-        """Search endpoints within a project scope with pagination and filtering.
+        """Search lightweight deployment summaries within a project scope.
 
         Returns lightweight DeploymentSummaryData built from EndpointRow scalar
         columns only (no eager-loaded relationships). Revision and policy

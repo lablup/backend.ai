@@ -35,7 +35,7 @@ from ai.backend.common.dto.manager.deployment import (
     RouteDTO,
     RouteFilter,
     RouteOrder,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
     UpsertDeploymentPolicyRequest,
@@ -170,7 +170,7 @@ class DeploymentAdapter(BaseFilterAdapter):
             sub_step=data.sub_step,
         )
 
-    def build_querier(self, request: SearchDeploymentsRequest) -> BatchQuerier:
+    def build_querier(self, request: SearchLegacyDeploymentsRequest) -> BatchQuerier:
         """
         Build a BatchQuerier for deployments from search request.
 

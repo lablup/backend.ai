@@ -1,5 +1,6 @@
 from typing import Any, Self
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import CIStrEnum
 
 
@@ -47,6 +48,20 @@ class ModelDeploymentStatus(CIStrEnum):
             if alias is not None:
                 return cls(alias)
         return super()._missing_(value)
+
+    @classmethod
+    def from_lifecycle(cls, lifecycle: EndpointLifecycle) -> "ModelDeploymentStatus":
+        match lifecycle:
+            case EndpointLifecycle.PENDING | EndpointLifecycle.CREATED:
+                return cls.PENDING
+            case EndpointLifecycle.READY | EndpointLifecycle.SCALING:
+                return cls.READY
+            case EndpointLifecycle.DEPLOYING:
+                return cls.DEPLOYING
+            case EndpointLifecycle.DESTROYING:
+                return cls.STOPPING
+            case EndpointLifecycle.DESTROYED:
+                return cls.STOPPED
 
 
 class DeploymentStrategy(CIStrEnum):
