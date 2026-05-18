@@ -92,7 +92,7 @@ class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
             added_version=NEXT_RELEASE_VERSION,
             description=(
                 "Per-variant baseline ``ModelDefinitionDraft`` serialized as JSON. An empty "
-                "draft (``{\"models\": null}``) indicates the definition is fully sourced "
+                'draft (``{"models": null}``) indicates the definition is fully sourced '
                 "from the vfolder at revision creation time."
             ),
         ),

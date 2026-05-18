@@ -22,7 +22,7 @@ class RuntimeVariantNode(BaseResponseModel):
     default_model_definition: dict[str, Any] = Field(
         description=(
             "Per-variant baseline ``ModelDefinitionDraft`` serialized as JSON. An empty "
-            "draft (``{\"models\": null}``) indicates the definition is fully sourced "
+            'draft (``{"models": null}``) indicates the definition is fully sourced '
             "from the vfolder at revision creation time."
         ),
     )

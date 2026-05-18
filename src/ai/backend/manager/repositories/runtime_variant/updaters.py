@@ -13,9 +13,7 @@ from ai.backend.manager.types import OptionalState, TriState
 class RuntimeVariantUpdaterSpec(UpdaterSpec[RuntimeVariantRow]):
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
-    reads_vfolder_config_files: OptionalState[bool] = field(
-        default_factory=OptionalState[bool].nop
-    )
+    reads_vfolder_config_files: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     default_model_definition: OptionalState[ModelDefinitionDraft] = field(
         default_factory=OptionalState[ModelDefinitionDraft].nop
     )
