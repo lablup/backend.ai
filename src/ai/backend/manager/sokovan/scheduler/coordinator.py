@@ -48,7 +48,6 @@ from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatc
 from ai.backend.manager.repositories.scheduling_history.creators import (
     SessionSchedulingHistoryCreatorSpec,
 )
-from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.data import (
     KernelCreationInfo,
     PromotionSpec,
@@ -57,6 +56,7 @@ from ai.backend.manager.sokovan.data import (
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
 
