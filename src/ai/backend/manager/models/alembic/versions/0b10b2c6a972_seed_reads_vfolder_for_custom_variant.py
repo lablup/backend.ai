@@ -36,8 +36,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        sa.text(
-            "UPDATE runtime_variants SET reads_vfolder_config_files = false WHERE name = 'custom'"
-        )
-    )
+    pass
