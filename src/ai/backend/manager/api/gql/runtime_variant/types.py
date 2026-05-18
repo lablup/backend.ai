@@ -5,6 +5,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from strawberry.relay import Connection, Edge, NodeID
+from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput as CreateRuntimeVariantInputDTO,
@@ -36,10 +37,12 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload as UpdateRuntimeVariantPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -47,6 +50,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.deployment.types.revision import ModelDefinitionInputGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 
@@ -73,6 +77,25 @@ class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     )
     description: str | None = gql_field(
         description="Human-readable description explaining the runtime engine and its typical use cases."
+    )
+    reads_vfolder_config_files: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether the runtime engine reads service configuration from files inside the "
+                "mounted vfolder (e.g., ``model-definition.yaml``)."
+            ),
+        ),
+    )
+    default_model_definition: JSON = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Per-variant baseline ``ModelDefinitionDraft`` serialized as JSON. An empty "
+                "draft (``{\"models\": null}``) indicates the definition is fully sourced "
+                "from the vfolder at revision creation time."
+            ),
+        ),
     )
     created_at: datetime = gql_field(
         description="Timestamp when this runtime variant was registered."
@@ -124,6 +147,26 @@ class CreateRuntimeVariantInputGQL(PydanticInputMixin[CreateRuntimeVariantInputD
     description: str | None = gql_field(
         default=None, description="Human-readable description of the runtime engine."
     )
+    reads_vfolder_config_files: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether the runtime engine reads service configuration from files inside "
+                "the mounted vfolder. Defaults to ``False``."
+            ),
+        ),
+        default=False,
+    )
+    default_model_definition: ModelDefinitionInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Per-variant baseline ``ModelDefinitionDraft``. Omit to register a variant "
+                "whose definition is fully sourced from the vfolder."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -134,6 +177,23 @@ class UpdateRuntimeVariantInputGQL(PydanticInputMixin[UpdateRuntimeVariantInputD
     id: UUID = gql_field(description="Runtime variant ID.")
     name: str | None = gql_field(default=None, description="New name.")
     description: str | None = gql_field(default=None, description="New description.")
+    reads_vfolder_config_files: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="New ``reads_vfolder_config_files`` value. ``null`` keeps the existing value.",
+        ),
+        default=None,
+    )
+    default_model_definition: ModelDefinitionInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "New baseline draft. ``null`` keeps the existing value; pass an empty "
+                "object to clear models back to an empty draft."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_type(

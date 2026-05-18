@@ -8,6 +8,7 @@ Test matrix:
   - Update: modifies description
   - Delete: removes runtime variant
   - Duplicate name: returns 409 conflict
+  - reads_vfolder_config_files + default_model_definition round-trip
 """
 
 from __future__ import annotations
@@ -17,6 +18,11 @@ import pytest
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelConfigInput,
+    ModelDefinitionInput,
+    ModelServiceConfigInput,
+)
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
     RuntimeVariantFilter,
@@ -148,5 +154,134 @@ class TestRuntimeVariantCRUD:
                     CreateRuntimeVariantInput(name="dup-test-variant")
                 )
             assert exc_info.value.args[0] == 409
+        finally:
+            await admin_v2_registry.runtime_variant.delete(variant_id)
+
+
+class TestRuntimeVariantExtendedFields:
+    """Round-trip tests for ``reads_vfolder_config_files`` and ``default_model_definition``."""
+
+    async def test_create_without_fields_uses_empty_draft(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        database_fixture: None,
+    ) -> None:
+        """Default create should succeed with an empty draft baseline."""
+        create_result = await admin_v2_registry.runtime_variant.create(
+            CreateRuntimeVariantInput(name="default-fields-variant")
+        )
+        variant = create_result.runtime_variant
+        try:
+            assert variant.reads_vfolder_config_files is False
+            assert variant.default_model_definition == {"models": None}
+        finally:
+            await admin_v2_registry.runtime_variant.delete(variant.id)
+
+    async def test_create_with_fields(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        database_fixture: None,
+    ) -> None:
+        """Create with both fields should round-trip through GET."""
+        definition = ModelDefinitionInput(
+            models=[
+                ModelConfigInput(
+                    name="my-model",
+                    service=ModelServiceConfigInput(port=8000),
+                ),
+            ],
+        )
+        create_result = await admin_v2_registry.runtime_variant.create(
+            CreateRuntimeVariantInput(
+                name="with-fields-variant",
+                reads_vfolder_config_files=True,
+                default_model_definition=definition,
+            )
+        )
+        variant = create_result.runtime_variant
+        try:
+            assert variant.reads_vfolder_config_files is True
+            models = variant.default_model_definition["models"]
+            assert isinstance(models, list)
+            assert models[0]["name"] == "my-model"
+            assert models[0]["service"]["port"] == 8000
+
+            fetched = await admin_v2_registry.runtime_variant.get(variant.id)
+            assert fetched.reads_vfolder_config_files is True
+            assert fetched.default_model_definition == variant.default_model_definition
+        finally:
+            await admin_v2_registry.runtime_variant.delete(variant.id)
+
+    async def test_update_fields(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        database_fixture: None,
+    ) -> None:
+        """Update should change ``reads_vfolder_config_files`` and ``default_model_definition``."""
+        create_result = await admin_v2_registry.runtime_variant.create(
+            CreateRuntimeVariantInput(name="update-fields-variant")
+        )
+        variant_id = create_result.runtime_variant.id
+
+        try:
+            new_definition = ModelDefinitionInput(
+                models=[
+                    ModelConfigInput(
+                        name="updated-model",
+                        service=ModelServiceConfigInput(port=9000),
+                    ),
+                ],
+            )
+            update_result = await admin_v2_registry.runtime_variant.update(
+                variant_id,
+                UpdateRuntimeVariantInput(
+                    id=variant_id,
+                    reads_vfolder_config_files=True,
+                    default_model_definition=new_definition,
+                ),
+            )
+            updated = update_result.runtime_variant
+            assert updated.reads_vfolder_config_files is True
+            models = updated.default_model_definition["models"]
+            assert isinstance(models, list)
+            assert models[0]["name"] == "updated-model"
+            assert models[0]["service"]["port"] == 9000
+        finally:
+            await admin_v2_registry.runtime_variant.delete(variant_id)
+
+    async def test_update_omits_fields_keeps_existing(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        database_fixture: None,
+    ) -> None:
+        """Omitting the new fields on update must leave them unchanged."""
+        definition = ModelDefinitionInput(
+            models=[
+                ModelConfigInput(
+                    name="keep-me",
+                    service=ModelServiceConfigInput(port=7000),
+                ),
+            ],
+        )
+        create_result = await admin_v2_registry.runtime_variant.create(
+            CreateRuntimeVariantInput(
+                name="omit-fields-variant",
+                reads_vfolder_config_files=True,
+                default_model_definition=definition,
+            )
+        )
+        variant_id = create_result.runtime_variant.id
+
+        try:
+            update_result = await admin_v2_registry.runtime_variant.update(
+                variant_id,
+                UpdateRuntimeVariantInput(
+                    id=variant_id,
+                    description="touch only description",
+                ),
+            )
+            updated = update_result.runtime_variant
+            assert updated.reads_vfolder_config_files is True
+            assert updated.default_model_definition["models"][0]["name"] == "keep-me"
         finally:
             await admin_v2_registry.runtime_variant.delete(variant_id)

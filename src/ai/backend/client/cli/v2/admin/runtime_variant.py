@@ -126,8 +126,16 @@ def get(variant_id: uuid.UUID) -> None:
 def create(body: str) -> None:
     """Create a new runtime variant (superadmin only).
 
-    BODY is a JSON string. Example: '{"name":"my-runtime","description":"My runtime"}'
+    BODY is a JSON string. Recognized keys: ``name`` (required), ``description``,
+    ``reads_vfolder_config_files`` (bool, default ``false``), and
+    ``default_model_definition`` (``ModelDefinitionDraft`` shape; omit for an
+    empty draft that gets sourced from the vfolder).
+
+    Example:
+      '{"name":"my-runtime","reads_vfolder_config_files":false,
+        "default_model_definition":{"models":[{"name":"m","service":{"port":8000}}]}}'
     """
+    from ai.backend.common.dto.manager.v2.deployment.request import ModelDefinitionInput
     from ai.backend.common.dto.manager.v2.runtime_variant.request import CreateRuntimeVariantInput
 
     try:
@@ -136,6 +144,11 @@ def create(body: str) -> None:
         click.echo(f"Invalid JSON: {e}", err=True)
         sys.exit(1)
 
+    raw_definition = data.get("default_model_definition")
+    definition_input = (
+        ModelDefinitionInput.model_validate(raw_definition) if raw_definition is not None else None
+    )
+
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
@@ -143,6 +156,8 @@ def create(body: str) -> None:
                 CreateRuntimeVariantInput(
                     name=data["name"],
                     description=data.get("description"),
+                    reads_vfolder_config_files=data.get("reads_vfolder_config_files", False),
+                    default_model_definition=definition_input,
                 ),
             )
             print_result(result)
@@ -158,8 +173,12 @@ def create(body: str) -> None:
 def update(variant_id: uuid.UUID, body: str) -> None:
     """Update a runtime variant (superadmin only).
 
-    BODY is a JSON string with fields to update.
+    BODY is a JSON string with fields to update. Recognized keys: ``name``,
+    ``description``, ``reads_vfolder_config_files`` (bool), and
+    ``default_model_definition`` (``ModelDefinitionDraft`` shape). Omit a key
+    to leave that field unchanged.
     """
+    from ai.backend.common.dto.manager.v2.deployment.request import ModelDefinitionInput
     from ai.backend.common.dto.manager.v2.runtime_variant.request import UpdateRuntimeVariantInput
 
     try:
@@ -167,6 +186,11 @@ def update(variant_id: uuid.UUID, body: str) -> None:
     except json.JSONDecodeError as e:
         click.echo(f"Invalid JSON: {e}", err=True)
         sys.exit(1)
+
+    raw_definition = data.get("default_model_definition")
+    definition_input = (
+        ModelDefinitionInput.model_validate(raw_definition) if raw_definition is not None else None
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -177,6 +201,8 @@ def update(variant_id: uuid.UUID, body: str) -> None:
                     id=variant_id,
                     name=data.get("name"),
                     description=data.get("description"),
+                    reads_vfolder_config_files=data.get("reads_vfolder_config_files"),
+                    default_model_definition=definition_input,
                 ),
             )
             print_result(result)

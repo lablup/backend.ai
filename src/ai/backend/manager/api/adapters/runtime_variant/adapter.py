@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
     DeleteRuntimeVariantsInput,
@@ -120,10 +121,21 @@ class RuntimeVariantAdapter(BaseAdapter):
         self,
         input: CreateRuntimeVariantInput,
     ) -> CreateRuntimeVariantPayload:
+        # ``default_model_definition`` is NOT NULL in the DB; default to an
+        # empty draft (``{"models": None}``) when the caller omits it so the
+        # row inserts cleanly. Operators wanting a real baseline can fill it
+        # in later via update.
+        default_definition = (
+            input.default_model_definition.to_draft()
+            if input.default_model_definition is not None
+            else ModelDefinitionDraft()
+        )
         creator = Creator(
             spec=RuntimeVariantCreatorSpec(
                 name=input.name,
                 description=input.description,
+                reads_vfolder_config_files=input.reads_vfolder_config_files,
+                default_model_definition=default_definition,
             )
         )
         result = await self._processors.runtime_variant.create.wait_for_complete(
@@ -145,6 +157,16 @@ class RuntimeVariantAdapter(BaseAdapter):
                 TriState.nullify()
                 if input.description is None
                 else TriState.update(input.description)
+            ),
+            reads_vfolder_config_files=(
+                OptionalState.update(input.reads_vfolder_config_files)
+                if input.reads_vfolder_config_files is not None
+                else OptionalState.nop()
+            ),
+            default_model_definition=(
+                OptionalState.update(input.default_model_definition.to_draft())
+                if input.default_model_definition is not None
+                else OptionalState.nop()
             ),
         )
         updater: Updater[RuntimeVariantRow] = Updater(spec=spec, pk_value=input.id)
@@ -229,6 +251,8 @@ class RuntimeVariantAdapter(BaseAdapter):
             id=data.id,
             name=data.name,
             description=data.description,
+            reads_vfolder_config_files=data.reads_vfolder_config_files,
+            default_model_definition=data.default_model_definition.model_dump(by_alias=False),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

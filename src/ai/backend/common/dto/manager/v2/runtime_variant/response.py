@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -12,6 +13,19 @@ class RuntimeVariantNode(BaseResponseModel):
     id: UUID = Field(description="ID of the runtime variant.")
     name: str = Field(description="Unique name of the runtime variant.")
     description: str | None = Field(default=None, description="Description.")
+    reads_vfolder_config_files: bool = Field(
+        description=(
+            "Whether the runtime engine reads service configuration from files inside the "
+            "mounted vfolder (e.g., ``model-definition.yaml``)."
+        ),
+    )
+    default_model_definition: dict[str, Any] = Field(
+        description=(
+            "Per-variant baseline ``ModelDefinitionDraft`` serialized as JSON. An empty "
+            "draft (``{\"models\": null}``) indicates the definition is fully sourced "
+            "from the vfolder at revision creation time."
+        ),
+    )
     created_at: datetime = Field(description="Creation timestamp.")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp.")
 
