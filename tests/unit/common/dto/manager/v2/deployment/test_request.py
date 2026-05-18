@@ -70,6 +70,25 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInput:
     return CreateRevisionInput(**defaults)
 
 
+class TestModelMountConfigInput:
+    """Tests for ModelMountConfigInput model."""
+
+    def test_definition_path_defaults_to_none(self) -> None:
+        config = ModelMountConfigInput(
+            vfolder_id=VFolderUUID(uuid.uuid4()),
+            mount_destination="/models",
+        )
+        assert config.definition_path is None
+
+    def test_empty_definition_path_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            ModelMountConfigInput.model_validate({
+                "vfolder_id": str(uuid.uuid4()),
+                "mount_destination": "/models",
+                "definition_path": "",
+            })
+
+
 class TestExtraVFolderMountInput:
     """Tests for ExtraVFolderMountInput model."""
 

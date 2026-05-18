@@ -160,3 +160,12 @@ class TestRevisionDraftMerge:
 
         assert merged.mounts is not None
         assert merged.mounts.model_definition_path == "model-definition.yml"
+
+    def test_mount_definition_path_treats_empty_string_as_missing(self) -> None:
+        base = RevisionDraft(mounts=_mounts("model-definition.yml"))
+        override = RevisionDraft(mounts=_mounts(""))
+
+        merged = base.merge(override)
+
+        assert merged.mounts is not None
+        assert merged.mounts.model_definition_path == "model-definition.yml"

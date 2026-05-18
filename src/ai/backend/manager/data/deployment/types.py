@@ -668,13 +668,11 @@ def _merge_mounts(
     return MountMetadata(
         model_vfolder_id=upper.model_vfolder_id,
         model_definition_path=upper.model_definition_path
-        if upper.model_definition_path is not None
+        if upper.model_definition_path
         else lower.model_definition_path,
         model_mount_destination=upper.model_mount_destination,
         extra_mounts=list(upper.extra_mounts),
-        vfolder_subpath=upper.vfolder_subpath
-        if upper.vfolder_subpath is not None
-        else lower.vfolder_subpath,
+        vfolder_subpath=upper.vfolder_subpath if upper.vfolder_subpath else lower.vfolder_subpath,
     )
 
 
