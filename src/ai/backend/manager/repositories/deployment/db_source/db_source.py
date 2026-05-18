@@ -413,15 +413,7 @@ class DeploymentDBSource:
             EndpointNotFound: If the endpoint does not exist.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .options(
-                    selectinload(EndpointRow.current_revision_row),
-                    selectinload(EndpointRow.deploying_revision_row),
-                    selectinload(EndpointRow.deployment_policy),
-                )
-            )
+            query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
             result = await db_sess.execute(query)
             row: EndpointRow | None = result.scalar_one_or_none()
 
@@ -1148,11 +1140,7 @@ class DeploymentDBSource:
         the stack (db_source → repository → service).
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.current_revision_row),
-                selectinload(EndpointRow.deploying_revision_row),
-                selectinload(EndpointRow.deployment_policy),
-            )
+            query = sa.select(EndpointRow)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -1181,11 +1169,7 @@ class DeploymentDBSource:
         ``execute_batch_querier``'s ``scope`` argument.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.current_revision_row),
-                selectinload(EndpointRow.deploying_revision_row),
-                selectinload(EndpointRow.deployment_policy),
-            )
+            query = sa.select(EndpointRow)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -1215,11 +1199,7 @@ class DeploymentDBSource:
         admin list pages. Backs the v2 adapter's ``project_search`` path.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.current_revision_row),
-                selectinload(EndpointRow.deploying_revision_row),
-                selectinload(EndpointRow.deployment_policy),
-            )
+            query = sa.select(EndpointRow)
 
             result = await execute_batch_querier(
                 db_sess,

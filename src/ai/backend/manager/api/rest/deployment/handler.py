@@ -128,10 +128,7 @@ class DeploymentAPIHandler:
         self._runtime_variant_adapter = runtime_variant_adapter
         self._revision_adapter = RevisionAdapter()
         self._policy_adapter = DeploymentPolicyAdapter()
-        self._deployment_adapter = DeploymentAdapter(
-            revision_adapter=self._revision_adapter,
-            policy_adapter=self._policy_adapter,
-        )
+        self._deployment_adapter = DeploymentAdapter()
         self._route_adapter = RouteAdapter()
         self._create_deployment_adapter = CreateDeploymentAdapter()
         self._add_revision_adapter = AddRevisionAdapter()
@@ -145,29 +142,21 @@ class DeploymentAPIHandler:
         resolving the runtime-variant id back to its name so the legacy
         shape stays stable.
         """
-        variant_name = await self._resolve_revision_variant_name(data)
-        return self._revision_adapter.convert_to_dto(data, variant_name)
-
-    async def _resolve_revision_variant_name(self, data: ModelRevisionData) -> RuntimeVariant:
-        """Resolve the runtime-variant name from a revision's variant id."""
         variant_node = await self._runtime_variant_adapter.get(
             data.model_runtime_config.runtime_variant_id
         )
-        return RuntimeVariant(variant_node.name)
+        return self._revision_adapter.convert_to_dto(data, RuntimeVariant(variant_node.name))
 
-    async def _deployment_dto(self, data: ModelDeploymentData) -> DeploymentDTO:
-        """Render a deployment DTO with runtime-variant name pre-resolved.
+    def _deployment_dto(self, data: ModelDeploymentData) -> DeploymentDTO:
+        """Render a deployment DTO.
 
-        ``DeploymentAdapter.convert_to_dto`` expects the caller to provide
-        the runtime-variant name; when no current revision exists the
-        value is an empty ``RuntimeVariant`` sentinel since the adapter
-        drops ``current_revision`` anyway.
+        Synchronous now — the v1 response surface mirrors the v2 GQL node
+        and only carries ``current_revision_id`` / ``deploying_revision_id``,
+        so there is no nested revision to resolve here. Clients fetch the
+        revision spec through ``GET /deployments/{deployment_id}/revisions/{id}``
+        and the policy through ``GET /deployments/{deployment_id}/policy``.
         """
-        if data.revision is None:
-            variant_name = RuntimeVariant("")
-        else:
-            variant_name = await self._resolve_revision_variant_name(data.revision)
-        return self._deployment_adapter.convert_to_dto(data, variant_name)
+        return self._deployment_adapter.convert_to_dto(data)
 
     # Deployment Endpoints
 
@@ -192,7 +181,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = CreateDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
+        resp = CreateDeploymentResponse(deployment=self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_deployments(
@@ -214,7 +203,7 @@ class DeploymentAPIHandler:
             SearchProjectDeploymentsAction(scope=scope, querier=querier)
         )
 
-        deployment_dtos = [await self._deployment_dto(dep) for dep in action_result.data]
+        deployment_dtos = [self._deployment_dto(dep) for dep in action_result.data]
         resp = ListDeploymentsResponse(
             deployments=deployment_dtos,
             pagination=PaginationInfo(
@@ -236,7 +225,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = GetDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
+        resp = GetDeploymentResponse(deployment=self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def update_deployment(
@@ -273,7 +262,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = UpdateDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
+        resp = UpdateDeploymentResponse(deployment=self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def destroy_deployment(

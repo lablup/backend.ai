@@ -98,13 +98,11 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     UpsertDeploymentPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
-    BlueGreenConfigInfo,
     BlueGreenStrategySpecInfo,
     ClusterConfigInfoDTO,
     DeploymentMetadataInfoDTO,
     DeploymentNetworkAccessInfoDTO,
     DeploymentOrderField,
-    DeploymentPolicyInfo,
     DeploymentStrategyInfoDTO,
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -117,7 +115,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaStateInfo,
     ResourceConfigInfoDTO,
     RevisionOrderField,
-    RollingUpdateConfigInfo,
     RollingUpdateStrategySpecInfo,
     RouteOrderField,
 )
@@ -2229,26 +2226,6 @@ class DeploymentAdapter(BaseAdapter):
 
     @staticmethod
     def _deployment_data_to_dto(data: ModelDeploymentData) -> DeploymentNode:
-        policy_info: DeploymentPolicyInfo | None = None
-        if data.policy is not None:
-            policy_spec = data.policy.strategy_spec
-            rolling: RollingUpdateConfigInfo | None = None
-            blue_green: BlueGreenConfigInfo | None = None
-            if isinstance(policy_spec, RollingUpdateSpec):
-                rolling = RollingUpdateConfigInfo(
-                    max_surge=policy_spec.max_surge,
-                    max_unavailable=policy_spec.max_unavailable,
-                )
-            elif isinstance(policy_spec, BlueGreenSpec):
-                blue_green = BlueGreenConfigInfo(
-                    auto_promote=policy_spec.auto_promote,
-                    promote_delay_seconds=policy_spec.promote_delay_seconds,
-                )
-            policy_info = DeploymentPolicyInfo(
-                strategy=data.policy.strategy,
-                rolling_update=rolling,
-                blue_green=blue_green,
-            )
         return DeploymentNode(
             id=data.id,
             metadata=DeploymentMetadataInfoDTO(
@@ -2278,7 +2255,6 @@ class DeploymentAdapter(BaseAdapter):
             scaling_state=data.scaling_state,
             current_revision_id=data.current_revision_id,
             deploying_revision_id=data.deploying_revision_id,
-            policy=policy_info,
         )
 
     @staticmethod

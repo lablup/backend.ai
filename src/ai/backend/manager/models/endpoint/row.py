@@ -813,27 +813,16 @@ class EndpointRow(Base):  # type: ignore[misc]
     def to_model_deployment_data(self) -> ModelDeploymentData:
         """Project the row to the API-shaped ``ModelDeploymentData``.
 
-        Eager-load requirements: ``current_revision_row`` (and
-        ``deploying_revision_row`` if the spec is needed) plus
-        ``deployment_policy``. Mirrors the relationship usage in
-        ``to_deployment_info`` so the projection follows the same
-        column-direct lookup as the BA-6056 split — no list scan over
-        ``revisions``. ``current_revision_id`` / ``deploying_revision_id``
-        surface directly from the row columns; the joined ``revision``
-        spec is ``None`` when the row was not eager-loaded (callers can
-        still act on the ID).
+        Reads only the row's own columns — no relationship access — so the
+        caller does not need to eager-load anything beyond the endpoint
+        row itself. Joined children (revision spec, policy, replicas, etc.)
+        are surfaced through their dedicated DataLoader/resolver paths
+        (v2 GQL) or via the nested REST endpoints (v1 REST); the projection
+        only carries scope IDs.
         """
-        revision: ModelRevisionData | None = None
-        if self.current_revision_row is not None:
-            revision = self.current_revision_row.to_data()
-
         desired_count = (
             self.desired_replicas if self.desired_replicas is not None else self.replicas
         )
-        policy_data = (
-            self.deployment_policy.to_data() if self.deployment_policy is not None else None
-        )
-
         return ModelDeploymentData(
             id=self.id,
             metadata=ModelDeploymentMetadataInfo(
@@ -852,11 +841,8 @@ class EndpointRow(Base):  # type: ignore[misc]
                 url=self.url,
                 preferred_domain_name=None,
             ),
-            revision_history_ids=[self.current_revision] if self.current_revision else [],
-            revision=revision,
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
-            scaling_rule_ids=[],
             replica_state=ReplicaStateData(
                 desired_replica_count=desired_count,
                 replica_ids=[],
@@ -865,7 +851,6 @@ class EndpointRow(Base):  # type: ignore[misc]
             created_user_id=self.created_user,
             options=self.options,
             scaling_state=self.scaling_state,
-            policy=policy_data,
             sub_step=self.sub_step,
         )
 

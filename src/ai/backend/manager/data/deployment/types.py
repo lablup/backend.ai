@@ -1078,14 +1078,21 @@ class ReplicaStateData:
 
 @dataclass
 class ModelDeploymentData:
+    """API-shaped projection of an ``EndpointRow``.
+
+    Carries only the row's own columns (plus the metadata composite). Joined
+    children — current/deploying revision spec, deployment policy, replica
+    list, auto-scaling rules, access tokens — are NOT included; the v2 GQL
+    layer fetches each via its own DataLoader/resolver and v1 REST clients
+    follow up with the dedicated nested endpoints. The projection therefore
+    stays scope-id-only and requires no eager loads beyond the row itself.
+    """
+
     id: DeploymentID
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkData
-    revision: ModelRevisionData | None
     current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None
-    revision_history_ids: list[DeploymentRevisionID]
-    scaling_rule_ids: list[UUID]
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
@@ -1094,8 +1101,6 @@ class ModelDeploymentData:
     # whether the endpoint is currently reconciling its replica count
     # (``SCALING``) or holding at the desired count (``STABLE``).
     scaling_state: ScalingState
-    policy: DeploymentPolicyData | None = None
-    access_token_ids: list[UUID] | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
 

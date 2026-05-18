@@ -26,7 +26,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ClusterConfigInfoDTO,
     DeploymentMetadataInfoDTO,
     DeploymentNetworkAccessInfoDTO,
-    DeploymentPolicyInfo,
     DeploymentStrategyInfoDTO,
     ExtraVFolderMountGQLDTO,
     ModelDefinitionInfoDTO,
@@ -175,9 +174,6 @@ class DeploymentNode(BaseResponseModel):
     deploying_revision_id: UUID | None = Field(
         default=None,
         description="ID of the revision currently being deployed (in progress, not yet active)",
-    )
-    policy: DeploymentPolicyInfo | None = Field(
-        default=None, description="Deployment update policy"
     )
 
 
