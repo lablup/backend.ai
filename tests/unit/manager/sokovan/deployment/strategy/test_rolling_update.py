@@ -25,6 +25,7 @@ from pydantic import ValidationError
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.model_deployment.types import DeploymentLifecycleSubStep
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.deployment import DeploymentID
@@ -32,7 +33,6 @@ from ai.backend.common.identifier.deployment_revision import DeploymentRevisionI
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkData,
     DeploymentOptions,
