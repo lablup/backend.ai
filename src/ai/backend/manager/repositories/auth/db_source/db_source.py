@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.exception import BackendAIError, UserNotFound
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -21,6 +22,7 @@ from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import (
+    AccessKeyNotFound,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
@@ -291,6 +293,16 @@ class AuthDBSource:
             if row is None:
                 raise ValueError("Unknown owner access key")
             return row.domain_name, row.role
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_id_by_access_key(self, access_key: str) -> UserID:
+        async with self._db.begin_readonly() as conn:
+            query = sa.select(keypairs.c.user).where(keypairs.c.access_key == access_key)
+            result = await conn.execute(query)
+            row = result.scalar()
+            if row is None:
+                raise AccessKeyNotFound("Unknown access key")
+            return UserID(UUID(str(row)))
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
