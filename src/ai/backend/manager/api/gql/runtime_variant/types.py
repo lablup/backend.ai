@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
+from strawberry import UNSET
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
@@ -134,7 +135,7 @@ class UpdateRuntimeVariantInputGQL(PydanticInputMixin[UpdateRuntimeVariantInputD
     id: UUID = gql_field(description="Runtime variant ID.")
     name: str | None = gql_field(default=None, description="New name.")
     description: str | None = gql_field(
-        description="New description. Omit to leave unchanged; pass null to clear."
+        default=UNSET, description="New description. Set to null to clear."
     )
 
 

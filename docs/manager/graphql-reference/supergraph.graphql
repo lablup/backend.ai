@@ -18800,7 +18800,7 @@ input UpdateRuntimeVariantInput
   """New name."""
   name: String = null
 
-  """New description. Omit to leave unchanged; pass null to clear."""
+  """New description. Set to null to clear."""
   description: String
 }
 
