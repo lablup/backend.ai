@@ -3907,6 +3907,16 @@ input CreateRuntimeVariantInput
 
   """Human-readable description of the runtime engine."""
   description: String = null
+
+  """
+  Added in UNRELEASED. Whether the runtime engine reads service configuration from files inside the mounted vfolder. Defaults to ``False``.
+  """
+  readsVfolderConfigFiles: Boolean! = false
+
+  """
+  Added in UNRELEASED. Per-variant baseline ``ModelDefinitionDraft``. Omit to register a variant whose definition is fully sourced from the vfolder.
+  """
+  defaultModelDefinition: ModelDefinitionInput = null
 }
 
 """Added in 26.4.2. Payload for runtime variant creation."""
@@ -16357,6 +16367,16 @@ type RuntimeVariant implements Node
   """
   description: String
 
+  """
+  Added in UNRELEASED. Whether the runtime engine reads service configuration from files inside the mounted vfolder (e.g., ``model-definition.yaml``).
+  """
+  readsVfolderConfigFiles: Boolean!
+
+  """
+  Added in UNRELEASED. Per-variant baseline ``ModelDefinitionDraft`` serialized as JSON. An empty draft (``{"models": null}``) indicates the definition is fully sourced from the vfolder at revision creation time.
+  """
+  defaultModelDefinition: JSON!
+
   """Timestamp when this runtime variant was registered."""
   createdAt: DateTime!
 
@@ -18802,6 +18822,16 @@ input UpdateRuntimeVariantInput
 
   """New description."""
   description: String = null
+
+  """
+  Added in UNRELEASED. New ``reads_vfolder_config_files`` value. ``null`` keeps the existing value.
+  """
+  readsVfolderConfigFiles: Boolean = null
+
+  """
+  Added in UNRELEASED. New baseline draft. ``null`` keeps the existing value; pass an empty object to clear models back to an empty draft.
+  """
+  defaultModelDefinition: ModelDefinitionInput = null
 }
 
 """Added in 26.4.2. Payload for runtime variant update."""
