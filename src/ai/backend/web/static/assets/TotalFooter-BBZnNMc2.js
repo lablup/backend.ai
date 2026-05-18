@@ -1,2 +1,0 @@
-import{t as n,ab as r,j as s,B as c,c6 as x,T as l}from"./index-Cd_TYquF.js";const i=({loading:e,total:t})=>{const{token:o}=n.useToken(),{t:a}=r();return s.jsxs(c,{justify:"end",gap:"xs",children:[e?s.jsx(x,{spin:!0,style:{color:o.colorTextSecondary}}):s.jsx("div",{}),s.jsx(l.Text,{type:"secondary",children:a("general.TotalItems",{total:t})})]})};export{i as T};
-//# sourceMappingURL=TotalFooter-BBZnNMc2.js.map

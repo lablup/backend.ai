@@ -1,3 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/EduAppLauncher-whBIUWpP.js","assets/index-Cd_TYquF.js"])))=>i.map(i=>d[i]);
-import{j as s,dr as c,r as p,h as i,it as u,be as l,cV as d}from"./index-Cd_TYquF.js";const x=l.lazy(()=>d(()=>import("./EduAppLauncher-whBIUWpP.js"),__vite__mapDeps([0,1]))),j=({sToken:a,extraParams:e})=>s.jsxs(s.Fragment,{children:[s.jsx(c,{}),s.jsx(p.Suspense,{fallback:null,children:s.jsx(m,{sToken:a,extraParams:e})})]}),m=a=>{"use memo";const e=i.c(4),{sToken:r,extraParams:n}=a,o=u();let t;return e[0]!==o||e[1]!==n||e[2]!==r?(t=s.jsx(x,{apiEndpoint:o,active:!0,sToken:r,extraParams:n}),e[0]=o,e[1]=n,e[2]=r,e[3]=t):t=e[3],t};export{j as default};
-//# sourceMappingURL=EduAppLauncherPage-D2iHLwXw.js.map
