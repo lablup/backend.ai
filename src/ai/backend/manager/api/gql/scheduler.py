@@ -117,7 +117,7 @@ async def scheduling_events_by_session(
     try:
         session_uuid = SessionId(uuid.UUID(session_id))
     except (ValueError, AttributeError) as e:
-        log.warning(f"Invalid session ID format: {session_id}")
+        log.warning("Invalid session ID format: {}", session_id)
         raise InvalidSessionId(f"Invalid session ID format: {session_id}") from e
 
     event_hub = info.context.event_hub
@@ -133,7 +133,7 @@ async def scheduling_events_by_session(
                 try:
                     status_dto = SchedulingStatusDTO(event.status_transition)
                 except ValueError:
-                    log.warning(f"Unknown status transition: {event.status_transition}")
+                    log.warning("Unknown status transition: {}", event.status_transition)
                     status_dto = SchedulingStatusDTO.ERROR
                 dto = SchedulingBroadcastEventPayloadNode(
                     session_id=str(event.session_id),

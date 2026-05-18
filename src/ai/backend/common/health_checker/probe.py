@@ -131,7 +131,7 @@ class HealthProbe:
         for checker, result_or_exc in zip(snapshot, results_or_exc, strict=True):
             service_group = checker.target_service_group
             if isinstance(result_or_exc, BaseException):
-                log.error(f"Unexpected error checking {service_group}: {result_or_exc}")
+                log.error("Unexpected error checking {}: {}", service_group, result_or_exc)
                 continue
             results[service_group] = result_or_exc
 
@@ -139,13 +139,13 @@ class HealthProbe:
         return AllServicesHealth(results=results)
 
     async def _run_loop(self) -> None:
-        log.debug(f"Health probe loop started (check interval: {self._options.check_interval}s)")
+        log.debug("Health probe loop started (check interval: {}s)", self._options.check_interval)
         try:
             while self._running:
                 try:
                     await self.check_all()
                 except Exception as e:
-                    log.error(f"Error in health probe loop: {e}", exc_info=True)
+                    log.error("Error in health probe loop: {}", e, exc_info=True)
                 finally:
                     await asyncio.sleep(self._options.check_interval)
         except asyncio.CancelledError:
@@ -162,13 +162,13 @@ class HealthProbe:
     ) -> ServiceHealth:
         try:
             result = await asyncio.wait_for(checker.check_service(), timeout=checker.timeout)
-            log.debug(f"Health check succeeded for {service_group}")
+            log.debug("Health check succeeded for {}", service_group)
             return result
         except TimeoutError:
-            log.warning(f"Health check timed out for {service_group} after {checker.timeout}s")
+            log.warning("Health check timed out for {} after {}s", service_group, checker.timeout)
             return ServiceHealth(results={})
         except Exception as e:
-            log.error(f"Health check failed for {service_group}: {e}", exc_info=True)
+            log.error("Health check failed for {}: {}", service_group, e, exc_info=True)
             return ServiceHealth(results={})
 
     async def get_connectivity_status(self) -> ConnectivityCheckResponse:

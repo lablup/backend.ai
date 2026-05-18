@@ -485,7 +485,7 @@ class SessionLauncher:
                     async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
                         await client.create_local_network(network_name)
                 except Exception:
-                    log.exception(f"Failed to create agent-local network {network_name}")
+                    log.exception("Failed to create agent-local network {}", network_name)
                     raise
                 network_config = {
                     "mode": "bridge",
@@ -501,8 +501,9 @@ class SessionLauncher:
                 if driver not in self._network_plugin_ctx.plugins:
                     available_plugins = list(self._network_plugin_ctx.plugins.keys())
                     log.error(
-                        f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
-                        f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
+                        "Network plugin '{}' not found. Available plugins: {}. For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'.",
+                        driver,
+                        available_plugins,
                     )
                     raise KeyError(
                         f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
@@ -518,7 +519,7 @@ class SessionLauncher:
                     network_name = network_info.network_id
                 except Exception:
                     log.exception(
-                        f"Failed to create the inter-container network (plugin: {driver})"
+                        "Failed to create the inter-container network (plugin: {})", driver
                     )
                     raise
         elif network_type == NetworkType.HOST:
@@ -531,7 +532,8 @@ class SessionLauncher:
                 for kernel in session.kernels:
                     if not kernel.agent_id:
                         log.warning(
-                            f"No agent assigned for kernel {kernel.kernel_id}, skipping port mapping"
+                            "No agent assigned for kernel {}, skipping port mapping",
+                            kernel.kernel_id,
                         )
                         continue
                     async with self._agent_client_pool.acquire(kernel.agent_id) as client:
