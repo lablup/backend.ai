@@ -61,7 +61,7 @@ class ServiceParser:
 
     async def parse(self, path: Path) -> None:
         for service_def_file in path.glob("*.json"):
-            log.debug(f"loading service-definition from {service_def_file}")
+            log.debug("loading service-definition from {}", service_def_file)
             try:
                 with service_def_file.absolute().open("rb") as fr:
                     raw_service_def = json.load(fr)

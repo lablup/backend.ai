@@ -38,7 +38,7 @@ class VFolderEventHandler:
         _source: AgentId,
         event: VFolderDeletionFailureEvent,
     ) -> None:
-        log.exception(f"Failed to delete vfolder (vfid:{event.vfid}, msg:{event.message})")
+        log.exception("Failed to delete vfolder (vfid:{}, msg:{})", event.vfid, event.message)
         await update_vfolder_status(
             self._db, [event.vfid.folder_id], VFolderOperationStatus.DELETE_ERROR, do_log=True
         )
@@ -63,7 +63,10 @@ class VFolderEventHandler:
         event: VFolderCloneFailureEvent,
     ) -> None:
         log.exception(
-            f"Failed to clone vfolder (vfid:{event.vfid}, dst:{event.dst_vfid} msg:{event.message})"
+            "Failed to clone vfolder (vfid:{}, dst:{} msg:{})",
+            event.vfid,
+            event.dst_vfid,
+            event.message,
         )
         await update_vfolder_status(
             self._db, [event.vfid.folder_id], VFolderOperationStatus.READY, do_log=True

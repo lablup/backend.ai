@@ -195,11 +195,13 @@ class ReservoirVFSFileDownloader:
                         self._bytes_downloaded += len(chunk)
                 except aiohttp.ClientError as e:
                     log.error(
-                        f"Network error during download: {e}, Downloaded {self._bytes_downloaded} bytes before failure"
+                        "Network error during download: {}, Downloaded {} bytes before failure",
+                        e,
+                        self._bytes_downloaded,
                     )
                     raise
                 except TimeoutError:
-                    log.error(f"Timeout after downloading {self._bytes_downloaded} bytes")
+                    log.error("Timeout after downloading {} bytes", self._bytes_downloaded)
                     raise
         except Exception as e:
             # Update Redis with error status for any unexpected errors
@@ -214,7 +216,7 @@ class ReservoirVFSFileDownloader:
                     error_message=str(e),
                 )
             except Exception as redis_err:
-                log.warning(f"Failed to update error status in Redis: {redis_err}")
+                log.warning("Failed to update error status in Redis: {}", redis_err)
             raise
         finally:
             self._download_complete = True
@@ -238,10 +240,10 @@ class ReservoirVFSFileDownloader:
                     success=(self._bytes_downloaded >= total_bytes),
                 )
             except Exception as redis_err:
-                log.warning(f"Failed to update final status in Redis: {redis_err}")
+                log.warning("Failed to update final status in Redis: {}", redis_err)
 
         log.debug(
-            f"Downloaded file: {remote_path} -> {local_path} ({self._bytes_downloaded} bytes)"
+            "Downloaded file: {} -> {} ({} bytes)", remote_path, local_path, self._bytes_downloaded
         )
         return self._bytes_downloaded
 
@@ -362,7 +364,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
                     error_message=str(e),
                 )
             except Exception as redis_err:
-                log.warning(f"Failed to update error status in Redis: {redis_err}")
+                log.warning("Failed to update error status in Redis: {}", redis_err)
             raise
         finally:
             self._download_complete = True
@@ -386,7 +388,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
                     success=(sent >= self._size),
                 )
             except Exception as redis_err:
-                log.warning(f"Failed to update final status in Redis: {redis_err}")
+                log.warning("Failed to update final status in Redis: {}", redis_err)
 
     @override
     def content_type(self) -> str | None:
@@ -445,7 +447,8 @@ class ReservoirService:
 
         try:
             log.debug(
-                f"Querying verification result from remote reservoir for artifact revision {artifact_revision_id}"
+                "Querying verification result from remote reservoir for artifact revision {}",
+                artifact_revision_id,
             )
             resp = await manager_client.get_verification_result(artifact_revision_id)
             if resp.verification_result:
@@ -505,7 +508,7 @@ class ReservoirService:
 
             # Execute import pipeline
             await pipeline.execute(context)
-            log.info(f"Model import completed: {model}")
+            log.info("Model import completed: {}", model)
             success = True
 
             # Fetch verification result from remote reservoir
@@ -543,7 +546,7 @@ class ReservoirService:
 
             reporter.total_progress = model_count
 
-            log.info(f"Starting batch model import: model_count={model_count}")
+            log.info("Starting batch model import: model_count={}", model_count)
 
             try:
                 successful_models = 0
@@ -559,7 +562,10 @@ class ReservoirService:
                     model_id = model.model_id
                     try:
                         log.info(
-                            f"Processing model in batch: model_id={model_id}, progress={idx}/{model_count}"
+                            "Processing model in batch: model_id={}, progress={}/{}",
+                            model_id,
+                            idx,
+                            model_count,
                         )
 
                         # TODO: Batch import logic can be optimized further
@@ -575,12 +581,19 @@ class ReservoirService:
 
                         successful_models += 1
                         log.info(
-                            f"Successfully imported model in batch: model_id={model_id}, progress={idx}/{model_count}"
+                            "Successfully imported model in batch: model_id={}, progress={}/{}",
+                            model_id,
+                            idx,
+                            model_count,
                         )
                     except Exception as e:
                         failed_models += 1
                         log.error(
-                            f"Failed to import model in batch: {e!s}, model_id={model_id}, progress={idx}/{model_count}"
+                            "Failed to import model in batch: {!s}, model_id={}, progress={}/{}",
+                            e,
+                            model_id,
+                            idx,
+                            model_count,
                         )
                         errors.append(str(e))
                     finally:
@@ -590,17 +603,19 @@ class ReservoirService:
                         )
 
                 log.info(
-                    f"Batch model import completed: total_models={model_count}, "
-                    f"successful_models={successful_models}, failed_models={failed_models}"
+                    "Batch model import completed: total_models={}, successful_models={}, failed_models={}",
+                    model_count,
+                    successful_models,
+                    failed_models,
                 )
 
                 if failed_models > 0:
                     log.warning(
-                        f"Some models failed to import in batch: failed_count={failed_models}"
+                        "Some models failed to import in batch: failed_count={}", failed_models
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error(f"Batch model import failed: {e!s}")
+                log.error("Batch model import failed: {!s}", e)
                 return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)
@@ -707,7 +722,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 f"Unsupported storage type: {storage_type} (storage class: {type(self._download_storage)})"
             )
 
-        log.info(f"Reservoir copy completed: {context.model}, bytes_copied={bytes_copied}")
+        log.info("Reservoir copy completed: {}, bytes_copied={}", context.model, bytes_copied)
 
         return DownloadStepResult(
             downloaded_files=downloaded_files,
@@ -740,17 +755,17 @@ class ReservoirDownloadStep(ImportStep[None]):
                 )
 
             # Get list of all files in the model directory
-            log.debug(f"Listing files for model: {model_prefix}")
+            log.debug("Listing files for model: {}", model_prefix)
             file_list_response = await manager_client.list_vfs_files(
                 storage_name=registry_config.storage_name, directory=model_prefix
             )
 
             files = file_list_response.files
             if not files:
-                log.warning(f"No files found for model: {model_prefix}")
+                log.warning("No files found for model: {}", model_prefix)
                 return 0
 
-            log.info(f"Found {len(files)} files to download for model: {model_prefix}")
+            log.info("Found {} files to download for model: {}", len(files), model_prefix)
 
             # Initialize artifact download tracking in Redis with all file information
             revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
@@ -794,13 +809,15 @@ class ReservoirDownloadStep(ImportStep[None]):
                     remote_file_path, local_file_path, file_info.size or 0
                 )
                 total_bytes += bytes_downloaded
-                log.debug(f"Downloaded: {remote_file_path} ({bytes_downloaded} bytes)")
+                log.debug("Downloaded: {} ({} bytes)", remote_file_path, bytes_downloaded)
 
-            log.info(f"VFS download completed: {model_prefix} -> {dest_path} ({total_bytes} bytes)")
+            log.info(
+                "VFS download completed: {} -> {} ({} bytes)", model_prefix, dest_path, total_bytes
+            )
             return total_bytes
 
         except Exception as e:
-            log.error(f"VFS download failed for {model_prefix}: {e!s}")
+            log.error("VFS download failed for {}: {!s}", model_prefix, e)
             raise
 
     async def _handle_object_storage_download(
@@ -1129,7 +1146,7 @@ class TarExtractor:
             # Create temporary file for tar
             with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tf:
                 temp_file = Path(tf.name)
-                log.debug(f"Downloading artifact tar to temp directory: {temp_file}")
+                log.debug("Downloading artifact tar to temp directory: {}", temp_file)
 
                 # Download to temp file
                 async with aiofiles.open(temp_file, "wb") as f:
@@ -1137,7 +1154,7 @@ class TarExtractor:
                         await f.write(chunk)
                         bytes_downloaded += len(chunk)
 
-                log.debug(f"Downloaded {bytes_downloaded} bytes to {temp_file}")
+                log.debug("Downloaded {} bytes to {}", bytes_downloaded, temp_file)
 
             # Ensure target directory exists
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -1146,7 +1163,7 @@ class TarExtractor:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
 
-            log.info(f"Successfully extracted artifact tar to: {target_dir}")
+            log.info("Successfully extracted artifact tar to: {}", target_dir)
             return bytes_downloaded
 
         finally:
@@ -1154,12 +1171,12 @@ class TarExtractor:
             if temp_file and temp_file.exists():
                 try:
                     temp_file.unlink()
-                    log.debug(f"Cleaned up temp file: {temp_file}")
+                    log.debug("Cleaned up temp file: {}", temp_file)
                 except Exception as e:
-                    log.warning(f"Failed to remove temp file {temp_file}: {e}")
+                    log.warning("Failed to remove temp file {}: {}", temp_file, e)
 
     def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
         """Extract tar archive to target directory safely."""
         with tarfile.open(tar_path, "r") as tar:
             tar.extractall(path=target_dir, filter=tarfile.data_filter)
-        log.debug(f"Tar extraction completed: {tar_path} -> {target_dir}")
+        log.debug("Tar extraction completed: {} -> {}", tar_path, target_dir)

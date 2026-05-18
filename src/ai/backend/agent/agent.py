@@ -1635,7 +1635,7 @@ class AbstractAgent[
                 # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
                 if self.local_config.debug.log_events:
-                    log.info(f"lifecycle event: {ev!r}")
+                    log.info("lifecycle event: {!r}", ev)
                 try:
                     match ev.event:
                         case LifecycleEvent.START:
@@ -1781,7 +1781,9 @@ class AbstractAgent[
                 return SessionId(UUID(_session_id))
             except ValueError:
                 log.warning(
-                    f"sync_container_lifecycles() invalid session-id (cid: {container.id}, sid:{_session_id})"
+                    "sync_container_lifecycles() invalid session-id (cid: {}, sid:{})",
+                    container.id,
+                    _session_id,
                 )
                 return None
 
@@ -1797,7 +1799,8 @@ class AbstractAgent[
                         if container.status in DEAD_STATUS_SET
                     ]
                     log.debug(
-                        f"detected dead containers: {[container.id[:12] for _, container in dead_containers]}"
+                        "detected dead containers: {}",
+                        [container.id[:12] for _, container in dead_containers],
                     )
                     for kernel_id, container in dead_containers:
                         if kernel_id in self.restarting_kernels:
@@ -1823,7 +1826,8 @@ class AbstractAgent[
                         if container.status in ACTIVE_STATUS_SET
                     ]
                     log.debug(
-                        f"detected active containers: {[container.id[:12] for _, container in active_containers]}"
+                        "detected active containers: {}",
+                        [container.id[:12] for _, container in active_containers],
                     )
                     for kernel_id, container in active_containers:
                         alive_kernels[kernel_id] = container.id
@@ -1848,7 +1852,7 @@ class AbstractAgent[
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
                         ):
                             continue
-                        log.debug(f"kernel with no container (kid: {kernel_id})")
+                        log.debug("kernel with no container (kid: {})", kernel_id)
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             kernel_session_map[kernel_id],
@@ -1860,7 +1864,7 @@ class AbstractAgent[
                     for kernel_id in alive_kernels.keys() - known_kernels.keys():
                         if kernel_id in self.restarting_kernels:
                             continue
-                        log.debug(f"kernel not found in registry (kid:{kernel_id})")
+                        log.debug("kernel not found in registry (kid:{})", kernel_id)
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             kernel_session_map[kernel_id],
@@ -1872,7 +1876,7 @@ class AbstractAgent[
                     # Enqueue the events.
                     terminated_kernel_ids = ",".join([str(kid) for kid in terminated_kernels])
                     if terminated_kernel_ids:
-                        log.debug(f"Terminate kernels(ids:[{terminated_kernel_ids}])")
+                        log.debug("Terminate kernels(ids:[{}])", terminated_kernel_ids)
                     for kernel_id, ev in terminated_kernels.items():
                         await self.container_lifecycle_queue.put(ev)
 
@@ -1888,7 +1892,7 @@ class AbstractAgent[
                 agent_id=self.id, exception=e
             )
         except Exception as e:
-            log.exception(f"sync_container_lifecycles() failure, continuing (detail: {e!r})")
+            log.exception("sync_container_lifecycles() failure, continuing (detail: {!r})", e)
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
             )
@@ -2099,7 +2103,7 @@ class AbstractAgent[
             # Track pull operation for health monitoring
             with self.track_pull(img_canonical) as should_proceed:
                 if not should_proceed:
-                    log.debug(f"Image {img_canonical} is already being pulled, skipping")
+                    log.debug("Image {} is already being pulled, skipping", img_canonical)
                     return
 
                 need_to_pull = await self.check_image(
@@ -2107,7 +2111,7 @@ class AbstractAgent[
                 )
 
                 if need_to_pull:
-                    log.info(f"check_and_pull() start pulling {img_ref!s}")
+                    log.info("check_and_pull() start pulling {!s}", img_ref)
 
                     await self.anycast_event(
                         ImagePullStartedEvent(
@@ -2126,7 +2130,7 @@ class AbstractAgent[
 
                     except TimeoutError:
                         log.exception(
-                            f"Image pull timeout (img:{img_ref!s}, sec:{image_pull_timeout})"
+                            "Image pull timeout (img:{!s}, sec:{})", img_ref, image_pull_timeout
                         )
 
                         await self.anycast_event(
@@ -2140,7 +2144,7 @@ class AbstractAgent[
                         raise
 
                     except Exception as e:
-                        log.exception(f"Image pull failed (img:{img_ref}, err:{e!r})")
+                        log.exception("Image pull failed (img:{}, err:{!r})", img_ref, e)
 
                         await self.anycast_event(
                             ImagePullFailedEvent(
@@ -2153,7 +2157,7 @@ class AbstractAgent[
                         raise
 
                     else:
-                        log.info(f"Image pull succeeded {img_ref}")
+                        log.info("Image pull succeeded {}", img_ref)
                         await self.anycast_event(
                             ImagePullFinishedEvent(
                                 image=str(img_ref),
@@ -2163,7 +2167,7 @@ class AbstractAgent[
                             )
                         )
                 else:
-                    log.debug(f"No need to pull image {img_ref}")
+                    log.debug("No need to pull image {}", img_ref)
 
                     await self.anycast_event(
                         ImagePullFinishedEvent(
@@ -2494,7 +2498,7 @@ class AbstractAgent[
         # Track kernel creation for health monitoring
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
-                log.debug(f"Kernel {kernel_id} is already being created, skipping")
+                log.debug("Kernel {} is already being created, skipping", kernel_id)
                 raise ResourceError("Kernel creation already in progress")
 
             if throttle_sema is None:
@@ -2587,7 +2591,10 @@ class AbstractAgent[
 
                     except TimeoutError as e:
                         log.exception(
-                            f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
+                            "Image pull timeout after {} seconds. Destroying kernel (k:{}, img:{})",
+                            image_pull_timeout,
+                            kernel_id,
+                            ctx.image_ref.canonical,
                         )
                         raise ImagePullTimeoutError(
                             f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
@@ -2965,8 +2972,9 @@ class AbstractAgent[
                     except ContainerCreationError as e:
                         msg = e.message or "unknown"
                         log.error(
-                            "Kernel failed to create container. Kernel is going to be destroyed."
-                            f" (k:{kernel_id}, detail:{msg})",
+                            "Kernel failed to create container. Kernel is going to be destroyed. (k:{}, detail:{})",
+                            kernel_id,
+                            msg,
                         )
                         cid = e.container_id
                         async with self.registry_lock:
@@ -3674,7 +3682,7 @@ async def handle_volume_umount(
     except VolumeMountFailed as e:
         err_msg = str(e)
     if not did_umount:
-        log.warning(f"{real_path} does not exist. Skip umount")
+        log.warning("{} does not exist. Skip umount", real_path)
     await context.event_producer.broadcast_event(
         VolumeUnmounted(
             str(context.id),

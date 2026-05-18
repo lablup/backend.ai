@@ -1531,7 +1531,7 @@ class AgentRegistry:
                                 await client.destroy_local_network(network_ref_name)
                         except Exception:
                             log.exception(
-                                f"Failed to destroy the agent-local network {network_ref_name}"
+                                "Failed to destroy the agent-local network {}", network_ref_name
                             )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
@@ -1545,7 +1545,7 @@ class AgentRegistry:
                 try:
                     await network_plugin.destroy_network(network_ref_name)
                 except Exception:
-                    log.exception(f"Failed to destroy the overlay network {network_ref_name}")
+                    log.exception("Failed to destroy the overlay network {}", network_ref_name)
             else:
                 pass
 

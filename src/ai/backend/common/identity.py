@@ -144,7 +144,7 @@ async def detect_cloud() -> CloudProvider | None:
             return result
         for exc in exceptions:
             if exc is not None:
-                log.debug(f"Cloud detection failed: {exc}")
+                log.debug("Cloud detection failed: {}", exc)
     return None
 
 
@@ -203,14 +203,14 @@ try:
         # No running loop, safe to use asyncio.run()
         current_provider = asyncio.run(detect_cloud())
 except Exception as e:
-    log.warning(f"Failed to detect cloud provider: {e}")
+    log.warning("Failed to detect cloud provider: {}", e)
     current_provider = None
 
 if current_provider is None:
     log.info("Detected environment: on-premise setup")
     log.info("The agent node ID is set using the hostname.")
 else:
-    log.info(f"Detected environment: {current_provider} cloud")
+    log.info("Detected environment: {} cloud", current_provider)
     log.info("The agent node ID will follow the instance ID.")
 
 _defined: bool = False
