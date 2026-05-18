@@ -765,7 +765,7 @@ class AuthService:
     async def resolve_user_id_by_access_key(
         self, action: ResolveUserIDByAccessKeyAction
     ) -> ResolveUserIDByAccessKeyResult:
-        user_id = await self._auth_repository.get_user_id_by_access_key(str(action.access_key))
+        user_id = await self._auth_repository.get_user_id_by_access_key(action.access_key)
         return ResolveUserIDByAccessKeyResult(user_id=user_id)
 
     async def resolve_user_scope(self, action: ResolveUserScopeAction) -> ResolveUserScopeResult:

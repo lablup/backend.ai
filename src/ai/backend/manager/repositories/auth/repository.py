@@ -8,6 +8,7 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
@@ -84,7 +85,7 @@ class AuthRepository:
         return await self._db_source.fetch_user_info_by_access_key(access_key)
 
     @auth_repository_resilience.apply()
-    async def get_user_id_by_access_key(self, access_key: str) -> UserID:
+    async def get_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
         return await self._db_source.fetch_user_id_by_access_key(access_key)
 
     @auth_repository_resilience.apply()

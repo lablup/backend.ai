@@ -17,6 +17,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
@@ -295,14 +296,14 @@ class AuthDBSource:
             return row.domain_name, row.role
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_id_by_access_key(self, access_key: str) -> UserID:
+    async def fetch_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
         async with self._db.begin_readonly() as conn:
             query = sa.select(keypairs.c.user).where(keypairs.c.access_key == access_key)
             result = await conn.execute(query)
             row = result.scalar()
             if row is None:
                 raise AccessKeyNotFound("Unknown access key")
-            return UserID(UUID(str(row)))
+            return UserID(cast(UUID, row))
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
