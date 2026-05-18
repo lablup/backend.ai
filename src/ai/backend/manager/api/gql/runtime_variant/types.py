@@ -133,7 +133,9 @@ class CreateRuntimeVariantInputGQL(PydanticInputMixin[CreateRuntimeVariantInputD
 class UpdateRuntimeVariantInputGQL(PydanticInputMixin[UpdateRuntimeVariantInputDTO]):
     id: UUID = gql_field(description="Runtime variant ID.")
     name: str | None = gql_field(default=None, description="New name.")
-    description: str | None = gql_field(default=None, description="New description.")
+    description: str | None = gql_field(
+        description="New description. Omit to leave unchanged; pass null to clear."
+    )
 
 
 @gql_pydantic_type(
