@@ -47,7 +47,11 @@ def _rewrap_model_definition(conn: Connection, table: str, column: str) -> None:
         for model in model_definition.get("models") or []:
             service = model.get("service") or {}
             start_command = service.get("start_command")
-            if isinstance(start_command, list) and len(start_command) == 1 and " " in start_command[0]:
+            if (
+                isinstance(start_command, list)
+                and len(start_command) == 1
+                and " " in start_command[0]
+            ):
                 # Case when the start_command is a single string that looks like a shell command.
                 # e.g. ["python service.py"] -> ["/bin/bash", "-c", "python service.py"]
                 shell = service.get("shell") or DEFAULT_SHELL
