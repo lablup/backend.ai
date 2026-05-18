@@ -15,6 +15,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
+    DeploymentLifecycleSubStep,
     LivenessStatus,
     ReadinessStatus,
     RouteHealthStatus,
@@ -174,6 +175,13 @@ class DeploymentNode(BaseResponseModel):
     deploying_revision_id: UUID | None = Field(
         default=None,
         description="ID of the revision currently being deployed (in progress, not yet active)",
+    )
+    sub_step: DeploymentLifecycleSubStep | None = Field(
+        default=None,
+        description=(
+            "Sub-step within the current lifecycle phase. ``None`` when the"
+            " deployment is not in a sub-step-bearing phase."
+        ),
     )
 
 

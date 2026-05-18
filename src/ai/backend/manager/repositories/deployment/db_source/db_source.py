@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.model_deployment.types import DeploymentLifecycleSubStep
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -59,7 +60,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoWithAutoScalingRules,
     DeploymentLastHistory,
-    DeploymentLifecycleSubStep,
     DeploymentOptions,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,

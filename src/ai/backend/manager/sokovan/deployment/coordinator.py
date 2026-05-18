@@ -15,7 +15,10 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.model_deployment.types import (
+    DeploymentLifecycleSubStep,
+    DeploymentStrategy,
+)
 from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
@@ -34,7 +37,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLastHistory,
     DeploymentLifecycleStatus,
-    DeploymentLifecycleSubStep,
     DeploymentTargetStatuses,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult

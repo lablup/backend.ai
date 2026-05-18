@@ -16,6 +16,7 @@ from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft, Mode
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
+    DeploymentLifecycleSubStep,
     DeploymentStrategy,
     LivenessStatus,
     ModelDeploymentStatus,
@@ -173,30 +174,6 @@ class RouteSubStatus(enum.StrEnum):
     PENDING = "pending"
     STARTING = "starting"
     WARMING_UP = "warming_up"
-
-
-# ========== Status Transition Types (BEP-1030) ==========
-
-
-class DeploymentLifecycleSubStep(enum.StrEnum):
-    """Sub-steps within deployment lifecycle phases.
-
-    Member names are prefixed with the lifecycle phase they belong to
-    (e.g. ``DEPLOYING_``).  String values are stored in the database as-is.
-    """
-
-    # -- DEPLOYING phase --
-    DEPLOYING_PROVISIONING = "deploying_provisioning"
-    """New revision routes are being provisioned and old routes are being drained."""
-    DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
-    """Clearing deploying_revision and transitioning to READY."""
-    DEPLOYING_COMPLETED = "deploying_completed"
-    """All strategy conditions satisfied; triggers revision swap."""
-
-    @classmethod
-    def deploying_handler_sub_steps(cls) -> tuple[DeploymentLifecycleSubStep, ...]:
-        """Sub-steps that have their own deploying handler (excludes COMPLETED, which is an evaluator outcome)."""
-        return (cls.DEPLOYING_PROVISIONING, cls.DEPLOYING_ROLLING_BACK)
 
 
 @dataclass(frozen=True)

@@ -30,6 +30,7 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.data.model_deployment.types import (
+    DeploymentLifecycleSubStep,
     DeploymentStrategy,
     ModelDeploymentStatus,
 )
@@ -64,7 +65,6 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkData,
     DeploymentOptions,

@@ -11,16 +11,14 @@ from typing import Any, override
 import yarl
 
 from ai.backend.common.data.endpoint.types import ScalingState
+from ai.backend.common.data.model_deployment.types import DeploymentLifecycleSubStep
 from ai.backend.common.types import (
     ClusterMode,
     MountInfoEntry,
     ResourceSlot,
     RuntimeVariant,
 )
-from ai.backend.manager.data.deployment.types import (
-    DeploymentLifecycleSubStep,
-    DeploymentOptions,
-)
+from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec

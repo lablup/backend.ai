@@ -7,12 +7,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.model_deployment.types import (
+    DeploymentLifecycleSubStep,
+    DeploymentStrategy,
+)
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentLifecycleSubStep,
     RouteInfo,
 )
 from ai.backend.manager.models.deployment_policy import DeploymentStrategySpec

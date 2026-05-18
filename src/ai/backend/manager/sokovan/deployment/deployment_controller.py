@@ -8,7 +8,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.model_deployment.types import (
+    DeploymentLifecycleSubStep,
+    DeploymentStrategy,
+)
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import UnreachableError
@@ -33,7 +36,6 @@ from ai.backend.manager.data.deployment.creator import (
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentLifecycleSubStep,
     DeploymentNetworkSpec,
     ImageIdentifierDraft,
     ModelRevisionData,

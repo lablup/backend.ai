@@ -2255,6 +2255,7 @@ class DeploymentAdapter(BaseAdapter):
             scaling_state=data.scaling_state,
             current_revision_id=data.current_revision_id,
             deploying_revision_id=data.deploying_revision_id,
+            sub_step=data.sub_step,
         )
 
     @staticmethod

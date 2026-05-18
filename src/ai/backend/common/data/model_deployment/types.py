@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import enum
 from typing import Any, Self
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -50,7 +53,7 @@ class ModelDeploymentStatus(CIStrEnum):
         return super()._missing_(value)
 
     @classmethod
-    def from_lifecycle(cls, lifecycle: EndpointLifecycle) -> "ModelDeploymentStatus":
+    def from_lifecycle(cls, lifecycle: EndpointLifecycle) -> ModelDeploymentStatus:
         match lifecycle:
             case EndpointLifecycle.PENDING | EndpointLifecycle.CREATED:
                 return cls.PENDING
@@ -67,6 +70,27 @@ class ModelDeploymentStatus(CIStrEnum):
 class DeploymentStrategy(CIStrEnum):
     ROLLING = "ROLLING"
     BLUE_GREEN = "BLUE_GREEN"
+
+
+class DeploymentLifecycleSubStep(enum.StrEnum):
+    """Sub-steps within deployment lifecycle phases.
+
+    Member names are prefixed with the lifecycle phase they belong to
+    (e.g. ``DEPLOYING_``). String values are stored in the database as-is.
+    """
+
+    # -- DEPLOYING phase --
+    DEPLOYING_PROVISIONING = "deploying_provisioning"
+    """New revision routes are being provisioned and old routes are being drained."""
+    DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
+    """Clearing deploying_revision and transitioning to READY."""
+    DEPLOYING_COMPLETED = "deploying_completed"
+    """All strategy conditions satisfied; triggers revision swap."""
+
+    @classmethod
+    def deploying_handler_sub_steps(cls) -> tuple[DeploymentLifecycleSubStep, ...]:
+        """Sub-steps that have their own deploying handler (excludes COMPLETED, which is an evaluator outcome)."""
+        return (cls.DEPLOYING_PROVISIONING, cls.DEPLOYING_ROLLING_BACK)
 
 
 class RouteStatus(CIStrEnum):
