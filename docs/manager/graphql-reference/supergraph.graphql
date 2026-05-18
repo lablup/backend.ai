@@ -18800,8 +18800,8 @@ input UpdateRuntimeVariantInput
   """New name."""
   name: String = null
 
-  """New description."""
-  description: String = null
+  """New description. Omit to leave unchanged; pass null to clear."""
+  description: String
 }
 
 """Added in 26.4.2. Payload for runtime variant update."""
