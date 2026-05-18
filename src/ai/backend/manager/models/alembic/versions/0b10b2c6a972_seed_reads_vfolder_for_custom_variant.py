@@ -30,9 +30,7 @@ depends_on = None
 def upgrade() -> None:
     op.execute(
         sa.text(
-            "UPDATE runtime_variants "
-            "SET reads_vfolder_config_files = true "
-            "WHERE name = 'custom'"
+            "UPDATE runtime_variants SET reads_vfolder_config_files = true WHERE name = 'custom'"
         )
     )
 
@@ -40,8 +38,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute(
         sa.text(
-            "UPDATE runtime_variants "
-            "SET reads_vfolder_config_files = false "
-            "WHERE name = 'custom'"
+            "UPDATE runtime_variants SET reads_vfolder_config_files = false WHERE name = 'custom'"
         )
     )
