@@ -417,9 +417,8 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
+                    selectinload(EndpointRow.current_revision_row),
+                    selectinload(EndpointRow.deploying_revision_row),
                     selectinload(EndpointRow.deployment_policy),
                 )
             )
