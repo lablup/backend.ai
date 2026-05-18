@@ -99,5 +99,5 @@ class SessionSpecValidator:
         context: SessionSpecValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug(f"Applying SessionSpec validation rule: {rule.name()}")
+            log.debug("Applying SessionSpec validation rule: {}", rule.name())
             rule.validate(spec, context)
