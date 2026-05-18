@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
@@ -14,7 +13,7 @@ from pydantic import (
     AliasChoices,
     ConfigDict,
     Field,
-    field_validator,
+    model_validator,
 )
 
 from . import validators as tx
@@ -144,14 +143,18 @@ agent_selector_globalconfig_iv = t.Dict({}).allow_extra("*")
 agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 
 
-def _normalize_start_command(value: Any) -> Any:
-    """Coerce legacy ``str`` ``start_command`` into argv list via
-    :func:`shlex.split`. Lists, ``None``, and other types pass through so
-    the schema's strict check rejects them.
-    """
-    if isinstance(value, str):
-        return shlex.split(value)
-    return value
+DEFAULT_SHELL = "/bin/bash"
+
+
+def _wrap_str_start_command_into_argv(service: Any) -> Any:
+    if not isinstance(service, dict):
+        return service
+    sc = service.get("start_command")
+    if not isinstance(sc, str):
+        return service
+    shell = service.get("shell") or DEFAULT_SHELL
+    # key override with the wrapped value, preserving other keys if present.
+    return {**service, "start_command": [shell, "-c", sc]}
 
 
 model_definition_iv = t.Dict({
@@ -159,31 +162,33 @@ model_definition_iv = t.Dict({
         t.Dict({
             t.Key("name"): t.String,
             t.Key("model_path"): t.String,
-            t.Key("service", default=None): t.Null
-            | t.Dict({
-                # ai.backend.kernel.service.ServiceParser.start_service()
-                # ai.backend.kernel.service_actions
-                t.Key("pre_start_actions", default=[]): t.Null
-                | t.List(
-                    t.Dict({
-                        t.Key("action"): t.String,
-                        t.Key("args"): t.Dict().allow_extra("*"),
-                    })
-                ),
-                t.Key("start_command", default=None): (t.Null | t.String | t.List(t.String))
-                >> _normalize_start_command,
-                t.Key("shell", default="/bin/bash"): t.String,
-                t.Key("port"): t.ToInt[1:],
-                t.Key("health_check", default=None): t.Null
+            t.Key("service", default=None): (
+                t.Null
                 | t.Dict({
-                    t.Key("interval", default=10): t.Null | t.ToFloat[0:],
-                    t.Key("path"): t.String,
-                    t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
-                    t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
-                    t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
-                    t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
-                }),
-            }),
+                    # ai.backend.kernel.service.ServiceParser.start_service()
+                    # ai.backend.kernel.service_actions
+                    t.Key("pre_start_actions", default=[]): t.Null
+                    | t.List(
+                        t.Dict({
+                            t.Key("action"): t.String,
+                            t.Key("args"): t.Dict().allow_extra("*"),
+                        })
+                    ),
+                    t.Key("start_command", default=None): t.Null | t.String | t.List(t.String),
+                    t.Key("shell", default=DEFAULT_SHELL): t.String,
+                    t.Key("port"): t.ToInt[1:],
+                    t.Key("health_check", default=None): t.Null
+                    | t.Dict({
+                        t.Key("interval", default=10): t.Null | t.ToFloat[0:],
+                        t.Key("path"): t.String,
+                        t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
+                        t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
+                        t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
+                        t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
+                    }),
+                })
+            )
+            >> _wrap_str_start_command_into_argv,
             t.Key("metadata", default=None): t.Null
             | t.Dict({
                 t.Key("author", default=None): t.Null | t.String(allow_blank=True),
@@ -268,9 +273,9 @@ class ModelServiceConfig(BaseConfigModel):
         examples=[["python", "service.py"], ["vllm", "serve", "{model_path}"]],
     )
     shell: str = Field(
-        default="/bin/bash",
+        default=DEFAULT_SHELL,
         description="Shell configured for the model service.",
-        examples=["/bin/bash"],
+        examples=[DEFAULT_SHELL],
     )
     port: int = Field(
         description="Port number for the model service. Must be greater than 1.",
@@ -282,10 +287,10 @@ class ModelServiceConfig(BaseConfigModel):
         description="Health check configuration for the model service.",
     )
 
-    @field_validator("start_command", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _coerce_start_command(cls, value: Any) -> Any:
-        return _normalize_start_command(value)
+    def _wrap_str_start_command(cls, data: Any) -> Any:
+        return _wrap_str_start_command_into_argv(data)
 
 
 class ModelMetadata(BaseConfigModel):
@@ -553,10 +558,10 @@ class ModelServiceConfigDraft(BaseConfigModel):
     port: int | None = None
     health_check: ModelHealthCheckDraft | None = None
 
-    @field_validator("start_command", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _coerce_start_command(cls, value: Any) -> Any:
-        return _normalize_start_command(value)
+    def _wrap_str_start_command(cls, data: Any) -> Any:
+        return _wrap_str_start_command_into_argv(data)
 
     def to_resolved(self) -> ModelServiceConfig:
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
