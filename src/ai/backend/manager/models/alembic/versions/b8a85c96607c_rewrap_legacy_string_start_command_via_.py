@@ -5,9 +5,9 @@ Repairs single-token argv rows broken by ``8c1f7d3a9e2b`` (e.g.
 when ``service.shell`` is set. Rows without ``shell`` are left as-is
 to match the updated validator (no shell -> no wrap). Re-applicable.
 
-Revision ID: 70ffcaaa5f5c
-Revises: ba42cb865efe
-Create Date: 2026-05-18
+Revision ID: b8a85c96607c
+Revises: 7a9be5b982c0
+Create Date: 2026-05-19
 
 """
 
@@ -18,8 +18,8 @@ from alembic import op
 from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
-revision = "70ffcaaa5f5c"
-down_revision = "ba42cb865efe"
+revision = "b8a85c96607c"
+down_revision = "7a9be5b982c0"
 # Part of: 26.5.1
 branch_labels = None
 depends_on = None
