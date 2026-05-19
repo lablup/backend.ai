@@ -79,7 +79,7 @@ class DeploymentRevisionValidator:
         context: DeploymentRevisionValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug(f"Applying DeploymentRevisionCreatorSpec validation rule: {rule.name()}")
+            log.debug("Applying DeploymentRevisionCreatorSpec validation rule: {}", rule.name())
             rule.validate(spec, context)
 
     def validate_legacy_revision_spec(
@@ -88,5 +88,5 @@ class DeploymentRevisionValidator:
         context: DeploymentRevisionValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug(f"Applying ModelRevisionSpec validation rule: {rule.name()}")
+            log.debug("Applying ModelRevisionSpec validation rule: {}", rule.name())
             rule.validate_legacy_revision_spec(spec, context)
