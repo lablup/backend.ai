@@ -157,3 +157,31 @@ class ContainerdRpcError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class NetnsSetupError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a workload's network namespace cannot be created or removed."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-netns-setup-error"
+    error_title = "Network namespace setup failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class CniInvocationError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a CNI plugin invocation fails or returns an invalid result."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-cni-invocation-error"
+    error_title = "CNI plugin invocation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

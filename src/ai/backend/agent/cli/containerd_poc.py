@@ -32,6 +32,9 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
+from ai.backend.agent.containerd.network import netns
+from ai.backend.agent.containerd.network.base import NetworkProvider
+from ai.backend.agent.containerd.network.cilium import CiliumNetworkProvider
 from ai.backend.agent.containerd.oci import build_oci_spec
 
 if TYPE_CHECKING:
@@ -114,6 +117,56 @@ def run(
 
 
 _StepBody = Callable[[], Coroutine[Any, Any, dict[str, Any]]]
+
+
+@cli.command(name="net")
+@click.option(
+    "--network-name",
+    default="cilium",
+    show_default=True,
+    help="CNI conflist name (matched by the conflist's `name` field).",
+)
+@click.option(
+    "--json-output",
+    is_flag=True,
+    help="Emit a single JSON document to stdout instead of human-readable lines.",
+)
+def net(network_name: str, json_output: bool) -> None:
+    """Walk the network layer once: netns -> CNI attach -> detach."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s:%(name)s:%(message)s",
+        force=True,
+    )
+    results = asyncio.run(_run_network(network_name=network_name))
+    _emit(results, json_output=json_output)
+    if not all(r.ok for r in results):
+        sys.exit(1)
+
+
+async def _run_network(*, network_name: str) -> list[StepResult]:
+    workload_id = f"containerd-poc-net-{uuid.uuid4().hex[:12]}"
+    provider = CiliumNetworkProvider(network_name=network_name)
+    results: list[StepResult] = []
+    # Cleanup steps pushed as resources are created, run in reverse at the end.
+    cleanups: list[tuple[str, _StepBody]] = []
+
+    results.append(await _step("preflight", lambda: _do_net_preflight(provider)))
+
+    created = await _step("create_netns", lambda: _do_create_netns(workload_id))
+    results.append(created)
+    if created.ok:
+        cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
+        path = netns.netns_path(workload_id)
+        attached = await _step("attach", lambda: _do_attach(provider, workload_id, path))
+        results.append(attached)
+        if attached.ok:
+            cleanups.append(("detach", lambda: _do_detach(provider, workload_id, path)))
+
+    # Teardown in reverse creation order.
+    for name, body in reversed(cleanups):
+        results.append(await _step(name, body))
+    return results
 
 
 async def _run_lifecycle(
@@ -288,6 +341,39 @@ async def _do_remove_snapshot(cd: ContainerdClient, snapshot_key: str) -> dict[s
 async def _do_list_namespaces(cd: ContainerdClient) -> dict[str, Any]:
     namespaces = await cd.list_namespaces()
     return {"namespaces": sorted(ns.name for ns in namespaces)}
+
+
+async def _do_net_preflight(provider: NetworkProvider) -> dict[str, Any]:
+    await provider.preflight()
+    return {"provider": provider.name}
+
+
+async def _do_create_netns(name: str) -> dict[str, Any]:
+    path = await netns.create_netns(name)
+    return {"netns": path}
+
+
+async def _do_attach(
+    provider: NetworkProvider, workload_id: str, netns_path: str
+) -> dict[str, Any]:
+    attachment = await provider.attach(workload_id, netns_path)
+    return {
+        "ipv4": attachment.ipv4,
+        "mac": attachment.mac,
+        "interface": attachment.interface,
+    }
+
+
+async def _do_detach(
+    provider: NetworkProvider, workload_id: str, netns_path: str
+) -> dict[str, Any]:
+    await provider.detach(workload_id, netns_path)
+    return {"workload_id": workload_id}
+
+
+async def _do_delete_netns(name: str) -> dict[str, Any]:
+    await netns.delete_netns(name)
+    return {"netns_name": name}
 
 
 def _emit(results: list[StepResult], *, json_output: bool) -> None:
