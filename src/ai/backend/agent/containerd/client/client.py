@@ -32,6 +32,7 @@ responsive.
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -336,6 +337,8 @@ class ContainerdClient:
         *,
         platform: platform_pb2.Platform | None = None,
         snapshotter: str = DEFAULT_SNAPSHOTTER,
+        username: str | None = None,
+        password: str | None = None,
     ) -> str:
         """Pull an image into this namespace and unpack it for the platform.
 
@@ -348,10 +351,23 @@ class ContainerdClient:
 
         ``ref`` is a registry reference such as
         ``docker.io/library/busybox:latest``. Returns ``ref`` unchanged.
+        When ``username`` and ``password`` are given, a Basic-Auth
+        ``Authorization`` header is attached to every registry request
+        via the resolver's headers — this covers harbor / GitLab / ECR
+        (static creds) / any registry that accepts Basic-Auth directly.
+        Registries that mandate a token-exchange flow (Docker Hub) need
+        the streaming auth callback the Transfer service also supports;
+        that flow is not implemented here yet.
         """
         stub = self._require(self._transfer)
         target_platform = platform if platform is not None else _host_platform()
-        source = _containerd_any(registry_pb2.OCIRegistry(reference=ref))
+        registry_kwargs: dict[str, Any] = {"reference": ref}
+        if username is not None and password is not None and username and password:
+            credentials = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
+            registry_kwargs["resolver"] = registry_pb2.RegistryResolver(
+                headers={"Authorization": f"Basic {credentials}"},
+            )
+        source = _containerd_any(registry_pb2.OCIRegistry(**registry_kwargs))
         destination = _containerd_any(
             imagestore_pb2.ImageStore(
                 name=ref,

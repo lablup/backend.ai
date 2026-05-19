@@ -1256,10 +1256,18 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
         timeout_seconds: float | None,
     ) -> None:
         log.info("pulling image {} via the containerd Transfer service", image_ref.canonical)
-        # Registry credentials are not threaded through to the Transfer
-        # service yet; only public registries work end-to-end for now.
-        del registry_conf
-        pull = self.containerd.pull_image(image_ref.canonical)
+        # Registries that accept Basic-Auth directly (harbor, GitLab,
+        # ECR with static creds, ...) are covered by the resolver header
+        # path inside ContainerdClient.pull_image. Token-exchange-only
+        # registries (Docker Hub) still need the Transfer auth-callback
+        # stream, which is not implemented here.
+        username = registry_conf.get("username") or None
+        password = registry_conf.get("password") or None
+        pull = self.containerd.pull_image(
+            image_ref.canonical,
+            username=username,
+            password=password,
+        )
         if timeout_seconds is not None:
             await asyncio.wait_for(pull, timeout=timeout_seconds)
         else:
