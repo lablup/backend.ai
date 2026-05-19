@@ -2,12 +2,12 @@ from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
 from typing import Final
 
-from ai.backend.common.clients.prometheus.metric_types import (
+from ai.backend.common.metrics.types import CAPACITY_SENTINEL, CAPACITY_SENTINEL_METRICS
+from ai.backend.common.types import KernelId, MetricValue
+from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     KernelLiveStatValues,
 )
-from ai.backend.common.metrics.types import CAPACITY_SENTINEL, CAPACITY_SENTINEL_METRICS
-from ai.backend.common.types import KernelId, MetricValue
 
 # Metric-name classification used only while adapting Prometheus samples back
 # into the legacy live_stat dict that Graphene/WebUI still expects.

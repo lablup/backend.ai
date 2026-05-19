@@ -1,12 +1,6 @@
 import logging
 from collections.abc import Sequence
 
-from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.metric_types import (
-    ContainerMetricOptionalLabel,
-    ContainerMetricResult,
-    KernelLiveStatBatchResult,
-)
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.exception import (
     BackendAIError,
@@ -19,6 +13,12 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.metric_types import (
+    ContainerMetricOptionalLabel,
+    ContainerMetricResult,
+    KernelLiveStatBatchResult,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

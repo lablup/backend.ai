@@ -1,52 +1,12 @@
-import re
 from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Self
 
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.validators import (
+    escape_non_placeholders,
+)
 from ai.backend.common.exception import InvalidMetricPresetTemplate
-
-_PLACEHOLDER_NAMES = frozenset({"labels", "window", "group_by"})
-_BRACE_BLOCK_RE = re.compile(r"\{([^{}]*)\}")
-# `$ident` / `${ident}` — foreign templating syntax (Grafana, shell, etc.)
-# that Backend.AI does not substitute and is almost always unintended in PromQL.
-_UNSUPPORTED_TEMPLATE_VAR_RE = re.compile(r"\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*")
-
-
-def validate_query_template(template: str) -> str:
-    """Reject empty templates, foreign variables, or malformed braces.
-
-    Returns the dry-run rendered template (useful for inspection in tests).
-    """
-    if not template.strip():
-        raise InvalidMetricPresetTemplate("Template must not be empty.")
-    unsupported_vars = _UNSUPPORTED_TEMPLATE_VAR_RE.findall(template)
-    if unsupported_vars:
-        placeholders = ", ".join(f"{{{name}}}" for name in sorted(_PLACEHOLDER_NAMES))
-        raise InvalidMetricPresetTemplate(
-            f"Unsupported template variables: {unsupported_vars}. "
-            f"Use placeholders {placeholders} or literal PromQL values."
-        )
-    return MetricPreset(template=template).render()
-
-
-def _escape_non_placeholders(template: str) -> str:
-    # Normalize each `{X}` so str.format produces a single PromQL `{value}`
-    # regardless of how many braces the user wrote.
-    def repl(match: re.Match[str]) -> str:
-        name = match.group(1)
-        start, end = match.span()
-        text = match.string
-        already_wrapped = (
-            start > 0 and text[start - 1] == "{" and end < len(text) and text[end] == "}"
-        )
-        if name not in _PLACEHOLDER_NAMES:
-            return match.group(0) if already_wrapped else "{{" + name + "}}"
-        if name != "labels":
-            return match.group(0)
-        return match.group(0) if already_wrapped else "{{" + match.group(0) + "}}"
-
-    return _BRACE_BLOCK_RE.sub(repl, template)
 
 
 class LabelOperator(StrEnum):
@@ -100,7 +60,7 @@ class MetricPreset:
             for key, value in self.labels.items()
         )
         try:
-            return _escape_non_placeholders(self.template).format(
+            return escape_non_placeholders(self.template).format(
                 labels=label_str,
                 window=self.window,
                 group_by=",".join(sorted(self.group_by)),

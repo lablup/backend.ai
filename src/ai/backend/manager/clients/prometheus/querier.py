@@ -3,8 +3,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
-from ai.backend.common.clients.prometheus.preset import LabelMatcher
-from ai.backend.common.clients.prometheus.types import ValueType
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher
+from ai.backend.manager.clients.prometheus.types import ValueType
 
 
 class MetricQuerier(ABC):

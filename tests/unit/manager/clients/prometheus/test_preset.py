@@ -2,12 +2,14 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.clients.prometheus import (
-    LabelMatcher,
-    MetricPreset,
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.validators import (
     validate_query_template,
 )
 from ai.backend.common.exception import InvalidMetricPresetTemplate
+from ai.backend.manager.clients.prometheus import (
+    LabelMatcher,
+    MetricPreset,
+)
 
 
 @dataclass
@@ -199,27 +201,24 @@ class TestValidateQueryTemplate:
     """Tests for validate_query_template() called from Pydantic field validators."""
 
     @pytest.mark.parametrize(
-        ("template", "expected_dry_run"),
+        "template",
         [
             pytest.param(
-                'rate(node_cpu_seconds_total{mode!="idle"}[5m])',
                 'rate(node_cpu_seconds_total{mode!="idle"}[5m])',
                 id="raw_promql",
             ),
             pytest.param(
                 "sum by ({group_by})(metric{{{labels}}}[{window}])",
-                "sum by ()(metric{}[])",
                 id="with_placeholders",
             ),
             pytest.param(
-                'count(metric{a="1",b=~"x|y"})',
                 'count(metric{a="1",b=~"x|y"})',
                 id="multiple_matchers",
             ),
         ],
     )
-    def test_accepts_valid_template(self, template: str, expected_dry_run: str) -> None:
-        assert validate_query_template(template) == expected_dry_run
+    def test_accepts_valid_template(self, template: str) -> None:
+        assert validate_query_template(template) == template
 
     @pytest.mark.parametrize(
         "template",

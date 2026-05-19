@@ -11,11 +11,11 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.clients.prometheus.preset import validate_query_template
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
 from .types import OrderDirection, QueryDefinitionOrderField
+from .validators import validate_query_template
 
 __all__ = (
     # Options inputs

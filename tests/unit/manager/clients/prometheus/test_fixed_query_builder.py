@@ -7,18 +7,18 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.clients.prometheus import (
+from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
 )
-from ai.backend.common.clients.prometheus.fixed_query_builder import _regex_union
-from ai.backend.common.clients.prometheus.metric_types import (
+from ai.backend.manager.clients.prometheus.fixed_query_builder import _regex_union
+from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     MetricType,
 )
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
-from ai.backend.common.clients.prometheus.types import ValueType
-from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.manager.clients.prometheus.types import ValueType
 
 
 class TestGetContainerMetricType:

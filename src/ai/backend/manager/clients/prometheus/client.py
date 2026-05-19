@@ -8,18 +8,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
 )
-from ai.backend.common.clients.prometheus.fixed_query_builder import (
-    ContainerLiveStatQueryBuilder,
-    ContainerMetricQueryBuilder,
-)
-from ai.backend.common.clients.prometheus.metric_types import (
-    ContainerMetricOptionalLabel,
-    ContainerMetricResponseInfo,
-    ContainerMetricResult,
-    KernelLiveStatBatchResult,
-    MetricResultValue,
-)
-from ai.backend.common.clients.prometheus.preset import LabelMatcher
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
@@ -30,8 +18,18 @@ from ai.backend.common.exception import (
     PrometheusConnectionError,
 )
 from ai.backend.common.types import KernelId
-
-from .preset import MetricPreset
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
+)
+from ai.backend.manager.clients.prometheus.metric_types import (
+    ContainerMetricOptionalLabel,
+    ContainerMetricResponseInfo,
+    ContainerMetricResult,
+    KernelLiveStatBatchResult,
+    MetricResultValue,
+)
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 

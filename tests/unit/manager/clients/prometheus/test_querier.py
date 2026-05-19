@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from ai.backend.common.clients.prometheus import ContainerMetricQuerier, LabelMatcher, ValueType
+from ai.backend.manager.clients.prometheus import ContainerMetricQuerier, LabelMatcher, ValueType
 
 
 class TestContainerMetricQuerier:

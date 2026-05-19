@@ -9,19 +9,6 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.fixed_query_builder import (
-    ContainerLiveStatQueryBuilder,
-    ContainerMetricQueryBuilder,
-)
-from ai.backend.common.clients.prometheus.metric_types import (
-    ContainerLiveStatQueries,
-    ContainerMetricOptionalLabel,
-    ContainerMetricResponseInfo,
-    KernelLiveStatBatchResult,
-    MetricType,
-    ValueType,
-)
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
@@ -36,6 +23,19 @@ from ai.backend.common.exception import (
     PrometheusConnectionError,
 )
 from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
+)
+from ai.backend.manager.clients.prometheus.metric_types import (
+    ContainerLiveStatQueries,
+    ContainerMetricOptionalLabel,
+    ContainerMetricResponseInfo,
+    KernelLiveStatBatchResult,
+    MetricType,
+)
+from ai.backend.manager.clients.prometheus.types import ValueType
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
