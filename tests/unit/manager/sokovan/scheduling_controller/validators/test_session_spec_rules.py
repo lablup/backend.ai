@@ -484,6 +484,27 @@ class TestImageSlotTypeRule:
         ctx = _ctx(known_slot_types=dict(_RG_BASE))
         ImageSlotTypeRule().validate(spec, ctx)
 
+    def test_skips_image_slot_when_min_is_zero(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        image_info = ImageInfo(
+            id=uuid.UUID(str(img)),
+            canonical="repo/img:tag",
+            architecture="x86_64",
+            registry="repo",
+            labels={},
+            resource_spec={
+                "cpu": {"min": "1", "max": None},
+                "mem": {"min": "1", "max": None},
+                "cuda.device": {"min": "0", "max": None},
+            },
+        )
+        ctx = _ctx(
+            image_infos={img: image_info},
+            known_slot_types=dict(_RG_BASE),
+        )
+        ImageSlotTypeRule().validate(spec, ctx)
+
 
 class TestRequestedSlotTypeRule:
     def test_passes_when_requested_slots_served_by_rg(self) -> None:
@@ -511,6 +532,17 @@ class TestRequestedSlotTypeRule:
         spec = _spec((_kernel_with_resources(img, resources=(("cpu", "1"),)),))
         with pytest.raises(InvalidAPIParameters):
             RequestedSlotTypeRule().validate(spec, _ctx())
+
+    def test_skips_requested_slot_when_quantity_is_zero(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((
+            _kernel_with_resources(
+                img,
+                resources=(("cpu", "1"), ("mem", "1073741824"), ("cuda.device", "0")),
+            ),
+        ))
+        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        RequestedSlotTypeRule().validate(spec, ctx)
 
 
 class TestRequiredResourceSlotRule:

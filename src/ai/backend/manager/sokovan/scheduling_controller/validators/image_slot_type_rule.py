@@ -14,8 +14,11 @@ would otherwise let the session reach the scheduler only to fail there.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.sokovan.scheduling_controller.resource_parse import image_min_slots
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
     SessionSpecValidationContext,
     SessionSpecValidatorRule,
@@ -41,23 +44,26 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
                     f"agents serving any resource slot."
                 ),
             )
+        errors: list[str] = []
         for idx, kernel in enumerate(spec.kernel_specs):
             image_info = context.image_infos.get(kernel.execution_spec.image_id)
             if image_info is None:
                 continue
+            min_slots = image_min_slots(image_info)
             unknown = sorted(
                 slot_name
                 for slot_name in image_info.resource_spec
                 if slot_name not in rg_slot_types
+                and min_slots.get(slot_name, Decimal(0)) > Decimal(0)
             )
             if unknown:
-                raise InvalidAPIParameters(
-                    extra_msg=(
-                        f"kernel_specs[{idx}]: image '{image_info.canonical}' "
-                        f"requires resource slot(s) {unknown} that resource "
-                        f"group '{spec.scope.resource_group_name}' does not "
-                        f"serve. Pick an image whose required slots are "
-                        f"available here, or switch to a resource group that "
-                        f"supports these slots."
-                    ),
+                errors.append(
+                    f"kernel_specs[{idx}]: image '{image_info.canonical}' "
+                    f"requires resource slot(s) {unknown} that resource "
+                    f"group '{spec.scope.resource_group_name}' does not "
+                    f"serve. Pick an image whose required slots are "
+                    f"available here, or switch to a resource group that "
+                    f"supports these slots."
                 )
+        if errors:
+            raise InvalidAPIParameters(extra_msg=" ".join(errors))
