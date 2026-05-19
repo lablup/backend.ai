@@ -27,9 +27,11 @@ import logging
 import sys
 import time
 import uuid
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import aiohttp
 import click
 
 from ai.backend.agent.containerd.network import netns
@@ -45,7 +47,20 @@ log = logging.getLogger(__spec__.name)
 # containerd task Status enum (containerd/types/task/task.proto) -> name.
 _TASK_STATUS = {0: "unknown", 1: "created", 2: "running", 3: "stopped", 4: "paused", 5: "pausing"}
 
+# Default cilium agent REST API socket on the node.
+_DEFAULT_CILIUM_AGENT_SOCK = Path("/var/run/cilium/cilium.sock")
+
 _StepBody = Callable[[], Coroutine[Any, Any, dict[str, Any]]]
+
+
+def _parse_labels(labels_kv: tuple[str, ...]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for kv in labels_kv:
+        if "=" not in kv:
+            raise click.BadParameter(f"--label expects K=V, got {kv!r}")
+        key, _, value = kv.partition("=")
+        out[key] = value
+    return out
 
 
 @click.group()
@@ -99,6 +114,37 @@ class StepResult:
     help="Leave the workload (netns, container, task) running instead of tearing it down.",
 )
 @click.option(
+    "--label",
+    "labels_kv",
+    multiple=True,
+    metavar="K=V",
+    help=(
+        "Label to push onto the cilium endpoint via the agent's labels API. "
+        "Repeatable. Triggers the identity-assignment path that pulls the "
+        "endpoint out of 'reserved:init' (see cni-exp.md exp.8)."
+    ),
+)
+@click.option(
+    "--check-identity",
+    is_flag=True,
+    help=(
+        "After attach, query the cilium agent and report the endpoint's identity id and label set."
+    ),
+)
+@click.option(
+    "--ping",
+    "ping_target",
+    default=None,
+    metavar="ADDR",
+    help="If set, ping ADDR from inside the workload netns after start_task.",
+)
+@click.option(
+    "--cilium-agent-sock",
+    default=str(_DEFAULT_CILIUM_AGENT_SOCK),
+    show_default=True,
+    help="Path to the node-local cilium agent REST socket (for --check-identity).",
+)
+@click.option(
     "--json-output",
     is_flag=True,
     help="Emit a single JSON document to stdout instead of human-readable lines.",
@@ -110,6 +156,10 @@ def run(
     network_name: str,
     connect_timeout: float,
     keep: bool,
+    labels_kv: tuple[str, ...],
+    check_identity: bool,
+    ping_target: str | None,
+    cilium_agent_sock: str,
     json_output: bool,
 ) -> None:
     """Walk the full containerd workload lifecycle once and report each step."""
@@ -118,6 +168,7 @@ def run(
         format="%(levelname)s:%(name)s:%(message)s",
         force=True,
     )
+    labels = _parse_labels(labels_kv)
     results = asyncio.run(
         _run_lifecycle(
             address=address,
@@ -126,6 +177,10 @@ def run(
             network_name=network_name,
             keep=keep,
             connect_timeout_secs=connect_timeout,
+            labels=labels or None,
+            check_identity=check_identity,
+            ping_target=ping_target,
+            cilium_agent_sock=Path(cilium_agent_sock),
         )
     )
     _emit(results, json_output=json_output)
@@ -141,18 +196,62 @@ def run(
     help="CNI conflist name (matched by the conflist's `name` field).",
 )
 @click.option(
+    "--label",
+    "labels_kv",
+    multiple=True,
+    metavar="K=V",
+    help=(
+        "Label to push onto the cilium endpoint via the agent's labels API. "
+        "Repeatable. Triggers the identity-assignment path."
+    ),
+)
+@click.option(
+    "--check-identity",
+    is_flag=True,
+    help="After attach, query the cilium agent and report the endpoint identity.",
+)
+@click.option(
+    "--ping",
+    "ping_target",
+    default=None,
+    metavar="ADDR",
+    help="If set, ping ADDR from inside the netns after attach.",
+)
+@click.option(
+    "--cilium-agent-sock",
+    default=str(_DEFAULT_CILIUM_AGENT_SOCK),
+    show_default=True,
+    help="Path to the node-local cilium agent REST socket (for --check-identity).",
+)
+@click.option(
     "--json-output",
     is_flag=True,
     help="Emit a single JSON document to stdout instead of human-readable lines.",
 )
-def net(network_name: str, json_output: bool) -> None:
+def net(
+    network_name: str,
+    labels_kv: tuple[str, ...],
+    check_identity: bool,
+    ping_target: str | None,
+    cilium_agent_sock: str,
+    json_output: bool,
+) -> None:
     """Walk the network layer once: netns -> CNI attach -> detach."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(levelname)s:%(name)s:%(message)s",
         force=True,
     )
-    results = asyncio.run(_run_network(network_name=network_name))
+    labels = _parse_labels(labels_kv)
+    results = asyncio.run(
+        _run_network(
+            network_name=network_name,
+            labels=labels or None,
+            check_identity=check_identity,
+            ping_target=ping_target,
+            cilium_agent_sock=Path(cilium_agent_sock),
+        )
+    )
     _emit(results, json_output=json_output)
     if not all(r.ok for r in results):
         sys.exit(1)
@@ -166,6 +265,10 @@ async def _run_lifecycle(
     network_name: str,
     keep: bool,
     connect_timeout_secs: float,
+    labels: Mapping[str, str] | None,
+    check_identity: bool,
+    ping_target: str | None,
+    cilium_agent_sock: Path,
 ) -> list[StepResult]:
     # Deferred import so `--help` works without the agent's full dependency
     # tree (and the generated stubs) being importable.
@@ -206,7 +309,8 @@ async def _run_lifecycle(
                 cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
 
                 attached = await _step(
-                    "attach", lambda: _do_attach(provider, workload_id, netns_path)
+                    "attach",
+                    lambda: _do_attach(provider, workload_id, netns_path, labels=labels),
                 )
                 results.append(attached)
                 if attached.ok:
@@ -214,6 +318,13 @@ async def _run_lifecycle(
                         "detach",
                         lambda: _do_detach(provider, workload_id, netns_path),
                     ))
+                    if check_identity:
+                        results.append(
+                            await _step(
+                                "check_identity",
+                                lambda: _do_check_identity(workload_id, cilium_agent_sock),
+                            )
+                        )
 
                     created = await _step(
                         "create_container",
@@ -241,6 +352,13 @@ async def _run_lifecycle(
                             results.append(
                                 await _step("get_task", lambda: _do_get_task(cd, workload_id))
                             )
+                            if ping_target:
+                                results.append(
+                                    await _step(
+                                        "ping",
+                                        lambda: _do_ping(workload_id, ping_target),
+                                    )
+                                )
 
         if keep:
             log.info("--keep: workload '%s' left running (netns %s)", workload_id, netns_path)
@@ -251,7 +369,14 @@ async def _run_lifecycle(
     return results
 
 
-async def _run_network(*, network_name: str) -> list[StepResult]:
+async def _run_network(
+    *,
+    network_name: str,
+    labels: Mapping[str, str] | None,
+    check_identity: bool,
+    ping_target: str | None,
+    cilium_agent_sock: Path,
+) -> list[StepResult]:
     workload_id = f"containerd-poc-net-{uuid.uuid4().hex[:12]}"
     provider = CiliumNetworkProvider(network_name=network_name)
     results: list[StepResult] = []
@@ -265,10 +390,26 @@ async def _run_network(*, network_name: str) -> list[StepResult]:
     if created.ok:
         cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
         path = netns.netns_path(workload_id)
-        attached = await _step("attach", lambda: _do_attach(provider, workload_id, path))
+        attached = await _step(
+            "attach", lambda: _do_attach(provider, workload_id, path, labels=labels)
+        )
         results.append(attached)
         if attached.ok:
             cleanups.append(("detach", lambda: _do_detach(provider, workload_id, path)))
+            if check_identity:
+                results.append(
+                    await _step(
+                        "check_identity",
+                        lambda: _do_check_identity(workload_id, cilium_agent_sock),
+                    )
+                )
+            if ping_target:
+                results.append(
+                    await _step(
+                        "ping",
+                        lambda: _do_ping(workload_id, ping_target),
+                    )
+                )
 
     # Teardown in reverse creation order.
     for name, body in reversed(cleanups):
@@ -404,14 +545,106 @@ async def _do_create_netns(name: str) -> dict[str, Any]:
 
 
 async def _do_attach(
-    provider: NetworkProvider, workload_id: str, netns_path: str
+    provider: NetworkProvider,
+    workload_id: str,
+    netns_path: str,
+    *,
+    labels: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    attachment = await provider.attach(workload_id, netns_path)
+    attachment = await provider.attach(workload_id, netns_path, labels=labels)
     return {
         "ipv4": attachment.ipv4,
         "mac": attachment.mac,
         "interface": attachment.interface,
+        "labels_applied": len(labels) if labels else 0,
     }
+
+
+async def _do_check_identity(workload_id: str, sock_path: Path) -> dict[str, Any]:
+    """Query the cilium agent for the endpoint that backs ``workload_id``.
+
+    Polls briefly because identity may take a moment to materialize.
+    Returns the endpoint id, the identity id (a small integer per
+    labelset), and the identity's resolved labels — the key signal that
+    the endpoint exited ``reserved:init`` is ``identity_id`` being a real
+    number (>= 256) and the labels carrying our ``container:...``
+    entries instead of just ``reserved:init``.
+    """
+    if not sock_path.exists():
+        raise RuntimeError(f"cilium agent socket not found at {sock_path}")
+    connector = aiohttp.UnixConnector(path=str(sock_path))
+    async with aiohttp.ClientSession(connector=connector) as session:
+        last_state: dict[str, Any] | None = None
+        for _ in range(20):
+            async with session.get("http://localhost/v1/endpoint") as resp:
+                if resp.status >= 400:
+                    raise RuntimeError(
+                        f"GET /v1/endpoint -> {resp.status}: {(await resp.text()).strip()}"
+                    )
+                endpoints = await resp.json()
+            for ep in endpoints:
+                status = ep.get("status") or {}
+                ext = status.get("external-identifiers") or {}
+                if ext.get("container-id") != workload_id:
+                    continue
+                identity = status.get("identity") or {}
+                policy_realized = (status.get("policy") or {}).get("realized") or {}
+                last_state = {
+                    "endpoint_id": ep.get("id"),
+                    "identity_id": identity.get("id"),
+                    "identity_labels": identity.get("labels", []),
+                    "policy_enabled": policy_realized.get("policy-enabled", "unknown"),
+                }
+                # Identity ids < 256 are reserved (init=5, host=1, world=2,
+                # ...). A real cluster identity is >= 256.
+                if isinstance(last_state["identity_id"], int) and last_state["identity_id"] >= 256:
+                    return last_state
+                break
+            await asyncio.sleep(0.2)
+    if last_state is not None:
+        # Endpoint exists but identity never escaped the reserved range —
+        # return what we have so the operator can see the state, but fail
+        # the step.
+        raise RuntimeError(
+            f"endpoint for {workload_id!r} did not resolve a real identity within timeout: "
+            f"{last_state}"
+        )
+    raise RuntimeError(f"no cilium endpoint matched container-id={workload_id!r}")
+
+
+async def _do_ping(netns_name: str, target: str, *, count: int = 3) -> dict[str, Any]:
+    """Run ``ping -c COUNT TARGET`` from inside the workload netns.
+
+    Uses ``ip netns exec`` from the host; the netns must be the one
+    create_netns set up (the harness reuses ``workload_id`` as the
+    netns name, so it works out).
+    """
+    proc = await asyncio.create_subprocess_exec(
+        "ip",
+        "netns",
+        "exec",
+        netns_name,
+        "ping",
+        "-c",
+        str(count),
+        "-W",
+        "2",
+        target,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    raw, _ = await proc.communicate()
+    output = raw.decode("utf-8", "replace")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"ping {target} from netns {netns_name!r} exited {proc.returncode}\n{output}"
+        )
+    summary = ""
+    for line in output.splitlines():
+        if "packets transmitted" in line:
+            summary = line.strip()
+            break
+    return {"target": target, "summary": summary or output.splitlines()[-1]}
 
 
 async def _do_detach(
