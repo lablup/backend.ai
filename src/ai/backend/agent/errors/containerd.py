@@ -204,3 +204,22 @@ class CniInvocationError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class CiliumIdentityError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when assigning a Cilium endpoint identity to a workload fails.
+
+    Without a real identity, a containerd-native workload on a
+    policy-enforcing Cilium stays at ``reserved:init`` and its traffic is
+    dropped even on the same node. See ``cni-exp.md`` experiment 8.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-cilium-identity-error"
+    error_title = "Cilium endpoint identity assignment failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
