@@ -22,6 +22,8 @@ import aiohttp
 import ifaddr
 import psutil
 
+from ai.backend.logging import BraceStyleAdapter
+
 from .exception import CloudDetectionError
 from .networking import curl
 
@@ -36,7 +38,7 @@ __all__ = (
     "get_wsl_version",
 )
 
-log = logging.getLogger(__spec__.name)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class CloudProvider(enum.StrEnum):

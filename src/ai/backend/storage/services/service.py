@@ -107,7 +107,7 @@ class VolumeService:
         except asyncio.CancelledError:
             log.warning("Vfolder deletion task cancelled. (vfolder_id:{})", vfolder_id)
         else:
-            log.info("VFolder deletion task successed. (vfolder_id:{})", vfolder_id)
+            log.info("VFolder deletion task succeeded. (vfolder_id:{})", vfolder_id)
             await self._event_producer.anycast_event(VFolderDeletionSuccessEvent(vfolder_id))
 
     async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:

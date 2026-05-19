@@ -312,7 +312,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                         )
                     except sa.exc.InterfaceError:
                         log.warning(
-                            "DB Connnection for lock(id: {:d}) has already been closed. Skip unlock",
+                            "DB Connection for lock(id: {:d}) has already been closed. Skip unlock",
                             lock_id,
                         )
 
@@ -622,5 +622,5 @@ async def vacuum_db(bootstrap_config: BootstrapConfig, vacuum_full: bool = False
     async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
         async with db.begin() as conn:
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
-            log.info("Perfoming {} operation...", vacuum_sql)
+            log.info("Performing {} operation...", vacuum_sql)
             await conn.exec_driver_sql(vacuum_sql)
