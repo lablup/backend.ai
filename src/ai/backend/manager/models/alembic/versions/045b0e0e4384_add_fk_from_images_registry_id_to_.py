@@ -19,7 +19,7 @@ remains ``NOT NULL``, so a SET NULL backfill is not an option, and a
 sentinel re-assignment would mask the original deletion intent.
 
 Revision ID: 045b0e0e4384
-Revises: ba42cb865efe
+Revises: ccd5dbb99161
 Create Date: 2026-05-17
 
 """
@@ -29,7 +29,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "045b0e0e4384"
-down_revision = "ba42cb865efe"
+down_revision = "ccd5dbb99161"
 # Part of: 26.5.0
 branch_labels = None
 depends_on = None

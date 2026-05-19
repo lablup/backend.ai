@@ -1,7 +1,7 @@
 """add ondelete cascade to image alias
 
 Revision ID: ccd5dbb99161
-Revises: 045b0e0e4384
+Revises: ba42cb865efe
 Create Date: 2026-05-19 09:52:10.921004
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "ccd5dbb99161"
-down_revision = "045b0e0e4384"
+down_revision = "ba42cb865efe"
 branch_labels = None
 depends_on = None
 
