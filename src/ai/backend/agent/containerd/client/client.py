@@ -16,11 +16,12 @@ Currently exposed (grows as the agent layer needs more):
 - ``version()`` — containerd health probe.
 - ``ensure_namespace()`` / ``list_namespaces()`` — namespace bootstrap.
 - ``pull_image()`` — image pull + unpack via the Transfer service.
-- ``get_image()`` — resolve an image record.
+- ``get_image()`` / ``list_images()`` — resolve / enumerate image records.
+- ``get_image_oci_config()`` — read an image's OCI config (entrypoint, cmd, ...).
 - ``prepare_image_rootfs()`` / ``prepare_snapshot()`` / ``remove_snapshot()``
   — prepare the container root filesystem from an image's layers.
-- ``create_container()`` / ``delete_container()`` — the container metadata
-  object (id, image, runtime, OCI spec, rootfs snapshot).
+- ``create_container()`` / ``delete_container()`` / ``list_containers()`` —
+  the container metadata object (id, image, runtime, OCI spec, rootfs snapshot).
 - ``create_task()`` / ``start_task()`` / ``get_task()`` / ``wait_task()`` /
   ``kill_task()`` / ``delete_task()`` — the running container process.
 
@@ -47,6 +48,7 @@ from grpc.aio import AioRpcError
 from ai.backend.agent.containerd.oci import OCI_SPEC_TYPE_URL
 from ai.backend.agent.errors.containerd import (
     ContainerdConnectionError,
+    ContainerdImageError,
     ContainerdRpcError,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -372,17 +374,47 @@ class ContainerdClient:
         return ref
 
     async def get_image(self, ref: str) -> images_pb2.Image:
-        """Return the image record (name -> content descriptor) for ``ref``."""
+        """Return the image record (name -> content descriptor) for ``ref``.
+
+        Raises ``ContainerdImageError`` if the image is unknown to containerd
+        in this namespace; callers can catch that distinctly from a
+        generic ``ContainerdRpcError``.
+        """
         stub = self._require(self._images)
         try:
             response: images_pb2.GetImageResponse = await stub.Get(
                 images_pb2.GetImageRequest(name=ref), metadata=self._metadata
             )
         except AioRpcError as exc:
+            if exc.code() is grpc.StatusCode.NOT_FOUND:
+                raise ContainerdImageError(
+                    f"containerd has no image '{ref}' in namespace '{self._namespace}'"
+                ) from exc
             raise ContainerdRpcError(
                 f"containerd GetImage '{ref}' failed: {exc.details()}"
             ) from exc
         return response.image
+
+    async def list_images(self) -> list[images_pb2.Image]:
+        """List every image record in this namespace."""
+        stub = self._require(self._images)
+        try:
+            response: images_pb2.ListImagesResponse = await stub.List(
+                images_pb2.ListImagesRequest(), metadata=self._metadata
+            )
+        except AioRpcError as exc:
+            raise ContainerdRpcError(f"containerd ListImages failed: {exc.details()}") from exc
+        return list(response.images)
+
+    async def get_image_oci_config(self, ref: str) -> dict[str, Any]:
+        """Return an image's OCI image config document.
+
+        The returned mapping is the JSON config blob the image manifest
+        points at — its ``config`` holds the container ``Entrypoint`` /
+        ``Cmd`` / ``Env`` / ``Labels``, and ``rootfs`` the layer diff IDs.
+        """
+        image = await self.get_image(ref)
+        return await self._read_image_config(image.target)
 
     async def prepare_image_rootfs(
         self,
@@ -451,9 +483,9 @@ class ContainerdClient:
             ) from exc
         return b"".join(chunks)
 
-    async def _resolve_chain_id(self, target: descriptor_pb2.Descriptor) -> str:
+    async def _read_image_config(self, target: descriptor_pb2.Descriptor) -> dict[str, Any]:
         """Walk an image's content (index -> manifest -> config) and return
-        the rootfs chain ID for the host platform."""
+        the parsed OCI image config document for the host platform."""
         document: Any = json.loads(await self._read_content(target.digest))
         if target.media_type in _INDEX_MEDIA_TYPES:
             host = _host_platform()
@@ -475,6 +507,13 @@ class ContainerdClient:
         if not isinstance(config, dict) or not config.get("digest"):
             raise ContainerdRpcError(f"image manifest {target.digest} has no config descriptor")
         image_config: Any = json.loads(await self._read_content(config["digest"]))
+        if not isinstance(image_config, dict):
+            raise ContainerdRpcError(f"image config for {target.digest} is not a JSON object")
+        return image_config
+
+    async def _resolve_chain_id(self, target: descriptor_pb2.Descriptor) -> str:
+        """Return the rootfs chain ID (snapshot key) for an image's host-platform layers."""
+        image_config = await self._read_image_config(target)
         diff_ids = image_config.get("rootfs", {}).get("diff_ids", [])
         return _chain_id([str(diff_id) for diff_id in diff_ids])
 
@@ -528,6 +567,17 @@ class ContainerdClient:
             raise ContainerdRpcError(
                 f"containerd DeleteContainer '{container_id}' failed: {exc.details()}"
             ) from exc
+
+    async def list_containers(self) -> list[containers_pb2.Container]:
+        """List every container metadata object in this namespace."""
+        stub = self._require(self._containers)
+        try:
+            response: containers_pb2.ListContainersResponse = await stub.List(
+                containers_pb2.ListContainersRequest(), metadata=self._metadata
+            )
+        except AioRpcError as exc:
+            raise ContainerdRpcError(f"containerd ListContainers failed: {exc.details()}") from exc
+        return list(response.containers)
 
     async def create_task(
         self,

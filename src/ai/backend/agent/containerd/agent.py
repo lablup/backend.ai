@@ -21,8 +21,9 @@ import logging
 import os
 import secrets
 import shutil
+import signal
 import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from functools import partial
 from importlib.resources import files
@@ -33,10 +34,22 @@ from typing import Any, override
 
 import aiotools
 
-from ai.backend.agent.agent import AbstractAgent, AbstractKernelCreationContext
-from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
+from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ScanImagesResult,
+)
+from ai.backend.agent.config.unified import (
+    AgentUnifiedConfig,
+    ContainerdNetworkMode,
+    ScratchType,
+)
+from ai.backend.agent.errors.containerd import ContainerdImageError, ContainerdRpcError
 from ai.backend.agent.exception import UnsupportedResource
 from ai.backend.agent.fs import create_scratch_filesystem
+from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
 from ai.backend.agent.resources import (
@@ -47,17 +60,37 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.scratch import create_loop_filesystem
-from ai.backend.agent.types import KernelOwnershipData, MountInfo
+from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.asyncio import current_loop
-from ai.backend.common.docker import ImageRef, KernelFeatures
+from ai.backend.common.cgroup import get_cgroup_mount_point
+from ai.backend.common.data.image.types import InstalledImageInfo
+from ai.backend.common.docker import (
+    MAX_KERNELSPEC,
+    MIN_KERNELSPEC,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.exception import (
+    ConfigurationError,
+    ImageNotAvailable,
+    InvalidImageName,
+    InvalidImageTag,
+)
 from ai.backend.common.json import dump_json
 from ai.backend.common.types import (
+    AutoPullBehavior,
     ClusterInfo,
+    ContainerStatus,
     DeviceId,
     DeviceName,
+    ImageCanonical,
+    ImageConfig,
+    ImageRegistry,
     KernelCreationConfig,
+    KernelId,
     MountPermission,
     MountTypes,
     ResourceGroupType,
@@ -70,6 +103,8 @@ from ai.backend.logging import BraceStyleAdapter
 from .client.client import ContainerdClient
 from .kernel import ContainerdKernel
 from .network.base import NetworkProvider
+from .network.cilium import CiliumNetworkProvider
+from .preflight import run_preflight
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -586,11 +621,230 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
 
 class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext]):
-    """Containerd-backed agent (prototype scaffold).
+    """Containerd-backed agent driving the host containerd over its native gRPC API.
 
-    Concrete operations will be implemented over the containerd native
-    gRPC API via ``ContainerdClient``. The abstract methods inherited from
-    ``AbstractAgent`` are intentionally left unoverridden so the class is
-    not yet instantiable; this scaffold exists to validate package wiring
-    and discovery only, and is filled in by a later increment.
+    Workloads live in a dedicated containerd metadata namespace so a
+    co-located kubelet (whose CRI plugin only enumerates ``k8s.io``)
+    never sees — and never reaps — Backend.AI containers.
+
+    This class currently covers the agent lifecycle, image scanning, and
+    cgroup introspection. The kernel create/destroy path
+    (``init_kernel_context``, ``prepare_container`` / ``start_container``,
+    ``destroy_kernel`` / ``clean_kernel``), crash recovery, and image
+    push/purge are filled in by later increments, so this class is not
+    yet fully instantiable.
     """
+
+    containerd: ContainerdClient
+    network_provider: NetworkProvider | None
+    agent_sockpath: Path
+    cgroup_version: str
+    checked_invalid_images: set[str]
+
+    async def __ainit__(self) -> None:
+        self.checked_invalid_images = set()
+        # The host's unified-vs-legacy cgroup hierarchy; used both to read
+        # per-container stats and to resolve OCI cgroupsPath.
+        self.cgroup_version = "2" if Path("/sys/fs/cgroup/cgroup.controllers").exists() else "1"
+        # Long-lived client to the host containerd. Connect before
+        # super().__ainit__() because the base scan_images() call already
+        # needs it.
+        self.containerd = ContainerdClient()
+        await self.containerd.connect()
+        await self.containerd.ensure_namespace()
+        version = await self.containerd.version()
+        log.info(
+            "connected to containerd {} (namespace: {!r}, cgroup v{})",
+            version.version,
+            self.containerd.namespace,
+            self.cgroup_version,
+        )
+        # Fail fast on CNI / network misconfiguration before any kernel work.
+        containerd_config = self.local_config.container.containerd
+        if containerd_config is None:
+            raise ConfigurationError({
+                "ContainerdAgent.__ainit__": (
+                    "container.containerd is required when agent.backend='containerd'."
+                )
+            })
+        await run_preflight(containerd_config)
+        # Build the pluggable network provider for the configured mode.
+        match containerd_config.network.mode:
+            case ContainerdNetworkMode.CILIUM:
+                provider: NetworkProvider = CiliumNetworkProvider(
+                    network_name=containerd_config.network.network_name,
+                    cni_conf_dir=containerd_config.network.cni_conf_dir,
+                    cni_bin_dir=containerd_config.network.cni_bin_dir,
+                )
+                await provider.preflight()
+                self.network_provider = provider
+            case _:
+                # 'managed' / 'host' / 'none' provider impls are not wired
+                # yet; the kernel create path will raise a clear error if
+                # one is needed but absent.
+                self.network_provider = None
+        # The agent socket is bind-mounted into kernels for in-container
+        # callbacks; the socket handler task is wired in a later increment.
+        ipc_base_path = self.local_config.agent.ipc_base_path
+        ipc_container_path = ipc_base_path / "container"
+        ipc_container_path.mkdir(parents=True, exist_ok=True)
+        self.agent_sockpath = ipc_container_path / f"agent.{self.id}.sock"
+        await super().__ainit__()
+
+    async def shutdown(self, stop_signal: signal.Signals) -> None:
+        try:
+            await super().shutdown(stop_signal)
+        finally:
+            await self.containerd.close()
+
+    @override
+    async def _load_kernel_registry_from_recovery(
+        self,
+    ) -> MutableMapping[KernelId, AbstractKernel]:
+        # Crash recovery is deferred to a later increment; on a fresh start
+        # there is nothing to restore, so keep the live (empty) registry.
+        return self.kernel_registry
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        # Registry persistence is deferred together with crash recovery.
+        del kernel_registry, metadata
+
+    @override
+    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+        mount_point = get_cgroup_mount_point(self.cgroup_version, controller)
+        # Matches oci.build_oci_spec()'s cgroupsPath ("/backendai/<cid>"):
+        # runc with the default cgroupfs driver creates the container's
+        # cgroup at that path under the controller mount point.
+        return mount_point / "backendai" / container_id
+
+    @override
+    def get_cgroup_version(self) -> str:
+        return self.cgroup_version
+
+    @override
+    async def extract_image_command(self, image: str) -> list[str] | None:
+        config_doc = await self.containerd.get_image_oci_config(image)
+        config = config_doc.get("config") or {}
+        command = config.get("Cmd")
+        if command is None:
+            return None
+        if isinstance(command, str):
+            return [command]
+        if isinstance(command, list):
+            return [str(part) for part in command]
+        return None
+
+    @override
+    async def enumerate_containers(
+        self,
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
+        # Resuming pre-existing containerd tasks after an agent restart
+        # is handled by the crash-recovery increment; on a fresh start
+        # there is nothing to enumerate.
+        del status_filter
+        return []
+
+    @override
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        distro = image["labels"].get(LabelName.BASE_DISTRO)
+        if distro:
+            return distro
+        # The docker backend probes `ldd --version` in a throwaway
+        # container; that probe is deferred for the containerd backend, so
+        # fall back to the base-distro label inside the image's OCI config.
+        config_doc = await self.containerd.get_image_oci_config(image["canonical"])
+        config_labels = (config_doc.get("config") or {}).get("Labels") or {}
+        distro = config_labels.get(LabelName.BASE_DISTRO)
+        if distro:
+            return str(distro)
+        raise ContainerdImageError(
+            f"cannot determine the base distro of image {image['canonical']!r}: "
+            f"the {LabelName.BASE_DISTRO} label is absent"
+        )
+
+    @override
+    async def scan_images(self) -> ScanImagesResult:
+        scanned_images: dict[ImageCanonical, InstalledImageInfo] = {}
+        removed_images: dict[ImageCanonical, InstalledImageInfo] = {}
+        for image in await self.containerd.list_images():
+            repo_tag = image.name
+            if repo_tag.endswith("<none>"):
+                continue
+            try:
+                ImageRef.parse_image_str(repo_tag, "*")
+            except (InvalidImageName, InvalidImageTag) as e:
+                if repo_tag not in self.checked_invalid_images:
+                    log.warning(
+                        "Image name {} does not conform to Backend.AI's image "
+                        "naming rule. This image will be ignored. Details: {}",
+                        repo_tag,
+                        e,
+                    )
+                    self.checked_invalid_images.add(repo_tag)
+                continue
+            try:
+                config_doc = await self.containerd.get_image_oci_config(repo_tag)
+            except (ContainerdRpcError, ContainerdImageError) as e:
+                log.warning("could not read the OCI config of image {}: {}", repo_tag, e)
+                continue
+            labels = (config_doc.get("config") or {}).get("Labels") or {}
+            kernelspec = int(labels.get(LabelName.KERNEL_SPEC, "1"))
+            if not (MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC):
+                continue
+            inspect_result: dict[str, str] = {"Id": image.target.digest}
+            if architecture := config_doc.get("architecture"):
+                inspect_result["Architecture"] = str(architecture)
+            scanned_images[ImageCanonical(repo_tag)] = InstalledImageInfo.from_inspect_result(
+                canonical=repo_tag,
+                inspect_result=inspect_result,
+            )
+        for added_image in scanned_images.keys() - self.images.keys():
+            log.debug("found kernel image: {0}", added_image)
+        for removed_image in self.images.keys() - scanned_images.keys():
+            log.debug("removed kernel image: {0}", removed_image)
+            removed_images[removed_image] = self.images[removed_image]
+        return ScanImagesResult(
+            scanned_images=scanned_images,
+            removed_images=removed_images,
+        )
+
+    @override
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout_seconds: float | None,
+    ) -> None:
+        log.info("pulling image {} via the containerd Transfer service", image_ref.canonical)
+        # Registry credentials are not threaded through to the Transfer
+        # service yet; only public registries work end-to-end for now.
+        del registry_conf
+        pull = self.containerd.pull_image(image_ref.canonical)
+        if timeout_seconds is not None:
+            await asyncio.wait_for(pull, timeout=timeout_seconds)
+        else:
+            await pull
+
+    @override
+    async def check_image(
+        self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
+    ) -> bool:
+        try:
+            image = await self.containerd.get_image(image_ref.canonical)
+        except ContainerdImageError as e:
+            if auto_pull in (AutoPullBehavior.DIGEST, AutoPullBehavior.TAG):
+                return True
+            if auto_pull == AutoPullBehavior.NONE:
+                raise ImageNotAvailable(image_ref) from e
+            return False
+        if auto_pull == AutoPullBehavior.DIGEST and image.target.digest != image_id:
+            return True
+        log.info("found the local up-to-date image for {}", image_ref.canonical)
+        return False

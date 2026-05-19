@@ -159,6 +159,25 @@ class ContainerdRpcError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ContainerdImageError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when an image cannot be resolved, inspected, or is missing metadata.
+
+    Covers failures distinct from a transport-level RPC error — e.g. an
+    image whose OCI config lacks the labels Backend.AI needs to launch a
+    kernel from it.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-image-error"
+    error_title = "containerd image error."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
+
+
 class NetnsSetupError(BackendAIError, web.HTTPInternalServerError):
     """Raised when a workload's network namespace cannot be created or removed."""
 
