@@ -1027,7 +1027,7 @@ class ImageAliasRow(Base):  # type: ignore[misc]
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
     image_id: Mapped[ImageID] = mapped_column(
-        "image", GUID(ImageID), sa.ForeignKey("images.id"), nullable=False
+        "image", GUID(ImageID), sa.ForeignKey("images.id", ondelete="CASCADE"), nullable=False
     )
     image: Mapped[ImageRow] = relationship("ImageRow", back_populates="aliases")
 
