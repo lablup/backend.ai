@@ -23,11 +23,18 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
+    RouteSubStatus,
 )
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, QueryCondition
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
+    QueryCondition,
+    combine_conditions_and,
+    combine_conditions_or,
+)
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -255,14 +262,29 @@ class RouteCoordinator:
 
         Observers collect data (e.g., health check results) without
         changing route status in DB.
+
+        Observed scope:
+        - RUNNING routes (any health status) — ongoing health monitoring.
+        - PROVISIONING + WARMING_UP routes — initial health probe so the
+          warming-up handler has data to transition into RUNNING.
+          Without this, warming-up routes have no one writing to Valkey
+          and time out after `initial_delay`.
         """
         try:
             routes = await self._deployment_repository.search_route_datas(
                 querier=BatchQuerier(
                     pagination=NoPagination(),
                     conditions=[
-                        RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                        RouteConditions.by_health_statuses(list(RouteHealthStatus)),
+                        combine_conditions_or([
+                            combine_conditions_and([
+                                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
+                                RouteConditions.by_health_statuses(list(RouteHealthStatus)),
+                            ]),
+                            combine_conditions_and([
+                                RouteConditions.by_lifecycle_statuses([RouteStatus.PROVISIONING]),
+                                RouteConditions.by_sub_statuses([RouteSubStatus.WARMING_UP]),
+                            ]),
+                        ]),
                     ],
                 ),
             )
