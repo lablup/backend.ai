@@ -16,18 +16,23 @@ Currently exposed (grows as the agent layer needs more):
 - ``version()`` — containerd health probe.
 - ``ensure_namespace()`` / ``list_namespaces()`` — namespace bootstrap.
 - ``pull_image()`` — image pull + unpack via the Transfer service.
+- ``get_image()`` — resolve an image record.
+- ``prepare_image_rootfs()`` / ``prepare_snapshot()`` / ``remove_snapshot()``
+  — prepare the container root filesystem from an image's layers.
 
-Snapshots, containers and tasks land in later increments. Everything goes
-through ``grpc.aio`` so the agent event loop stays responsive.
+Containers and tasks land in later increments. Everything goes through
+``grpc.aio`` so the agent event loop stays responsive.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import os
 from types import TracebackType
-from typing import TYPE_CHECKING, Self, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
 import grpc
 from google.protobuf import any_pb2, empty_pb2
@@ -40,19 +45,25 @@ from ai.backend.agent.errors.containerd import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .generated.containerd.services.content.v1 import content_pb2, content_pb2_grpc
+from .generated.containerd.services.images.v1 import images_pb2, images_pb2_grpc
 from .generated.containerd.services.namespaces.v1 import namespace_pb2, namespace_pb2_grpc
+from .generated.containerd.services.snapshots.v1 import snapshots_pb2, snapshots_pb2_grpc
 from .generated.containerd.services.transfer.v1 import transfer_pb2, transfer_pb2_grpc
 from .generated.containerd.services.version.v1 import version_pb2, version_pb2_grpc
-from .generated.containerd.types import platform_pb2
+from .generated.containerd.types import descriptor_pb2, mount_pb2, platform_pb2
 from .generated.containerd.types.transfer import imagestore_pb2, registry_pb2
 
 if TYPE_CHECKING:
     # mypy-protobuf emits the *AsyncStub types for type-checking only
     # (decorated @type_check_only); importing them under TYPE_CHECKING
     # keeps the names available for annotations without a runtime import.
+    from .generated.containerd.services.content.v1.content_pb2_grpc import ContentAsyncStub
+    from .generated.containerd.services.images.v1.images_pb2_grpc import ImagesAsyncStub
     from .generated.containerd.services.namespaces.v1.namespace_pb2_grpc import (
         NamespacesAsyncStub,
     )
+    from .generated.containerd.services.snapshots.v1.snapshots_pb2_grpc import SnapshotsAsyncStub
     from .generated.containerd.services.transfer.v1.transfer_pb2_grpc import TransferAsyncStub
     from .generated.containerd.services.version.v1.version_pb2_grpc import VersionAsyncStub
 
@@ -83,6 +94,13 @@ _NAMESPACE_HEADER = "containerd-namespace"
 # `uname` machine name -> OCI/containerd architecture name.
 _ARCH_ALIASES = {"x86_64": "amd64", "aarch64": "arm64"}
 
+# Multi-platform image media types whose content is a list of per-platform
+# manifests rather than a single manifest.
+_INDEX_MEDIA_TYPES = frozenset({
+    "application/vnd.oci.image.index.v1+json",
+    "application/vnd.docker.distribution.manifest.list.v2+json",
+})
+
 _StubT = TypeVar("_StubT")
 
 
@@ -112,6 +130,23 @@ def _containerd_any(message: Message) -> any_pb2.Any:
     )
 
 
+def _chain_id(diff_ids: list[str]) -> str:
+    """Compute an OCI rootfs chain ID from a list of layer diff IDs.
+
+    ``chainID([]) = ""``; ``chainID([d]) = d``;
+    ``chainID([d1..dn]) = sha256(chainID([d1..dn-1]) + " " + dn)``.
+    This is the snapshot key under which containerd commits the unpacked
+    image rootfs.
+    """
+    if not diff_ids:
+        return ""
+    chain = diff_ids[0]
+    for diff_id in diff_ids[1:]:
+        digest = hashlib.sha256(f"{chain} {diff_id}".encode()).hexdigest()
+        chain = f"sha256:{digest}"
+    return chain
+
+
 class ContainerdClient:
     """High-level async client for the host's containerd native API.
 
@@ -133,6 +168,9 @@ class ContainerdClient:
     _version: VersionAsyncStub | None
     _namespaces: NamespacesAsyncStub | None
     _transfer: TransferAsyncStub | None
+    _images: ImagesAsyncStub | None
+    _content: ContentAsyncStub | None
+    _snapshots: SnapshotsAsyncStub | None
 
     def __init__(
         self,
@@ -148,6 +186,9 @@ class ContainerdClient:
         self._version = None
         self._namespaces = None
         self._transfer = None
+        self._images = None
+        self._content = None
+        self._snapshots = None
 
     @property
     def namespace(self) -> str:
@@ -199,6 +240,9 @@ class ContainerdClient:
         self._version = cast("VersionAsyncStub", version_pb2_grpc.VersionStub(channel))
         self._namespaces = cast("NamespacesAsyncStub", namespace_pb2_grpc.NamespacesStub(channel))
         self._transfer = cast("TransferAsyncStub", transfer_pb2_grpc.TransferStub(channel))
+        self._images = cast("ImagesAsyncStub", images_pb2_grpc.ImagesStub(channel))
+        self._content = cast("ContentAsyncStub", content_pb2_grpc.ContentStub(channel))
+        self._snapshots = cast("SnapshotsAsyncStub", snapshots_pb2_grpc.SnapshotsStub(channel))
 
     async def close(self) -> None:
         if self._channel is None:
@@ -208,6 +252,9 @@ class ContainerdClient:
         self._version = None
         self._namespaces = None
         self._transfer = None
+        self._images = None
+        self._content = None
+        self._snapshots = None
 
     @property
     def _metadata(self) -> tuple[tuple[str, str], ...]:
@@ -299,6 +346,113 @@ class ContainerdClient:
                 f"containerd Transfer (pull '{ref}') failed: {exc.details()}"
             ) from exc
         return ref
+
+    async def get_image(self, ref: str) -> images_pb2.Image:
+        """Return the image record (name -> content descriptor) for ``ref``."""
+        stub = self._require(self._images)
+        try:
+            response: images_pb2.GetImageResponse = await stub.Get(
+                images_pb2.GetImageRequest(name=ref), metadata=self._metadata
+            )
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd GetImage '{ref}' failed: {exc.details()}"
+            ) from exc
+        return response.image
+
+    async def prepare_image_rootfs(
+        self,
+        image_ref: str,
+        snapshot_key: str,
+        *,
+        snapshotter: str = DEFAULT_SNAPSHOTTER,
+    ) -> list[mount_pb2.Mount]:
+        """Prepare a writable container root filesystem from an image.
+
+        Resolves the image's rootfs chain ID (the key of the committed
+        snapshot containerd produced when unpacking the image) and prepares
+        a new active snapshot on top of it. Returns the mounts that make up
+        the container root filesystem — these are handed to ``Tasks.Create``.
+        """
+        image = await self.get_image(image_ref)
+        chain_id = await self._resolve_chain_id(image.target)
+        return await self.prepare_snapshot(snapshot_key, chain_id, snapshotter=snapshotter)
+
+    async def prepare_snapshot(
+        self,
+        key: str,
+        parent: str,
+        *,
+        snapshotter: str = DEFAULT_SNAPSHOTTER,
+    ) -> list[mount_pb2.Mount]:
+        """Prepare an active snapshot ``key`` on top of ``parent``; return mounts."""
+        stub = self._require(self._snapshots)
+        request = snapshots_pb2.PrepareSnapshotRequest(
+            snapshotter=snapshotter,
+            key=key,
+            parent=parent,
+        )
+        try:
+            response: snapshots_pb2.PrepareSnapshotResponse = await stub.Prepare(
+                request, metadata=self._metadata
+            )
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd PrepareSnapshot '{key}' failed: {exc.details()}"
+            ) from exc
+        return list(response.mounts)
+
+    async def remove_snapshot(self, key: str, *, snapshotter: str = DEFAULT_SNAPSHOTTER) -> None:
+        """Remove a snapshot by key."""
+        stub = self._require(self._snapshots)
+        request = snapshots_pb2.RemoveSnapshotRequest(snapshotter=snapshotter, key=key)
+        try:
+            await stub.Remove(request, metadata=self._metadata)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd RemoveSnapshot '{key}' failed: {exc.details()}"
+            ) from exc
+
+    async def _read_content(self, digest: str) -> bytes:
+        """Read a content-store blob in full by digest."""
+        stub = self._require(self._content)
+        request = content_pb2.ReadContentRequest(digest=digest)
+        chunks: list[bytes] = []
+        try:
+            async for response in stub.Read(request, metadata=self._metadata):
+                chunks.append(response.data)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd ReadContent '{digest}' failed: {exc.details()}"
+            ) from exc
+        return b"".join(chunks)
+
+    async def _resolve_chain_id(self, target: descriptor_pb2.Descriptor) -> str:
+        """Walk an image's content (index -> manifest -> config) and return
+        the rootfs chain ID for the host platform."""
+        document: Any = json.loads(await self._read_content(target.digest))
+        if target.media_type in _INDEX_MEDIA_TYPES:
+            host = _host_platform()
+            manifest_digest: str | None = None
+            for entry in document.get("manifests", []):
+                entry_platform = entry.get("platform") or {}
+                if (
+                    entry_platform.get("os") == host.os
+                    and entry_platform.get("architecture") == host.architecture
+                ):
+                    manifest_digest = entry.get("digest")
+                    break
+            if not manifest_digest:
+                raise ContainerdRpcError(
+                    f"image index {target.digest} has no manifest for {host.os}/{host.architecture}"
+                )
+            document = json.loads(await self._read_content(manifest_digest))
+        config = document.get("config")
+        if not isinstance(config, dict) or not config.get("digest"):
+            raise ContainerdRpcError(f"image manifest {target.digest} has no config descriptor")
+        image_config: Any = json.loads(await self._read_content(config["digest"]))
+        diff_ids = image_config.get("rootfs", {}).get("diff_ids", [])
+        return _chain_id([str(diff_id) for diff_id in diff_ids])
 
     def _require(self, stub: _StubT | None) -> _StubT:
         if stub is None:

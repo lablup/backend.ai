@@ -26,6 +26,7 @@ import json
 import logging
 import sys
 import time
+import uuid
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any
 
@@ -67,7 +68,7 @@ class StepResult:
     "--image",
     default="docker.io/library/busybox:latest",
     show_default=True,
-    help="Image reference to pull + unpack via the Transfer service.",
+    help="Image reference to pull + unpack and prepare a rootfs from.",
 )
 @click.option(
     "--connect-timeout",
@@ -118,6 +119,7 @@ async def _run_lifecycle(
     # tree (and the generated stubs) being importable.
     from ai.backend.agent.containerd.client.client import ContainerdClient
 
+    snapshot_key = f"containerd-poc-{uuid.uuid4().hex[:12]}"
     results: list[StepResult] = []
     async with ContainerdClient(
         address=address,
@@ -127,6 +129,16 @@ async def _run_lifecycle(
         results.append(await _step("version", lambda: _do_version(cd)))
         results.append(await _step("ensure_namespace", lambda: _do_ensure_namespace(cd)))
         results.append(await _step("pull_image", lambda: _do_pull_image(cd, image)))
+        results.append(await _step("get_image", lambda: _do_get_image(cd, image)))
+        prepared = await _step(
+            "prepare_snapshot", lambda: _do_prepare_snapshot(cd, image, snapshot_key)
+        )
+        results.append(prepared)
+        # Only attempt teardown if the snapshot was actually prepared.
+        if prepared.ok:
+            results.append(
+                await _step("remove_snapshot", lambda: _do_remove_snapshot(cd, snapshot_key))
+            )
         results.append(await _step("list_namespaces", lambda: _do_list_namespaces(cd)))
     return results
 
@@ -165,6 +177,31 @@ async def _do_ensure_namespace(cd: ContainerdClient) -> dict[str, Any]:
 async def _do_pull_image(cd: ContainerdClient, image: str) -> dict[str, Any]:
     ref = await cd.pull_image(image)
     return {"image": ref}
+
+
+async def _do_get_image(cd: ContainerdClient, image: str) -> dict[str, Any]:
+    record = await cd.get_image(image)
+    return {
+        "name": record.name,
+        "target_media_type": record.target.media_type,
+        "target_digest": record.target.digest,
+    }
+
+
+async def _do_prepare_snapshot(
+    cd: ContainerdClient, image: str, snapshot_key: str
+) -> dict[str, Any]:
+    mounts = await cd.prepare_image_rootfs(image, snapshot_key)
+    return {
+        "snapshot_key": snapshot_key,
+        "mount_count": len(mounts),
+        "mount_types": sorted({m.type for m in mounts}),
+    }
+
+
+async def _do_remove_snapshot(cd: ContainerdClient, snapshot_key: str) -> dict[str, Any]:
+    await cd.remove_snapshot(snapshot_key)
+    return {"snapshot_key": snapshot_key}
 
 
 async def _do_list_namespaces(cd: ContainerdClient) -> dict[str, Any]:
