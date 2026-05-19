@@ -65,7 +65,13 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesystem
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
+from ai.backend.agent.types import (
+    AgentEventData,
+    Container,
+    KernelOwnershipData,
+    LifecycleEvent,
+    MountInfo,
+)
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import get_cgroup_mount_point
@@ -80,6 +86,7 @@ from ai.backend.common.docker import (
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import (
     ConfigurationError,
     ImageNotAvailable,
@@ -112,6 +119,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .client.client import ContainerdClient
+from .client.generated.containerd.events import task_pb2 as events_task_pb2
 from .client.generated.containerd.types.task import task_pb2
 from .kernel import ContainerdKernel
 from .network.base import NetworkAttachment, NetworkProvider
@@ -1023,9 +1031,11 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
     agent_sockpath: Path
     cgroup_version: str
     checked_invalid_images: set[str]
+    monitor_events_task: asyncio.Task[None] | None
 
     async def __ainit__(self) -> None:
         self.checked_invalid_images = set()
+        self.monitor_events_task = None
         # The host's unified-vs-legacy cgroup hierarchy; used both to read
         # per-container stats and to resolve OCI cgroupsPath.
         self.cgroup_version = "2" if Path("/sys/fs/cgroup/cgroup.controllers").exists() else "1"
@@ -1073,8 +1083,18 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
         ipc_container_path.mkdir(parents=True, exist_ok=True)
         self.agent_sockpath = ipc_container_path / f"agent.{self.id}.sock"
         await super().__ainit__()
+        # Subscribe to containerd task events so kernel termination is
+        # picked up immediately instead of waiting for the base agent's
+        # sync_container_lifecycles polling sweep.
+        self.monitor_events_task = asyncio.create_task(self.monitor_containerd_events())
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
+        if self.monitor_events_task is not None:
+            self.monitor_events_task.cancel()
+            try:
+                await self.monitor_events_task
+            except (asyncio.CancelledError, ContainerdRpcError):
+                pass
         try:
             await super().shutdown(stop_signal)
         finally:
@@ -1467,3 +1487,92 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
         scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
         await asyncio.to_thread((config_dir / name).write_bytes, data)
+
+    async def monitor_containerd_events(self) -> None:
+        """Drive CLEAN / OOM lifecycle events from containerd's event stream.
+
+        Subscribes to ``/tasks/exit`` and ``/tasks/oom`` events scoped to
+        this client's namespace. On a task exit, injects a CLEAN
+        lifecycle event so the kernel is torn down immediately; on OOM,
+        forwards an ``oom`` notification to the kernel so the krunner can
+        surface it. The stream is reconnected with exponential backoff
+        on transport errors (the underlying gRPC stream can break when
+        containerd restarts).
+        """
+        namespace = self.containerd.namespace
+        filters = [
+            f"namespace=={namespace},topic==/tasks/exit",
+            f"namespace=={namespace},topic==/tasks/oom",
+        ]
+        backoff = 1.0
+        while True:
+            try:
+                async for envelope in self.containerd.subscribe_events(filters=filters):
+                    await self._handle_containerd_event(envelope)
+                # The stream ended cleanly (no exception); containerd is
+                # likely restarting. Fall through to the backoff branch.
+                log.warning(
+                    "containerd events stream closed; reconnecting in {:.1f}s",
+                    backoff,
+                )
+            except asyncio.CancelledError:
+                return
+            except ContainerdRpcError as e:
+                log.warning(
+                    "containerd events stream error ({}); reconnecting in {:.1f}s",
+                    e,
+                    backoff,
+                )
+            except Exception:
+                log.exception(
+                    "unexpected error in containerd events stream; reconnecting in {:.1f}s",
+                    backoff,
+                )
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 30.0)
+
+    async def _handle_containerd_event(self, envelope: Any) -> None:
+        """Dispatch a single ``Events.Subscribe`` envelope.
+
+        Filters out events whose ``container_id`` does not match the
+        ``kernel-{kernel_id}`` convention from ``start_container``; the
+        kernel-id is parsed back out without a containerd lookup.
+        """
+        topic = envelope.topic
+        container_id_field: str = ""
+        exit_code = 0
+        if topic == "/tasks/exit":
+            exit_event = events_task_pb2.TaskExit()
+            envelope.event.Unpack(exit_event)
+            container_id_field = exit_event.container_id
+            exit_code = exit_event.exit_status
+        elif topic == "/tasks/oom":
+            oom_event = events_task_pb2.TaskOOM()
+            envelope.event.Unpack(oom_event)
+            container_id_field = oom_event.container_id
+        else:
+            return
+        if not container_id_field.startswith("kernel-"):
+            return  # not one of ours.
+        kernel_id_str = container_id_field[len("kernel-") :]
+        try:
+            kernel_id = KernelId(UUID(kernel_id_str))
+        except ValueError:
+            return
+        kernel_obj = self.kernel_registry.get(kernel_id)
+        if kernel_obj is None:
+            # The event may arrive after our own clean_kernel removed
+            # the registry entry; nothing more to do here.
+            return
+        if topic == "/tasks/oom":
+            await kernel_obj.notify_event(AgentEventData(type="oom", data={}))
+            return
+        reason = kernel_obj.termination_reason or KernelLifecycleEventReason.SELF_TERMINATED
+        await self.inject_container_lifecycle_event(
+            kernel_id,
+            kernel_obj.session_id,
+            LifecycleEvent.CLEAN,
+            reason,
+            container_id=ContainerId(container_id_field),
+            exit_code=exit_code,
+        )

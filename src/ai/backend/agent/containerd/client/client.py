@@ -24,6 +24,8 @@ Currently exposed (grows as the agent layer needs more):
   the container metadata object (id, image, runtime, OCI spec, rootfs snapshot).
 - ``create_task()`` / ``start_task()`` / ``get_task()`` / ``wait_task()`` /
   ``kill_task()`` / ``delete_task()`` — the running container process.
+- ``subscribe_events()`` — push notifications for task exit / OOM /
+  start / etc., replacing the poll loop.
 
 Everything goes through ``grpc.aio`` so the agent event loop stays
 responsive.
@@ -37,7 +39,7 @@ import hashlib
 import json
 import logging
 import os
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
@@ -56,13 +58,14 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .generated.containerd.services.containers.v1 import containers_pb2, containers_pb2_grpc
 from .generated.containerd.services.content.v1 import content_pb2, content_pb2_grpc
+from .generated.containerd.services.events.v1 import events_pb2, events_pb2_grpc
 from .generated.containerd.services.images.v1 import images_pb2, images_pb2_grpc
 from .generated.containerd.services.namespaces.v1 import namespace_pb2, namespace_pb2_grpc
 from .generated.containerd.services.snapshots.v1 import snapshots_pb2, snapshots_pb2_grpc
 from .generated.containerd.services.tasks.v1 import tasks_pb2, tasks_pb2_grpc
 from .generated.containerd.services.transfer.v1 import transfer_pb2, transfer_pb2_grpc
 from .generated.containerd.services.version.v1 import version_pb2, version_pb2_grpc
-from .generated.containerd.types import descriptor_pb2, mount_pb2, platform_pb2
+from .generated.containerd.types import descriptor_pb2, event_pb2, mount_pb2, platform_pb2
 from .generated.containerd.types.task import task_pb2
 from .generated.containerd.types.transfer import imagestore_pb2, registry_pb2
 
@@ -74,6 +77,7 @@ if TYPE_CHECKING:
         ContainersAsyncStub,
     )
     from .generated.containerd.services.content.v1.content_pb2_grpc import ContentAsyncStub
+    from .generated.containerd.services.events.v1.events_pb2_grpc import EventsAsyncStub
     from .generated.containerd.services.images.v1.images_pb2_grpc import ImagesAsyncStub
     from .generated.containerd.services.namespaces.v1.namespace_pb2_grpc import (
         NamespacesAsyncStub,
@@ -192,6 +196,7 @@ class ContainerdClient:
     _snapshots: SnapshotsAsyncStub | None
     _containers: ContainersAsyncStub | None
     _tasks: TasksAsyncStub | None
+    _events: EventsAsyncStub | None
 
     def __init__(
         self,
@@ -212,6 +217,7 @@ class ContainerdClient:
         self._snapshots = None
         self._containers = None
         self._tasks = None
+        self._events = None
 
     @property
     def namespace(self) -> str:
@@ -268,6 +274,7 @@ class ContainerdClient:
         self._snapshots = cast("SnapshotsAsyncStub", snapshots_pb2_grpc.SnapshotsStub(channel))
         self._containers = cast("ContainersAsyncStub", containers_pb2_grpc.ContainersStub(channel))
         self._tasks = cast("TasksAsyncStub", tasks_pb2_grpc.TasksStub(channel))
+        self._events = cast("EventsAsyncStub", events_pb2_grpc.EventsStub(channel))
 
     async def close(self) -> None:
         if self._channel is None:
@@ -282,6 +289,7 @@ class ContainerdClient:
         self._snapshots = None
         self._containers = None
         self._tasks = None
+        self._events = None
 
     @property
     def _metadata(self) -> tuple[tuple[str, str], ...]:
@@ -702,6 +710,34 @@ class ContainerdClient:
                 f"containerd DeleteTask '{container_id}' failed: {exc.details()}"
             ) from exc
         return response
+
+    async def subscribe_events(
+        self,
+        filters: Sequence[str] | None = None,
+    ) -> AsyncIterator[event_pb2.Envelope]:
+        """Stream events from containerd's Events.Subscribe RPC.
+
+        ``filters`` are containerd filter expressions; without a
+        ``namespace==`` filter, events from every namespace arrive.
+        Common filters:
+        - ``topic==/tasks/exit`` — process exit per task
+        - ``topic==/tasks/oom`` — OOM-kill signaled per task
+        - ``namespace==backendai`` — restrict to this client's namespace
+
+        Use as an async iterator (``async for env in
+        client.subscribe_events(...): ...``). The iterator runs for as
+        long as the gRPC call is in flight; transport errors surface as
+        ``ContainerdRpcError``.
+        """
+        stub = self._require(self._events)
+        request = events_pb2.SubscribeRequest(filters=list(filters or []))
+        try:
+            async for envelope in stub.Subscribe(request, metadata=self._metadata):
+                yield envelope
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd Events.Subscribe failed: {exc.details()}"
+            ) from exc
 
     def _require(self, stub: _StubT | None) -> _StubT:
         if stub is None:

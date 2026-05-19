@@ -363,6 +363,8 @@ async def _do_start_task(cd: ContainerdClient, container_id: str) -> dict[str, A
 
 async def _do_get_task(cd: ContainerdClient, container_id: str) -> dict[str, Any]:
     process = await cd.get_task(container_id)
+    if process is None:
+        return {"status": "missing", "pid": 0}
     return {
         "status": _TASK_STATUS.get(process.status, process.status),
         "pid": process.pid,
