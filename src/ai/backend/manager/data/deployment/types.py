@@ -66,6 +66,17 @@ class DeploymentConfig(BackendAISchema):
     environ: dict[str, str] | None = None
 
 
+@dataclass(frozen=True)
+class FetchedModelDefinition:
+    """Model definition draft with the vfolder path it was read from.
+
+    ``path`` is the matched candidate path inside the model vfolder.
+    """
+
+    path: str
+    model_definition: ModelDefinitionDraft
+
+
 class RouteStatus(enum.Enum):
     """Lifecycle status of a route (independent of health)."""
 
@@ -511,12 +522,11 @@ class ModelRevisionSpecDraft(ConfiguredModel):
         """Project this legacy spec draft onto a ``RevisionDraft`` layer.
 
         ``image_id`` is resolved upstream from the spec's ``image_identifier``
-        (canonical + architecture) via the repository; mount-identifying
-        fields live on ``MountMetadata`` and are passed alongside into
-        ``add_revision`` rather than through the draft chain.
+        (canonical + architecture) via the repository.
         """
         return RevisionDraft(
             image_id=image_id,
+            mounts=self.mounts,
             resource_slots=self.resource_spec.resource_slots,
             resource_opts=self.resource_spec.resource_opts,
             cluster_mode=self.resource_spec.cluster_mode,
@@ -548,6 +558,8 @@ class RevisionDraft:
     # (see ``deployment_revisions.image`` SET NULL FK) — downstream
     # resolvers must treat the latter as non-deployable.
     image_id: ImageID | None = None
+    # Mount
+    mounts: MountMetadata | None = None
     # Resource
     resource_slots: Mapping[str, Any] | None = None
     resource_opts: Mapping[str, Any] | None = None
@@ -570,6 +582,7 @@ class RevisionDraft:
         """Return a new draft with ``other`` layered on top of ``self``."""
         return RevisionDraft(
             image_id=other.image_id if other.image_id is not None else self.image_id,
+            mounts=_merge_mounts(self.mounts, other.mounts),
             resource_slots=_merge_mappings(self.resource_slots, other.resource_slots),
             resource_opts=_merge_mappings(self.resource_opts, other.resource_opts),
             cluster_mode=other.cluster_mode
@@ -600,7 +613,7 @@ class RevisionDraft:
             else (list(self.preset_values) if self.preset_values is not None else None),
         )
 
-    def to_model_revision_spec(self, mounts: MountMetadata) -> ModelRevisionSpec:
+    def to_model_revision_spec(self) -> ModelRevisionSpec:
         """Project the merged draft into a final ``ModelRevisionSpec``.
 
         Validates that the merge chain produced an ``image_id`` and a
@@ -611,6 +624,8 @@ class RevisionDraft:
         """
         if self.image_id is None:
             raise InvalidAPIParameters("image_id is required to build a revision")
+        if self.mounts is None:
+            raise InvalidAPIParameters("mounts are required to build a revision")
         if self.runtime_variant_id is None:
             raise InvalidAPIParameters("runtime_variant_id is required to build a revision")
         return ModelRevisionSpec(
@@ -621,7 +636,7 @@ class RevisionDraft:
                 resource_slots=self.resource_slots or {},
                 resource_opts=self.resource_opts,
             ),
-            mounts=mounts,
+            mounts=self.mounts,
             execution=ExecutionSpec(
                 startup_command=self.startup_command,
                 bootstrap_script=self.bootstrap_script,
@@ -634,6 +649,31 @@ class RevisionDraft:
                 self.model_definition.to_resolved() if self.model_definition is not None else None
             ),
         )
+
+
+def _merge_mounts(
+    lower: MountMetadata | None,
+    upper: MountMetadata | None,
+) -> MountMetadata | None:
+    if upper is None:
+        return lower
+    if lower is None:
+        return MountMetadata(
+            model_vfolder_id=upper.model_vfolder_id,
+            model_definition_path=upper.model_definition_path,
+            model_mount_destination=upper.model_mount_destination,
+            extra_mounts=list(upper.extra_mounts),
+            vfolder_subpath=upper.vfolder_subpath,
+        )
+    return MountMetadata(
+        model_vfolder_id=upper.model_vfolder_id,
+        model_definition_path=upper.model_definition_path
+        if upper.model_definition_path
+        else lower.model_definition_path,
+        model_mount_destination=upper.model_mount_destination,
+        extra_mounts=list(upper.extra_mounts),
+        vfolder_subpath=upper.vfolder_subpath if upper.vfolder_subpath else lower.vfolder_subpath,
+    )
 
 
 def _merge_mappings(
@@ -993,6 +1033,17 @@ class ModelRevisionData:
         )
         return RevisionDraft(
             image_id=self.image_id,
+            mounts=(
+                MountMetadata(
+                    model_vfolder_id=self.model_mount_config.vfolder_id,
+                    model_definition_path=self.model_mount_config.definition_path or None,
+                    model_mount_destination=self.model_mount_config.mount_destination or "/models",
+                    extra_mounts=list(self.model_mount_config.extra_mounts),
+                    vfolder_subpath=self.model_mount_config.subpath,
+                )
+                if self.model_mount_config.vfolder_id is not None
+                else None
+            ),
             resource_slots=resource_slots,
             resource_opts=resource_opts,
             cluster_mode=self.cluster_config.mode,

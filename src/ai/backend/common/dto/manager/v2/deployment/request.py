@@ -266,10 +266,12 @@ class ModelMountConfigInput(BaseRequestModel):
     mount_destination: str = Field(description="Mount destination path inside container")
     definition_path: str | None = Field(
         default=None,
+        min_length=1,
         description=(
             "Optional path to the model definition file within the model vfolder. "
             "When omitted, the server auto-detects `model-definition.yaml` or "
-            "`model-definition.yml`."
+            "`model-definition.yml`. Empty string is rejected; omit the field to "
+            "trigger auto-detection."
         ),
     )
     subpath: str | None = Field(

@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import ClusterMode
@@ -62,7 +63,6 @@ class RevisionDraftReader:
         self,
         *,
         request_draft: RevisionDraft,
-        mounts: MountMetadata,
         execution: ExecutionSpec,
         preset_id: DeploymentPresetID | None,
     ) -> list[RevisionDraft]:
@@ -80,13 +80,15 @@ class RevisionDraftReader:
             runtime_variant_id=execution.runtime_variant_id,
             preset_id=preset_id,
         )
+        if request_draft.mounts is None:
+            raise InvalidAPIParameters("mounts are required to read revision drafts")
         drafts: list[RevisionDraft] = [
-            self._model_mount_path_default_draft(mounts),
+            self._model_mount_path_default_draft(request_draft.mounts),
             self._variant_baseline_to_draft(bundle.variant),
         ]
         if bundle.preset is not None:
             drafts.append(self._preset_to_draft(bundle.preset, bundle.preset_resource_slots or []))
-        drafts.extend(await self._read_vfolder_drafts(mounts, bundle.variant))
+        drafts.extend(await self._read_vfolder_drafts(request_draft.mounts, bundle.variant))
         drafts.append(request_draft)
         return drafts
 
@@ -95,7 +97,6 @@ class RevisionDraftReader:
         *,
         runtime_variant_id: RuntimeVariantID,
         request_draft: RevisionDraft,
-        mounts: MountMetadata,
         preset_id: DeploymentPresetID | None,
     ) -> list[RevisionDraft]:
         """v2 ``add_revision``: typed variant id, no base layer."""
@@ -103,17 +104,17 @@ class RevisionDraftReader:
             runtime_variant_id=runtime_variant_id,
             preset_id=preset_id,
         )
+        if request_draft.mounts is None:
+            raise InvalidAPIParameters("mounts are required to read revision drafts")
         drafts: list[RevisionDraft] = [
-            self._model_mount_path_default_draft(mounts),
+            self._model_mount_path_default_draft(request_draft.mounts),
             self._variant_baseline_to_draft(bundle.variant),
         ]
         if bundle.preset is not None:
             drafts.append(self._preset_to_draft(bundle.preset, bundle.preset_resource_slots or []))
-        drafts.extend(await self._read_vfolder_drafts(mounts, bundle.variant))
+        drafts.extend(await self._read_vfolder_drafts(request_draft.mounts, bundle.variant))
         drafts.append(request_draft)
         return drafts
-
-    # ---- Private helpers ----
 
     def _variant_baseline_to_draft(self, variant: RuntimeVariantData) -> RevisionDraft:
         """Project the variant's ``default_model_definition`` into a RevisionDraft."""
@@ -153,7 +154,7 @@ class RevisionDraftReader:
         model_definition = ModelDefinitionDraft(
             models=[ModelConfigDraft(model_path=mounts.model_mount_destination)]
         )
-        return RevisionDraft(model_definition=model_definition)
+        return RevisionDraft(mounts=mounts, model_definition=model_definition)
 
     async def _read_vfolder_drafts(
         self,
@@ -203,5 +204,16 @@ class RevisionDraftReader:
             )
             model_def = None
         if model_def is not None:
-            drafts.append(RevisionDraft(model_definition=model_def))
+            drafts.append(
+                RevisionDraft(
+                    mounts=MountMetadata(
+                        model_vfolder_id=mounts.model_vfolder_id,
+                        model_definition_path=model_def.path,
+                        model_mount_destination=mounts.model_mount_destination,
+                        extra_mounts=list(mounts.extra_mounts),
+                        vfolder_subpath=mounts.vfolder_subpath,
+                    ),
+                    model_definition=model_def.model_definition,
+                )
+            )
         return drafts

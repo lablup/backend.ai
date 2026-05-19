@@ -40,7 +40,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountInfo,
-    MountMetadata,
     ReplicaSpec,
     RevisionDraft,
     RouteInfo,
@@ -247,14 +246,11 @@ class DeploymentController:
         request_draft = draft.draft_model_revision.to_draft(image_id)
         drafts = await self._revision_draft_reader.read_for_legacy_model_service_deployment(
             request_draft=request_draft,
-            mounts=draft.draft_model_revision.mounts,
             execution=draft.draft_model_revision.execution,
             preset_id=None,
         )
         merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
-        model_revision_spec = merged.to_model_revision_spec(
-            mounts=draft.draft_model_revision.mounts
-        )
+        model_revision_spec = merged.to_model_revision_spec()
         validation_ctx = await self._build_deployment_revision_validation_context()
         self._deployment_revision_validator.validate_legacy_revision_spec(
             model_revision_spec, validation_ctx
@@ -272,9 +268,9 @@ class DeploymentController:
         # ``draft.draft_model_revision.mounts.extra_mounts`` is already
         # ``list[MountInfoEntry]`` because the legacy validator pre-resolved
         # via ``prepare_vfolder_mounts``. Project into ``MountInfo`` with
-        # the concrete ``mount_perm`` carried over as an explicit
-        # override; ``add_deployment_revision`` then uses it directly
-        # without re-reading the vfolder.
+        # the concrete ``mount_perm`` carried over as an explicit override;
+        # ``add_deployment_revision`` applies the final permission cap before
+        # delegating to ``add_revision``.
         legacy_extra_mounts = [
             MountInfo(
                 vfolder_id=m.vfolder_id,
@@ -376,15 +372,14 @@ class DeploymentController:
         self,
         endpoint_id: DeploymentID,
         overrides: RevisionDraft,
-        mounts: MountMetadata,
         preset_id: DeploymentPresetID | None = None,
     ) -> ModelRevisionData:
         """Create a new immutable revision on an existing deployment.
 
         Revisions are immutable — every mutation (legacy ModifyEndpoint included)
-        must go through this single entry point. ``mounts`` carries the vfolder
-        context required by file-based draft sources and is not part of the
-        merged RevisionDraft — mount identity is not a merge candidate.
+        must go through this single entry point. ``overrides.mounts`` carries
+        the vfolder context required by file-based draft sources and final
+        revision persistence.
 
         Merge order (low → high) is assembled by ``RevisionDraftReader``:
             1. model mount destination as the ``model_path`` default
@@ -419,7 +414,6 @@ class DeploymentController:
         drafts = await self._revision_draft_reader.read_for_deployment_revision(
             runtime_variant_id=runtime_variant_id,
             request_draft=overrides,
-            mounts=mounts,
             preset_id=preset_id,
         )
         merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
@@ -427,6 +421,8 @@ class DeploymentController:
         endpoint_info = await self._deployment_repository.get_endpoint_info(endpoint_id)
         if merged.image_id is None:
             raise InvalidAPIParameters("image_id is required to add a revision")
+        if merged.mounts is None:
+            raise InvalidAPIParameters("mounts are required to add a revision")
         if merged.model_definition is None:
             raise InvalidAPIParameters(
                 "model_definition is required to add a revision; provide it in the request,"
@@ -443,17 +439,17 @@ class DeploymentController:
             resource_opts=dict(merged.resource_opts) if merged.resource_opts else {},
             cluster_mode=(merged.cluster_mode or ClusterMode.SINGLE_NODE).value,
             cluster_size=merged.cluster_size or 1,
-            model_vfolder_id=mounts.model_vfolder_id,
-            model_mount_destination=mounts.model_mount_destination,
-            vfolder_subpath=mounts.vfolder_subpath,
-            model_definition_path=mounts.model_definition_path,
+            model_vfolder_id=merged.mounts.model_vfolder_id,
+            model_mount_destination=merged.mounts.model_mount_destination,
+            vfolder_subpath=merged.mounts.vfolder_subpath,
+            model_definition_path=merged.mounts.model_definition_path,
             model_definition=resolved_model_definition,
             startup_command=merged.startup_command,
             bootstrap_script=merged.bootstrap_script,
             environ=dict(merged.environ) if merged.environ else {},
             callback_url=str(merged.callback_url) if merged.callback_url else None,
             runtime_variant_id=runtime_variant_id,
-            extra_mounts=list(mounts.extra_mounts),
+            extra_mounts=list(merged.mounts.extra_mounts),
             preset_values=[
                 PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
                 for pv in (merged.preset_values or [])
@@ -514,17 +510,9 @@ class DeploymentController:
             )
             for m in revision.mounts.extra_mounts
         ]
-        mounts = MountMetadata(
-            model_vfolder_id=revision.mounts.model_vfolder_id,
-            model_definition_path=revision.mounts.model_definition_path,
-            model_mount_destination=revision.mounts.model_mount_destination,
-            extra_mounts=extra_mount_entries,
-            vfolder_subpath=revision.mounts.vfolder_subpath,
-        )
         revision_data = await self.add_revision(
             endpoint_id=deployment_id,
-            overrides=revision.to_draft(),
-            mounts=mounts,
+            overrides=revision.to_draft_with_extra_mount(extra_mount_entries),
             preset_id=revision.revision_preset_id,
         )
         if auto_activate:
@@ -618,12 +606,11 @@ class DeploymentController:
         request_draft = draft_revision.to_draft(image_id)
         drafts = await self._revision_draft_reader.read_for_legacy_model_service_deployment(
             request_draft=request_draft,
-            mounts=draft_revision.mounts,
             execution=draft_revision.execution,
             preset_id=None,
         )
         merged = functools.reduce(RevisionDraft.merge, drafts, RevisionDraft())
-        model_revision_spec = merged.to_model_revision_spec(mounts=draft_revision.mounts)
+        model_revision_spec = merged.to_model_revision_spec()
         validation_ctx = await self._build_deployment_revision_validation_context()
         self._deployment_revision_validator.validate_legacy_revision_spec(
             model_revision_spec, validation_ctx
