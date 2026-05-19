@@ -772,9 +772,7 @@ class MountInfoEntry(BackendAISchema):
     def _strip_quota_scope_prefix(cls, value: Any) -> Any:
         # VFolderID strings may be in the form "<quota_scope_id>/<uuid>" or just "<uuid>"
         if isinstance(value, str) and "/" in value:
-            # Use rpartition in case there are multiple slashes
-            _, _, folder_part = value.rpartition("/")
-            return folder_part
+            return VFolderID.from_str(value).folder_id
         return value
 
 
