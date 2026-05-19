@@ -15,8 +15,11 @@ to fail there.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
     SessionSpecValidationContext,
     SessionSpecValidatorRule,
@@ -42,19 +45,21 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
                     f"agents serving any resource slot."
                 ),
             )
+        errors: list[str] = []
         for idx, kernel in enumerate(spec.kernel_specs):
             unknown = sorted({
                 entry.resource_type
                 for entry in kernel.execution_spec.resources
                 if entry.resource_type not in rg_slot_types
+                and parse_quantity(entry.quantity) > Decimal(0)
             })
             if unknown:
-                raise InvalidAPIParameters(
-                    extra_msg=(
-                        f"kernel_specs[{idx}]: the request asks for resource "
-                        f"slot(s) {unknown} that resource group "
-                        f"'{spec.scope.resource_group_name}' does not serve. "
-                        f"Drop these slots from the request or switch to a "
-                        f"resource group that supports them."
-                    ),
+                errors.append(
+                    f"kernel_specs[{idx}]: the request asks for resource "
+                    f"slot(s) {unknown} that resource group "
+                    f"'{spec.scope.resource_group_name}' does not serve. "
+                    f"Drop these slots from the request or switch to a "
+                    f"resource group that supports them."
                 )
+        if errors:
+            raise InvalidAPIParameters(extra_msg=" ".join(errors))
