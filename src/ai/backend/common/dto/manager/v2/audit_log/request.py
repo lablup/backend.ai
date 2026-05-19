@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from typing import Self
-from uuid import UUID
 
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
-from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope
+from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope, UUIDScope
 
 from .types import AuditLogOrderField, AuditLogStatus, OrderDirection
 
@@ -89,7 +88,7 @@ class AuditLogScope(BaseRequestModel):
     entity: list[EntityTypeScope] | None = Field(
         default=None, description="Entity-tagged scope items"
     )
-    triggered_user: list[UUID] | None = Field(
+    triggered_user: list[UUIDScope] | None = Field(
         default=None, description="Actor UUIDs (matches audit_logs.triggered_by)"
     )
 

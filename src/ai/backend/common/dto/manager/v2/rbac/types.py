@@ -5,6 +5,7 @@ Common types for RBAC DTO v2.
 from __future__ import annotations
 
 from enum import StrEnum
+from uuid import UUID
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.data.permission.types import (
@@ -36,6 +37,7 @@ __all__ = (
     "RoleStatusDTO",
     "RoleStatusFilter",
     "ScopeInputDTO",
+    "UUIDScope",
 )
 
 
@@ -216,6 +218,17 @@ class EntityTypeScope(BaseRequestModel):
 
     entity_type: RBACElementTypeDTO
     entity_id: str
+
+
+class UUIDScope(BaseRequestModel):
+    """Single-UUID scope item wrapper.
+
+    A thin wrapper around a UUID used as a scope item. The wrapper exists so
+    that scope-input lists stay structurally uniform with other scope item
+    types and leave room for per-item metadata in the future.
+    """
+
+    value: UUID
 
 
 class PermissionSummary(BaseResponseModel):
