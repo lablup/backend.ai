@@ -1367,6 +1367,7 @@ class TestDeploymentRevisionOperations:
                 KeyPairRow,  # UserRow.main_access_key FK target
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
@@ -1533,13 +1534,25 @@ class TestDeploymentRevisionOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> uuid.UUID:
         """Create test image and return image ID."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://test-registry.example.com",
+                registry_name=f"test-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
@@ -3520,6 +3533,7 @@ class TestDeploymentRepositoryDuplicateName:
                 KeyPairRow,
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
@@ -3550,13 +3564,25 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> uuid.UUID:
         """Create test image and return image ID."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://test-registry.example.com",
+                registry_name=f"test-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
