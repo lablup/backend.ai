@@ -13,6 +13,7 @@ namespace path — are layered on as the agent lifecycle integration grows.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 # runtime-spec version this builder targets.
@@ -126,12 +127,23 @@ def build_oci_spec(
     terminal: bool = False,
     cgroups_path: str | None = None,
     netns_path: str | None = None,
+    bind_mounts: Sequence[dict[str, Any]] | None = None,
+    cpu_period_us: int = 100_000,
+    cpu_quota_us: int | None = None,
+    memory_limit_bytes: int | None = None,
 ) -> dict[str, Any]:
-    """Build a minimal Linux OCI runtime spec for a workload container.
+    """Build a Linux OCI runtime spec for a workload container.
 
     The rootfs itself is supplied separately, via the snapshot mounts on
     the task-create request; ``root.path`` is the conventional ``rootfs``
     that containerd's runc shim resolves inside the container bundle.
+
+    ``bind_mounts`` is appended to the default mount set (in order, so
+    later entries can shadow earlier ones) and each entry must already be
+    in OCI mount-dict form (``destination``/``source``/``type``/``options``).
+    ``cpu_quota_us`` paired with ``cpu_period_us`` set the CFS bandwidth
+    limit for the kernel; ``memory_limit_bytes`` sets the memory cgroup
+    limit. Either may be omitted to leave the limit unset.
     """
     full_env = list(_DEFAULT_ENV)
     if env:
@@ -145,6 +157,14 @@ def build_oci_spec(
             # instead of letting runc create a fresh (unconnected) one.
             entry["path"] = netns_path
         namespaces.append(entry)
+    mounts: list[dict[str, Any]] = [dict(mount) for mount in _DEFAULT_MOUNTS]
+    if bind_mounts:
+        mounts.extend(dict(mount) for mount in bind_mounts)
+    resources: dict[str, Any] = {"devices": [{"allow": False, "access": "rwm"}]}
+    if cpu_quota_us is not None and cpu_quota_us > 0:
+        resources["cpu"] = {"period": cpu_period_us, "quota": cpu_quota_us}
+    if memory_limit_bytes is not None and memory_limit_bytes > 0:
+        resources["memory"] = {"limit": memory_limit_bytes}
     return {
         "ociVersion": OCI_VERSION,
         "process": {
@@ -163,12 +183,12 @@ def build_oci_spec(
         },
         "root": {"path": "rootfs", "readonly": False},
         "hostname": hostname or container_id,
-        "mounts": [dict(mount) for mount in _DEFAULT_MOUNTS],
+        "mounts": mounts,
         "linux": {
             "namespaces": namespaces,
             "maskedPaths": list(_MASKED_PATHS),
             "readonlyPaths": list(_READONLY_PATHS),
             "cgroupsPath": cgroups_path or f"/backendai/{container_id}",
-            "resources": {"devices": [{"allow": False, "access": "rwm"}]},
+            "resources": resources,
         },
     }

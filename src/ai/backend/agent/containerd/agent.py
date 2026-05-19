@@ -27,6 +27,7 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from functools import partial
 from importlib.resources import files
+from io import StringIO
 from pathlib import Path
 from subprocess import CalledProcessError
 from subprocess import run as subprocess_run
@@ -46,8 +47,11 @@ from ai.backend.agent.config.unified import (
     ScratchType,
 )
 from ai.backend.agent.errors.containerd import ContainerdImageError, ContainerdRpcError
-from ai.backend.agent.exception import UnsupportedResource
-from ai.backend.agent.fs import create_scratch_filesystem
+from ai.backend.agent.exception import (
+    ContainerCreationError,
+    UnsupportedResource,
+)
+from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.port_pool import PortPool
@@ -59,7 +63,7 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.scratch import create_loop_filesystem
+from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesystem
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.asyncio import current_loop
@@ -72,6 +76,8 @@ from ai.backend.common.docker import (
     KernelFeatures,
     LabelName,
 )
+from ai.backend.common.dto.agent.response import PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import (
     ConfigurationError,
@@ -83,6 +89,8 @@ from ai.backend.common.json import dump_json
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
+    ClusterSSHPortMapping,
+    ContainerId,
     ContainerStatus,
     DeviceId,
     DeviceName,
@@ -95,6 +103,8 @@ from ai.backend.common.types import (
     MountTypes,
     ResourceGroupType,
     ResourceSlot,
+    Sentinel,
+    ServicePort,
     SlotName,
     current_resource_slots,
 )
@@ -102,11 +112,40 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .client.client import ContainerdClient
 from .kernel import ContainerdKernel
-from .network.base import NetworkProvider
+from .network.base import NetworkAttachment, NetworkProvider
 from .network.cilium import CiliumNetworkProvider
+from .network.netns import create_netns, delete_netns
+from .oci import build_oci_spec
 from .preflight import run_preflight
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _mount_to_oci(mount: Mount) -> dict[str, Any] | None:
+    """Translate an agent ``Mount`` into an OCI runtime-spec mount entry.
+
+    Returns ``None`` for mount types the containerd backend does not
+    provision (Docker named volumes); only BIND and TMPFS map cleanly.
+    """
+    if mount.type is MountTypes.BIND:
+        options = [
+            "rbind",
+            "rw" if mount.permission != MountPermission.READ_ONLY else "ro",
+        ]
+        return {
+            "destination": str(mount.target),
+            "source": str(mount.source),
+            "type": "bind",
+            "options": options,
+        }
+    if mount.type is MountTypes.TMPFS:
+        return {
+            "destination": str(mount.target),
+            "source": "tmpfs",
+            "type": "tmpfs",
+            "options": ["nosuid", "nodev"],
+        }
+    return None
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
@@ -619,6 +658,321 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         src_path.mkdir(exist_ok=True)
         return await computer.generate_mounts(src_path, device_alloc)
 
+    @override
+    async def prepare_container(
+        self,
+        resource_spec: KernelResourceSpec,
+        environ: Mapping[str, str],
+        service_ports: list[ServicePort],
+        cluster_info: ClusterInfo,
+    ) -> ContainerdKernel:
+        del cluster_info  # multi-node cluster wiring is via per-kernel CNI attach.
+        loop = current_loop()
+        ouid = self.get_overriding_uid()
+        ogid = self.get_overriding_gid()
+
+        if not self.restarting:
+            # Create bootstrap.sh into workdir if needed.
+            if bootstrap := self.kernel_config.get("bootstrap_script"):
+
+                def _write_user_bootstrap_script() -> None:
+                    (self.work_dir / "bootstrap.sh").write_text(bootstrap)
+                    if ouid is not None or ogid is not None:
+                        self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
+                    else:
+                        if KernelFeatures.UID_MATCH in self.kernel_features:
+                            self._chown_paths_if_root(
+                                [self.work_dir / "bootstrap.sh"],
+                                self.local_config.container.kernel_uid,
+                                self.local_config.container.kernel_gid,
+                            )
+
+                await loop.run_in_executor(None, _write_user_bootstrap_script)
+
+            with StringIO() as buf:
+                for k, v in environ.items():
+                    buf.write(f"{k}={v}\n")
+                await loop.run_in_executor(
+                    None,
+                    (self.config_dir / "environ.txt").write_bytes,
+                    buf.getvalue().encode("utf8"),
+                )
+
+            with StringIO() as buf:
+                resource_spec.write_to_file(buf)
+                for dev_type, device_alloc in resource_spec.allocations.items():
+                    device_plugin = self.computers[dev_type].instance
+                    kvpairs = await device_plugin.generate_resource_data(device_alloc)
+                    for k, v in kvpairs.items():
+                        buf.write(f"{k}={v}\n")
+                await loop.run_in_executor(
+                    None,
+                    (self.config_dir / "resource.txt").write_bytes,
+                    buf.getvalue().encode("utf8"),
+                )
+
+        shutil.copyfile(self.config_dir / "environ.txt", self.config_dir / "environ_base.txt")
+        shutil.copyfile(self.config_dir / "resource.txt", self.config_dir / "resource_base.txt")
+
+        # SSH keypair only if internal_data.ssh_keypair exists and
+        # /home/work/.ssh has not been bind-mounted in.
+        if self.internal_data.get("ssh_keypair"):
+            for mount in resource_spec.mounts:
+                container_path = str(mount).split(":")[1]
+                if container_path == "/home/work/.ssh":
+                    break
+            else:
+                pubkey = self.internal_data["ssh_keypair"]["public_key"].encode("ascii")
+                privkey = self.internal_data["ssh_keypair"]["private_key"].encode("ascii")
+                ssh_dir = self.work_dir / ".ssh"
+
+                def _populate_ssh_config() -> None:
+                    ssh_dir.mkdir(parents=True, exist_ok=True)
+                    ssh_dir.chmod(0o700)
+                    (ssh_dir / "authorized_keys").write_bytes(pubkey)
+                    (ssh_dir / "authorized_keys").chmod(0o600)
+                    if not (ssh_dir / "id_rsa").is_file():
+                        (ssh_dir / "id_rsa").write_bytes(privkey)
+                        (ssh_dir / "id_rsa").chmod(0o600)
+                    (self.work_dir / "id_container").write_bytes(privkey)
+                    (self.work_dir / "id_container").chmod(0o600)
+
+                    def chown_idfile(uid: int | None, gid: int | None) -> None:
+                        paths = [
+                            ssh_dir,
+                            ssh_dir / "authorized_keys",
+                            ssh_dir / "id_rsa",
+                            self.work_dir / "id_container",
+                        ]
+                        self._chown_paths_if_root(paths, uid, gid)
+
+                    if ouid is not None or ogid is not None:
+                        chown_idfile(ouid, ogid)
+                    else:
+                        if KernelFeatures.UID_MATCH in self.kernel_features:
+                            chown_idfile(
+                                self.local_config.container.kernel_uid,
+                                self.local_config.container.kernel_gid,
+                            )
+
+                await loop.run_in_executor(None, _populate_ssh_config)
+
+        # higher-priority dotfiles are stored last so they overwrite.
+        for dotfile in self.internal_data.get("dotfiles", []):
+            if dotfile["path"].startswith("/"):
+                if dotfile["path"].startswith("/home/"):
+                    path_arr = dotfile["path"].split("/")
+                    file_path: Path = self.scratch_dir / "/".join(path_arr[2:])
+                else:
+                    file_path = Path(dotfile["path"])
+            else:
+                file_path = self.work_dir / dotfile["path"]
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            dotfile_content = dotfile["data"]
+            if not dotfile_content.endswith("\n"):
+                dotfile_content += "\n"
+            await loop.run_in_executor(None, file_path.write_text, dotfile_content)
+
+            tmp = Path(file_path)
+            tmp_paths: list[Path] = []
+            while tmp != self.work_dir:
+                tmp.chmod(int(dotfile["perm"], 8))
+                tmp_paths.append(tmp)
+                tmp = tmp.parent
+            if ouid is not None or ogid is not None:
+                self._chown_paths_if_root(tmp_paths, ouid, ogid)
+            else:
+                if KernelFeatures.UID_MATCH in self.kernel_features:
+                    self._chown_paths_if_root(
+                        tmp_paths,
+                        self.local_config.container.kernel_uid,
+                        self.local_config.container.kernel_gid,
+                    )
+
+        return ContainerdKernel(
+            self.ownership_data,
+            self.kernel_config["network_id"],
+            self.image_ref,
+            self.kspec_version,
+            agent_config=self.local_config.model_dump(by_alias=True),
+            service_ports=service_ports,
+            resource_spec=resource_spec,
+            environ=environ,
+            data={},
+        )
+
+    @override
+    async def start_container(
+        self,
+        kernel_obj: AbstractKernel,
+        cmdargs: list[str],
+        resource_opts: Mapping[str, Any] | None,
+        preopen_ports: list[int],
+        cluster_info: ClusterInfo,
+    ) -> Mapping[str, Any]:
+        del resource_opts, cluster_info  # reserved for future use.
+        resource_spec = kernel_obj.resource_spec
+        service_ports = kernel_obj.service_ports
+        environ = kernel_obj.environ
+        image_labels = self.kernel_config["image"]["labels"]
+
+        # Compute the kernel's exposed-port list. With direct-netns-IP
+        # repl the agent does NOT consume port_pool for the intrinsic
+        # repl ports; each service port also maps 1:1 to the same
+        # container port (the netns IP is reachable on the cluster
+        # fabric).
+        exposed_ports: list[int] = [*self.repl_ports]
+        for sport in service_ports:
+            exposed_ports.extend(sport["container_ports"])
+            sport["host_ports"] = tuple(sport["container_ports"])
+
+        # service-ports label mirrors the docker backend so the manager-side
+        # parsing of the kernel container's labels stays uniform.
+        service_ports_label: list[str] = []
+        service_ports_label += image_labels.get(LabelName.SERVICE_PORTS, "").split(",")
+        service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
+
+        if self.image_ref.is_local:
+            image_canonical = self.image_ref.short
+        else:
+            image_canonical = self.image_ref.canonical
+
+        kernel_id_str = str(self.kernel_id)
+        container_id = f"kernel-{kernel_id_str}"
+        netns_name = f"bai-{kernel_id_str}"
+
+        # Translate the bind mounts collected by process_mounts +
+        # intrinsic_mounts into OCI mount entries; named volumes (a
+        # Docker concept) have no containerd equivalent and are dropped.
+        oci_mounts: list[dict[str, Any]] = []
+        all_mounts: list[Mount] = [*resource_spec.mounts, *self.bind_mounts]
+        for mount in all_mounts:
+            translated = _mount_to_oci(mount)
+            if translated is not None:
+                oci_mounts.append(translated)
+
+        # CFS-bandwidth + memory cgroup limits derived from the resource
+        # spec; either may be left unset (no limit) if the slot is zero.
+        cpu_period_us = 100_000
+        cpu_slot = resource_spec.slots.get("cpu", Decimal(0))
+        cpu_quota_us: int | None = int(cpu_period_us * cpu_slot) if cpu_slot > 0 else None
+        mem_slot = resource_spec.slots.get("mem", Decimal(0))
+        memory_limit_bytes: int | None = int(mem_slot) if mem_slot > 0 else None
+
+        # Network namespace + CNI attach.
+        ns_path = await create_netns(netns_name)
+        attachment: NetworkAttachment | None = None
+        try:
+            attachment = await self.network_provider.attach(
+                container_id,
+                ns_path,
+                labels={
+                    LabelName.AGENT_ID: str(self.agent_id),
+                    LabelName.KERNEL_ID: kernel_id_str,
+                    LabelName.SESSION_ID: str(self.session_id),
+                },
+            )
+            if attachment.ipv4 is None:
+                raise ContainerCreationError(
+                    container_id=ContainerId(container_id),
+                    message="CNI attach returned no IPv4 address",
+                )
+
+            # Prepare the writable container rootfs from the image layers.
+            rootfs_mounts = await self.containerd_client.prepare_image_rootfs(
+                image_canonical, container_id
+            )
+
+            spec = build_oci_spec(
+                container_id=container_id,
+                args=["/opt/kernel/entrypoint.sh", *cmdargs],
+                env=[f"{k}={v}" for k, v in environ.items()],
+                cwd="/home/work",
+                hostname=self.kernel_config["cluster_hostname"],
+                terminal=False,
+                cgroups_path=f"/backendai/{container_id}",
+                netns_path=ns_path,
+                bind_mounts=oci_mounts,
+                cpu_period_us=cpu_period_us,
+                cpu_quota_us=cpu_quota_us,
+                memory_limit_bytes=memory_limit_bytes,
+            )
+
+            labels: dict[str, str] = {
+                LabelName.AGENT_ID: str(self.agent_id),
+                LabelName.KERNEL_ID: kernel_id_str,
+                LabelName.SESSION_ID: str(self.session_id),
+                LabelName.OWNER_USER: self.ownership_data.owner_user_id_to_str or "",
+                LabelName.OWNER_PROJECT: self.ownership_data.owner_project_id_to_str or "",
+                LabelName.OWNER_AGENT: str(self.agent_id),
+                LabelName.BLOCK_SERVICE_PORTS: (
+                    "1" if self.internal_data.get("block_service_ports", False) else "0"
+                ),
+                LabelName.SERVICE_PORTS: ",".join(label for label in service_ports_label if label),
+            }
+            await self.containerd_client.create_container(
+                container_id,
+                image=image_canonical,
+                spec=spec,
+                snapshot_key=container_id,
+                labels=labels,
+            )
+            try:
+                await self.containerd_client.create_task(container_id, rootfs=rootfs_mounts)
+                await self.containerd_client.start_task(container_id)
+            except Exception:
+                # Roll back the container metadata if the task failed to
+                # start; the snapshot + netns are cleaned in the outer
+                # except below.
+                try:
+                    await self.containerd_client.delete_container(container_id)
+                except Exception:
+                    log.exception("rollback: delete_container({}) failed", container_id)
+                raise
+        except Exception:
+            if attachment is not None:
+                try:
+                    await self.network_provider.detach(container_id, ns_path)
+                except Exception:
+                    log.exception("rollback: cni detach({}) failed", container_id)
+            try:
+                await delete_netns(netns_name)
+            except Exception:
+                log.exception("rollback: delete_netns({}) failed", netns_name)
+            try:
+                await self.containerd_client.remove_snapshot(container_id)
+            except Exception:
+                # The snapshot may or may not have been prepared.
+                pass
+            async with self.resource_lock:
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    self.computers[dev_name].alloc_map.free(device_alloc)
+            raise
+
+        # Append CID + IP to resource.txt for the recovery increment to
+        # reconstruct workload identity later.
+        cid_record = f"CID={container_id}\nIP={attachment.ipv4}\n"
+        (self.config_dir / "resource.txt").write_text(
+            (self.config_dir / "resource.txt").read_text() + cid_record
+        )
+
+        kernel_obj.set_container_id(ContainerId(container_id))
+
+        return {
+            "container_id": container_id,
+            "kernel_host": attachment.ipv4,
+            "repl_in_port": 2000,
+            "repl_out_port": 2001,
+            "stdin_port": 0,
+            "stdout_port": 0,
+            "host_ports": tuple(exposed_ports),
+            "domain_socket_proxies": self.domain_socket_proxies,
+            "block_service_ports": self.internal_data.get("block_service_ports", False),
+            "netns_name": netns_name,
+            "netns_path": ns_path,
+        }
+
 
 class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext]):
     """Containerd-backed agent driving the host containerd over its native gRPC API.
@@ -848,3 +1202,181 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
             return True
         log.info("found the local up-to-date image for {}", image_ref.canonical)
         return False
+
+    @override
+    async def init_kernel_context(
+        self,
+        ownership_data: KernelOwnershipData,
+        kernel_image: ImageRef,
+        kernel_config: KernelCreationConfig,
+        *,
+        restarting: bool = False,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
+    ) -> ContainerdKernelCreationContext:
+        if self.network_provider is None:
+            raise ConfigurationError({
+                "ContainerdAgent.init_kernel_context": (
+                    "no network provider was built; only 'cilium' mode is wired today."
+                )
+            })
+        distro = await self.resolve_image_distro(kernel_config["image"])
+        del cluster_ssh_port_mapping  # not yet threaded through to the context.
+        return ContainerdKernelCreationContext(
+            ownership_data,
+            self.event_producer,
+            kernel_image,
+            kernel_config,
+            distro,
+            self.local_config,
+            self.computers,
+            containerd_client=self.containerd,
+            network_provider=self.network_provider,
+            port_pool=self.port_pool,
+            agent_sockpath=self.agent_sockpath,
+            resource_lock=self.resource_lock,
+            restarting=restarting,
+        )
+
+    @override
+    async def destroy_kernel(
+        self,
+        kernel_id: KernelId,
+        container_id: ContainerId | None,
+    ) -> None:
+        if container_id is None:
+            return
+        try:
+            await self.containerd.kill_task(str(container_id))
+        except ContainerdRpcError as e:
+            # Already dead or task already deleted — clean_kernel does
+            # the final teardown either way; treat as a soft warning.
+            log.warning(
+                "destroy_kernel(k:{}) kill_task failed (probably already dead): {}",
+                kernel_id,
+                e,
+            )
+
+    @override
+    async def clean_kernel(
+        self,
+        kernel_id: KernelId,
+        container_id: ContainerId | None,
+        restarting: bool,
+    ) -> None:
+        kernel_obj = self.kernel_registry.get(kernel_id)
+        container_id_str = str(container_id) if container_id is not None else None
+        netns_name: str | None = None
+        ns_path: str | None = None
+        if kernel_obj is not None:
+            netns_name = kernel_obj.get("netns_name")
+            ns_path = kernel_obj.get("netns_path")
+            for domain_socket_proxy in kernel_obj.get("domain_socket_proxies", []):
+                if domain_socket_proxy.proxy_server.is_serving():
+                    domain_socket_proxy.proxy_server.close()
+                    await domain_socket_proxy.proxy_server.wait_closed()
+                    try:
+                        domain_socket_proxy.host_proxy_path.unlink()
+                    except OSError:
+                        pass
+
+        if container_id_str is not None:
+            # Best-effort teardown: each step is independent and we
+            # continue past a failed step so a partial creation still
+            # cleans up as much as possible.
+            try:
+                await self.containerd.delete_task(container_id_str)
+            except ContainerdRpcError as e:
+                log.warning("clean_kernel(k:{}) delete_task: {}", kernel_id, e)
+            if not self.local_config.debug.skip_container_deletion:
+                try:
+                    await self.containerd.delete_container(container_id_str)
+                except ContainerdRpcError as e:
+                    log.warning("clean_kernel(k:{}) delete_container: {}", kernel_id, e)
+                try:
+                    await self.containerd.remove_snapshot(container_id_str)
+                except ContainerdRpcError as e:
+                    log.warning("clean_kernel(k:{}) remove_snapshot: {}", kernel_id, e)
+
+        if (
+            container_id_str is not None
+            and ns_path is not None
+            and self.network_provider is not None
+        ):
+            try:
+                await self.network_provider.detach(container_id_str, ns_path)
+            except Exception as e:
+                log.warning("clean_kernel(k:{}) cni detach: {!r}", kernel_id, e)
+        if netns_name is not None:
+            try:
+                await delete_netns(netns_name)
+            except Exception as e:
+                log.warning("clean_kernel(k:{}) delete_netns: {!r}", kernel_id, e)
+
+        if not restarting:
+            scratch_root = self.local_config.container.scratch_root
+            scratch_type = self.local_config.container.scratch_type
+            scratch_dir = scratch_root / str(kernel_id)
+            tmp_dir = scratch_root / f"{kernel_id}_tmp"
+            try:
+                if sys.platform.startswith("linux") and scratch_type == ScratchType.MEMORY:
+                    await destroy_scratch_filesystem(scratch_dir)
+                    await destroy_scratch_filesystem(tmp_dir)
+                    await asyncio.to_thread(shutil.rmtree, scratch_dir)
+                    await asyncio.to_thread(shutil.rmtree, tmp_dir)
+                elif sys.platform.startswith("linux") and scratch_type == ScratchType.HOSTFILE:
+                    await destroy_loop_filesystem(scratch_root, kernel_id)
+                else:
+                    await asyncio.to_thread(shutil.rmtree, scratch_dir)
+            except (CalledProcessError, FileNotFoundError):
+                pass
+
+    @override
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout_seconds: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
+        del image_ref, registry_conf, timeout_seconds
+        raise NotImplementedError("containerd image push is not implemented yet")
+
+    @override
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
+        del request
+        raise NotImplementedError("containerd image purge is not implemented yet")
+
+    @override
+    async def create_local_network(self, network_name: str) -> None:
+        del network_name
+        # The containerd backend uses CNI-managed networks instead of
+        # a per-cluster docker bridge; there is nothing to create here.
+        raise NotImplementedError("create_local_network is not supported by the containerd backend")
+
+    @override
+    async def destroy_local_network(self, network_name: str) -> None:
+        del network_name
+        raise NotImplementedError(
+            "destroy_local_network is not supported by the containerd backend"
+        )
+
+    @override
+    async def restart_kernel__load_config(
+        self,
+        kernel_id: KernelId,
+        name: str,
+    ) -> bytes:
+        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
+        config_dir = scratch_dir / "config"
+        return await asyncio.to_thread((config_dir / name).read_bytes)
+
+    @override
+    async def restart_kernel__store_config(
+        self,
+        kernel_id: KernelId,
+        name: str,
+        data: bytes,
+    ) -> None:
+        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
+        config_dir = scratch_dir / "config"
+        await asyncio.to_thread((config_dir / name).write_bytes, data)
