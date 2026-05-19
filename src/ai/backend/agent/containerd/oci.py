@@ -125,6 +125,7 @@ def build_oci_spec(
     hostname: str | None = None,
     terminal: bool = False,
     cgroups_path: str | None = None,
+    netns_path: str | None = None,
 ) -> dict[str, Any]:
     """Build a minimal Linux OCI runtime spec for a workload container.
 
@@ -136,6 +137,14 @@ def build_oci_spec(
     if env:
         full_env.extend(env)
     capabilities = list(_DEFAULT_CAPABILITIES)
+    namespaces: list[dict[str, Any]] = []
+    for namespace in _DEFAULT_NAMESPACES:
+        entry: dict[str, Any] = {"type": namespace}
+        if namespace == "network" and netns_path:
+            # Join the agent-provided, CNI-attached network namespace
+            # instead of letting runc create a fresh (unconnected) one.
+            entry["path"] = netns_path
+        namespaces.append(entry)
     return {
         "ociVersion": OCI_VERSION,
         "process": {
@@ -156,7 +165,7 @@ def build_oci_spec(
         "hostname": hostname or container_id,
         "mounts": [dict(mount) for mount in _DEFAULT_MOUNTS],
         "linux": {
-            "namespaces": [{"type": ns} for ns in _DEFAULT_NAMESPACES],
+            "namespaces": namespaces,
             "maskedPaths": list(_MASKED_PATHS),
             "readonlyPaths": list(_READONLY_PATHS),
             "cgroupsPath": cgroups_path or f"/backendai/{container_id}",

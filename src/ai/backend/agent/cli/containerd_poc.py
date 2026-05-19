@@ -2,20 +2,20 @@
 
 A diagnostic CLI (not part of the agent runtime). It walks the containerd
 native-API lifecycle against a real containerd over its socket and reports
-per-step results. It grows as ``ContainerdClient`` gains methods.
+per-step results.
 
-The point of this harness is to prove the core assumption of the
-containerd-backend design: Backend.AI workloads created in a dedicated
-containerd namespace (``backendai``) are invisible to a co-located kubelet
-and therefore are not garbage-collected by it — unlike CRI sandboxes,
-which kubelet reaps.
+Two subcommands:
 
-Use::
+- ``run`` — the full workload lifecycle: pull an image, prepare a rootfs
+  snapshot, create a CNI-attached network namespace, create and start a
+  container task in it, then tear everything down. With ``--keep`` the
+  workload is left running so connectivity can be tested against it.
+- ``net`` — just the network layer: netns + CNI attach/detach.
 
-    backend.ai ag containerd-poc run \\
-        --address unix:///run/containerd/containerd.sock \\
-        --namespace backendai \\
-        --image docker.io/library/busybox:latest
+The point of this harness is to prove the containerd-backend design:
+Backend.AI workloads created in a dedicated containerd namespace
+(``backendai``) are invisible to a co-located kubelet — unlike CRI
+sandboxes, which kubelet reaps — yet still join the cluster CNI fabric.
 """
 
 from __future__ import annotations
@@ -44,6 +44,8 @@ log = logging.getLogger(__spec__.name)
 
 # containerd task Status enum (containerd/types/task/task.proto) -> name.
 _TASK_STATUS = {0: "unknown", 1: "created", 2: "running", 3: "stopped", 4: "paused", 5: "pausing"}
+
+_StepBody = Callable[[], Coroutine[Any, Any, dict[str, Any]]]
 
 
 @click.group()
@@ -76,7 +78,13 @@ class StepResult:
     "--image",
     default="docker.io/library/busybox:latest",
     show_default=True,
-    help="Image reference to pull, prepare a rootfs from, and run a container with.",
+    help="Image reference to pull and run a container with.",
+)
+@click.option(
+    "--network-name",
+    default="cilium",
+    show_default=True,
+    help="CNI conflist name for the network provider.",
 )
 @click.option(
     "--connect-timeout",
@@ -84,6 +92,11 @@ class StepResult:
     show_default=True,
     type=float,
     help="Seconds to wait for the channel to become ready before bailing out.",
+)
+@click.option(
+    "--keep",
+    is_flag=True,
+    help="Leave the workload (netns, container, task) running instead of tearing it down.",
 )
 @click.option(
     "--json-output",
@@ -94,10 +107,12 @@ def run(
     address: str,
     namespace: str,
     image: str,
+    network_name: str,
     connect_timeout: float,
+    keep: bool,
     json_output: bool,
 ) -> None:
-    """Walk the containerd native-API lifecycle once and report each step."""
+    """Walk the full containerd workload lifecycle once and report each step."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(levelname)s:%(name)s:%(message)s",
@@ -108,15 +123,14 @@ def run(
             address=address,
             namespace=namespace,
             image=image,
+            network_name=network_name,
+            keep=keep,
             connect_timeout_secs=connect_timeout,
         )
     )
     _emit(results, json_output=json_output)
     if not all(r.ok for r in results):
         sys.exit(1)
-
-
-_StepBody = Callable[[], Coroutine[Any, Any, dict[str, Any]]]
 
 
 @cli.command(name="net")
@@ -144,36 +158,13 @@ def net(network_name: str, json_output: bool) -> None:
         sys.exit(1)
 
 
-async def _run_network(*, network_name: str) -> list[StepResult]:
-    workload_id = f"containerd-poc-net-{uuid.uuid4().hex[:12]}"
-    provider = CiliumNetworkProvider(network_name=network_name)
-    results: list[StepResult] = []
-    # Cleanup steps pushed as resources are created, run in reverse at the end.
-    cleanups: list[tuple[str, _StepBody]] = []
-
-    results.append(await _step("preflight", lambda: _do_net_preflight(provider)))
-
-    created = await _step("create_netns", lambda: _do_create_netns(workload_id))
-    results.append(created)
-    if created.ok:
-        cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
-        path = netns.netns_path(workload_id)
-        attached = await _step("attach", lambda: _do_attach(provider, workload_id, path))
-        results.append(attached)
-        if attached.ok:
-            cleanups.append(("detach", lambda: _do_detach(provider, workload_id, path)))
-
-    # Teardown in reverse creation order.
-    for name, body in reversed(cleanups):
-        results.append(await _step(name, body))
-    return results
-
-
 async def _run_lifecycle(
     *,
     address: str,
     namespace: str,
     image: str,
+    network_name: str,
+    keep: bool,
     connect_timeout_secs: float,
 ) -> list[StepResult]:
     # Deferred import so `--help` works without the agent's full dependency
@@ -181,8 +172,11 @@ async def _run_lifecycle(
     from ai.backend.agent.containerd.client.client import ContainerdClient
 
     # containerd's convention: a container's rootfs snapshot key is the
-    # container id. The poc uses one id for both.
+    # container id. The poc uses one id for the container, the snapshot,
+    # and the network namespace.
     workload_id = f"containerd-poc-{uuid.uuid4().hex[:12]}"
+    netns_path = netns.netns_path(workload_id)
+    provider = CiliumNetworkProvider(network_name=network_name)
     results: list[StepResult] = []
     # Cleanup steps pushed as resources are created, run in reverse at the end.
     cleanups: list[tuple[str, _StepBody]] = []
@@ -206,26 +200,79 @@ async def _run_lifecycle(
         if prepared.ok:
             cleanups.append(("remove_snapshot", lambda: _do_remove_snapshot(cd, workload_id)))
 
-            created = await _step(
-                "create_container", lambda: _do_create_container(cd, image, workload_id)
-            )
-            results.append(created)
-            if created.ok:
-                cleanups.append(("delete_container", lambda: _do_delete_container(cd, workload_id)))
+            netns_created = await _step("create_netns", lambda: _do_create_netns(workload_id))
+            results.append(netns_created)
+            if netns_created.ok:
+                cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
 
-                task = await _step("create_task", lambda: _do_create_task(cd, workload_id, rootfs))
-                results.append(task)
-                if task.ok:
-                    cleanups.append(("teardown_task", lambda: _do_teardown_task(cd, workload_id)))
-                    results.append(
-                        await _step("start_task", lambda: _do_start_task(cd, workload_id))
+                attached = await _step(
+                    "attach", lambda: _do_attach(provider, workload_id, netns_path)
+                )
+                results.append(attached)
+                if attached.ok:
+                    cleanups.append((
+                        "detach",
+                        lambda: _do_detach(provider, workload_id, netns_path),
+                    ))
+
+                    created = await _step(
+                        "create_container",
+                        lambda: _do_create_container(cd, image, workload_id, netns_path),
                     )
-                    results.append(await _step("get_task", lambda: _do_get_task(cd, workload_id)))
+                    results.append(created)
+                    if created.ok:
+                        cleanups.append((
+                            "delete_container",
+                            lambda: _do_delete_container(cd, workload_id),
+                        ))
 
-        # Teardown in reverse creation order.
-        for name, body in reversed(cleanups):
-            results.append(await _step(name, body))
+                        task = await _step(
+                            "create_task", lambda: _do_create_task(cd, workload_id, rootfs)
+                        )
+                        results.append(task)
+                        if task.ok:
+                            cleanups.append((
+                                "teardown_task",
+                                lambda: _do_teardown_task(cd, workload_id),
+                            ))
+                            results.append(
+                                await _step("start_task", lambda: _do_start_task(cd, workload_id))
+                            )
+                            results.append(
+                                await _step("get_task", lambda: _do_get_task(cd, workload_id))
+                            )
+
+        if keep:
+            log.info("--keep: workload '%s' left running (netns %s)", workload_id, netns_path)
+        else:
+            for name, body in reversed(cleanups):
+                results.append(await _step(name, body))
         results.append(await _step("list_namespaces", lambda: _do_list_namespaces(cd)))
+    return results
+
+
+async def _run_network(*, network_name: str) -> list[StepResult]:
+    workload_id = f"containerd-poc-net-{uuid.uuid4().hex[:12]}"
+    provider = CiliumNetworkProvider(network_name=network_name)
+    results: list[StepResult] = []
+    # Cleanup steps pushed as resources are created, run in reverse at the end.
+    cleanups: list[tuple[str, _StepBody]] = []
+
+    results.append(await _step("preflight", lambda: _do_net_preflight(provider)))
+
+    created = await _step("create_netns", lambda: _do_create_netns(workload_id))
+    results.append(created)
+    if created.ok:
+        cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
+        path = netns.netns_path(workload_id)
+        attached = await _step("attach", lambda: _do_attach(provider, workload_id, path))
+        results.append(attached)
+        if attached.ok:
+            cleanups.append(("detach", lambda: _do_detach(provider, workload_id, path)))
+
+    # Teardown in reverse creation order.
+    for name, body in reversed(cleanups):
+        results.append(await _step(name, body))
     return results
 
 
@@ -285,11 +332,12 @@ async def _do_prepare_snapshot(
 
 
 async def _do_create_container(
-    cd: ContainerdClient, image: str, container_id: str
+    cd: ContainerdClient, image: str, container_id: str, netns_path: str
 ) -> dict[str, Any]:
     spec = build_oci_spec(
         container_id=container_id,
         args=["/bin/sh", "-c", "sleep 3600"],
+        netns_path=netns_path,
     )
     await cd.create_container(
         container_id,
@@ -298,7 +346,7 @@ async def _do_create_container(
         snapshot_key=container_id,
         labels={"io.backend.ai/origin": "containerd-poc"},
     )
-    return {"container_id": container_id}
+    return {"container_id": container_id, "netns": netns_path}
 
 
 async def _do_create_task(
