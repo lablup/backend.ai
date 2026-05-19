@@ -770,8 +770,8 @@ class MountInfoEntry(BackendAISchema):
     @field_validator("vfolder_id", mode="before")
     @classmethod
     def _strip_quota_scope_prefix(cls, value: Any) -> Any:
-        # VFolderID strings may be in the form "<quota_scope_id>/<uuid>" or just "<uuid>"
-        if isinstance(value, str) and "/" in value:
+        # Legacy `vfid` is `str(VFolderID)`; reuse the canonical parser.
+        if isinstance(value, str):
             return VFolderID.from_str(value).folder_id
         return value
 
