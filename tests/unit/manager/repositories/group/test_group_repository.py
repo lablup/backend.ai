@@ -39,6 +39,7 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -258,6 +259,7 @@ class TestGroupRepository:
                 KeyPairRow,
                 GroupRow,
                 AssociationScopesEntitiesRow,  # RBAC scopes-entities association
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,

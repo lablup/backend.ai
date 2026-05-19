@@ -334,7 +334,13 @@ class ImageRow(Base):  # type: ignore[misc]
     )
     tag: Mapped[str | None] = mapped_column("tag", sa.TEXT, nullable=True)
     registry: Mapped[str] = mapped_column("registry", sa.String, nullable=False, index=True)
-    registry_id: Mapped[UUID] = mapped_column("registry_id", GUID, nullable=False, index=True)
+    registry_id: Mapped[UUID] = mapped_column(
+        "registry_id",
+        GUID,
+        sa.ForeignKey("container_registries.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     architecture: Mapped[str] = mapped_column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
@@ -1021,7 +1027,7 @@ class ImageAliasRow(Base):  # type: ignore[misc]
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
     image_id: Mapped[ImageID] = mapped_column(
-        "image", GUID(ImageID), sa.ForeignKey("images.id"), nullable=False
+        "image", GUID(ImageID), sa.ForeignKey("images.id", ondelete="CASCADE"), nullable=False
     )
     image: Mapped[ImageRow] = relationship("ImageRow", back_populates="aliases")
 
