@@ -1039,7 +1039,7 @@ input AuditLogScope {
   entity: [EntityTypeScope!] = null
 
   """Actor UUIDs (matches audit_logs.triggered_by)."""
-  triggeredUser: [UUID!] = null
+  triggeredUser: [UUIDScope!] = null
 }
 
 """Added in 26.3.0. Status of an audit log entry."""
@@ -12270,6 +12270,12 @@ input UUIDFilter {
   in: [UUID!] = null
   notEquals: UUID = null
   notIn: [UUID!] = null
+}
+
+"""Added in UNRELEASED. Single-UUID scope item wrapper."""
+input UUIDScope {
+  """UUID value."""
+  value: UUID!
 }
 
 """

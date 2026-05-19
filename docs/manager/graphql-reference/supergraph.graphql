@@ -1535,7 +1535,7 @@ input AuditLogScope
   entity: [EntityTypeScope!] = null
 
   """Actor UUIDs (matches audit_logs.triggered_by)."""
-  triggeredUser: [UUID!] = null
+  triggeredUser: [UUIDScope!] = null
 }
 
 """Added in 26.3.0. Status of an audit log entry."""
@@ -20177,6 +20177,14 @@ Verifies that the key is a UUID (represented as a string) and the value is a flo
 """
 scalar UUIDFloatMap
   @join__type(graph: GRAPHENE)
+
+"""Added in UNRELEASED. Single-UUID scope item wrapper."""
+input UUIDScope
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID value."""
+  value: UUID!
+}
 
 """Added in 24.09.0. Input for validate notification channel mutation"""
 input ValidateNotificationChannelInput
