@@ -351,5 +351,5 @@ async def ping_redis_connection(connection: RedisConnectionInfo) -> bool:
     try:
         return cast(bool, await redis_helper.execute(connection, lambda r: r.ping()))
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
-        log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
-        raise e from e
+        log.exception("ping_redis_connection(): Connecting to redis failed: {}", e)
+        raise

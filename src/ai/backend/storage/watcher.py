@@ -400,7 +400,7 @@ class WatcherProcess:
                     task = self._deserialize_from_request(client_request)
                     result = await task.run()
                 except Exception as e:
-                    log.exception(f"Error in watcher task. (e: {e})")
+                    log.exception("Error in watcher task. (e: {})", e)
                     await self.respond(False, repr(e))
                 else:
                     if result is not None:

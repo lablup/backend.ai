@@ -88,7 +88,7 @@ class ValkeyLeaderElection(AbstractLeaderElection):
         if self._started:
             raise AlreadyStartedError("Cannot register tasks after leader election has started")
         self._leader_tasks.append(task)
-        log.info(f"Registered leader task: {task.__class__.__name__}")
+        log.info("Registered leader task: {}", task.__class__.__name__)
 
     async def _try_acquire_or_renew_leadership(self) -> bool:
         return await self._leader_client.acquire_or_renew_leadership(
@@ -112,26 +112,34 @@ class ValkeyLeaderElection(AbstractLeaderElection):
                     if not was_leader:
                         self._is_leader = True
                         log.info(
-                            f"Server {self._config.server_id} became the leader for {self._config.leader_key}"
+                            "Server {} became the leader for {}",
+                            self._config.server_id,
+                            self._config.leader_key,
                         )
                 else:
                     if was_leader:
                         self._is_leader = False
                         log.info(
-                            f"Server {self._config.server_id} lost leadership for {self._config.leader_key}"
+                            "Server {} lost leadership for {}",
+                            self._config.server_id,
+                            self._config.leader_key,
                         )
             except Exception:
                 failure_count += 1
                 log.warning(
-                    f"Error during leadership renewal for {self._config.leader_key} "
-                    f"(failure {failure_count}/{self._config.failure_threshold})"
+                    "Error during leadership renewal for {} (failure {}/{})",
+                    self._config.leader_key,
+                    failure_count,
+                    self._config.failure_threshold,
                 )
                 if failure_count >= self._config.failure_threshold:
                     # Too many failures, lose leadership
                     if self._is_leader:
                         log.warning(
-                            f"Server {self._config.server_id} lost leadership for {self._config.leader_key} "
-                            f"after {self._config.failure_threshold} consecutive failures"
+                            "Server {} lost leadership for {} after {} consecutive failures",
+                            self._config.server_id,
+                            self._config.leader_key,
+                            self._config.failure_threshold,
                         )
                     self._is_leader = False
                     failure_count = 0  # Reset after losing leadership
@@ -142,7 +150,7 @@ class ValkeyLeaderElection(AbstractLeaderElection):
         """
         Start the leader election renewal loop and all registered tasks.
         """
-        log.info(f"Starting Valkey leader election for server {self._config.server_id}")
+        log.info("Starting Valkey leader election for server {}", self._config.server_id)
 
         if self._started:
             raise AlreadyStartedError("Leader election already started")
@@ -157,7 +165,7 @@ class ValkeyLeaderElection(AbstractLeaderElection):
         # Start all registered leader tasks
         for task in self._leader_tasks:
             await task.start(self)  # Pass self as LeadershipChecker
-            log.debug(f"Started leader task: {task.__class__.__name__}")
+            log.debug("Started leader task: {}", task.__class__.__name__)
 
         log.info("Valkey leader election started")
 
@@ -169,13 +177,13 @@ class ValkeyLeaderElection(AbstractLeaderElection):
             log.debug("Leader election already stopped")
             return
 
-        log.info(f"Stopping Valkey leader election for server {self._config.server_id}")
+        log.info("Stopping Valkey leader election for server {}", self._config.server_id)
         self._stopped = True
 
         # Stop all registered leader tasks
         for task in self._leader_tasks:
             await task.stop()
-            log.debug(f"Stopped leader task: {task.__class__.__name__}")
+            log.debug("Stopped leader task: {}", task.__class__.__name__)
 
         # Stop election task
         if self._election_task and not self._election_task.done():

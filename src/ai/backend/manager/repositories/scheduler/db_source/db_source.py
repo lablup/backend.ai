@@ -3024,7 +3024,7 @@ class ScheduleDBSource:
                 # Use the image UUID as key for reliable matching
                 image_configs[image_row.id] = image_config
             except Exception as e:
-                log.error(f"Failed to process image {image_row.name}: {e}")
+                log.error("Failed to process image {}: {}", image_row.name, e)
                 continue
 
         return image_configs
@@ -3434,7 +3434,7 @@ class ScheduleDBSource:
             # Get user info
             user_info = user_map.get(session_info["user_uuid"])
             if not user_info:
-                log.warning(f"User info not found for session {session_id}")
+                log.warning("User info not found for session {}", session_id)
                 continue
 
             # Convert kernels
@@ -4444,7 +4444,7 @@ class ScheduleDBSource:
             # Get user info
             user_info = user_map.get(session_info["user_uuid"])
             if not user_info:
-                log.warning(f"User info not found for session {session_id}")
+                log.warning("User info not found for session {}", session_id)
                 continue
 
             # Convert kernels
@@ -4816,7 +4816,7 @@ class ScheduleDBSource:
                 session_info = session_info_map[session_id]
                 user_info = user_map.get(session_info["user_uuid"])
                 if not user_info:
-                    log.warning(f"User info not found for session {session_id}")
+                    log.warning("User info not found for session {}", session_id)
                     continue
 
                 sessions_for_start.append(

@@ -162,7 +162,7 @@ class GPFSAPIClient:
                         case GPFSJobStatus.COMPLETED:
                             return
                         case GPFSJobStatus.FAILED:
-                            log.error(f"Failed to run GPFS job. (e:{jobs!s})")
+                            log.error("Failed to run GPFS job. (e:{!s})", jobs)
                             raise GPFSJobFailedError(
                                 job.result.to_json() if job.result is not None else ""
                             )
@@ -307,7 +307,7 @@ class GPFSAPIClient:
                     body,
                 )
             except GPFSConflictError:
-                log.warning(f"GPFS fileset already exists. Skip create. (name: {fileset_name})")
+                log.warning("GPFS fileset already exists. Skip create. (name: {})", fileset_name)
                 return
             if response.status not in (200, 201, 202):
                 raise ExternalStorageServiceError(

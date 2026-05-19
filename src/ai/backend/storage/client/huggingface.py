@@ -114,7 +114,9 @@ class HuggingFaceClient:
         except Exception as e:
             # TODO: Improve exception handling
             log.warning(
-                f"Failed to list revisions for {model_id}: {e!s}, skipping and fallback to main..."
+                "Failed to list revisions for {}: {!s}, skipping and fallback to main...",
+                model_id,
+                e,
             )
             # Fall back to main revision if revision listing fails
             return ["main"]
@@ -239,7 +241,9 @@ class HuggingFaceScanner:
     ) -> list[ModelData]:
         """Scan HuggingFace models concurrently and retrieve metadata for all revisions."""
         try:
-            log.info(f"Scanning HuggingFace models: limit={limit}, search={search}, sort={sort}")
+            log.info(
+                "Scanning HuggingFace models: limit={}, search={}, sort={}", limit, search, sort
+            )
             models = await self._client.scan_models(search=search, sort=sort, limit=limit)
             if not models:
                 log.info("No models returned from scan_models()")
@@ -272,7 +276,7 @@ class HuggingFaceScanner:
                 except Exception as e:
                     # Log and skip this entire model if we can't get revisions
                     log.warning(
-                        f"Failed to get revisions for model: model_id={model.id}, error={e!s}"
+                        "Failed to get revisions for model: model_id={}, error={!s}", model.id, e
                     )
 
                 return model_data_list
@@ -286,7 +290,7 @@ class HuggingFaceScanner:
             for model_data_list in task_results:
                 result.extend(model_data_list)
 
-            log.info(f"Successfully scanned HuggingFace models: count={len(result)}")
+            log.info("Successfully scanned HuggingFace models: count={}", len(result))
             return result
 
         except Exception as e:
@@ -302,7 +306,7 @@ class HuggingFaceScanner:
             ModelData object with model metadata and files
         """
         try:
-            log.info(f"Scanning specific HuggingFace model: {model}")
+            log.info("Scanning specific HuggingFace model: {}", model)
             model_info = await self._client.scan_model(model)
             total_size = await self._calculate_model_size(model)
             readme_content = await self._download_readme(model)
@@ -323,7 +327,8 @@ class HuggingFaceScanner:
             )
 
             log.info(
-                f"Successfully scanned HuggingFace model: {model}",
+                "Successfully scanned HuggingFace model: {}",
+                model,
             )
             return result
 
@@ -340,7 +345,7 @@ class HuggingFaceScanner:
             ModelData object with basic metadata only (without README and size)
         """
         try:
-            log.info(f"Scanning HuggingFace model without metadata: {model}")
+            log.info("Scanning HuggingFace model without metadata: {}", model)
             model_info = await self._client.scan_model(model)
 
             model_id = model.model_id
@@ -359,7 +364,8 @@ class HuggingFaceScanner:
             )
 
             log.info(
-                f"Successfully scanned HuggingFace model without metadata: {model}",
+                "Successfully scanned HuggingFace model without metadata: {}",
+                model,
             )
             return result
 
@@ -427,7 +433,7 @@ class HuggingFaceScanner:
                 except Exception as e:
                     path = getattr(file, "path", "unknown")
                     log.error(
-                        f"Error processing file {path} info for model {model}. Details: {e!s}"
+                        "Error processing file {} info for model {}. Details: {!s}", path, model, e
                     )
                     continue
 
@@ -452,7 +458,9 @@ class HuggingFaceScanner:
             max_concurrent: Maximum number of concurrent metadata downloads (default: 8)
         """
         log.info(
-            f"Starting batch metadata processing for {len(models)} models (max_concurrent={max_concurrent})"
+            "Starting batch metadata processing for {} models (max_concurrent={})",
+            len(models),
+            max_concurrent,
         )
         semaphore = asyncio.Semaphore(max_concurrent)
 

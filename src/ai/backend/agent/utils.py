@@ -424,13 +424,19 @@ def get_safe_ulimit(name: str, desired_soft: int, desired_hard: int) -> DockerUl
         # Log if we had to adjust the limits
         if safe_soft != desired_soft or safe_hard != desired_hard:
             log.debug(
-                f"Adjusted ulimit {name}: desired=({desired_soft}, {desired_hard}) "
-                f"-> safe=({safe_soft}, {safe_hard}) (system limits: {current_soft_limit}, {current_hard_limit})"
+                "Adjusted ulimit {}: desired=({}, {}) -> safe=({}, {}) (system limits: {}, {})",
+                name,
+                desired_soft,
+                desired_hard,
+                safe_soft,
+                safe_hard,
+                current_soft_limit,
+                current_hard_limit,
             )
 
         return {"Name": name, "Soft": safe_soft, "Hard": safe_hard}
 
     except (OSError, ValueError, AttributeError) as e:
         # If we can't get system limits, log and use desired values
-        log.warning(f"Could not get system ulimit for {name}: {e}")
+        log.warning("Could not get system ulimit for {}: {}", name, e)
         return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}

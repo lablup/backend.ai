@@ -1415,7 +1415,7 @@ async def handle_volume_mount(
     if context.pidx != 0:
         return
     if context.watcher is None:
-        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling mount event.")
+        log.debug("{}: Watcher is disabled. Skip handling mount event.", context.node_id)
         return
     err_msg: str | None = None
     mount_prefix = await context.etcd.get("volumes/_mount")
@@ -1462,7 +1462,7 @@ async def handle_volume_umount(
     if context.pidx != 0:
         return
     if context.watcher is None:
-        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling umount event.")
+        log.debug("{}: Watcher is disabled. Skip handling umount event.", context.node_id)
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
