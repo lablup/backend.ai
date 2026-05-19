@@ -97,7 +97,7 @@ class DomainDBSource:
                 .distinct()
             )
 
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.DomainRow.to_data() for row in result.rows]
 

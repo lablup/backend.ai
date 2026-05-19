@@ -551,7 +551,7 @@ class SessionDBSource:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             session_rows = [row.SessionRow for row in result.rows]

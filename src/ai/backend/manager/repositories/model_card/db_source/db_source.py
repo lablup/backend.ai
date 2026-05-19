@@ -303,7 +303,7 @@ class ModelCardDBSource:
             if not is_member:
                 raise GenericForbidden("User is not a member of this project")
             query = sa.select(ModelCardRow)
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
             return ModelCardSearchResult(
                 items=[row.ModelCardRow.to_data() for row in result.rows],
                 total_count=result.total_count,

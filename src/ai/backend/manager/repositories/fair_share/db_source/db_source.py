@@ -239,7 +239,7 @@ class FairShareDBSource:
                 )
             )
 
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             # Fetch scaling group spec AND available_slots for default generation
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
@@ -446,7 +446,7 @@ class FairShareDBSource:
                 )
             )
 
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             # Fetch scaling group spec AND available_slots for default generation
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
@@ -804,7 +804,7 @@ class FairShareDBSource:
                 )
             )
 
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             # Fetch scaling group spec AND available_slots for default generation
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
