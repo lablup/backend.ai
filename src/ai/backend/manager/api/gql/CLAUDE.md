@@ -60,14 +60,20 @@
 
 **search — always two variants:**
 - `adminFoosV2`: superadmin only, no scope — queries entire system.
-- `{scope}FoosV2` (e.g., `projectSessionsV2`): non-admin, scope parameter required — queries within the given scope only.
+- `scopedFoosV2` (e.g., `scopedSessionsV2`): non-admin, scope target required — queries within the given scope only.
 - `myFoosV2`: self-service, adapter resolves current user as scope internally.
 - There is NO "search everything without scope" for non-admin users.
 
 **Scoped search naming convention:**
-- GQL query names use scope as prefix: `projectSessionsV2`, `domainUsersV2`.
-- The scope ID is a required argument, not an optional filter.
-- Maps to REST pattern: `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
+- GQL query name: `scopedFoosV2` (single root field per entity).
+- The scope target is a required argument typed as an entity-specific input
+  (`FooScopeGQL`), defined under `api/gql/{entity}/types/scope.py`.
+- The scope input is not a bare ID — it carries the shape the entity needs
+  (e.g., a single scope ID, a list of entity-tagged refs, or category-separated lists).
+- Non-empty validation lives on the DTO via a Pydantic `model_validator`, so empty
+  input is rejected at the GQL/REST boundary uniformly.
+- Legacy `{scope}FoosV2` queries (e.g., `projectSessionsV2`) predate this convention;
+  do NOT add new ones — use `scopedFoosV2` instead.
 
 **create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
 - **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` mutation/query.
@@ -123,6 +129,21 @@ Clients must be able to choose between cursor and offset pagination freely.
 - Use this mode for infinite scrolling / "load more" UX where stable page boundaries matter.
 
 Only one pagination mode is allowed per request. Combining `first` with `limit` raises an error.
+
+## `scoped_` Resolver Pattern
+
+`scopedFoosV2` is the standard naming for non-admin scoped search queries.
+
+- Naming: `scopedFoosV2` (e.g., `scopedSessionsV2`, `scopedAuditLogsV2`).
+- Scope target argument: required, typed as an entity-specific input (`FooScopeGQL`)
+  defined under `api/gql/{entity}/types/scope.py`. Never accept a bare scope ID.
+- Scope input shape is entity-specific. A simple case may carry a single field
+  (e.g., a project ID); a complex case may carry category-separated lists.
+- Non-empty validation MUST live on the DTO via a Pydantic `model_validator`, so the
+  GQL/REST boundary rejects empty input uniformly without resolver-side checks.
+- The resolver forwards the scope target to the adapter alongside the search input DTO.
+  Authorization (RBAC validation, batch or single) is the adapter/service's
+  responsibility, not the resolver's.
 
 ## `my_` Resolver Pattern
 

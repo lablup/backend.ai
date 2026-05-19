@@ -8,6 +8,7 @@ Both permission.py and role.py can safely import from this module.
 from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.rbac.types import (
+    EntityTypeScope,
     RBACElementTypeDTO,
     ScopeInputDTO,
 )
@@ -21,6 +22,14 @@ from ai.backend.manager.api.gql.decorators import (
     gql_enum,
     gql_field,
     gql_pydantic_input,
+)
+
+# Re-export for stable import paths in audit_log scope
+__all__ = (
+    "EntityTypeScopeGQL",
+    "RBACElementTypeFilterGQL",
+    "RBACElementTypeGQL",
+    "ScopeInputGQL",
 )
 
 # ==================== Enums ====================
@@ -47,6 +56,22 @@ RBACElementTypeGQL: type[RBACElementTypeDTO] = gql_enum(
 class ScopeInputGQL(PydanticInputMixin[ScopeInputDTO]):
     scope_type: RBACElementTypeGQL
     scope_id: str
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entity reference parametrized by RBAC element type.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="EntityTypeScope",
+)
+class EntityTypeScopeGQL(PydanticInputMixin[EntityTypeScope]):
+    entity_type: RBACElementTypeGQL = gql_field(
+        description="RBAC element type of the entity.",
+    )
+    entity_id: str = gql_field(
+        description="ID of the entity.",
+    )
 
 
 @gql_pydantic_input(

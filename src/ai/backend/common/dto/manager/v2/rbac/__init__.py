@@ -61,6 +61,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     EntityOrderField,
     EntityType,
+    EntityTypeScope,
     OperationType,
     OperationTypeDTO,
     OperationTypeFilter,
@@ -84,6 +85,7 @@ __all__ = (
     # Types
     "EntityOrderField",
     "EntityType",
+    "EntityTypeScope",
     "OperationType",
     "OperationTypeDTO",
     "OperationTypeFilter",

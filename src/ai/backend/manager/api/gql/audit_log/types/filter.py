@@ -42,6 +42,7 @@ class AuditLogStatusFilterGQL(PydanticInputMixin[AuditLogStatusFilter]):
 )
 class AuditLogFilterGQL(PydanticInputMixin[AuditLogFilter]):
     entity_type: StringFilter | None = None
+    entity_id: StringFilter | None = None
     operation: StringFilter | None = None
     status: AuditLogStatusFilterGQL | None = None
     created_at: DateTimeFilter | None = None

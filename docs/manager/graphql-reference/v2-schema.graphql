@@ -1007,6 +1007,7 @@ input AssignRoleInput {
 """Added in 24.09.0. Filter criteria for querying audit logs."""
 input AuditLogFilter {
   entityType: StringFilter = null
+  entityId: StringFilter = null
   operation: StringFilter = null
   status: AuditLogStatusFilter = null
   createdAt: DateTimeFilter = null
@@ -1028,6 +1029,17 @@ enum AuditLogOrderField {
   ENTITY_TYPE
   OPERATION
   STATUS
+}
+
+"""
+Added in UNRELEASED. Scope target for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
+"""
+input AuditLogScope {
+  """Entity-tagged scope items."""
+  entity: [EntityTypeScope!] = null
+
+  """Actor UUIDs (matches audit_logs.triggered_by)."""
+  triggeredUser: [UUID!] = null
 }
 
 """Added in 26.3.0. Status of an audit log entry."""
@@ -4402,6 +4414,17 @@ type EntityTimestamps {
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
+}
+
+"""
+Added in UNRELEASED. Entity reference parametrized by RBAC element type.
+"""
+input EntityTypeScope {
+  """RBAC element type of the entity."""
+  entityType: RBACElementType!
+
+  """ID of the entity."""
+  entityId: String!
 }
 
 """
@@ -8959,6 +8982,11 @@ type Query {
   Added in 26.3.0. Query audit logs with pagination and filtering. (admin only)
   """
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
+
+  """
+  Added in UNRELEASED. Query audit logs within a scope target (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
+  """
+  scopedAuditLogsV2(scopeTarget: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
 
   """
   Added in 26.4.2. List container registries with filtering, ordering, and pagination (admin only).

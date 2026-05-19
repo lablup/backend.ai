@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "EntityOrderField",
     "EntityType",
+    "EntityTypeScope",
     "OperationType",
     "OperationTypeDTO",
     "OperationTypeFilter",
@@ -204,6 +205,17 @@ class ScopeInputDTO(BaseRequestModel):
 
     scope_type: RBACElementTypeDTO
     scope_id: str
+
+
+class EntityTypeScope(BaseRequestModel):
+    """Entity reference parametrized by RBAC element type.
+
+    A typed (element_type, id) pair used to reference a specific entity in
+    contexts such as batch RBAC validation or scoped queries.
+    """
+
+    entity_type: RBACElementTypeDTO
+    entity_id: str
 
 
 class PermissionSummary(BaseResponseModel):
