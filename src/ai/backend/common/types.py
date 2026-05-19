@@ -48,6 +48,7 @@ from pydantic import (
     PlainValidator,
     TypeAdapter,
     ValidationError,
+    field_validator,
 )
 from pydantic_core import ErrorDetails
 from redis.asyncio import Redis
@@ -753,13 +754,26 @@ class MountInfoEntry(BackendAISchema):
     string ``"."``) means mount the vfolder root.
     """
 
-    vfolder_id: VFolderUUID
+    vfolder_id: VFolderUUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfid"),
+    )
     mount_destination: str | None = Field(
         validation_alias=AliasChoices("mount_destination", "kernel_path"),
         default=None,
     )
     mount_perm: MountPermission | None = Field(default=None)
-    subpath: str | None = Field(default=None)
+    subpath: str | None = Field(
+        validation_alias=AliasChoices("subpath", "vfsubpath"),
+        default=None,
+    )
+
+    @field_validator("vfolder_id", mode="before")
+    @classmethod
+    def _strip_quota_scope_prefix(cls, value: Any) -> Any:
+        # Legacy `vfid` is `str(VFolderID)`; reuse the canonical parser.
+        if isinstance(value, str):
+            return VFolderID.from_str(value).folder_id
+        return value
 
 
 class MountTypes(enum.StrEnum):

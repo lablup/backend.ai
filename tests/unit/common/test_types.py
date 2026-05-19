@@ -1,14 +1,23 @@
 import asyncio
+import uuid
+from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from typeguard import TypeCheckError
 
-from ai.backend.common.exception import InvalidResourceSlotQuantity
+from ai.backend.common.exception import (
+    BackendAISchemaValidationFailed,
+    InvalidResourceSlotQuantity,
+)
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
     DefaultForUnspecified,
     HardwareMetadata,
+    MountInfoEntry,
+    MountPermission,
     ResourceSlot,
     SlotName,
     SlotTypes,
@@ -423,3 +432,105 @@ def test_stringify_number_decimal_places() -> None:
     # Integer and BinarySize handling unchanged
     assert _stringify_number(42) == "42"
     assert _stringify_number(BinarySize(1024)) == "1024"
+
+
+@dataclass(frozen=True)
+class _LegacyDecodingCase:
+    """Pairs a raw JSONB shape with the canonical entry it should decode to."""
+
+    raw_payload: dict[str, Any]
+    expected: MountInfoEntry
+
+
+_FOLDER_UUID = uuid.uuid4()
+_QUOTA_SCOPE_STR = f"user:{uuid.uuid4().hex}"
+
+
+class TestMountInfoEntryLegacyShape:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            pytest.param(
+                _LegacyDecodingCase(
+                    raw_payload={
+                        "name": ".claude",
+                        "vfid": f"{_QUOTA_SCOPE_STR}/{_FOLDER_UUID.hex}",
+                        "vfsubpath": ".",
+                        "host_path": "/vfroot/local/user:00/abc",
+                        "kernel_path": "/home/work/.claude",
+                        "mount_perm": "rw",
+                        "usage_mode": "general",
+                    },
+                    expected=MountInfoEntry(
+                        vfolder_id=VFolderUUID(_FOLDER_UUID),
+                        mount_destination="/home/work/.claude",
+                        mount_perm=MountPermission.READ_WRITE,
+                        subpath=".",
+                    ),
+                ),
+                id="legacy_vfid_with_quota_scope_prefix",
+            ),
+            pytest.param(
+                _LegacyDecodingCase(
+                    raw_payload={
+                        "vfid": _FOLDER_UUID.hex,
+                        "kernel_path": "/home/work/data",
+                        "mount_perm": "ro",
+                    },
+                    expected=MountInfoEntry(
+                        vfolder_id=VFolderUUID(_FOLDER_UUID),
+                        mount_destination="/home/work/data",
+                        mount_perm=MountPermission.READ_ONLY,
+                        subpath=None,
+                    ),
+                ),
+                id="legacy_vfid_without_quota_scope_prefix",
+            ),
+            pytest.param(
+                _LegacyDecodingCase(
+                    raw_payload={
+                        "vfolder_id": str(_FOLDER_UUID),
+                        "mount_destination": "/home/work/data",
+                        "mount_perm": "rw",
+                        "subpath": "nested/dir",
+                    },
+                    expected=MountInfoEntry(
+                        vfolder_id=VFolderUUID(_FOLDER_UUID),
+                        mount_destination="/home/work/data",
+                        mount_perm=MountPermission.READ_WRITE,
+                        subpath="nested/dir",
+                    ),
+                ),
+                id="new_shape_unchanged",
+            ),
+            pytest.param(
+                _LegacyDecodingCase(
+                    raw_payload={
+                        "vfid": _FOLDER_UUID.hex,
+                        "kernel_path": "/home/work/data",
+                        "vfsubpath": "weights",
+                        "mount_perm": "rw",
+                    },
+                    expected=MountInfoEntry(
+                        vfolder_id=VFolderUUID(_FOLDER_UUID),
+                        mount_destination="/home/work/data",
+                        mount_perm=MountPermission.READ_WRITE,
+                        subpath="weights",
+                    ),
+                ),
+                id="vfsubpath_alias_maps_to_subpath",
+            ),
+        ],
+    )
+    async def test_decodes_payload_to_canonical_entry(
+        self,
+        case: _LegacyDecodingCase,
+    ) -> None:
+        assert MountInfoEntry.model_validate(case.raw_payload) == case.expected
+
+    async def test_missing_vfolder_id_and_vfid_still_fails(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            MountInfoEntry.model_validate({
+                "mount_destination": "/home/work/data",
+                "mount_perm": "rw",
+            })
