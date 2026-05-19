@@ -21,9 +21,11 @@ Currently exposed (grows as the agent layer needs more):
   — prepare the container root filesystem from an image's layers.
 - ``create_container()`` / ``delete_container()`` — the container metadata
   object (id, image, runtime, OCI spec, rootfs snapshot).
+- ``create_task()`` / ``start_task()`` / ``get_task()`` / ``wait_task()`` /
+  ``kill_task()`` / ``delete_task()`` — the running container process.
 
-Tasks (the running process) land in a later increment. Everything goes
-through ``grpc.aio`` so the agent event loop stays responsive.
+Everything goes through ``grpc.aio`` so the agent event loop stays
+responsive.
 """
 
 from __future__ import annotations
@@ -54,9 +56,11 @@ from .generated.containerd.services.content.v1 import content_pb2, content_pb2_g
 from .generated.containerd.services.images.v1 import images_pb2, images_pb2_grpc
 from .generated.containerd.services.namespaces.v1 import namespace_pb2, namespace_pb2_grpc
 from .generated.containerd.services.snapshots.v1 import snapshots_pb2, snapshots_pb2_grpc
+from .generated.containerd.services.tasks.v1 import tasks_pb2, tasks_pb2_grpc
 from .generated.containerd.services.transfer.v1 import transfer_pb2, transfer_pb2_grpc
 from .generated.containerd.services.version.v1 import version_pb2, version_pb2_grpc
 from .generated.containerd.types import descriptor_pb2, mount_pb2, platform_pb2
+from .generated.containerd.types.task import task_pb2
 from .generated.containerd.types.transfer import imagestore_pb2, registry_pb2
 
 if TYPE_CHECKING:
@@ -72,6 +76,7 @@ if TYPE_CHECKING:
         NamespacesAsyncStub,
     )
     from .generated.containerd.services.snapshots.v1.snapshots_pb2_grpc import SnapshotsAsyncStub
+    from .generated.containerd.services.tasks.v1.tasks_pb2_grpc import TasksAsyncStub
     from .generated.containerd.services.transfer.v1.transfer_pb2_grpc import TransferAsyncStub
     from .generated.containerd.services.version.v1.version_pb2_grpc import VersionAsyncStub
 
@@ -183,6 +188,7 @@ class ContainerdClient:
     _content: ContentAsyncStub | None
     _snapshots: SnapshotsAsyncStub | None
     _containers: ContainersAsyncStub | None
+    _tasks: TasksAsyncStub | None
 
     def __init__(
         self,
@@ -202,6 +208,7 @@ class ContainerdClient:
         self._content = None
         self._snapshots = None
         self._containers = None
+        self._tasks = None
 
     @property
     def namespace(self) -> str:
@@ -257,6 +264,7 @@ class ContainerdClient:
         self._content = cast("ContentAsyncStub", content_pb2_grpc.ContentStub(channel))
         self._snapshots = cast("SnapshotsAsyncStub", snapshots_pb2_grpc.SnapshotsStub(channel))
         self._containers = cast("ContainersAsyncStub", containers_pb2_grpc.ContainersStub(channel))
+        self._tasks = cast("TasksAsyncStub", tasks_pb2_grpc.TasksStub(channel))
 
     async def close(self) -> None:
         if self._channel is None:
@@ -270,6 +278,7 @@ class ContainerdClient:
         self._content = None
         self._snapshots = None
         self._containers = None
+        self._tasks = None
 
     @property
     def _metadata(self) -> tuple[tuple[str, str], ...]:
@@ -519,6 +528,95 @@ class ContainerdClient:
             raise ContainerdRpcError(
                 f"containerd DeleteContainer '{container_id}' failed: {exc.details()}"
             ) from exc
+
+    async def create_task(
+        self,
+        container_id: str,
+        *,
+        rootfs: list[mount_pb2.Mount],
+    ) -> int:
+        """Create a task (the runc process) for an existing container.
+
+        ``rootfs`` is the list of mounts from the container's prepared
+        snapshot; the runc shim performs these mounts before exec'ing the
+        container process. The task is created but not started — call
+        ``start_task``. stdio is left empty (the process gets no attached
+        streams), which suits non-interactive workloads. Returns the pid.
+        """
+        stub = self._require(self._tasks)
+        request = tasks_pb2.CreateTaskRequest(container_id=container_id, rootfs=rootfs)
+        try:
+            response: tasks_pb2.CreateTaskResponse = await stub.Create(
+                request, metadata=self._metadata
+            )
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd CreateTask '{container_id}' failed: {exc.details()}"
+            ) from exc
+        return response.pid
+
+    async def start_task(self, container_id: str) -> int:
+        """Start a previously created task; return the process pid."""
+        stub = self._require(self._tasks)
+        request = tasks_pb2.StartRequest(container_id=container_id)
+        try:
+            response: tasks_pb2.StartResponse = await stub.Start(request, metadata=self._metadata)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd StartTask '{container_id}' failed: {exc.details()}"
+            ) from exc
+        return response.pid
+
+    async def get_task(self, container_id: str) -> task_pb2.Process:
+        """Return a task's current process state (status, pid, ...)."""
+        stub = self._require(self._tasks)
+        request = tasks_pb2.GetRequest(container_id=container_id)
+        try:
+            response: tasks_pb2.GetResponse = await stub.Get(request, metadata=self._metadata)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd GetTask '{container_id}' failed: {exc.details()}"
+            ) from exc
+        return cast(task_pb2.Process, response.process)
+
+    async def wait_task(self, container_id: str) -> int:
+        """Block until a task exits; return its exit status."""
+        stub = self._require(self._tasks)
+        request = tasks_pb2.WaitRequest(container_id=container_id)
+        try:
+            response: tasks_pb2.WaitResponse = await stub.Wait(request, metadata=self._metadata)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd WaitTask '{container_id}' failed: {exc.details()}"
+            ) from exc
+        return response.exit_status
+
+    async def kill_task(self, container_id: str, *, signal_number: int = 9) -> None:
+        """Send a signal to a task's processes (default 9 = SIGKILL)."""
+        stub = self._require(self._tasks)
+        request = tasks_pb2.KillRequest(
+            container_id=container_id,
+            signal=signal_number,
+            all=True,
+        )
+        try:
+            await stub.Kill(request, metadata=self._metadata)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd KillTask '{container_id}' failed: {exc.details()}"
+            ) from exc
+
+    async def delete_task(self, container_id: str) -> tasks_pb2.DeleteResponse:
+        """Delete a stopped task and its on-disk state; return exit info."""
+        stub = self._require(self._tasks)
+        request = tasks_pb2.DeleteTaskRequest(container_id=container_id)
+        try:
+            response: tasks_pb2.DeleteResponse = await stub.Delete(request, metadata=self._metadata)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd DeleteTask '{container_id}' failed: {exc.details()}"
+            ) from exc
+        return response
 
     def _require(self, stub: _StubT | None) -> _StubT:
         if stub is None:

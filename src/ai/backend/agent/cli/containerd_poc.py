@@ -39,6 +39,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__spec__.name)
 
+# containerd task Status enum (containerd/types/task/task.proto) -> name.
+_TASK_STATUS = {0: "unknown", 1: "created", 2: "running", 3: "stopped", 4: "paused", 5: "pausing"}
+
 
 @click.group()
 def cli() -> None:
@@ -70,7 +73,7 @@ class StepResult:
     "--image",
     default="docker.io/library/busybox:latest",
     show_default=True,
-    help="Image reference to pull, prepare a rootfs from, and create a container with.",
+    help="Image reference to pull, prepare a rootfs from, and run a container with.",
 )
 @click.option(
     "--connect-timeout",
@@ -110,6 +113,9 @@ def run(
         sys.exit(1)
 
 
+_StepBody = Callable[[], Coroutine[Any, Any, dict[str, Any]]]
+
+
 async def _run_lifecycle(
     *,
     address: str,
@@ -125,6 +131,11 @@ async def _run_lifecycle(
     # container id. The poc uses one id for both.
     workload_id = f"containerd-poc-{uuid.uuid4().hex[:12]}"
     results: list[StepResult] = []
+    # Cleanup steps pushed as resources are created, run in reverse at the end.
+    cleanups: list[tuple[str, _StepBody]] = []
+    # Rootfs mounts from prepare_snapshot, consumed by create_task.
+    rootfs: list[Any] = []
+
     async with ContainerdClient(
         address=address,
         namespace=namespace,
@@ -134,32 +145,38 @@ async def _run_lifecycle(
         results.append(await _step("ensure_namespace", lambda: _do_ensure_namespace(cd)))
         results.append(await _step("pull_image", lambda: _do_pull_image(cd, image)))
         results.append(await _step("get_image", lambda: _do_get_image(cd, image)))
+
         prepared = await _step(
-            "prepare_snapshot", lambda: _do_prepare_snapshot(cd, image, workload_id)
+            "prepare_snapshot", lambda: _do_prepare_snapshot(cd, image, workload_id, rootfs)
         )
         results.append(prepared)
         if prepared.ok:
+            cleanups.append(("remove_snapshot", lambda: _do_remove_snapshot(cd, workload_id)))
+
             created = await _step(
                 "create_container", lambda: _do_create_container(cd, image, workload_id)
             )
             results.append(created)
-            # Teardown — delete the container before removing the snapshot
-            # it references.
             if created.ok:
-                results.append(
-                    await _step("delete_container", lambda: _do_delete_container(cd, workload_id))
-                )
-            results.append(
-                await _step("remove_snapshot", lambda: _do_remove_snapshot(cd, workload_id))
-            )
+                cleanups.append(("delete_container", lambda: _do_delete_container(cd, workload_id)))
+
+                task = await _step("create_task", lambda: _do_create_task(cd, workload_id, rootfs))
+                results.append(task)
+                if task.ok:
+                    cleanups.append(("teardown_task", lambda: _do_teardown_task(cd, workload_id)))
+                    results.append(
+                        await _step("start_task", lambda: _do_start_task(cd, workload_id))
+                    )
+                    results.append(await _step("get_task", lambda: _do_get_task(cd, workload_id)))
+
+        # Teardown in reverse creation order.
+        for name, body in reversed(cleanups):
+            results.append(await _step(name, body))
         results.append(await _step("list_namespaces", lambda: _do_list_namespaces(cd)))
     return results
 
 
-async def _step(
-    name: str,
-    body: Callable[[], Coroutine[Any, Any, dict[str, Any]]],
-) -> StepResult:
+async def _step(name: str, body: _StepBody) -> StepResult:
     started = time.perf_counter()
     try:
         detail = await body()
@@ -202,9 +219,11 @@ async def _do_get_image(cd: ContainerdClient, image: str) -> dict[str, Any]:
 
 
 async def _do_prepare_snapshot(
-    cd: ContainerdClient, image: str, snapshot_key: str
+    cd: ContainerdClient, image: str, snapshot_key: str, rootfs_out: list[Any]
 ) -> dict[str, Any]:
     mounts = await cd.prepare_image_rootfs(image, snapshot_key)
+    rootfs_out.clear()
+    rootfs_out.extend(mounts)
     return {
         "snapshot_key": snapshot_key,
         "mount_count": len(mounts),
@@ -227,6 +246,33 @@ async def _do_create_container(
         labels={"io.backend.ai/origin": "containerd-poc"},
     )
     return {"container_id": container_id}
+
+
+async def _do_create_task(
+    cd: ContainerdClient, container_id: str, rootfs: list[Any]
+) -> dict[str, Any]:
+    pid = await cd.create_task(container_id, rootfs=rootfs)
+    return {"container_id": container_id, "pid": pid}
+
+
+async def _do_start_task(cd: ContainerdClient, container_id: str) -> dict[str, Any]:
+    pid = await cd.start_task(container_id)
+    return {"container_id": container_id, "pid": pid}
+
+
+async def _do_get_task(cd: ContainerdClient, container_id: str) -> dict[str, Any]:
+    process = await cd.get_task(container_id)
+    return {
+        "status": _TASK_STATUS.get(process.status, process.status),
+        "pid": process.pid,
+    }
+
+
+async def _do_teardown_task(cd: ContainerdClient, container_id: str) -> dict[str, Any]:
+    await cd.kill_task(container_id)
+    exit_status = await cd.wait_task(container_id)
+    await cd.delete_task(container_id)
+    return {"container_id": container_id, "exit_status": exit_status}
 
 
 async def _do_delete_container(cd: ContainerdClient, container_id: str) -> dict[str, Any]:
