@@ -74,3 +74,8 @@ def health() -> None:
 @main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.cri_poc:cli")
 def cri_poc() -> None:
     """Containerd backend CRI lifecycle PoC harness (V1 cilium-mode validation)."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.containerd_poc:cli")
+def containerd_poc() -> None:
+    """Containerd native-API backend PoC harness."""

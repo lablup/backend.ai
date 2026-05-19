@@ -84,6 +84,9 @@ extend-exclude = [
     # Auto-generated CRI gRPC stubs — regenerated from proto, see
     # src/ai/backend/agent/containerd/cri/proto/README.md.
     "src/ai/backend/agent/containerd/cri/generated/**",
+    # Auto-generated containerd native-API gRPC stubs — regenerated from
+    # proto, see src/ai/backend/agent/containerd/client/proto/README.md.
+    "src/ai/backend/agent/containerd/client/generated/**",
 ]
 
 [tool.ruff.lint]
@@ -384,8 +387,16 @@ ignore_errors = true
 # .pyi (standard protoc + grpc_tools does not emit one — would require
 # mypy-protobuf as an additional codegen tool). Treat the whole
 # generated subpackage as opaque to mypy.
+#
+# The containerd native-API stubs (client/generated) are also generated;
+# they ship with mypy-protobuf .pyi files, but the protoc-emitted _pb2.py
+# runtime modules are still treated as opaque to keep regeneration churn
+# out of type-checking.
 [[tool.mypy.overrides]]
-module = ["ai.backend.agent.containerd.cri.generated.*"]
+module = [
+    "ai.backend.agent.containerd.cri.generated.*",
+    "ai.backend.agent.containerd.client.generated.*",
+]
 ignore_errors = true
 
 [tool.pyright]

@@ -1,0 +1,151 @@
+"""Client and server classes corresponding to protobuf-defined services."""
+import grpc
+import warnings
+from .....containerd.services.containers.v1 import containers_pb2 as containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+GRPC_GENERATED_VERSION = '1.80.0'
+GRPC_VERSION = grpc.__version__
+_version_not_supported = False
+try:
+    from grpc._utilities import first_version_is_lower
+    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+except ImportError:
+    _version_not_supported = True
+if _version_not_supported:
+    raise RuntimeError(f'The grpc package installed is at version {GRPC_VERSION},' + ' but the generated code in containerd/services/containers/v1/containers_pb2_grpc.py depends on' + f' grpcio>={GRPC_GENERATED_VERSION}.' + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}' + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.')
+
+class ContainersStub(object):
+    """Containers provides metadata storage for containers used in the execution
+    service.
+
+    The objects here provide an state-independent view of containers for use in
+    management and resource pinning. From that perspective, containers do not
+    have a "state" but rather this is the set of resources that will be
+    considered in use by the container.
+
+    From the perspective of the execution service, these objects represent the
+    base parameters for creating a container process.
+
+    In general, when looking to add fields for this type, first ask yourself
+    whether or not the function of the field has to do with runtime execution or
+    is invariant of the runtime state of the container. If it has to do with
+    runtime, or changes as the "container" is started and stops, it probably
+    doesn't belong on this object.
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.Get = channel.unary_unary('/containerd.services.containers.v1.Containers/Get', request_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.GetContainerRequest.SerializeToString, response_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.GetContainerResponse.FromString, _registered_method=True)
+        self.List = channel.unary_unary('/containerd.services.containers.v1.Containers/List', request_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersRequest.SerializeToString, response_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersResponse.FromString, _registered_method=True)
+        self.ListStream = channel.unary_stream('/containerd.services.containers.v1.Containers/ListStream', request_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersRequest.SerializeToString, response_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainerMessage.FromString, _registered_method=True)
+        self.Create = channel.unary_unary('/containerd.services.containers.v1.Containers/Create', request_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.CreateContainerRequest.SerializeToString, response_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.CreateContainerResponse.FromString, _registered_method=True)
+        self.Update = channel.unary_unary('/containerd.services.containers.v1.Containers/Update', request_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.UpdateContainerRequest.SerializeToString, response_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.UpdateContainerResponse.FromString, _registered_method=True)
+        self.Delete = channel.unary_unary('/containerd.services.containers.v1.Containers/Delete', request_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.DeleteContainerRequest.SerializeToString, response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString, _registered_method=True)
+
+class ContainersServicer(object):
+    """Containers provides metadata storage for containers used in the execution
+    service.
+
+    The objects here provide an state-independent view of containers for use in
+    management and resource pinning. From that perspective, containers do not
+    have a "state" but rather this is the set of resources that will be
+    considered in use by the container.
+
+    From the perspective of the execution service, these objects represent the
+    base parameters for creating a container process.
+
+    In general, when looking to add fields for this type, first ask yourself
+    whether or not the function of the field has to do with runtime execution or
+    is invariant of the runtime state of the container. If it has to do with
+    runtime, or changes as the "container" is started and stops, it probably
+    doesn't belong on this object.
+    """
+
+    def Get(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def List(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListStream(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Create(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Update(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Delete(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+def add_ContainersServicer_to_server(servicer, server):
+    rpc_method_handlers = {'Get': grpc.unary_unary_rpc_method_handler(servicer.Get, request_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.GetContainerRequest.FromString, response_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.GetContainerResponse.SerializeToString), 'List': grpc.unary_unary_rpc_method_handler(servicer.List, request_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersRequest.FromString, response_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersResponse.SerializeToString), 'ListStream': grpc.unary_stream_rpc_method_handler(servicer.ListStream, request_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersRequest.FromString, response_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainerMessage.SerializeToString), 'Create': grpc.unary_unary_rpc_method_handler(servicer.Create, request_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.CreateContainerRequest.FromString, response_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.CreateContainerResponse.SerializeToString), 'Update': grpc.unary_unary_rpc_method_handler(servicer.Update, request_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.UpdateContainerRequest.FromString, response_serializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.UpdateContainerResponse.SerializeToString), 'Delete': grpc.unary_unary_rpc_method_handler(servicer.Delete, request_deserializer=containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.DeleteContainerRequest.FromString, response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString)}
+    generic_handler = grpc.method_handlers_generic_handler('containerd.services.containers.v1.Containers', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('containerd.services.containers.v1.Containers', rpc_method_handlers)
+
+class Containers(object):
+    """Containers provides metadata storage for containers used in the execution
+    service.
+
+    The objects here provide an state-independent view of containers for use in
+    management and resource pinning. From that perspective, containers do not
+    have a "state" but rather this is the set of resources that will be
+    considered in use by the container.
+
+    From the perspective of the execution service, these objects represent the
+    base parameters for creating a container process.
+
+    In general, when looking to add fields for this type, first ask yourself
+    whether or not the function of the field has to do with runtime execution or
+    is invariant of the runtime state of the container. If it has to do with
+    runtime, or changes as the "container" is started and stops, it probably
+    doesn't belong on this object.
+    """
+
+    @staticmethod
+    def Get(request, target, options=(), channel_credentials=None, call_credentials=None, insecure=False, compression=None, wait_for_ready=None, timeout=None, metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/containerd.services.containers.v1.Containers/Get', containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.GetContainerRequest.SerializeToString, containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.GetContainerResponse.FromString, options, channel_credentials, insecure, call_credentials, compression, wait_for_ready, timeout, metadata, _registered_method=True)
+
+    @staticmethod
+    def List(request, target, options=(), channel_credentials=None, call_credentials=None, insecure=False, compression=None, wait_for_ready=None, timeout=None, metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/containerd.services.containers.v1.Containers/List', containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersRequest.SerializeToString, containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersResponse.FromString, options, channel_credentials, insecure, call_credentials, compression, wait_for_ready, timeout, metadata, _registered_method=True)
+
+    @staticmethod
+    def ListStream(request, target, options=(), channel_credentials=None, call_credentials=None, insecure=False, compression=None, wait_for_ready=None, timeout=None, metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/containerd.services.containers.v1.Containers/ListStream', containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainersRequest.SerializeToString, containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.ListContainerMessage.FromString, options, channel_credentials, insecure, call_credentials, compression, wait_for_ready, timeout, metadata, _registered_method=True)
+
+    @staticmethod
+    def Create(request, target, options=(), channel_credentials=None, call_credentials=None, insecure=False, compression=None, wait_for_ready=None, timeout=None, metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/containerd.services.containers.v1.Containers/Create', containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.CreateContainerRequest.SerializeToString, containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.CreateContainerResponse.FromString, options, channel_credentials, insecure, call_credentials, compression, wait_for_ready, timeout, metadata, _registered_method=True)
+
+    @staticmethod
+    def Update(request, target, options=(), channel_credentials=None, call_credentials=None, insecure=False, compression=None, wait_for_ready=None, timeout=None, metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/containerd.services.containers.v1.Containers/Update', containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.UpdateContainerRequest.SerializeToString, containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.UpdateContainerResponse.FromString, options, channel_credentials, insecure, call_credentials, compression, wait_for_ready, timeout, metadata, _registered_method=True)
+
+    @staticmethod
+    def Delete(request, target, options=(), channel_credentials=None, call_credentials=None, insecure=False, compression=None, wait_for_ready=None, timeout=None, metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/containerd.services.containers.v1.Containers/Delete', containerd_dot_services_dot_containers_dot_v1_dot_containers__pb2.DeleteContainerRequest.SerializeToString, google_dot_protobuf_dot_empty__pb2.Empty.FromString, options, channel_credentials, insecure, call_credentials, compression, wait_for_ready, timeout, metadata, _registered_method=True)

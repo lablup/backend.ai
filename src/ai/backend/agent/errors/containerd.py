@@ -124,3 +124,36 @@ class CriRpcError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ContainerdConnectionError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the containerd native-API gRPC channel cannot be established or is lost."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-connection-error"
+    error_title = "containerd gRPC connection error."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.UNREACHABLE,
+        )
+
+
+class ContainerdRpcError(BackendAIError, web.HTTPInternalServerError):
+    """Wraps a non-recoverable gRPC error returned by containerd's native API.
+
+    Specific operations may map gRPC status codes to more precise
+    BackendAIError subclasses; this is the catch-all for operations
+    that do not yet have specialized error classes.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-rpc-error"
+    error_title = "containerd RPC error."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
