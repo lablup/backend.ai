@@ -1,23 +1,28 @@
 """Containerd-backed kernel and code runner.
 
-``ContainerdKernel`` mirrors ``DockerKernel``: most operations delegate to
-the ``ContainerdCodeRunner`` (which speaks the same ZMQ REPL protocol the
-in-container krunner exposes), and the filesystem-only operations
-(``accept_file``, ``check_duplicate_commit``) reach the bind-mounted host
-scratch directory directly. Runtime-specific operations that the docker
-backend implements with the Docker API — fetching task logs, image
-commit, in-container ``tar``/``ls`` — need ``ContainerdClient.exec_task``
-plus stdio plumbing and are deferred; they raise ``NotImplementedError``
-for now.
+``ContainerdKernel`` mirrors ``DockerKernel``: most operations delegate
+to the ``ContainerdCodeRunner`` (which speaks the same ZMQ REPL protocol
+the in-container krunner exposes). The container's ``/home/work`` is
+bind-mounted from the host's per-kernel scratch dir, so file operations
+(``accept_file``, ``download_file``, ``download_single``, ``list_files``)
+read and write the host path directly — no in-container exec is needed
+to inspect or transfer files there. Runtime-specific operations that
+still need ``ContainerdClient.exec_task`` plus stdio plumbing — task
+log retrieval and image commit — are deferred; they raise
+``NotImplementedError`` for now.
 """
 
 from __future__ import annotations
 
 import asyncio
+import io
+import json
 import logging
 import os
+import stat
+import tarfile
 from collections.abc import Mapping
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, override
 
 from ai.backend.agent.errors import KernelRunnerNotInitializedError
@@ -214,26 +219,85 @@ class ContainerdKernel(AbstractKernel):
                 f"{container_path} -> {host_abspath} ({e!r})"
             ) from e
 
+    def _resolve_work_path(self, container_path: os.PathLike[str] | str) -> Path:
+        """Translate a ``/home/work/...`` container path to its host equivalent.
+
+        ``/home/work`` is bind-mounted from the host scratch directory at
+        task-create time, so a container-side path resolves to the same
+        host-side file. The path is confined to ``/home/work`` to match
+        the docker backend's safety check.
+        """
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
+            raise PermissionError("You cannot access files outside /home/work")
+        host_work_dir: Path = (
+            self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
+        )
+        return host_work_dir / container_abspath.relative_to(container_home_path)
+
     @override
     async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
-        # Streaming the container's file system needs ContainerdClient.exec
-        # to run ``tar`` inside the task; deferred together with get_logs.
-        del container_path
-        raise NotImplementedError("containerd kernel file download is not implemented yet")
+        # Read from the host bind-mount and tar it up; the container and
+        # the host see the same bytes under /home/work, so no in-container
+        # exec is needed for files there.
+        host_abspath = self._resolve_work_path(container_path)
+
+        def _build_tar() -> bytes:
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w") as tar:
+                tar.add(str(host_abspath), arcname=host_abspath.name)
+            data = buf.getvalue()
+            if len(data) > 1048576:
+                raise ValueError("Too large archive file exceeding 1 MiB")
+            return data
+
+        return await asyncio.to_thread(_build_tar)
 
     @override
     async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
-        # See download_file.
-        del container_path
-        raise NotImplementedError("containerd kernel single-file download is not implemented yet")
+        host_abspath = self._resolve_work_path(container_path)
+
+        def _read_bytes() -> bytes:
+            if host_abspath.is_dir():
+                raise ValueError(f"Expected a single file but {container_path!r} is a directory")
+            size = host_abspath.stat().st_size
+            if size > 1048576:
+                raise ValueError("Too large file exceeding 1 MiB")
+            return host_abspath.read_bytes()
+
+        return await asyncio.to_thread(_read_bytes)
 
     @override
     async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
-        # The docker backend exec()s a Python helper inside the container;
-        # the containerd equivalent needs exec_task plus a stdio pipe and
-        # is deferred to a follow-up.
-        del container_path
-        raise NotImplementedError("containerd kernel file listing is not implemented yet")
+        host_abspath = self._resolve_work_path(container_path)
+
+        def _scandir() -> dict[str, Any]:
+            try:
+                entries: list[dict[str, Any]] = []
+                for entry in os.scandir(host_abspath):
+                    fstat = entry.stat(follow_symlinks=False)
+                    entries.append({
+                        "mode": stat.filemode(fstat.st_mode),
+                        "size": fstat.st_size,
+                        "ctime": fstat.st_ctime,
+                        "mtime": fstat.st_mtime,
+                        "atime": fstat.st_atime,
+                        "filename": entry.name,
+                    })
+                return {
+                    "files": json.dumps(entries),
+                    "errors": "",
+                    "abspath": str(container_path),
+                }
+            except OSError as e:
+                return {
+                    "files": "",
+                    "errors": str(e),
+                    "abspath": str(container_path),
+                }
+
+        return await asyncio.to_thread(_scandir)
 
     @override
     async def notify_event(self, evdata: AgentEventData) -> None:
