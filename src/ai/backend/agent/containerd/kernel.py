@@ -6,10 +6,11 @@ the in-container krunner exposes). The container's ``/home/work`` is
 bind-mounted from the host's per-kernel scratch dir, so file operations
 (``accept_file``, ``download_file``, ``download_single``, ``list_files``)
 read and write the host path directly — no in-container exec is needed
-to inspect or transfer files there. Runtime-specific operations that
-still need ``ContainerdClient.exec_task`` plus stdio plumbing — task
-log retrieval and image commit — are deferred; they raise
-``NotImplementedError`` for now.
+to inspect or transfer files there. Likewise the task's stdout/stderr
+are wired to ``{scratch_dir}/container.log`` at task-create time, so
+``get_logs`` is a plain host-side tail. The remaining hold-out is image
+commit, which needs ``Snapshots.Commit`` + ``Images.Create`` plumbing
+and is still deferred.
 """
 
 from __future__ import annotations
@@ -112,10 +113,28 @@ class ContainerdKernel(AbstractKernel):
 
     @override
     async def get_logs(self) -> dict[str, Any]:
-        # Fetching containerd task logs requires a stdio FIFO configured at
-        # task-creation time; that stdio plumbing is deferred to a
-        # follow-up increment together with exec-based file ops.
-        raise NotImplementedError("containerd kernel log retrieval is not implemented yet")
+        # The task's stdout/stderr are wired to a host file at
+        # task-create time (see ContainerdKernelCreationContext
+        # .start_container's stdout/stderr URIs), so log retrieval is a
+        # plain host-side read. Cap the returned slice at 1 MiB — the
+        # docker backend imposes a similar cap via its log driver's
+        # max-size — and read the tail so the most recent output wins
+        # if the file has grown beyond that.
+        log_path: Path = (
+            self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "container.log"
+        )
+        max_bytes = 1 * 1024 * 1024
+
+        def _read_tail() -> str:
+            if not log_path.is_file():
+                return ""
+            size = log_path.stat().st_size
+            with log_path.open("rb") as fp:
+                if size > max_bytes:
+                    fp.seek(size - max_bytes)
+                return fp.read().decode("utf-8", "replace")
+
+        return {"logs": await asyncio.to_thread(_read_tail)}
 
     @override
     async def interrupt_kernel(self) -> dict[str, Any]:

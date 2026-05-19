@@ -584,17 +584,27 @@ class ContainerdClient:
         container_id: str,
         *,
         rootfs: list[mount_pb2.Mount],
+        stdout: str | None = None,
+        stderr: str | None = None,
     ) -> int:
         """Create a task (the runc process) for an existing container.
 
         ``rootfs`` is the list of mounts from the container's prepared
         snapshot; the runc shim performs these mounts before exec'ing the
-        container process. The task is created but not started — call
-        ``start_task``. stdio is left empty (the process gets no attached
-        streams), which suits non-interactive workloads. Returns the pid.
+        container process. ``stdout`` / ``stderr`` are optional containerd
+        stdio URIs (e.g. ``file:///var/lib/.../container.log``,
+        ``fifo:///var/run/.../stdout``, ``binary:///path/to/logger``); when
+        unset, the streams are discarded, which suits non-interactive
+        workloads that do not need log retrieval. The task is created but
+        not started — call ``start_task``. Returns the pid.
         """
         stub = self._require(self._tasks)
-        request = tasks_pb2.CreateTaskRequest(container_id=container_id, rootfs=rootfs)
+        request = tasks_pb2.CreateTaskRequest(
+            container_id=container_id,
+            rootfs=rootfs,
+            stdout=stdout or "",
+            stderr=stderr or "",
+        )
         try:
             response: tasks_pb2.CreateTaskResponse = await stub.Create(
                 request, metadata=self._metadata

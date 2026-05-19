@@ -860,6 +860,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         mem_slot = resource_spec.slots.get("mem", Decimal(0))
         memory_limit_bytes: int | None = int(mem_slot) if mem_slot > 0 else None
 
+        # Per-kernel container-log path. Stdout/stderr are wired to this
+        # file via the task's stdio URIs so the kernel's logs are
+        # retrievable from the host without needing an in-container exec.
+        log_path = self.scratch_dir / "container.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.touch(exist_ok=True)
+        log_uri = f"file://{log_path}"
+
         # Network namespace + CNI attach.
         ns_path = await create_netns(netns_name)
         attachment: NetworkAttachment | None = None
@@ -919,7 +927,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 labels=labels,
             )
             try:
-                await self.containerd_client.create_task(container_id, rootfs=rootfs_mounts)
+                await self.containerd_client.create_task(
+                    container_id,
+                    rootfs=rootfs_mounts,
+                    stdout=log_uri,
+                    stderr=log_uri,
+                )
                 await self.containerd_client.start_task(container_id)
             except Exception:
                 # Roll back the container metadata if the task failed to
