@@ -81,9 +81,6 @@ asyncio_default_fixture_loop_scope = "function"
 line-length = 100
 src = ["src"]
 extend-exclude = [
-    # Auto-generated CRI gRPC stubs — regenerated from proto, see
-    # src/ai/backend/agent/containerd/cri/proto/README.md.
-    "src/ai/backend/agent/containerd/cri/generated/**",
     # Auto-generated containerd native-API gRPC stubs — regenerated from
     # proto, see src/ai/backend/agent/containerd/client/proto/README.md.
     "src/ai/backend/agent/containerd/client/generated/**",
@@ -394,7 +391,6 @@ ignore_errors = true
 # out of type-checking.
 [[tool.mypy.overrides]]
 module = [
-    "ai.backend.agent.containerd.cri.generated.*",
     "ai.backend.agent.containerd.client.generated.*",
 ]
 ignore_errors = true

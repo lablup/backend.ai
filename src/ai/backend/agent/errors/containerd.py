@@ -93,39 +93,6 @@ class CniConfDirNotWritableError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class CriConnectionError(BackendAIError, web.HTTPInternalServerError):
-    """Raised when the CRI gRPC channel cannot be established or is lost."""
-
-    error_type = "https://api.backend.ai/probs/agent/containerd-cri-connection-error"
-    error_title = "CRI gRPC connection error."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.SETUP,
-            error_detail=ErrorDetail.UNREACHABLE,
-        )
-
-
-class CriRpcError(BackendAIError, web.HTTPInternalServerError):
-    """Wraps a non-recoverable gRPC error returned by the runtime.
-
-    Specific operations may map gRPC status codes to more precise
-    BackendAIError subclasses; this is the catch-all for operations
-    that do not yet have specialized error classes.
-    """
-
-    error_type = "https://api.backend.ai/probs/agent/containerd-cri-rpc-error"
-    error_title = "CRI RPC error."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
 class ContainerdConnectionError(BackendAIError, web.HTTPInternalServerError):
     """Raised when the containerd native-API gRPC channel cannot be established or is lost."""
 

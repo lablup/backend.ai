@@ -31,8 +31,6 @@ from .containerd import (
     CniConflistInvalidError,
     CniConflistMissingError,
     CniPortmapMissingError,
-    CriConnectionError,
-    CriRpcError,
 )
 from .kernel import (
     AsyncioContextError,
@@ -83,8 +81,6 @@ __all__ = [
     "CniConflistInvalidError",
     "CniConflistMissingError",
     "CniPortmapMissingError",
-    "CriConnectionError",
-    "CriRpcError",
     # kernel
     "AsyncioContextError",
     "KernelRunnerNotInitializedError",
