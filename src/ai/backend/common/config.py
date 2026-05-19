@@ -152,9 +152,10 @@ def _wrap_str_start_command_into_argv(service: Any) -> Any:
     sc = service.get("start_command")
     if not isinstance(sc, str):
         return service
-    shell = service.get("shell") or DEFAULT_SHELL
-    # key override with the wrapped value, preserving other keys if present.
-    return {**service, "start_command": [shell, "-c", sc]}
+    shell = service.get("shell")
+    if shell:
+        return {**service, "start_command": [shell, "-c", sc]}
+    return {**service, "start_command": [sc]}
 
 
 model_definition_iv = t.Dict({
@@ -162,7 +163,8 @@ model_definition_iv = t.Dict({
         t.Dict({
             t.Key("name"): t.String,
             t.Key("model_path"): t.String,
-            t.Key("service", default=None): (
+            t.Key("service", default=None): t.Call(_wrap_str_start_command_into_argv)
+            & (
                 t.Null
                 | t.Dict({
                     # ai.backend.kernel.service.ServiceParser.start_service()
@@ -174,7 +176,7 @@ model_definition_iv = t.Dict({
                             t.Key("args"): t.Dict().allow_extra("*"),
                         })
                     ),
-                    t.Key("start_command", default=None): t.Null | t.String | t.List(t.String),
+                    t.Key("start_command", default=None): t.Null | t.List(t.String),
                     t.Key("shell", default=DEFAULT_SHELL): t.String,
                     t.Key("port"): t.ToInt[1:],
                     t.Key("health_check", default=None): t.Null
@@ -187,8 +189,7 @@ model_definition_iv = t.Dict({
                         t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
                     }),
                 })
-            )
-            >> _wrap_str_start_command_into_argv,
+            ),
             t.Key("metadata", default=None): t.Null
             | t.Dict({
                 t.Key("author", default=None): t.Null | t.String(allow_blank=True),

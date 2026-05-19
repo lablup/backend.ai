@@ -1,19 +1,9 @@
 """rewrap legacy string start_command via shell -c
 
-Migration ``8c1f7d3a9e2b`` (Part of: 26.5.0) wrapped any legacy ``str``
-``start_command`` as a one-item argv list (e.g. ``"python service.py"``
-became ``["python service.py"]``). That value is meaningless at exec
-time -- ``execve`` would look for a binary literally named
-``"python service.py"`` -- and it loses the shell semantics the user
-originally intended.
-
-This migration repairs those rows by replacing single-element argv
-lists whose only token still looks like a shell command (contains
-whitespace) with ``[shell, "-c", token]``, where ``shell`` comes from
-the sibling ``service.shell`` field and falls back to ``/bin/bash`` to
-match ``ai.backend.common.config.DEFAULT_SHELL``. Multi-token argv
-lists and single-token lists without whitespace are left untouched,
-so the migration is safe to re-apply.
+Repairs single-token argv rows broken by ``8c1f7d3a9e2b`` (e.g.
+``["python service.py"]``) by rewrapping as ``[shell, "-c", token]``
+when ``service.shell`` is set. Rows without ``shell`` are left as-is
+to match the updated validator (no shell -> no wrap). Re-applicable.
 
 Revision ID: 70ffcaaa5f5c
 Revises: ba42cb865efe
@@ -34,8 +24,6 @@ down_revision = "ba42cb865efe"
 branch_labels = None
 depends_on = None
 
-DEFAULT_SHELL = "/bin/bash"
-
 
 def _rewrap_model_definition(conn: Connection, table: str, column: str) -> None:
     rows = conn.execute(
@@ -47,14 +35,13 @@ def _rewrap_model_definition(conn: Connection, table: str, column: str) -> None:
         for model in model_definition.get("models") or []:
             service = model.get("service") or {}
             start_command = service.get("start_command")
+            shell = service.get("shell")
             if (
                 isinstance(start_command, list)
                 and len(start_command) == 1
                 and " " in start_command[0]
+                and shell
             ):
-                # Case when the start_command is a single string that looks like a shell command.
-                # e.g. ["python service.py"] -> ["/bin/bash", "-c", "python service.py"]
-                shell = service.get("shell") or DEFAULT_SHELL
                 service["start_command"] = [shell, "-c", start_command[0]]
                 changed = True
 
