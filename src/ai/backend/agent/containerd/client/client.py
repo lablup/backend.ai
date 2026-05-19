@@ -19,9 +19,11 @@ Currently exposed (grows as the agent layer needs more):
 - ``get_image()`` — resolve an image record.
 - ``prepare_image_rootfs()`` / ``prepare_snapshot()`` / ``remove_snapshot()``
   — prepare the container root filesystem from an image's layers.
+- ``create_container()`` / ``delete_container()`` — the container metadata
+  object (id, image, runtime, OCI spec, rootfs snapshot).
 
-Containers and tasks land in later increments. Everything goes through
-``grpc.aio`` so the agent event loop stays responsive.
+Tasks (the running process) land in a later increment. Everything goes
+through ``grpc.aio`` so the agent event loop stays responsive.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ import hashlib
 import json
 import logging
 import os
+from collections.abc import Mapping
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
@@ -39,12 +42,14 @@ from google.protobuf import any_pb2, empty_pb2
 from google.protobuf.message import Message
 from grpc.aio import AioRpcError
 
+from ai.backend.agent.containerd.oci import OCI_SPEC_TYPE_URL
 from ai.backend.agent.errors.containerd import (
     ContainerdConnectionError,
     ContainerdRpcError,
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .generated.containerd.services.containers.v1 import containers_pb2, containers_pb2_grpc
 from .generated.containerd.services.content.v1 import content_pb2, content_pb2_grpc
 from .generated.containerd.services.images.v1 import images_pb2, images_pb2_grpc
 from .generated.containerd.services.namespaces.v1 import namespace_pb2, namespace_pb2_grpc
@@ -58,6 +63,9 @@ if TYPE_CHECKING:
     # mypy-protobuf emits the *AsyncStub types for type-checking only
     # (decorated @type_check_only); importing them under TYPE_CHECKING
     # keeps the names available for annotations without a runtime import.
+    from .generated.containerd.services.containers.v1.containers_pb2_grpc import (
+        ContainersAsyncStub,
+    )
     from .generated.containerd.services.content.v1.content_pb2_grpc import ContentAsyncStub
     from .generated.containerd.services.images.v1.images_pb2_grpc import ImagesAsyncStub
     from .generated.containerd.services.namespaces.v1.namespace_pb2_grpc import (
@@ -79,6 +87,9 @@ DEFAULT_NAMESPACE = "backendai"
 # containerd's default snapshotter; images are unpacked into it so a
 # container's root filesystem can be prepared from the image layers.
 DEFAULT_SNAPSHOTTER = "overlayfs"
+
+# containerd runtime (shim) used to execute containers.
+DEFAULT_RUNTIME = "io.containerd.runc.v2"
 
 # Upper bound on waiting for the gRPC channel to become ready. grpc.aio
 # retries forever otherwise, so an unreachable socket (containerd down,
@@ -171,6 +182,7 @@ class ContainerdClient:
     _images: ImagesAsyncStub | None
     _content: ContentAsyncStub | None
     _snapshots: SnapshotsAsyncStub | None
+    _containers: ContainersAsyncStub | None
 
     def __init__(
         self,
@@ -189,6 +201,7 @@ class ContainerdClient:
         self._images = None
         self._content = None
         self._snapshots = None
+        self._containers = None
 
     @property
     def namespace(self) -> str:
@@ -243,6 +256,7 @@ class ContainerdClient:
         self._images = cast("ImagesAsyncStub", images_pb2_grpc.ImagesStub(channel))
         self._content = cast("ContentAsyncStub", content_pb2_grpc.ContentStub(channel))
         self._snapshots = cast("SnapshotsAsyncStub", snapshots_pb2_grpc.SnapshotsStub(channel))
+        self._containers = cast("ContainersAsyncStub", containers_pb2_grpc.ContainersStub(channel))
 
     async def close(self) -> None:
         if self._channel is None:
@@ -255,6 +269,7 @@ class ContainerdClient:
         self._images = None
         self._content = None
         self._snapshots = None
+        self._containers = None
 
     @property
     def _metadata(self) -> tuple[tuple[str, str], ...]:
@@ -453,6 +468,57 @@ class ContainerdClient:
         image_config: Any = json.loads(await self._read_content(config["digest"]))
         diff_ids = image_config.get("rootfs", {}).get("diff_ids", [])
         return _chain_id([str(diff_id) for diff_id in diff_ids])
+
+    async def create_container(
+        self,
+        container_id: str,
+        *,
+        image: str,
+        spec: dict[str, Any],
+        snapshot_key: str,
+        runtime: str = DEFAULT_RUNTIME,
+        snapshotter: str = DEFAULT_SNAPSHOTTER,
+        labels: Mapping[str, str] | None = None,
+    ) -> None:
+        """Create the container metadata object in containerd's store.
+
+        This records the container (its image, runtime, OCI spec and rootfs
+        snapshot) but does not start anything — a task must be created from
+        it to run the process. ``spec`` is the OCI runtime spec dict (see
+        ``oci.build_oci_spec``); containerd stores it as a typeurl-tagged
+        JSON blob, not a protobuf message.
+        """
+        stub = self._require(self._containers)
+        container = containers_pb2.Container(
+            id=container_id,
+            image=image,
+            runtime=containers_pb2.Container.Runtime(name=runtime),
+            spec=any_pb2.Any(
+                type_url=OCI_SPEC_TYPE_URL,
+                value=json.dumps(spec).encode(),
+            ),
+            snapshotter=snapshotter,
+            snapshot_key=snapshot_key,
+            labels=dict(labels or {}),
+        )
+        request = containers_pb2.CreateContainerRequest(container=container)
+        try:
+            await stub.Create(request, metadata=self._metadata)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd CreateContainer '{container_id}' failed: {exc.details()}"
+            ) from exc
+
+    async def delete_container(self, container_id: str) -> None:
+        """Delete a container metadata object (its task must already be gone)."""
+        stub = self._require(self._containers)
+        request = containers_pb2.DeleteContainerRequest(id=container_id)
+        try:
+            await stub.Delete(request, metadata=self._metadata)
+        except AioRpcError as exc:
+            raise ContainerdRpcError(
+                f"containerd DeleteContainer '{container_id}' failed: {exc.details()}"
+            ) from exc
 
     def _require(self, stub: _StubT | None) -> _StubT:
         if stub is None:

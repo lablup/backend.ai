@@ -32,6 +32,8 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
+from ai.backend.agent.containerd.oci import build_oci_spec
+
 if TYPE_CHECKING:
     from ai.backend.agent.containerd.client.client import ContainerdClient
 
@@ -68,7 +70,7 @@ class StepResult:
     "--image",
     default="docker.io/library/busybox:latest",
     show_default=True,
-    help="Image reference to pull + unpack and prepare a rootfs from.",
+    help="Image reference to pull, prepare a rootfs from, and create a container with.",
 )
 @click.option(
     "--connect-timeout",
@@ -119,7 +121,9 @@ async def _run_lifecycle(
     # tree (and the generated stubs) being importable.
     from ai.backend.agent.containerd.client.client import ContainerdClient
 
-    snapshot_key = f"containerd-poc-{uuid.uuid4().hex[:12]}"
+    # containerd's convention: a container's rootfs snapshot key is the
+    # container id. The poc uses one id for both.
+    workload_id = f"containerd-poc-{uuid.uuid4().hex[:12]}"
     results: list[StepResult] = []
     async with ContainerdClient(
         address=address,
@@ -131,13 +135,22 @@ async def _run_lifecycle(
         results.append(await _step("pull_image", lambda: _do_pull_image(cd, image)))
         results.append(await _step("get_image", lambda: _do_get_image(cd, image)))
         prepared = await _step(
-            "prepare_snapshot", lambda: _do_prepare_snapshot(cd, image, snapshot_key)
+            "prepare_snapshot", lambda: _do_prepare_snapshot(cd, image, workload_id)
         )
         results.append(prepared)
-        # Only attempt teardown if the snapshot was actually prepared.
         if prepared.ok:
+            created = await _step(
+                "create_container", lambda: _do_create_container(cd, image, workload_id)
+            )
+            results.append(created)
+            # Teardown — delete the container before removing the snapshot
+            # it references.
+            if created.ok:
+                results.append(
+                    await _step("delete_container", lambda: _do_delete_container(cd, workload_id))
+                )
             results.append(
-                await _step("remove_snapshot", lambda: _do_remove_snapshot(cd, snapshot_key))
+                await _step("remove_snapshot", lambda: _do_remove_snapshot(cd, workload_id))
             )
         results.append(await _step("list_namespaces", lambda: _do_list_namespaces(cd)))
     return results
@@ -197,6 +210,28 @@ async def _do_prepare_snapshot(
         "mount_count": len(mounts),
         "mount_types": sorted({m.type for m in mounts}),
     }
+
+
+async def _do_create_container(
+    cd: ContainerdClient, image: str, container_id: str
+) -> dict[str, Any]:
+    spec = build_oci_spec(
+        container_id=container_id,
+        args=["/bin/sh", "-c", "sleep 3600"],
+    )
+    await cd.create_container(
+        container_id,
+        image=image,
+        spec=spec,
+        snapshot_key=container_id,
+        labels={"io.backend.ai/origin": "containerd-poc"},
+    )
+    return {"container_id": container_id}
+
+
+async def _do_delete_container(cd: ContainerdClient, container_id: str) -> dict[str, Any]:
+    await cd.delete_container(container_id)
+    return {"container_id": container_id}
 
 
 async def _do_remove_snapshot(cd: ContainerdClient, snapshot_key: str) -> dict[str, Any]:
