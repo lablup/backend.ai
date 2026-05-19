@@ -561,7 +561,7 @@ class EventDispatcher(EventDispatcherGroup):
                 duration=time.perf_counter() - start,
                 exception=e,
             )
-            log.exception(f"EventDispatcher.{evh_type}(): unexpected-error, {e!r}")
+            log.exception("EventDispatcher.{}(): unexpected-error", evh_type)
             raise
         except BaseException as e:
             self._metric_observer.observe_event_failure(
