@@ -224,6 +224,14 @@ def run(
     help="Path to the node-local cilium agent REST socket (for --check-identity).",
 )
 @click.option(
+    "--keep",
+    is_flag=True,
+    help=(
+        "Leave the netns + CNI attachment in place after the run so the "
+        "endpoint can be inspected from outside (e.g. via cilium-dbg)."
+    ),
+)
+@click.option(
     "--json-output",
     is_flag=True,
     help="Emit a single JSON document to stdout instead of human-readable lines.",
@@ -234,6 +242,7 @@ def net(
     check_identity: bool,
     ping_target: str | None,
     cilium_agent_sock: str,
+    keep: bool,
     json_output: bool,
 ) -> None:
     """Walk the network layer once: netns -> CNI attach -> detach."""
@@ -250,6 +259,7 @@ def net(
             check_identity=check_identity,
             ping_target=ping_target,
             cilium_agent_sock=Path(cilium_agent_sock),
+            keep=keep,
         )
     )
     _emit(results, json_output=json_output)
@@ -376,6 +386,7 @@ async def _run_network(
     check_identity: bool,
     ping_target: str | None,
     cilium_agent_sock: Path,
+    keep: bool = False,
 ) -> list[StepResult]:
     workload_id = f"containerd-poc-net-{uuid.uuid4().hex[:12]}"
     provider = CiliumNetworkProvider(network_name=network_name)
@@ -411,9 +422,16 @@ async def _run_network(
                     )
                 )
 
-    # Teardown in reverse creation order.
-    for name, body in reversed(cleanups):
-        results.append(await _step(name, body))
+    if keep:
+        log.info(
+            "--keep: netns %s and cilium endpoint left in place (workload %s)",
+            netns.netns_path(workload_id),
+            workload_id,
+        )
+    else:
+        # Teardown in reverse creation order.
+        for name, body in reversed(cleanups):
+            results.append(await _step(name, body))
     return results
 
 
@@ -564,16 +582,16 @@ async def _do_check_identity(workload_id: str, sock_path: Path) -> dict[str, Any
     """Query the cilium agent for the endpoint that backs ``workload_id``.
 
     Polls briefly because identity may take a moment to materialize.
-    Returns the endpoint id, the identity id (a small integer per
-    labelset), and the identity's resolved labels — the key signal that
-    the endpoint exited ``reserved:init`` is ``identity_id`` being a real
-    number (>= 256) and the labels carrying our ``container:...``
-    entries instead of just ``reserved:init``.
+    Returns identity + the full ``LabelConfigurationStatus`` so the
+    operator can see which category each label lives in (``realized.user``
+    vs ``derived``) — useful to figure out why ``reserved:init`` is or is
+    not removed by our PATCH.
     """
     if not sock_path.exists():
         raise RuntimeError(f"cilium agent socket not found at {sock_path}")
     connector = aiohttp.UnixConnector(path=str(sock_path))
     async with aiohttp.ClientSession(connector=connector) as session:
+        endpoint_id: int | None = None
         last_state: dict[str, Any] | None = None
         for _ in range(20):
             async with session.get("http://localhost/v1/endpoint") as resp:
@@ -589,27 +607,40 @@ async def _do_check_identity(workload_id: str, sock_path: Path) -> dict[str, Any
                     continue
                 identity = status.get("identity") or {}
                 policy_realized = (status.get("policy") or {}).get("realized") or {}
-                last_state = {
+                candidate = {
                     "endpoint_id": ep.get("id"),
                     "identity_id": identity.get("id"),
                     "identity_labels": identity.get("labels", []),
                     "policy_enabled": policy_realized.get("policy-enabled", "unknown"),
                 }
-                # Identity ids < 256 are reserved (init=5, host=1, world=2,
-                # ...). A real cluster identity is >= 256.
-                if isinstance(last_state["identity_id"], int) and last_state["identity_id"] >= 256:
-                    return last_state
+                ident_id = candidate["identity_id"]
+                if isinstance(ident_id, int) and ident_id >= 256:
+                    last_state = candidate
+                    endpoint_id = candidate["endpoint_id"]
+                    break
+            if last_state is not None:
                 break
             await asyncio.sleep(0.2)
-    if last_state is not None:
-        # Endpoint exists but identity never escaped the reserved range —
-        # return what we have so the operator can see the state, but fail
-        # the step.
-        raise RuntimeError(
-            f"endpoint for {workload_id!r} did not resolve a real identity within timeout: "
-            f"{last_state}"
-        )
-    raise RuntimeError(f"no cilium endpoint matched container-id={workload_id!r}")
+        if last_state is None or endpoint_id is None:
+            raise RuntimeError(
+                f"no cilium endpoint matched container-id={workload_id!r} with a real identity"
+            )
+        # Augment with the full label-category breakdown so we can tell
+        # whether reserved:init lives in user / derived / disabled. This
+        # is the key diagnostic for the 'reserved:init re-appears' case.
+        async with session.get(f"http://localhost/v1/endpoint/{endpoint_id}/labels") as resp:
+            if resp.status < 400:
+                lstatus = await resp.json()
+                realized = lstatus.get("realized") or {}
+                last_state["label_realized_user"] = realized.get("user", [])
+                last_state["label_derived"] = lstatus.get("derived", [])
+                last_state["label_disabled"] = lstatus.get("disabled", [])
+                last_state["label_security_relevant"] = lstatus.get("security-relevant", [])
+            else:
+                last_state["labels_dump_error"] = (
+                    f"GET /v1/endpoint/{endpoint_id}/labels -> {resp.status}"
+                )
+        return last_state
 
 
 async def _do_ping(netns_name: str, target: str, *, count: int = 3) -> dict[str, Any]:
