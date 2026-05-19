@@ -627,13 +627,22 @@ class ContainerdClient:
             ) from exc
         return response.pid
 
-    async def get_task(self, container_id: str) -> task_pb2.Process:
-        """Return a task's current process state (status, pid, ...)."""
+    async def get_task(self, container_id: str) -> task_pb2.Process | None:
+        """Return a task's current process state, or ``None`` if absent.
+
+        A container may exist (its metadata is in the store) without an
+        active task — e.g. between ``delete_task`` and ``delete_container``,
+        or right after agent restart while we walk the namespace looking
+        for orphan containers. ``None`` lets the caller distinguish
+        cleanly from a transport-level RPC error.
+        """
         stub = self._require(self._tasks)
         request = tasks_pb2.GetRequest(container_id=container_id)
         try:
             response: tasks_pb2.GetResponse = await stub.Get(request, metadata=self._metadata)
         except AioRpcError as exc:
+            if exc.code() is grpc.StatusCode.NOT_FOUND:
+                return None
             raise ContainerdRpcError(
                 f"containerd GetTask '{container_id}' failed: {exc.details()}"
             ) from exc

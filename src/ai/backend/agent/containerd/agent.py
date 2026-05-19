@@ -32,6 +32,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from subprocess import run as subprocess_run
 from typing import Any, override
+from uuid import UUID
 
 import aiotools
 
@@ -111,6 +112,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .client.client import ContainerdClient
+from .client.generated.containerd.types.task import task_pb2
 from .kernel import ContainerdKernel
 from .network.base import NetworkAttachment, NetworkProvider
 from .network.cilium import CiliumNetworkProvider
@@ -119,6 +121,20 @@ from .oci import build_oci_spec
 from .preflight import run_preflight
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+# Map containerd task status enum values to the agent's ContainerStatus.
+# CREATED has no exact analog — treat it as RESTARTING since it means
+# "task exists but has not been started yet" (the agent's recovery flow
+# treats RESTARTING as active and tries to resume).
+_TASK_STATUS_MAP: Mapping[int, ContainerStatus] = {
+    task_pb2.RUNNING: ContainerStatus.RUNNING,
+    task_pb2.PAUSED: ContainerStatus.PAUSED,
+    task_pb2.PAUSING: ContainerStatus.PAUSED,
+    task_pb2.CREATED: ContainerStatus.RESTARTING,
+    task_pb2.STOPPED: ContainerStatus.EXITED,
+    task_pb2.UNKNOWN: ContainerStatus.DEAD,
+}
 
 
 def _mount_to_oci(mount: Mount) -> dict[str, Any] | None:
@@ -1111,11 +1127,61 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
     ) -> Sequence[tuple[KernelId, Container]]:
-        # Resuming pre-existing containerd tasks after an agent restart
-        # is handled by the crash-recovery increment; on a fresh start
-        # there is nothing to enumerate.
-        del status_filter
-        return []
+        # Walk this namespace's containers and report the ones owned by
+        # this agent. A container's active/dead state is its task's
+        # status; a container with no task at all is treated as exited
+        # (probably mid-teardown). Live-kernel re-attachment after agent
+        # restart still needs the kernel-registry recovery piece to be
+        # implemented; this method covers the cleanup side of the loop
+        # (DEAD entries are picked up by scan_running_kernels and
+        # routed through clean_kernel) so stale workloads from a prior
+        # crash get torn down on the next start.
+        agent_id_str = str(self.id)
+        results: list[tuple[KernelId, Container]] = []
+        for c in await self.containerd.list_containers():
+            labels = dict(c.labels)
+            kernel_id_label = labels.get(LabelName.KERNEL_ID)
+            if not kernel_id_label:
+                continue
+            if labels.get(LabelName.OWNER_AGENT) != agent_id_str:
+                continue
+            try:
+                process = await self.containerd.get_task(c.id)
+            except ContainerdRpcError as e:
+                log.warning(
+                    "enumerate_containers: get_task({}) failed; treating as dead: {}",
+                    c.id,
+                    e,
+                )
+                process = None
+            if process is None:
+                status = ContainerStatus.EXITED
+            else:
+                status = _TASK_STATUS_MAP.get(process.status, ContainerStatus.DEAD)
+            if status not in status_filter:
+                continue
+            try:
+                kernel_id = KernelId(UUID(kernel_id_label))
+            except ValueError:
+                log.warning(
+                    "enumerate_containers: container {} has malformed kernel-id "
+                    "label {!r}; skipping",
+                    c.id,
+                    kernel_id_label,
+                )
+                continue
+            results.append((
+                kernel_id,
+                Container(
+                    id=ContainerId(c.id),
+                    status=status,
+                    image=c.image,
+                    labels=labels,
+                    ports=[],
+                    backend_obj=c,
+                ),
+            ))
+        return results
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
