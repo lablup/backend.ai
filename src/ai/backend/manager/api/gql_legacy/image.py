@@ -1283,7 +1283,7 @@ class PurgeImages(graphene.Mutation):  # type: ignore[misc]
             f"{key.agent_id}: [{', '.join(img.name for img in key.images)}]" for key in keys
         )
 
-        log.info(f"purge images ({agent_images}) by API request")
+        log.info("purge images ({}) by API request", agent_images)
 
         # Convert GraphQL input types to bgtask manifest types
         manifest_keys = [
@@ -1353,7 +1353,9 @@ class ClearImageCustomResourceLimit(graphene.Mutation):  # type: ignore[misc]
     ) -> ClearImageCustomResourceLimitPayload:
         arch = key.architecture if key.architecture is not None else DEFAULT_IMAGE_ARCH
         log.info(
-            f'clear custom resource limits for image "{key.image_canonical}" ({arch}) by API request',
+            'clear custom resource limits for image "{}" ({}) by API request',
+            key.image_canonical,
+            arch,
         )
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.clear_image_custom_resource_limit.wait_for_complete(

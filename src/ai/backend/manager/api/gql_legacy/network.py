@@ -274,7 +274,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
             network_info = await network_plugin.create_network()
             network_name = network_info.network_id
         except Exception:
-            log.exception(f"Failed to create the inter-container network (plugin: {_driver})")
+            log.exception("Failed to create the inter-container network (plugin: {})", _driver)
             raise
 
         async def _do_mutate() -> CreateNetwork:

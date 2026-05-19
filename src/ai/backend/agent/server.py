@@ -597,7 +597,7 @@ class AgentRPCServer(aobject):
 
                 self.local_config.update(container_update=container_updates)
         except Exception as e:
-            log.warning(f"etcd: container-config error: {e}")
+            log.warning("etcd: container-config error: {}", e)
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()

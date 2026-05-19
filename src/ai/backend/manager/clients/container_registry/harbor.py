@@ -137,7 +137,7 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
                 if resp.status != 200:
-                    log.error(f"Failed to create quota! response: {resp}")
+                    log.error("Failed to create quota! response: {}", resp)
                     raise InternalServerError(f"Failed to create quota! response: {resp}")
 
     @override
@@ -160,7 +160,7 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
                 if resp.status != 200:
-                    log.error(f"Failed to update quota! response: {resp}")
+                    log.error("Failed to update quota! response: {}", resp)
                     raise InternalServerError(f"Failed to update quota! response: {resp}")
 
     @override
@@ -183,5 +183,5 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
                 if resp.status != 200:
-                    log.error(f"Failed to delete quota! response: {resp}")
+                    log.error("Failed to delete quota! response: {}", resp)
                     raise InternalServerError(f"Failed to delete quota! response: {resp}")
