@@ -50,11 +50,21 @@ DEFAULT_CILIUM_NETWORK_NAME = "cilium"
 # Default path of the cilium agent's REST API socket on the node.
 DEFAULT_CILIUM_AGENT_SOCK = Path("/var/run/cilium/cilium.sock")
 
-# Source prefix attached to user labels we push through the cilium agent
-# API. Cilium parses ``<source>:<key>=<value>``; ``container`` is what the
-# CNI plugin itself uses for k8s-pod-derived labels, and is the source
-# closest to "labels Backend.AI owns".
+# Source prefix attached to the Backend.AI domain labels we push through
+# the cilium agent API. Cilium parses ``<source>:<key>=<value>``;
+# ``container`` is the source CNI-derived labels normally carry.
 _LABEL_SOURCE = "container"
+
+# Cilium's default ``valid-label-prefixes`` filter only keeps labels
+# whose **key** matches one of a handful of prefixes (``id.*``,
+# ``io.kubernetes.pod.namespace``, ``app.kubernetes.io``, ...) — every
+# other label is dropped from the security-relevant set used for
+# identity computation. Backend.AI's domain keys (``backendai/...``)
+# don't match any of those, so unless we re-shape them they end up in
+# ``realized.user`` but never reach ``security-relevant``, leaving the
+# identity stuck at ``reserved:init``. Prefix our domain keys with
+# ``id.`` so they hit cilium's ``^id\..*`` include rule.
+_KEY_PREFIX = "id."
 
 # How many times to poll the cilium agent for the endpoint that
 # corresponds to our workload right after CNI ADD. cilium-cni registers
@@ -182,7 +192,12 @@ class CiliumNetworkProvider(NetworkProvider):
 
         if labels:
             try:
-                await self._assign_endpoint_identity(workload_id, labels)
+                await self._assign_endpoint_identity(
+                    workload_id,
+                    labels,
+                    k8s_pod_namespace=k8s_pod_namespace,
+                    k8s_pod_name=k8s_pod_name,
+                )
             except CiliumIdentityError as e:
                 # Surface as a warning rather than rolling the CNI ADD
                 # back: on a non-policy fabric the workload is still
@@ -221,6 +236,9 @@ class CiliumNetworkProvider(NetworkProvider):
         self,
         workload_id: str,
         labels: Mapping[str, str],
+        *,
+        k8s_pod_namespace: str | None = None,
+        k8s_pod_name: str | None = None,
     ) -> None:
         """Push ``labels`` onto the cilium endpoint of ``workload_id``.
 
@@ -255,7 +273,22 @@ class CiliumNetworkProvider(NetworkProvider):
             if endpoint_id is None:
                 raise CiliumIdentityError(f"cilium endpoint for {workload_id!r} carries no id")
             await self._wait_for_endpoint_ready(session, workload_id, endpoint_id)
-            user_labels = [f"{_LABEL_SOURCE}:{k}={v}" for k, v in labels.items()]
+            # Build the user-labels payload. Two parts:
+            # 1. ``k8s:io.kubernetes.pod.namespace`` / ``k8s:...pod.name``:
+            #    these are the labels cilium would have derived from a
+            #    backing Pod and they match cilium's default include
+            #    rules for security-relevant labels — they keep the
+            #    endpoint from collapsing back to reserved:init.
+            # 2. The agent's domain labels, key-prefixed with ``id.`` so
+            #    they hit cilium's ``^id\..*`` security-relevant rule and
+            #    participate in identity computation.
+            user_labels: list[str] = []
+            if k8s_pod_namespace:
+                user_labels.append(f"k8s:io.kubernetes.pod.namespace={k8s_pod_namespace}")
+            if k8s_pod_name:
+                user_labels.append(f"k8s:io.kubernetes.pod.name={k8s_pod_name}")
+            for k, v in labels.items():
+                user_labels.append(f"{_LABEL_SOURCE}:{_KEY_PREFIX}{k}={v}")
             for attempt in range(1, _LABEL_PATCH_RETRIES + 1):
                 try:
                     async with session.patch(
