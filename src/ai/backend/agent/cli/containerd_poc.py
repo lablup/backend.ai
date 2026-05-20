@@ -149,16 +149,24 @@ class StepResult:
     default=None,
     metavar="NS",
     help=(
-        "Synthetic K8S_POD_NAMESPACE passed to cilium-cni via CNI_ARGS. "
-        "When set together with --pod-name, cilium-cni records the "
-        "endpoint as orchestration-backed and does NOT stamp reserved:init."
+        "K8S_POD_NAMESPACE passed to cilium-cni via CNI_ARGS. "
+        "Leave UNSET for Backend.AI's normal flow — without a real "
+        "backing Pod (or registered CiliumExternalWorkload CRD), "
+        "advertising a fake ns/name makes cilium-cni reconcile against "
+        "the k8s API, fail to find the Pod, strip user labels, and "
+        "force reserved:init back. This flag exists only to exercise "
+        "the ClusterMesh / placeholder-Pod opt-in scenarios."
     ),
 )
 @click.option(
     "--pod-name",
     default=None,
     metavar="NAME",
-    help="Synthetic K8S_POD_NAME passed to cilium-cni via CNI_ARGS.",
+    help=(
+        "K8S_POD_NAME passed to cilium-cni via CNI_ARGS. Same caveats "
+        "as --pod-namespace — leave UNSET unless a real Pod / "
+        "External Workload CRD with this name exists."
+    ),
 )
 @click.option(
     "--json-output",
@@ -256,16 +264,24 @@ def run(
     default=None,
     metavar="NS",
     help=(
-        "Synthetic K8S_POD_NAMESPACE passed to cilium-cni via CNI_ARGS. "
-        "When set together with --pod-name, cilium-cni records the "
-        "endpoint as orchestration-backed and does NOT stamp reserved:init."
+        "K8S_POD_NAMESPACE passed to cilium-cni via CNI_ARGS. "
+        "Leave UNSET for Backend.AI's normal flow — without a real "
+        "backing Pod (or registered CiliumExternalWorkload CRD), "
+        "advertising a fake ns/name makes cilium-cni reconcile against "
+        "the k8s API, fail to find the Pod, strip user labels, and "
+        "force reserved:init back. This flag exists only to exercise "
+        "the ClusterMesh / placeholder-Pod opt-in scenarios."
     ),
 )
 @click.option(
     "--pod-name",
     default=None,
     metavar="NAME",
-    help="Synthetic K8S_POD_NAME passed to cilium-cni via CNI_ARGS.",
+    help=(
+        "K8S_POD_NAME passed to cilium-cni via CNI_ARGS. Same caveats "
+        "as --pod-namespace — leave UNSET unless a real Pod / "
+        "External Workload CRD with this name exists."
+    ),
 )
 @click.option(
     "--json-output",

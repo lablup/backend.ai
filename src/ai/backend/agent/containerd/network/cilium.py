@@ -150,18 +150,26 @@ class CiliumNetworkProvider(NetworkProvider):
     ) -> NetworkAttachment:
         """Attach the network namespace to the Cilium network via cilium-cni.
 
-        ``k8s_pod_namespace`` / ``k8s_pod_name`` are passed to cilium-cni
-        as ``CNI_ARGS=K8S_POD_NAMESPACE=...;K8S_POD_NAME=...``; cilium-cni
-        records them on the endpoint's ``external-identifiers`` and
-        treats the endpoint as orchestration-backed, so it does NOT
-        stamp ``reserved:init`` on the security-relevant label set.
-        Without these args, even ``user`` labels pushed via the labels
-        API leave ``reserved:init`` in the identity's labelset and a
-        policy-enforcing fabric drops all traffic (see cni-exp.md
-        experiments 7 & 8, and the diagnostics in this commit).
+        ``k8s_pod_namespace`` / ``k8s_pod_name`` (if set) are passed to
+        cilium-cni as ``CNI_ARGS=K8S_POD_NAMESPACE=...;K8S_POD_NAME=...``.
+        **Leave them None for Backend.AI's default flow.** Setting them
+        without a real backing Pod (or a registered
+        ``CiliumExternalWorkload`` CRD) is harmful: cilium-cni records
+        the ns/name on the endpoint's ``external-identifiers`` and the
+        cilium reconciler then tries to reconcile against the k8s API,
+        fails to find the Pod, strips the user labels out of the
+        endpoint's security-relevant set, and forces ``reserved:init``
+        back in — leaving the endpoint policy-restricted. End-to-end
+        verification on a cluster Cilium showed that the working
+        combination is *no* ``K8S_POD_*`` in CNI_ARGS + the labels API
+        push below. The args remain on the signature for the
+        ClusterMesh External Workloads / placeholder-Pod opt-in
+        scenarios; the harness's ``--pod-namespace`` / ``--pod-name``
+        flags exercise the same path for those.
 
-        After CNI ADD, ``labels`` are pushed onto the endpoint's ``user``
-        slot via the cilium agent for downstream policy targeting.
+        After CNI ADD, ``labels`` are pushed onto the endpoint's
+        ``user`` slot via the cilium agent for downstream policy
+        targeting.
         """
         conflist = await asyncio.to_thread(
             load_conflist, self._network_name, conf_dir=self._cni_conf_dir

@@ -101,13 +101,24 @@ class NetworkProvider(abc.ABC):
         """Attach the network namespace at ``netns_path`` to the network.
 
         ``labels`` carry the workload's identity (session group, user, …)
-        for providers that map them onto network identity. ``k8s_pod_*``
-        synthesize the orchestration metadata that CNI plugins read off
-        ``CNI_ARGS`` (the ``K8S_POD_NAMESPACE`` / ``K8S_POD_NAME`` keys);
-        Cilium uses this to decide whether the endpoint has a Pod
-        backing it — without these, cilium-cni stamps ``reserved:init``
-        on the endpoint and a policy-enforcing fabric drops its
-        traffic. Returns the address assignment.
+        for providers that map them onto network identity.
+
+        ``k8s_pod_namespace`` / ``k8s_pod_name`` get stamped into
+        ``CNI_ARGS`` (``K8S_POD_NAMESPACE`` / ``K8S_POD_NAME``) for the
+        underlying CNI plugin. **For Backend.AI's default flow these
+        must be left as None.** Backend.AI workloads have no backing Pod
+        object in the k8s API, and advertising a fake ns/name makes
+        cilium-cni (and similar CNI plugins) reconcile against the k8s
+        API, fail to find the Pod, and strip the agent's user labels —
+        leaving the endpoint at ``reserved:init`` and policy-restricted.
+        Set these args ONLY in two opt-in scenarios:
+
+        1. A real backing Pod with that ns/name exists in the k8s API
+           (placeholder-Pod approach).
+        2. A ``CiliumExternalWorkload`` CRD has been registered for
+           this workload (Cilium ClusterMesh External Workloads).
+
+        Returns the address assignment.
         """
 
     @abc.abstractmethod

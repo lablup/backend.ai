@@ -902,11 +902,15 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         ns_path = await create_netns(netns_name)
         attachment: NetworkAttachment | None = None
         try:
-            # The synthetic K8S_POD_NAMESPACE / K8S_POD_NAME are what
-            # convince cilium-cni that this endpoint has orchestration
-            # backing — without them cilium-cni stamps reserved:init on
-            # the security-relevant label set and a policy-enforcing
-            # fabric drops the kernel's traffic. See cni-exp.md exp.7/8.
+            # K8S_POD_NAMESPACE / K8S_POD_NAME piggyback on CNI_ARGS and
+            # only make sense when a real Pod (or CiliumExternalWorkload
+            # CRD) with that ns/name exists in the k8s API. The default
+            # is OFF (containerd.network.cilium_pod_namespace=""):
+            # empirically, advertising a fake ns/name made cilium-cni
+            # reconcile against the missing Pod and strip our user
+            # labels, leaving the endpoint stuck at reserved:init. The
+            # opt-in remains for operators who set up a placeholder Pod
+            # or ClusterMesh External Workload alongside their kernels.
             pod_name = (
                 f"{self.k8s_pod_name_prefix}-{kernel_id_str}" if self.k8s_pod_namespace else None
             )
