@@ -18,7 +18,6 @@ from sqlalchemy.engine.default import DefaultDialect
 from ai.backend.common.config import (
     ModelDefinition,
     ModelServiceConfigDraft,
-    model_definition_iv,
 )
 from ai.backend.manager.models.base import PydanticColumn
 
@@ -80,19 +79,22 @@ class TestPydanticInputCompat:
         assert draft.start_command == expected
 
 
-class TestTrafaretInputCompat:
-    """vfolder YAML scan → ``model_definition_iv`` trafaret validator."""
+class TestModelDefinitionInputCompat:
+    """vfolder YAML scan → ``ModelDefinition.model_validate``."""
 
-    @pytest.mark.parametrize(("raw", "shell", "expected"), START_COMMAND_CASES)
-    def test_str_input_is_wrapped(self, raw: str, shell: str | None, expected: list[str]) -> None:
-        result = model_definition_iv.check(_wrap_definition(raw, shell))
-        assert result["models"][0]["service"]["start_command"] == expected
+    @pytest.mark.parametrize(("raw", "expected"), START_COMMAND_CASES)
+    def test_str_input_is_normalized(self, raw: str, expected: list[str]) -> None:
+        result = ModelDefinition.model_validate(_wrap_definition(raw))
+        assert result.models[0].service is not None
+        assert result.models[0].service.start_command == expected
 
 
 class TestYAMLInputCompat:
-    """End-to-end vfolder scan: ruamel.yaml-parsed model-definition.yaml fed
-    to ``model_definition_iv``. Covers every YAML notation a user might write
-    (legacy shell string, inline flow sequence, hyphenated block sequence).
+    """End-to-end vfolder scan path: a user-authored ``model-definition.yaml``
+    is parsed by ruamel.yaml and fed to ``ModelDefinition.model_validate``.
+    Confirms that every YAML notation a user might write — legacy shell string,
+    inline flow sequence, hyphenated block sequence — resolves to the same
+    canonical ``list[str]``.
     """
 
     @pytest.mark.parametrize(
@@ -153,8 +155,9 @@ class TestYAMLInputCompat:
     )
     def test_yaml_forms_are_normalized(self, yaml_text: str, expected: list[str]) -> None:
         loaded = YAML().load(yaml_text)
-        result = model_definition_iv.check(loaded)
-        assert result["models"][0]["service"]["start_command"] == expected
+        result = ModelDefinition.model_validate(loaded)
+        assert result.models[0].service is not None
+        assert result.models[0].service.start_command == expected
 
 
 class TestPydanticColumnReadCompat:
