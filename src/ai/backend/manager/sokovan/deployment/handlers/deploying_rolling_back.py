@@ -19,6 +19,7 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionError,
     DeploymentExecutionResult,
     DeploymentLifecycleType,
     DeploymentWithHistory,
@@ -68,25 +69,58 @@ class DeployingRollingBackHandler(DeploymentHandler):
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
+        destroying = DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.DESTROYING,
+            sub_step=None,
+        )
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.READY,
                 sub_step=None,
             ),
+            need_retry=destroying,
+            expired=destroying,
+            give_up=destroying,
         )
 
     @override
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        all_deployment_ids = {deployment.deployment_info.id for deployment in deployments}
-        await self._deployment_repo.clear_deploying_revision(all_deployment_ids)
-        log.info(
-            "Cleared deploying_revision for {} rolling-back deployments",
-            len(all_deployment_ids),
-        )
+        rollback_targets: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
 
-        return DeploymentExecutionResult(successes=list(deployments))
+        for deployment in deployments:
+            if deployment.deployment_info.current_revision is None:
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="No current revision to roll back to",
+                        error_detail=(
+                            "Initial deployment failed; current_revision is None. "
+                            "Transitioning to DESTROYING."
+                        ),
+                    )
+                )
+            else:
+                rollback_targets.append(deployment)
+
+        if rollback_targets:
+            await self._deployment_repo.clear_deploying_revision({
+                d.deployment_info.id for d in rollback_targets
+            })
+            log.info(
+                "Cleared deploying_revision for {} rolling-back deployments",
+                len(rollback_targets),
+            )
+
+        if failures:
+            log.warning(
+                "Rolling back {} deployments with no current_revision -> DESTROYING",
+                len(failures),
+            )
+
+        return DeploymentExecutionResult(successes=rollback_targets, failures=failures)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
