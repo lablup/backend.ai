@@ -1,4 +1,4 @@
-from typing import override
+from typing import Any, override
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import UnreachableError
@@ -40,9 +40,9 @@ class BulkActionRBACValidator(BulkActionValidator):
 
     @override
     async def validate(
-        self, action: BaseBulkAction, meta: BaseActionTriggerMeta
+        self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        element_refs = list(action.element_refs())
+        element_refs = [t.to_rbac_element_ref() for t in action.targets()]
         if not self._config_provider.config.manager.rbac.enforcement_enabled:
             return BulkValidationResult(
                 allowed_entities=element_refs,

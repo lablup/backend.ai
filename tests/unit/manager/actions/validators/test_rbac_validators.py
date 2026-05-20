@@ -30,7 +30,7 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
-from ai.backend.manager.actions.action.bulk import BaseBulkAction
+from ai.backend.manager.actions.action.bulk import BaseBulkAction, BulkActionTarget
 from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
 from ai.backend.manager.actions.action.types import FieldData
@@ -67,6 +67,18 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.testutils.db import with_tables
+
+
+@dataclass(frozen=True)
+class _RefTarget(BulkActionTarget):
+    """Wraps a bare ``RBACElementRef`` as a ``BulkActionTarget`` for tests."""
+
+    ref: RBACElementRef
+
+    @override
+    def to_rbac_element_ref(self) -> RBACElementRef:
+        return self.ref
+
 
 _TARGET_DOMAIN = "default"
 _TARGET_VFOLDER = "vf-1"
@@ -139,14 +151,14 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
 
 
 @dataclass
-class _BulkVfolderUpdateAction(BaseBulkAction):
+class _BulkVfolderUpdateAction(BaseBulkAction[BulkActionTarget]):
     """VFOLDER:UPDATE on multiple vfolders — exercises the bulk validator path."""
 
     refs: list[RBACElementRef]
 
     @override
-    def element_refs(self) -> list[RBACElementRef]:
-        return list(self.refs)
+    def targets(self) -> list[BulkActionTarget]:
+        return [_RefTarget(ref=r) for r in self.refs]
 
     @classmethod
     @override
@@ -604,7 +616,7 @@ class TestBulkActionRBACValidator:
             DeniedEntity(entity_ref=_BULK_REF_DENIED, deny_reason="permission_denied"),
         ]
 
-    async def test_empty_element_refs_returns_empty_result(
+    async def test_empty_targets_returns_empty_result(
         self,
         repository: PermissionControllerRepository,
         trigger_meta: BaseActionTriggerMeta,

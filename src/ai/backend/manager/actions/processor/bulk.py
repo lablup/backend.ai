@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.action import (
@@ -22,7 +23,7 @@ __all__ = ("BulkActionProcessor",)
 
 
 class BulkActionProcessor[
-    TBulkAction: BaseBulkAction,
+    TBulkAction: BaseBulkAction[Any],
     TBulkActionResult: BaseBulkActionResult,
 ]:
     _validators: Sequence[BulkActionValidator]

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
@@ -31,7 +32,7 @@ class BulkActionValidator(ABC):
 
     @abstractmethod
     async def validate(
-        self, action: BaseBulkAction, meta: BaseActionTriggerMeta
+        self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        """Classify each ref in ``action.element_refs()`` as allowed or denied."""
+        """Classify each target in ``action.targets()`` as allowed or denied."""
         raise NotImplementedError

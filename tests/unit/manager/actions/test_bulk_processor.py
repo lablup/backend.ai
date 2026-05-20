@@ -8,14 +8,18 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import override
+from typing import Any, override
 
 import pytest
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
+from ai.backend.manager.actions.action.bulk import (
+    BaseBulkAction,
+    BaseBulkActionResult,
+    BulkActionTarget,
+)
 from ai.backend.manager.actions.processor.bulk import (
     BulkActionProcessor,
 )
@@ -26,6 +30,17 @@ from ai.backend.manager.actions.validator.bulk import (
     DeniedEntity,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+
+
+@dataclass(frozen=True)
+class _RefTarget(BulkActionTarget):
+    """Wraps a bare ``RBACElementRef`` as a ``BulkActionTarget`` for tests."""
+
+    ref: RBACElementRef
+
+    @override
+    def to_rbac_element_ref(self) -> RBACElementRef:
+        return self.ref
 
 
 @pytest.fixture
@@ -44,12 +59,12 @@ def ref_c() -> RBACElementRef:
 
 
 @dataclass
-class _MockBulkAction(BaseBulkAction):
+class _MockBulkAction(BaseBulkAction[BulkActionTarget]):
     refs: list[RBACElementRef]
 
     @override
-    def element_refs(self) -> list[RBACElementRef]:
-        return list(self.refs)
+    def targets(self) -> list[BulkActionTarget]:
+        return [_RefTarget(ref=r) for r in self.refs]
 
     @override
     @classmethod
@@ -84,9 +99,9 @@ class _AllowSetValidator(BulkActionValidator):
 
     @override
     async def validate(
-        self, action: BaseBulkAction, meta: BaseActionTriggerMeta
+        self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        current = list(action.element_refs())
+        current = [t.to_rbac_element_ref() for t in action.targets()]
         allowed = [r for r in current if r in self._allowed]
         denied = [
             DeniedEntity(entity_ref=r, deny_reason="not in allow-set")
@@ -110,9 +125,9 @@ class _RecordingValidator(BulkActionValidator):
 
     @override
     async def validate(
-        self, action: BaseBulkAction, meta: BaseActionTriggerMeta
+        self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        current = list(action.element_refs())
+        current = [t.to_rbac_element_ref() for t in action.targets()]
         self.observed_batches.append(current)
         allowed = [r for r in current if r in self._allowed]
         denied = [
@@ -125,7 +140,9 @@ class _RecordingValidator(BulkActionValidator):
 
 def _echo_func() -> Callable[[_MockBulkAction], Awaitable[_MockBulkActionResult]]:
     async def _run(action: _MockBulkAction) -> _MockBulkActionResult:
-        return _MockBulkActionResult(processed_refs=list(action.element_refs()))
+        return _MockBulkActionResult(
+            processed_refs=[t.to_rbac_element_ref() for t in action.targets()],
+        )
 
     return _run
 
@@ -221,4 +238,4 @@ class TestBulkActionProcessor:
 
         await processor.wait_for_complete(original)
 
-        assert original.element_refs() == [ref_a, ref_b]
+        assert [t.to_rbac_element_ref() for t in original.targets()] == [ref_a, ref_b]

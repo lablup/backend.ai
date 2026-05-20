@@ -11,6 +11,8 @@ from .base import (
 from .bulk import (
     BaseBulkAction,
     BaseBulkActionResult,
+    BulkActionTarget,
+    SearchableBulkActionTarget,
 )
 from .rbac import (
     BaseRBACAction,
@@ -125,6 +127,8 @@ __all__ = (
     "BaseActionTriggerMeta",
     "BaseBulkAction",
     "BaseBulkActionResult",
+    "BulkActionTarget",
+    "SearchableBulkActionTarget",
     "BaseRBACAction",
     "RBACActionName",
     "RBACRequiredPermission",
