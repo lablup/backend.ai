@@ -2313,7 +2313,7 @@ class VfolderRepository:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.VFolderRow.to_data() for row in result.rows]
@@ -2347,7 +2347,7 @@ class VfolderRepository:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.VFolderRow.to_data() for row in result.rows]

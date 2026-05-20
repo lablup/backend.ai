@@ -664,7 +664,7 @@ class AuthDBSource:
         """Search all login sessions without scope restriction (admin only)."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            result = await execute_batch_querier(db_session, query, querier)
             items = [row.LoginSessionRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -682,7 +682,7 @@ class AuthDBSource:
         """Search login sessions within a given scope."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.LoginSessionRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -757,7 +757,7 @@ class AuthDBSource:
         """Search all login history without scope restriction (admin only)."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            result = await execute_batch_querier(db_session, query, querier)
             items = [row.LoginHistoryRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -775,7 +775,7 @@ class AuthDBSource:
         """Search login history within a given scope."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.LoginHistoryRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,

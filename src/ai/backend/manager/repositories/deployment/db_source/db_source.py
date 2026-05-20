@@ -1160,7 +1160,7 @@ class DeploymentDBSource:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.EndpointRow.to_summary_data() for row in result.rows]
