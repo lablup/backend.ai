@@ -1,30 +1,24 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
+from ai.backend.manager.data.permission.types import RBACElementRef
 
 
 @dataclass(frozen=True)
 class DeniedEntity:
     """A bulk entity that a validator rejected, paired with its reason."""
 
-    entity_id: str
+    entity_ref: RBACElementRef
     deny_reason: str
 
 
 @dataclass(frozen=True)
 class BulkValidationResult:
-    """Per-entity validation outcome for a bulk action.
+    """Per-entity validation outcome for a bulk action."""
 
-    ``BulkActionProcessor`` intersects ``allowed_entity_ids`` across
-    validators and records each ``DeniedEntity`` — with its reason — on the
-    corresponding ``ValidatorDecision`` so the final response can
-    surface *why* each ID was filtered out.
-    """
-
-    allowed_entity_ids: list[str]
+    allowed_entities: list[RBACElementRef]
     denied_entities: list[DeniedEntity]
 
 
@@ -32,26 +26,12 @@ class BulkActionValidator(ABC):
     @classmethod
     @abstractmethod
     def name(cls) -> str:
-        """Stable identifier used in ``ValidatorDecision.validator_name``.
-
-        Chosen by the implementation so logs and partial-success responses can
-        attribute denials to a specific validator independently of the Python
-        class name.
-        """
+        """Stable identifier for ``ValidatorDecision.validator_name``."""
         raise NotImplementedError
 
     @abstractmethod
     async def validate(
-        self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
+        self, action: BaseBulkAction, meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        """Validate the bulk action and return per-entity permission results.
-
-        Implementations must classify every ID in ``action.entity_ids`` as
-        either allowed or denied. Validators that cannot make a decision for
-        an ID should treat it as allowed.
-
-        The processor wraps each call in its own async context manager so
-        cross-cutting concerns (timing, audit) live in one place — validators
-        do not need to own them.
-        """
+        """Classify each ref in ``action.element_refs`` as allowed or denied."""
         raise NotImplementedError
