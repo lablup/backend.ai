@@ -69,6 +69,7 @@ from .role import (
     RoleSourceGQL,
     RoleStatusFilterGQL,
     RoleStatusGQL,
+    RoleUserNestedFilterGQL,
     UpdateRoleInput,
 )
 from .role_invitation import (
@@ -117,6 +118,7 @@ __all__ = [
     "RoleFilter",
     "RoleAssignmentFilter",
     "RoleAssignmentRoleNestedFilterGQL",
+    "RoleUserNestedFilterGQL",
     "PermissionNestedFilterGQL",
     "EntityFilter",
     # OrderBy

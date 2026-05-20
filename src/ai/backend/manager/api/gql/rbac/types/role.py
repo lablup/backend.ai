@@ -57,6 +57,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    UserNestedFilter as UserNestedFilterDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkAssignRoleFailureInfo as BulkAssignRoleFailureInfoDTO,
 )
@@ -88,6 +91,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -503,6 +507,24 @@ class RoleStatusFilterGQL(PydanticInputMixin[RoleStatusFilterDTO]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Nested filter for users within a role filter. "
+            "Matches roles assigned to at least one user satisfying all conditions."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RoleUserNestedFilter",
+)
+class RoleUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
+    user_id: UUIDFilter | None = None
+
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for roles", added_version="26.3.0"),
     name="RoleFilter",
 )
@@ -510,6 +532,7 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
+    assigned_user: RoleUserNestedFilterGQL | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

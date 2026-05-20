@@ -118,6 +118,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    UserNestedFilter as UserNestedFilterDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     OperationTypeFilter,
@@ -1399,6 +1402,8 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(
                     RoleConditions.by_status_not_in([InternalRoleStatus(s) for s in st.not_in])
                 )
+        if f.assigned_user is not None:
+            conditions.extend(self._convert_user_nested_filter(f.assigned_user))
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_role_filter_gql(sub))
@@ -1412,6 +1417,36 @@ class RBACAdapter(BaseAdapter):
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
                 not_conditions.extend(self._convert_role_filter_gql(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
+    def _convert_user_nested_filter(self, f: UserNestedFilterDTO) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if f.user_id is not None:
+            condition = self.convert_uuid_filter(
+                f.user_id,
+                equals_factory=AssignedUserConditions.by_user_id_equals,
+                in_factory=AssignedUserConditions.by_user_id_in,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
+        conditions: list[QueryCondition] = []
+        if raw_conditions:
+            conditions.append(RoleConditions.by_assigned_user_id(raw_conditions))
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_user_nested_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_user_nested_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_user_nested_filter(sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions

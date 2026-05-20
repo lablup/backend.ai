@@ -203,6 +203,22 @@ class RoleConditions:
 
         return inner
 
+    @staticmethod
+    def by_assigned_user_id(
+        user_conditions: list[QueryCondition],
+    ) -> QueryCondition:
+        """Match roles assigned to a user satisfying ``user_conditions`` via a correlated EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1)).where(UserRoleRow.role_id == RoleRow.id).correlate(RoleRow)
+            )
+            for cond in user_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class PermissionConditions:
     """Query conditions for permissions."""
@@ -274,6 +290,26 @@ class AssignedUserConditions:
     def by_role_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             condition = UserRoleRow.role_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_user_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRoleRow.user_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_user_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRoleRow.user_id.in_(spec.values)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
