@@ -470,6 +470,9 @@ class CommonAgentConfig(BaseConfigSchema):
                 "container orchestration infrastructure. Available options: "
                 "'docker' uses Docker daemon for container management (default for most deployments); "
                 "'kubernetes' uses Kubernetes API for container management in K8s clusters; "
+                "'containerd' uses containerd's native gRPC API in a dedicated metadata namespace "
+                "('backendai'), invisible to a co-located kubelet, with a pluggable CNI provider "
+                "(currently only 'cilium' mode is wired); "
                 "'dummy' is a mock backend for testing without actual containers."
             ),
             added_version="25.12.0",

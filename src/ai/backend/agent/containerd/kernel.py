@@ -371,11 +371,139 @@ class ContainerdCodeRunner(AbstractCodeRunner):
 
 
 async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, str]:
-    # TODO(containerd-prototype): provision the krunner image into containerd's
-    # content store via the Transfer service and return the env mapping
-    # consumed by AbstractAgent.
-    del local_config
-    return {}
+    """Extract every installed krunner archive to a host directory.
+
+    The docker backend stages the krunner runtime (Backend.AI's in-kernel
+    Python/agent-socket/dropbear/... bundle) into a docker named volume
+    and then mounts it into the kernel at ``/opt/backend.ai``. containerd
+    has no equivalent of named volumes, so we extract the archive into a
+    plain host directory and treat the path as the "volume name" — the
+    OCI mount translator turns ``MountTypes.VOLUME`` with such a source
+    into a regular bind mount.
+
+    For each (distro, krunner-entrypoint) pair packaged on the host:
+    target dir is ``{base}/backendai-krunner.v{ver}.{arch}.{distro}``
+    under ``container.krunner_base_path`` (default
+    ``/var/lib/backend.ai/krunner``). The extraction is idempotent on
+    the *versioned* directory: if it exists, it is assumed correct, so
+    operators rotate krunner just by bumping the package version (which
+    flips the dir name). Returns ``{distro: host_path}``.
+    """
+    from importlib.resources import files
+    from pathlib import Path as _Path
+
+    from aiotools import TaskGroup
+
+    from ai.backend.agent.utils import get_arch_name
+    from ai.backend.plugin.entrypoint import scan_entrypoints
+
+    arch = get_arch_name()
+    krunner_base = _Path(
+        local_config.get("container", {}).get("krunner-base-path", "/var/lib/backend.ai/krunner")
+    )
+    await asyncio.to_thread(krunner_base.mkdir, parents=True, exist_ok=True)
+
+    targets: list[tuple[str, str]] = []  # (distro, entrypoint_name)
+    entry_prefix = "backendai_krunner_v10"
+
+    def _read_versions(ep_name: str) -> str:
+        return _Path(
+            str(files(f"ai.backend.krunner.{ep_name}").joinpath("versions.txt"))
+        ).read_text()
+
+    for entrypoint in scan_entrypoints(entry_prefix):
+        log.debug("loading krunner pkg: {}", entrypoint.module)
+        plugin = entrypoint.load()
+        await plugin.init({})  # currently a no-op on the plugin side.
+        versions_text = await asyncio.to_thread(_read_versions, entrypoint.name)
+        for distro in versions_text.splitlines():
+            distro = distro.strip()
+            if not distro:
+                continue
+            targets.append((distro, entrypoint.name))
+
+    results: dict[str, str] = {}
+    async with TaskGroup() as tg:
+        tasks = [
+            tg.create_task(_prepare_one_krunner_env(distro, ep_name, arch, krunner_base))
+            for distro, ep_name in targets
+        ]
+    for task in tasks:
+        distro, path = task.result()
+        if path is not None:
+            results[distro] = path
+    return results
+
+
+async def _prepare_one_krunner_env(
+    distro: str, entrypoint_name: str, arch: str, krunner_base: Path
+) -> tuple[str, str | None]:
+    from importlib.resources import files
+
+    def _read_version() -> int:
+        version_path = files(f"ai.backend.krunner.{entrypoint_name}").joinpath(
+            f"krunner-version.{distro}.txt"
+        )
+        return int(Path(str(version_path)).read_text().strip())
+
+    try:
+        version = await asyncio.to_thread(_read_version)
+    except FileNotFoundError:
+        log.warning(
+            "krunner version file missing for distro={} arch={}: skipping",
+            distro,
+            arch,
+        )
+        return distro, None
+    volume_name = f"backendai-krunner.v{version}.{arch}.{distro}"
+    target_dir = krunner_base / volume_name
+    if target_dir.exists():
+        # Already extracted at this version. The dir name embeds the
+        # version, so a new package version produces a fresh dir; old
+        # dirs are left in place for now (operators can prune).
+        log.debug("krunner env already extracted: {}", target_dir)
+        return distro, str(target_dir)
+
+    archive_path = Path(
+        str(
+            files(f"ai.backend.krunner.{entrypoint_name}").joinpath(
+                f"krunner-env.{distro}.{arch}.tar.xz"
+            )
+        )
+    )
+    if not archive_path.exists():
+        log.warning(
+            "krunner archive not packaged for {} ({}); supported distros differ "
+            "between architectures. Skipping.",
+            distro,
+            arch,
+        )
+        return distro, None
+
+    log.info("extracting krunner env for {} ({}) -> {}", distro, arch, target_dir)
+
+    def _extract() -> None:
+        import tarfile
+
+        tmp_dir = target_dir.with_name(target_dir.name + ".extracting")
+        if tmp_dir.exists():
+            import shutil
+
+            shutil.rmtree(tmp_dir)
+        tmp_dir.mkdir(parents=True)
+        with tarfile.open(archive_path, mode="r:xz") as tar:
+            tar.extractall(tmp_dir)
+        # Atomic-ish swap: the rename is atomic on the same filesystem,
+        # so a concurrent reader sees either the old absence or the new
+        # complete tree.
+        tmp_dir.rename(target_dir)
+
+    try:
+        await asyncio.to_thread(_extract)
+    except Exception as e:
+        log.error("krunner extract failed for {} ({}): {!r}", distro, arch, e)
+        return distro, None
+    return distro, str(target_dir)
 
 
 __all__ = (

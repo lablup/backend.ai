@@ -148,14 +148,19 @@ _TASK_STATUS_MAP: Mapping[int, ContainerStatus] = {
 def _mount_to_oci(mount: Mount) -> dict[str, Any] | None:
     """Translate an agent ``Mount`` into an OCI runtime-spec mount entry.
 
-    Returns ``None`` for mount types the containerd backend does not
-    provision (Docker named volumes); only BIND and TMPFS map cleanly.
+    BIND and TMPFS map cleanly. VOLUME mounts are translated as bind
+    mounts too — the source is treated as a host path. The Docker
+    backend uses VOLUME for the krunner runtime (mounted via a docker
+    named volume); the containerd backend has no equivalent of named
+    volumes, so ``prepare_krunner_env`` extracts the krunner archive to
+    a host directory and the source becomes that path. Any other mount
+    type maps to ``None`` and is skipped with a warning at the call site.
     """
-    if mount.type is MountTypes.BIND:
-        options = [
-            "rbind",
-            "rw" if mount.permission != MountPermission.READ_ONLY else "ro",
-        ]
+    options = [
+        "rbind",
+        "rw" if mount.permission != MountPermission.READ_ONLY else "ro",
+    ]
+    if mount.type is MountTypes.BIND or mount.type is MountTypes.VOLUME:
         return {
             "destination": str(mount.target),
             "source": str(mount.source),
@@ -1097,11 +1102,22 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
                 # one is needed but absent.
                 self.network_provider = None
         # The agent socket is bind-mounted into kernels for in-container
-        # callbacks; the socket handler task is wired in a later increment.
+        # callbacks (the krunner uses it for host-pid translation, OOM
+        # signaling, etc.). The host-side file MUST exist before any
+        # task references it — runc's mount syscall fails ENOENT
+        # otherwise — so create it eagerly. Serving traffic on it is a
+        # follow-up: handle_agent_socket is still a stub, so for now
+        # in-container callbacks targeting it will just block on the
+        # other end (kernels work for REPL and stats-via-cgroup-sysfs
+        # without it).
         ipc_base_path = self.local_config.agent.ipc_base_path
         ipc_container_path = ipc_base_path / "container"
         ipc_container_path.mkdir(parents=True, exist_ok=True)
         self.agent_sockpath = ipc_container_path / f"agent.{self.id}.sock"
+        # touch() is enough — what matters is that the path exists at
+        # bind-mount time. If a real socket is later listening on it,
+        # the file gets replaced; the bind is by path, not by inode.
+        self.agent_sockpath.touch(exist_ok=True)
         await super().__ainit__()
         # Subscribe to containerd task events so kernel termination is
         # picked up immediately instead of waiting for the base agent's
