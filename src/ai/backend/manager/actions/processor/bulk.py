@@ -1,10 +1,8 @@
-import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
 from ai.backend.common.exception import PermissionDeniedError
-from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
 )
@@ -21,8 +19,6 @@ from ai.backend.manager.actions.validator.bulk import (
 from .base import ActionRunner
 
 __all__ = ("BulkActionProcessor",)
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class BulkActionProcessor[
