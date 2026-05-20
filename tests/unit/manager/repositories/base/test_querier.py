@@ -810,6 +810,34 @@ class TestBatchQuerierMultipleScopes:
             assert len(result.rows) == 1
             assert result.rows[0].name == "item-a"
 
+    async def test_multiple_and_conditions_combined_with_multiple_or_scopes(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """Final WHERE is `(c1 AND c2) AND (s1 OR s2)` — multiple ANDs + multiple ORs."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+                conditions=[
+                    lambda: ScopeValidationTestRow.id >= 2,
+                    lambda: ScopeValidationTestRow.id <= 4,
+                ],
+            )
+            scope_cat1 = MockSearchScope(checks=[], filter_category="cat1")
+            scope_cat2 = MockSearchScope(checks=[], filter_category="cat2")
+
+            result = await execute_batch_querier(
+                db_sess, query, querier, scopes=[scope_cat1, scope_cat2]
+            )
+
+            # (id ∈ [2,4]) ∩ (category ∈ {cat1, cat2}) = {2:cat1, 3:cat2, 4:cat2}
+            assert {row.id for row in result.rows} == {2, 3, 4}
+            assert result.total_count == 3
+
     async def test_existence_checks_aggregated_across_scopes(
         self,
         database_connection: ExtendedAsyncSAEngine,
