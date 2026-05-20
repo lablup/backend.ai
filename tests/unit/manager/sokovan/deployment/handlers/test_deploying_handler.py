@@ -31,7 +31,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaData,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.sokovan.deployment.handlers.deploying import (
+from ai.backend.manager.sokovan.deployment.handlers.deploying_provisioning import (
     DeployingProvisioningHandler,
 )
 from ai.backend.manager.sokovan.deployment.strategy.applier import StrategyApplyResult

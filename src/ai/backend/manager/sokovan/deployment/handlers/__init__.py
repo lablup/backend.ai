@@ -3,10 +3,8 @@ Deployment lifecycle operation handlers.
 """
 
 from .base import DeploymentHandler
-from .deploying import (
-    DeployingProvisioningHandler,
-    DeployingRollingBackHandler,
-)
+from .deploying_provisioning import DeployingProvisioningHandler
+from .deploying_rolling_back import DeployingRollingBackHandler
 from .destroying import DestroyingDeploymentHandler
 from .reconcile import ReconcileDeploymentHandler
 from .replica import CheckReplicaDeploymentHandler

@@ -1,28 +1,3 @@
-"""Handlers for DEPLOYING sub-steps (BEP-1049).
-
-Two DEPLOYING handlers are registered in the coordinator's HandlerRegistry:
-
-- **DeployingProvisioningHandler**: Runs the strategy FSM each cycle to
-  create/drain routes and check for completion.
-- **DeployingRollingBackHandler**: Clears ``deploying_revision`` and
-  transitions directly to READY.
-
-Sub-step flow::
-
-    PROVISIONING ──(need_retry)──▸ PROVISIONING  (route mutations, logged)
-         │
-         │ (success)
-         ▼
-       READY  (completed — all routes replaced)
-
-    PROVISIONING ──(timeout)──▸ ROLLING_BACK ──(success)──▸ READY
-
-The evaluator determines sub-step assignments and route mutations;
-the applier persists them to DB atomically.  Each handler classifies
-deployments into successes (transition forward), need_retry (route mutations
-with history logged), and skipped (no change — waiting).
-"""
-
 from __future__ import annotations
 
 import logging
@@ -62,11 +37,6 @@ from ai.backend.manager.sokovan.deployment.types import (
 from .base import DeploymentHandler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-# ---------------------------------------------------------------------------
-# DEPLOYING sub-step handlers
-# ---------------------------------------------------------------------------
 
 
 class DeployingProvisioningHandler(DeploymentHandler):
@@ -265,77 +235,6 @@ class DeployingProvisioningHandler(DeploymentHandler):
             DeploymentLifecycleType.DEPLOYING,
             sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
         )
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING,
-            sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
-        )
-        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
-
-
-class DeployingRollingBackHandler(DeploymentHandler):
-    """Handler for DEPLOYING / ROLLING_BACK sub-step.
-
-    Clears ``deploying_revision`` and transitions directly to READY.
-    """
-
-    def __init__(
-        self,
-        deployment_controller: DeploymentController,
-        route_controller: RouteController,
-        deployment_repo: DeploymentRepository,
-    ) -> None:
-        self._deployment_controller = deployment_controller
-        self._route_controller = route_controller
-        self._deployment_repo = deployment_repo
-
-    @classmethod
-    @override
-    def name(cls) -> str:
-        return "deploying-rolling-back"
-
-    @classmethod
-    @override
-    def category(cls) -> DeploymentHandlerCategory:
-        return DeploymentHandlerCategory.LIFECYCLE
-
-    @property
-    @override
-    def lock_id(self) -> LockID | None:
-        return LockID.LOCKID_DEPLOYMENT_DEPLOYING
-
-    @classmethod
-    @override
-    def target_statuses(cls) -> DeploymentTargetStatuses:
-        return DeploymentTargetStatuses(
-            lifecycle_stages=[EndpointLifecycle.DEPLOYING],
-            sub_steps=[DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK],
-        )
-
-    @classmethod
-    @override
-    def status_transitions(cls) -> DeploymentStatusTransitions:
-        return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.READY,
-                sub_step=None,
-            ),
-        )
-
-    @override
-    async def execute(
-        self, deployments: Sequence[DeploymentWithHistory]
-    ) -> DeploymentExecutionResult:
-        all_deployment_ids = {deployment.deployment_info.id for deployment in deployments}
-        await self._deployment_repo.clear_deploying_revision(all_deployment_ids)
-        log.info(
-            "Cleared deploying_revision for {} rolling-back deployments",
-            len(all_deployment_ids),
-        )
-
-        return DeploymentExecutionResult(successes=list(deployments))
-
-    @override
-    async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.DEPLOYING,
             sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
