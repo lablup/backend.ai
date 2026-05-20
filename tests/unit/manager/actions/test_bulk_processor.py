@@ -1,8 +1,7 @@
-"""Tests for ``BulkActionProcessor`` filtering infrastructure (BA-5777).
+"""Tests for ``BulkActionProcessor``: validator chain + all-or-nothing denial.
 
-Verifies that the processor narrows ``entity_ids`` exactly to what each
-validator allowed — no more, no less — and that later validators only
-see IDs that survived earlier ones.
+Any denial across the full validator chain raises ``PermissionDeniedError``
+after every validator has run, aggregating all denied refs into the error.
 """
 
 from __future__ import annotations
@@ -13,9 +12,14 @@ from typing import Any, override
 
 import pytest
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
+from ai.backend.manager.actions.action.bulk import (
+    BaseBulkAction,
+    BaseBulkActionResult,
+)
+from ai.backend.manager.actions.action.types import ActionTarget
 from ai.backend.manager.actions.processor.bulk import (
     BulkActionProcessor,
 )
@@ -25,13 +29,42 @@ from ai.backend.manager.actions.validator.bulk import (
     BulkValidationResult,
     DeniedEntity,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
+
+
+@dataclass(frozen=True)
+class _RefTarget(ActionTarget):
+    """Wraps a bare ``RBACElementRef`` as an :class:`ActionTarget` for tests."""
+
+    ref: RBACElementRef
+
+    @override
+    def to_rbac_element_ref(self) -> RBACElementRef:
+        return self.ref
+
+
+@pytest.fixture
+def ref_a() -> RBACElementRef:
+    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="a")
+
+
+@pytest.fixture
+def ref_b() -> RBACElementRef:
+    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="b")
+
+
+@pytest.fixture
+def ref_c() -> RBACElementRef:
+    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="c")
 
 
 @dataclass
-class _MockBulkAction(BaseBulkAction[str]):
+class _MockBulkAction(BaseBulkAction[ActionTarget]):
+    refs: list[RBACElementRef]
+
     @override
-    def typed_entity_ids(self) -> list[str]:
-        return list(self.entity_ids)
+    def targets(self) -> list[ActionTarget]:
+        return [_RefTarget(ref=r) for r in self.refs]
 
     @override
     @classmethod
@@ -46,17 +79,17 @@ class _MockBulkAction(BaseBulkAction[str]):
 
 @dataclass
 class _MockBulkActionResult(BaseBulkActionResult):
-    processed_ids: list[str] = field(default_factory=list)
+    processed_refs: list[RBACElementRef] = field(default_factory=list)
 
     @override
-    def entity_ids(self) -> list[str]:
-        return list(self.processed_ids)
+    def element_refs(self) -> list[RBACElementRef]:
+        return list(self.processed_refs)
 
 
 class _AllowSetValidator(BulkActionValidator):
-    """Approves any ID in ``allowed``; anything else visible is denied."""
+    """Approves any ref in ``allowed``; anything else visible is denied."""
 
-    def __init__(self, allowed: set[str]) -> None:
+    def __init__(self, allowed: set[RBACElementRef]) -> None:
         self._allowed = set(allowed)
 
     @classmethod
@@ -68,22 +101,22 @@ class _AllowSetValidator(BulkActionValidator):
     async def validate(
         self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        current = list(action.entity_ids)
-        allowed = [eid for eid in current if eid in self._allowed]
+        current = [t.to_rbac_element_ref() for t in action.targets()]
+        allowed = [r for r in current if r in self._allowed]
         denied = [
-            DeniedEntity(entity_id=eid, deny_reason="not in allow-set")
-            for eid in current
-            if eid not in self._allowed
+            DeniedEntity(entity_ref=r, deny_reason="not in allow-set")
+            for r in current
+            if r not in self._allowed
         ]
-        return BulkValidationResult(allowed_entity_ids=allowed, denied_entities=denied)
+        return BulkValidationResult(allowed_entities=allowed, denied_entities=denied)
 
 
 class _RecordingValidator(BulkActionValidator):
-    """Captures the entity IDs each ``validate()`` call received."""
+    """Captures the refs each ``validate()`` call received."""
 
-    def __init__(self, allowed: set[str]) -> None:
+    def __init__(self, allowed: set[RBACElementRef]) -> None:
         self._allowed = set(allowed)
-        self.observed_batches: list[list[str]] = []
+        self.observed_batches: list[list[RBACElementRef]] = []
 
     @classmethod
     @override
@@ -94,148 +127,115 @@ class _RecordingValidator(BulkActionValidator):
     async def validate(
         self, action: BaseBulkAction[Any], meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        current = list(action.entity_ids)
+        current = [t.to_rbac_element_ref() for t in action.targets()]
         self.observed_batches.append(current)
-        allowed = [eid for eid in current if eid in self._allowed]
+        allowed = [r for r in current if r in self._allowed]
         denied = [
-            DeniedEntity(entity_id=eid, deny_reason="blocked")
-            for eid in current
-            if eid not in self._allowed
+            DeniedEntity(entity_ref=r, deny_reason="blocked")
+            for r in current
+            if r not in self._allowed
         ]
-        return BulkValidationResult(allowed_entity_ids=allowed, denied_entities=denied)
+        return BulkValidationResult(allowed_entities=allowed, denied_entities=denied)
 
 
 def _echo_func() -> Callable[[_MockBulkAction], Awaitable[_MockBulkActionResult]]:
     async def _run(action: _MockBulkAction) -> _MockBulkActionResult:
-        return _MockBulkActionResult(processed_ids=list(action.entity_ids))
+        return _MockBulkActionResult(
+            processed_refs=[t.to_rbac_element_ref() for t in action.targets()],
+        )
 
     return _run
 
 
-class TestBulkActionProcessorFiltering:
-    async def test_no_validators_passes_all_ids_through(self) -> None:
+class TestBulkActionProcessor:
+    async def test_no_validators_passes_all_refs_through(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+        ref_c: RBACElementRef,
+    ) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
         )
-        action = _MockBulkAction(entity_ids=["a", "b", "c"])
+        action = _MockBulkAction(refs=[ref_a, ref_b, ref_c])
 
-        outcome = await processor.wait_for_complete(action)
+        result = await processor.wait_for_complete(action)
 
-        assert outcome.result.processed_ids == ["a", "b", "c"]
-        assert outcome.validator_decisions == []
+        assert result.processed_refs == [ref_a, ref_b, ref_c]
 
-    async def test_validator_denies_subset_reports_denied_ids(self) -> None:
+    async def test_all_allowed_runs_action_normally(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+        ref_c: RBACElementRef,
+    ) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
-            validators=[_AllowSetValidator(allowed={"a", "c"})],
+            validators=[_AllowSetValidator(allowed={ref_a, ref_b, ref_c})],
         )
-        action = _MockBulkAction(entity_ids=["a", "b", "c"])
+        action = _MockBulkAction(refs=[ref_a, ref_b, ref_c])
 
-        outcome = await processor.wait_for_complete(action)
+        result = await processor.wait_for_complete(action)
 
-        assert outcome.result.processed_ids == ["a", "c"]
-        assert len(outcome.validator_decisions) == 1
-        decision = outcome.validator_decisions[0]
-        assert decision.validator_name == "allow-set"
-        assert decision.results.allowed_entity_ids == ["a", "c"]
-        assert decision.results.denied_entities == [
-            DeniedEntity(entity_id="b", deny_reason="not in allow-set"),
-        ]
+        assert result.processed_refs == [ref_a, ref_b, ref_c]
 
-    async def test_validator_denies_all_still_runs_service_with_empty_batch(self) -> None:
+    async def test_single_validator_partial_denial_raises(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+        ref_c: RBACElementRef,
+    ) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
-            validators=[_AllowSetValidator(allowed=set())],
+            validators=[_AllowSetValidator(allowed={ref_a, ref_c})],
         )
-        action = _MockBulkAction(entity_ids=["a", "b"])
+        action = _MockBulkAction(refs=[ref_a, ref_b, ref_c])
 
-        outcome = await processor.wait_for_complete(action)
+        with pytest.raises(PermissionDeniedError) as exc_info:
+            await processor.wait_for_complete(action)
 
-        assert outcome.result.processed_ids == []
-        decision = outcome.validator_decisions[0]
-        assert decision.results.allowed_entity_ids == []
-        assert [d.entity_id for d in decision.results.denied_entities] == ["a", "b"]
+        msg = str(exc_info.value)
+        assert ref_b.to_str() in msg
+        assert "not in allow-set" in msg
 
-    async def test_later_validator_only_sees_surviving_ids(self) -> None:
-        first = _RecordingValidator(allowed={"a", "b"})
-        second = _RecordingValidator(allowed={"a"})
+    async def test_full_chain_runs_before_raising(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+        ref_c: RBACElementRef,
+    ) -> None:
+        """Every validator runs even when an earlier one denied refs."""
+        first = _RecordingValidator(allowed={ref_a, ref_b})
+        second = _RecordingValidator(allowed={ref_a})
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
             validators=[first, second],
         )
-        action = _MockBulkAction(entity_ids=["a", "b", "c"])
+        action = _MockBulkAction(refs=[ref_a, ref_b, ref_c])
 
-        outcome = await processor.wait_for_complete(action)
+        with pytest.raises(PermissionDeniedError) as exc_info:
+            await processor.wait_for_complete(action)
 
-        # First validator sees the full batch; second only sees IDs that
-        # survived the first.
-        assert first.observed_batches == [["a", "b", "c"]]
-        assert second.observed_batches == [["a", "b"]]
+        # Both validators saw the original (unfiltered) action.
+        assert first.observed_batches == [[ref_a, ref_b, ref_c]]
+        assert second.observed_batches == [[ref_a, ref_b, ref_c]]
+        # Aggregated denials from both validators surface in the error,
+        # each paired with its deny reason.
+        msg = str(exc_info.value)
+        assert f"{ref_b.to_str()} (blocked)" in msg
+        assert f"{ref_c.to_str()} (blocked)" in msg
 
-        assert outcome.result.processed_ids == ["a"]
-        assert [
-            (
-                d.validator_name,
-                d.results.allowed_entity_ids,
-                [de.entity_id for de in d.results.denied_entities],
-            )
-            for d in outcome.validator_decisions
-        ] == [
-            ("recording", ["a", "b"], ["c"]),
-            ("recording", ["a"], ["b"]),
-        ]
-
-    async def test_original_action_is_not_mutated(self) -> None:
+    async def test_original_action_is_not_mutated(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+    ) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
-            validators=[_AllowSetValidator(allowed={"a"})],
+            validators=[_AllowSetValidator(allowed={ref_a, ref_b})],
         )
-        original = _MockBulkAction(entity_ids=["a", "b"])
-
-        outcome = await processor.wait_for_complete(original)
-
-        assert outcome.result.processed_ids == ["a"]
-        # The processor constructs a fresh action; it must not mutate the caller's.
-        assert original.entity_ids == ["a", "b"]
-
-    async def test_pass_through_reuses_same_action_instance(self) -> None:
-        seen: list[_MockBulkAction] = []
-
-        async def _capture(action: _MockBulkAction) -> _MockBulkActionResult:
-            seen.append(action)
-            return _MockBulkActionResult(processed_ids=list(action.entity_ids))
-
-        processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
-            func=_capture,
-            validators=[_AllowSetValidator(allowed={"a", "b"})],
-        )
-        original = _MockBulkAction(entity_ids=["a", "b"])
+        original = _MockBulkAction(refs=[ref_a, ref_b])
 
         await processor.wait_for_complete(original)
 
-        # No denials → no filtering copy was created.
-        assert seen[0] is original
-
-
-@pytest.mark.parametrize(
-    ("allowed", "batch", "expected_processed"),
-    [
-        ({"a", "b"}, ["a", "b"], ["a", "b"]),
-        ({"a"}, ["a", "b"], ["a"]),
-        (set(), ["a", "b"], []),
-    ],
-)
-async def test_single_validator_scenarios(
-    allowed: set[str],
-    batch: list[str],
-    expected_processed: list[str],
-) -> None:
-    processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
-        func=_echo_func(),
-        validators=[_AllowSetValidator(allowed=allowed)],
-    )
-    action = _MockBulkAction(entity_ids=batch)
-
-    outcome = await processor.wait_for_complete(action)
-
-    assert outcome.result.processed_ids == expected_processed
+        assert [t.to_rbac_element_ref() for t in original.targets()] == [ref_a, ref_b]
