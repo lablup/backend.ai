@@ -65,6 +65,16 @@ _ENDPOINT_LOOKUP_RETRIES = 20
 # Delay between endpoint-lookup retries.
 _ENDPOINT_LOOKUP_DELAY_SECS = 0.2
 
+# How long to wait for an endpoint to reach 'ready' state before
+# PATCHing labels. PATCHing during cilium-cni's k8s-pod reconciliation
+# has been observed to race with reserved:init being re-added.
+_READY_WAIT_RETRIES = 30
+_READY_WAIT_DELAY_SECS = 0.2
+
+# How many times to re-PATCH labels if reserved:init survives.
+_LABEL_PATCH_RETRIES = 3
+_LABEL_PATCH_RETRY_DELAY_SECS = 0.5
+
 
 class CiliumNetworkProvider(NetworkProvider):
     """Attaches containerd workloads to a Cilium network via cilium-cni.
@@ -204,10 +214,19 @@ class CiliumNetworkProvider(NetworkProvider):
     ) -> None:
         """Push ``labels`` onto the cilium endpoint of ``workload_id``.
 
-        Cilium re-resolves an endpoint's identity from its labelset, so
-        a non-empty user labelset on what was a ``reserved:init``
-        endpoint pulls the endpoint out of init state into a real
-        cluster identity.
+        PATCHing the endpoint's user labels mid-regeneration races with
+        cilium-cni's k8s-pod reconciler — the reconciler can re-add
+        ``reserved:init`` to the security-relevant label set after our
+        PATCH lands, leaving the endpoint policy-restricted even though
+        the identity number changed. We work around this with a
+        three-step dance:
+
+        1. Wait for the endpoint to reach ``state == "ready"`` so the
+           reconciler is done with its initial pass.
+        2. PATCH ``{user: [<labels>]}``.
+        3. Verify the identity labelset no longer carries
+           ``reserved:init``; if it does, re-PATCH after a short delay
+           up to a few times.
         """
         if not self._cilium_agent_sock_path.exists():
             raise CiliumIdentityError(
@@ -225,28 +244,76 @@ class CiliumNetworkProvider(NetworkProvider):
             endpoint_id = endpoint.get("id")
             if endpoint_id is None:
                 raise CiliumIdentityError(f"cilium endpoint for {workload_id!r} carries no id")
+            await self._wait_for_endpoint_ready(session, workload_id, endpoint_id)
             user_labels = [f"{_LABEL_SOURCE}:{k}={v}" for k, v in labels.items()]
-            try:
-                async with session.patch(
-                    f"http://localhost/v1/endpoint/{endpoint_id}/labels",
-                    json={"user": user_labels},
-                ) as resp:
-                    if resp.status >= 400:
-                        body = await resp.text()
-                        raise CiliumIdentityError(
-                            f"cilium PATCH endpoint/{endpoint_id}/labels failed "
-                            f"({resp.status}): {body.strip()}"
-                        )
-            except aiohttp.ClientError as e:
-                raise CiliumIdentityError(
-                    f"cilium PATCH endpoint/{endpoint_id}/labels transport error: {e!r}"
-                ) from e
-            log.info(
-                "cilium: endpoint {} (workload {}) labeled with {} entries",
+            for attempt in range(1, _LABEL_PATCH_RETRIES + 1):
+                try:
+                    async with session.patch(
+                        f"http://localhost/v1/endpoint/{endpoint_id}/labels",
+                        json={"user": user_labels},
+                    ) as resp:
+                        if resp.status >= 400:
+                            body = await resp.text()
+                            raise CiliumIdentityError(
+                                f"cilium PATCH endpoint/{endpoint_id}/labels failed "
+                                f"({resp.status}): {body.strip()}"
+                            )
+                except aiohttp.ClientError as e:
+                    raise CiliumIdentityError(
+                        f"cilium PATCH endpoint/{endpoint_id}/labels transport error: {e!r}"
+                    ) from e
+                # Verify: re-fetch the endpoint and confirm reserved:init
+                # is gone from the identity's labelset.
+                refreshed = await self._find_endpoint(session, workload_id)
+                if refreshed is None:
+                    break
+                id_labels = (refreshed.get("status") or {}).get("identity", {}).get("labels", [])
+                if "reserved:init" not in id_labels:
+                    log.info(
+                        "cilium: endpoint {} (workload {}) labeled with {} entries "
+                        "(stable after {} attempt(s))",
+                        endpoint_id,
+                        workload_id,
+                        len(user_labels),
+                        attempt,
+                    )
+                    return
+                log.debug(
+                    "cilium: endpoint {} still carries reserved:init after PATCH "
+                    "attempt {} — retrying",
+                    endpoint_id,
+                    attempt,
+                )
+                await asyncio.sleep(_LABEL_PATCH_RETRY_DELAY_SECS)
+            log.warning(
+                "cilium: endpoint {} (workload {}) still carries reserved:init "
+                "after {} PATCH attempts — policy-enforced traffic may be dropped",
                 endpoint_id,
                 workload_id,
-                len(user_labels),
+                _LABEL_PATCH_RETRIES,
             )
+
+    async def _wait_for_endpoint_ready(
+        self,
+        session: aiohttp.ClientSession,
+        workload_id: str,
+        endpoint_id: int,
+    ) -> None:
+        """Poll until the endpoint reports ``state == "ready"`` or we time out."""
+        for _ in range(_READY_WAIT_RETRIES):
+            ep = await self._find_endpoint(session, workload_id)
+            if ep is None:
+                break
+            state = (ep.get("status") or {}).get("state", "")
+            if state == "ready":
+                return
+            await asyncio.sleep(_READY_WAIT_DELAY_SECS)
+        log.debug(
+            "cilium: endpoint {} did not reach 'ready' state within "
+            "{:.1f}s — proceeding with PATCH anyway",
+            endpoint_id,
+            _READY_WAIT_RETRIES * _READY_WAIT_DELAY_SECS,
+        )
 
     async def _find_endpoint(
         self,
