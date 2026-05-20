@@ -73,14 +73,14 @@ async def admin_audit_logs_v2(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Query audit logs within a scope target (non-admin accessible, subject to RBAC). "
+            "Query audit logs within a scope (non-admin accessible, subject to RBAC). "
             "All scope items are OR'd; raises an error if every field is empty."
         ),
     )
 )  # type: ignore[misc]
 async def scoped_audit_logs_v2(
     info: Info[StrawberryGQLContext],
-    scope_target: AuditLogScopeGQL,
+    scope: AuditLogScopeGQL,
     filter: AuditLogFilterGQL | None = None,
     order_by: list[AuditLogOrderByGQL] | None = None,
     before: str | None = None,
@@ -91,7 +91,7 @@ async def scoped_audit_logs_v2(
     offset: int | None = None,
 ) -> AuditLogV2ConnectionGQL | None:
     ScopedSearchAuditLogsInput(
-        scope_target=scope_target.to_pydantic(),
+        scope=scope.to_pydantic(),
         filter=filter.to_pydantic() if filter else None,
         order=[o.to_pydantic() for o in order_by] if order_by else None,
         first=first,

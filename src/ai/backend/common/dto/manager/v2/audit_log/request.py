@@ -79,7 +79,7 @@ class AdminSearchAuditLogsInput(BaseRequestModel):
 
 
 class AuditLogScope(BaseRequestModel):
-    """Scope target for the scoped audit log query.
+    """Scope for the scoped audit log query.
 
     Each category list is OR'd internally and across categories. Raises an error
     if every field is empty.
@@ -102,9 +102,9 @@ class AuditLogScope(BaseRequestModel):
 
 
 class ScopedSearchAuditLogsInput(BaseRequestModel):
-    """Input for searching audit logs under a non-admin scope target."""
+    """Input for searching audit logs under a non-admin scope."""
 
-    scope_target: AuditLogScope = Field(description="Scope target (OR across all items)")
+    scope: AuditLogScope = Field(description="Scope (OR across all items)")
     filter: AuditLogFilter | None = Field(default=None, description="Filter criteria")
     order: list[AuditLogOrder] | None = Field(default=None, description="Sort order")
     first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")

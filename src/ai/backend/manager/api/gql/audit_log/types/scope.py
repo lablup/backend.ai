@@ -16,7 +16,7 @@ from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeScopeGQL, UUID
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description=(
-            "Scope target for the scoped audit log query. "
+            "Scope for the scoped audit log query. "
             "All items are OR'd; raises an error if every field is empty."
         ),
         added_version=NEXT_RELEASE_VERSION,

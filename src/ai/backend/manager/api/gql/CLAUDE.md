@@ -60,13 +60,13 @@
 
 **search — always two variants:**
 - `adminFoosV2`: superadmin only, no scope — queries entire system.
-- `scopedFoosV2` (e.g., `scopedSessionsV2`): non-admin, scope target required — queries within the given scope only.
+- `scopedFoosV2` (e.g., `scopedSessionsV2`): non-admin, scope required — queries within the given scope only.
 - `myFoosV2`: self-service, adapter resolves current user as scope internally.
 - There is NO "search everything without scope" for non-admin users.
 
 **Scoped search naming convention:**
 - GQL query name: `scopedFoosV2` (single root field per entity).
-- The scope target is a required argument typed as an entity-specific input
+- The scope is a required argument typed as an entity-specific input
   (`FooScopeGQL`), defined under `api/gql/{entity}/types/scope.py`.
 - The scope input is not a bare ID — it carries the shape the entity needs
   (e.g., a single scope ID, a list of entity-tagged refs, or category-separated lists).
@@ -135,13 +135,13 @@ Only one pagination mode is allowed per request. Combining `first` with `limit` 
 `scopedFoosV2` is the standard naming for non-admin scoped search queries.
 
 - Naming: `scopedFoosV2` (e.g., `scopedSessionsV2`, `scopedAuditLogsV2`).
-- Scope target argument: required, typed as an entity-specific input (`FooScopeGQL`)
+- Scope argument: required, typed as an entity-specific input (`FooScopeGQL`)
   defined under `api/gql/{entity}/types/scope.py`. Never accept a bare scope ID.
 - Scope input shape is entity-specific. A simple case may carry a single field
   (e.g., a project ID); a complex case may carry category-separated lists.
 - Non-empty validation MUST live on the DTO via a Pydantic `model_validator`, so the
   GQL/REST boundary rejects empty input uniformly without resolver-side checks.
-- The resolver forwards the scope target to the adapter alongside the search input DTO.
+- The resolver forwards the scope to the adapter alongside the search input DTO.
   Authorization (RBAC validation, batch or single) is the adapter/service's
   responsibility, not the resolver's.
 
