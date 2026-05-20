@@ -1,10 +1,9 @@
-"""Unit tests for ``start_command`` input compatibility (str → list[str]) in
-``model_definition`` validators.
+"""``start_command`` input compatibility (str → list[str]).
 
-PR #11402 narrowed ``ModelServiceConfig.start_command`` from
-``str | list[str]`` to ``list[str] | None``. To preserve backward
-compatibility for users who still author the field as a shell string,
-the validators normalize ``str`` input via :func:`shlex.split`.
+PR #11402 narrowed ``start_command`` to ``list[str] | None``. Legacy
+``str`` inputs are wrapped as ``[shell, "-c", str]`` only when the user
+sets ``shell``; otherwise they pass through as ``[str]`` so shell-less
+images stay launchable.
 """
 
 from __future__ import annotations
@@ -26,27 +25,44 @@ from ai.backend.manager.models.base import PydanticColumn
 START_COMMAND_CASES = [
     pytest.param(
         "python service.py",
-        ["python", "service.py"],
-        id="simple-split",
+        None,
+        ["python service.py"],
+        id="no-shell-single-argv",
     ),
     pytest.param(
         'python -c "import x; x.run()"',
-        ["python", "-c", "import x; x.run()"],
-        id="shlex-preserves-quoted",
+        None,
+        ['python -c "import x; x.run()"'],
+        id="no-shell-quoted-single-argv",
+    ),
+    pytest.param(
+        "echo $HOME && exec python serve.py",
+        "/bin/zsh",
+        ["/bin/zsh", "-c", "echo $HOME && exec python serve.py"],
+        id="explicit-shell-custom",
+    ),
+    pytest.param(
+        "python service.py --port 8080",
+        "/bin/bash",
+        ["/bin/bash", "-c", "python service.py --port 8080"],
+        id="explicit-shell-bash",
     ),
 ]
 
 
-def _wrap_definition(start_command: str) -> dict[str, Any]:
+def _wrap_definition(start_command: str, shell: str | None = None) -> dict[str, Any]:
+    service: dict[str, Any] = {
+        "start_command": start_command,
+        "port": 8080,
+    }
+    if shell is not None:
+        service["shell"] = shell
     return {
         "models": [
             {
                 "name": "model",
                 "model_path": "/models/x",
-                "service": {
-                    "start_command": start_command,
-                    "port": 8080,
-                },
+                "service": service,
             }
         ]
     }
@@ -55,30 +71,28 @@ def _wrap_definition(start_command: str) -> dict[str, Any]:
 class TestPydanticInputCompat:
     """REST/GQL input → ``ModelServiceConfigDraft`` Pydantic validator."""
 
-    @pytest.mark.parametrize(("raw", "expected"), START_COMMAND_CASES)
-    def test_str_input_is_normalized(self, raw: str, expected: list[str]) -> None:
-        draft = ModelServiceConfigDraft.model_validate({
-            "start_command": raw,
-            "port": 8080,
-        })
+    @pytest.mark.parametrize(("raw", "shell", "expected"), START_COMMAND_CASES)
+    def test_str_input_is_wrapped(self, raw: str, shell: str | None, expected: list[str]) -> None:
+        payload: dict[str, Any] = {"start_command": raw, "port": 8080}
+        if shell is not None:
+            payload["shell"] = shell
+        draft = ModelServiceConfigDraft.model_validate(payload)
         assert draft.start_command == expected
 
 
 class TestTrafaretInputCompat:
     """vfolder YAML scan → ``model_definition_iv`` trafaret validator."""
 
-    @pytest.mark.parametrize(("raw", "expected"), START_COMMAND_CASES)
-    def test_str_input_is_normalized(self, raw: str, expected: list[str]) -> None:
-        result = model_definition_iv.check(_wrap_definition(raw))
+    @pytest.mark.parametrize(("raw", "shell", "expected"), START_COMMAND_CASES)
+    def test_str_input_is_wrapped(self, raw: str, shell: str | None, expected: list[str]) -> None:
+        result = model_definition_iv.check(_wrap_definition(raw, shell))
         assert result["models"][0]["service"]["start_command"] == expected
 
 
 class TestYAMLInputCompat:
-    """End-to-end vfolder scan path: a user-authored ``model-definition.yaml``
-    is parsed by ruamel.yaml and fed to ``model_definition_iv``. Confirms that
-    every YAML notation a user might write — legacy shell string, inline flow
-    sequence, hyphenated block sequence — resolves to the same canonical
-    ``list[str]``.
+    """End-to-end vfolder scan: ruamel.yaml-parsed model-definition.yaml fed
+    to ``model_definition_iv``. Covers every YAML notation a user might write
+    (legacy shell string, inline flow sequence, hyphenated block sequence).
     """
 
     @pytest.mark.parametrize(
@@ -93,8 +107,21 @@ class TestYAMLInputCompat:
                         start_command: python service.py
                         port: 8080
                 """),
-                ["python", "service.py"],
-                id="legacy-shell-string",
+                ["python service.py"],
+                id="legacy-shell-string-no-shell-key",
+            ),
+            pytest.param(
+                textwrap.dedent("""\
+                    models:
+                    - name: model
+                      model_path: /models/x
+                      service:
+                        start_command: echo $HOME | tee /tmp/out
+                        shell: /bin/zsh
+                        port: 8080
+                """),
+                ["/bin/zsh", "-c", "echo $HOME | tee /tmp/out"],
+                id="legacy-shell-string-explicit-shell",
             ),
             pytest.param(
                 textwrap.dedent("""\
@@ -131,17 +158,12 @@ class TestYAMLInputCompat:
 
 
 class TestPydanticColumnReadCompat:
-    """DB read path → ``PydanticColumn(ModelDefinition).process_result_value``.
+    """DB read path → ``PydanticColumn(ModelDefinition).process_result_value``."""
 
-    Downstream ``Row.to_data`` only forwards ``self.model_definition`` to the
-    output dataclass, so verifying the resolved object here covers the
-    read → to_data flow.
-    """
-
-    @pytest.mark.parametrize(("raw", "expected"), START_COMMAND_CASES)
-    def test_legacy_str_is_normalized(self, raw: str, expected: list[str]) -> None:
+    @pytest.mark.parametrize(("raw", "shell", "expected"), START_COMMAND_CASES)
+    def test_legacy_str_is_wrapped(self, raw: str, shell: str | None, expected: list[str]) -> None:
         column = PydanticColumn(ModelDefinition)
-        resolved = column.process_result_value(_wrap_definition(raw), DefaultDialect())
+        resolved = column.process_result_value(_wrap_definition(raw, shell), DefaultDialect())
         assert resolved is not None
         assert resolved.models[0].service is not None
         assert resolved.models[0].service.start_command == expected
