@@ -207,7 +207,7 @@ class RoleConditions:
     def by_assigned_user_id(
         user_conditions: list[QueryCondition],
     ) -> QueryCondition:
-        """Match roles assigned to a user satisfying ``user_conditions`` via a correlated EXISTS subquery."""
+        """Match roles whose ``user_roles`` rows satisfy ``user_conditions`` (correlated EXISTS)."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subq = (

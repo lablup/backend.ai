@@ -203,10 +203,7 @@ class ReplaceRolePermissionsInput(BaseRequestModel):
 
 
 class UserNestedFilter(BaseRequestModel):
-    """Nested filter for users within a role filter.
-
-    Matches roles that are assigned to at least one user satisfying the conditions.
-    """
+    """Filter roles by their user assignments."""
 
     user_id: UUIDFilter | None = None
     AND: list[UserNestedFilter] | None = None

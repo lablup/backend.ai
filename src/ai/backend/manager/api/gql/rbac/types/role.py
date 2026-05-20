@@ -508,10 +508,7 @@ class RoleStatusFilterGQL(PydanticInputMixin[RoleStatusFilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description=(
-            "Nested filter for users within a role filter. "
-            "Matches roles assigned to at least one user satisfying all conditions."
-        ),
+        description="Filter roles by their user assignments.",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="RoleUserNestedFilter",
