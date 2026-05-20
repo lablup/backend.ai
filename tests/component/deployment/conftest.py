@@ -19,6 +19,7 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -150,6 +151,7 @@ def deployment_processors(
                 single_entity=SingleEntityActionRBACValidator(
                     permission_controller_repo, MagicMock()
                 ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )

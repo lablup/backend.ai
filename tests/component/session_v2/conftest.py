@@ -122,6 +122,7 @@ async def session_processors(
             rbac=RBACValidators(
                 scope=AsyncMock(),
                 single_entity=real_single_entity_validator,
+                bulk=AsyncMock(),
             )
         ),
     )

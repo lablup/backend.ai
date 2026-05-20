@@ -13,6 +13,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -88,6 +89,7 @@ def deployment_processors(
                 single_entity=SingleEntityActionRBACValidator(
                     permission_controller_repo, MagicMock()
                 ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )

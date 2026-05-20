@@ -27,6 +27,7 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -120,6 +121,7 @@ class DeploymentCRUDBaseFixtures:
                 rbac=RBACValidators(
                     scope=MagicMock(spec=ScopeActionRBACValidator),
                     single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                    bulk=MagicMock(spec=BulkActionRBACValidator),
                 ),
             ),
         )
