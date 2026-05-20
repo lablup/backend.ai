@@ -16,6 +16,39 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.4rc6 (2026-05-20)
+
+### Features
+* Add `UserID` identifier type and `ResolveUserIDByAccessKey` auth action for resolving an access_key to its owning user UUID. ([#11647](https://github.com/lablup/backend.ai/issues/11647))
+* Add `ResolveDomainIDByName` and `ResolveResourceGroupIDByName` actions to resolve entity names to their canonical UUID identifiers. ([#11660](https://github.com/lablup/backend.ai/issues/11660))
+* Add `scopedAuditLogsV2` GraphQL query schema (stub) with `AuditLogScope` input for category-separated, OR-combined scope leaves. ([#11694](https://github.com/lablup/backend.ai/issues/11694))
+
+### Improvements
+* Move manager-only Prometheus client modules from common to manager package ([#11559](https://github.com/lablup/backend.ai/issues/11559))
+* Generalize `execute_batch_querier` to accept multiple `SearchScope` instances OR-combined into a single predicate that is AND-merged with the rest of the querier conditions. ([#11700](https://github.com/lablup/backend.ai/issues/11700))
+
+### Fixes
+* Record the resolved model-definition file path on model service revisions instead of the request's empty value ([#11638](https://github.com/lablup/backend.ai/issues/11638))
+* Enforce `ON DELETE RESTRICT` on `images.registry_id` so deleting a container registry that still has images is blocked at the database level instead of leaving dangling references that surfaced later as a misleading "Image not found in database" error. ([#11643](https://github.com/lablup/backend.ai/issues/11643))
+* Restore legacy string `start_command` in model definitions: wrap as `[shell, '-c', value]` when `shell` is set, else pass through as `[value]`. Includes a data migration to repair broken single-token argv rows. ([#11648](https://github.com/lablup/backend.ai/issues/11648))
+* Fix custom runtime variant not reading model-definition.yaml from the model vfolder during revision creation ([#11661](https://github.com/lablup/backend.ai/issues/11661))
+* Fix the runtime variant update API to preserve `description` when the field is omitted from partial-update requests across REST v2, GraphQL, and CLI. ([#11668](https://github.com/lablup/backend.ai/issues/11668))
+* Fix `Route warming-up` never advancing to `RUNNING` when `health_check` is configured. The route health observer now scans `PROVISIONING+WARMING_UP` routes in addition to `RUNNING`, so initial health probes are written to Valkey while a replica is warming up. ([#11672](https://github.com/lablup/backend.ai/issues/11672))
+* Fix `BraceStyleAdapter` log calls that fail when f-string interpolations contain literal brace characters (`EventDispatcher` single site). ([#11680](https://github.com/lablup/backend.ai/issues/11680))
+* Fix `BraceStyleAdapter` log calls that fail when f-string interpolations contain literal brace characters (main-only scope sweep). ([#11682](https://github.com/lablup/backend.ai/issues/11682))
+* Fix `BraceStyleAdapter` log calls that fail when f-string interpolations contain literal brace characters (26.4 scope sweep). ([#11684](https://github.com/lablup/backend.ai/issues/11684))
+* Fix `BraceStyleAdapter` log calls that fail when f-string interpolations contain literal brace characters (25.15 LTS scope sweep). ([#11686](https://github.com/lablup/backend.ai/issues/11686))
+* Skip resource-group slot-type validation for slots requested with a non-positive quantity (or image minimum), and aggregate per-kernel errors instead of failing on the first offending kernel. ([#11691](https://github.com/lablup/backend.ai/issues/11691))
+* Fix sync_appproxy aborting on deployment revisions whose extra_mounts JSONB still carries the legacy VFolderMount shape ([#11699](https://github.com/lablup/backend.ai/issues/11699))
+* Transition deployments to DESTROYING (instead of READY) when rollback is triggered but no `current_revision` exists to revert to. ([#11706](https://github.com/lablup/backend.ai/issues/11706))
+
+### External Dependency Updates
+* Upgrade `valkey-glide` to 2.3.1. ([#11693](https://github.com/lablup/backend.ai/issues/11693))
+
+### Miscellaneous
+* Remove the legacy scheduler module fully superseded by the Sokovan scheduler. ([#11639](https://github.com/lablup/backend.ai/issues/11639))
+
+
 ## 26.4.4rc5 (2026-05-18)
 
 ### Features
