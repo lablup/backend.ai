@@ -18,8 +18,8 @@ from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import (
     BaseBulkAction,
     BaseBulkActionResult,
-    BulkActionTarget,
 )
+from ai.backend.manager.actions.action.types import ActionTarget
 from ai.backend.manager.actions.processor.bulk import (
     BulkActionProcessor,
 )
@@ -33,8 +33,8 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 
 
 @dataclass(frozen=True)
-class _RefTarget(BulkActionTarget):
-    """Wraps a bare ``RBACElementRef`` as a ``BulkActionTarget`` for tests."""
+class _RefTarget(ActionTarget):
+    """Wraps a bare ``RBACElementRef`` as an :class:`ActionTarget` for tests."""
 
     ref: RBACElementRef
 
@@ -59,11 +59,11 @@ def ref_c() -> RBACElementRef:
 
 
 @dataclass
-class _MockBulkAction(BaseBulkAction[BulkActionTarget]):
+class _MockBulkAction(BaseBulkAction[ActionTarget]):
     refs: list[RBACElementRef]
 
     @override
-    def targets(self) -> list[BulkActionTarget]:
+    def targets(self) -> list[ActionTarget]:
         return [_RefTarget(ref=r) for r in self.refs]
 
     @override

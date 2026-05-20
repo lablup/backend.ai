@@ -30,10 +30,10 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BulkActionTarget
+from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
-from ai.backend.manager.actions.action.types import FieldData
+from ai.backend.manager.actions.action.types import ActionTarget, FieldData
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.validator.bulk import DeniedEntity
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -70,8 +70,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @dataclass(frozen=True)
-class _RefTarget(BulkActionTarget):
-    """Wraps a bare ``RBACElementRef`` as a ``BulkActionTarget`` for tests."""
+class _RefTarget(ActionTarget):
+    """Wraps a bare ``RBACElementRef`` as an :class:`ActionTarget` for tests."""
 
     ref: RBACElementRef
 
@@ -151,13 +151,13 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
 
 
 @dataclass
-class _BulkVfolderUpdateAction(BaseBulkAction[BulkActionTarget]):
+class _BulkVfolderUpdateAction(BaseBulkAction[ActionTarget]):
     """VFOLDER:UPDATE on multiple vfolders — exercises the bulk validator path."""
 
     refs: list[RBACElementRef]
 
     @override
-    def targets(self) -> list[BulkActionTarget]:
+    def targets(self) -> list[ActionTarget]:
         return [_RefTarget(ref=r) for r in self.refs]
 
     @classmethod

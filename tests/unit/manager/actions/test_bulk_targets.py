@@ -1,10 +1,9 @@
-"""Contract tests for bulk-action target abstracts.
+"""Contract tests for action-target abstracts and their use in bulk actions.
 
-Covers the hierarchy added in BA-6100:
+Covers:
 
-* :class:`BulkActionTarget` — RBAC element ref (universal).
-* :class:`SearchableBulkActionTarget` — RBAC ref + per-leaf :class:`SearchScope`,
-  used by bulk actions whose semantics include a SQL search.
+* :class:`ActionTarget` — RBAC element ref (universal across all action shapes).
+* :class:`SearchableActionTarget` — RBAC ref + per-leaf :class:`SearchScope`.
 * :class:`BaseBulkAction` parametrized on the target type so consumers see
   ``to_search_scope()`` without isinstance checks.
 """
@@ -18,11 +17,8 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
-from ai.backend.manager.actions.action.bulk import (
-    BaseBulkAction,
-    BulkActionTarget,
-    SearchableBulkActionTarget,
-)
+from ai.backend.manager.actions.action.bulk import BaseBulkAction
+from ai.backend.manager.actions.action.types import ActionTarget, SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base.types import (
@@ -48,7 +44,7 @@ class _StubSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class _SearchableRefTarget(SearchableBulkActionTarget):
+class _SearchableRefTarget(SearchableActionTarget):
     ref: RBACElementRef
     scope: _StubSearchScope
 
@@ -62,11 +58,11 @@ class _SearchableRefTarget(SearchableBulkActionTarget):
 
 
 @dataclass
-class _MockSearchableBulkAction(BaseBulkAction[SearchableBulkActionTarget]):
+class _MockSearchableBulkAction(BaseBulkAction[SearchableActionTarget]):
     items: list[_SearchableRefTarget]
 
     @override
-    def targets(self) -> Sequence[SearchableBulkActionTarget]:
+    def targets(self) -> Sequence[SearchableActionTarget]:
         return list(self.items)
 
     @override
@@ -80,14 +76,14 @@ class _MockSearchableBulkAction(BaseBulkAction[SearchableBulkActionTarget]):
         return ActionOperationType.SEARCH
 
 
-class TestSearchableBulkActionTarget:
-    def test_is_a_bulk_action_target(self) -> None:
+class TestSearchableActionTarget:
+    def test_is_an_action_target(self) -> None:
         target = _SearchableRefTarget(
             ref=RBACElementRef(element_type=RBACElementType.VFOLDER, element_id="vf-1"),
             scope=_StubSearchScope(column_value="vf-1"),
         )
 
-        assert isinstance(target, BulkActionTarget)
+        assert isinstance(target, ActionTarget)
 
     def test_exposes_both_rbac_ref_and_search_scope(self) -> None:
         ref = RBACElementRef(element_type=RBACElementType.VFOLDER, element_id="vf-1")

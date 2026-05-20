@@ -1,30 +1,18 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import Sequence
 from typing import override
 
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base.types import SearchScope
 
 from .base import BaseAction, BaseActionResult
+from .types import ActionTarget
 
 
-class BulkActionTarget(ABC):
-    @abstractmethod
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        raise NotImplementedError
-
-
-class SearchableBulkActionTarget(BulkActionTarget):
-    @abstractmethod
-    def to_search_scope(self) -> SearchScope:
-        raise NotImplementedError
-
-
-class BaseBulkAction[TTarget: BulkActionTarget](BaseAction):
-    """Bulk action over a sequence of :class:`BulkActionTarget`.
+class BaseBulkAction[TTarget: ActionTarget](BaseAction):
+    """Bulk action over a sequence of :class:`ActionTarget`.
 
     Parametrize the target type to require a richer contract — e.g.
-    ``BaseBulkAction[SearchableBulkActionTarget]`` for a scoped search.
+    ``BaseBulkAction[SearchableActionTarget]`` for a scoped search.
     """
 
     @abstractmethod
