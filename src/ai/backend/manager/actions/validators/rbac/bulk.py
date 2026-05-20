@@ -42,7 +42,7 @@ class BulkActionRBACValidator(BulkActionValidator):
     async def validate(
         self, action: BaseBulkAction, meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        element_refs = list(action.element_refs)
+        element_refs = list(action.element_refs())
         if not self._config_provider.config.manager.rbac.enforcement_enabled:
             return BulkValidationResult(
                 allowed_entities=element_refs,

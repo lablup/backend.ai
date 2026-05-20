@@ -33,5 +33,5 @@ class BulkActionValidator(ABC):
     async def validate(
         self, action: BaseBulkAction, meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        """Classify each ref in ``action.element_refs`` as allowed or denied."""
+        """Classify each ref in ``action.element_refs()`` as allowed or denied."""
         raise NotImplementedError

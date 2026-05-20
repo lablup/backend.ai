@@ -45,6 +45,12 @@ def ref_c() -> RBACElementRef:
 
 @dataclass
 class _MockBulkAction(BaseBulkAction):
+    refs: list[RBACElementRef]
+
+    @override
+    def element_refs(self) -> list[RBACElementRef]:
+        return list(self.refs)
+
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
@@ -80,7 +86,7 @@ class _AllowSetValidator(BulkActionValidator):
     async def validate(
         self, action: BaseBulkAction, meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        current = list(action.element_refs)
+        current = list(action.element_refs())
         allowed = [r for r in current if r in self._allowed]
         denied = [
             DeniedEntity(entity_ref=r, deny_reason="not in allow-set")
@@ -106,7 +112,7 @@ class _RecordingValidator(BulkActionValidator):
     async def validate(
         self, action: BaseBulkAction, meta: BaseActionTriggerMeta
     ) -> BulkValidationResult:
-        current = list(action.element_refs)
+        current = list(action.element_refs())
         self.observed_batches.append(current)
         allowed = [r for r in current if r in self._allowed]
         denied = [
@@ -119,7 +125,7 @@ class _RecordingValidator(BulkActionValidator):
 
 def _echo_func() -> Callable[[_MockBulkAction], Awaitable[_MockBulkActionResult]]:
     async def _run(action: _MockBulkAction) -> _MockBulkActionResult:
-        return _MockBulkActionResult(processed_refs=list(action.element_refs))
+        return _MockBulkActionResult(processed_refs=list(action.element_refs()))
 
     return _run
 
@@ -134,7 +140,7 @@ class TestBulkActionProcessor:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
         )
-        action = _MockBulkAction(element_refs=[ref_a, ref_b, ref_c])
+        action = _MockBulkAction(refs=[ref_a, ref_b, ref_c])
 
         result = await processor.wait_for_complete(action)
 
@@ -150,7 +156,7 @@ class TestBulkActionProcessor:
             func=_echo_func(),
             validators=[_AllowSetValidator(allowed={ref_a, ref_b, ref_c})],
         )
-        action = _MockBulkAction(element_refs=[ref_a, ref_b, ref_c])
+        action = _MockBulkAction(refs=[ref_a, ref_b, ref_c])
 
         result = await processor.wait_for_complete(action)
 
@@ -166,7 +172,7 @@ class TestBulkActionProcessor:
             func=_echo_func(),
             validators=[_AllowSetValidator(allowed={ref_a, ref_c})],
         )
-        action = _MockBulkAction(element_refs=[ref_a, ref_b, ref_c])
+        action = _MockBulkAction(refs=[ref_a, ref_b, ref_c])
 
         with pytest.raises(PermissionDeniedError) as exc_info:
             await processor.wait_for_complete(action)
@@ -188,7 +194,7 @@ class TestBulkActionProcessor:
             func=_echo_func(),
             validators=[first, second],
         )
-        action = _MockBulkAction(element_refs=[ref_a, ref_b, ref_c])
+        action = _MockBulkAction(refs=[ref_a, ref_b, ref_c])
 
         with pytest.raises(PermissionDeniedError) as exc_info:
             await processor.wait_for_complete(action)
@@ -211,8 +217,8 @@ class TestBulkActionProcessor:
             func=_echo_func(),
             validators=[_AllowSetValidator(allowed={ref_a, ref_b})],
         )
-        original = _MockBulkAction(element_refs=[ref_a, ref_b])
+        original = _MockBulkAction(refs=[ref_a, ref_b])
 
         await processor.wait_for_complete(original)
 
-        assert original.element_refs == [ref_a, ref_b]
+        assert original.element_refs() == [ref_a, ref_b]

@@ -142,6 +142,12 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
 class _BulkVfolderUpdateAction(BaseBulkAction):
     """VFOLDER:UPDATE on multiple vfolders — exercises the bulk validator path."""
 
+    refs: list[RBACElementRef]
+
+    @override
+    def element_refs(self) -> list[RBACElementRef]:
+        return list(self.refs)
+
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
@@ -329,7 +335,7 @@ async def regular_user_with_vfolder_update(
 @pytest.fixture
 def bulk_vfolder_action() -> _BulkVfolderUpdateAction:
     return _BulkVfolderUpdateAction(
-        element_refs=[_BULK_REF_GRANTED, _BULK_REF_DENIED],
+        refs=[_BULK_REF_GRANTED, _BULK_REF_DENIED],
     )
 
 
@@ -607,7 +613,7 @@ class TestBulkActionRBACValidator:
         validator = BulkActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_without_permission):
             result = await validator.validate(
-                _BulkVfolderUpdateAction(element_refs=[]),
+                _BulkVfolderUpdateAction(refs=[]),
                 trigger_meta,
             )
 

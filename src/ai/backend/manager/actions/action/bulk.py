@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from dataclasses import dataclass
 from typing import TypeVar, override
 
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -7,7 +6,6 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from .base import BaseAction, BaseActionResult
 
 
-@dataclass
 class BaseBulkAction(BaseAction):
     """Bulk action over a list of ``RBACElementRef`` (may mix element types).
 
@@ -15,7 +13,9 @@ class BaseBulkAction(BaseAction):
     types — ``[(PROJECT, p1), (DOMAIN, default)]``.
     """
 
-    element_refs: list[RBACElementRef]
+    @abstractmethod
+    def element_refs(self) -> list[RBACElementRef]:
+        raise NotImplementedError
 
 
 class BaseBulkActionResult(BaseActionResult):
