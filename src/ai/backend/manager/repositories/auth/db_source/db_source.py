@@ -297,13 +297,12 @@ class AuthDBSource:
 
     @auth_db_source_resilience.apply()
     async def fetch_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
-        async with self._db.begin_readonly() as conn:
-            query = sa.select(keypairs.c.user).where(keypairs.c.access_key == access_key)
-            result = await conn.execute(query)
-            row = result.scalar()
-            if row is None:
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
+            user_id = await db_session.scalar(query)
+            if user_id is None:
                 raise AccessKeyNotFound("Unknown access key")
-            return UserID(cast(UUID, row))
+            return UserID(user_id)
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
