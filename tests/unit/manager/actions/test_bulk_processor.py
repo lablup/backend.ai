@@ -125,10 +125,9 @@ class TestBulkActionProcessor:
         )
         action = _MockBulkAction(element_refs=[_REF_A, _REF_B, _REF_C])
 
-        outcome = await processor.wait_for_complete(action)
+        result = await processor.wait_for_complete(action)
 
-        assert outcome.result.processed_refs == [_REF_A, _REF_B, _REF_C]
-        assert outcome.validator_decisions == []
+        assert result.processed_refs == [_REF_A, _REF_B, _REF_C]
 
     async def test_all_allowed_runs_action_normally(self) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
@@ -137,12 +136,9 @@ class TestBulkActionProcessor:
         )
         action = _MockBulkAction(element_refs=[_REF_A, _REF_B, _REF_C])
 
-        outcome = await processor.wait_for_complete(action)
+        result = await processor.wait_for_complete(action)
 
-        assert outcome.result.processed_refs == [_REF_A, _REF_B, _REF_C]
-        decision = outcome.validator_decisions[0]
-        assert decision.results.allowed_entities == [_REF_A, _REF_B, _REF_C]
-        assert decision.results.denied_entities == []
+        assert result.processed_refs == [_REF_A, _REF_B, _REF_C]
 
     async def test_single_validator_partial_denial_raises(self) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
@@ -209,6 +205,6 @@ async def test_full_allow_scenarios(
     )
     action = _MockBulkAction(element_refs=batch)
 
-    outcome = await processor.wait_for_complete(action)
+    result = await processor.wait_for_complete(action)
 
-    assert outcome.result.processed_refs == expected_processed
+    assert result.processed_refs == expected_processed
