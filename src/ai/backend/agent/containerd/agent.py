@@ -189,6 +189,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     resource_lock: asyncio.Lock
     containerd_client: ContainerdClient
     network_provider: NetworkProvider
+    k8s_pod_namespace: str | None
+    k8s_pod_name_prefix: str
     domain_socket_proxies: list[DomainSocketProxy]
     bind_mounts: list[Mount]
 
@@ -207,6 +209,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         port_pool: PortPool,
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
+        k8s_pod_namespace: str | None = None,
+        k8s_pod_name_prefix: str = "kernel",
         restarting: bool = False,
     ) -> None:
         super().__init__(
@@ -233,6 +237,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self.resource_lock = resource_lock
         self.containerd_client = containerd_client
         self.network_provider = network_provider
+        self.k8s_pod_namespace = k8s_pod_namespace
+        self.k8s_pod_name_prefix = k8s_pod_name_prefix
 
         self.domain_socket_proxies = []
         self.bind_mounts = []
@@ -896,6 +902,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         ns_path = await create_netns(netns_name)
         attachment: NetworkAttachment | None = None
         try:
+            # The synthetic K8S_POD_NAMESPACE / K8S_POD_NAME are what
+            # convince cilium-cni that this endpoint has orchestration
+            # backing — without them cilium-cni stamps reserved:init on
+            # the security-relevant label set and a policy-enforcing
+            # fabric drops the kernel's traffic. See cni-exp.md exp.7/8.
+            pod_name = (
+                f"{self.k8s_pod_name_prefix}-{kernel_id_str}" if self.k8s_pod_namespace else None
+            )
             attachment = await self.network_provider.attach(
                 container_id,
                 ns_path,
@@ -904,6 +918,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                     LabelName.KERNEL_ID: kernel_id_str,
                     LabelName.SESSION_ID: str(self.session_id),
                 },
+                k8s_pod_namespace=self.k8s_pod_namespace,
+                k8s_pod_name=pod_name,
             )
             if attachment.ipv4 is None:
                 raise ContainerCreationError(
@@ -1326,6 +1342,15 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
                     "no network provider was built; only 'cilium' mode is wired today."
                 )
             })
+        containerd_config = self.local_config.container.containerd
+        if containerd_config is None:
+            # __ainit__ already enforces this; the recheck just narrows
+            # the optional for the type checker.
+            raise ConfigurationError({
+                "ContainerdAgent.init_kernel_context": (
+                    "container.containerd is required when agent.backend='containerd'."
+                )
+            })
         distro = await self.resolve_image_distro(kernel_config["image"])
         del cluster_ssh_port_mapping  # not yet threaded through to the context.
         return ContainerdKernelCreationContext(
@@ -1341,6 +1366,8 @@ class ContainerdAgent(AbstractAgent[ContainerdKernel, ContainerdKernelCreationCo
             port_pool=self.port_pool,
             agent_sockpath=self.agent_sockpath,
             resource_lock=self.resource_lock,
+            k8s_pod_namespace=containerd_config.network.cilium_pod_namespace,
+            k8s_pod_name_prefix=containerd_config.network.cilium_pod_name_prefix,
             restarting=restarting,
         )
 

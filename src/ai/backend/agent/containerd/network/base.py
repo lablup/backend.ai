@@ -95,12 +95,19 @@ class NetworkProvider(abc.ABC):
         netns_path: str,
         *,
         labels: Mapping[str, str] | None = None,
+        k8s_pod_namespace: str | None = None,
+        k8s_pod_name: str | None = None,
     ) -> NetworkAttachment:
         """Attach the network namespace at ``netns_path`` to the network.
 
         ``labels`` carry the workload's identity (session group, user, …)
-        for providers that map them onto network identity. Returns the
-        address assignment.
+        for providers that map them onto network identity. ``k8s_pod_*``
+        synthesize the orchestration metadata that CNI plugins read off
+        ``CNI_ARGS`` (the ``K8S_POD_NAMESPACE`` / ``K8S_POD_NAME`` keys);
+        Cilium uses this to decide whether the endpoint has a Pod
+        backing it — without these, cilium-cni stamps ``reserved:init``
+        on the endpoint and a policy-enforcing fabric drops its
+        traffic. Returns the address assignment.
         """
 
     @abc.abstractmethod

@@ -115,25 +115,40 @@ class CiliumNetworkProvider(NetworkProvider):
         netns_path: str,
         *,
         labels: Mapping[str, str] | None = None,
+        k8s_pod_namespace: str | None = None,
+        k8s_pod_name: str | None = None,
     ) -> NetworkAttachment:
         """Attach the network namespace to the Cilium network via cilium-cni.
 
-        After CNI ADD, push ``labels`` onto the resulting endpoint via
-        the cilium agent so the endpoint exits ``reserved:init`` and
-        acquires a real cluster identity. Identity assignment is
-        best-effort: a failure is logged but does not abort the attach
-        (the agent socket may be unavailable on a non-cilium node, or
-        when the workload is intentionally policy-free); cluster-policy
-        environments must still treat it as a hard requirement.
+        ``k8s_pod_namespace`` / ``k8s_pod_name`` are passed to cilium-cni
+        as ``CNI_ARGS=K8S_POD_NAMESPACE=...;K8S_POD_NAME=...``; cilium-cni
+        records them on the endpoint's ``external-identifiers`` and
+        treats the endpoint as orchestration-backed, so it does NOT
+        stamp ``reserved:init`` on the security-relevant label set.
+        Without these args, even ``user`` labels pushed via the labels
+        API leave ``reserved:init`` in the identity's labelset and a
+        policy-enforcing fabric drops all traffic (see cni-exp.md
+        experiments 7 & 8, and the diagnostics in this commit).
+
+        After CNI ADD, ``labels`` are pushed onto the endpoint's ``user``
+        slot via the cilium agent for downstream policy targeting.
         """
         conflist = await asyncio.to_thread(
             load_conflist, self._network_name, conf_dir=self._cni_conf_dir
         )
+        cni_args: dict[str, str] | None = None
+        if k8s_pod_namespace or k8s_pod_name:
+            cni_args = {}
+            if k8s_pod_namespace:
+                cni_args["K8S_POD_NAMESPACE"] = k8s_pod_namespace
+            if k8s_pod_name:
+                cni_args["K8S_POD_NAME"] = k8s_pod_name
         result = await self._invoker.add(
             conflist,
             container_id=workload_id,
             netns_path=netns_path,
             ifname=DEFAULT_IFNAME,
+            cni_args=cni_args,
         )
         attachment = NetworkAttachment.from_cni_result(
             result, netns_path=netns_path, interface=DEFAULT_IFNAME
@@ -171,6 +186,9 @@ class CiliumNetworkProvider(NetworkProvider):
         conflist = await asyncio.to_thread(
             load_conflist, self._network_name, conf_dir=self._cni_conf_dir
         )
+        # CNI_ARGS aren't needed for DEL — cilium-cni looks up the
+        # endpoint by container-id/netns and doesn't re-evaluate
+        # orchestration metadata on teardown.
         await self._invoker.delete(
             conflist,
             container_id=workload_id,

@@ -145,6 +145,22 @@ class StepResult:
     help="Path to the node-local cilium agent REST socket (for --check-identity).",
 )
 @click.option(
+    "--pod-namespace",
+    default=None,
+    metavar="NS",
+    help=(
+        "Synthetic K8S_POD_NAMESPACE passed to cilium-cni via CNI_ARGS. "
+        "When set together with --pod-name, cilium-cni records the "
+        "endpoint as orchestration-backed and does NOT stamp reserved:init."
+    ),
+)
+@click.option(
+    "--pod-name",
+    default=None,
+    metavar="NAME",
+    help="Synthetic K8S_POD_NAME passed to cilium-cni via CNI_ARGS.",
+)
+@click.option(
     "--json-output",
     is_flag=True,
     help="Emit a single JSON document to stdout instead of human-readable lines.",
@@ -160,6 +176,8 @@ def run(
     check_identity: bool,
     ping_target: str | None,
     cilium_agent_sock: str,
+    pod_namespace: str | None,
+    pod_name: str | None,
     json_output: bool,
 ) -> None:
     """Walk the full containerd workload lifecycle once and report each step."""
@@ -181,6 +199,8 @@ def run(
             check_identity=check_identity,
             ping_target=ping_target,
             cilium_agent_sock=Path(cilium_agent_sock),
+            k8s_pod_namespace=pod_namespace,
+            k8s_pod_name=pod_name,
         )
     )
     _emit(results, json_output=json_output)
@@ -232,6 +252,22 @@ def run(
     ),
 )
 @click.option(
+    "--pod-namespace",
+    default=None,
+    metavar="NS",
+    help=(
+        "Synthetic K8S_POD_NAMESPACE passed to cilium-cni via CNI_ARGS. "
+        "When set together with --pod-name, cilium-cni records the "
+        "endpoint as orchestration-backed and does NOT stamp reserved:init."
+    ),
+)
+@click.option(
+    "--pod-name",
+    default=None,
+    metavar="NAME",
+    help="Synthetic K8S_POD_NAME passed to cilium-cni via CNI_ARGS.",
+)
+@click.option(
     "--json-output",
     is_flag=True,
     help="Emit a single JSON document to stdout instead of human-readable lines.",
@@ -243,6 +279,8 @@ def net(
     ping_target: str | None,
     cilium_agent_sock: str,
     keep: bool,
+    pod_namespace: str | None,
+    pod_name: str | None,
     json_output: bool,
 ) -> None:
     """Walk the network layer once: netns -> CNI attach -> detach."""
@@ -260,6 +298,8 @@ def net(
             ping_target=ping_target,
             cilium_agent_sock=Path(cilium_agent_sock),
             keep=keep,
+            k8s_pod_namespace=pod_namespace,
+            k8s_pod_name=pod_name,
         )
     )
     _emit(results, json_output=json_output)
@@ -279,6 +319,8 @@ async def _run_lifecycle(
     check_identity: bool,
     ping_target: str | None,
     cilium_agent_sock: Path,
+    k8s_pod_namespace: str | None,
+    k8s_pod_name: str | None,
 ) -> list[StepResult]:
     # Deferred import so `--help` works without the agent's full dependency
     # tree (and the generated stubs) being importable.
@@ -320,7 +362,14 @@ async def _run_lifecycle(
 
                 attached = await _step(
                     "attach",
-                    lambda: _do_attach(provider, workload_id, netns_path, labels=labels),
+                    lambda: _do_attach(
+                        provider,
+                        workload_id,
+                        netns_path,
+                        labels=labels,
+                        k8s_pod_namespace=k8s_pod_namespace,
+                        k8s_pod_name=k8s_pod_name,
+                    ),
                 )
                 results.append(attached)
                 if attached.ok:
@@ -387,6 +436,8 @@ async def _run_network(
     ping_target: str | None,
     cilium_agent_sock: Path,
     keep: bool = False,
+    k8s_pod_namespace: str | None = None,
+    k8s_pod_name: str | None = None,
 ) -> list[StepResult]:
     workload_id = f"containerd-poc-net-{uuid.uuid4().hex[:12]}"
     provider = CiliumNetworkProvider(network_name=network_name)
@@ -402,7 +453,15 @@ async def _run_network(
         cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
         path = netns.netns_path(workload_id)
         attached = await _step(
-            "attach", lambda: _do_attach(provider, workload_id, path, labels=labels)
+            "attach",
+            lambda: _do_attach(
+                provider,
+                workload_id,
+                path,
+                labels=labels,
+                k8s_pod_namespace=k8s_pod_namespace,
+                k8s_pod_name=k8s_pod_name,
+            ),
         )
         results.append(attached)
         if attached.ok:
@@ -568,13 +627,23 @@ async def _do_attach(
     netns_path: str,
     *,
     labels: Mapping[str, str] | None = None,
+    k8s_pod_namespace: str | None = None,
+    k8s_pod_name: str | None = None,
 ) -> dict[str, Any]:
-    attachment = await provider.attach(workload_id, netns_path, labels=labels)
+    attachment = await provider.attach(
+        workload_id,
+        netns_path,
+        labels=labels,
+        k8s_pod_namespace=k8s_pod_namespace,
+        k8s_pod_name=k8s_pod_name,
+    )
     return {
         "ipv4": attachment.ipv4,
         "mac": attachment.mac,
         "interface": attachment.interface,
         "labels_applied": len(labels) if labels else 0,
+        "k8s_pod_namespace": k8s_pod_namespace or "(none)",
+        "k8s_pod_name": k8s_pod_name or "(none)",
     }
 
 
