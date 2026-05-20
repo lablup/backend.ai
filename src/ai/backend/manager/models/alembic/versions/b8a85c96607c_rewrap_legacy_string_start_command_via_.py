@@ -32,6 +32,8 @@ def _rewrap_model_definition(conn: Connection, table: str, column: str) -> None:
 
     for row_id, model_definition in rows:
         changed = False
+        if model_definition is None:
+            continue
         for model in model_definition.get("models") or []:
             service = model.get("service") or {}
             start_command = service.get("start_command")
