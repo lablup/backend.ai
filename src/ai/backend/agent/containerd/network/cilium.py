@@ -65,15 +65,25 @@ _ENDPOINT_LOOKUP_RETRIES = 20
 # Delay between endpoint-lookup retries.
 _ENDPOINT_LOOKUP_DELAY_SECS = 0.2
 
-# How long to wait for an endpoint to reach 'ready' state before
-# PATCHing labels. PATCHing during cilium-cni's k8s-pod reconciliation
-# has been observed to race with reserved:init being re-added.
-_READY_WAIT_RETRIES = 30
-_READY_WAIT_DELAY_SECS = 0.2
+# How long to wait for an endpoint to reach 'ready' state. PATCHing
+# during cilium-cni's k8s-pod reconciliation races with reserved:init
+# being re-added, and after a PATCH we also need to wait for cilium
+# to allocate a new identity for the cleaned labelset
+# (state: regenerating → waiting-for-identity → ready). The same
+# budget covers both waits.
+_READY_WAIT_RETRIES = 60
+_READY_WAIT_DELAY_SECS = 0.25
 
-# How many times to re-PATCH labels if reserved:init survives.
-_LABEL_PATCH_RETRIES = 3
-_LABEL_PATCH_RETRY_DELAY_SECS = 0.5
+# Short pause right after a PATCH so cilium's state has time to leave
+# 'ready' (regeneration begins) before we start polling for ready
+# again. Without this, the wait loop's first poll can catch the
+# pre-PATCH 'ready' and return immediately.
+_LABEL_PATCH_PROPAGATE_DELAY_SECS = 0.3
+
+# How many times to re-PATCH labels if reserved:init survives in the
+# identity's labelset after a full wait-for-ready cycle.
+_LABEL_PATCH_RETRIES = 5
+_LABEL_PATCH_RETRY_DELAY_SECS = 1.0
 
 
 class CiliumNetworkProvider(NetworkProvider):
@@ -262,19 +272,29 @@ class CiliumNetworkProvider(NetworkProvider):
                     raise CiliumIdentityError(
                         f"cilium PATCH endpoint/{endpoint_id}/labels transport error: {e!r}"
                     ) from e
+                # PATCH applied. The state transitions
+                # ready → regenerating → waiting-for-identity → ready.
+                # Sleep briefly so the first poll below doesn't catch the
+                # pre-PATCH 'ready' and return immediately, then wait
+                # for cilium to settle on a new identity.
+                await asyncio.sleep(_LABEL_PATCH_PROPAGATE_DELAY_SECS)
+                await self._wait_for_endpoint_ready(session, workload_id, endpoint_id)
                 # Verify: re-fetch the endpoint and confirm reserved:init
-                # is gone from the identity's labelset.
+                # is gone from the identity's labelset (the new identity
+                # cilium just allocated for the cleaned labelset).
                 refreshed = await self._find_endpoint(session, workload_id)
                 if refreshed is None:
                     break
                 id_labels = (refreshed.get("status") or {}).get("identity", {}).get("labels", [])
                 if "reserved:init" not in id_labels:
+                    new_id = (refreshed.get("status") or {}).get("identity", {}).get("id")
                     log.info(
-                        "cilium: endpoint {} (workload {}) labeled with {} entries "
-                        "(stable after {} attempt(s))",
+                        "cilium: endpoint {} (workload {}) labeled with {} entries; "
+                        "new identity {} (stable after {} attempt(s))",
                         endpoint_id,
                         workload_id,
                         len(user_labels),
+                        new_id,
                         attempt,
                     )
                     return
