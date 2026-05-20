@@ -1416,19 +1416,23 @@ class ContainerdNetworkConfig(BaseConfigSchema):
     cilium_pod_namespace: Annotated[
         str,
         Field(
-            default="backendai-kernels",
+            default="",
             validation_alias=AliasChoices("cilium-pod-namespace", "cilium_pod_namespace"),
             serialization_alias="cilium-pod-namespace",
         ),
         BackendAIConfigMeta(
             description=(
-                "Synthetic Kubernetes namespace stamped into "
-                "PodSandboxConfig.metadata.namespace when invoking containerd CRI "
-                "in 'cilium' mode. No backing Pod object exists; Cilium falls back "
-                "to 'reserved:init' identity. Only used in 'cilium' mode."
+                "Kubernetes namespace passed to cilium-cni as "
+                "CNI_ARGS=K8S_POD_NAMESPACE=... . Leave empty (the default) for "
+                "non-k8s containerd workloads on a cluster Cilium: empirically, "
+                "advertising a synthetic ns/name made cilium-cni reconcile against "
+                "the k8s API, fail to find the (non-existent) Pod, and strip the "
+                "agent's user labels — leaving the endpoint stuck at "
+                "'reserved:init' and policy-restricted. Set this only when a real "
+                "backing Pod (or Cilium External Workload) exists with that ns/name."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="backendai-kernels", prod="backendai-kernels"),
+            example=ConfigExample(local="", prod=""),
         ),
     ]
     cilium_pod_name_prefix: Annotated[
@@ -1441,8 +1445,8 @@ class ContainerdNetworkConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Prefix for the synthetic Pod name (combined with the kernel id) "
-                "stamped into PodSandboxConfig.metadata.name when invoking "
-                "containerd CRI in 'cilium' mode. Only used in 'cilium' mode."
+                "stamped into CNI_ARGS=K8S_POD_NAME when cilium_pod_namespace is "
+                "set. Ignored when cilium_pod_namespace is empty (the default)."
             ),
             added_version="25.12.0",
             example=ConfigExample(local="kernel", prod="kernel"),
