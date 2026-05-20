@@ -364,42 +364,52 @@ async def _run_lifecycle(
         results.append(await _step("pull_image", lambda: _do_pull_image(cd, image)))
         results.append(await _step("get_image", lambda: _do_get_image(cd, image)))
 
-        prepared = await _step(
-            "prepare_snapshot", lambda: _do_prepare_snapshot(cd, image, workload_id, rootfs)
-        )
-        results.append(prepared)
-        if prepared.ok:
-            cleanups.append(("remove_snapshot", lambda: _do_remove_snapshot(cd, workload_id)))
+        # IMPORTANT — order must match ContainerdAgent.start_container:
+        # netns -> CNI attach (slow with cilium identity) -> prepare snapshot
+        # -> create_container -> create_task. Putting prepare_snapshot before
+        # attach opens a multi-second window during which containerd's GC
+        # cleans the unreferenced snapshot, and create_task then fails with
+        # 'no such file or directory' on the upperdir.
+        netns_created = await _step("create_netns", lambda: _do_create_netns(workload_id))
+        results.append(netns_created)
+        if netns_created.ok:
+            cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
 
-            netns_created = await _step("create_netns", lambda: _do_create_netns(workload_id))
-            results.append(netns_created)
-            if netns_created.ok:
-                cleanups.append(("delete_netns", lambda: _do_delete_netns(workload_id)))
-
-                attached = await _step(
-                    "attach",
-                    lambda: _do_attach(
-                        provider,
-                        workload_id,
-                        netns_path,
-                        labels=labels,
-                        k8s_pod_namespace=k8s_pod_namespace,
-                        k8s_pod_name=k8s_pod_name,
-                    ),
-                )
-                results.append(attached)
-                if attached.ok:
-                    cleanups.append((
-                        "detach",
-                        lambda: _do_detach(provider, workload_id, netns_path),
-                    ))
-                    if check_identity:
-                        results.append(
-                            await _step(
-                                "check_identity",
-                                lambda: _do_check_identity(workload_id, cilium_agent_sock),
-                            )
+            attached = await _step(
+                "attach",
+                lambda: _do_attach(
+                    provider,
+                    workload_id,
+                    netns_path,
+                    labels=labels,
+                    k8s_pod_namespace=k8s_pod_namespace,
+                    k8s_pod_name=k8s_pod_name,
+                ),
+            )
+            results.append(attached)
+            if attached.ok:
+                cleanups.append((
+                    "detach",
+                    lambda: _do_detach(provider, workload_id, netns_path),
+                ))
+                if check_identity:
+                    results.append(
+                        await _step(
+                            "check_identity",
+                            lambda: _do_check_identity(workload_id, cilium_agent_sock),
                         )
+                    )
+
+                prepared = await _step(
+                    "prepare_snapshot",
+                    lambda: _do_prepare_snapshot(cd, image, workload_id, rootfs),
+                )
+                results.append(prepared)
+                if prepared.ok:
+                    cleanups.append((
+                        "remove_snapshot",
+                        lambda: _do_remove_snapshot(cd, workload_id),
+                    ))
 
                     created = await _step(
                         "create_container",
