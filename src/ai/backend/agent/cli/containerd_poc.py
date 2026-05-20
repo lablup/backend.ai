@@ -676,11 +676,22 @@ async def _do_check_identity(workload_id: str, sock_path: Path) -> dict[str, Any
                     continue
                 identity = status.get("identity") or {}
                 policy_realized = (status.get("policy") or {}).get("realized") or {}
+                # The endpoint's own labels.* tree (alongside identity.*)
+                # tells us which cilium category each label lives in.
+                ep_labels = status.get("labels") or {}
+                realized_user = (ep_labels.get("realized") or {}).get("user", [])
                 candidate = {
                     "endpoint_id": ep.get("id"),
                     "identity_id": identity.get("id"),
                     "identity_labels": identity.get("labels", []),
                     "policy_enabled": policy_realized.get("policy-enabled", "unknown"),
+                    "ext_pod_name": ext.get("pod-name", "(missing)"),
+                    "ext_container_id": ext.get("container-id", "(missing)"),
+                    "ep_labels_realized_user": realized_user,
+                    "ep_labels_security_relevant": ep_labels.get("security-relevant", []),
+                    "ep_labels_derived": ep_labels.get("derived", []),
+                    "ep_labels_disabled": ep_labels.get("disabled", []),
+                    "ep_state": status.get("state", "?"),
                 }
                 ident_id = candidate["identity_id"]
                 if isinstance(ident_id, int) and ident_id >= 256:
@@ -694,21 +705,6 @@ async def _do_check_identity(workload_id: str, sock_path: Path) -> dict[str, Any
             raise RuntimeError(
                 f"no cilium endpoint matched container-id={workload_id!r} with a real identity"
             )
-        # Augment with the full label-category breakdown so we can tell
-        # whether reserved:init lives in user / derived / disabled. This
-        # is the key diagnostic for the 'reserved:init re-appears' case.
-        async with session.get(f"http://localhost/v1/endpoint/{endpoint_id}/labels") as resp:
-            if resp.status < 400:
-                lstatus = await resp.json()
-                realized = lstatus.get("realized") or {}
-                last_state["label_realized_user"] = realized.get("user", [])
-                last_state["label_derived"] = lstatus.get("derived", [])
-                last_state["label_disabled"] = lstatus.get("disabled", [])
-                last_state["label_security_relevant"] = lstatus.get("security-relevant", [])
-            else:
-                last_state["labels_dump_error"] = (
-                    f"GET /v1/endpoint/{endpoint_id}/labels -> {resp.status}"
-                )
         return last_state
 
 
