@@ -10906,9 +10906,7 @@ input RoleStatusFilter {
   notIn: [RoleStatus!] = null
 }
 
-"""
-Added in UNRELEASED. Nested filter for users within a role filter. Matches roles assigned to at least one user satisfying all conditions.
-"""
+"""Added in UNRELEASED. Filter roles by their user assignments."""
 input RoleUserNestedFilter {
   userId: UUIDFilter = null
   AND: [RoleUserNestedFilter!] = null
