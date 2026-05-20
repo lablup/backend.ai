@@ -1032,7 +1032,7 @@ enum AuditLogOrderField {
 }
 
 """
-Added in UNRELEASED. Scope target for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
+Added in UNRELEASED. Scope for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
 """
 input AuditLogScope {
   """Entity-tagged scope items."""
@@ -8984,9 +8984,9 @@ type Query {
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
 
   """
-  Added in UNRELEASED. Query audit logs within a scope target (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
+  Added in UNRELEASED. Query audit logs within a scope (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
   """
-  scopedAuditLogsV2(scopeTarget: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
+  scopedAuditLogsV2(scope: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
 
   """
   Added in 26.4.2. List container registries with filtering, ordering, and pagination (admin only).
