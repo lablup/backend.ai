@@ -15888,6 +15888,7 @@ input RoleFilter
   name: StringFilter = null
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
+  assignedUser: RoleUserNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -16101,6 +16102,18 @@ input RoleStatusFilter
 
   """Excludes roles whose status is in this list."""
   notIn: [RoleStatus!] = null
+}
+
+"""
+Added in UNRELEASED. Nested filter for users within a role filter. Matches roles assigned to at least one user satisfying all conditions.
+"""
+input RoleUserNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  userId: UUIDFilter = null
+  AND: [RoleUserNestedFilter!] = null
+  OR: [RoleUserNestedFilter!] = null
+  NOT: [RoleUserNestedFilter!] = null
 }
 
 """
