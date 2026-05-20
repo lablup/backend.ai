@@ -82,9 +82,11 @@ class TestPydanticInputCompat:
 class TestModelDefinitionInputCompat:
     """vfolder YAML scan → ``ModelDefinition.model_validate``."""
 
-    @pytest.mark.parametrize(("raw", "expected"), START_COMMAND_CASES)
-    def test_str_input_is_normalized(self, raw: str, expected: list[str]) -> None:
-        result = ModelDefinition.model_validate(_wrap_definition(raw))
+    @pytest.mark.parametrize(("raw", "shell", "expected"), START_COMMAND_CASES)
+    def test_str_input_is_normalized(
+        self, raw: str, shell: str | None, expected: list[str]
+    ) -> None:
+        result = ModelDefinition.model_validate(_wrap_definition(raw, shell))
         assert result.models[0].service is not None
         assert result.models[0].service.start_command == expected
 
