@@ -3,10 +3,15 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.dto.manager.v2.audit_log.request import AdminSearchAuditLogsInput
+from ai.backend.common.dto.manager.v2.audit_log.request import (
+    AdminSearchAuditLogsInput,
+    ScopedSearchAuditLogsInput,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.audit_log.types import (
     AuditLogFilterGQL,
     AuditLogOrderByGQL,
+    AuditLogScopeGQL,
     AuditLogV2ConnectionGQL,
     AuditLogV2EdgeGQL,
     AuditLogV2GQL,
@@ -62,3 +67,38 @@ async def admin_audit_logs_v2(
         ),
         count=result.total_count,
     )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Query audit logs within a scope (non-admin accessible, subject to RBAC). "
+            "All scope items are OR'd; raises an error if every field is empty."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_audit_logs_v2(
+    info: Info[StrawberryGQLContext],
+    scope: AuditLogScopeGQL,
+    filter: AuditLogFilterGQL | None = None,
+    order_by: list[AuditLogOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> AuditLogV2ConnectionGQL | None:
+    ScopedSearchAuditLogsInput(
+        scope=scope.to_pydantic(),
+        filter=filter.to_pydantic() if filter else None,
+        order=[o.to_pydantic() for o in order_by] if order_by else None,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    raise NotImplementedError("scoped_audit_logs_v2 resolver body lands in BA-6097")

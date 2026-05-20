@@ -1435,6 +1435,7 @@ input AuditLogFilter
   @join__type(graph: STRAWBERRY)
 {
   entityType: StringFilter = null
+  entityId: StringFilter = null
   operation: StringFilter = null
   status: AuditLogStatusFilter = null
   createdAt: DateTimeFilter = null
@@ -1522,6 +1523,19 @@ type AuditLogSchema
   Possible values of "AuditLogNode.status"
   """
   status_variants: [String]
+}
+
+"""
+Added in UNRELEASED. Scope for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
+"""
+input AuditLogScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Entity-tagged scope items."""
+  entity: [EntityTypeScope!] = null
+
+  """Actor UUIDs (matches audit_logs.triggered_by)."""
+  triggeredUser: [UUIDScope!] = null
 }
 
 """Added in 26.3.0. Status of an audit log entry."""
@@ -6681,6 +6695,19 @@ type EntityTimestamps
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
+}
+
+"""
+Added in UNRELEASED. Entity reference parametrized by RBAC element type.
+"""
+input EntityTypeScope
+  @join__type(graph: STRAWBERRY)
+{
+  """RBAC element type of the entity."""
+  entityType: RBACElementType!
+
+  """ID of the entity."""
+  entityId: String!
 }
 
 """
@@ -13837,6 +13864,11 @@ type Query
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. Query audit logs within a scope (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
+  """
+  scopedAuditLogsV2(scope: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.2. List container registries with filtering, ordering, and pagination (admin only).
   """
   adminContainerRegistriesV2(filter: ContainerRegistryV2Filter = null, orderBy: [ContainerRegistryV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ContainerRegistryV2Connection @join__field(graph: STRAWBERRY)
@@ -20145,6 +20177,14 @@ Verifies that the key is a UUID (represented as a string) and the value is a flo
 """
 scalar UUIDFloatMap
   @join__type(graph: GRAPHENE)
+
+"""Added in UNRELEASED. Single-UUID scope item wrapper."""
+input UUIDScope
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID value."""
+  value: UUID!
+}
 
 """Added in 24.09.0. Input for validate notification channel mutation"""
 input ValidateNotificationChannelInput
