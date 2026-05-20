@@ -28,13 +28,19 @@ from ai.backend.manager.actions.validator.bulk import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 
 
-def _ref(element_type: RBACElementType, element_id: str) -> RBACElementRef:
-    return RBACElementRef(element_type=element_type, element_id=element_id)
+@pytest.fixture
+def ref_a() -> RBACElementRef:
+    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="a")
 
 
-_REF_A = _ref(RBACElementType.SESSION, "a")
-_REF_B = _ref(RBACElementType.SESSION, "b")
-_REF_C = _ref(RBACElementType.SESSION, "c")
+@pytest.fixture
+def ref_b() -> RBACElementRef:
+    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="b")
+
+
+@pytest.fixture
+def ref_c() -> RBACElementRef:
+    return RBACElementRef(element_type=RBACElementType.SESSION, element_id="c")
 
 
 @dataclass
@@ -119,92 +125,94 @@ def _echo_func() -> Callable[[_MockBulkAction], Awaitable[_MockBulkActionResult]
 
 
 class TestBulkActionProcessor:
-    async def test_no_validators_passes_all_refs_through(self) -> None:
+    async def test_no_validators_passes_all_refs_through(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+        ref_c: RBACElementRef,
+    ) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
         )
-        action = _MockBulkAction(element_refs=[_REF_A, _REF_B, _REF_C])
+        action = _MockBulkAction(element_refs=[ref_a, ref_b, ref_c])
 
         result = await processor.wait_for_complete(action)
 
-        assert result.processed_refs == [_REF_A, _REF_B, _REF_C]
+        assert result.processed_refs == [ref_a, ref_b, ref_c]
 
-    async def test_all_allowed_runs_action_normally(self) -> None:
+    async def test_all_allowed_runs_action_normally(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+        ref_c: RBACElementRef,
+    ) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
-            validators=[_AllowSetValidator(allowed={_REF_A, _REF_B, _REF_C})],
+            validators=[_AllowSetValidator(allowed={ref_a, ref_b, ref_c})],
         )
-        action = _MockBulkAction(element_refs=[_REF_A, _REF_B, _REF_C])
+        action = _MockBulkAction(element_refs=[ref_a, ref_b, ref_c])
 
         result = await processor.wait_for_complete(action)
 
-        assert result.processed_refs == [_REF_A, _REF_B, _REF_C]
+        assert result.processed_refs == [ref_a, ref_b, ref_c]
 
-    async def test_single_validator_partial_denial_raises(self) -> None:
+    async def test_single_validator_partial_denial_raises(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+        ref_c: RBACElementRef,
+    ) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
-            validators=[_AllowSetValidator(allowed={_REF_A, _REF_C})],
+            validators=[_AllowSetValidator(allowed={ref_a, ref_c})],
         )
-        action = _MockBulkAction(element_refs=[_REF_A, _REF_B, _REF_C])
+        action = _MockBulkAction(element_refs=[ref_a, ref_b, ref_c])
 
         with pytest.raises(PermissionDeniedError) as exc_info:
             await processor.wait_for_complete(action)
 
         msg = str(exc_info.value)
-        assert _REF_B.to_str() in msg
+        assert ref_b.to_str() in msg
         assert "not in allow-set" in msg
 
-    async def test_full_chain_runs_before_raising(self) -> None:
+    async def test_full_chain_runs_before_raising(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+        ref_c: RBACElementRef,
+    ) -> None:
         """Every validator runs even when an earlier one denied refs."""
-        first = _RecordingValidator(allowed={_REF_A, _REF_B})
-        second = _RecordingValidator(allowed={_REF_A})
+        first = _RecordingValidator(allowed={ref_a, ref_b})
+        second = _RecordingValidator(allowed={ref_a})
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
             validators=[first, second],
         )
-        action = _MockBulkAction(element_refs=[_REF_A, _REF_B, _REF_C])
+        action = _MockBulkAction(element_refs=[ref_a, ref_b, ref_c])
 
         with pytest.raises(PermissionDeniedError) as exc_info:
             await processor.wait_for_complete(action)
 
         # Both validators saw the original (unfiltered) action.
-        assert first.observed_batches == [[_REF_A, _REF_B, _REF_C]]
-        assert second.observed_batches == [[_REF_A, _REF_B, _REF_C]]
+        assert first.observed_batches == [[ref_a, ref_b, ref_c]]
+        assert second.observed_batches == [[ref_a, ref_b, ref_c]]
         # Aggregated denials from both validators surface in the error,
         # each paired with its deny reason.
         msg = str(exc_info.value)
-        assert f"{_REF_B.to_str()} (blocked)" in msg
-        assert f"{_REF_C.to_str()} (blocked)" in msg
+        assert f"{ref_b.to_str()} (blocked)" in msg
+        assert f"{ref_c.to_str()} (blocked)" in msg
 
-    async def test_original_action_is_not_mutated(self) -> None:
+    async def test_original_action_is_not_mutated(
+        self,
+        ref_a: RBACElementRef,
+        ref_b: RBACElementRef,
+    ) -> None:
         processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
             func=_echo_func(),
-            validators=[_AllowSetValidator(allowed={_REF_A, _REF_B})],
+            validators=[_AllowSetValidator(allowed={ref_a, ref_b})],
         )
-        original = _MockBulkAction(element_refs=[_REF_A, _REF_B])
+        original = _MockBulkAction(element_refs=[ref_a, ref_b])
 
         await processor.wait_for_complete(original)
 
-        assert original.element_refs == [_REF_A, _REF_B]
-
-
-@pytest.mark.parametrize(
-    ("allowed", "batch", "expected_processed"),
-    [
-        ({_REF_A, _REF_B}, [_REF_A, _REF_B], [_REF_A, _REF_B]),
-    ],
-)
-async def test_full_allow_scenarios(
-    allowed: set[RBACElementRef],
-    batch: list[RBACElementRef],
-    expected_processed: list[RBACElementRef],
-) -> None:
-    processor = BulkActionProcessor[_MockBulkAction, _MockBulkActionResult](
-        func=_echo_func(),
-        validators=[_AllowSetValidator(allowed=allowed)],
-    )
-    action = _MockBulkAction(element_refs=batch)
-
-    result = await processor.wait_for_complete(action)
-
-    assert result.processed_refs == expected_processed
+        assert original.element_refs == [ref_a, ref_b]

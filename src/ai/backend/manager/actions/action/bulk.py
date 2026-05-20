@@ -9,7 +9,11 @@ from .base import BaseAction, BaseActionResult
 
 @dataclass
 class BaseBulkAction(BaseAction):
-    """Bulk action over a list of ``RBACElementRef`` (may mix element types)."""
+    """Bulk action over a list of ``RBACElementRef`` (may mix element types).
+
+    For example, a scoped audit-log search may pass refs of different
+    types — ``[(PROJECT, p1), (DOMAIN, default)]``.
+    """
 
     element_refs: list[RBACElementRef]
 
