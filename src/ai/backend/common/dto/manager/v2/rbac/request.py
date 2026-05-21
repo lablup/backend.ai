@@ -51,6 +51,7 @@ __all__ = (
     "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
+    "UserNestedFilter",
 )
 
 
@@ -201,12 +202,25 @@ class ReplaceRolePermissionsInput(BaseRequestModel):
     )
 
 
+class UserNestedFilter(BaseRequestModel):
+    """Filter roles by their user assignments."""
+
+    user_id: UUIDFilter | None = None
+    AND: list[UserNestedFilter] | None = None
+    OR: list[UserNestedFilter] | None = None
+    NOT: list[UserNestedFilter] | None = None
+
+
+UserNestedFilter.model_rebuild()
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
+    assigned_user: UserNestedFilter | None = None
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
