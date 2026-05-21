@@ -8790,14 +8790,16 @@ type LoginHistoryV2 implements Node
   """Timestamp when the login attempt occurred."""
   createdAt: DateTime!
 
+  """
+  Added in UNRELEASED. Client IP that initiated the event. Null for system-driven events (e.g. eviction, expiration).
+  """
+  clientIp: String
+
   """Added in 26.4.3. The user who attempted to log in."""
   user: UserV2
 
   """Added in 26.4.3. The domain at the time of the login attempt."""
   domain: DomainV2
-
-  """Added in UNRELEASED. Client IP that initiated the event. Null for system-driven events (e.g. eviction, expiration)."""
-  clientIp: String
 }
 
 """Added in 26.4.2. Connection type for paginated login history results."""
