@@ -90,15 +90,28 @@ async def scoped_audit_logs_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> AuditLogV2ConnectionGQL | None:
-    ScopedSearchAuditLogsInput(
-        scope=scope.to_pydantic(),
-        filter=filter.to_pydantic() if filter else None,
-        order=[o.to_pydantic() for o in order_by] if order_by else None,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.audit_log.scoped_search(
+        ScopedSearchAuditLogsInput(
+            scope=scope.to_pydantic(),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
     )
-    raise NotImplementedError("scoped_audit_logs_v2 resolver body lands in BA-6097")
+    nodes = [AuditLogV2GQL.from_pydantic(item) for item in result.items]
+    edges = [AuditLogV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return AuditLogV2ConnectionGQL(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
