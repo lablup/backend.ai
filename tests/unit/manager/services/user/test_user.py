@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
@@ -109,6 +110,7 @@ class TestUserServiceCompatibility:
                     full_name="Test User",
                     role=UserRole.USER,
                     domain_name="default",
+                    domain_id=DomainID(uuid.uuid4()),
                     need_password_change=False,
                     resource_policy="default-user-policy",
                     status=UserStatus.ACTIVE,
@@ -141,6 +143,7 @@ class TestUserServiceCompatibility:
                     username="containeruser",
                     need_password_change=False,
                     domain_name="default",
+                    domain_id=DomainID(uuid.uuid4()),
                     container_uid=2000,
                     container_main_gid=2000,
                     container_gids=[2000, 2001],
@@ -283,6 +286,7 @@ class TestUserServiceCompatibility:
                 description="Test Description",
                 need_password_change=False,
                 domain_name="default",
+                domain_id=DomainID(uuid.uuid4()),
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
                 allowed_client_ip=["192.168.1.0/24"],

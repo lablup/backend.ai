@@ -12,6 +12,7 @@ from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -122,6 +123,7 @@ async def admin_bulk_create_users_v2(
             rounds=auth_config.password_hash_rounds,
             salt_size=auth_config.password_hash_salt_size,
         )
+        domain_id = await ctx.adapters.domain.resolve_domain_id_by_name(DomainName(dto.domain_name))
 
         spec = UserCreatorSpec(
             email=dto.email,
@@ -129,6 +131,7 @@ async def admin_bulk_create_users_v2(
             password=password_info,
             need_password_change=dto.need_password_change,
             domain_name=dto.domain_name,
+            domain_id=domain_id,
             full_name=dto.full_name,
             description=dto.description,
             status=UserStatus(dto.status),

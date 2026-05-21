@@ -19,6 +19,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import UserNotFound
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import (
     UserData,
@@ -50,6 +51,9 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
+    ResolveDomainIDByNameAction,
+)
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -952,7 +956,9 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
-    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> CreateUserAction:
+    def to_action(
+        self, email: str, domain_id: DomainID, graph_ctx: GraphQueryContext
+    ) -> CreateUserAction:
         def value_or_none(value: Any) -> Any | None:
             return value if value is not Undefined else None
 
@@ -972,6 +978,7 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
                     email=email,
                     need_password_change=bool(self.need_password_change),
                     domain_name=str(self.domain_name),
+                    domain_id=domain_id,
                     full_name=value_or_none(self.full_name),
                     description=value_or_none(self.description),
                     is_active=value_or_none(self.is_active),
@@ -1020,7 +1027,9 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> ModifyUserAction:
+    def to_action(
+        self, email: str, domain_id: DomainID | None, graph_ctx: GraphQueryContext
+    ) -> ModifyUserAction:
         # Create PasswordInfo if password is being changed
         password_state = OptionalState[PasswordInfo].nop()
         if self.password is not Undefined and self.password is not None:
@@ -1058,6 +1067,9 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             domain_name=OptionalState[str].from_graphql(
                 self.domain_name,
             ),
+            domain_id=OptionalState[DomainID].from_graphql(domain_id)
+            if domain_id is not None
+            else OptionalState[DomainID].nop(),
             role=OptionalState[UserRole].from_graphql(
                 self.role if (self.role is Undefined or self.role is None) else UserRole(self.role),
             ),
@@ -1147,7 +1159,10 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         validate_user_mutation_props(props)
 
         graph_ctx: GraphQueryContext = info.context
-        action: CreateUserAction = props.to_action(email, graph_ctx)
+        resolve_res = await graph_ctx.processors.domain.resolve_domain_id_by_name.wait_for_complete(
+            ResolveDomainIDByNameAction(name=DomainName(str(props.domain_name)))
+        )
+        action: CreateUserAction = props.to_action(email, resolve_res.domain_id, graph_ctx)
 
         action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
         keypair = KeyPair.from_data(action_result.data.keypair)
@@ -1183,7 +1198,15 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
 
         validate_user_mutation_props(props)
 
-        action: ModifyUserAction = props.to_action(email, graph_ctx)
+        domain_id: DomainID | None = None
+        if props.domain_name is not Undefined and props.domain_name is not None:
+            resolve_res = (
+                await graph_ctx.processors.domain.resolve_domain_id_by_name.wait_for_complete(
+                    ResolveDomainIDByNameAction(name=DomainName(str(props.domain_name)))
+                )
+            )
+            domain_id = resolve_res.domain_id
+        action: ModifyUserAction = props.to_action(email, domain_id, graph_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
         action.user_uuid = user_data.id
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(

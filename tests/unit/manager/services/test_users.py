@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
@@ -157,6 +158,7 @@ class TestCreateUser:
                     password=sample_password_info,
                     need_password_change=sample_user_data.need_password_change,
                     domain_name=sample_user_data.domain_name,
+                    domain_id=DomainID(uuid.uuid4()),
                 )
             ),
             group_ids=None,
@@ -192,6 +194,7 @@ class TestCreateUser:
                     password=sample_password_info,
                     need_password_change=sample_user_data.need_password_change,
                     domain_name=sample_user_data.domain_name,
+                    domain_id=DomainID(uuid.uuid4()),
                 )
             ),
             group_ids=group_ids,
@@ -223,6 +226,7 @@ class TestCreateUser:
                     password=sample_password_info,
                     need_password_change=False,
                     domain_name="default",
+                    domain_id=DomainID(uuid.uuid4()),
                 )
             ),
         )

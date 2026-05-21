@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
+from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.user.types import UserInfoContext
@@ -36,6 +37,9 @@ from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPath
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
+    ResolveDomainIDByNameAction,
+)
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
@@ -48,6 +52,7 @@ from .adapter import UserAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.services.domain.processors import DomainProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -56,8 +61,15 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class UserHandler:
     """User admin API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, user: UserProcessors, config_provider: ManagerConfigProvider) -> None:
+    def __init__(
+        self,
+        *,
+        user: UserProcessors,
+        domain: DomainProcessors,
+        config_provider: ManagerConfigProvider,
+    ) -> None:
         self._user = user
+        self._domain = domain
         self._config_provider = config_provider
         self._adapter = UserAdapter()
 
@@ -77,6 +89,9 @@ class UserHandler:
             rounds=self._config_provider.config.auth.password_hash_rounds,
             salt_size=self._config_provider.config.auth.password_hash_salt_size,
         )
+        resolve_result = await self._domain.resolve_domain_id_by_name.wait_for_complete(
+            ResolveDomainIDByNameAction(name=DomainName(body.parsed.domain_name))
+        )
 
         creator = Creator(
             spec=UserCreatorSpec(
@@ -85,6 +100,7 @@ class UserHandler:
                 password=password_info,
                 need_password_change=body.parsed.need_password_change,
                 domain_name=body.parsed.domain_name,
+                domain_id=resolve_result.domain_id,
                 full_name=body.parsed.full_name,
                 description=body.parsed.description,
                 status=ManagerUserStatus(body.parsed.status.value)

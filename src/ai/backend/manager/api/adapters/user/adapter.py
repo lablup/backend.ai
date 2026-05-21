@@ -88,6 +88,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.domain import DomainName
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -121,6 +122,9 @@ from ai.backend.manager.repositories.user.types import (
     RoleUserSearchScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
+    ResolveDomainIDByNameAction,
+)
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
@@ -402,12 +406,16 @@ class UserAdapter(BaseAdapter):
             rounds=self._auth_config.password_hash_rounds,
             salt_size=self._auth_config.password_hash_salt_size,
         )
+        resolve_result = await self._processors.domain.resolve_domain_id_by_name.wait_for_complete(
+            ResolveDomainIDByNameAction(name=DomainName(input.domain_name))
+        )
         spec = UserCreatorSpec(
             email=input.email,
             username=input.username,
             password=password_info,
             need_password_change=input.need_password_change,
             domain_name=input.domain_name,
+            domain_id=resolve_result.domain_id,
             full_name=input.full_name,
             description=input.description,
             status=UserStatus(input.status),

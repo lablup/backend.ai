@@ -127,7 +127,11 @@ def server_module_registries(
     mock_gql_deps.adapters.user = UserAdapter(processors=mock_processors, auth_config=None)  # type: ignore[arg-type]
 
     user_registry = register_user_routes(
-        UserHandler(user=user_processors, config_provider=config_provider),
+        UserHandler(
+            user=user_processors,
+            domain=MagicMock(),
+            config_provider=config_provider,
+        ),
         route_deps,
     )
     return [

@@ -16,6 +16,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
@@ -176,6 +177,7 @@ class TestCreateUser:
                 password=_make_password_info(),
                 need_password_change=False,
                 domain_name="default",
+                domain_id=DomainID(uuid.uuid4()),
             )
         )
         action = CreateUserAction(creator=creator)
@@ -206,6 +208,7 @@ class TestCreateUser:
                 password=_make_password_info(),
                 need_password_change=False,
                 domain_name="default",
+                domain_id=DomainID(uuid.uuid4()),
             )
         )
         action = CreateUserAction(creator=creator, group_ids=group_ids)
@@ -232,6 +235,7 @@ class TestCreateUser:
                 password=_make_password_info(),
                 need_password_change=False,
                 domain_name="default",
+                domain_id=DomainID(uuid.uuid4()),
             )
         )
         action = CreateUserAction(creator=creator)
@@ -260,6 +264,7 @@ class TestBulkCreateUser:
                     password=_make_password_info(),
                     need_password_change=False,
                     domain_name="default",
+                    domain_id=DomainID(uuid.uuid4()),
                 )
             ),
         )
@@ -301,6 +306,7 @@ class TestBulkCreateUser:
                     password=_make_password_info(),
                     need_password_change=False,
                     domain_name="default",
+                    domain_id=DomainID(uuid.uuid4()),
                 ),
                 exception=InvalidAPIParameters("Duplicate email"),
                 index=2,

@@ -13,6 +13,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ReadableCIDR, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
@@ -207,6 +208,7 @@ class TestUserRepository:
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
             )
@@ -235,6 +237,7 @@ class TestUserRepository:
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
             )
@@ -307,6 +310,7 @@ class TestUserRepository:
             description="Test Description",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -377,6 +381,7 @@ class TestUserRepository:
             description="New User Description",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -416,6 +421,7 @@ class TestUserRepository:
             description="New User Description",
             status=UserStatus.ACTIVE,
             domain_name="nonexistent-domain",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -448,6 +454,7 @@ class TestUserRepository:
             description="New User Description",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -479,6 +486,7 @@ class TestUserRepository:
             description="New User Description",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -538,6 +546,7 @@ class TestUserRepository:
             description="New User Description",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -583,6 +592,7 @@ class TestUserRepository:
             description="New User Description",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -628,6 +638,7 @@ class TestUserRepository:
             description="New User Description",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -946,6 +957,7 @@ class TestUserRepository:
                 description=f"Bulk created user {i}",
                 status=UserStatus.ACTIVE,
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
                 allowed_client_ip=None,
@@ -991,6 +1003,7 @@ class TestUserRepository:
                 description=f"Bulk created user {i}",
                 status=UserStatus.ACTIVE,
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
                 allowed_client_ip=None,
@@ -1035,6 +1048,7 @@ class TestUserRepository:
                 description=f"Bulk update test user {i}",
                 status=UserStatus.ACTIVE,
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
                 allowed_client_ip=None,
@@ -1089,6 +1103,7 @@ class TestUserRepository:
             description="Bulk update test user",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,

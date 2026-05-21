@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
@@ -50,6 +51,9 @@ from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomai
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
 from ai.backend.manager.services.domain.actions.modify_domain_node import ModifyDomainNodeAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
+    ResolveDomainIDByNameAction,
+)
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
 from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -89,6 +93,18 @@ class DomainAdapter(BaseAdapter):
             GetDomainAction(domain_name=domain_name)
         )
         return self._domain_data_to_node(action_result.data)
+
+    async def resolve_domain_id_by_name(self, name: DomainName) -> DomainID:
+        """Resolve a domain name into the corresponding domain id.
+
+        Exposed for sibling adapters and resolvers that need to translate
+        a client-supplied domain name into ``DomainID`` before constructing
+        a Creator/Updater spec for a domain-referencing entity.
+        """
+        result = await self._processors.domain.resolve_domain_id_by_name.wait_for_complete(
+            ResolveDomainIDByNameAction(name=name)
+        )
+        return result.domain_id
 
     async def admin_search(
         self,

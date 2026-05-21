@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.user import UserCreationBadRequest
@@ -26,6 +27,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
     password: PasswordInfo
     need_password_change: bool
     domain_name: str
+    domain_id: DomainID
     full_name: str | None = None
     description: str | None = None
     is_active: bool | None = None
@@ -74,6 +76,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
             description=self.description,
             status=status,
             domain_name=self.domain_name,
+            domain_id=self.domain_id,
             role=UserRole(self.role) if self.role is not None else UserRole.USER,
             resource_policy=self.resource_policy if self.resource_policy is not None else "default",
             allowed_client_ip=self.allowed_client_ip,

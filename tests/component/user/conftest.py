@@ -31,7 +31,10 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -69,14 +72,28 @@ def user_processors(
 
 
 @pytest.fixture()
+def domain_processors(database_engine: ExtendedAsyncSAEngine) -> DomainProcessors:
+    repo = DomainRepository(database_engine)
+    service = DomainService(repo)
+    return DomainProcessors(
+        service=service, action_monitors=[], validators=_create_mock_validators()
+    )
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     user_processors: UserProcessors,
+    domain_processors: DomainProcessors,
     config_provider: ManagerConfigProvider,
 ) -> list[RouteRegistry]:
     """Load only the modules required for user-domain tests."""
     user_registry = register_user_routes(
-        UserHandler(user=user_processors, config_provider=config_provider),
+        UserHandler(
+            user=user_processors,
+            domain=domain_processors,
+            config_provider=config_provider,
+        ),
         route_deps,
     )
     return [

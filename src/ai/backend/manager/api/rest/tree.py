@@ -233,7 +233,9 @@ def build_api_routes(
 
     # Admin sub-registries
     domain_handler = DomainHandler(domain=processors.domain)
-    user_handler = UserHandler(user=processors.user, config_provider=config_provider)
+    user_handler = UserHandler(
+        user=processors.user, domain=processors.domain, config_provider=config_provider
+    )
     image_handler = ImageHandler(image=processors.image)
     rbac_handler = RBACHandler(permission_controller=processors.permission_controller)
     quota_scope_handler = QuotaScopeHandler(vfs_storage=processors.vfs_storage)
