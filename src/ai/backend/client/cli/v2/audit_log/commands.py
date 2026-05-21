@@ -13,6 +13,7 @@ from ai.backend.client.cli.v2.helpers import (
     parse_order_options,
     print_result,
 )
+from ai.backend.client.cli.v2.types import ScopeArg, ScopeArgType
 from ai.backend.common.dto.manager.v2.rbac.types import (
     EntityTypeScope,
     RBACElementTypeDTO,
@@ -22,45 +23,37 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 _TRIGGERED_USER_KEYWORD = "triggered_user"
 
 
-def _parse_scope_items(
-    raw_scopes: tuple[str, ...],
+def _to_audit_log_scope_buckets(
+    scopes: tuple[ScopeArg, ...],
 ) -> tuple[list[EntityTypeScope], list[UUIDScope]]:
-    """Parse ``--scope`` values of form ``<type>:<id>`` into entity / triggered_user buckets."""
+    """Sort parsed ``--scope`` args into audit-log entity / actor buckets.
+
+    ``triggered_user:<uuid>`` routes to the actor list (parsed as UUID); any
+    other ``<type>`` is validated against :class:`RBACElementTypeDTO` and
+    routed to the entity list.
+    """
     entity: list[EntityTypeScope] = []
     triggered_user: list[UUIDScope] = []
-    for raw in raw_scopes:
-        if ":" not in raw:
-            raise click.BadParameter(
-                f"--scope must be in '<type>:<id>' form (got: {raw!r})",
-                param_hint="--scope",
-            )
-        type_part, id_part = raw.split(":", 1)
-        type_part = type_part.strip()
-        id_part = id_part.strip()
-        if not type_part or not id_part:
-            raise click.BadParameter(
-                f"--scope requires both type and id (got: {raw!r})",
-                param_hint="--scope",
-            )
-        if type_part == _TRIGGERED_USER_KEYWORD:
+    for scope in scopes:
+        if scope.type == _TRIGGERED_USER_KEYWORD:
             try:
-                triggered_user.append(UUIDScope(value=uuid.UUID(id_part)))
+                triggered_user.append(UUIDScope(value=uuid.UUID(scope.id)))
             except ValueError as exc:
                 raise click.BadParameter(
-                    f"--scope triggered_user requires a UUID id (got: {id_part!r})",
+                    f"--scope {_TRIGGERED_USER_KEYWORD} requires a UUID id (got: {scope.id!r})",
                     param_hint="--scope",
                 ) from exc
             continue
         try:
-            element_type = RBACElementTypeDTO(type_part)
+            element_type = RBACElementTypeDTO(scope.type)
         except ValueError as exc:
             valid = ", ".join(sorted(t.value for t in RBACElementTypeDTO))
             raise click.BadParameter(
-                f"unknown scope type {type_part!r}; "
+                f"unknown scope type {scope.type!r}; "
                 f"expected one of: {_TRIGGERED_USER_KEYWORD}, {valid}",
                 param_hint="--scope",
             ) from exc
-        entity.append(EntityTypeScope(entity_type=element_type, entity_id=id_part))
+        entity.append(EntityTypeScope(entity_type=element_type, entity_id=scope.id))
     return entity, triggered_user
 
 
@@ -165,6 +158,7 @@ def search(
 @click.option(
     "--scope",
     "scopes",
+    type=ScopeArgType(),
     multiple=True,
     required=True,
     help=(
@@ -211,7 +205,7 @@ def search(
     ),
 )
 def scoped_search(
-    scopes: tuple[str, ...],
+    scopes: tuple[ScopeArg, ...],
     limit: int | None,
     offset: int | None,
     first: int | None,
@@ -236,7 +230,7 @@ def scoped_search(
         AuditLogStatus,
     )
 
-    entity_items, triggered_user_items = _parse_scope_items(scopes)
+    entity_items, triggered_user_items = _to_audit_log_scope_buckets(scopes)
     scope_dto = AuditLogScope(
         entity=entity_items or None,
         triggered_user=triggered_user_items or None,

@@ -9,7 +9,6 @@ import pytest
 
 from ai.backend.client.v2.exceptions import InvalidRequestError, PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     AuditLogFilter,
@@ -18,55 +17,71 @@ from ai.backend.common.dto.manager.v2.audit_log.request import (
     ScopedSearchAuditLogsInput,
 )
 from ai.backend.common.dto.manager.v2.audit_log.types import AuditLogStatus
-from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope, UUIDScope
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    EntityTypeScope,
+    RBACElementTypeDTO,
+    UUIDScope,
+)
 from ai.backend.manager.actions.types import OperationStatus
 
 if TYPE_CHECKING:
     from tests.component.audit_log.conftest import AuditLogFactory
 
 
-_ENTITY_ID = "ba-6098-vf"
-_ACTOR = uuid.uuid4()
+@pytest.fixture()
+def entity_id() -> str:
+    return f"ba-6098-vf-{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture()
-async def seeded_rows(audit_log_factory: AuditLogFactory) -> dict[str, uuid.UUID]:
-    """Two SUCCESS rows + one ERROR row on the same target/actor."""
-    return {
-        "success_a": await audit_log_factory(
-            entity_type=RBACElementType.VFOLDER.value,
-            entity_id=_ENTITY_ID,
-            triggered_by=str(_ACTOR),
-            operation="update",
-            status=OperationStatus.SUCCESS,
-        ),
-        "success_b": await audit_log_factory(
-            entity_type=RBACElementType.VFOLDER.value,
-            entity_id=_ENTITY_ID,
-            triggered_by=str(_ACTOR),
-            operation="delete",
-            status=OperationStatus.SUCCESS,
-        ),
-        "error_a": await audit_log_factory(
-            entity_type=RBACElementType.VFOLDER.value,
-            entity_id=_ENTITY_ID,
-            triggered_by=str(_ACTOR),
-            operation="update",
-            status=OperationStatus.ERROR,
-        ),
-    }
+def actor_uuid() -> uuid.UUID:
+    return uuid.uuid4()
 
 
-def _entity_scope() -> AuditLogScope:
+@pytest.fixture()
+def entity_scope(entity_id: str) -> AuditLogScope:
     return AuditLogScope(
         entity=[
-            EntityTypeScope(entity_type=RBACElementType.VFOLDER, entity_id=_ENTITY_ID),
+            EntityTypeScope(entity_type=RBACElementTypeDTO.VFOLDER, entity_id=entity_id),
         ]
     )
 
 
-def _actor_scope() -> AuditLogScope:
-    return AuditLogScope(triggered_user=[UUIDScope(value=_ACTOR)])
+@pytest.fixture()
+def actor_scope(actor_uuid: uuid.UUID) -> AuditLogScope:
+    return AuditLogScope(triggered_user=[UUIDScope(value=actor_uuid)])
+
+
+@pytest.fixture()
+async def seeded_rows(
+    audit_log_factory: AuditLogFactory,
+    entity_id: str,
+    actor_uuid: uuid.UUID,
+) -> dict[str, uuid.UUID]:
+    """Two SUCCESS rows + one ERROR row on the same target/actor."""
+    return {
+        "success_a": await audit_log_factory(
+            entity_type=RBACElementTypeDTO.VFOLDER.value,
+            entity_id=entity_id,
+            triggered_by=str(actor_uuid),
+            operation="update",
+            status=OperationStatus.SUCCESS,
+        ),
+        "success_b": await audit_log_factory(
+            entity_type=RBACElementTypeDTO.VFOLDER.value,
+            entity_id=entity_id,
+            triggered_by=str(actor_uuid),
+            operation="delete",
+            status=OperationStatus.SUCCESS,
+        ),
+        "error_a": await audit_log_factory(
+            entity_type=RBACElementTypeDTO.VFOLDER.value,
+            entity_id=entity_id,
+            triggered_by=str(actor_uuid),
+            operation="update",
+            status=OperationStatus.ERROR,
+        ),
+    }
 
 
 class TestAuditLogAdminSearchUnchanged:
@@ -96,10 +111,11 @@ class TestAuditLogScopedSearchAuth:
     async def test_regular_user_can_call_scoped_search(
         self,
         user_v2_registry: V2ClientRegistry,
+        entity_scope: AuditLogScope,
         seeded_rows: dict[str, uuid.UUID],
     ) -> None:
         result = await user_v2_registry.audit_log.scoped_search(
-            ScopedSearchAuditLogsInput(scope=_entity_scope(), limit=10),
+            ScopedSearchAuditLogsInput(scope=entity_scope, limit=10),
         )
         ids = {item.id for item in result.items}
         assert {seeded_rows["success_a"], seeded_rows["success_b"], seeded_rows["error_a"]} <= ids
@@ -125,11 +141,12 @@ class TestAuditLogScopedSearchFilter:
     async def test_status_filter_narrows_results(
         self,
         user_v2_registry: V2ClientRegistry,
+        entity_scope: AuditLogScope,
         seeded_rows: dict[str, uuid.UUID],
     ) -> None:
         result = await user_v2_registry.audit_log.scoped_search(
             ScopedSearchAuditLogsInput(
-                scope=_entity_scope(),
+                scope=entity_scope,
                 filter=AuditLogFilter(
                     status=AuditLogStatusFilter(equals=AuditLogStatus.ERROR),
                 ),
@@ -148,10 +165,11 @@ class TestAuditLogScopedSearchPagination:
     async def test_offset_pagination_limits_page_size(
         self,
         user_v2_registry: V2ClientRegistry,
+        actor_scope: AuditLogScope,
         seeded_rows: dict[str, uuid.UUID],
     ) -> None:
         result = await user_v2_registry.audit_log.scoped_search(
-            ScopedSearchAuditLogsInput(scope=_actor_scope(), limit=2, offset=0),
+            ScopedSearchAuditLogsInput(scope=actor_scope, limit=2, offset=0),
         )
         assert len(result.items) <= 2
         assert result.total_count >= len(seeded_rows)
@@ -159,10 +177,11 @@ class TestAuditLogScopedSearchPagination:
     async def test_cursor_pagination_returns_page_info(
         self,
         user_v2_registry: V2ClientRegistry,
+        actor_scope: AuditLogScope,
         seeded_rows: dict[str, uuid.UUID],
     ) -> None:
         first_page = await user_v2_registry.audit_log.scoped_search(
-            ScopedSearchAuditLogsInput(scope=_actor_scope(), first=1),
+            ScopedSearchAuditLogsInput(scope=actor_scope, first=1),
         )
         assert len(first_page.items) == 1
         assert first_page.has_next_page is True
