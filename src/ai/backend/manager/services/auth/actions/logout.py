@@ -9,6 +9,7 @@ from ai.backend.manager.services.auth.actions.base import AuthAction
 @dataclass
 class LogoutAction(AuthAction):
     session_token: str
+    client_ip: str | None = None
 
     @override
     def entity_id(self) -> str | None:

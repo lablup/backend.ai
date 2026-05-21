@@ -182,5 +182,6 @@ class LoginHistoryAdapter(BaseAdapter):
             domain_name=data.domain_name,
             result=LoginAttemptResult(data.result.value),
             fail_reason=data.fail_reason,
+            client_ip=data.client_ip,
             created_at=data.created_at,
         )

@@ -15,6 +15,7 @@ from typing import Final
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -151,6 +152,7 @@ class AuthHandler:
             stoken=params.stoken,
             otp=params.otp,
             client_type_id=params.client_type_id,
+            client_ip=extract_client_ip(ctx.request),
             force=params.force,
         )
         result = await self._auth.authorize.wait_for_complete(action)
@@ -179,7 +181,10 @@ class AuthHandler:
     async def logout(self, body: BodyParam[LogoutRequest], ctx: RequestCtx) -> APIResponse:
         params = body.parsed
         log.info("AUTH.LOGOUT(session_token:{}...)", params.session_token[:8])
-        action = LogoutAction(session_token=params.session_token)
+        action = LogoutAction(
+            session_token=params.session_token,
+            client_ip=extract_client_ip(ctx.request),
+        )
         await self._auth.logout.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, LogoutResponse())
 
@@ -220,6 +225,7 @@ class AuthHandler:
                 requester_email=ctx.user_email,
                 email=params.email,
                 password=params.password,
+                client_ip=current_client_ip(),
             )
         )
         return APIResponse.build(HTTPStatus.OK, SignoutResponse())

@@ -21,6 +21,7 @@ class AuthorizeAction(AuthAction):
     stoken: str | None
     otp: str | None
     client_type_id: UUID | None
+    client_ip: str | None = None
     force: bool = False
 
     @override

@@ -216,6 +216,7 @@ class AuthService:
                 user.uuid,
                 action.domain_name,
                 _classify_failure(e),
+                action.client_ip,
             )
             raise
 
@@ -375,6 +376,7 @@ class AuthService:
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
             login_client_type_id=login_client_type_id,
+            client_ip=action.client_ip,
         )
 
         if tokens_to_invalidate:
@@ -421,9 +423,12 @@ class AuthService:
         user_uuid: uuid.UUID,
         domain_name: str,
         result: LoginAttemptResult,
+        client_ip: str | None,
     ) -> None:
         try:
-            await self._auth_repository.record_login_history(user_uuid, domain_name, result)
+            await self._auth_repository.record_login_history(
+                user_uuid, domain_name, result, client_ip=client_ip
+            )
         except Exception:
             log.warning("Failed to record login history: {} for user {}", result, user_uuid)
 
@@ -541,7 +546,7 @@ class AuthService:
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
         await self._auth_repository.delete_login_session_by_token(
-            action.session_token, LoginAttemptResult.LOGOUT
+            action.session_token, LoginAttemptResult.LOGOUT, action.client_ip
         )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
@@ -550,7 +555,7 @@ class AuthService:
         self, action: AdminRevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
         session_token = await self._auth_repository.delete_login_session_by_id(
-            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN
+            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN, action.client_ip
         )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
@@ -562,7 +567,7 @@ class AuthService:
         if session_data.user_id != action.user_id:
             raise GenericForbidden("You can only revoke your own login sessions.")
         session_token = await self._auth_repository.delete_login_session_by_id(
-            action.session_id, LoginAttemptResult.REVOKED_BY_USER
+            action.session_id, LoginAttemptResult.REVOKED_BY_USER, action.client_ip
         )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
@@ -583,7 +588,7 @@ class AuthService:
             action.password,
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
-            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT
+            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT, action.client_ip
         )
         for token in deleted_tokens:
             await self._valkey_session_client.delete_login_session(token)

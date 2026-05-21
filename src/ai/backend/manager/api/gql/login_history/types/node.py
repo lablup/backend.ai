@@ -12,6 +12,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_history.response import LoginHistoryNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -62,6 +63,13 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
     result: LoginAttemptResultGQL = gql_field(description="Result of the login attempt.")
     fail_reason: str | None = gql_field(description="Detailed reason for the login failure.")
     created_at: datetime = gql_field(description="Timestamp when the login attempt occurred.")
+
+    client_ip: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Client IP that initiated the event. Null for system-driven events (e.g. eviction, expiration).",
+        )
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(

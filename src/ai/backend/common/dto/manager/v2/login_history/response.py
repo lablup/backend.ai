@@ -28,6 +28,10 @@ class LoginHistoryNode(BaseResponseModel):
     fail_reason: str | None = Field(
         default=None, description="Detailed reason for the login failure"
     )
+    client_ip: str | None = Field(
+        default=None,
+        description="Client IP that initiated the event. Null for system-driven events (e.g. eviction, expiration).",
+    )
     created_at: datetime = Field(description="Timestamp when the login attempt occurred")
 
 

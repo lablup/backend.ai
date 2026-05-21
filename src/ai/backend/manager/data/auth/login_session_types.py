@@ -26,4 +26,5 @@ class LoginHistoryData:
     domain_name: str
     result: LoginAttemptResult
     fail_reason: str | None
+    client_ip: str | None
     created_at: datetime

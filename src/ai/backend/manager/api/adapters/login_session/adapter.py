@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
@@ -128,6 +129,7 @@ class LoginSessionAdapter(BaseAdapter):
             MyRevokeLoginSessionAction(
                 session_id=input.session_id,
                 user_id=me.user_id,
+                client_ip=current_client_ip(),
             )
         )
         return RevokeLoginSessionPayload(success=action_result.success)
@@ -137,6 +139,7 @@ class LoginSessionAdapter(BaseAdapter):
         action_result = await self._processors.auth.admin_revoke_login_session.wait_for_complete(
             AdminRevokeLoginSessionAction(
                 session_id=input.session_id,
+                client_ip=current_client_ip(),
             )
         )
         return RevokeLoginSessionPayload(success=action_result.success)
