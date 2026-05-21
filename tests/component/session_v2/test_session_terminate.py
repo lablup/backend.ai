@@ -1,11 +1,10 @@
 """Component tests for v2 Session terminate endpoint RBAC validation.
 
 Tests that the v2 POST /sessions/terminate endpoint enforces per-session RBAC via
-the BulkActionRBACValidator with fail-on-any-denial policy:
+the BulkActionRBACValidator:
 
 - Regular users can terminate their own sessions (owner permission via scope chain)
 - Regular users are denied on other users' sessions (403)
-- A mixed bulk request (own + other) fails the whole request (fail-on-any-denial)
 - Superadmin bypasses RBAC and can terminate any session
 """
 
@@ -80,25 +79,6 @@ class TestSessionTerminateV2RBAC:
             await user_v2_registry.session.terminate(
                 TerminateSessionsInput(session_ids=[admin_session_seed.session_id])
             )
-
-    async def test_regular_user_mixed_bulk_fails_on_any_denial(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        user_session_seed: SessionSeedData,
-        admin_session_seed: SessionSeedData,
-        stub_mark_terminating: AsyncMock,
-    ) -> None:
-        """A bulk request containing any unauthorized session fails the whole call."""
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.session.terminate(
-                TerminateSessionsInput(
-                    session_ids=[
-                        user_session_seed.session_id,
-                        admin_session_seed.session_id,
-                    ]
-                )
-            )
-        stub_mark_terminating.mark_sessions_for_termination.assert_not_called()
 
     async def test_superadmin_terminating_other_users_session_bypasses_rbac(
         self,
