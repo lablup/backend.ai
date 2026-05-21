@@ -22,6 +22,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import users
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import UserFactory
 
@@ -114,7 +115,7 @@ class TestUserCreateCrud:
     async def test_f_biz_1_duplicate_email_raises_conflict(
         self,
         user_factory: UserFactory,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
@@ -127,7 +128,7 @@ class TestUserCreateCrud:
                     email=existing.user.email,
                     username="another-username-xyz",
                     password="test-password-1234",
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=resource_policy_fixture,
                 )
             )
@@ -151,7 +152,7 @@ class TestUserCreateCrud:
 
     async def test_f_biz_3_nonexistent_resource_policy_raises_error(
         self,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """F-BIZ-3: Non-existent resource_policy → ConflictError (409, FK violation)."""
@@ -161,7 +162,7 @@ class TestUserCreateCrud:
                     email="no-policy@test.local",
                     username="no-policy-user",
                     password="test-password-1234",
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy="nonexistent-policy-xyz",
                 )
             )

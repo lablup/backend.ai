@@ -37,6 +37,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @dataclass
@@ -119,7 +120,7 @@ def server_module_registries(
 @pytest.fixture()
 async def model_deployment_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     scaling_group_fixture: str,
     admin_user_fixture: UserFixtureData,
@@ -170,7 +171,7 @@ async def model_deployment_fixture(
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=str(admin_user_fixture.user_uuid),
                 session_owner=str(admin_user_fixture.user_uuid),
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 project=str(group_fixture),
                 resource_group=scaling_group_fixture,
                 lifecycle_stage=EndpointLifecycle.CREATED,

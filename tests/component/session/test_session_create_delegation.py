@@ -18,6 +18,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.types import UserScope
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import UserFixtureData
@@ -87,7 +88,7 @@ class TestDelegatedSessionCreation:
     async def test_admin_create_with_owner_access_key_routes_owner_into_user_scope(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_for_fixture: str,
         admin_user_fixture: UserFixtureData,
         regular_user_fixture: UserFixtureData,
@@ -105,7 +106,7 @@ class TestDelegatedSessionCreation:
             image="python:latest",
             architecture="x86_64",
             session_type=SessionTypes.INTERACTIVE,
-            domain=domain_fixture,
+            domain=domain_fixture.domain_name,
             group=group_name_for_fixture,
             owner_access_key=regular_user_fixture.keypair.access_key,
             # ``reuse=False`` skips the existing-session lookup branch in

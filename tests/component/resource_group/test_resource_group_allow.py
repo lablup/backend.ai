@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
@@ -116,14 +117,14 @@ class TestAllowedResourceGroupsForDomain:
     async def test_add_and_get_allowed(
         self,
         admin_v2_registry: V2ClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         extra_scaling_group: str,
     ) -> None:
         """Allow a resource group for a domain, then verify it's listed."""
         result = await admin_v2_registry.resource_group.update_allowed_resource_groups_for_domain(
-            domain_fixture,
+            domain_fixture.domain_name,
             UpdateAllowedResourceGroupsForDomainInput(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 add=[extra_scaling_group],
             ),
         )
@@ -133,24 +134,24 @@ class TestAllowedResourceGroupsForDomain:
     async def test_add_and_remove_atomically(
         self,
         admin_v2_registry: V2ClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         extra_scaling_group: str,
         second_scaling_group: str,
     ) -> None:
         """Add one and remove another in a single request."""
         # First, allow extra
         await admin_v2_registry.resource_group.update_allowed_resource_groups_for_domain(
-            domain_fixture,
+            domain_fixture.domain_name,
             UpdateAllowedResourceGroupsForDomainInput(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 add=[extra_scaling_group, second_scaling_group],
             ),
         )
         # Then remove extra, verify second remains
         result = await admin_v2_registry.resource_group.update_allowed_resource_groups_for_domain(
-            domain_fixture,
+            domain_fixture.domain_name,
             UpdateAllowedResourceGroupsForDomainInput(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 add=[],
                 remove=[extra_scaling_group],
             ),
@@ -161,21 +162,21 @@ class TestAllowedResourceGroupsForDomain:
     async def test_idempotent_add(
         self,
         admin_v2_registry: V2ClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         extra_scaling_group: str,
     ) -> None:
         """Adding the same resource group twice should not error."""
         await admin_v2_registry.resource_group.update_allowed_resource_groups_for_domain(
-            domain_fixture,
+            domain_fixture.domain_name,
             UpdateAllowedResourceGroupsForDomainInput(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 add=[extra_scaling_group],
             ),
         )
         result = await admin_v2_registry.resource_group.update_allowed_resource_groups_for_domain(
-            domain_fixture,
+            domain_fixture.domain_name,
             UpdateAllowedResourceGroupsForDomainInput(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 add=[extra_scaling_group],
             ),
         )
@@ -200,7 +201,7 @@ class TestAllowedDomainsForResourceGroup:
     async def test_add_and_get_allowed_domains(
         self,
         admin_v2_registry: V2ClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         extra_scaling_group: str,
     ) -> None:
         """Allow a domain for a resource group, then verify."""
@@ -208,11 +209,11 @@ class TestAllowedDomainsForResourceGroup:
             extra_scaling_group,
             UpdateAllowedDomainsForResourceGroupInput(
                 resource_group_name=extra_scaling_group,
-                add=[domain_fixture],
+                add=[domain_fixture.domain_name],
             ),
         )
         assert isinstance(result, AllowedDomainsPayload)
-        assert domain_fixture in result.items
+        assert domain_fixture.domain_name in result.items
 
 
 class TestAllowedResourceGroupsForProject:

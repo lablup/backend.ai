@@ -74,6 +74,7 @@ from ai.backend.manager.services.permission_contoller.service import PermissionC
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -303,7 +304,7 @@ async def admin_target_project_permission(
 @pytest.fixture()
 async def target_project_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a fresh project where regular_user is NOT pre-bound.
@@ -321,7 +322,7 @@ async def target_project_fixture(
                 name=f"target-project-{secrets.token_hex(6)}",
                 description="Primary test project for membership scenarios",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -333,7 +334,7 @@ async def target_project_fixture(
 @pytest.fixture()
 async def other_project_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert another project for cross-project isolation tests."""
@@ -345,7 +346,7 @@ async def other_project_fixture(
                 name=f"other-project-{secrets.token_hex(6)}",
                 description="Secondary test project",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -460,7 +461,7 @@ async def user_v2_registry(
 async def assigned_users(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[list[uuid.UUID]]:
     """Insert test users and assign them to the target project via ASE.
@@ -496,7 +497,7 @@ async def assigned_users(
                     description=f"Test assigned user {i}",
                     status=UserStatus.ACTIVE,
                     status_info="admin-requested",
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=resource_policy_fixture,
                     role=UserRole.USER,
                 )

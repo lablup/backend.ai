@@ -34,6 +34,7 @@ from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 _AUTH_SERVER_SUBAPP_MODULES = (_auth_api,)
 
@@ -108,7 +109,7 @@ async def seed_login_client_types(
 async def auth_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[AuthUserFixtureData]:
     """Insert a regular user with a known password for auth tests.
@@ -125,7 +126,7 @@ async def auth_user_fixture(
         secret_key=secrets.token_hex(20),
         password=password,
         email=email,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
     )
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -144,7 +145,7 @@ async def auth_user_fixture(
                 description=f"Test auth user {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )
@@ -281,14 +282,14 @@ async def _create_auth_user(
 async def inactive_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[AuthUserFixtureData]:
     """Insert a user with INACTIVE status for authorization rejection tests."""
     async with _create_auth_user(
         db_engine,
         group_id=group_fixture,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         resource_policy=resource_policy_fixture,
         email_prefix="auth-inactive",
         username_prefix="auth-inactive",
@@ -303,14 +304,14 @@ async def inactive_user_fixture(
 async def before_verification_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[AuthUserFixtureData]:
     """Insert a user with BEFORE_VERIFICATION status for authorization rejection tests."""
     async with _create_auth_user(
         db_engine,
         group_id=group_fixture,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         resource_policy=resource_policy_fixture,
         email_prefix="auth-unverified",
         username_prefix="auth-unverified",
@@ -325,14 +326,14 @@ async def before_verification_user_fixture(
 async def expired_password_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[AuthUserFixtureData]:
     """Insert a user whose password_changed_at is far in the past for expiry tests."""
     async with _create_auth_user(
         db_engine,
         group_id=group_fixture,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         resource_policy=resource_policy_fixture,
         email_prefix="auth-expired",
         username_prefix="auth-expired",

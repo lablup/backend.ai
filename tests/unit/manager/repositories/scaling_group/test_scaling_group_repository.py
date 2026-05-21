@@ -81,6 +81,7 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 class TestScalingGroupRepositoryDB:
@@ -477,20 +478,11 @@ class TestScalingGroupRepositoryDB:
     @pytest.fixture
     async def sample_domain(
         self,
+        domain_factory: DomainFactory,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> DomainFixtureData:
         """Create a sample domain for testing"""
-        domain_name = "test-domain-for-sgroup"
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-            )
-            db_sess.add(domain)
-
-        yield domain_name
+        return await domain_factory(db_with_cleanup, name="test-domain-for-sgroup")
 
     @pytest.fixture
     async def sample_scaling_group_for_association(
@@ -796,7 +788,7 @@ class TestScalingGroupRepositoryDB:
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_association: str,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
     ) -> None:
         """Test associating a scaling group with domains"""
         binder = RBACScopeBinder(
@@ -804,7 +796,7 @@ class TestScalingGroupRepositoryDB:
                 RBACScopeBindingPair(
                     spec=ScalingGroupForDomainCreatorSpec(
                         scaling_group=sample_scaling_group_for_association,
-                        domain=sample_domain,
+                        domain=sample_domain.domain_name,
                     ),
                     entity_ref=RBACElementRef(
                         RBACElementType.RESOURCE_GROUP,
@@ -812,7 +804,7 @@ class TestScalingGroupRepositoryDB:
                     ),
                     scope_ref=RBACElementRef(
                         RBACElementType.DOMAIN,
-                        sample_domain,
+                        sample_domain.domain_name,
                     ),
                 )
             ]
@@ -823,7 +815,7 @@ class TestScalingGroupRepositoryDB:
         association_exists = (
             await scaling_group_repository.check_scaling_group_domain_association_exists(
                 scaling_group=sample_scaling_group_for_association,
-                domain=sample_domain,
+                domain=sample_domain.domain_name,
             )
         )
         assert association_exists is True
@@ -833,17 +825,17 @@ class TestScalingGroupRepositoryDB:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_scaling_group_for_association: str,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
     ) -> AsyncGenerator[tuple[str, str], None]:
         """Create a scaling group with a single domain association for testing"""
         async with db_with_cleanup.begin_session() as db_sess:
             association = ScalingGroupForDomainRow(
                 scaling_group=sample_scaling_group_for_association,
-                domain=sample_domain,
+                domain=sample_domain.domain_name,
             )
             db_sess.add(association)
 
-        yield sample_scaling_group_for_association, sample_domain
+        yield sample_scaling_group_for_association, sample_domain.domain_name
 
     # Disassociate with Domain Tests
     async def test_disassociate_scaling_group_with_domains_success(
@@ -871,13 +863,13 @@ class TestScalingGroupRepositoryDB:
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_association: str,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
     ) -> None:
         """Test disassociating a non-existent association (should not raise error)"""
         # Disassociate without prior association should succeed without error
         unbinder = ResourceGroupDomainEntityUnbinder(
             scaling_groups=[sample_scaling_group_for_association],
-            domain=sample_domain,
+            domain=sample_domain.domain_name,
         )
         await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
 

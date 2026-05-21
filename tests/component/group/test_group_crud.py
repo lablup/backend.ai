@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.group import (
     UpdateGroupRequest,
     UpdateGroupResponse,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 _XFAIL_ROUTES_NOT_IMPLEMENTED = pytest.mark.xfail(
     strict=True,
@@ -33,26 +34,26 @@ class TestGroupCreateCRUD:
     async def test_superadmin_creates_group_with_required_fields(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-1: Superadmin creates group with required fields."""
         unique = secrets.token_hex(4)
         result = await admin_registry.group.create(
             CreateGroupRequest(
                 name=f"test-group-{unique}",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
             ),
         )
         assert isinstance(result, CreateGroupResponse)
         assert result.group.name == f"test-group-{unique}"
-        assert result.group.domain_name == domain_fixture
+        assert result.group.domain_name == domain_fixture.domain_name
         assert result.group.is_active is True
 
     @_XFAIL_ROUTES_NOT_IMPLEMENTED
     async def test_create_group_with_all_optional_fields(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
     ) -> None:
         """S-2: Create group with all optional fields."""
@@ -60,7 +61,7 @@ class TestGroupCreateCRUD:
         result = await admin_registry.group.create(
             CreateGroupRequest(
                 name=f"test-group-full-{unique}",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 description=f"Full group {unique}",
                 resource_policy=resource_policy_fixture,
                 total_resource_slots={"cpu": "4"},
@@ -76,14 +77,14 @@ class TestGroupCreateCRUD:
     async def test_create_group_then_set_inactive(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-3: Create group then deactivate it (is_active=False)."""
         unique = secrets.token_hex(4)
         create_result = await admin_registry.group.create(
             CreateGroupRequest(
                 name=f"test-group-inactive-{unique}",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
             ),
         )
         update_result = await admin_registry.group.update(
@@ -96,20 +97,20 @@ class TestGroupCreateCRUD:
     async def test_create_multiple_groups_with_different_names(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-4: Create multiple groups with different names."""
         unique = secrets.token_hex(4)
         result_a = await admin_registry.group.create(
             CreateGroupRequest(
                 name=f"test-group-alpha-{unique}",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
             ),
         )
         result_b = await admin_registry.group.create(
             CreateGroupRequest(
                 name=f"test-group-beta-{unique}",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
             ),
         )
         assert result_a.group.name != result_b.group.name
@@ -119,30 +120,30 @@ class TestGroupCreateCRUD:
     async def test_duplicate_group_name_in_same_domain_raises_error(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """F-BIZ-1: Duplicate group name in same domain → error."""
         unique = secrets.token_hex(4)
         name = f"test-group-dup-{unique}"
         await admin_registry.group.create(
-            CreateGroupRequest(name=name, domain_name=domain_fixture),
+            CreateGroupRequest(name=name, domain_name=domain_fixture.domain_name),
         )
         await admin_registry.group.create(
-            CreateGroupRequest(name=name, domain_name=domain_fixture),
+            CreateGroupRequest(name=name, domain_name=domain_fixture.domain_name),
         )
 
     @_XFAIL_ROUTES_NOT_IMPLEMENTED
     async def test_regular_user_cannot_create_group(
         self,
         user_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """F-AUTH-1: Regular user cannot create group → error."""
         unique = secrets.token_hex(4)
         await user_registry.group.create(
             CreateGroupRequest(
                 name=f"test-group-user-{unique}",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
             ),
         )
 
@@ -255,13 +256,13 @@ class TestGroupModifyCRUD:
         self,
         admin_registry: BackendAIClientRegistry,
         target_group: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """F-BIZ-3: Rename to duplicate name → error."""
         unique = secrets.token_hex(4)
         other_name = f"other-group-{unique}"
         await admin_registry.group.create(
-            CreateGroupRequest(name=other_name, domain_name=domain_fixture),
+            CreateGroupRequest(name=other_name, domain_name=domain_fixture.domain_name),
         )
         await admin_registry.group.update(
             target_group,

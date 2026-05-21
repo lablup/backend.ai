@@ -151,6 +151,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
     redis_container,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger("tests.component.conftest")
@@ -543,20 +544,23 @@ async def database_engine(
 @pytest.fixture()
 async def domain_fixture(
     db_engine: SAEngine,
-) -> AsyncIterator[str]:
-    """Insert a test domain and yield its name."""
+) -> AsyncIterator[DomainFixtureData]:
+    """Insert a test domain and yield its identifiers."""
     domain_name = f"domain-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(domains).values(
+        result = await conn.execute(
+            sa.insert(domains)
+            .values(
                 name=domain_name,
                 description=f"Test domain {domain_name}",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
+            .returning(domains.c.id, domains.c.name)
         )
-    yield domain_name
+        row = result.one()
+    yield DomainFixtureData(domain_name=row.name, domain_id=row.id)
     async with db_engine.begin() as conn:
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
 

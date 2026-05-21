@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.registry.request import (
     ReadRegistryQuotaReq,
 )
 from ai.backend.common.dto.manager.registry.response import RegistryQuotaResponse
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestGroupRegistryQuota:
@@ -83,13 +84,13 @@ class TestGroupCreate:
     async def test_admin_creates_group(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
     ) -> None:
         result = await admin_registry.group.create(
             CreateGroupRequest(
                 name="test-group-create",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 description="Test group created via SDK",
                 resource_policy=resource_policy_fixture,
             ),
@@ -196,14 +197,14 @@ class TestGroupLifecycle:
     async def test_full_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
     ) -> None:
         # 1. Create group
         create_result = await admin_registry.group.create(
             CreateGroupRequest(
                 name="lifecycle-test-group",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 description="Lifecycle test",
                 resource_policy=resource_policy_fixture,
             ),

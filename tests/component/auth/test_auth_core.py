@@ -22,6 +22,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import users
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import AuthUserFixtureData
 
@@ -147,14 +148,14 @@ class TestSignup:
         self,
         admin_registry: BackendAIClientRegistry,
         db_engine: SAEngine,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         unique_id = secrets.token_hex(4)
         email = f"signup-test-{unique_id}@test.local"
         password = f"TestP@ss{unique_id}"
         result = await admin_registry.auth.signup(
             SignupRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 email=email,
                 password=password,
             ),

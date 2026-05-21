@@ -63,6 +63,7 @@ from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 # Type aliases for fixture factories
 ImageFactoryFunc = Callable[[], Coroutine[Any, Any, ImageID]]
@@ -287,7 +288,7 @@ async def image_factory(
 @pytest.fixture()
 async def vfolder_factory(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     admin_user_fixture: Any,
 ) -> AsyncIterator[VFolderFactoryFunc]:
     """Factory that creates VFolder entries for deployment model mounts."""
@@ -307,7 +308,7 @@ async def vfolder_factory(
                     id=vfolder_id,
                     name=f"deployment-model-{unique}",
                     host="local",
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     quota_scope_id=str(quota_scope_id),
                     usage_mode=VFolderUsageMode.MODEL,
                     permission=VFolderMountPermission.READ_ONLY,
@@ -332,7 +333,7 @@ async def vfolder_factory(
 @pytest.fixture()
 async def deployment_seed_data(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     image_factory: ImageFactoryFunc,
     vfolder_factory: VFolderFactoryFunc,
 ) -> AsyncIterator[tuple[ImageID, VFolderUUID]]:
@@ -349,7 +350,7 @@ async def deployment_seed_data(
     # Clean up endpoints and soft-FK children created during the test
     async with db_engine.begin() as conn:
         endpoint_ids_q = sa.select(EndpointRow.__table__.c.id).where(
-            EndpointRow.__table__.c.domain == domain_fixture
+            EndpointRow.__table__.c.domain == domain_fixture.domain_name
         )
         await conn.execute(
             DeploymentRevisionRow.__table__.delete().where(
@@ -362,5 +363,7 @@ async def deployment_seed_data(
             )
         )
         await conn.execute(
-            EndpointRow.__table__.delete().where(EndpointRow.__table__.c.domain == domain_fixture)
+            EndpointRow.__table__.delete().where(
+                EndpointRow.__table__.c.domain == domain_fixture.domain_name
+            )
         )

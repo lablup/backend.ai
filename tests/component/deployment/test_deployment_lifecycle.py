@@ -37,6 +37,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 _RANDOM_DEPLOYMENT_ID = uuid.uuid4()
 _RANDOM_REVISION_ID = uuid.uuid4()
@@ -52,13 +53,13 @@ class TestCreateDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Creating a deployment with a non-existent image raises an error."""
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_group_name=ResourceGroupName("nonexistent-sgroup"),
                 name="test-deployment",
             ),
@@ -89,7 +90,7 @@ class TestCreateDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -98,7 +99,7 @@ class TestCreateDeployment:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
@@ -156,7 +157,7 @@ class TestUpdateDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -166,7 +167,7 @@ class TestUpdateDeployment:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
@@ -226,7 +227,7 @@ class TestDestroyDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -236,7 +237,7 @@ class TestDestroyDeployment:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
@@ -292,7 +293,7 @@ class TestRevisionManagement:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -317,7 +318,7 @@ class TestRevisionManagement:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
@@ -373,7 +374,7 @@ class TestReplicaManagement:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -382,7 +383,7 @@ class TestReplicaManagement:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),

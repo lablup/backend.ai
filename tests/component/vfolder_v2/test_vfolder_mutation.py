@@ -63,6 +63,7 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -265,7 +266,7 @@ async def created_vfolder_cleanup(
 @pytest.fixture()
 async def project_vfolder(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     vfolder_host_permission_fixture: None,
 ) -> AsyncIterator[ProjectVFolderFixtureData]:
@@ -279,7 +280,7 @@ async def project_vfolder(
                 id=vfolder_id,
                 name=f"test-proj-vfolder-{unique}",
                 host="local",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 quota_scope_id=str(quota_scope_id),
                 usage_mode=VFolderUsageMode.GENERAL,
                 permission=VFolderMountPermission.READ_WRITE,
