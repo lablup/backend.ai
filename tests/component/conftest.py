@@ -78,6 +78,7 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
 from ai.backend.manager.agent_cache import AgentRPCCache
@@ -1274,6 +1275,7 @@ def auth_processors(
             rbac=RBACValidators(
                 scope=MagicMock(spec=ScopeActionRBACValidator),
                 single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                bulk=MagicMock(spec=BulkActionRBACValidator),
             ),
         ),
     )

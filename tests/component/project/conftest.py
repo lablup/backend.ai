@@ -27,6 +27,7 @@ from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
@@ -87,6 +88,7 @@ def _build_validators(
         rbac=RBACValidators(
             scope=ScopeActionRBACValidator(permission_repo, config_provider),
             single_entity=SingleEntityActionRBACValidator(permission_repo, config_provider),
+            bulk=BulkActionRBACValidator(permission_repo, config_provider),
         ),
     )
 

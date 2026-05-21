@@ -106,7 +106,7 @@ async def session_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -118,7 +118,7 @@ def agent_processors_mock() -> AgentProcessors:
         service=AsyncMock(),
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -130,7 +130,7 @@ def vfolder_processors_mock() -> VFolderProcessors:
         service=AsyncMock(),
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 

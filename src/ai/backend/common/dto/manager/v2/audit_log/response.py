@@ -12,8 +12,8 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from .types import AuditLogStatus
 
 __all__ = (
-    "AdminSearchAuditLogsPayload",
     "AuditLogNode",
+    "SearchAuditLogsPayload",
 )
 
 
@@ -35,7 +35,7 @@ class AuditLogNode(BaseResponseModel):
     status: AuditLogStatus = Field(description="Status of the operation")
 
 
-class AdminSearchAuditLogsPayload(BaseResponseModel):
+class SearchAuditLogsPayload(BaseResponseModel):
     """Payload for audit log search result."""
 
     items: list[AuditLogNode] = Field(description="Audit log list")

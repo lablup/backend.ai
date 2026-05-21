@@ -5,21 +5,24 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     AuditLogFilter,
     AuditLogOrder,
     AuditLogStatusFilter,
+    ScopedSearchAuditLogsInput,
 )
 from ai.backend.common.dto.manager.v2.audit_log.response import (
-    AdminSearchAuditLogsPayload,
     AuditLogNode,
+    SearchAuditLogsPayload,
 )
 from ai.backend.common.dto.manager.v2.audit_log.types import (
     AuditLogOrderField,
     AuditLogStatus,
     OrderDirection,
 )
+from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData
@@ -32,6 +35,11 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
+)
+from ai.backend.manager.services.audit_log.actions.scoped_search import (
+    EntityAuditLogTarget,
+    ScopedSearchAuditLogsAction,
+    TriggeredByAuditLogTarget,
 )
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 
@@ -64,7 +72,7 @@ class AuditLogAdapter(BaseAdapter):
         audit_log_map = {item.id: self._data_to_node(item) for item in action_result.data}
         return [audit_log_map.get(audit_log_id) for audit_log_id in ids]
 
-    async def admin_search(self, input: AdminSearchAuditLogsInput) -> AdminSearchAuditLogsPayload:
+    async def admin_search(self, input: AdminSearchAuditLogsInput) -> SearchAuditLogsPayload:
         """Search audit logs with filters, ordering, and pagination."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
@@ -82,12 +90,56 @@ class AuditLogAdapter(BaseAdapter):
         action_result = await self._processors.audit_log.search.wait_for_complete(
             SearchAuditLogsAction(querier=querier)
         )
-        return AdminSearchAuditLogsPayload(
+        return SearchAuditLogsPayload(
             items=[self._data_to_node(item) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    async def scoped_search(self, input: ScopedSearchAuditLogsInput) -> SearchAuditLogsPayload:
+        """Scoped audit-log search: caller passes a list of scope items; results
+        are the OR-union of matching rows, restricted to items the caller is
+        RBAC-authorized for."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_AUDIT_LOG_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        targets = self._scope_to_targets(input)
+        action_result = await self._processors.audit_log.scoped_search.wait_for_complete(
+            ScopedSearchAuditLogsAction(items=targets, querier=querier)
+        )
+        return SearchAuditLogsPayload(
+            items=[self._data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    @staticmethod
+    def _scope_to_targets(input: ScopedSearchAuditLogsInput) -> list[SearchableActionTarget]:
+        targets: list[SearchableActionTarget] = []
+        if input.scope.entity:
+            for entity_scope in input.scope.entity:
+                targets.append(
+                    EntityAuditLogTarget(
+                        element_type=RBACElementType(entity_scope.entity_type.value),
+                        element_id=entity_scope.entity_id,
+                    )
+                )
+        if input.scope.triggered_user:
+            for user_scope in input.scope.triggered_user:
+                targets.append(TriggeredByAuditLogTarget(user_id=user_scope.value))
+        return targets
 
     def _convert_filter(self, f: AuditLogFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

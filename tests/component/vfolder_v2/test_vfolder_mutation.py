@@ -32,6 +32,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -122,6 +123,7 @@ def vfolder_processors(
             rbac=RBACValidators(
                 scope=ScopeActionRBACValidator(rbac_permission_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(rbac_permission_repo, MagicMock()),
+                bulk=BulkActionRBACValidator(rbac_permission_repo, MagicMock()),
             )
         ),
     )

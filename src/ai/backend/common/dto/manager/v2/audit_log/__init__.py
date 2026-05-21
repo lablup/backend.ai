@@ -9,8 +9,8 @@ from ai.backend.common.dto.manager.v2.audit_log.request import (
     ScopedSearchAuditLogsInput,
 )
 from ai.backend.common.dto.manager.v2.audit_log.response import (
-    AdminSearchAuditLogsPayload,
     AuditLogNode,
+    SearchAuditLogsPayload,
 )
 from ai.backend.common.dto.manager.v2.audit_log.types import (
     AuditLogOrderField,
@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.v2.audit_log.types import (
 
 __all__ = (
     "AdminSearchAuditLogsInput",
-    "AdminSearchAuditLogsPayload",
     "AuditLogFilter",
     "AuditLogNode",
     "AuditLogOrder",
@@ -30,4 +29,5 @@ __all__ = (
     "AuditLogStatusFilter",
     "OrderDirection",
     "ScopedSearchAuditLogsInput",
+    "SearchAuditLogsPayload",
 )

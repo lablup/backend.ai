@@ -21,6 +21,7 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -78,6 +79,7 @@ def _build_validators(
         rbac=RBACValidators(
             scope=ScopeActionRBACValidator(permission_repo, config_provider),
             single_entity=SingleEntityActionRBACValidator(permission_repo, config_provider),
+            bulk=BulkActionRBACValidator(permission_repo, config_provider),
         ),
     )
 
