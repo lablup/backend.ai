@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
-from ai.backend.common.dto.manager.v2.audit_log.request import AdminSearchAuditLogsInput
+from ai.backend.common.dto.manager.v2.audit_log.request import (
+    AdminSearchAuditLogsInput,
+    ScopedSearchAuditLogsInput,
+)
 from ai.backend.common.dto.manager.v2.audit_log.response import SearchAuditLogsPayload
 
 _PATH = "/v2/audit-logs"
@@ -17,6 +20,15 @@ class V2AuditLogClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/search",
+            request=request,
+            response_model=SearchAuditLogsPayload,
+        )
+
+    async def scoped_search(self, request: ScopedSearchAuditLogsInput) -> SearchAuditLogsPayload:
+        """Search audit logs within an RBAC-authorized scope (non-admin)."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/scoped-search",
             request=request,
             response_model=SearchAuditLogsPayload,
         )

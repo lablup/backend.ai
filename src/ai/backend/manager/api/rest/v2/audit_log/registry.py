@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2AuditLogHandler
@@ -25,6 +25,12 @@ def register_v2_audit_log_routes(
         "/search",
         handler.admin_search_audit_logs,
         middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/scoped-search",
+        handler.scoped_search_audit_logs,
+        middlewares=[auth_required],
     )
 
     return registry

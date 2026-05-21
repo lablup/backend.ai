@@ -7,7 +7,10 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
-from ai.backend.common.dto.manager.v2.audit_log.request import AdminSearchAuditLogsInput
+from ai.backend.common.dto.manager.v2.audit_log.request import (
+    AdminSearchAuditLogsInput,
+    ScopedSearchAuditLogsInput,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -28,4 +31,12 @@ class V2AuditLogHandler:
     ) -> APIResponse:
         """Search audit logs with admin scope."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search_audit_logs(
+        self,
+        body: BodyParam[ScopedSearchAuditLogsInput],
+    ) -> APIResponse:
+        """Search audit logs within an RBAC-authorized scope (non-admin)."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
