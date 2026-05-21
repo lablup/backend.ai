@@ -1466,7 +1466,7 @@ input BulkPurgeVFoldersV2Input {
   """
   Added in UNRELEASED. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
   """
-  options: PurgeVFolderOptionsInput!
+  options: PurgeVFolderOptionsInput
 }
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
