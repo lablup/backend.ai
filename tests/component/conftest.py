@@ -674,7 +674,7 @@ async def resource_policy_fixture(
 @pytest.fixture()
 async def scaling_group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
 ) -> AsyncIterator[ResourceGroupName]:
     """Insert a scaling group and its domain association; yield the name."""
     sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
@@ -693,7 +693,7 @@ async def scaling_group_fixture(
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
                 scaling_group=sgroup_name,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
         )
     yield sgroup_name
@@ -707,7 +707,7 @@ async def scaling_group_fixture(
 @pytest.fixture()
 async def group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a test group (project) and yield its UUID."""
@@ -720,7 +720,7 @@ async def group_fixture(
                 name=group_name,
                 description=f"Test group {group_name}",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -733,7 +733,7 @@ async def group_fixture(
 async def admin_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert admin user, keypair, and group membership; yield identifiers."""
@@ -764,7 +764,7 @@ async def admin_user_fixture(
                 description=f"Test admin account {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
             )
@@ -834,7 +834,7 @@ async def admin_user_fixture(
 async def regular_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert regular user, keypair, and group membership; yield identifiers."""
@@ -865,7 +865,7 @@ async def regular_user_fixture(
                 description=f"Test user account {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )

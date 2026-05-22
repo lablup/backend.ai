@@ -70,6 +70,7 @@ from ai.backend.manager.services.scaling_group.actions.purge_scaling_group impor
 )
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 # ---------------------------------------------------------------------------
 # Module-level helpers — shared across all test classes
@@ -297,7 +298,7 @@ class TestScalingGroupDomainAssociation:
         self,
         scaling_group_processors: ScalingGroupProcessors,
         scaling_group_repository: ScalingGroupRepository,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         database_fixture: None,
     ) -> None:
         """S-1: Associate a scaling group with a single domain; association exists in DB."""
@@ -309,10 +310,10 @@ class TestScalingGroupDomainAssociation:
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
                             scaling_group=name,
-                            domain=domain_fixture,
+                            domain=domain_fixture.domain_name,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture),
+                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture.domain_name),
                     )
                 ]
             )
@@ -322,7 +323,7 @@ class TestScalingGroupDomainAssociation:
 
             exists = await scaling_group_repository.check_scaling_group_domain_association_exists(
                 scaling_group=name,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
             assert exists is True
         finally:
@@ -336,7 +337,7 @@ class TestScalingGroupDomainAssociation:
         self,
         scaling_group_processors: ScalingGroupProcessors,
         scaling_group_repository: ScalingGroupRepository,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         database_fixture: None,
     ) -> None:
         """S-3: Disassociate domain; check_exists returns False afterwards."""
@@ -349,10 +350,10 @@ class TestScalingGroupDomainAssociation:
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
                             scaling_group=name,
-                            domain=domain_fixture,
+                            domain=domain_fixture.domain_name,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture),
+                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture.domain_name),
                     )
                 ]
             )
@@ -364,14 +365,14 @@ class TestScalingGroupDomainAssociation:
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
                     scaling_group=name,
-                    domain=domain_fixture,
+                    domain=domain_fixture.domain_name,
                 )
             ) is True
 
             # Now disassociate
             unbinder = ResourceGroupDomainEntityUnbinder(
                 scaling_groups=[name],
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
             await (
                 scaling_group_processors.disassociate_scaling_group_with_domains.wait_for_complete(
@@ -382,7 +383,7 @@ class TestScalingGroupDomainAssociation:
             # Association should be gone
             exists = await scaling_group_repository.check_scaling_group_domain_association_exists(
                 scaling_group=name,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
             assert exists is False
         finally:
@@ -396,7 +397,7 @@ class TestScalingGroupDomainAssociation:
         self,
         scaling_group_processors: ScalingGroupProcessors,
         scaling_group_repository: ScalingGroupRepository,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         database_fixture: None,
     ) -> None:
         """S-5: check_scaling_group_domain_association_exists returns True/False correctly."""
@@ -407,7 +408,7 @@ class TestScalingGroupDomainAssociation:
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
                     scaling_group=name,
-                    domain=domain_fixture,
+                    domain=domain_fixture.domain_name,
                 )
             ) is False
 
@@ -417,10 +418,10 @@ class TestScalingGroupDomainAssociation:
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
                             scaling_group=name,
-                            domain=domain_fixture,
+                            domain=domain_fixture.domain_name,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture),
+                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture.domain_name),
                     )
                 ]
             )
@@ -430,7 +431,7 @@ class TestScalingGroupDomainAssociation:
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
                     scaling_group=name,
-                    domain=domain_fixture,
+                    domain=domain_fixture.domain_name,
                 )
             ) is True
         finally:
