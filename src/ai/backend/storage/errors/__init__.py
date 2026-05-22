@@ -62,6 +62,10 @@ from .quota import (
     QuotaScopeNotFoundError,
     QuotaTreeNotFoundError,
 )
+from .upload import (
+    ChunkConflictError,
+    UploadSessionCorruptedError,
+)
 from .vfolder import (
     InvalidSubpathError,
     VFolderNotFoundError,
@@ -90,6 +94,9 @@ __all__ = [
     "InvalidDataLengthError",
     "ServiceNotInitializedError",
     "UploadOffsetMismatchError",
+    # upload
+    "ChunkConflictError",
+    "UploadSessionCorruptedError",
     # vfolder
     "VFolderNotFoundError",
     "InvalidSubpathError",
