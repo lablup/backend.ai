@@ -17,6 +17,7 @@ class LoginSessionData:
     created_at: datetime
     last_accessed_at: datetime | None
     invalidated_at: datetime | None
+    client_ip: str | None
 
 
 @dataclass(frozen=True)

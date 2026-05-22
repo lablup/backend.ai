@@ -186,6 +186,17 @@ class LoginSessionAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if f.client_ip is not None:
+            condition = self.convert_string_filter(
+                f.client_ip,
+                contains_factory=LoginSessionConditions.by_client_ip_contains,
+                equals_factory=LoginSessionConditions.by_client_ip_equals,
+                starts_with_factory=LoginSessionConditions.by_client_ip_starts_with,
+                ends_with_factory=LoginSessionConditions.by_client_ip_ends_with,
+                in_factory=LoginSessionConditions.by_client_ip_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.AND:
             for sub_filter in f.AND:
                 conditions.extend(self._convert_filter(sub_filter))
@@ -226,6 +237,8 @@ class LoginSessionAdapter(BaseAdapter):
                     result.append(LoginSessionOrders.status(ascending))
                 case LoginSessionOrderField.LAST_ACCESSED_AT:
                     result.append(LoginSessionOrders.last_accessed_at(ascending))
+                case LoginSessionOrderField.CLIENT_IP:
+                    result.append(LoginSessionOrders.client_ip(ascending))
         return result
 
     @staticmethod
@@ -238,4 +251,5 @@ class LoginSessionAdapter(BaseAdapter):
             created_at=data.created_at,
             last_accessed_at=data.last_accessed_at,
             invalidated_at=data.invalidated_at,
+            client_ip=data.client_ip,
         )

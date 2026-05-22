@@ -12,6 +12,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -56,6 +57,13 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
     )
     invalidated_at: datetime | None = gql_field(
         description="Timestamp when the session was invalidated."
+    )
+    client_ip: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Originating client IP of the login that created this session, if known.",
+        ),
+        default=None,
     )
 
     @gql_added_field(

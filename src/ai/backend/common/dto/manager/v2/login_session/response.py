@@ -34,6 +34,10 @@ class LoginSessionNode(BaseResponseModel):
     invalidated_at: datetime | None = Field(
         default=None, description="Timestamp when the session was invalidated"
     )
+    client_ip: str | None = Field(
+        default=None,
+        description="Originating client IP of the login that created this session, if known",
+    )
 
 
 class AdminSearchLoginSessionsPayload(BaseResponseModel):

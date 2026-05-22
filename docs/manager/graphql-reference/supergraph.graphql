@@ -8842,6 +8842,11 @@ input LoginSessionFilter
   accessKey: StringFilter = null
   createdAt: DateTimeFilter = null
   lastAccessedAt: DateTimeFilter = null
+
+  """
+  Added in UNRELEASED. Filter by the originating client IP recorded on the session.
+  """
+  clientIp: StringFilter = null
   AND: [LoginSessionFilter!] = null
   OR: [LoginSessionFilter!] = null
   NOT: [LoginSessionFilter!] = null
@@ -8862,6 +8867,7 @@ enum LoginSessionOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   STATUS @join__enumValue(graph: STRAWBERRY)
   LAST_ACCESSED_AT @join__enumValue(graph: STRAWBERRY)
+  CLIENT_IP @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.4.2. Status of a login session."""
@@ -8914,6 +8920,11 @@ type LoginSessionV2 implements Node
 
   """Timestamp when the session was invalidated."""
   invalidatedAt: DateTime
+
+  """
+  Added in UNRELEASED. Originating client IP of the login that created this session, if known.
+  """
+  clientIp: String
 
   """Added in 26.4.3. The user who owns this login session."""
   user: UserV2

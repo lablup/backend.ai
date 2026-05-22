@@ -525,6 +525,7 @@ class AuthDBSource:
                     session_token=session_token,
                     status=LoginSessionStatus.ACTIVE,
                     login_client_type_id=login_client_type_id,
+                    client_ip=client_ip,
                 )
             )
 

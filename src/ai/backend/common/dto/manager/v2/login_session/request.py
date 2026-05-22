@@ -50,6 +50,9 @@ class LoginSessionFilter(BaseRequestModel):
     last_accessed_at: DateTimeFilter | None = Field(
         default=None, description="Filter sessions by last_accessed_at datetime"
     )
+    client_ip: StringFilter | None = Field(
+        default=None, description="Client IP filter (origin IP recorded on the session)"
+    )
     AND: list[LoginSessionFilter] | None = Field(
         default=None, description="All conditions must match"
     )

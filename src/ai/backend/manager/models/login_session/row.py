@@ -64,6 +64,9 @@ class LoginSessionRow(Base):  # type: ignore[misc]
     invalidated_at: Mapped[datetime | None] = mapped_column(
         "invalidated_at", sa.DateTime(timezone=True), nullable=True
     )
+    # 45 = INET6_ADDRSTRLEN - 1: the longest possible textual representation of an
+    # IP address is an IPv4-mapped IPv6 form like "0000:0000:0000:0000:0000:ffff:255.255.255.255".
+    client_ip: Mapped[str | None] = mapped_column("client_ip", sa.String(45), nullable=True)
 
     __table_args__ = (sa.Index("ix_login_sessions_user_id_status", "user_id", "status"),)
 
@@ -81,6 +84,7 @@ class LoginSessionRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             last_accessed_at=self.last_accessed_at,
             invalidated_at=self.invalidated_at,
+            client_ip=self.client_ip,
         )
 
 

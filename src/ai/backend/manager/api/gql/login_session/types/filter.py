@@ -8,9 +8,11 @@ from ai.backend.common.dto.manager.v2.login_session.request import (
     LoginSessionFilter,
     LoginSessionStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
 )
@@ -50,6 +52,13 @@ class LoginSessionFilterGQL(PydanticInputMixin[LoginSessionFilter]):
     access_key: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     last_accessed_at: DateTimeFilter | None = None
+    client_ip: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the originating client IP recorded on the session.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

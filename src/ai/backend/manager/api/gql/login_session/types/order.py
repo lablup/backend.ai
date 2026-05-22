@@ -25,6 +25,7 @@ class LoginSessionOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     STATUS = "status"
     LAST_ACCESSED_AT = "last_accessed_at"
+    CLIENT_IP = "client_ip"
 
 
 @gql_pydantic_input(
