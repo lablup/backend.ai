@@ -43,6 +43,7 @@ from ai.backend.manager.services.permission_contoller.actions.revoke_role import
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import RoleFactory
 
@@ -60,14 +61,14 @@ class TestPermissionCreate:
         self,
         permission_controller_processors: PermissionControllerProcessors,
         target_role: Any,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-CREATE-1: Create basic permission with valid params → PermissionData returned."""
         creator = Creator(
             spec=PermissionCreatorSpec(
                 role_id=target_role.role.id,
                 scope_type=RBACElementType.DOMAIN,
-                scope_id=domain_fixture,
+                scope_id=domain_fixture.domain_name,
                 entity_type=RBACElementType.SESSION,
                 operation=OperationType.READ,
             )
@@ -91,15 +92,25 @@ class TestPermissionCreate:
         self,
         permission_controller_processors: PermissionControllerProcessors,
         target_role: Any,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-CREATE-2: Create permissions with various scope/entity/operation combinations."""
         combos: list[tuple[RBACElementType, str, RBACElementType, OperationType]] = [
-            (RBACElementType.DOMAIN, domain_fixture, RBACElementType.SESSION, OperationType.READ),
-            (RBACElementType.DOMAIN, domain_fixture, RBACElementType.IMAGE, OperationType.UPDATE),
             (
                 RBACElementType.DOMAIN,
-                domain_fixture,
+                domain_fixture.domain_name,
+                RBACElementType.SESSION,
+                OperationType.READ,
+            ),
+            (
+                RBACElementType.DOMAIN,
+                domain_fixture.domain_name,
+                RBACElementType.IMAGE,
+                OperationType.UPDATE,
+            ),
+            (
+                RBACElementType.DOMAIN,
+                domain_fixture.domain_name,
                 RBACElementType.VFOLDER,
                 OperationType.SOFT_DELETE,
             ),
@@ -135,13 +146,13 @@ class TestPermissionCreate:
         self,
         permission_controller_processors: PermissionControllerProcessors,
         target_role: Any,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """F-BIZ-4: Create duplicate permission → unique constraint error."""
         spec = PermissionCreatorSpec(
             role_id=target_role.role.id,
             scope_type=RBACElementType.DOMAIN,
-            scope_id=domain_fixture,
+            scope_id=domain_fixture.domain_name,
             entity_type=RBACElementType.VFOLDER,
             operation=OperationType.READ,
         )
@@ -169,7 +180,7 @@ class TestPermissionDelete:
         self,
         permission_controller_processors: PermissionControllerProcessors,
         target_role: Any,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-DELETE-1: Delete existing permission → deletion response."""
         create_result = await permission_controller_processors.create_permission.wait_for_complete(
@@ -178,7 +189,7 @@ class TestPermissionDelete:
                     spec=PermissionCreatorSpec(
                         role_id=target_role.role.id,
                         scope_type=RBACElementType.DOMAIN,
-                        scope_id=domain_fixture,
+                        scope_id=domain_fixture.domain_name,
                         entity_type=RBACElementType.SESSION,
                         operation=OperationType.HARD_DELETE,
                     )
@@ -198,7 +209,7 @@ class TestPermissionDelete:
         self,
         permission_controller_processors: PermissionControllerProcessors,
         target_role: Any,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-DELETE-2: Verify deleted permission no longer exists."""
         create_result = await permission_controller_processors.create_permission.wait_for_complete(
@@ -207,7 +218,7 @@ class TestPermissionDelete:
                     spec=PermissionCreatorSpec(
                         role_id=target_role.role.id,
                         scope_type=RBACElementType.DOMAIN,
-                        scope_id=domain_fixture,
+                        scope_id=domain_fixture.domain_name,
                         entity_type=RBACElementType.IMAGE,
                         operation=OperationType.SOFT_DELETE,
                     )
@@ -268,7 +279,7 @@ class TestCheckPermissionInScope:
         permission_repo: PermissionControllerRepository,
         role_factory: RoleFactory,
         admin_user_fixture: Any,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-SCOPE-1: User has permission in target scope → True."""
         role = await role_factory()
@@ -281,7 +292,7 @@ class TestCheckPermissionInScope:
                     spec=PermissionCreatorSpec(
                         role_id=role_id,
                         scope_type=RBACElementType.DOMAIN,
-                        scope_id=domain_fixture,
+                        scope_id=domain_fixture.domain_name,
                         entity_type=RBACElementType.SESSION,
                         operation=OperationType.READ,
                     )
@@ -298,7 +309,9 @@ class TestCheckPermissionInScope:
                 ScopePermissionCheckInput(
                     user_id=user_id,
                     target_entity_type=EntityType.SESSION,
-                    target_scope_id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_fixture),
+                    target_scope_id=ScopeId(
+                        scope_type=ScopeType.DOMAIN, scope_id=domain_fixture.domain_name
+                    ),
                     operation=OperationType.READ,
                 )
             )
@@ -316,14 +329,16 @@ class TestCheckPermissionInScope:
     async def test_user_without_permission_in_scope_returns_false(
         self,
         permission_repo: PermissionControllerRepository,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-SCOPE-2: User lacks permission in target scope → False."""
         has_perm = await permission_repo.check_permission_in_scope(
             ScopePermissionCheckInput(
                 user_id=uuid.uuid4(),  # random user with no roles
                 target_entity_type=EntityType.SESSION,
-                target_scope_id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_fixture),
+                target_scope_id=ScopeId(
+                    scope_type=ScopeType.DOMAIN, scope_id=domain_fixture.domain_name
+                ),
                 operation=OperationType.READ,
             )
         )

@@ -67,6 +67,7 @@ from ai.backend.manager.repositories.container_registry.updaters import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 @dataclass
@@ -151,21 +152,20 @@ class TestContainerRegistryRepository:
         return ContainerRegistryRepository(db=db_with_cleanup)
 
     @pytest.fixture
-    async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
-        """Pre-created domain for group tests. Returns domain name."""
-        domain_name = "test-domain-" + str(uuid.uuid4())[:8]
-        async with db_with_cleanup.begin_session() as session:
-            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
-            session.add(domain)
-            await session.commit()
-        return domain_name
+    async def sample_domain(
+        self,
+        domain_factory: DomainFactory,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        """Pre-created domain for group tests."""
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def sample_groups(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: str
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: DomainFixtureData
     ) -> list[UUID]:
-        """Pre-created 2 groups with required policies. Depends on sample_domain."""
-        resource_policy_name = f"test-policy-{sample_domain}"
+        """Pre-created 2 groups with required policies. Depends on sample_domain.domain_name."""
+        resource_policy_name = f"test-policy-{sample_domain.domain_name}"
         group_ids: list[UUID] = []
 
         async with db_with_cleanup.begin_session() as session:
@@ -190,8 +190,8 @@ class TestContainerRegistryRepository:
             # Create 2 groups
             for i in range(2):
                 group = GroupRow(
-                    name=f"test-group-{i}-{sample_domain}",
-                    domain_name=sample_domain,
+                    name=f"test-group-{i}-{sample_domain.domain_name}",
+                    domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
@@ -882,12 +882,12 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def registry_with_associated_groups(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: str
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: DomainFixtureData
     ) -> _RegistryWithGroups:
         """Pre-created registry with 3 groups already associated."""
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
-        resource_policy_name = f"test-policy-{sample_domain}-3groups"
+        resource_policy_name = f"test-policy-{sample_domain.domain_name}-3groups"
         group_ids: list[UUID] = []
 
         async with db_with_cleanup.begin_session() as session:
@@ -922,8 +922,8 @@ class TestContainerRegistryRepository:
             # Create 3 groups and associate them
             for i in range(3):
                 group = GroupRow(
-                    name=f"test-group-{i}-{sample_domain}-assoc",
-                    domain_name=sample_domain,
+                    name=f"test-group-{i}-{sample_domain.domain_name}-assoc",
+                    domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
@@ -1009,12 +1009,12 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def registry_with_partial_groups(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: str
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: DomainFixtureData
     ) -> _RegistryWithPartialGroups:
         """Pre-created registry with 2 out of 4 groups associated."""
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
-        resource_policy_name = f"test-policy-{sample_domain}-4groups"
+        resource_policy_name = f"test-policy-{sample_domain.domain_name}-4groups"
         group_ids: list[UUID] = []
 
         async with db_with_cleanup.begin_session() as session:
@@ -1049,8 +1049,8 @@ class TestContainerRegistryRepository:
             # Create 4 groups
             for i in range(4):
                 group = GroupRow(
-                    name=f"test-group-{i}-{sample_domain}-partial",
-                    domain_name=sample_domain,
+                    name=f"test-group-{i}-{sample_domain.domain_name}-partial",
+                    domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )

@@ -32,6 +32,7 @@ from ai.backend.manager.service.container_registry.harbor import (
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.group.service import GroupService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class InMemoryQuotaService:
@@ -121,7 +122,7 @@ def group_service(
 @pytest.fixture()
 async def target_group(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a test group (project) and yield its UUID."""
@@ -134,7 +135,7 @@ async def target_group(
                 name=group_name,
                 description=f"Test group {group_name}",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )

@@ -56,6 +56,7 @@ from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import _map_lifecycle_to_status
 from ai.backend.manager.services.processors import Processors
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import UserFixtureData
@@ -94,7 +95,7 @@ class TestSearchDeployments:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -106,7 +107,7 @@ class TestSearchDeployments:
             request = CreateDeploymentRequest(
                 metadata=DeploymentMetadataInput(
                     project_id=group_fixture,
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     resource_group_name=scaling_group_fixture,
                     name=f"test-deployment-{i}-{secrets.token_hex(4)}",
                 ),
@@ -156,7 +157,7 @@ class TestGetDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -165,7 +166,7 @@ class TestGetDeployment:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
@@ -267,7 +268,7 @@ class TestSearchRoutes:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -276,7 +277,7 @@ class TestSearchRoutes:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
@@ -406,7 +407,7 @@ class TestDeploymentAdapterFilter:
         admin_user_fixture: UserFixtureData,
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -414,7 +415,7 @@ class TestDeploymentAdapterFilter:
         await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["alpha", "production"],
@@ -422,7 +423,7 @@ class TestDeploymentAdapterFilter:
         await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["beta", "production"],
@@ -430,7 +431,7 @@ class TestDeploymentAdapterFilter:
         target_id = await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["alpha", "beta"],
@@ -442,7 +443,9 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture)):
+        with with_user(
+            self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
+        ):
             payload = await deployment_adapter.my_search(
                 AdminSearchDeploymentsInput(filter=filter_input, limit=50),
             )
@@ -456,7 +459,7 @@ class TestDeploymentAdapterFilter:
         admin_user_fixture: UserFixtureData,
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -464,7 +467,7 @@ class TestDeploymentAdapterFilter:
         alpha_id = await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["alpha"],
@@ -472,7 +475,7 @@ class TestDeploymentAdapterFilter:
         beta_id = await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["beta"],
@@ -480,7 +483,7 @@ class TestDeploymentAdapterFilter:
         await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["gamma"],
@@ -492,7 +495,9 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture)):
+        with with_user(
+            self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
+        ):
             payload = await deployment_adapter.my_search(
                 AdminSearchDeploymentsInput(filter=filter_input, limit=50),
             )
@@ -506,7 +511,7 @@ class TestDeploymentAdapterFilter:
         admin_user_fixture: UserFixtureData,
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -521,7 +526,7 @@ class TestDeploymentAdapterFilter:
         branch1_id = await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["alpha"],
@@ -530,7 +535,7 @@ class TestDeploymentAdapterFilter:
         branch2_id = await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["beta"],
@@ -539,7 +544,7 @@ class TestDeploymentAdapterFilter:
         await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["beta"],
@@ -548,7 +553,7 @@ class TestDeploymentAdapterFilter:
         await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["alpha"],
@@ -567,7 +572,9 @@ class TestDeploymentAdapterFilter:
                 ),
             ],
         )
-        with with_user(self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture)):
+        with with_user(
+            self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
+        ):
             payload = await deployment_adapter.my_search(
                 AdminSearchDeploymentsInput(filter=filter_input, limit=50),
             )
@@ -581,7 +588,7 @@ class TestDeploymentAdapterFilter:
         admin_user_fixture: UserFixtureData,
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_fixture: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
@@ -589,7 +596,7 @@ class TestDeploymentAdapterFilter:
         await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["alpha"],
@@ -597,7 +604,7 @@ class TestDeploymentAdapterFilter:
         target_id = await self._create_deployment_with_tags(
             admin_registry,
             group_fixture,
-            domain_fixture,
+            domain_fixture.domain_name,
             scaling_group_fixture,
             deployment_seed_data,
             ["alpha", "beta"],
@@ -609,7 +616,9 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture)):
+        with with_user(
+            self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
+        ):
             payload = await deployment_adapter.project_search(
                 group_fixture,
                 AdminSearchDeploymentsInput(filter=filter_input, limit=50),

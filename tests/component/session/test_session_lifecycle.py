@@ -25,6 +25,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import SessionSeedData, UserFixtureData
 
@@ -69,7 +70,7 @@ def _build_kernel_values(
 @pytest.fixture()
 async def degraded_session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -91,7 +92,7 @@ async def degraded_session_seed(
         unique=unique,
         session_name=session_name,
         cluster_size=2,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
@@ -108,7 +109,7 @@ async def degraded_session_seed(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=2,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -147,7 +148,7 @@ async def degraded_session_seed(
         session_name=session_name,
         kernel_id=uuid.UUID(int=0),  # not meaningful for multi-kernel
         access_key=admin_user_fixture.keypair.access_key,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         user_uuid=admin_user_fixture.user_uuid,
     )
 
@@ -161,7 +162,7 @@ async def degraded_session_seed(
 @pytest.fixture()
 async def full_lifecycle_session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -189,7 +190,7 @@ async def full_lifecycle_session_seed(
         unique=unique,
         session_name=session_name,
         cluster_size=1,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
@@ -206,7 +207,7 @@ async def full_lifecycle_session_seed(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -235,7 +236,7 @@ async def full_lifecycle_session_seed(
         session_name=session_name,
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         user_uuid=admin_user_fixture.user_uuid,
     )
 

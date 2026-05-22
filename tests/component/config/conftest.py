@@ -33,6 +33,7 @@ from ai.backend.manager.repositories.dotfile.repository import DotfileRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.dotfile.service import DotfileService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 UserDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 GroupDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
@@ -131,7 +132,7 @@ async def group_dotfile_factory(
 @pytest.fixture()
 async def domain_dotfile_factory(
     admin_registry: BackendAIClientRegistry,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
 ) -> AsyncIterator[DomainDotfileFactory]:
     """Factory fixture that creates domain dotfiles via SDK and deletes on teardown."""
     created_paths: list[str] = []
@@ -139,7 +140,7 @@ async def domain_dotfile_factory(
     async def _create(**overrides: Any) -> CreateDotfileResponse:
         unique = secrets.token_hex(4)
         params: dict[str, Any] = {
-            "domain": domain_fixture,
+            "domain": domain_fixture.domain_name,
             "path": f".test-domain-dotfile-{unique}",
             "data": f"# domain test content {unique}",
             "permission": "644",
@@ -156,7 +157,7 @@ async def domain_dotfile_factory(
     for path in reversed(created_paths):
         try:
             await admin_registry.config.delete_domain_dotfile(
-                DeleteDomainDotfileRequest(domain=domain_fixture, path=path)
+                DeleteDomainDotfileRequest(domain=domain_fixture.domain_name, path=path)
             )
         except Exception:
             pass

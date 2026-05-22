@@ -31,6 +31,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.stream.repository import StreamRepository
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 _STREAMING_SERVER_SUBAPP_MODULES = (_auth_api,)
 
@@ -100,7 +101,7 @@ def server_module_registries(
 @pytest.fixture()
 async def session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -130,7 +131,7 @@ async def session_seed(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -155,7 +156,7 @@ async def session_seed(
                 cluster_hostname="main0",
                 cluster_mode="single-node",
                 cluster_size=1,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -191,7 +192,7 @@ async def session_seed(
         session_name=session_name,
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
     )
 
     async with db_engine.begin() as conn:
@@ -204,7 +205,7 @@ async def session_seed(
 @pytest.fixture()
 async def session_seed_no_ports(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -234,7 +235,7 @@ async def session_seed_no_ports(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -259,7 +260,7 @@ async def session_seed_no_ports(
                 cluster_hostname="main0",
                 cluster_mode="single-node",
                 cluster_size=1,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -282,7 +283,7 @@ async def session_seed_no_ports(
         session_name=session_name,
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
     )
 
     async with db_engine.begin() as conn:

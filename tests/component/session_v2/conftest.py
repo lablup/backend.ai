@@ -57,6 +57,7 @@ from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -408,7 +409,7 @@ async def _cleanup_session(db_engine: SAEngine, session_id: SessionId) -> None:
 @pytest.fixture()
 async def admin_session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -416,7 +417,7 @@ async def admin_session_seed(
     """Seed a RUNNING session owned by the admin user."""
     seed = await _seed_session(
         db_engine,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
@@ -429,7 +430,7 @@ async def admin_session_seed(
 @pytest.fixture()
 async def user_session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     regular_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -441,7 +442,7 @@ async def user_session_seed(
     """
     seed = await _seed_session(
         db_engine,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         group_id=group_fixture,
         user_uuid=regular_user_fixture.user_uuid,
         access_key=regular_user_fixture.keypair.access_key,
