@@ -67,6 +67,10 @@ class TestLoginHistoryClientIP:
         return AuthDBSource(db)
 
     @pytest.fixture
+    def client_ip(self) -> str:
+        return "1.2.3.4"
+
+    @pytest.fixture
     async def sample(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SampleUser, None]:
         domain_name = f"test-domain-{uuid.uuid4()}"
         user_uuid = uuid.uuid4()
@@ -151,64 +155,68 @@ class TestLoginHistoryClientIP:
         auth_db_source: AuthDBSource,
         db: ExtendedAsyncSAEngine,
         sample: SampleUser,
+        client_ip: str,
     ) -> None:
         await auth_db_source.create_login_session(
             user_id=sample.user_id,
             access_key=sample.access_key,
             domain_name=sample.domain_name,
-            client_ip="203.0.113.10",
+            client_ip=client_ip,
         )
         ips = await self._fetch_client_ips(db, sample.user_id, LoginAttemptResult.SUCCESS)
-        assert ips == ["203.0.113.10"]
+        assert ips == [client_ip]
 
     async def test_record_login_history_records_client_ip(
         self,
         auth_db_source: AuthDBSource,
         db: ExtendedAsyncSAEngine,
         sample: SampleUser,
+        client_ip: str,
     ) -> None:
         await auth_db_source.record_login_history(
             user_id=sample.user_id,
             domain_name=sample.domain_name,
             result=LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
-            client_ip="198.51.100.7",
+            client_ip=client_ip,
         )
         ips = await self._fetch_client_ips(
             db, sample.user_id, LoginAttemptResult.FAILED_INVALID_CREDENTIALS
         )
-        assert ips == ["198.51.100.7"]
+        assert ips == [client_ip]
 
     async def test_delete_session_by_token_records_client_ip(
         self,
         auth_db_source: AuthDBSource,
         db: ExtendedAsyncSAEngine,
         sample: SampleUser,
+        client_ip: str,
     ) -> None:
         session = await auth_db_source.create_login_session(
             user_id=sample.user_id,
             access_key=sample.access_key,
             domain_name=sample.domain_name,
-            client_ip="203.0.113.10",
+            client_ip=client_ip,
         )
         await auth_db_source.delete_session_by_token(
             session.session_token,
             LoginAttemptResult.LOGOUT,
-            client_ip="203.0.113.99",
+            client_ip=client_ip,
         )
         ips = await self._fetch_client_ips(db, sample.user_id, LoginAttemptResult.LOGOUT)
-        assert ips == ["203.0.113.99"]
+        assert ips == [client_ip]
 
     async def test_delete_session_by_id_records_client_ip(
         self,
         auth_db_source: AuthDBSource,
         db: ExtendedAsyncSAEngine,
         sample: SampleUser,
+        client_ip: str,
     ) -> None:
         session = await auth_db_source.create_login_session(
             user_id=sample.user_id,
             access_key=sample.access_key,
             domain_name=sample.domain_name,
-            client_ip="203.0.113.10",
+            client_ip=client_ip,
         )
         async with db.begin_readonly() as conn:
             session_id = await conn.scalar(
@@ -220,38 +228,40 @@ class TestLoginHistoryClientIP:
         await auth_db_source.delete_session_by_id(
             session_id,
             LoginAttemptResult.REVOKED_BY_ADMIN,
-            client_ip="192.0.2.55",
+            client_ip=client_ip,
         )
         ips = await self._fetch_client_ips(db, sample.user_id, LoginAttemptResult.REVOKED_BY_ADMIN)
-        assert ips == ["192.0.2.55"]
+        assert ips == [client_ip]
 
     async def test_delete_sessions_by_user_records_client_ip(
         self,
         auth_db_source: AuthDBSource,
         db: ExtendedAsyncSAEngine,
         sample: SampleUser,
+        client_ip: str,
     ) -> None:
         for _ in range(2):
             await auth_db_source.create_login_session(
                 user_id=sample.user_id,
                 access_key=sample.access_key,
                 domain_name=sample.domain_name,
-                client_ip="203.0.113.10",
+                client_ip=client_ip,
             )
         await auth_db_source.delete_sessions_by_user(
             user_id=sample.user_id,
             domain_name=sample.domain_name,
             result=LoginAttemptResult.LOGOUT,
-            client_ip="198.51.100.22",
+            client_ip=client_ip,
         )
         ips = await self._fetch_client_ips(db, sample.user_id, LoginAttemptResult.LOGOUT)
-        assert ips == ["198.51.100.22", "198.51.100.22"]
+        assert ips == [client_ip, client_ip]
 
     async def test_delete_sessions_by_tokens_leaves_client_ip_null_for_eviction(
         self,
         auth_db_source: AuthDBSource,
         db: ExtendedAsyncSAEngine,
         sample: SampleUser,
+        client_ip: str,
     ) -> None:
         """System-driven eviction (``EVICTED``/``EXPIRED``) is called without a
         ``client_ip`` argument by the service, so the history row remains NULL."""
@@ -259,7 +269,7 @@ class TestLoginHistoryClientIP:
             user_id=sample.user_id,
             access_key=sample.access_key,
             domain_name=sample.domain_name,
-            client_ip="203.0.113.10",
+            client_ip=client_ip,
         )
         await auth_db_source.delete_sessions_by_tokens(
             [session.session_token],
