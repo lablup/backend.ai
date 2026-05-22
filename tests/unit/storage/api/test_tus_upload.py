@@ -1,10 +1,15 @@
 """
-Tests for TUS upload offset validation in tus_upload_part().
+Tests for the rewired TUS handlers (``tus_check_session``, ``tus_upload_part``).
+
+The handlers are exercised against real ``tmp_path`` session directories;
+only the volume/context plumbing is mocked. This covers header-level guard
+checks (Upload-Offset parsing, range bounds) plus the end-to-end happy path
+that writes through to ``TusUploadSession``.
 """
 
 from __future__ import annotations
 
-from collections.abc import Generator
+import dataclasses
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,244 +21,276 @@ from ai.backend.storage.api.client import tus_upload_part
 from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
 
 
-class TestTusUploadPartOffsetValidation:
-    """Tests for Upload-Offset header validation in tus_upload_part()."""
+@dataclasses.dataclass(slots=True)
+class _PatchEnv:
+    vfpath: Path
+    session_dir: Path
 
-    # =========================================================================
-    # Low-level fixtures (internal building blocks)
-    # =========================================================================
 
-    @pytest.fixture
-    def token_data(self) -> dict[str, Any]:
-        """Create mock token data."""
-        return {
-            "volume": "test-volume",
-            "vfid": MagicMock(),
-            "session": "test-session",
-            "size": "10240",
-            "relpath": "test-file.txt",
-        }
+def _build_request(
+    *,
+    vfpath: Path,
+    session_id: str,
+    total_size: int,
+    body: bytes | None,
+    offset_header: str | None,
+) -> MagicMock:
+    volume = MagicMock()
+    volume.mangle_vfpath.return_value = vfpath
 
-    def _create_mock_request(
-        self,
-        tmp_path: Path,
-        client_offset: str | None,
-    ) -> MagicMock:
-        """Create a fully configured mock request."""
-        # Mock volume
-        volume = MagicMock()
-        volume.mangle_vfpath.return_value = tmp_path
+    ctx = MagicMock()
+    ctx.local_config.storage_proxy.secret = "test-secret"
+    ctx.get_volume.return_value.__aenter__ = AsyncMock(return_value=volume)
+    ctx.get_volume.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        # Mock context
-        ctx = MagicMock()
-        ctx.local_config.storage_proxy.secret = "test-secret"
-        ctx.get_volume.return_value.__aenter__ = AsyncMock(return_value=volume)
-        ctx.get_volume.return_value.__aexit__ = AsyncMock(return_value=None)
+    request = MagicMock(spec=web.Request)
+    request.app = {"ctx": ctx}
+    request.headers = {}
+    if offset_header is not None:
+        request.headers["Upload-Offset"] = offset_header
+    request.query = {"token": "test-token"}
 
-        # Mock request
-        request = MagicMock(spec=web.Request)
-        request.app = {"ctx": ctx}
-        request.headers = {}
-        request.query = {"token": "test-token"}
-
-        if client_offset is not None:
-            request.headers["Upload-Offset"] = client_offset
-
-        # Mock content reader (returns EOF immediately)
+    if body is None:
         content = AsyncMock()
-        content.at_eof.return_value = True
+        content.read = AsyncMock(return_value=b"")
+        request.content = content
+    else:
+        body_state = {"pos": 0}
+
+        async def _read(_n: int) -> bytes:
+            if body_state["pos"] >= len(body):
+                return b""
+            chunk = body[body_state["pos"] :]
+            body_state["pos"] = len(body)
+            return chunk
+
+        content = AsyncMock()
+        content.read = AsyncMock(side_effect=_read)
         request.content = content
 
-        return request
+    return request
 
-    # =========================================================================
-    # Scenario fixtures (composed, one per test scenario)
-    # =========================================================================
 
-    @pytest.fixture
-    def request_without_offset_header(
-        self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        """Scenario: Missing Upload-Offset header."""
-        request = self._create_mock_request(tmp_path, client_offset=None)
+@pytest.fixture
+def patch_env(tmp_path: Path) -> _PatchEnv:
+    session_id = "test-session"
+    vfpath = tmp_path / "vfpath"
+    session_dir = vfpath / ".upload" / session_id
+    session_dir.mkdir(parents=True)
+    return _PatchEnv(vfpath=vfpath, session_dir=session_dir)
 
-        with (
-            patch("ai.backend.storage.api.client.check_params") as mock_check_params,
-            patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-        ):
-            mock_check_params.return_value.__aenter__ = AsyncMock(
-                return_value={"token": token_data, "dst_dir": None}
+
+def _token_data(*, session_id: str, total_size: int, relpath: str) -> dict[str, Any]:
+    return {
+        "volume": "test-volume",
+        "vfid": MagicMock(),
+        "session": session_id,
+        "size": total_size,
+        "relpath": relpath,
+    }
+
+
+def _patch_handler_params(token_data: dict[str, Any]) -> Any:
+    cp = patch("ai.backend.storage.api.client.check_params")
+    mock_check_params = cp.start()
+    mock_check_params.return_value.__aenter__ = AsyncMock(
+        return_value={"token": token_data, "dst_dir": None}
+    )
+    mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
+    return cp
+
+
+class TestUploadOffsetHeaderValidation:
+    async def test_missing_offset_header_raises(self, patch_env: _PatchEnv) -> None:
+        request = _build_request(
+            vfpath=patch_env.vfpath,
+            session_id="test-session",
+            total_size=1024,
+            body=None,
+            offset_header=None,
+        )
+        token_data = _token_data(session_id="test-session", total_size=1024, relpath="f.bin")
+        cp = _patch_handler_params(token_data)
+        try:
+            with pytest.raises(InvalidAPIParameters):
+                await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+    async def test_non_integer_offset_header_raises(self, patch_env: _PatchEnv) -> None:
+        request = _build_request(
+            vfpath=patch_env.vfpath,
+            session_id="test-session",
+            total_size=1024,
+            body=None,
+            offset_header="not-a-number",
+        )
+        token_data = _token_data(session_id="test-session", total_size=1024, relpath="f.bin")
+        cp = _patch_handler_params(token_data)
+        try:
+            with pytest.raises(InvalidAPIParameters):
+                await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+    async def test_negative_offset_raises_conflict(self, patch_env: _PatchEnv) -> None:
+        request = _build_request(
+            vfpath=patch_env.vfpath,
+            session_id="test-session",
+            total_size=1024,
+            body=None,
+            offset_header="-1",
+        )
+        token_data = _token_data(session_id="test-session", total_size=1024, relpath="f.bin")
+        cp = _patch_handler_params(token_data)
+        try:
+            with pytest.raises(UploadOffsetMismatchError):
+                await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+    async def test_offset_above_total_size_raises_conflict(self, patch_env: _PatchEnv) -> None:
+        request = _build_request(
+            vfpath=patch_env.vfpath,
+            session_id="test-session",
+            total_size=1024,
+            body=None,
+            offset_header="2048",
+        )
+        token_data = _token_data(session_id="test-session", total_size=1024, relpath="f.bin")
+        cp = _patch_handler_params(token_data)
+        try:
+            with pytest.raises(UploadOffsetMismatchError):
+                await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+
+class TestSessionNotFound:
+    async def test_missing_session_dir_raises_not_found(self, tmp_path: Path) -> None:
+        vfpath = tmp_path / "vfpath"
+        vfpath.mkdir()
+        # NOTE: do not create .upload/<session> — session has not been prepared.
+
+        request = _build_request(
+            vfpath=vfpath,
+            session_id="missing-session",
+            total_size=1024,
+            body=b"",
+            offset_header="0",
+        )
+        token_data = _token_data(session_id="missing-session", total_size=1024, relpath="f.bin")
+        cp = _patch_handler_params(token_data)
+        try:
+            with pytest.raises(web.HTTPNotFound):
+                await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+
+class TestHappyPath:
+    async def test_single_chunk_upload_completes_and_assembles(self, patch_env: _PatchEnv) -> None:
+        payload = b"hello world" * 100
+        request = _build_request(
+            vfpath=patch_env.vfpath,
+            session_id="test-session",
+            total_size=len(payload),
+            body=payload,
+            offset_header="0",
+        )
+        token_data = _token_data(
+            session_id="test-session",
+            total_size=len(payload),
+            relpath="result.bin",
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            response = await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+        assert response.headers["Upload-Offset"] == str(len(payload))
+        final_path = patch_env.vfpath / "result.bin"
+        assert final_path.read_bytes() == payload
+        # Session directory must be cleaned up after assembly.
+        assert not patch_env.session_dir.exists()
+
+    async def test_two_chunks_assemble_in_order(self, patch_env: _PatchEnv) -> None:
+        token_data = _token_data(session_id="test-session", total_size=2048, relpath="result.bin")
+
+        cp = _patch_handler_params(token_data)
+        try:
+            first = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id="test-session",
+                total_size=2048,
+                body=b"A" * 1024,
+                offset_header="0",
             )
-            mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_headers.return_value = {"Upload-Offset": "1024"}
+            await tus_upload_part(first)
 
-            yield request
-
-    @pytest.fixture
-    def request_with_invalid_offset(
-        self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        """Scenario: Invalid (non-integer) Upload-Offset header."""
-        request = self._create_mock_request(tmp_path, client_offset="not-a-number")
-
-        with (
-            patch("ai.backend.storage.api.client.check_params") as mock_check_params,
-            patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-        ):
-            mock_check_params.return_value.__aenter__ = AsyncMock(
-                return_value={"token": token_data, "dst_dir": None}
+            second = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id="test-session",
+                total_size=2048,
+                body=b"B" * 1024,
+                offset_header="1024",
             )
-            mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_headers.return_value = {"Upload-Offset": "1024"}
+            response = await tus_upload_part(second)
+        finally:
+            cp.stop()
 
-            yield request
+        assert response.headers["Upload-Offset"] == "2048"
+        final_path = patch_env.vfpath / "result.bin"
+        assert final_path.read_bytes() == b"A" * 1024 + b"B" * 1024
 
-    @pytest.fixture
-    def request_offset_mismatch_client_behind(
-        self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        """Scenario: Client offset (512) behind server offset (1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="512")
-
-        with (
-            patch("ai.backend.storage.api.client.check_params") as mock_check_params,
-            patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-        ):
-            mock_check_params.return_value.__aenter__ = AsyncMock(
-                return_value={"token": token_data, "dst_dir": None}
+    async def test_duplicate_chunk_replay_is_idempotent(self, patch_env: _PatchEnv) -> None:
+        token_data = _token_data(session_id="test-session", total_size=2048, relpath="result.bin")
+        cp = _patch_handler_params(token_data)
+        try:
+            payload = b"A" * 1024
+            first = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id="test-session",
+                total_size=2048,
+                body=payload,
+                offset_header="0",
             )
-            mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_headers.return_value = {"Upload-Offset": "1024"}
+            await tus_upload_part(first)
 
-            yield request
-
-    @pytest.fixture
-    def request_offset_mismatch_client_ahead(
-        self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        """Scenario: Client offset (2048) ahead of server offset (1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="2048")
-
-        with (
-            patch("ai.backend.storage.api.client.check_params") as mock_check_params,
-            patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-        ):
-            mock_check_params.return_value.__aenter__ = AsyncMock(
-                return_value={"token": token_data, "dst_dir": None}
+            # Replay the same chunk; must not change committed offset.
+            replay = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id="test-session",
+                total_size=2048,
+                body=payload,
+                offset_header="0",
             )
-            mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_headers.return_value = {"Upload-Offset": "1024"}
+            response = await tus_upload_part(replay)
+        finally:
+            cp.stop()
 
-            yield request
+        assert response.headers["Upload-Offset"] == "1024"
+        # Session is still pending (not finalized).
+        assert patch_env.session_dir.exists()
 
-    @pytest.fixture
-    def request_with_matching_offset(
-        self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        """Scenario: Client offset matches server offset (both 1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="1024")
+    async def test_chunk_exceeding_declared_size_raises(self, patch_env: _PatchEnv) -> None:
+        token_data = _token_data(session_id="test-session", total_size=10, relpath="result.bin")
+        request = _build_request(
+            vfpath=patch_env.vfpath,
+            session_id="test-session",
+            total_size=10,
+            body=b"too-much-data",  # 13 bytes > 10
+            offset_header="0",
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            with pytest.raises(UploadOffsetMismatchError):
+                await tus_upload_part(request)
+        finally:
+            cp.stop()
 
-        # Create upload temp file
-        upload_parent = tmp_path / ".upload"
-        upload_parent.mkdir(parents=True, exist_ok=True)
-        temp_file = upload_parent / token_data["session"]
-        temp_file.write_bytes(b"x" * 1024)
-
-        with (
-            patch("ai.backend.storage.api.client.check_params") as mock_check_params,
-            patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-            patch("ai.backend.storage.api.client.AsyncFileWriter") as mock_writer,
-        ):
-            mock_check_params.return_value.__aenter__ = AsyncMock(
-                return_value={"token": token_data, "dst_dir": None}
-            )
-            mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_headers.return_value = {"Upload-Offset": "1024"}
-
-            writer = AsyncMock()
-            mock_writer.return_value.__aenter__ = AsyncMock(return_value=writer)
-            mock_writer.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            yield request
-
-    @pytest.fixture
-    def request_with_zero_offset(
-        self, tmp_path: Path, token_data: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        """Scenario: New file upload with zero offset."""
-        request = self._create_mock_request(tmp_path, client_offset="0")
-
-        # Create empty upload temp file
-        upload_parent = tmp_path / ".upload"
-        upload_parent.mkdir(parents=True, exist_ok=True)
-        temp_file = upload_parent / token_data["session"]
-        temp_file.write_bytes(b"")
-
-        with (
-            patch("ai.backend.storage.api.client.check_params") as mock_check_params,
-            patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-            patch("ai.backend.storage.api.client.AsyncFileWriter") as mock_writer,
-        ):
-            mock_check_params.return_value.__aenter__ = AsyncMock(
-                return_value={"token": token_data, "dst_dir": None}
-            )
-            mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_headers.return_value = {"Upload-Offset": "0"}
-
-            writer = AsyncMock()
-            mock_writer.return_value.__aenter__ = AsyncMock(return_value=writer)
-            mock_writer.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            yield request
-
-    # =========================================================================
-    # Test methods (minimal fixture injection, Act & Assert only)
-    # =========================================================================
-
-    async def test_missing_upload_offset_header_raises_bad_request(
-        self,
-        request_without_offset_header: MagicMock,
-    ) -> None:
-        """When Upload-Offset header is missing, should raise InvalidAPIParameters (400)."""
-        with pytest.raises(InvalidAPIParameters):
-            await tus_upload_part(request_without_offset_header)
-
-    async def test_invalid_upload_offset_header_raises_bad_request(
-        self,
-        request_with_invalid_offset: MagicMock,
-    ) -> None:
-        """When Upload-Offset header is not a valid integer, should raise InvalidAPIParameters (400)."""
-        with pytest.raises(InvalidAPIParameters):
-            await tus_upload_part(request_with_invalid_offset)
-
-    async def test_offset_mismatch_client_behind_raises_conflict(
-        self,
-        request_offset_mismatch_client_behind: MagicMock,
-    ) -> None:
-        """When client offset is behind server file size, should raise UploadOffsetMismatchError (409)."""
-        with pytest.raises(UploadOffsetMismatchError):
-            await tus_upload_part(request_offset_mismatch_client_behind)
-
-    async def test_offset_mismatch_client_ahead_raises_conflict(
-        self,
-        request_offset_mismatch_client_ahead: MagicMock,
-    ) -> None:
-        """When client offset is ahead of server file size, should raise UploadOffsetMismatchError (409)."""
-        with pytest.raises(UploadOffsetMismatchError):
-            await tus_upload_part(request_offset_mismatch_client_ahead)
-
-    async def test_matching_offset_proceeds_with_upload(
-        self,
-        request_with_matching_offset: MagicMock,
-    ) -> None:
-        """When client offset matches server file size, upload should proceed successfully."""
-        # No exception should be raised
-        await tus_upload_part(request_with_matching_offset)
-
-    async def test_new_file_upload_with_zero_offset(
-        self,
-        request_with_zero_offset: MagicMock,
-    ) -> None:
-        """When both client offset and file size are 0, upload should proceed successfully."""
-        # No exception should be raised
-        await tus_upload_part(request_with_zero_offset)
+        # The aborted temp chunk file must be cleaned up.
+        chunks_dir = patch_env.session_dir / "chunks"
+        if chunks_dir.exists():
+            assert list(chunks_dir.glob("*.tmp")) == []

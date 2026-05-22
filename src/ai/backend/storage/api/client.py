@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 import urllib.parse
-from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
+from collections.abc import AsyncGenerator, Iterator, Mapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -38,7 +38,6 @@ from ai.backend.common.dto.storage.request import (
     ArchiveDownloadQueryParams,
     ArchiveDownloadTokenData,
 )
-from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
@@ -50,6 +49,10 @@ from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
 from ai.backend.storage.services.file_stream.zip import (
     ZipArchiveStreamReader,
+)
+from ai.backend.storage.services.upload.tus_session import (
+    TusUploadSession,
+    stream_chunk_to_temp,
 )
 from ai.backend.storage.types import SENTINEL
 from ai.backend.storage.utils import (
@@ -329,13 +332,38 @@ async def tus_check_session(request: web.Request) -> web.Response:
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
-            headers = await prepare_tus_session_headers(request, token_data, volume)
+            session_dir = _resolve_session_dir(volume, token_data)
+            if not session_dir.exists():
+                raise web.HTTPNotFound(
+                    body=dump_json_str(
+                        {
+                            "title": "No such upload session",
+                            "type": ("https://api.backend.ai/probs/storage/no-such-upload-session"),
+                        },
+                    ),
+                    content_type="application/problem+json",
+                )
+            session = TusUploadSession(
+                session_dir,
+                session_id=token_data["session"],
+                total_size=int(token_data["size"]),
+            )
+            state = await session.read_state()
+            headers = _tus_response_headers(
+                upload_offset=state.committed_offset,
+                upload_length=int(token_data["size"]),
+            )
     return web.Response(headers=headers)
 
 
 async def tus_upload_part(request: web.Request) -> web.Response:
     """
-    Perform the chunk upload.
+    Perform a TUS PATCH chunk upload.
+
+    Concurrent PATCH requests from multiple Storage Proxy replicas are made
+    safe by writing each chunk to its own file under ``chunks/`` and updating
+    the session ``info.json`` under a short ``fcntl.flock``. See
+    ``ai.backend.storage.services.upload.tus_session`` for the layout.
     """
     ctx: RootContext = request.app["ctx"]
     secret = ctx.local_config.storage_proxy.secret
@@ -361,59 +389,98 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
+        total_size = int(token_data["size"])
+
+        upload_offset_header = request.headers.get("Upload-Offset")
+        if upload_offset_header is None:
+            raise InvalidAPIParameters(
+                "Missing required Upload-Offset header for TUS PATCH request"
+            )
+        try:
+            client_offset = int(upload_offset_header)
+        except ValueError as e:
+            raise InvalidAPIParameters(
+                f"Invalid Upload-Offset header value: {upload_offset_header}"
+            ) from e
+        if client_offset < 0 or client_offset > total_size:
+            raise UploadOffsetMismatchError(
+                f"Upload-Offset {client_offset} is out of range [0, {total_size}]"
+            )
+
         async with ctx.get_volume(token_data["volume"]) as volume:
-            headers = await prepare_tus_session_headers(request, token_data, volume)
-            vfpath = volume.mangle_vfpath(token_data["vfid"])
-            upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
-
-            # TUS protocol requires Upload-Offset validation before appending data
-            upload_offset_header = request.headers.get("Upload-Offset")
-            if upload_offset_header is None:
-                raise InvalidAPIParameters(
-                    "Missing required Upload-Offset header for TUS PATCH request"
+            session_dir = _resolve_session_dir(volume, token_data)
+            if not session_dir.exists():
+                raise web.HTTPNotFound(
+                    body=dump_json_str(
+                        {
+                            "title": "No such upload session",
+                            "type": ("https://api.backend.ai/probs/storage/no-such-upload-session"),
+                        },
+                    ),
+                    content_type="application/problem+json",
                 )
+            session = TusUploadSession(
+                session_dir,
+                session_id=token_data["session"],
+                total_size=total_size,
+            )
+            await session.ensure_initialized()
 
+            temp_chunk = session.open_temp_chunk(client_offset)
             try:
-                client_offset = int(upload_offset_header)
-            except ValueError as e:
-                raise InvalidAPIParameters(
-                    f"Invalid Upload-Offset header value: {upload_offset_header}"
-                ) from e
-
-            actual_offset = int(headers["Upload-Offset"])
-            if client_offset != actual_offset:
-                raise UploadOffsetMismatchError(
-                    f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+                length, sha256 = await stream_chunk_to_temp(
+                    request.content, temp_chunk.path, DEFAULT_CHUNK_SIZE
                 )
-
-            async with AsyncFileWriter(
-                target_filename=upload_temp_path,
-                access_mode="ab",
-                max_chunks=DEFAULT_INFLIGHT_CHUNKS,
-            ) as writer:
-                while not request.content.at_eof():
-                    chunk = await request.content.read(DEFAULT_CHUNK_SIZE)
-                    await writer.write(chunk)
-
-            current_size = Path(upload_temp_path).stat().st_size
-            if current_size >= int(token_data["size"]):
-                parent_dir = vfpath
-                if (dst_dir := params["dst_dir"]) is not None:
-                    parent_dir = vfpath / dst_dir
-                target_path: Path = parent_dir / token_data["relpath"]
-                if not target_path.parent.exists():
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                upload_temp_path.rename(target_path)
-                try:
-                    loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(
-                        None,
-                        lambda: upload_temp_path.parent.rmdir(),
+                if client_offset + length > total_size:
+                    raise UploadOffsetMismatchError(
+                        f"Chunk at offset {client_offset} with length {length} "
+                        f"exceeds declared size {total_size}"
                     )
-                except OSError:
-                    pass
-            headers["Upload-Offset"] = str(current_size)
+                acceptance = await session.commit_chunk(
+                    offset=client_offset,
+                    chunk_path=temp_chunk.path,
+                    length=length,
+                    sha256=sha256,
+                )
+            except BaseException:
+                if temp_chunk.path.exists():
+                    await asyncio.to_thread(temp_chunk.path.unlink)
+                raise
+
+            state = acceptance.state
+            if acceptance.completed_now:
+                parent_dir = volume.mangle_vfpath(token_data["vfid"])
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = parent_dir / dst_dir
+                target_path = parent_dir / token_data["relpath"]
+                await session.assemble(target_path)
+                await session.cleanup()
+
+            headers = _tus_response_headers(
+                upload_offset=state.committed_offset,
+                upload_length=total_size,
+            )
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
+
+
+def _resolve_session_dir(volume: AbstractVolume, token_data: UploadTokenData) -> Path:
+    return volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
+
+
+_TUS_HEADER_LIST = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+
+
+def _tus_response_headers(*, upload_offset: int, upload_length: int) -> dict[str, str]:
+    return {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": _TUS_HEADER_LIST,
+        "Access-Control-Expose-Headers": _TUS_HEADER_LIST,
+        "Access-Control-Allow-Methods": "*",
+        "Cache-Control": "no-store",
+        "Tus-Resumable": "1.0.0",
+        "Upload-Offset": str(upload_offset),
+        "Upload-Length": str(upload_length),
+    }
 
 
 async def tus_options(request: web.Request) -> web.Response:
@@ -437,39 +504,6 @@ async def tus_options(request: web.Request) -> web.Response:
     )
     headers["X-Content-Type-Options"] = "nosniff"
     return web.Response(headers=headers)
-
-
-async def prepare_tus_session_headers(
-    _request: web.Request,
-    token_data: Mapping[str, Any],
-    volume: AbstractVolume,
-) -> MutableMapping[str, str]:
-    vfpath = volume.mangle_vfpath(token_data["vfid"])
-    upload_temp_path = vfpath / ".upload" / token_data["session"]
-    if not Path(upload_temp_path).exists():
-        raise web.HTTPNotFound(
-            body=dump_json_str(
-                {
-                    "title": "No such upload session",
-                    "type": "https://api.backend.ai/probs/storage/no-such-upload-session",
-                },
-            ),
-            content_type="application/problem+json",
-        )
-    headers = {}
-    headers["Access-Control-Allow-Origin"] = "*"
-    headers["Access-Control-Allow-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    )
-    headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    )
-    headers["Access-Control-Allow-Methods"] = "*"
-    headers["Cache-Control"] = "no-store"
-    headers["Tus-Resumable"] = "1.0.0"
-    headers["Upload-Offset"] = str(Path(upload_temp_path).stat().st_size)
-    headers["Upload-Length"] = str(token_data["size"])
-    return headers
 
 
 class DownloadHandler:
