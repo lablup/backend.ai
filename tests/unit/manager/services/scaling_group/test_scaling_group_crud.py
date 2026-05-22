@@ -313,7 +313,9 @@ class TestScalingGroupDomainAssociation:
                             domain=domain_fixture.domain_name,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture.domain_name),
+                        scope_ref=RBACElementRef(
+                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                        ),
                     )
                 ]
             )
@@ -353,7 +355,9 @@ class TestScalingGroupDomainAssociation:
                             domain=domain_fixture.domain_name,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture.domain_name),
+                        scope_ref=RBACElementRef(
+                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                        ),
                     )
                 ]
             )
@@ -421,7 +425,9 @@ class TestScalingGroupDomainAssociation:
                             domain=domain_fixture.domain_name,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_fixture.domain_name),
+                        scope_ref=RBACElementRef(
+                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                        ),
                     )
                 ]
             )
