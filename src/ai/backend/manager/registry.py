@@ -123,7 +123,7 @@ from ai.backend.manager.data.session.options import (
     SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
+from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -1726,38 +1726,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def sync_kernel_stats(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> None:
-        per_kernel_updates = {}
-        log.debug("sync_kernel_stats(k:{!r})", kernel_ids)
-        for kernel_id in kernel_ids:
-            raw_kernel_id = str(kernel_id)
-            kern_stat = await self.valkey_stat.get_kernel_statistics(raw_kernel_id)
-            if kern_stat is None:
-                log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
-                continue
-            per_kernel_updates[kernel_id] = kern_stat
-
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                update_query = (
-                    sa.update(kernels)
-                    .where(kernels.c.id == sa.bindparam("kernel_id"))
-                    .values({kernels.c.last_stat: sa.bindparam("last_stat")})
-                )
-                params = []
-                for kernel_id, updates in per_kernel_updates.items():
-                    params.append({
-                        "kernel_id": kernel_id,
-                        "last_stat": updates,
-                    })
-                await conn.execute(update_query, params)
-
-        if per_kernel_updates:
-            await execute_with_retry(_update)
-
     async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
         """
         Fetch agent data and status of related kernel data from DB.
@@ -1787,38 +1755,6 @@ class AgentRegistry:
                     (kernel.id, kernel.session_id) for kernel in grouped_kernels
                 ])
             return
-
-    async def _free_kernel_resources(
-        self,
-        kernel_id: uuid.UUID,
-        agent_id: str,
-    ) -> int:
-        """Free normalized resource allocations and decrement agent_resources.used."""
-        ar = AgentResourceRow.__table__
-        async with self.db.begin_session() as db_sess:
-            released = (
-                await db_sess.execute(
-                    sa.update(ResourceAllocationRow)
-                    .where(
-                        ResourceAllocationRow.kernel_id == kernel_id,
-                        ResourceAllocationRow.free_at.is_(None),
-                    )
-                    .values(free_at=sa.func.now())
-                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
-                )
-            ).all()
-            if not released:
-                return 0
-            for r in released:
-                if r.used is None:
-                    continue
-                new_used = sa.func.greatest(ar.c.used - r.used, 0)
-                await db_sess.execute(
-                    sa.update(ar)
-                    .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
-                    .values(used=new_used)
-                )
-            return len(released)
 
     async def _get_user_email(
         self,
