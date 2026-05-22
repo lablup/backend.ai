@@ -624,8 +624,8 @@ class BaseVolume(AbstractVolume):
         def _create_target() -> None:
             upload_base_path = vfpath / ".upload"
             upload_base_path.mkdir(exist_ok=True)
-            upload_target_path = upload_base_path / session_id
-            upload_target_path.touch()
+            session_dir = upload_base_path / session_id
+            session_dir.mkdir(parents=True, exist_ok=True)
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, _create_target)
