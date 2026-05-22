@@ -5,6 +5,7 @@ Tests allowed_vfolder_hosts JSON serialization in CreateGroup mutation.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -16,6 +17,7 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     ResourceSlot,
     VFolderHostPermission,
@@ -24,6 +26,9 @@ from ai.backend.common.types import (
 from ai.backend.manager.api.gql_legacy.group import CreateGroup, GroupNode
 from ai.backend.manager.data.group.types import GroupData, ProjectType
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
+    ResolveDomainIDByNameActionResult,
+)
 from ai.backend.manager.services.group.actions.create_group import CreateGroupActionResult
 
 
@@ -73,6 +78,9 @@ class TestCreateGroupMutation:
         ctx = MagicMock()
         ctx.processors.group.create_group.wait_for_complete = AsyncMock(
             return_value=CreateGroupActionResult(data=group_data_response, _domain_name="default")
+        )
+        ctx.processors.domain.resolve_domain_id_by_name.wait_for_complete = AsyncMock(
+            return_value=ResolveDomainIDByNameActionResult(domain_id=DomainID(uuid.uuid4()))
         )
         # Required for privileged_mutation decorator
         ctx.user = {

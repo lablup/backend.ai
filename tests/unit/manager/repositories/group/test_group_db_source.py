@@ -10,6 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -113,12 +114,13 @@ class TestGroupDBSourceDeleteEndpoints:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainRow:
         """Create test domain"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -131,13 +133,13 @@ class TestGroupDBSourceDeleteEndpoints:
             session.add(domain)
             await session.commit()
 
-        return domain_name
+        return domain
 
     @pytest.fixture
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainRow,
         test_password_info: PasswordInfo,
     ) -> uuid.UUID:
         """Create test user"""
@@ -166,7 +168,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 description="Test user",
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain,
+                domain_name=test_domain.name,
                 role=UserRole.USER,
                 resource_policy=policy_name,
             )
@@ -179,7 +181,7 @@ class TestGroupDBSourceDeleteEndpoints:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainRow,
     ) -> uuid.UUID:
         """Create test group"""
         group_id = uuid.uuid4()
@@ -201,7 +203,8 @@ class TestGroupDBSourceDeleteEndpoints:
                 name=f"test-group-{group_id.hex[:8]}",
                 description="Test group",
                 is_active=True,
-                domain_name=test_domain,
+                domain_name=test_domain.name,
+                domain_id=test_domain.id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -227,7 +230,7 @@ class TestGroupDBSourceDeleteEndpoints:
     async def inactive_endpoints_with_routings(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainRow,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
     ) -> list[DeploymentID]:
@@ -258,7 +261,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     session_owner=test_user,
                     replicas=1,
                     desired_replicas=1,
-                    domain=test_domain,
+                    domain=test_domain.name,
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
@@ -273,7 +276,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     endpoint=endpoint_id,
                     session=None,
                     session_owner=test_user,
-                    domain=test_domain,
+                    domain=test_domain.name,
                     project=test_group,
                     traffic_ratio=1.0,
                     revision=uuid.uuid4(),
@@ -288,7 +291,7 @@ class TestGroupDBSourceDeleteEndpoints:
     async def inactive_endpoint_with_session_and_routing(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainRow,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
     ) -> EndpointWithSessionFixtureData:
@@ -319,7 +322,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                domain=test_domain,
+                domain=test_domain.name,
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
@@ -331,7 +334,7 @@ class TestGroupDBSourceDeleteEndpoints:
             session_row = SessionRow(
                 id=session_id,
                 creation_id=f"test-session-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain,
+                domain_name=test_domain.name,
                 group_id=test_group,
                 user_uuid=test_user,
                 access_key="test-access-key",
@@ -353,7 +356,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 endpoint=endpoint_id,
                 session=session_id,
                 session_owner=test_user,
-                domain=test_domain,
+                domain=test_domain.name,
                 project=test_group,
                 traffic_ratio=1.0,
                 revision=uuid.uuid4(),
@@ -368,7 +371,7 @@ class TestGroupDBSourceDeleteEndpoints:
     async def active_endpoint(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainRow,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
     ) -> uuid.UUID:
@@ -397,7 +400,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                domain=test_domain,
+                domain=test_domain.name,
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
@@ -412,7 +415,7 @@ class TestGroupDBSourceDeleteEndpoints:
     async def multiple_endpoints_with_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainRow,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
     ) -> MultipleEndpointsWithSessionsFixtureData:
@@ -446,7 +449,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     session_owner=test_user,
                     replicas=1,
                     desired_replicas=1,
-                    domain=test_domain,
+                    domain=test_domain.name,
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
@@ -459,7 +462,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 session_row = SessionRow(
                     id=session_id,
                     creation_id=f"test-session-{i}-{uuid.uuid4().hex[:8]}",
-                    domain_name=test_domain,
+                    domain_name=test_domain.name,
                     group_id=test_group,
                     user_uuid=test_user,
                     access_key=f"test-access-key-{i}",
@@ -482,7 +485,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     endpoint=endpoint_id,
                     session=session_id,
                     session_owner=test_user,
-                    domain=test_domain,
+                    domain=test_domain.name,
                     project=test_group,
                     traffic_ratio=1.0,
                     revision=uuid.uuid4(),

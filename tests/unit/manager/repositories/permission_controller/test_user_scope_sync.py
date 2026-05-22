@@ -46,6 +46,7 @@ from ai.backend.manager.repositories.permission_controller.db_source.db_source i
     PermissionDBSource,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 class TestUserScopeSync:
@@ -94,23 +95,12 @@ class TestUserScopeSync:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        async with db_with_cleanup.begin_session() as session:
-            session.add(
-                DomainRow(
-                    name=domain_name,
-                    description="Test domain",
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
-                    allowed_docker_registries=[],
-                    dotfiles=b"",
-                    integration_id=None,
-                )
-            )
-            await session.commit()
-        return domain_name
+    async def test_domain(
+        self,
+        domain_factory: DomainFactory,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def user_resource_policy(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
@@ -130,7 +120,7 @@ class TestUserScopeSync:
 
     @pytest.fixture
     async def test_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
     ) -> uuid.UUID:
         project_id = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -149,7 +139,8 @@ class TestUserScopeSync:
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
                     is_active=True,
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
+                    domain_id=test_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
@@ -162,7 +153,7 @@ class TestUserScopeSync:
 
     @pytest.fixture
     async def second_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
     ) -> uuid.UUID:
         project_id = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -181,7 +172,8 @@ class TestUserScopeSync:
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Second project",
                     is_active=True,
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
+                    domain_id=test_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
@@ -224,12 +216,12 @@ class TestUserScopeSync:
     async def user_1(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> uuid.UUID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture

@@ -323,6 +323,7 @@ async def target_project_fixture(
                 description="Primary test project for membership scenarios",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -347,6 +348,7 @@ async def other_project_fixture(
                 description="Secondary test project",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )

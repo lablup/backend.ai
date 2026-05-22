@@ -367,6 +367,7 @@ class TestUserPurgersIntegration:
                     description="Test group",
                     is_active=True,
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     integration_id=None,

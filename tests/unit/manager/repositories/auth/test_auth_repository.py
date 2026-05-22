@@ -53,6 +53,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 @dataclass
@@ -62,13 +63,6 @@ class UserTestData(UserData):
     access_key: str
     ssh_public_key: str
     ssh_private_key: str
-
-
-@dataclass
-class DomainTestData:
-    """Test data for domain fixture"""
-
-    name: str
 
 
 @dataclass
@@ -125,22 +119,12 @@ class TestAuthRepository:
 
     @pytest.fixture
     async def default_domain(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[DomainTestData, None]:
+        self,
+        domain_factory: DomainFactory,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
         """Create default domain"""
-        domain_name = f"domain-{uuid.uuid4()}"
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Default domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-            await db_sess.commit()
-        yield DomainTestData(name=domain_name)
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def user_resource_policy(
@@ -182,7 +166,7 @@ class TestAuthRepository:
     async def sample_user_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        default_domain: DomainTestData,
+        default_domain: DomainFixtureData,
         user_resource_policy: ResourcePolicyTestData,
         keypair_resource_policy: ResourcePolicyTestData,
     ) -> AsyncGenerator[UserTestData, None]:
@@ -206,7 +190,7 @@ class TestAuthRepository:
                 username=email,
                 email=email,
                 password=password_info,
-                domain_name=default_domain.name,
+                domain_name=default_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy.name,
                 need_password_change=False,
@@ -278,6 +262,7 @@ class TestAuthRepository:
     async def sample_group_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        default_domain: DomainFixtureData,
         sample_user_data: UserTestData,
         project_resource_policy: ResourcePolicyTestData,
     ) -> AsyncGenerator[GroupData, None]:
@@ -292,7 +277,8 @@ class TestAuthRepository:
                 name=group_name,
                 description="Test Group",
                 is_active=True,
-                domain_name=sample_user_data.domain_name,
+                domain_name=default_domain.domain_name,
+                domain_id=default_domain.domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 integration_id=None,
@@ -391,12 +377,12 @@ class TestAuthRepository:
             assert user.full_name == update_name
 
     async def test_update_user_full_name_not_found(
-        self, auth_repository: AuthRepository, default_domain: DomainTestData
+        self, auth_repository: AuthRepository, default_domain: DomainFixtureData
     ) -> None:
         """Test updating user full name when user doesn't exist"""
         with pytest.raises(UserNotFound):
             await auth_repository.update_user_full_name(
-                "nonexistent@example.com", default_domain.name, "Some Name"
+                "nonexistent@example.com", default_domain.domain_name, "Some Name"
             )
 
     async def test_update_user_password(

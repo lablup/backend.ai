@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -192,6 +193,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}",
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
@@ -425,7 +427,11 @@ class TestContainerRegistryRepository:
         group_ids: list[str] = []
         async with db_with_cleanup.begin_session() as session:
             # Create domain
-            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+            domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
+                name=domain_name,
+                total_resource_slots=ResourceSlot(),
+            )
             session.add(domain)
 
             # Create project resource policy
@@ -443,7 +449,8 @@ class TestContainerRegistryRepository:
             for i in range(2):
                 group = GroupRow(
                     name=f"test-group-for-registry-{i}-{registry_name}",
-                    domain_name=domain_name,
+                    domain_name=domain.name,
+                    domain_id=domain.id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
@@ -924,6 +931,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-assoc",
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
@@ -1051,6 +1059,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-partial",
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )

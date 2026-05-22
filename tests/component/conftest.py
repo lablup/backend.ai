@@ -721,6 +721,7 @@ async def group_fixture(
                 description=f"Test group {group_name}",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )

@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -120,7 +121,11 @@ async def session_info(
         )
         db_sess.add(scaling_group)
 
-        domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+        domain = DomainRow(
+            id=DomainID(uuid.uuid4()),
+            name=domain_name,
+            total_resource_slots=ResourceSlot(),
+        )
         db_sess.add(domain)
 
         user_resource_policy = UserResourcePolicyRow(
@@ -144,6 +149,7 @@ async def session_info(
             id=group_id,
             name=group_name,
             domain_name=domain_name,
+            domain_id=domain.id,
             total_resource_slots=ResourceSlot(),
             resource_policy=resource_policy_name,
         )

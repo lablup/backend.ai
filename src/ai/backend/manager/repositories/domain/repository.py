@@ -94,7 +94,7 @@ class DomainRepository:
             await self._role_manager.create_system_role(db_session, data)
 
             # Create model-store group for the domain
-            await self._create_model_store_group(db_session, spec.name)
+            await self._create_model_store_group(db_session, spec.name, domain.id)
 
             return data
 
@@ -225,7 +225,9 @@ class DomainRepository:
             await session.commit()
             return result.row.to_data()
 
-    async def _create_model_store_group(self, db_session: SASession, domain_name: str) -> None:
+    async def _create_model_store_group(
+        self, db_session: SASession, domain_name: str, domain_id: DomainID
+    ) -> None:
         """
         Private method to create model-store group for a domain.
         """
@@ -243,6 +245,7 @@ class DomainRepository:
             "description": "Model Store",
             "is_active": True,
             "domain_name": domain_name,
+            "domain_id": domain_id,
             "total_resource_slots": ResourceSlot(),
             "allowed_vfolder_hosts": VFolderHostPermissionMap(),
             "integration_id": None,

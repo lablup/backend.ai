@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -83,6 +84,7 @@ class TestVfolderSearchFilter:
           - vf_noclone_b (cloneable=False, NOT shared)
         """
         domain_name = "test-domain"
+        domain_id = DomainID(uuid.uuid4())
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
         project_id = uuid.uuid4()
@@ -95,6 +97,7 @@ class TestVfolderSearchFilter:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -194,6 +197,7 @@ class TestVfolderSearchFilter:
                     id=project_id,
                     name="project-clone",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project",
                     is_active=True,
                     total_resource_slots=ResourceSlot(),

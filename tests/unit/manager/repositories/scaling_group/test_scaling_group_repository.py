@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -321,6 +322,7 @@ class TestScalingGroupRepositoryDB:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=test_domain,
                 description="Test domain for cascade delete",
                 is_active=True,
@@ -374,7 +376,8 @@ class TestScalingGroupRepositoryDB:
                 description="Test group for cascade delete",
                 is_active=True,
                 created_at=datetime.now(tz=UTC),
-                domain_name=test_domain,
+                domain_name=domain.name,
+                domain_id=domain.id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy,

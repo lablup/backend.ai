@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -109,6 +110,7 @@ class TestSessionRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -189,7 +191,8 @@ class TestSessionRepository:
                 name="test-group",
                 description="Test group",
                 is_active=True,
-                domain_name=domain_name,
+                domain_name=domain.name,
+                domain_id=domain.id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=project_resource_policy.name,
@@ -445,6 +448,7 @@ class TestBatchPopulateSessionOccupiedSlots:
 
         async with db_with_resource_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -520,7 +524,8 @@ class TestBatchPopulateSessionOccupiedSlots:
                 name="test-group",
                 description="Test group",
                 is_active=True,
-                domain_name=domain_name,
+                domain_name=domain.name,
+                domain_id=domain.id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=project_resource_policy.name,

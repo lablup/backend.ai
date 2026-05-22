@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -99,6 +100,7 @@ class TestCreateGroup:
                     resource_policy=sample_group_data.resource_policy,
                     total_resource_slots=sample_group_data.total_resource_slots,
                     domain_name=sample_group_data.domain_name,
+                    domain_id=DomainID(uuid.uuid4()),
                     is_active=sample_group_data.is_active,
                 )
             ),
@@ -131,6 +133,7 @@ class TestCreateGroup:
                     resource_policy="default",
                     total_resource_slots=ResourceSlot.from_user_input({}, None),
                     domain_name="default",
+                    domain_id=DomainID(uuid.uuid4()),
                 )
             ),
             _domain_name="default",
@@ -158,6 +161,7 @@ class TestCreateGroup:
                     resource_policy="",
                     total_resource_slots=ResourceSlot.from_user_input({}, None),
                     domain_name="default",
+                    domain_id=DomainID(uuid.uuid4()),
                 )
             ),
             _domain_name="default",

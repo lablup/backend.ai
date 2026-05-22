@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth import PublicKey, SecretKey
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -124,11 +125,12 @@ class TestReconcileAgentResources:
     async def _seed_infrastructure(self, db: ExtendedAsyncSAEngine) -> tuple[str, uuid.UUID, str]:
         """Create domain, project, scaling group, and agent."""
         domain_name = "test-domain"
+        domain_id = DomainID(uuid.uuid4())
         project_id = uuid4()
         sg_name = "test-sg"
         agent_id = "i-test-agent"
         async with db.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=domain_name))
+            db_sess.add(DomainRow(id=domain_id, name=domain_name))
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ProjectResourcePolicyRow(
@@ -154,6 +156,7 @@ class TestReconcileAgentResources:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )
@@ -517,6 +520,7 @@ class TestOrphanedAllocationCleanup:
     ) -> tuple[str, uuid.UUID, str]:
         """Seed slot types, domain, project, scaling group, agent."""
         domain_name = "test-domain"
+        domain_id = DomainID(uuid.uuid4())
         project_id = uuid4()
         sg_name = "test-sg"
         agent_id = "i-test-agent"
@@ -525,7 +529,7 @@ class TestOrphanedAllocationCleanup:
             db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=0))
             db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=1))
         async with db.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=domain_name))
+            db_sess.add(DomainRow(id=domain_id, name=domain_name))
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ProjectResourcePolicyRow(
@@ -551,6 +555,7 @@ class TestOrphanedAllocationCleanup:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )
@@ -969,6 +974,7 @@ class TestTerminalSessionKernelReconciliation:
         db: ExtendedAsyncSAEngine,
     ) -> tuple[str, uuid.UUID, str]:
         domain_name = "test-domain"
+        domain_id = DomainID(uuid.uuid4())
         project_id = uuid4()
         sg_name = "test-sg"
         agent_id = "i-test-agent"
@@ -976,7 +982,7 @@ class TestTerminalSessionKernelReconciliation:
             db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=0))
             db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=1))
         async with db.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=domain_name))
+            db_sess.add(DomainRow(id=domain_id, name=domain_name))
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ProjectResourcePolicyRow(
@@ -1002,6 +1008,7 @@ class TestTerminalSessionKernelReconciliation:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )

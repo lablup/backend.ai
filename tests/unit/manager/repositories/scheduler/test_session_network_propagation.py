@@ -10,6 +10,7 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -81,6 +82,7 @@ class TestPersistentNetworkNotRecreated:
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Seed FK-required rows (domain, sgroup, policies, user, keypair, group, agent)."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
@@ -93,6 +95,7 @@ class TestPersistentNetworkNotRecreated:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     total_resource_slots=ResourceSlot({
                         "cpu": Decimal("1000"),
@@ -164,6 +167,7 @@ class TestPersistentNetworkNotRecreated:
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_policy_name,
                     integration_id=None,

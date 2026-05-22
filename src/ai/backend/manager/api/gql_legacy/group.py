@@ -23,6 +23,7 @@ from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
@@ -45,6 +46,9 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
+from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
+    ResolveDomainIDByNameAction,
+)
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
@@ -581,7 +585,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
-    def to_action(self, name: str) -> CreateGroupAction:
+    def to_action(self, name: str, domain_id: DomainID) -> CreateGroupAction:
         def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
@@ -607,6 +611,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 spec=GroupCreatorSpec(
                     name=name,
                     domain_name=self.domain_name,
+                    domain_id=domain_id,
                     type=type_val,
                     description=description_val,
                     is_active=is_active_val,
@@ -708,7 +713,10 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
                 "Group name cannot be empty or whitespace and must not exceed 64 characters."
             )
 
-        action = props.to_action(name)
+        resolve_res = await graph_ctx.processors.domain.resolve_domain_id_by_name.wait_for_complete(
+            ResolveDomainIDByNameAction(name=DomainName(str(props.domain_name)))
+        )
+        action = props.to_action(name, resolve_res.domain_id)
         res = await graph_ctx.processors.group.create_group.wait_for_complete(action)
         return cls(
             ok=True,

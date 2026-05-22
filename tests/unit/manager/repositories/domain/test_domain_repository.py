@@ -12,7 +12,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -205,6 +205,7 @@ class TestDomainRepository:
                 "name": "model-store",
                 "description": "Model store group for sample-domain",
                 "domain_name": "sample-domain",
+                "domain_id": domain_row.id,
                 "is_active": True,
                 "created_at": datetime.now(tz=UTC),
                 "modified_at": datetime.now(tz=UTC),
@@ -234,6 +235,7 @@ class TestDomainRepository:
         domain_name = f"inactive-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=domain_name,
                 description="Test domain for purging",
                 is_active=False,
@@ -255,6 +257,7 @@ class TestDomainRepository:
         domain_name = f"domain-with-user-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=domain_name,
                 description="Test domain with users",
                 is_active=False,
@@ -298,6 +301,7 @@ class TestDomainRepository:
         domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=domain_name,
                 description="Test domain with groups",
                 is_active=False,
@@ -315,6 +319,7 @@ class TestDomainRepository:
                 description="Test group",
                 is_active=True,
                 domain_name=domain_name,
+                domain_id=domain.id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -337,6 +342,7 @@ class TestDomainRepository:
 
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=domain_name,
                 description="Test domain with active kernels",
                 is_active=False,
@@ -354,6 +360,7 @@ class TestDomainRepository:
                 description="Test group",
                 is_active=True,
                 domain_name=domain_name,
+                domain_id=domain.id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,

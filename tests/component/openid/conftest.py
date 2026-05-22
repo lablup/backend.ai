@@ -30,6 +30,7 @@ from authlib.jose import JsonWebKey  # pants: no-infer-dep
 from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     ResourceSlot,
@@ -405,7 +406,12 @@ async def seed_data(
     Yields the database_engine for convenience.
     """
     async with database_engine.begin_session() as sess:
-        sess.add(DomainRow(name="default", total_resource_slots=ResourceSlot({})))
+        domain = DomainRow(
+            id=DomainID(uuid.uuid4()),
+            name="default",
+            total_resource_slots=ResourceSlot({}),
+        )
+        sess.add(domain)
         sess.add(
             UserResourcePolicyRow(
                 name="default",
@@ -442,7 +448,8 @@ async def seed_data(
         sess.add(
             GroupRow(
                 name="default",
-                domain_name="default",
+                domain_name=domain.name,
+                domain_id=domain.id,
                 total_resource_slots=ResourceSlot({}),
                 resource_policy="default",
             )

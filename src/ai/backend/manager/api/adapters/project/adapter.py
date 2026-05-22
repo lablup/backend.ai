@@ -42,6 +42,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectUserFilter,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.domain import DomainName
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -68,6 +69,9 @@ from ai.backend.manager.repositories.group.types import (
     UserProjectSearchScope,
 )
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
+from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
+    ResolveDomainIDByNameAction,
+)
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
 )
@@ -162,9 +166,13 @@ class ProjectAdapter(BaseAdapter):
 
     async def admin_create(self, input: CreateProjectInput) -> ProjectPayload:
         """Create a new project (superadmin only)."""
+        resolve_res = await self._processors.domain.resolve_domain_id_by_name.wait_for_complete(
+            ResolveDomainIDByNameAction(name=DomainName(input.domain_name))
+        )
         spec = GroupCreatorSpec(
             name=input.name,
             domain_name=input.domain_name,
+            domain_id=resolve_res.domain_id,
             type=DataProjectType(input.type.value) if input.type else None,
             description=input.description,
             integration_name=input.integration_name,

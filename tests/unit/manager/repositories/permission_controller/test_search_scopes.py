@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -54,6 +55,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -126,6 +128,7 @@ class TestSearchDomainScopes:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
+                    id=DomainID(uuid.uuid4()),
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,
@@ -146,6 +149,7 @@ class TestSearchDomainScopes:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
+                    id=DomainID(uuid.uuid4()),
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,
@@ -374,13 +378,15 @@ class TestSearchProjectScopes:
     async def sample_domain_with_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-    ) -> tuple[str, str]:
+    ) -> tuple[DomainFixtureData, str]:
         """Create a sample domain and project resource policy for projects."""
         domain_name = "test-domain-for-projects"
+        domain_id = DomainID(uuid.uuid4())
         policy_name = "test-project-policy"
 
         async with db_with_scope_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for projects",
                 is_active=True,
@@ -396,16 +402,19 @@ class TestSearchProjectScopes:
             db_sess.add(policy)
             await db_sess.flush()
 
-        return domain_name, policy_name
+        return (
+            DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id),
+            policy_name,
+        )
 
     @pytest.fixture
     async def sample_projects(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        sample_domain_with_policy: tuple[str, str],
+        sample_domain_with_policy: tuple[DomainFixtureData, str],
     ) -> list[uuid.UUID]:
         """Create sample projects (groups) for testing."""
-        domain_name, policy_name = sample_domain_with_policy
+        domain, policy_name = sample_domain_with_policy
         project_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -418,7 +427,8 @@ class TestSearchProjectScopes:
                     name=name,
                     description=f"Test project: {name}",
                     is_active=True,
-                    domain_name=domain_name,
+                    domain_name=domain.domain_name,
+                    domain_id=domain.domain_id,
                     total_resource_slots=ResourceSlot({}),
                     resource_policy=policy_name,
                 )
@@ -432,10 +442,10 @@ class TestSearchProjectScopes:
     async def sample_projects_for_pagination(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        sample_domain_with_policy: tuple[str, str],
+        sample_domain_with_policy: tuple[DomainFixtureData, str],
     ) -> list[uuid.UUID]:
         """Create 15 sample projects for pagination testing."""
-        domain_name, policy_name = sample_domain_with_policy
+        domain, policy_name = sample_domain_with_policy
         project_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -446,7 +456,8 @@ class TestSearchProjectScopes:
                     name=f"project-{i:02d}",
                     description=f"Test project {i}",
                     is_active=True,
-                    domain_name=domain_name,
+                    domain_name=domain.domain_name,
+                    domain_id=domain.domain_id,
                     total_resource_slots=ResourceSlot({}),
                     resource_policy=policy_name,
                 )
@@ -596,6 +607,7 @@ class TestSearchUserScopes:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=domain_name,
                 description="Test domain for users",
                 is_active=True,
@@ -861,6 +873,7 @@ class TestSearchScopesEmptyResult:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
+                    id=DomainID(uuid.uuid4()),
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,

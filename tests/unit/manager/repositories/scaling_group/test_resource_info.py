@@ -9,6 +9,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -394,6 +395,7 @@ class TestResourceInfo:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=DomainID(uuid.uuid4()),
                 name=test_domain,
                 description="Test domain",
                 is_active=True,
@@ -447,7 +449,8 @@ class TestResourceInfo:
                 description="Test group",
                 is_active=True,
                 created_at=datetime.now(tz=UTC),
-                domain_name=test_domain,
+                domain_name=domain.name,
+                domain_id=domain.id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy,

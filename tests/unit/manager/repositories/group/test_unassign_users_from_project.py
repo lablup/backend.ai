@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -90,23 +91,22 @@ class TestUnassignUsersFromProject:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+    ) -> DomainRow:
+        domain = DomainRow(
+            id=DomainID(uuid.uuid4()),
+            name=f"test-domain-{uuid.uuid4().hex[:8]}",
+            description="Test domain",
+            is_active=True,
+            total_resource_slots=ResourceSlot(),
+            allowed_vfolder_hosts=VFolderHostPermissionMap(),
+            allowed_docker_registries=[],
+            dotfiles=b"",
+            integration_id=None,
+        )
         async with db_with_cleanup.begin_session() as session:
-            session.add(
-                DomainRow(
-                    name=domain_name,
-                    description="Test domain",
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
-                    allowed_docker_registries=[],
-                    dotfiles=b"",
-                    integration_id=None,
-                )
-            )
+            session.add(domain)
             await session.commit()
-        return domain_name
+        return domain
 
     @pytest.fixture
     async def user_resource_policy(
@@ -131,7 +131,7 @@ class TestUnassignUsersFromProject:
     async def test_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainRow,
     ) -> uuid.UUID:
         project_id = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -150,7 +150,8 @@ class TestUnassignUsersFromProject:
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
                     is_active=True,
-                    domain_name=test_domain,
+                    domain_name=test_domain.name,
+                    domain_id=test_domain.id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
@@ -211,7 +212,7 @@ class TestUnassignUsersFromProject:
     async def assigned_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainRow,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
         test_project: uuid.UUID,
@@ -220,7 +221,7 @@ class TestUnassignUsersFromProject:
         user_ids: list[uuid.UUID] = []
         for _ in range(3):
             uid = await self._create_user(
-                db_with_cleanup, test_domain, user_resource_policy, test_password_info
+                db_with_cleanup, test_domain.name, user_resource_policy, test_password_info
             )
             await self._assign_user(db_with_cleanup, test_project, uid)
             user_ids.append(uid)
@@ -306,7 +307,7 @@ class TestUnassignUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
-        test_domain: str,
+        test_domain: DomainRow,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
         test_project: uuid.UUID,
@@ -314,7 +315,7 @@ class TestUnassignUsersFromProject:
     ) -> None:
         """Users that exist but are not assigned to the project are reported as failures."""
         unassigned_user_id = await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.name, user_resource_policy, test_password_info
         )
         unbinder = UserProjectEntityUnbinder(
             user_uuids=[unassigned_user_id],
@@ -331,7 +332,7 @@ class TestUnassignUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
-        test_domain: str,
+        test_domain: DomainRow,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
         test_project: uuid.UUID,
@@ -340,7 +341,7 @@ class TestUnassignUsersFromProject:
         """Mixed request: assigned users are unassigned, others reported as failures."""
         fake_id = uuid.uuid4()
         unassigned_user_id = await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.name, user_resource_policy, test_password_info
         )
         mixed_ids = [assigned_users[0], fake_id, unassigned_user_id]
 

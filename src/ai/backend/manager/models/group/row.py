@@ -31,6 +31,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common import msgpack
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
@@ -162,9 +163,7 @@ association_groups_users = AssocGroupUserRow.__table__
 
 class GroupRow(Base):  # type: ignore[misc]
     __tablename__ = "groups"
-    __table_args__ = (
-        sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
-    )
+    __table_args__ = (sa.UniqueConstraint("name", "domain_id", name="uq_groups_name_domain_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -188,7 +187,13 @@ class GroupRow(Base):  # type: ignore[misc]
     domain_name: Mapped[str] = mapped_column(
         "domain_name",
         sa.String(length=64),
-        sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    domain_id: Mapped[DomainID] = mapped_column(
+        "domain_id",
+        GUID,
+        sa.ForeignKey("domains.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

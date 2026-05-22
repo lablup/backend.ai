@@ -87,6 +87,7 @@ from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 class TestVfolderRepository:
@@ -165,24 +166,11 @@ class TestVfolderRepository:
     @pytest.fixture
     async def test_domain_name(
         self,
+        domain_factory: DomainFactory,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
-        """Create test domain and return domain name"""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain for vfolder",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-            await db_sess.flush()
-
-        yield domain_name
+    ) -> DomainFixtureData:
+        """Create test domain and return domain identifiers"""
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -229,7 +217,7 @@ class TestVfolderRepository:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test user and return user UUID"""
@@ -251,7 +239,7 @@ class TestVfolderRepository:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
             )
@@ -282,7 +270,7 @@ class TestVfolderRepository:
     async def test_model_store_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test model-store group and return group UUID"""
@@ -292,7 +280,8 @@ class TestVfolderRepository:
             group = GroupRow(
                 id=group_uuid,
                 name=f"test-model-store-{group_uuid.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
+                domain_id=test_domain_name.domain_id,
                 description="Test model-store group",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
@@ -317,7 +306,7 @@ class TestVfolderRepository:
     async def test_model_store_vfolder_permission_is_overridden_to_read_only(
         self,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user: uuid.UUID,
         test_model_store_group: uuid.UUID,
     ) -> None:
@@ -330,7 +319,7 @@ class TestVfolderRepository:
         folder_id = uuid.uuid4()
         params = self._make_vfolder_create_params(
             folder_id=folder_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain_name.domain_name,
             group_id=test_model_store_group,
             user_id=test_user,
             permission=VFolderMountPermission.READ_ONLY,
@@ -377,24 +366,11 @@ class TestVfolderRepositoryAllowedVfolderHosts:
     @pytest.fixture
     async def test_domain_name(
         self,
+        domain_factory: DomainFactory,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-            await db_sess.flush()
-
-        return domain_name
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -441,7 +417,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user."""
@@ -463,7 +439,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
             )
@@ -476,7 +452,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create a group with allowed_vfolder_hosts set."""
@@ -486,7 +462,8 @@ class TestVfolderRepositoryAllowedVfolderHosts:
             group = GroupRow(
                 id=group_uuid,
                 name=f"test-group-{group_uuid.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
+                domain_id=test_domain_name.domain_id,
                 description="Test group with vfolder hosts",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
@@ -637,24 +614,11 @@ class TestVfolderRepositoryPurge:
     @pytest.fixture
     async def test_domain_name(
         self,
+        domain_factory: DomainFactory,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-            await db_sess.flush()
-
-        return domain_name
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -681,7 +645,7 @@ class TestVfolderRepositoryPurge:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user."""
@@ -703,7 +667,7 @@ class TestVfolderRepositoryPurge:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
             )
@@ -766,7 +730,7 @@ class TestVfolderRepositoryPurge:
         self,
         request: pytest.FixtureRequest,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user: uuid.UUID,
     ) -> uuid.UUID:
         """Create a vfolder with the given status in DB."""
@@ -775,7 +739,7 @@ class TestVfolderRepositoryPurge:
         await self._create_vfolder_in_db(
             db_with_cleanup,
             vfolder_id=vfolder_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain_name.domain_name,
             user_id=test_user,
             status=status,
         )
@@ -885,7 +849,7 @@ class TestVfolderRepositoryPurge:
     async def test_project_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         project_id = uuid.uuid4()
@@ -894,7 +858,8 @@ class TestVfolderRepositoryPurge:
                 GroupRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
-                    domain_name=test_domain_name,
+                    domain_name=test_domain_name.domain_name,
+                    domain_id=test_domain_name.domain_id,
                     is_active=True,
                     type=ProjectType.GENERAL,
                     total_resource_slots=ResourceSlot(),
@@ -910,7 +875,7 @@ class TestVfolderRepositoryPurge:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_in_db: uuid.UUID,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user: uuid.UUID,
     ) -> uuid.UUID:
@@ -927,7 +892,7 @@ class TestVfolderRepositoryPurge:
                     id=card_id,
                     name=f"mc-{card_id.hex[:8]}",
                     vfolder=vfolder_in_db,
-                    domain=test_domain_name,
+                    domain=test_domain_name.domain_name,
                     project=test_project_id,
                     creator=test_user,
                 )
@@ -1008,22 +973,10 @@ class TestVfolderRepositoryDeleteForever:
     @pytest.fixture
     async def test_domain_name(
         self,
+        domain_factory: DomainFactory,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                DomainRow(
-                    name=domain_name,
-                    description="Test domain",
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts={},
-                    allowed_docker_registries=[],
-                )
-            )
-            await db_sess.flush()
-        return domain_name
+    ) -> DomainFixtureData:
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -1048,7 +1001,7 @@ class TestVfolderRepositoryDeleteForever:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> uuid.UUID:
         user_uuid = uuid.uuid4()
@@ -1068,7 +1021,7 @@ class TestVfolderRepositoryDeleteForever:
                     need_password_change=False,
                     status=UserStatus.ACTIVE,
                     status_info="active",
-                    domain_name=test_domain_name,
+                    domain_name=test_domain_name.domain_name,
                     role=UserRole.USER,
                     resource_policy=test_user_resource_policy_name,
                 )
@@ -1098,7 +1051,7 @@ class TestVfolderRepositoryDeleteForever:
     async def test_project_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         project_id = uuid.uuid4()
@@ -1107,7 +1060,8 @@ class TestVfolderRepositoryDeleteForever:
                 GroupRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
-                    domain_name=test_domain_name,
+                    domain_name=test_domain_name.domain_name,
+                    domain_id=test_domain_name.domain_id,
                     is_active=True,
                     type=ProjectType.GENERAL,
                     total_resource_slots=ResourceSlot(),
@@ -1211,11 +1165,11 @@ class TestVfolderRepositoryDeleteForever:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user: uuid.UUID,
     ) -> None:
         vfolder_id = await self._create_vfolder(
-            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+            db_with_cleanup, domain_name=test_domain_name.domain_name, user_id=test_user
         )
 
         result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
@@ -1232,17 +1186,17 @@ class TestVfolderRepositoryDeleteForever:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user: uuid.UUID,
     ) -> None:
         vfolder_id = await self._create_vfolder(
-            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+            db_with_cleanup, domain_name=test_domain_name.domain_name, user_id=test_user
         )
         card_id = await self._create_model_card(
             db_with_cleanup,
             vfolder_id=vfolder_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain_name.domain_name,
             project_id=test_project_id,
             creator_id=test_user,
         )
@@ -1264,17 +1218,17 @@ class TestVfolderRepositoryDeleteForever:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user: uuid.UUID,
     ) -> None:
         vfolder_id = await self._create_vfolder(
-            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+            db_with_cleanup, domain_name=test_domain_name.domain_name, user_id=test_user
         )
         card_id = await self._create_model_card(
             db_with_cleanup,
             vfolder_id=vfolder_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain_name.domain_name,
             project_id=test_project_id,
             creator_id=test_user,
         )
@@ -1296,20 +1250,20 @@ class TestVfolderRepositoryDeleteForever:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_id: uuid.UUID,
         test_user: uuid.UUID,
     ) -> None:
         plain_id = await self._create_vfolder(
-            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+            db_with_cleanup, domain_name=test_domain_name.domain_name, user_id=test_user
         )
         carded_id = await self._create_vfolder(
-            db_with_cleanup, domain_name=test_domain_name, user_id=test_user
+            db_with_cleanup, domain_name=test_domain_name.domain_name, user_id=test_user
         )
         card_id = await self._create_model_card(
             db_with_cleanup,
             vfolder_id=carded_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain_name.domain_name,
             project_id=test_project_id,
             creator_id=test_user,
         )

@@ -60,6 +60,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 VFOLDER_HOST = "local:volume1"
 
@@ -110,26 +111,18 @@ class TestVFolderOwnershipTransferRBACCleanup:
     @pytest.fixture
     async def test_domain_name(
         self,
+        domain_factory: DomainFactory,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts=VFolderHostPermissionMap({
-                    VFOLDER_HOST: {
-                        VFolderHostPermission.CREATE,
-                        VFolderHostPermission.MOUNT_IN_SESSION,
-                    }
-                }),
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-            await db_sess.flush()
-        return domain_name
+    ) -> DomainFixtureData:
+        return await domain_factory(
+            db_with_cleanup,
+            allowed_vfolder_hosts=VFolderHostPermissionMap({
+                VFOLDER_HOST: {
+                    VFolderHostPermission.CREATE,
+                    VFolderHostPermission.MOUNT_IN_SESSION,
+                }
+            }),
+        )
 
     @pytest.fixture
     async def test_keypair_resource_policy_name(
@@ -195,7 +188,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         group_uuid = uuid.uuid4()
@@ -203,7 +196,8 @@ class TestVFolderOwnershipTransferRBACCleanup:
             group = GroupRow(
                 id=group_uuid,
                 name=f"test-group-{group_uuid.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
+                domain_id=test_domain_name.domain_id,
                 description="Test group",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
@@ -219,14 +213,14 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def old_owner(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user_resource_policy_name: str,
         test_keypair_resource_policy_name: str,
     ) -> UserWithKeypair:
         """Create old owner with keypair. Returns (user_uuid, email)."""
         return await self._create_user_with_keypair(
             db_with_cleanup,
-            test_domain_name,
+            test_domain_name.domain_name,
             test_user_resource_policy_name,
             test_keypair_resource_policy_name,
         )
@@ -235,14 +229,14 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def new_owner(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_user_resource_policy_name: str,
         test_keypair_resource_policy_name: str,
     ) -> UserWithKeypair:
         """Create new owner with keypair. Returns (user_uuid, email)."""
         return await self._create_user_with_keypair(
             db_with_cleanup,
-            test_domain_name,
+            test_domain_name.domain_name,
             test_user_resource_policy_name,
             test_keypair_resource_policy_name,
         )
@@ -315,7 +309,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_group: uuid.UUID,
         old_owner: UserWithKeypair,
         new_owner: UserWithKeypair,
@@ -335,7 +329,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_row = VFolderRow(
                 id=vfolder_id,
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
                 permission=VFolderMountPermission.OWNER_PERM,
                 host=VFOLDER_HOST,
@@ -432,7 +426,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_group: uuid.UUID,
         old_owner: UserWithKeypair,
         new_owner: UserWithKeypair,
@@ -454,7 +448,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_row = VFolderRow(
                 id=vfolder_id,
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
                 permission=VFolderMountPermission.OWNER_PERM,
                 host=VFOLDER_HOST,
@@ -526,7 +520,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_group: uuid.UUID,
         old_owner: UserWithKeypair,
         new_owner: UserWithKeypair,
@@ -549,7 +543,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_row = VFolderRow(
                 id=vfolder_id,
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
                 permission=VFolderMountPermission.OWNER_PERM,
                 host=VFOLDER_HOST,
@@ -630,7 +624,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_group: uuid.UUID,
         old_owner: UserWithKeypair,
         new_owner: UserWithKeypair,
@@ -650,7 +644,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_row = VFolderRow(
                 id=vfolder_id,
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
                 permission=VFolderMountPermission.OWNER_PERM,
                 host=VFOLDER_HOST,
@@ -725,7 +719,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
+        test_domain_name: DomainFixtureData,
         test_group: uuid.UUID,
         old_owner: UserWithKeypair,
         new_owner: UserWithKeypair,
@@ -745,7 +739,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_row = VFolderRow(
                 id=vfolder_id,
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain_name.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
                 permission=VFolderMountPermission.OWNER_PERM,
                 host=VFOLDER_HOST,

@@ -15,6 +15,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -108,7 +109,12 @@ class TestCreateGroup:
         mock_group_repository.create = AsyncMock(return_value=group)
 
         creator = Creator(
-            spec=GroupCreatorSpec(name="new-project", domain_name="default", description="desc")
+            spec=GroupCreatorSpec(
+                name="new-project",
+                domain_name="default",
+                domain_id=DomainID(uuid.uuid4()),
+                description="desc",
+            )
         )
         action = CreateGroupAction(creator=creator, _domain_name="default")
 
@@ -133,6 +139,7 @@ class TestCreateGroup:
             spec=GroupCreatorSpec(
                 name="gpu-project",
                 domain_name="default",
+                domain_id=DomainID(uuid.uuid4()),
                 total_resource_slots=slots,
             )
         )
@@ -153,7 +160,11 @@ class TestCreateGroup:
             side_effect=IntegrityError("duplicate", {}, Exception("duplicate key"))
         )
 
-        creator = Creator(spec=GroupCreatorSpec(name="existing", domain_name="default"))
+        creator = Creator(
+            spec=GroupCreatorSpec(
+                name="existing", domain_name="default", domain_id=DomainID(uuid.uuid4())
+            )
+        )
         action = CreateGroupAction(creator=creator, _domain_name="default")
 
         with pytest.raises(IntegrityError):
