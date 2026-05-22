@@ -37,21 +37,21 @@ class AgentSelectionError(SchedulingError):
         return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
 
 
-class NoAgentsInScalingGroupError(AgentSelectionError):
-    """Raised when the scaling group has no candidate agents at all.
+class NoAgentsInResourceGroupError(AgentSelectionError):
+    """Raised when the resource group has no candidate agents at all.
 
     Distinct from :class:`NoAvailableAgentError`, which aggregates *per-kernel*
     compatibility failures across known candidates.
     """
 
-    error_type = "https://api.backend.ai/probs/no-agents-in-scaling-group"
-    error_title = "Unavailable : Scaling group has no candidate agents."
+    error_type = "https://api.backend.ai/probs/no-agents-in-resource-group"
+    error_title = "Unavailable : Resource group has no candidate agents."
 
-    _scaling_group: str
+    _resource_group: str
 
-    def __init__(self, scaling_group: str) -> None:
-        self._scaling_group = scaling_group
-        super().__init__(f"No agents available in scaling group '{scaling_group}'")
+    def __init__(self, resource_group: str) -> None:
+        self._resource_group = resource_group
+        super().__init__(f"No agents available in resource group '{resource_group}'")
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(

@@ -7,7 +7,14 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
@@ -64,7 +71,7 @@ class TestLegacyAgentSelector:
         """Test that legacy selector prioritizes fewer unutilized capabilities."""
         # Request only CPU and memory (explicitly no GPU/TPU)
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -95,7 +102,7 @@ class TestLegacyAgentSelector:
     ) -> None:
         """Test that ties in unutilized capabilities are broken by resource availability."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -127,7 +134,7 @@ class TestLegacyAgentSelector:
         selector = LegacyAgentSelector(agent_selection_resource_priority=["mem", "cpu"])
 
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             required_architecture="x86_64",
         )
@@ -156,7 +163,7 @@ class TestLegacyAgentSelector:
         """Test selection when agents have partially utilized special resources."""
         # Request includes GPU
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -192,7 +199,7 @@ class TestLegacyAgentSelector:
 
         # Request only CPU and memory
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -230,7 +237,7 @@ class TestLegacyAgentSelector:
         )
 
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),

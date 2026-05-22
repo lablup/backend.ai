@@ -28,7 +28,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from .exceptions import (
     ContainerLimitExceededError,
     InsufficientResourcesError,
-    NoAgentsInScalingGroupError,
+    NoAgentsInResourceGroupError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
     TrackerCompatibilityError,
@@ -345,7 +345,7 @@ class AgentSelector:
             # Return empty list for sessions with no kernels
             return []
         if not agents:
-            raise NoAgentsInScalingGroupError(criteria.session_metadata.scaling_group)
+            raise NoAgentsInResourceGroupError(criteria.session_metadata.scaling_group)
 
         # Track agent state changes as diffs using AgentStateTracker
         state_trackers = [AgentStateTracker(original_agent=agent) for agent in agents]

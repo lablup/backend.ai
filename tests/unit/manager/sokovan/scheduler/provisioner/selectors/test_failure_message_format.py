@@ -29,7 +29,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
     ArchitectureIncompatibleError,
     ContainerLimitExceededError,
     InsufficientResourcesError,
-    NoAgentsInScalingGroupError,
+    NoAgentsInResourceGroupError,
     NoAvailableAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
@@ -613,7 +613,7 @@ class TestGoldenNoAvailableAgentDirectConstruction:
         assert err.extra_msg == expected
 
 
-class TestGoldenNoAgentsInScalingGroupError:
+class TestGoldenNoAgentsInResourceGroupError:
     def test_full_message(self) -> None:
-        err = NoAgentsInScalingGroupError("default")
-        assert err.extra_msg == "No agents available in scaling group 'default'"
+        err = NoAgentsInResourceGroupError("default")
+        assert err.extra_msg == "No agents available in resource group 'default'"
