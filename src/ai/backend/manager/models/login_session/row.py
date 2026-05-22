@@ -105,6 +105,8 @@ class LoginHistoryRow(Base):  # type: ignore[misc]
         index=True,
     )
     fail_reason: Mapped[str | None] = mapped_column("fail_reason", sa.Text, nullable=True)
+    # 45 = INET6_ADDRSTRLEN - 1: the longest possible textual representation of an
+    # IP address is an IPv4-mapped IPv6 form like "0000:0000:0000:0000:0000:ffff:255.255.255.255".
     client_ip: Mapped[str | None] = mapped_column("client_ip", sa.String(45), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
