@@ -7468,8 +7468,10 @@ type Mutation {
   """Added in 26.4.2. Enqueue a new compute session."""
   enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload
 
-  """Added in 26.4.2. Terminate sessions within a project scope."""
-  terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
+  """
+  Added in UNRELEASED. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  """
+  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
 }
 
 """

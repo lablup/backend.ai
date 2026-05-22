@@ -48,7 +48,6 @@ __all__ = (
     "ShutdownSessionServiceInput",
     "StartServiceInput",
     "StartSessionServiceInput",
-    "TerminateSessionsInProjectInput",
     "TerminateSessionsInput",
     "UpdateSessionInput",
     "UploadFilesInput",
@@ -375,14 +374,6 @@ class EnqueueSessionInput(BaseRequestModel):
 class TerminateSessionsInput(BaseRequestModel):
     """Input for terminating one or more sessions."""
 
-    session_ids: list[UUID] = Field(description="Session UUIDs to terminate.")
-    forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
-
-
-class TerminateSessionsInProjectInput(BaseRequestModel):
-    """Input for terminating sessions within a project scope."""
-
-    project_id: UUID = Field(description="Project UUID to scope the termination.")
     session_ids: list[UUID] = Field(description="Session UUIDs to terminate.")
     forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
 

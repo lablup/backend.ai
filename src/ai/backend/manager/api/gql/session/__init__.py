@@ -6,7 +6,7 @@ from .resolver import (
     admin_sessions_v2,
     enqueue_session,
     project_sessions_v2,
-    terminate_project_sessions_v2,
+    terminate_sessions_v2,
 )
 from .types import (
     EnqueueSessionInputGQL,
@@ -33,7 +33,7 @@ __all__ = [
     "admin_sessions_v2",
     "enqueue_session",
     "project_sessions_v2",
-    "terminate_project_sessions_v2",
+    "terminate_sessions_v2",
     # V2 types
     "EnqueueSessionInputGQL",
     "EnqueueSessionPayloadGQL",

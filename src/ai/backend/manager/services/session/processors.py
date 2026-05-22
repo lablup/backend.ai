@@ -2,6 +2,7 @@ from typing import cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
@@ -126,10 +127,6 @@ from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
     TerminateSessionsActionResult,
 )
-from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
-    TerminateSessionsInProjectAction,
-    TerminateSessionsInProjectActionResult,
-)
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
@@ -177,10 +174,7 @@ class SessionProcessors(AbstractProcessorPackage):
     ]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
-    terminate_sessions: ActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
-    terminate_sessions_in_project: ActionProcessor[
-        TerminateSessionsInProjectAction, TerminateSessionsInProjectActionResult
-    ]
+    terminate_sessions: BulkActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
     modify_session: SingleEntityActionProcessor[ModifySessionAction, ModifySessionActionResult]
@@ -215,7 +209,6 @@ class SessionProcessors(AbstractProcessorPackage):
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
-        self.terminate_sessions = ActionProcessor(service.terminate_sessions, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
 
         # Scope actions with RBAC validation
@@ -257,10 +250,10 @@ class SessionProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[cast(ActionValidator, scope_validator)],
         )
-        self.terminate_sessions_in_project = ActionProcessor(
-            service.terminate_sessions_in_project,
-            action_monitors,
-            validators=[cast(ActionValidator, scope_validator)],
+        self.terminate_sessions = BulkActionProcessor(
+            service.terminate_sessions,
+            monitors=action_monitors,
+            validators=[validators.rbac.bulk],
         )
 
         # Actions without RBAC validation (name-based, no session_id at construction)
@@ -312,7 +305,6 @@ class SessionProcessors(AbstractProcessorPackage):
             ShutdownServiceAction.spec(),
             StartServiceAction.spec(),
             TerminateSessionsAction.spec(),
-            TerminateSessionsInProjectAction.spec(),
             UploadFilesAction.spec(),
             GetSessionAction.spec(),
             ModifySessionAction.spec(),

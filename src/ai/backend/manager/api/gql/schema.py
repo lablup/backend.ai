@@ -399,7 +399,7 @@ from .session.resolver import (
     enqueue_session,
     project_sessions_v2,
     session_v2,
-    terminate_project_sessions_v2,
+    terminate_sessions_v2,
 )
 from .storage_host import my_storage_host_permissions
 from .storage_namespace import (
@@ -895,7 +895,7 @@ class Mutation:
     vfolder_create_download_session_v2 = vfolder_create_download_session_v2
     # Session V2 mutations
     enqueue_session = enqueue_session
-    terminate_project_sessions_v2 = terminate_project_sessions_v2
+    terminate_sessions_v2 = terminate_sessions_v2
 
 
 @strawberry.type

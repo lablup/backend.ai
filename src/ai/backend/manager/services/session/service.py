@@ -220,10 +220,6 @@ from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
     TerminateSessionsActionResult,
 )
-from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
-    TerminateSessionsInProjectAction,
-    TerminateSessionsInProjectActionResult,
-)
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
@@ -832,37 +828,10 @@ class SessionService:
             action.session_ids, reason=reason.value, forced=action.forced
         )
         return TerminateSessionsActionResult(
-            cancelled=[uuid.UUID(str(s)) for s in mark_result.cancelled_sessions],
-            terminating=[uuid.UUID(str(s)) for s in mark_result.terminating_sessions],
-            force_terminated=[uuid.UUID(str(s)) for s in mark_result.force_terminated_sessions],
-            skipped=[uuid.UUID(str(s)) for s in mark_result.skipped_sessions],
-        )
-
-    async def terminate_sessions_in_project(
-        self, action: TerminateSessionsInProjectAction
-    ) -> TerminateSessionsInProjectActionResult:
-        """Terminate multiple sessions within a project scope.
-
-        Sessions not belonging to the project are filtered out and
-        included in the ``skipped`` list of the result.
-        """
-        valid_ids = await self._session_repository.filter_sessions_in_project(
-            action.session_ids, action.project_id
-        )
-        valid_set = set(valid_ids)
-        not_in_project = [uuid.UUID(str(sid)) for sid in action.session_ids if sid not in valid_set]
-        if valid_ids:
-            result = await self.terminate_sessions(
-                TerminateSessionsAction(session_ids=valid_ids, forced=action.forced)
-            )
-            return TerminateSessionsInProjectActionResult(
-                cancelled=result.cancelled,
-                terminating=result.terminating,
-                force_terminated=result.force_terminated,
-                skipped=result.skipped + not_in_project,
-            )
-        return TerminateSessionsInProjectActionResult(
-            skipped=not_in_project,
+            cancelled=mark_result.cancelled_sessions,
+            terminating=mark_result.terminating_sessions,
+            force_terminated=mark_result.force_terminated_sessions,
+            skipped=mark_result.skipped_sessions,
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
