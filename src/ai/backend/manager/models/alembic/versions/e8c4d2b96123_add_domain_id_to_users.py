@@ -17,7 +17,6 @@ Create Date: 2026-05-21
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.engine import Connection
 
 from ai.backend.manager.models.base import GUID
 
@@ -26,17 +25,6 @@ revision = "e8c4d2b96123"
 down_revision = "b8a85c96607c"
 branch_labels = None
 depends_on = None
-
-
-_LEGACY_FK_COLUMN = "domain_name"
-
-
-def _find_fk_name(conn: Connection, table: str, column: str) -> str | None:
-    inspector = sa.inspect(conn)
-    for fk in inspector.get_foreign_keys(table):
-        if fk["constrained_columns"] == [column] and fk["referred_table"] == "domains":
-            return fk["name"]
-    return None
 
 
 def upgrade() -> None:
@@ -50,25 +38,22 @@ def upgrade() -> None:
         )
     )
 
-    old_fk_name = _find_fk_name(conn, "users", _LEGACY_FK_COLUMN)
-    if old_fk_name is not None:
-        op.drop_constraint(old_fk_name, "users", type_="foreignkey")
-
+    op.drop_constraint(op.f("fk_users_domain_name_domains"), "users", type_="foreignkey")
     op.create_foreign_key(
-        "fk_users_domain_id_domains",
+        op.f("fk_users_domain_id_domains"),
         "users",
         "domains",
         ["domain_id"],
         ["id"],
     )
-    op.create_index("ix_users_domain_id", "users", ["domain_id"])
+    op.create_index(op.f("ix_users_domain_id"), "users", ["domain_id"])
 
 
 def downgrade() -> None:
-    op.drop_index("ix_users_domain_id", table_name="users")
-    op.drop_constraint("fk_users_domain_id_domains", "users", type_="foreignkey")
+    op.drop_index(op.f("ix_users_domain_id"), table_name="users")
+    op.drop_constraint(op.f("fk_users_domain_id_domains"), "users", type_="foreignkey")
     op.create_foreign_key(
-        "fk_users_domain_name_domains",
+        op.f("fk_users_domain_name_domains"),
         "users",
         "domains",
         ["domain_name"],
