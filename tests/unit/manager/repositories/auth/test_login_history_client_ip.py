@@ -256,15 +256,22 @@ class TestLoginHistoryClientIP:
         ips = await self._fetch_client_ips(db, sample.user_id, LoginAttemptResult.LOGOUT)
         assert ips == [client_ip, client_ip]
 
-    async def test_delete_sessions_by_tokens_leaves_client_ip_null_for_eviction(
+    async def test_eviction_writes_separate_history_row_without_dropping_login_ip(
         self,
         auth_db_source: AuthDBSource,
         db: ExtendedAsyncSAEngine,
         sample: SampleUser,
         client_ip: str,
     ) -> None:
-        """System-driven eviction (``EVICTED``/``EXPIRED``) is called without a
-        ``client_ip`` argument by the service, so the history row remains NULL."""
+        """Eviction is a system-driven event that appends a NEW ``login_history`` row.
+
+        - The original ``SUCCESS`` row's ``client_ip`` is preserved (login_history is
+          append-only; deleting a ``login_session`` does not touch existing history rows).
+        - The new ``EVICTED`` row carries ``client_ip = NULL`` because no client
+          initiated the eviction — the service calls ``delete_sessions_by_tokens``
+          without a ``client_ip`` argument for system-driven results
+          (``EVICTED`` / ``EXPIRED``).
+        """
         session = await auth_db_source.create_login_session(
             user_id=sample.user_id,
             access_key=sample.access_key,
@@ -275,8 +282,13 @@ class TestLoginHistoryClientIP:
             [session.session_token],
             LoginAttemptResult.EVICTED,
         )
-        ips = await self._fetch_client_ips(db, sample.user_id, LoginAttemptResult.EVICTED)
-        assert ips == [None]
+
+        # Original SUCCESS row keeps its client_ip.
+        success_ips = await self._fetch_client_ips(db, sample.user_id, LoginAttemptResult.SUCCESS)
+        assert success_ips == [client_ip]
+        # New EVICTED row is system-driven, so client_ip is NULL.
+        evicted_ips = await self._fetch_client_ips(db, sample.user_id, LoginAttemptResult.EVICTED)
+        assert evicted_ips == [None]
 
     async def test_client_ip_defaults_to_null_when_not_provided(
         self,
