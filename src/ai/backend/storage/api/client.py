@@ -60,7 +60,7 @@ from ai.backend.storage.services.file_stream.zip import (
     ZipArchiveStreamReader,
 )
 from ai.backend.storage.services.upload.tus_session import TusUploadSession
-from ai.backend.storage.services.upload.types import TusUploadSessionArgs
+from ai.backend.storage.services.upload.types import TusSessionState, TusUploadSessionArgs
 from ai.backend.storage.types import SENTINEL, TusChunkUploadStreamReader
 from ai.backend.storage.utils import (
     CheckParamSource,
@@ -462,7 +462,79 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 upload_offset=state.committed_offset,
                 upload_length=total_size,
             )
+            headers.update(_progress_response_headers(state))
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
+
+
+async def tus_upload_status(request: web.Request) -> web.Response:
+    """
+    GET /upload/status — JSON snapshot of an in-flight upload session.
+
+    Used by clients to recover after a Storage Proxy crash or network error:
+    they discover which byte ranges are still missing and resend only those.
+    """
+    ctx: RootContext = request.app["ctx"]
+    secret = ctx.local_config.storage_proxy.secret
+
+    class Params(TypedDict):
+        token: UploadTokenData
+        dst_dir: str
+
+    async with cast(
+        AbstractAsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=upload_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
+        ),
+    ) as params:
+        token_data = params["token"]
+        total_size = int(token_data["size"])
+        async with ctx.get_volume(token_data["volume"]) as volume:
+            session_dir = (
+                volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
+            )
+            session = TusUploadSession(
+                TusUploadSessionArgs(
+                    session_dir=session_dir,
+                    session_id=token_data["session"],
+                    total_size=total_size,
+                    valkey_client=ctx.valkey_tus_client,
+                    lock_factory=ctx.tus_lock_factory,
+                )
+            )
+            if not await session.exists():
+                raise TusSessionNotFoundError
+            state = await session.read_state()
+            body = {
+                "session": token_data["session"],
+                "total_size": total_size,
+                "committed_offset": state.committed_offset,
+                "chunks_received": [rec.offset for rec in state.committed_chunks],
+                "missing_ranges": [
+                    {"offset": offset, "length": length}
+                    for offset, length in state.missing_ranges()
+                ],
+                "progress_percent": state.progress_percent(),
+                "status": state.status,
+            }
+            log.trace(
+                "TUS upload status: session={}, progress={}/{} ({:.1f}%), status={}",
+                token_data["session"],
+                state.committed_offset,
+                total_size,
+                state.progress_percent(),
+                state.status,
+            )
+    return web.json_response(body, status=HTTPStatus.OK)
 
 
 # TUS-related request/response headers that the storage-proxy accepts and emits,
@@ -489,13 +561,16 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 _TUS_HEADER_LIST = (
     "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Upload-Checksum, Content-Type"
 )
+_PROGRESS_HEADER_LIST = (
+    "X-Backend-Ai-Chunks-Received, X-Backend-Ai-Progress-Percent, X-Backend-Ai-Total-Expected"
+)
 
 
 def _prepare_tus_session_headers(*, upload_offset: int, upload_length: int) -> dict[str, str]:
     return {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": _TUS_HEADER_LIST,
-        "Access-Control-Expose-Headers": _TUS_HEADER_LIST,
+        "Access-Control-Expose-Headers": f"{_TUS_HEADER_LIST}, {_PROGRESS_HEADER_LIST}",
         "Access-Control-Allow-Methods": "*",
         "Cache-Control": "no-store",
         "Tus-Resumable": "1.0.0",
@@ -533,6 +608,14 @@ def _parse_upload_checksum_header(raw: str | None) -> str | None:
     if len(digest) != 32:
         raise InvalidUploadChecksumHeaderError(f"sha256 digest must be 32 bytes, got {len(digest)}")
     return digest.hex()
+
+
+def _progress_response_headers(state: TusSessionState) -> dict[str, str]:
+    return {
+        "X-Backend-Ai-Chunks-Received": str(len(state.committed_chunks)),
+        "X-Backend-Ai-Progress-Percent": str(state.progress_percent()),
+        "X-Backend-Ai-Total-Expected": str(state.total_size),
+    }
 
 
 async def tus_options(request: web.Request) -> web.Response:
@@ -630,5 +713,8 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)
+
+    status_resource = app.router.add_resource("/upload/status")
+    status_resource.add_route("GET", tus_upload_status)
 
     return app

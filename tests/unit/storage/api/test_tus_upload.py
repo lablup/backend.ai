@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import dataclasses
 import hashlib
+import json
 import secrets
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -29,7 +30,7 @@ from ai.backend.common.defs import REDIS_STREAM_LOCK, REDIS_TUS_DB
 from ai.backend.common.lock import DistributedLockFactory
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisConnectionInfo, TusSessionId, ValkeyTarget
-from ai.backend.storage.api.client import tus_upload_part
+from ai.backend.storage.api.client import tus_upload_part, tus_upload_status
 from ai.backend.storage.errors import (
     ChunkChecksumMismatchError,
     InvalidAPIParameters,
@@ -550,5 +551,192 @@ class TestUploadChecksum:
             )
             with pytest.raises(InvalidUploadChecksumHeaderError):
                 await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+
+def _body_bytes(response: web.Response) -> bytes:
+    body = response.body
+    assert isinstance(body, (bytes, bytearray))
+    return bytes(body)
+
+
+class TestProgressHeaders:
+    async def test_patch_response_includes_progress_headers(
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
+    ) -> None:
+        await _register_session_state(valkey_tus_client, patch_env.session_id, 2048)
+        token_data = _token_data(
+            session_id=patch_env.session_id, total_size=2048, relpath="result.bin"
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            request = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id=patch_env.session_id,
+                total_size=2048,
+                body=b"A" * 1024,
+                offset_header="0",
+                valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
+            )
+            response = await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+        assert response.headers["X-Backend-Ai-Chunks-Received"] == "1"
+        assert response.headers["X-Backend-Ai-Total-Expected"] == "2048"
+        assert response.headers["X-Backend-Ai-Progress-Percent"] == "50.0"
+
+
+class TestUploadStatus:
+    async def test_status_for_empty_session(
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
+    ) -> None:
+        await _register_session_state(valkey_tus_client, patch_env.session_id, 2048)
+        token_data = _token_data(
+            session_id=patch_env.session_id, total_size=2048, relpath="result.bin"
+        )
+        request = _build_request(
+            vfpath=patch_env.vfpath,
+            session_id=patch_env.session_id,
+            total_size=2048,
+            body=None,
+            offset_header=None,
+            valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            response = await tus_upload_status(request)
+        finally:
+            cp.stop()
+
+        payload = json.loads(_body_bytes(response))
+        assert payload["total_size"] == 2048
+        assert payload["committed_offset"] == 0
+        assert payload["chunks_received"] == []
+        assert payload["missing_ranges"] == [{"offset": 0, "length": 2048}]
+        assert payload["progress_percent"] == 0.0
+        assert payload["status"] == "in_progress"
+
+    async def test_status_after_partial_upload(
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
+    ) -> None:
+        await _register_session_state(valkey_tus_client, patch_env.session_id, 4096)
+        token_data = _token_data(
+            session_id=patch_env.session_id, total_size=4096, relpath="result.bin"
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            patch_request = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id=patch_env.session_id,
+                total_size=4096,
+                body=b"A" * 1024,
+                offset_header="0",
+                valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
+            )
+            await tus_upload_part(patch_request)
+
+            status_request = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id=patch_env.session_id,
+                total_size=4096,
+                body=None,
+                offset_header=None,
+                valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
+            )
+            response = await tus_upload_status(status_request)
+        finally:
+            cp.stop()
+
+        payload = json.loads(_body_bytes(response))
+        assert payload["committed_offset"] == 1024
+        assert payload["chunks_received"] == [0]
+        assert payload["missing_ranges"] == [{"offset": 1024, "length": 3072}]
+        assert payload["progress_percent"] == 25.0
+        assert payload["status"] == "in_progress"
+
+    async def test_status_with_out_of_order_chunks_reports_gaps(
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
+    ) -> None:
+        await _register_session_state(valkey_tus_client, patch_env.session_id, 4096)
+        token_data = _token_data(
+            session_id=patch_env.session_id, total_size=4096, relpath="result.bin"
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            # Commit the *second* chunk first, leaving [0, 1024) missing.
+            second = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id=patch_env.session_id,
+                total_size=4096,
+                body=b"B" * 1024,
+                offset_header="1024",
+                valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
+            )
+            await tus_upload_part(second)
+
+            status_request = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id=patch_env.session_id,
+                total_size=4096,
+                body=None,
+                offset_header=None,
+                valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
+            )
+            response = await tus_upload_status(status_request)
+        finally:
+            cp.stop()
+
+        payload = json.loads(_body_bytes(response))
+        # Contiguous prefix has not advanced because [0,1024) is missing.
+        assert payload["committed_offset"] == 0
+        assert payload["chunks_received"] == [1024]
+        assert payload["missing_ranges"] == [
+            {"offset": 0, "length": 1024},
+            {"offset": 2048, "length": 2048},
+        ]
+
+    async def test_status_for_missing_session_returns_404(
+        self,
+        tmp_path: Path,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
+    ) -> None:
+        vfpath = tmp_path / "vfpath"
+        vfpath.mkdir()
+        missing_id = f"missing-{secrets.token_hex(8)}"
+        token_data = _token_data(session_id=missing_id, total_size=1024, relpath="result.bin")
+        request = _build_request(
+            vfpath=vfpath,
+            session_id=missing_id,
+            total_size=1024,
+            body=None,
+            offset_header=None,
+            valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            with pytest.raises(web.HTTPNotFound):
+                await tus_upload_status(request)
         finally:
             cp.stop()

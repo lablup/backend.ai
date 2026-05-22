@@ -86,6 +86,47 @@ class TusSessionState(BackendAISchema):
                 return None
         return None
 
+    def missing_ranges(self) -> list[tuple[int, int]]:
+        """
+        Return the list of ``(offset, length)`` byte ranges in
+        ``[0, total_size)`` that are NOT yet covered by any received chunk.
+
+        Overlapping or out-of-bounds received chunks are tolerated: ranges
+        are coalesced and clipped against the declared total size.
+        """
+        if self.total_size <= 0:
+            return []
+        covered: list[tuple[int, int]] = []
+        for rec in self.committed_chunks:
+            start = max(0, rec.offset)
+            end = min(self.total_size, rec.end)
+            if start < end:
+                covered.append((start, end))
+        if not covered:
+            return [(0, self.total_size)]
+        covered.sort()
+        merged: list[tuple[int, int]] = [covered[0]]
+        for start, end in covered[1:]:
+            last_start, last_end = merged[-1]
+            if start <= last_end:
+                merged[-1] = (last_start, max(last_end, end))
+            else:
+                merged.append((start, end))
+        gaps: list[tuple[int, int]] = []
+        cursor = 0
+        for start, end in merged:
+            if cursor < start:
+                gaps.append((cursor, start - cursor))
+            cursor = end
+        if cursor < self.total_size:
+            gaps.append((cursor, self.total_size - cursor))
+        return gaps
+
+    def progress_percent(self) -> float:
+        if self.total_size <= 0:
+            return 100.0
+        return round(100.0 * self.committed_offset / self.total_size, 2)
+
     @classmethod
     def empty(cls, session_id: TusSessionId, total_size: int) -> Self:
         return cls(session_id=session_id, total_size=total_size)
