@@ -149,7 +149,6 @@ class EntityType(enum.StrEnum):
     APP_CONFIG_DOMAIN = "app_config:domain"
     APP_CONFIG_USER = "app_config:user"
     # Session sub
-    SESSION_KERNEL = "session:kernel"
     SESSION_FILE = "session:file"
     SESSION_DIRECTORY = "session:directory"
     SESSION_APP_SERVICE = "session:app_service"

@@ -27,7 +27,7 @@ class SearchKernelsAction(SessionScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.SESSION_KERNEL
+        return EntityType.SESSION
 
     @override
     def entity_id(self) -> str | None:
