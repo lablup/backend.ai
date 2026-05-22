@@ -5,6 +5,8 @@ Client-facing API
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import logging
 import os
 import urllib.parse
@@ -47,7 +49,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import (
+    ChunkChecksumMismatchError,
     InvalidAPIParameters,
+    InvalidUploadChecksumHeaderError,
     TusSessionNotFoundError,
     UploadChunkExceedsTotalSizeError,
     UploadOffsetMismatchError,
@@ -400,6 +404,10 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 f"Upload-Offset {client_offset} is out of range [0, {total_size}]"
             )
 
+        expected_checksum_hex = _parse_upload_checksum_header(
+            request.headers.get("Upload-Checksum")
+        )
+
         async with ctx.get_volume(token_data["volume"]) as volume:
             session_dir = (
                 volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
@@ -425,6 +433,10 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     raise UploadChunkExceedsTotalSizeError(
                         f"Chunk at offset {client_offset} with length {written.length} "
                         f"exceeds declared size {total_size}"
+                    )
+                if expected_checksum_hex is not None and expected_checksum_hex != written.sha256:
+                    raise ChunkChecksumMismatchError(
+                        f"Chunk at offset {client_offset} failed SHA-256 verification"
                     )
                 commit_result = await session.commit_chunk(
                     offset=client_offset,
@@ -468,9 +480,15 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 # - Upload-Offset: byte position from which the next PATCH must continue;
 #   required on PATCH requests and present on HEAD/PATCH responses. The core
 #   resumability primitive of TUS.
+# - Upload-Checksum: `<algorithm> <base64>` payload integrity check for PATCH
+#   bodies (TUS Checksum extension). Only `sha256` is accepted; the server
+#   verifies the PATCH body's digest against the supplied value and returns
+#   460 on mismatch.
 # - Content-Type: PATCH bodies must be `application/offset+octet-stream` per
 #   the TUS spec.
-_TUS_HEADER_LIST = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+_TUS_HEADER_LIST = (
+    "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Upload-Checksum, Content-Type"
+)
 
 
 def _prepare_tus_session_headers(*, upload_offset: int, upload_length: int) -> dict[str, str]:
@@ -486,6 +504,37 @@ def _prepare_tus_session_headers(*, upload_offset: int, upload_length: int) -> d
     }
 
 
+def _parse_upload_checksum_header(raw: str | None) -> str | None:
+    """
+    Parse a TUS Checksum extension header value into a hex SHA-256 digest.
+
+    Returns ``None`` if no header was sent. Raises
+    ``InvalidUploadChecksumHeaderError`` for malformed values or unsupported
+    algorithms (only ``sha256`` is accepted).
+    """
+    if raw is None:
+        return None
+    parts = raw.strip().split(None, 1)
+    if len(parts) != 2:
+        raise InvalidUploadChecksumHeaderError(
+            f"Upload-Checksum must be '<algorithm> <base64>', got {raw!r}"
+        )
+    algorithm, encoded = parts
+    if algorithm.lower() != "sha256":
+        raise InvalidUploadChecksumHeaderError(
+            f"Unsupported checksum algorithm: {algorithm}. Only 'sha256' is accepted."
+        )
+    try:
+        digest = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as e:
+        raise InvalidUploadChecksumHeaderError(
+            f"Invalid base64 in Upload-Checksum: {encoded!r}"
+        ) from e
+    if len(digest) != 32:
+        raise InvalidUploadChecksumHeaderError(f"sha256 digest must be 32 bytes, got {len(digest)}")
+    return digest.hex()
+
+
 async def tus_options(request: web.Request) -> web.Response:
     """
     Let clients discover the supported features of our tus.io server-side implementation.
@@ -493,15 +542,13 @@ async def tus_options(request: web.Request) -> web.Response:
     ctx: RootContext = request.app["ctx"]
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers["Access-Control-Allow-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    )
-    headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    )
+    headers["Access-Control-Allow-Headers"] = _TUS_HEADER_LIST
+    headers["Access-Control-Expose-Headers"] = _TUS_HEADER_LIST
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
+    headers["Tus-Extension"] = "checksum"
+    headers["Tus-Checksum-Algorithm"] = "sha256"
     headers["Tus-Max-Size"] = str(
         int(BinarySize.from_str(ctx.local_config.storage_proxy.max_upload_size)),
     )

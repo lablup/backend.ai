@@ -10,7 +10,9 @@ range bounds) plus the end-to-end happy path that writes through to
 
 from __future__ import annotations
 
+import base64
 import dataclasses
+import hashlib
 import secrets
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -29,7 +31,9 @@ from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisConnectionInfo, TusSessionId, ValkeyTarget
 from ai.backend.storage.api.client import tus_upload_part
 from ai.backend.storage.errors import (
+    ChunkChecksumMismatchError,
     InvalidAPIParameters,
+    InvalidUploadChecksumHeaderError,
     UploadChunkExceedsTotalSizeError,
     UploadOffsetMismatchError,
 )
@@ -88,6 +92,7 @@ def _build_request(
     offset_header: str | None,
     valkey_client: ValkeyTusClient,
     lock_factory: DistributedLockFactory,
+    checksum_header: str | None = None,
 ) -> MagicMock:
     volume = MagicMock()
     volume.mangle_vfpath.return_value = vfpath
@@ -104,6 +109,8 @@ def _build_request(
     request.headers = {}
     if offset_header is not None:
         request.headers["Upload-Offset"] = offset_header
+    if checksum_header is not None:
+        request.headers["Upload-Checksum"] = checksum_header
     request.query = {"token": "test-token"}
 
     if body is None:
@@ -441,3 +448,107 @@ class TestHappyPath:
         chunks_dir = patch_env.session_dir / "chunks"
         if chunks_dir.exists():
             assert list(chunks_dir.glob("*.tmp")) == []
+
+
+def _sha256_b64(data: bytes) -> str:
+    return base64.b64encode(hashlib.sha256(data).digest()).decode("ascii")
+
+
+class TestUploadChecksum:
+    async def test_matching_checksum_accepted(
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
+    ) -> None:
+        payload = b"X" * 1024
+        token_data = _token_data(
+            session_id=patch_env.session_id, total_size=1024, relpath="result.bin"
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            request = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id=patch_env.session_id,
+                total_size=1024,
+                body=payload,
+                offset_header="0",
+                valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
+                checksum_header=f"sha256 {_sha256_b64(payload)}",
+            )
+            response = await tus_upload_part(request)
+        finally:
+            cp.stop()
+        assert response.headers["Upload-Offset"] == "1024"
+        assert (patch_env.vfpath / "result.bin").read_bytes() == payload
+
+    async def test_mismatched_checksum_rejected(
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
+    ) -> None:
+        payload = b"X" * 1024
+        wrong = _sha256_b64(b"different-payload")
+        token_data = _token_data(
+            session_id=patch_env.session_id, total_size=1024, relpath="result.bin"
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            request = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id=patch_env.session_id,
+                total_size=1024,
+                body=payload,
+                offset_header="0",
+                valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
+                checksum_header=f"sha256 {wrong}",
+            )
+            with pytest.raises(ChunkChecksumMismatchError):
+                await tus_upload_part(request)
+        finally:
+            cp.stop()
+
+        # The mismatched chunk must not be committed.
+        assert not (patch_env.vfpath / "result.bin").exists()
+        chunks_dir = patch_env.session_dir / "chunks"
+        if chunks_dir.exists():
+            assert list(chunks_dir.glob("*")) == []
+
+    @pytest.mark.parametrize(
+        "header",
+        [
+            "sha256",  # missing digest
+            "sha1 abc",  # unsupported algorithm
+            "sha256 not_base64!!",  # invalid base64
+            "sha256 " + base64.b64encode(b"too-short").decode("ascii"),  # wrong length
+        ],
+    )
+    async def test_malformed_checksum_header_rejected(
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
+        header: str,
+    ) -> None:
+        token_data = _token_data(
+            session_id=patch_env.session_id, total_size=1024, relpath="result.bin"
+        )
+        cp = _patch_handler_params(token_data)
+        try:
+            request = _build_request(
+                vfpath=patch_env.vfpath,
+                session_id=patch_env.session_id,
+                total_size=1024,
+                body=b"X" * 1024,
+                offset_header="0",
+                valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
+                checksum_header=header,
+            )
+            with pytest.raises(InvalidUploadChecksumHeaderError):
+                await tus_upload_part(request)
+        finally:
+            cp.stop()

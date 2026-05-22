@@ -82,3 +82,46 @@ class UploadSessionCorruptedError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class _ChecksumMismatch(web.HTTPClientError):
+    """
+    TUS Checksum extension defines HTTP 460 for checksum mismatches.
+    aiohttp does not ship a built-in class for this code, so we declare one.
+    """
+
+    status_code = 460
+
+
+class ChunkChecksumMismatchError(BackendAIError, _ChecksumMismatch):
+    """
+    Raised when ``Upload-Checksum`` header does not match the SHA-256 digest
+    of the received chunk body (HTTP 460 per TUS Checksum extension).
+    """
+
+    error_type = "https://api.backend.ai/probs/storage/chunk-checksum-mismatch"
+    error_title = "Upload Chunk Checksum Mismatch"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.MISMATCH,
+        )
+
+
+class InvalidUploadChecksumHeaderError(BackendAIError, web.HTTPBadRequest):
+    """
+    Raised when ``Upload-Checksum`` header is malformed or specifies an
+    unsupported algorithm (only ``sha256`` is accepted).
+    """
+
+    error_type = "https://api.backend.ai/probs/storage/invalid-upload-checksum"
+    error_title = "Invalid Upload-Checksum header"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
