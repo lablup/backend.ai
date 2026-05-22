@@ -10,7 +10,6 @@ from ai.backend.manager.services.auth.actions.base import AuthAction
 @dataclass
 class AdminRevokeLoginSessionAction(AuthAction):
     session_id: UUID
-    client_ip: str | None = None
 
     @override
     def entity_id(self) -> str | None:
@@ -26,7 +25,6 @@ class AdminRevokeLoginSessionAction(AuthAction):
 class MyRevokeLoginSessionAction(AuthAction):
     session_id: UUID
     user_id: UUID
-    client_ip: str | None = None
 
     @override
     def entity_id(self) -> str | None:

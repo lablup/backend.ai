@@ -15,7 +15,6 @@ from typing import Final
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
-from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -225,7 +224,6 @@ class AuthHandler:
                 requester_email=ctx.user_email,
                 email=params.email,
                 password=params.password,
-                client_ip=current_client_ip(),
             )
         )
         return APIResponse.build(HTTPStatus.OK, SignoutResponse())

@@ -15,6 +15,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionInner,
     LoginSessionTokenData,
 )
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
@@ -555,7 +556,7 @@ class AuthService:
         self, action: AdminRevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
         session_token = await self._auth_repository.delete_login_session_by_id(
-            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN, action.client_ip
+            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN, current_client_ip()
         )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
@@ -567,7 +568,7 @@ class AuthService:
         if session_data.user_id != action.user_id:
             raise GenericForbidden("You can only revoke your own login sessions.")
         session_token = await self._auth_repository.delete_login_session_by_id(
-            action.session_id, LoginAttemptResult.REVOKED_BY_USER, action.client_ip
+            action.session_id, LoginAttemptResult.REVOKED_BY_USER, current_client_ip()
         )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
@@ -588,7 +589,7 @@ class AuthService:
             action.password,
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
-            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT, action.client_ip
+            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT, current_client_ip()
         )
         for token in deleted_tokens:
             await self._valkey_session_client.delete_login_session(token)

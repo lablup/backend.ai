@@ -14,7 +14,6 @@ class SignoutAction(AuthAction):
     requester_email: str
     email: str
     password: str
-    client_ip: str | None = None
 
     @override
     def entity_id(self) -> str | None:
