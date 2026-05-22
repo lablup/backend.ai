@@ -199,7 +199,7 @@ class UserRow(Base):  # type: ignore[misc]
     )
     domain_id: Mapped[DomainID | None] = mapped_column(
         "domain_id",
-        GUID,
+        GUID(DomainID),
         sa.ForeignKey("domains.id"),
         index=True,
         nullable=True,
