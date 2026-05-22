@@ -43,8 +43,6 @@ class PendingSessionResourceLimitValidator(ValidatorRule):
         # Check if adding this workload would exceed the limit
         total_after = current_pending_slots
         if total_after > pending_resource_limit:
-            # Format the current usage for human-readable output
-            usage_str = " ".join(f"{k}={v}" for k, v in current_pending_slots.items() if v)
             raise PendingSessionResourceLimitExceeded(
-                f"Your pending session quota is exceeded. ({usage_str})"
+                current_pending_slots=current_pending_slots,
             )
