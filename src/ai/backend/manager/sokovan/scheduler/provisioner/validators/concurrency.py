@@ -49,5 +49,6 @@ class ConcurrencyValidator(ValidatorRule):
 
         if current_count >= max_sessions:
             raise ConcurrencyLimitExceeded(
-                f"You cannot run more than {max_sessions} {session_type} sessions"
+                max_sessions=max_sessions,
+                session_type=session_type,
             )

@@ -2,13 +2,19 @@
 Exceptions for agent selection in sokovan scheduler.
 """
 
+from __future__ import annotations
+
+from abc import ABC
+from collections.abc import Iterable, Mapping, Sequence
+
 from ai.backend.common.exception import (
+    BackendAIError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.common.types import AgentId, KernelId, ResourceSlot
 from ai.backend.manager.sokovan.data import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 
@@ -19,8 +25,7 @@ class AgentSelectionError(SchedulingError):
     error_type = "https://api.backend.ai/probs/agent-selection-failed"
     error_title = "Agent selection failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
@@ -32,19 +37,110 @@ class AgentSelectionError(SchedulingError):
         return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
 
 
-class NoAvailableAgentError(AgentSelectionError):
-    """Raised when no agents are available."""
+class NoAgentsInScalingGroupError(AgentSelectionError):
+    """Raised when the scaling group has no candidate agents at all.
 
-    error_type = "https://api.backend.ai/probs/no-available-agents"
-    error_title = "Unavailable : No agents can be allocated at this time."
+    Distinct from :class:`NoAvailableAgentError`, which aggregates *per-kernel*
+    compatibility failures across known candidates.
+    """
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    error_type = "https://api.backend.ai/probs/no-agents-in-scaling-group"
+    error_title = "Unavailable : Scaling group has no candidate agents."
+
+    _scaling_group: str
+
+    def __init__(self, scaling_group: str) -> None:
+        self._scaling_group = scaling_group
+        super().__init__(f"No agents available in scaling group '{scaling_group}'")
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class NoAvailableAgentError(AgentSelectionError):
+    """Raised when no agents can satisfy a kernel-group's resource requirement.
+
+    The constructor accepts the structured inputs that describe *which*
+    kernels failed and *why* each candidate agent was rejected, and composes
+    the multi-line, bullet-formatted message itself.
+    """
+
+    error_type = "https://api.backend.ai/probs/no-available-agents"
+    error_title = "Unavailable : No agents can be allocated at this time."
+
+    _kernel_ids: Sequence[KernelId]
+    _required_architecture: str
+    _requested_slots: ResourceSlot
+    _agent_errors: Mapping[AgentId, TrackerCompatibilityError]
+    _designated_agent_ids: Sequence[AgentId] | None
+
+    def __init__(
+        self,
+        *,
+        kernel_ids: Sequence[KernelId],
+        required_architecture: str,
+        requested_slots: ResourceSlot,
+        agent_errors: Mapping[AgentId, TrackerCompatibilityError],
+        designated_agent_ids: Sequence[AgentId] | None = None,
+    ) -> None:
+        self._kernel_ids = kernel_ids
+        self._required_architecture = required_architecture
+        self._requested_slots = requested_slots
+        self._agent_errors = agent_errors
+        self._designated_agent_ids = designated_agent_ids
+        super().__init__(self._build_message())
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+    def _build_message(self) -> str:
+        header = self._format_header()
+        if self._designated_agent_ids is None:
+            prefix = "no available agents"
+            # Use extra_msg directly so the inner BackendAIError's `title (msg)`
+            # wrapping does not leak into our aggregated layout.
+            reasons: Iterable[str] = (err.extra_msg or "" for err in self._agent_errors.values())
+        else:
+            prefix = "no designated agent is compatible"
+            reasons = self._designated_reasons()
+        details = self._format_reason_lines(reasons)
+        return f"{prefix} for {header}:\n{details}"
+
+    def _format_header(self) -> str:
+        kernel_id_list = ", ".join(str(k) for k in self._kernel_ids)
+        slot_str = " ".join(f"{k}={v}" for k, v in self._requested_slots.items() if v)
+        return f"kernels [{kernel_id_list}] (arch={self._required_architecture}, slots={slot_str})"
+
+    def _designated_reasons(self) -> list[str]:
+        reasons: list[str] = []
+        for agent_id in self._designated_agent_ids or ():
+            err = self._agent_errors.get(agent_id)
+            reason = (err.extra_msg or "") if err is not None else "not found in compatible agents"
+            reasons.append(f"designated agent '{agent_id}': {reason}")
+        return reasons
+
+    @staticmethod
+    def _format_reason_lines(reasons: Iterable[str]) -> str:
+        """Format reasons as a '- '-prefixed bullet list with continuation indent.
+
+        Multi-line inner messages keep their internal indentation so the agent →
+        detail hierarchy stays visually clear in the rendered output.
+        """
+        lines: list[str] = []
+        for reason in reasons:
+            msg_lines = reason.splitlines() or [""]
+            first, *rest = msg_lines
+            lines.append(f"- {first}")
+            lines.extend(f"  {line}" for line in rest)
+        return "\n".join(lines)
 
 
 class NoCompatibleAgentError(AgentSelectionError):
@@ -53,8 +149,7 @@ class NoCompatibleAgentError(AgentSelectionError):
     error_type = "https://api.backend.ai/probs/no-compatible-agents"
     error_title = "No agents meet the resource requirements."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
@@ -62,27 +157,54 @@ class NoCompatibleAgentError(AgentSelectionError):
         )
 
 
-# Tracker compatibility check exceptions (not inheriting from SchedulingError)
-class TrackerCompatibilityError(Exception):
+# Per-agent compatibility check exceptions. These inherit from BackendAIError so
+# every concrete subclass is forced to declare an `error_code` — otherwise a new
+# compatibility error could silently leak with an undefined RFC-7807 code.
+class TrackerCompatibilityError(BackendAIError, ABC):
     """Base exception for tracker compatibility checks."""
 
-    pass
+    error_type = "https://api.backend.ai/probs/agent-compatibility-failed"
+    error_title = "Agent compatibility check failed."
 
 
 class ArchitectureIncompatibleError(TrackerCompatibilityError):
     """Raised when agent architecture does not match the required architecture."""
 
+    error_type = "https://api.backend.ai/probs/agent-architecture-mismatch"
+    error_title = "Agent architecture does not match the requirement."
+
+    _agent_id: AgentId
+    _agent_arch: str
+    _required_arch: str
+
     def __init__(self, agent_id: AgentId, agent_arch: str, required_arch: str) -> None:
-        self.agent_id = agent_id
-        self.agent_arch = agent_arch
-        self.required_arch = required_arch
+        self._agent_id = agent_id
+        self._agent_arch = agent_arch
+        self._required_arch = required_arch
         super().__init__(
-            f"Agent {agent_id} architecture '{agent_arch}' does not match required architecture '{required_arch}'"
+            f"Agent {agent_id} architecture '{agent_arch}'"
+            f" does not match required architecture '{required_arch}'"
+        )
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.MISMATCH,
         )
 
 
 class InsufficientResourcesError(TrackerCompatibilityError):
     """Raised when agent does not have sufficient resources available."""
+
+    error_type = "https://api.backend.ai/probs/agent-insufficient-resources"
+    error_title = "Agent has insufficient resources."
+
+    _agent_id: AgentId
+    _requested_slots: ResourceSlot
+    _available_slots: ResourceSlot
+    _occupied_slots: ResourceSlot
+    _insufficient_resources: dict[str, tuple[str, str]]
 
     def __init__(
         self,
@@ -92,25 +214,39 @@ class InsufficientResourcesError(TrackerCompatibilityError):
         occupied_slots: ResourceSlot,
         insufficient_resources: dict[str, tuple[str, str]],
     ) -> None:
-        self.agent_id = agent_id
-        self.requested_slots = requested_slots
-        self.available_slots = available_slots
-        self.occupied_slots = occupied_slots
-        self.insufficient_resources = insufficient_resources
+        self._agent_id = agent_id
+        self._requested_slots = requested_slots
+        self._available_slots = available_slots
+        self._occupied_slots = occupied_slots
+        self._insufficient_resources = insufficient_resources
 
-        # Build detailed message showing which resources are insufficient
-        resource_details = []
-        for resource_name, (requested, available) in insufficient_resources.items():
-            resource_details.append(
-                f"{resource_name}: requested={requested}, available={available}"
-            )
-        details_msg = "; ".join(resource_details)
+        # Build detailed message: one resource shortfall per indented line so that
+        # upstream aggregators (e.g. NoAvailableAgentError) can newline-join cleanly.
+        resource_lines = [
+            f"  - {resource_name}: requested={requested}, available={available}"
+            for resource_name, (requested, available) in insufficient_resources.items()
+        ]
+        details_msg = "\n".join(resource_lines)
 
-        super().__init__(f"Agent {agent_id} has insufficient resources: {details_msg}")
+        super().__init__(f"Agent {agent_id} has insufficient resources:\n{details_msg}")
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
 
 
 class ContainerLimitExceededError(TrackerCompatibilityError):
     """Raised when agent has reached its maximum container count limit."""
+
+    error_type = "https://api.backend.ai/probs/agent-container-limit-exceeded"
+    error_title = "Agent has reached its container limit."
+
+    _agent_id: AgentId
+    _current_count: int
+    _max_count: int
 
     def __init__(
         self,
@@ -118,9 +254,16 @@ class ContainerLimitExceededError(TrackerCompatibilityError):
         current_count: int,
         max_count: int,
     ) -> None:
-        self.agent_id = agent_id
-        self.current_count = current_count
-        self.max_count = max_count
+        self._agent_id = agent_id
+        self._current_count = current_count
+        self._max_count = max_count
         super().__init__(
             f"Agent {agent_id} container limit exceeded: current={current_count}, max={max_count}"
+        )
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )

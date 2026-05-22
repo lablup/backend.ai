@@ -43,7 +43,4 @@ class KeypairResourceLimitValidator(ValidatorRule):
         # Check if adding this workload would exceed the limit
         total_after = key_occupied + workload.requested_slots
         if not (total_after <= policy.total_resource_slots):
-            exceeded_msg = " ".join(f"{k}={v}" for k, v in policy.total_resource_slots.items() if v)
-            raise KeypairResourceQuotaExceeded(
-                f"Your keypair resource quota is exceeded. ({exceeded_msg})"
-            )
+            raise KeypairResourceQuotaExceeded(quota_slots=policy.total_resource_slots)
