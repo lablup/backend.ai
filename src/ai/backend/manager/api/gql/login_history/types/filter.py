@@ -8,9 +8,11 @@ from ai.backend.common.dto.manager.v2.login_history.request import (
     LoginHistoryFilter,
     LoginHistoryResultFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
 )
@@ -48,6 +50,13 @@ class LoginHistoryFilterGQL(PydanticInputMixin[LoginHistoryFilter]):
     domain_name: StringFilter | None = None
     result: LoginHistoryResultFilterGQL | None = None
     created_at: DateTimeFilter | None = None
+    client_ip: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the client IP recorded on the login_history event.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

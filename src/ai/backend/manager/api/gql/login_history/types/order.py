@@ -25,6 +25,7 @@ class LoginHistoryOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     RESULT = "result"
     DOMAIN_NAME = "domain_name"
+    CLIENT_IP = "client_ip"
 
 
 @gql_pydantic_input(

@@ -132,6 +132,17 @@ class LoginHistoryAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if f.client_ip is not None:
+            condition = self.convert_string_filter(
+                f.client_ip,
+                contains_factory=LoginHistoryConditions.by_client_ip_contains,
+                equals_factory=LoginHistoryConditions.by_client_ip_equals,
+                starts_with_factory=LoginHistoryConditions.by_client_ip_starts_with,
+                ends_with_factory=LoginHistoryConditions.by_client_ip_ends_with,
+                in_factory=LoginHistoryConditions.by_client_ip_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.AND:
             for sub_filter in f.AND:
                 conditions.extend(self._convert_filter(sub_filter))
@@ -172,6 +183,8 @@ class LoginHistoryAdapter(BaseAdapter):
                     result.append(LoginHistoryOrders.result(ascending))
                 case LoginHistoryOrderField.DOMAIN_NAME:
                     result.append(LoginHistoryOrders.domain_name(ascending))
+                case LoginHistoryOrderField.CLIENT_IP:
+                    result.append(LoginHistoryOrders.client_ip(ascending))
         return result
 
     @staticmethod

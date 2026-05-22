@@ -43,6 +43,9 @@ class LoginHistoryFilter(BaseRequestModel):
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter history by created_at datetime"
     )
+    client_ip: StringFilter | None = Field(
+        default=None, description="Client IP filter (source IP recorded on the event)"
+    )
     AND: list[LoginHistoryFilter] | None = Field(
         default=None, description="All conditions must match"
     )

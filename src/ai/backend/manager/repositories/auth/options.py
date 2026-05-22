@@ -315,6 +315,62 @@ class LoginHistoryConditions:
 
     by_domain_name_in = staticmethod(make_string_in_factory(LoginHistoryRow.domain_name))
 
+    # --- client_ip string filters ---
+
+    @staticmethod
+    def by_client_ip_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = LoginHistoryRow.client_ip.ilike(f"%{spec.value}%")
+            else:
+                condition = LoginHistoryRow.client_ip.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_client_ip_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(LoginHistoryRow.client_ip) == spec.value.lower()
+            else:
+                condition = LoginHistoryRow.client_ip == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_client_ip_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = LoginHistoryRow.client_ip.ilike(f"{spec.value}%")
+            else:
+                condition = LoginHistoryRow.client_ip.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_client_ip_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = LoginHistoryRow.client_ip.ilike(f"%{spec.value}")
+            else:
+                condition = LoginHistoryRow.client_ip.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_client_ip_in = staticmethod(make_string_in_factory(LoginHistoryRow.client_ip))
+
     # --- created_at datetime filters ---
 
     @staticmethod
@@ -385,3 +441,9 @@ class LoginHistoryOrders:
         if ascending:
             return LoginHistoryRow.domain_name.asc()
         return LoginHistoryRow.domain_name.desc()
+
+    @staticmethod
+    def client_ip(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return LoginHistoryRow.client_ip.asc()
+        return LoginHistoryRow.client_ip.desc()

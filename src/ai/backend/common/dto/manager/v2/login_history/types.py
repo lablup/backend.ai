@@ -36,3 +36,4 @@ class LoginHistoryOrderField(StrEnum):
     CREATED_AT = "created_at"
     RESULT = "result"
     DOMAIN_NAME = "domain_name"
+    CLIENT_IP = "client_ip"

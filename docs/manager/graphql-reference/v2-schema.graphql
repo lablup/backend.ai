@@ -5675,6 +5675,11 @@ input LoginHistoryFilter {
   domainName: StringFilter = null
   result: LoginHistoryResultFilter = null
   createdAt: DateTimeFilter = null
+
+  """
+  Added in UNRELEASED. Filter by the client IP recorded on the login_history event.
+  """
+  clientIp: StringFilter = null
   AND: [LoginHistoryFilter!] = null
   OR: [LoginHistoryFilter!] = null
   NOT: [LoginHistoryFilter!] = null
@@ -5691,6 +5696,7 @@ enum LoginHistoryOrderField {
   CREATED_AT
   RESULT
   DOMAIN_NAME
+  CLIENT_IP
 }
 
 """Added in 26.4.2. Filter for login attempt result field."""
