@@ -11,9 +11,12 @@ from .creator import (
     Creator,
     CreatorResult,
     CreatorSpec,
+    DependentCreatorSpec,
     execute_bulk_creator,
     execute_bulk_creator_partial,
+    execute_bulk_dependent_creator,
     execute_creator,
+    execute_dependent_creator,
 )
 from .export import (
     ExportDataStream,
@@ -133,6 +136,10 @@ __all__ = [
     "Creator",
     "CreatorResult",
     "execute_creator",
+    # DependentCreator
+    "DependentCreatorSpec",
+    "execute_dependent_creator",
+    "execute_bulk_dependent_creator",
     # BulkCreator
     "BulkCreator",
     "BulkCreatorError",

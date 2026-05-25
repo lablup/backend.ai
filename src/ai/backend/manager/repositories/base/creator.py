@@ -46,6 +46,37 @@ class CreatorSpec[TRow: Base](ABC):
         raise NotImplementedError
 
 
+class DependentCreatorSpec[TDependency, TRow: Base](ABC):
+    """Abstract base class defining a row whose construction depends on a resolved value.
+
+    Unlike CreatorSpec, ``build_row`` receives a dependency value (e.g. a parent row's
+    generated id) that is only known at execution time. The caller (repository) builds
+    the dependency from a prior operation's result and passes it in. Each spec still
+    owns exactly one table's row.
+    """
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        """Integrity error checks to match after flush.
+
+        Override to declare expected constraint violations and their domain errors.
+        Empty by default (unmatched errors raise RepositoryIntegrityError).
+        """
+        return ()
+
+    @abstractmethod
+    def build_row(self, dependency: TDependency) -> TRow:
+        """Build ORM row instance to insert, using the resolved dependency value.
+
+        Args:
+            dependency: Value resolved from a prior operation (e.g. a parent id).
+
+        Returns:
+            An ORM model instance to be inserted
+        """
+        raise NotImplementedError
+
+
 @dataclass
 class Creator[TRow: Base]:
     """Bundles creator spec for insert operations.
@@ -284,3 +315,70 @@ async def execute_bulk_creator_partial[TRow: Base](
                 )
 
     return BulkCreatorResultWithFailures(successes=successes, errors=errors)
+
+
+async def execute_dependent_creator[TDependency, TRow: Base](
+    db_sess: SASession,
+    spec: DependentCreatorSpec[TDependency, TRow],
+    dependency: TDependency,
+) -> CreatorResult[TRow]:
+    """Execute INSERT for a single dependent spec with a resolved dependency.
+
+    The caller builds ``dependency`` from a prior operation's result (e.g. a parent id)
+    and passes it in; the spec's build_row receives it.
+
+    Args:
+        db_sess: Database session (must be writable)
+        spec: Dependent creator spec to insert
+        dependency: The resolved dependency value passed to the spec's build_row
+
+    Returns:
+        CreatorResult containing the created row with generated values
+
+    Note:
+        The caller controls the transaction boundary (commit/rollback).
+    """
+    row = spec.build_row(dependency)
+    db_sess.add(row)
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        match_integrity_error(parsed, spec.integrity_error_checks)
+    return CreatorResult(row=row)
+
+
+async def execute_bulk_dependent_creator[TDependency, TRow: Base](
+    db_sess: SASession,
+    specs: Sequence[DependentCreatorSpec[TDependency, TRow]],
+    dependency: TDependency,
+) -> BulkCreatorResult[TRow]:
+    """Execute bulk INSERT for dependent specs sharing one resolved dependency.
+
+    Each spec builds its row from the same dependency value (e.g. a parent id resolved
+    by the caller after creating the parent). All rows are inserted in a single flush.
+
+    Args:
+        db_sess: Database session (must be writable)
+        specs: Dependent creator specs to insert
+        dependency: The resolved dependency value passed to every spec's build_row
+
+    Returns:
+        BulkCreatorResult containing all created rows with generated values
+
+    Note:
+        The caller controls the transaction boundary (commit/rollback).
+    """
+    if not specs:
+        return BulkCreatorResult(rows=[])
+
+    rows = [spec.build_row(dependency) for spec in specs]
+    db_sess.add_all(rows)
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        # Use first spec's checks (all specs share the same DependentCreatorSpec subclass)
+        checks = specs[0].integrity_error_checks
+        match_integrity_error(parsed, checks)
+    return BulkCreatorResult(rows=rows)

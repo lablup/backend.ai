@@ -29,6 +29,7 @@ from ai.backend.manager.repositories.base import (
     BulkCreatorResultWithFailures,
     Creator,
     CreatorResult,
+    DependentCreatorSpec,
     Purger,
     PurgerResult,
     Querier,
@@ -43,7 +44,9 @@ from ai.backend.manager.repositories.base import (
     execute_batch_updater,
     execute_bulk_creator,
     execute_bulk_creator_partial,
+    execute_bulk_dependent_creator,
     execute_creator,
+    execute_dependent_creator,
     execute_purger,
     execute_querier,
     execute_updater,
@@ -123,6 +126,31 @@ class WriteOps(ReadOps):
     ) -> BulkCreatorResultWithFailures[TRow]:
         """Insert multiple rows, isolating each via a savepoint for partial success."""
         return await execute_bulk_creator_partial(self._sess, bulk)
+
+    async def create_dependent[TDependency, TRow: Base](
+        self,
+        spec: DependentCreatorSpec[TDependency, TRow],
+        dependency: TDependency,
+    ) -> CreatorResult[TRow]:
+        """Insert a single row that depends on a resolved value (e.g. a parent id).
+
+        The caller builds ``dependency`` from a prior operation's result and passes it
+        in; the spec's ``build_row`` receives it.
+        """
+        return await execute_dependent_creator(self._sess, spec, dependency)
+
+    async def bulk_create_dependent[TDependency, TRow: Base](
+        self,
+        specs: Sequence[DependentCreatorSpec[TDependency, TRow]],
+        dependency: TDependency,
+    ) -> BulkCreatorResult[TRow]:
+        """Insert rows that depend on a resolved value (e.g. a just-created parent id).
+
+        The caller builds ``dependency`` from a prior operation's result and passes it
+        in; every spec's ``build_row`` receives it. Keeps each spec single-table while
+        the repository coordinates the multi-table sequence.
+        """
+        return await execute_bulk_dependent_creator(self._sess, specs, dependency)
 
     async def update[TRow: Base](self, updater: Updater[TRow]) -> UpdaterResult[TRow] | None:
         """Update a single row by primary key."""
