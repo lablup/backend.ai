@@ -34,6 +34,28 @@ Each directory has its own `CLAUDE.md` with setup patterns.
 - Repositories/Models: Integration points where actual behavior matters
 - Other layers: Logic verification where isolation improves speed and clarity
 
+## What to Test (Behavior, Not Implementation)
+
+Test **observable contracts**, not how they are implemented internally. A good test
+survives a refactor that keeps behavior the same.
+
+**Do test:**
+- **Constraints / preconditions** the code enforces — e.g. an empty scope list raises
+  `EmptySearchScopeError`; an invalid argument is rejected.
+- **Abstraction guarantees** — the promise a method makes to its caller — e.g. a
+  dependent insert receives the resolved dependency, and the child row actually carries
+  the parent's id.
+- **Real outcomes** (for repositories/models, via `with_tables`) — create then read back
+  the same row; update is reflected; purge removes it; a scoped query filters by scope.
+
+**Do NOT test:**
+- **Implementation details / internal call wiring** — e.g. asserting that `savepoint()`
+  calls `session.begin_nested()`, that `write_ops()` opens one specific session method, or
+  spying on which delegate function was invoked. Such tests break on harmless refactors
+  and verify nothing the caller actually relies on.
+- **Behavior already covered by a lower layer's own tests** — do not re-assert delegated
+  logic (e.g. a thin wrapper that forwards to an already-tested `execute_*` function).
+
 ## Test Structure & Organization
 
 ### Use Test Classes
