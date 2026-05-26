@@ -1,0 +1,33 @@
+## Backend.AI swarm-network-daemon values.
+
+image:
+  # python:3-slim base + pip install aiohttp aiodocker at runtime via initContainer,
+  # OR a prebuilt image. Default uses python:3.13-slim + on-the-fly install.
+  repository: python
+  tag: "3.13-slim"
+  pullPolicy: IfNotPresent
+
+daemon:
+  service:
+    type: ClusterIP
+    port: 7700
+  bindPort: 7700
+
+  # Shared bearer token between manager and daemon. Empty disables auth.
+  authToken: "CHANGE-ME-SWARM-NETWORK-TOKEN"
+
+  # MTU for the overlay network. 1500 is docker default.
+  mtu: 1500
+
+  # Pin to swarm leader/manager node so the docker.sock mount can issue
+  # `docker network create --driver overlay`.
+  nodeSelector:
+    backendai.io/dedicated: swarm-manager
+
+  tolerations:
+    - key: backendai.io/dedicated
+      operator: Equal
+      value: swarm-manager
+      effect: NoSchedule
+
+  resources: {}

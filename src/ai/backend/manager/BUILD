@@ -58,6 +58,7 @@ python_distribution(
         },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
+            "rpc_overlay": "ai.backend.manager.network.rpc:RpcOverlayNetworkPlugin",
         },
     },
     generate_setup=True,

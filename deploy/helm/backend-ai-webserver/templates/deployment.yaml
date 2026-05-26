@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bai-webserver.fullname" . }}
+  labels:
+    {{- include "bai-webserver.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.webserver.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bai-webserver.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bai-webserver.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-webserver-conf.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: render-config
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              sed -e "s|__SESSION_SECRET__|$SESSION_SECRET|g" \
+                  -e "s|__REDIS_PASSWORD__|$REDIS_PASSWORD|g" \
+                  /config-in/webserver.conf > /config-out/webserver.conf
+          env:
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bai-webserver.fullname" . }}-secrets
+                  key: session-secret
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bai-webserver.fullname" . }}-secrets
+                  key: redis-password
+          volumeMounts:
+            - { name: config-template, mountPath: /config-in }
+            - { name: config-rendered, mountPath: /config-out }
+      containers:
+        - name: webserver
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/bin/tini", "--", "backend.ai"]
+          args:
+            - web
+            - start-server
+            - --config
+            - /etc/backend.ai/webserver.conf
+          ports:
+            - name: http
+              containerPort: {{ .Values.webserver.bindPort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: config-rendered
+              mountPath: /etc/backend.ai
+              readOnly: true
+          resources:
+            {{- toYaml .Values.webserver.resources | nindent 12 }}
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ include "bai-webserver.fullname" . }}-config
+        - name: config-rendered
+          emptyDir: {}
+      {{- with .Values.webserver.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.webserver.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.webserver.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,36 @@
+## Backend.AI Webserver Helm values.
+
+image:
+  repository: 192.168.0.156:5000/backend.ai-webserver
+  tag: dev
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+webserver:
+  service:
+    type: NodePort
+    port: 8090
+    nodePort: 30890
+  bindIP: "0.0.0.0"
+  bindPort: 8090
+
+  # Manager API endpoint (in-cluster service DNS by default).
+  # Manager chart's service is `<release>-backend-ai-manager`.
+  apiEndpoint: "http://bai-backend-ai-manager.backend-ai.svc.cluster.local:8081"
+
+  # Session/cookie config
+  sessionSecret: "CHANGE-ME-WEBSERVER-SESSION-SECRET"
+
+  # webui or static
+  mode: "webui"
+
+  replicaCount: 1
+
+  resources: {}
+
+  nodeSelector: {}
+
+  affinity: {}
+
+  tolerations: []

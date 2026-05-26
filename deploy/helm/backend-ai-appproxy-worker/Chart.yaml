@@ -1,0 +1,6 @@
+apiVersion: v2
+name: backend-ai-appproxy-worker
+description: Backend.AI App Proxy Worker — per-host traffic forwarder serving session apps.
+type: application
+version: 0.1.0
+appVersion: "26.4.0"

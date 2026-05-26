@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-storage-proxy.fullname" . }}-config
+  labels:
+    {{- include "bai-storage-proxy.labels" . | nindent 4 }}
+data:
+  storage-proxy.toml: |
+    [etcd]
+    namespace = {{ .Values.storageProxy.etcd.namespace | quote }}
+    addr = { host = {{ .Values.storageProxy.etcd.host | quote }}, port = {{ .Values.storageProxy.etcd.port }} }
+    user = ""
+    password = ""
+
+    [storage-proxy]
+    node-id = {{ .Values.storageProxy.nodeId | quote }}
+    num-proc = {{ .Values.storageProxy.num_proc }}
+    event-loop = "uvloop"
+    scandir-limit = 1000
+    max-upload-size = "100g"
+    secret = "__JWT_SECRET__"
+    session-expire = "1d"
+    use-watcher = false
+
+    [api.client]
+    service-addr = { host = "0.0.0.0", port = {{ .Values.storageProxy.ports.clientApi }} }
+    ssl-enabled = false
+
+    [api.manager]
+    service-addr = { host = "0.0.0.0", port = {{ .Values.storageProxy.ports.managerApi }} }
+    internal-addr = { host = "0.0.0.0", port = {{ .Values.storageProxy.ports.internal }} }
+    ssl-enabled = false
+    secret = "__MANAGER_SECRET__"
+
+    [debug]
+    enabled = false
+    asyncio = false
+    enhanced-aiomonitor-task-info = false
+    log-events = false
+
+    [logging]
+    level = "INFO"
+    drivers = ["console"]
+
+    [logging.pkg-ns]
+    "" = "WARNING"
+    "aiotools" = "INFO"
+    "aiohttp" = "INFO"
+    "ai.backend" = "INFO"
+
+    [logging.console]
+    colored = false
+    format = "verbose"
+
+    [volume]
+    {{- range $name, $vol := .Values.storageProxy.volumes }}
+
+    [volume.{{ $name }}]
+    backend = {{ $vol.backend | quote }}
+    path = {{ printf "%s/%s" $.Values.storageProxy.hostPaths.vfroot $vol.subpath | quote }}
+    {{- end }}

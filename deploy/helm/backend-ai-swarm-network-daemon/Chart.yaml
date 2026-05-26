@@ -1,0 +1,6 @@
+apiVersion: v2
+name: backend-ai-swarm-network-daemon
+description: Out-of-process swarm overlay network manager (pins to swarm leader node so manager pod can run anywhere).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

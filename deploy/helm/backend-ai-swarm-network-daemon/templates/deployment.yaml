@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bai-swarm-net.fullname" . }}
+  labels:
+    {{- include "bai-swarm-net.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "bai-swarm-net.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: Recreate     # hostPath /var/run/docker.sock — avoid concurrent pods on same node
+  template:
+    metadata:
+      labels:
+        {{- include "bai-swarm-net.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/script: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.daemon.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.daemon.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: pip-install
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              pip install --no-cache-dir --target /pylibs aiohttp~=3.13 aiodocker~=0.24
+          volumeMounts:
+            - name: pylibs
+              mountPath: /pylibs
+      containers:
+        - name: daemon
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "/script/daemon.py"]
+          env:
+            - { name: BIND_PORT, value: "{{ .Values.daemon.bindPort }}" }
+            - { name: MTU, value: "{{ .Values.daemon.mtu }}" }
+            - name: AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bai-swarm-net.fullname" . }}-secrets
+                  key: auth-token
+            - { name: PYTHONPATH, value: "/pylibs" }
+          ports:
+            - name: http
+              containerPort: {{ .Values.daemon.bindPort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - { name: script, mountPath: /script, readOnly: true }
+            - { name: pylibs, mountPath: /pylibs, readOnly: true }
+            - { name: docker-sock, mountPath: /var/run/docker.sock }
+          resources:
+            {{- toYaml .Values.daemon.resources | nindent 12 }}
+      volumes:
+        - name: script
+          configMap:
+            name: {{ include "bai-swarm-net.fullname" . }}-script
+        - name: pylibs
+          emptyDir: {}
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket

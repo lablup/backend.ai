@@ -1,0 +1,109 @@
+## Backend.AI Manager Helm values (dev/smoke: single-replica deps, no HA).
+
+image:
+  repository: 192.168.0.156:5000/backend.ai-manager
+  tag: dev
+  pullPolicy: Always
+
+imagePullSecrets: []
+
+manager:
+  replicaCount: 1
+  # Host docker group GID — must match `getent group docker` on the node the
+  # manager pod is pinned to (nodeSelector below).
+  dockerGid: 999
+  service:
+    type: ClusterIP
+    port: 8081
+  bindPort: 8081
+  secret: "CHANGE-ME-MANAGER-SECRET"
+  extraEnv: []
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  podAnnotations: {}
+  # Pin to the Swarm leader node. See todo.md §5.2 I-21.
+  nodeSelector: {}
+  # If the target node has a Backend.AI-specific taint (e.g., ser8 carries
+  # `backendai.io/dedicated=swarm-manager:NoSchedule`), tolerate it here.
+  # tolerations:
+  #   - key: backendai.io/dedicated
+  #     operator: Equal
+  #     value: swarm-manager
+  #     effect: NoSchedule
+  tolerations: []
+  affinity: {}
+
+## ---------------- Embedded deps (single replica, no HA) ----------------
+postgres:
+  image: postgres:16
+  username: backendai
+  database: backendai
+  password: "CHANGE-ME-POSTGRES-PASSWORD"
+  storage:
+    size: 20Gi
+    storageClassName: ""   # empty → cluster default
+
+redis:
+  image: redis:7
+  password: "CHANGE-ME-REDIS-PASSWORD"
+  storage:
+    size: 4Gi
+    storageClassName: ""
+
+etcd:
+  image: quay.io/coreos/etcd:v3.5.15
+  storage:
+    size: 4Gi
+    storageClassName: ""
+
+## Seed etcd with Backend.AI global config on first install (Helm hook Job).
+etcdSeed:
+  enabled: true
+  config:
+    system:
+      timezone: "UTC"
+    docker:
+      image:
+        auto_pull: "digest"
+    network:
+      subnet:
+        agent: "0.0.0.0/0"
+        container: "0.0.0.0/0"
+
+## Storage-proxy registration written into etcd at
+## `volumes/proxies/<proxyName>/{client_api,manager_api,secret,ssl_verify}`
+## by a secondary hook Job. Manager reads these keys at startup (see
+## StorageSessionManager) to discover proxies and their credentials.
+##
+## `clientApiHost` / `managerApiHost` MUST be reachable from the consumers:
+##   - client_api: user machines, kernel containers → external host IP
+##   - manager_api: manager Pod → in-cluster host IP (same ser8 node works)
+## For the lab both point at ser8's node IP.
+storageProxy:
+  enabled: true
+  proxyName: proxy1
+  clientApiHost: "192.168.0.156"   # ser8 node IP, override in values-local.yaml
+  clientApiPort: 6021
+  managerApiHost: "192.168.0.156"
+  managerApiPort: 6022
+  # MUST match `storageProxy.managerSecret` in values-storage-proxy-local.yaml.
+  managerSecret: "CHANGE-ME-STORAGE-MANAGER-SECRET"
+  sslVerify: false
+  # Volumes exposed on the default_host. Order matters — the first volume's
+  # `proxyName:name` string is used as `volumes.default_host`.
+  volumes:
+    - name: volume1
+      # Publicly advertised capabilities of this volume. Manager filters
+      # proxies by these when a client asks for a folder with specific needs.
+      backend: vfs
+
+schemaMigrate:
+  enabled: true
+
+fixture:
+  enabled: true

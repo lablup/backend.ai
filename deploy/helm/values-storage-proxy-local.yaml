@@ -1,0 +1,41 @@
+## Storage Proxy local-cluster overrides.
+## Usage:
+##   helm install bai-sp deploy/helm/backend-ai-storage-proxy \
+##     -n backend-ai --create-namespace \
+##     -f deploy/helm/values-storage-proxy-local.yaml
+
+image:
+  repository: 192.168.0.156:5000/backend.ai-storage-proxy
+  tag: dev
+  pullPolicy: IfNotPresent
+
+storageProxy:
+  proxyName: proxy1
+  nodeId: storage-proxy-1
+
+  # MUST match `storageProxy.managerSecret` in deploy/helm/values-local.yaml
+  # (consumed by the manager etcd-seed Job). Duplication is intentional for
+  # the lab; in production this secret belongs in an external secret store.
+  managerSecret: "local-dev-storage-manager-secret"
+  jwtSecret: "local-dev-storage-jwt"
+
+  etcd:
+    # bai-etcd Service DNS created by the manager chart (release name `bai`,
+    # namespace backend-ai). hostNetwork Pods still resolve this because we
+    # set dnsPolicy=ClusterFirstWithHostNet in the Deployment template.
+    host: bai-etcd.backend-ai.svc.cluster.local
+    port: 2379
+    namespace: local
+
+  nodeSelector:
+    kubernetes.io/hostname: ser8
+  tolerations:
+    - key: backendai.io/dedicated
+      operator: Equal
+      value: swarm-manager
+      effect: NoSchedule
+
+  volumes:
+    volume1:
+      backend: vfs
+      subpath: volume1

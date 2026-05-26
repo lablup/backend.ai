@@ -1,0 +1,75 @@
+{{- if .Values.fixture.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "bai-manager.fullname" . }}-fixture-populate
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "bai-manager.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: fixture-populate
+    spec:
+      restartPolicy: OnFailure
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: render-config
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              for f in manager.toml alembic.ini; do
+                sed -e "s|__POSTGRES_PASSWORD__|$POSTGRES_PASSWORD|g" \
+                    -e "s|__REDIS_PASSWORD__|$REDIS_PASSWORD|g" \
+                    -e "s|__MANAGER_SECRET__|$MANAGER_SECRET|g" \
+                    /config-in/$f > /config-out/$f
+              done
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "bai-manager.fullname" . }}-secrets, key: postgres-password } }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "bai-manager.fullname" . }}-secrets, key: redis-password } }
+            - name: MANAGER_SECRET
+              valueFrom: { secretKeyRef: { name: {{ include "bai-manager.fullname" . }}-secrets, key: manager-secret } }
+          volumeMounts:
+            - { name: config-template, mountPath: /config-in }
+            - { name: config-rendered, mountPath: /config-out }
+      containers:
+        - name: populate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              for f in /fixture/*.json; do
+                echo "populating $f"
+                backend.ai mgr --config /etc/backend.ai/manager.toml fixture populate "$f"
+              done
+          volumeMounts:
+            - name: config-rendered
+              mountPath: /etc/backend.ai
+              readOnly: true
+            - name: fixture
+              mountPath: /fixture
+              readOnly: true
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ include "bai-manager.fullname" . }}-config
+        - name: config-rendered
+          emptyDir: {}
+        - name: fixture
+          configMap:
+            name: {{ include "bai-manager.fullname" . }}-fixture
+{{- end }}

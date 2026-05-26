@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bai-appproxy-worker.fullname" . }}
+  labels:
+    {{- include "bai-appproxy-worker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bai-appproxy-worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bai-appproxy-worker.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-worker-toml.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- if .Values.worker.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: ser8
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: render-config
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              sed -e "s|__REDIS_PASSWORD__|$REDIS_PASSWORD|g" \
+                  -e "s|__JWT_SECRET__|$JWT_SECRET|g" \
+                  -e "s|__API_TOKEN__|$API_TOKEN|g" \
+                  /config-in/worker.toml > /config-out/worker.toml
+          env:
+            - { name: REDIS_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-worker.fullname" . }}-secrets, key: redis-password } } }
+            - { name: JWT_SECRET,     valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-worker.fullname" . }}-secrets, key: jwt-secret } } }
+            - { name: API_TOKEN,      valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-worker.fullname" . }}-secrets, key: api-token } } }
+          volumeMounts:
+            - { name: config-template, mountPath: /config-in }
+            - { name: config-rendered, mountPath: /config-out }
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/bin/tini", "--", "backend.ai"]
+          args:
+            - app-proxy-worker
+            - start-server
+            - --config-path
+            - /etc/backend.ai/worker.toml
+          ports:
+            - name: api
+              containerPort: {{ .Values.worker.bindPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: config-rendered
+              mountPath: /etc/backend.ai
+              readOnly: true
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ include "bai-appproxy-worker.fullname" . }}-config
+        - name: config-rendered
+          emptyDir: {}
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}

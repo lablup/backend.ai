@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bai-appproxy-coordinator.fullname" . }}
+  labels:
+    {{- include "bai-appproxy-coordinator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.coordinator.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bai-appproxy-coordinator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bai-appproxy-coordinator.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-coordinator-toml.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: render-config
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              sed -e "s|__POSTGRES_PASSWORD__|$POSTGRES_PASSWORD|g" \
+                  -e "s|__REDIS_PASSWORD__|$REDIS_PASSWORD|g" \
+                  -e "s|__JWT_SECRET__|$JWT_SECRET|g" \
+                  -e "s|__API_TOKEN__|$API_TOKEN|g" \
+                  /config-in/coordinator.toml > /config-out/coordinator.toml
+          env:
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-coordinator.fullname" . }}-secrets, key: postgres-password } } }
+            - { name: REDIS_PASSWORD,    valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-coordinator.fullname" . }}-secrets, key: redis-password } } }
+            - { name: JWT_SECRET,        valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-coordinator.fullname" . }}-secrets, key: jwt-secret } } }
+            - { name: API_TOKEN,         valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-coordinator.fullname" . }}-secrets, key: api-token } } }
+          volumeMounts:
+            - { name: config-template, mountPath: /config-in }
+            - { name: config-rendered, mountPath: /config-out }
+      containers:
+        - name: coordinator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/bin/tini", "--", "backend.ai"]
+          args:
+            - app-proxy-coordinator
+            - start-server
+            - --config-path
+            - /etc/backend.ai/coordinator.toml
+          ports:
+            - name: api
+              containerPort: {{ .Values.coordinator.bindPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: config-rendered
+              mountPath: /etc/backend.ai
+              readOnly: true
+          resources:
+            {{- toYaml .Values.coordinator.resources | nindent 12 }}
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ include "bai-appproxy-coordinator.fullname" . }}-config
+        - name: config-rendered
+          emptyDir: {}
+      {{- with .Values.coordinator.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.coordinator.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

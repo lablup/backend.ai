@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bai-webserver.fullname" . }}
+  labels:
+    {{- include "bai-webserver.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.webserver.service.type }}
+  selector:
+    {{- include "bai-webserver.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.webserver.service.port }}
+      targetPort: {{ .Values.webserver.bindPort }}
+      {{- if and (eq .Values.webserver.service.type "NodePort") .Values.webserver.service.nodePort }}
+      nodePort: {{ .Values.webserver.service.nodePort }}
+      {{- end }}
+      protocol: TCP

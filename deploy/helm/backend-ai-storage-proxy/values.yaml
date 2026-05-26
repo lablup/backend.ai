@@ -1,0 +1,83 @@
+## Backend.AI Storage Proxy Helm values (lab dev: single replica, hostNetwork).
+
+image:
+  repository: 192.168.0.156:5000/backend.ai-storage-proxy
+  tag: dev
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+storageProxy:
+  # Identifier published to etcd — must be unique across proxies registered
+  # under /sorna/<ns>/volumes/proxies/. Manager references this via the
+  # `proxy:volume` host string (see StorageSessionManager.parse_host).
+  nodeId: "storage-proxy-1"
+  # Proxy name used as the etcd registration key (volumes/proxies/<name>).
+  proxyName: "proxy1"
+
+  num_proc: 1
+
+  # JWT signing key for upload/download session tokens issued by the client
+  # API. Internal to the storage-proxy; not shared with manager.
+  jwtSecret: "CHANGE-ME-STORAGE-JWT"
+
+  # Shared secret between storage-proxy and manager on the manager-facing
+  # API. MUST match the value manager writes to etcd under
+  # `volumes/proxies/<proxy_name>/secret` — otherwise manager calls are
+  # rejected with 401 at the token-auth middleware.
+  managerSecret: "CHANGE-ME-STORAGE-MANAGER-SECRET"
+
+  # Etcd the storage-proxy reads global config from. Defaults to the in-cluster
+  # etcd installed by the backend-ai-manager chart. hostNetwork Pods still
+  # resolve this via ClusterFirstWithHostNet dnsPolicy.
+  etcd:
+    host: bai-etcd.backend-ai.svc.cluster.local
+    port: 2379
+    namespace: local
+
+  # API bind ports on the host (hostNetwork=true). Client API must be reachable
+  # from user machines and kernel containers; manager API is consumed by the
+  # manager Pod (which runs on the same node in this lab).
+  ports:
+    clientApi: 6021
+    managerApi: 6022
+    internal: 16023
+
+  # Host path where the NFS share is mounted (pre-mounted via /etc/fstab on
+  # every node — see docs/reports/todo.md §6.3). Storage-proxy mkdir's volume
+  # subdirectories under `{vfroot}/{volumes.<name>.subpath}`.
+  hostPaths:
+    vfroot: /vfroot
+
+  # Volumes exposed by this storage-proxy. Each key becomes the volume name in
+  # `{proxy_name}:{volume_name}`; `subpath` is the directory under vfroot that
+  # backs the volume.
+  volumes:
+    volume1:
+      backend: vfs
+      subpath: volume1
+
+  # Pin to the node that runs the NFS container + holds /vfroot. Changing
+  # nodes later requires storage-proxy to see the same NFS mount.
+  nodeSelector:
+    kubernetes.io/hostname: ser8
+  tolerations:
+    - key: backendai.io/dedicated
+      operator: Equal
+      value: swarm-manager
+      effect: NoSchedule
+  affinity: {}
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+  # Manager-facing announce URL. Emitted back in error reports/logs; does not
+  # affect reachability. Defaults to the hostNetwork bind.
+  announceHost: ""   # empty → use Pod's node IP at runtime
+
+  podAnnotations: {}

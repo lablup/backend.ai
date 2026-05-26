@@ -1,0 +1,42 @@
+## Backend.AI AppProxy Coordinator Helm values.
+
+image:
+  repository: 192.168.0.156:5000/backend.ai-appproxy
+  tag: dev
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+coordinator:
+  service:
+    type: NodePort
+    apiPort: 10200
+    nodePort: 30200
+  bindPort: 10200
+  advertisedHost: "192.168.0.156"
+  advertisedPort: 30201
+
+  # Reuse manager's PG/Redis. Coordinator writes its own tables (alembic-managed).
+  db:
+    host: bai-postgres
+    port: 5432
+    user: backendai
+    name: appproxy
+    # postgres password supplied via secret (same as manager's)
+  redis:
+    host: bai-redis
+    port: 6379
+    db: 6
+  # Etcd shared with manager
+  etcd:
+    host: bai-etcd
+    port: 2379
+    namespace: local
+
+  jwtSecret: "CHANGE-ME-APPPROXY-COORDINATOR-JWT"
+  apiToken: "CHANGE-ME-COORDINATOR-API-TOKEN"
+
+  replicaCount: 1
+  resources: {}
+  nodeSelector: {}
+  affinity: {}

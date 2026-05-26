@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-appproxy-coordinator.fullname" . }}-config
+  labels:
+    {{- include "bai-appproxy-coordinator.labels" . | nindent 4 }}
+data:
+  coordinator.toml: |
+    [db]
+    type = "postgresql"
+    addr = { host = "{{ .Values.coordinator.db.host }}", port = {{ .Values.coordinator.db.port }} }
+    name = "{{ .Values.coordinator.db.name }}"
+    user = "{{ .Values.coordinator.db.user }}"
+    password = "__POSTGRES_PASSWORD__"
+
+    [redis]
+    addr = { host = "{{ .Values.coordinator.redis.host }}", port = {{ .Values.coordinator.redis.port }} }
+    password = "__REDIS_PASSWORD__"
+
+    [proxy_coordinator]
+    bind_addr = { host = "0.0.0.0", port = {{ .Values.coordinator.bindPort }} }
+    advertised_addr = { host = "{{ .Values.coordinator.advertisedHost }}", port = {{ default .Values.coordinator.bindPort .Values.coordinator.advertisedPort }} }
+    announce_addr = { host = "{{ .Values.coordinator.advertisedHost }}", port = {{ default .Values.coordinator.bindPort .Values.coordinator.advertisedPort }} }
+    aiomonitor_termui_port = 48500
+    aiomonitor_webui_port = 49500
+    metric_access_allowed_hosts = "0.0.0.0/0"
+    use_experimental_redis_event_dispatcher = false
+    allow_unauthorized_configure_request = true
+
+    [secrets]
+    jwt_secret = "__JWT_SECRET__"
+    api_secret = "__API_TOKEN__"
+
+    [permit_hash]
+    secret = "__JWT_SECRET__"
+
+    [etcd]
+    addr = { host = "{{ .Values.coordinator.etcd.host }}", port = {{ .Values.coordinator.etcd.port }} }
+    namespace = "{{ .Values.coordinator.etcd.namespace }}"
+
+    [logging]
+    level = "INFO"
+    drivers = ["console"]
+
+    [logging.console]
+    colored = true
+    format = "verbose"
+
+    [logging.pkg-ns]
+    "ai.backend" = "INFO"
+    "aiohttp" = "INFO"
+
+    [debug]
+    enabled = false

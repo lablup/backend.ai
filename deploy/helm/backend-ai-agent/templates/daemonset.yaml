@@ -1,0 +1,160 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "bai-agent.fullname" . }}
+  labels:
+    {{- include "bai-agent.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "bai-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bai-agent.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-agent-toml.yaml") . | sha256sum }}
+    spec:
+      hostNetwork: {{ .Values.agent.hostNetwork }}
+      hostPID: {{ .Values.agent.hostPID }}
+      dnsPolicy: {{ if .Values.agent.hostNetwork }}ClusterFirstWithHostNet{{ else }}ClusterFirst{{ end }}
+      {{- if .Values.agent.gpu.enabled }}
+      runtimeClassName: {{ .Values.agent.gpu.runtimeClassName }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: render-config
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              sed -e "s|__NODE_IP__|$NODE_IP|g" \
+                  /config-in/agent.toml > /config-out/agent.toml
+          env:
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          volumeMounts:
+            - { name: config-template, mountPath: /config-in }
+            - { name: config-rendered, mountPath: /config-out }
+        - name: stage-krunner
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Copy runner/kernel/helpers from the agent image's site-packages to
+          # the host-backed krunner dir. The agent's resolver uses
+          # `files("ai.backend.runner").joinpath("../" + rel)` which touches
+          # these three sibling packages, so staging all three covers every
+          # bind source the agent will ask dockerd to open.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              SRC=/opt/backend.ai/venv/lib/python3.13/site-packages/ai/backend
+              DST=/krunner/ai/backend
+              mkdir -p "$DST"
+              for pkg in runner kernel helpers krunner; do
+                rm -rf "$DST/$pkg"
+                cp -a "$SRC/$pkg" "$DST/$pkg"
+              done
+              # Keep ai/ and ai/backend/ as PEP 420 namespace directories
+              # (no __init__.py) so Python merges this staged location with
+              # the venv's ai.backend.* packages at runtime.
+          volumeMounts:
+            - name: krunner
+              mountPath: /krunner
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - ag
+            - start-server
+            - --config
+            - /etc/backend.ai/agent.toml
+          securityContext:
+            privileged: {{ .Values.agent.privileged }}
+          env:
+            - name: NODE_IP
+              valueFrom: { fieldRef: { fieldPath: status.hostIP } }
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+            # Prepend the host-staged copy of ai.backend.{runner,kernel,helpers}
+            # to sys.path. `files("ai.backend.runner")` resolves there, so the
+            # bind-mount sources the agent hands to dockerd point at paths the
+            # host kernel can actually open.
+            - name: PYTHONPATH
+              value: "{{ .Values.agent.hostPaths.krunner }}"
+            {{- if .Values.agent.gpu.enabled }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "{{ .Values.agent.gpu.visibleDevices }}"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "{{ .Values.agent.gpu.driverCapabilities }}"
+            - name: LD_LIBRARY_PATH
+              value: "{{ .Values.agent.gpu.hostCudaPath }}/lib64:{{ .Values.agent.gpu.hostCudaPath }}/targets/x86_64-linux/lib"
+            {{- end }}
+          volumeMounts:
+            - name: config-rendered
+              mountPath: /etc/backend.ai
+              readOnly: true
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+            - name: var-lib
+              mountPath: {{ .Values.agent.hostPaths.varLib }}
+            - name: scratch
+              mountPath: {{ .Values.agent.hostPaths.scratchRoot }}
+            - name: ipc
+              mountPath: {{ .Values.agent.hostPaths.ipc }}
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+            - name: krunner
+              mountPath: {{ .Values.agent.hostPaths.krunner }}
+            {{- if .Values.agent.gpu.enabled }}
+            - name: host-cuda
+              mountPath: {{ .Values.agent.gpu.hostCudaPath }}
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ include "bai-agent.fullname" . }}-config
+        - name: config-rendered
+          emptyDir: {}
+        - name: docker-socket
+          hostPath: { path: {{ .Values.agent.hostPaths.dockerSocket }}, type: Socket }
+        - name: var-lib
+          hostPath: { path: {{ .Values.agent.hostPaths.varLib }}, type: DirectoryOrCreate }
+        - name: scratch
+          hostPath: { path: {{ .Values.agent.hostPaths.scratchRoot }}, type: DirectoryOrCreate }
+        - name: ipc
+          hostPath: { path: {{ .Values.agent.hostPaths.ipc }}, type: DirectoryOrCreate }
+        - name: proc
+          hostPath: { path: /proc }
+        - name: sys
+          hostPath: { path: /sys }
+        - name: krunner
+          hostPath: { path: {{ .Values.agent.hostPaths.krunner }}, type: DirectoryOrCreate }
+        {{- if .Values.agent.gpu.enabled }}
+        - name: host-cuda
+          hostPath: { path: {{ .Values.agent.gpu.hostCudaPath }}, type: Directory }
+        {{- end }}

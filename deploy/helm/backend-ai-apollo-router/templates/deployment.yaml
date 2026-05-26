@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bai-apollo-router.fullname" . }}
+  labels:
+    {{- include "bai-apollo-router.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.router.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bai-apollo-router.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bai-apollo-router.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/supergraph: {{ include (print $.Template.BasePath "/configmap-supergraph.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-router-yaml.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: router
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config
+            - /etc/router/router.yaml
+            - --supergraph
+            - /etc/router/supergraph.graphql
+            - --dev
+          ports:
+            - name: graphql
+              containerPort: {{ .Values.router.bindPort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: graphql
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: graphql
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: supergraph
+              mountPath: /etc/router/supergraph.graphql
+              subPath: supergraph.graphql
+              readOnly: true
+            - name: router-config
+              mountPath: /etc/router/router.yaml
+              subPath: router.yaml
+              readOnly: true
+          resources:
+            {{- toYaml .Values.router.resources | nindent 12 }}
+      volumes:
+        - name: supergraph
+          configMap:
+            name: {{ include "bai-apollo-router.fullname" . }}-supergraph
+        - name: router-config
+          configMap:
+            name: {{ include "bai-apollo-router.fullname" . }}-config
+      {{- with .Values.router.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.router.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.router.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,20 @@
+## Override for the GPU agent release.
+## Pins to nodes labeled `accelerator=gpu` and enables nvidia-container-runtime.
+##
+## Usage:
+##   helm upgrade --install bai-agent-gpu deploy/helm/backend-ai-agent \
+##     -n backend-ai -f deploy/helm/values-agent-gpu.yaml
+
+image:
+  repository: 192.168.0.156:5000/backend.ai-agent
+  tag: dev
+  pullPolicy: IfNotPresent
+
+agent:
+  gpu:
+    enabled: true
+    runtimeClassName: nvidia
+    visibleDevices: all
+    driverCapabilities: compute,utility
+  nodeSelector:
+    accelerator: gpu

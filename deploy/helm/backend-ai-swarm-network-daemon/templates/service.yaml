@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bai-swarm-net.fullname" . }}
+  labels:
+    {{- include "bai-swarm-net.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.daemon.service.type }}
+  selector:
+    {{- include "bai-swarm-net.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.daemon.service.port }}
+      targetPort: {{ .Values.daemon.bindPort }}
+      protocol: TCP

@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-agent.fullname" . }}-config
+  labels:
+    {{- include "bai-agent.labels" . | nindent 4 }}
+data:
+  agent.toml: |
+    [etcd]
+    namespace = {{ .Values.agent.etcd.namespace | quote }}
+    addr = { host = "{{ .Values.agent.etcd.host }}", port = {{ .Values.agent.etcd.port }} }
+
+    [agent]
+    mode = "docker"
+    backend = "docker"
+    scaling-group = {{ .Values.agent.scalingGroup | quote }}
+    # With hostNetwork=true the pod shares the node's network namespace, so
+    # binding rpc-listen-addr directly to the node IP both opens the port on
+    # the host and publishes a routable address to etcd (agent server.py
+    # writes `rpc_listen_addr.host` to `nodes/agents/{id}/ip`).
+    rpc-listen-addr = { host = "__NODE_IP__", port = {{ .Values.agent.rpcPort }} }
+    agent-sock-port = {{ .Values.agent.agentSockPort }}
+    ipc-base-path = {{ .Values.agent.hostPaths.ipc | quote }}
+    var-base-path = {{ .Values.agent.hostPaths.varLib | quote }}
+
+    [container]
+    scratch-type = "hostdir"
+    scratch-root = {{ .Values.agent.hostPaths.scratchRoot | quote }}
+    port-range = [{{ index .Values.agent.containerPortRange 0 }}, {{ index .Values.agent.containerPortRange 1 }}]
+    bind-host = "0.0.0.0"
+    kernel-uid = -1
+    kernel-gid = -1
+
+    [resource]
+    reserved-cpu = {{ .Values.agent.reserved.cpu }}
+    reserved-mem = {{ .Values.agent.reserved.memory | quote }}
+    reserved-disk = {{ .Values.agent.reserved.disk | quote }}
+    allocation-mode = "auto-split"
+
+    [kernel-lifecycles]
+    init-polling-attempt = {{ .Values.agent.kernelLifecycles.initPollingAttempt }}
+    init-polling-timeout-sec = {{ .Values.agent.kernelLifecycles.initPollingTimeoutSec }}
+    init-timeout-sec = {{ .Values.agent.kernelLifecycles.initTimeoutSec }}
+
+    [logging]
+    level = "INFO"
+    drivers = ["console"]
+
+    [logging.console]
+    colored = false
+    format = "verbose"

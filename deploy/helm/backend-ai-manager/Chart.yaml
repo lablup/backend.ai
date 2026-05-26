@@ -1,0 +1,6 @@
+apiVersion: v2
+name: backend-ai-manager
+description: Backend.AI Manager with single-replica dependencies (PostgreSQL, Redis, etcd) for development.
+type: application
+version: 0.2.0
+appVersion: "26.4.0"

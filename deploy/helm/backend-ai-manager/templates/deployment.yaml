@@ -1,0 +1,193 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bai-manager.fullname" . }}
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.manager.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bai-manager.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bai-manager.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-manager-toml.yaml") . | sha256sum }}
+        {{- with .Values.manager.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.manager.dockerGid }}
+      securityContext:
+        supplementalGroups: [{{ .Values.manager.dockerGid }}]
+      {{- end }}
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "bai-manager.postgresHost" . }} 5432; do
+                echo "waiting for postgres..."; sleep 3;
+              done
+        - name: wait-for-redis
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "bai-manager.redisHost" . }} 6379; do
+                echo "waiting for redis..."; sleep 3;
+              done
+        - name: wait-for-etcd
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "bai-manager.etcdHost" . }} 2379; do
+                echo "waiting for etcd..."; sleep 3;
+              done
+        - name: wait-for-schema
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bai-manager.fullname" . }}-secrets
+                  key: postgres-password
+          command:
+            - sh
+            - -c
+            - |
+              # Wait until the `alembic_version` table exists — the schema
+              # migration Job creates it. Falls back on psycopg since psql is
+              # not shipped in the manager image.
+              python - <<'PY'
+              import os, time, asyncio, asyncpg
+              async def check():
+                  conn = await asyncpg.connect(
+                      host="{{ include "bai-manager.postgresHost" . }}", port=5432,
+                      database="{{ .Values.postgres.database }}",
+                      user="{{ .Values.postgres.username }}",
+                      password=os.environ["PGPASSWORD"])
+                  try:
+                      row = await conn.fetchrow("SELECT to_regclass('public.alembic_version') AS t")
+                      return row["t"] is not None
+                  finally:
+                      await conn.close()
+              while True:
+                  try:
+                      if asyncio.run(check()):
+                          print("schema ready"); break
+                  except Exception as e:
+                      print(f"waiting for schema: {e}")
+                  time.sleep(3)
+              PY
+        - name: render-config
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              for f in manager.toml alembic.ini; do
+                sed \
+                  -e "s|__POSTGRES_PASSWORD__|$POSTGRES_PASSWORD|g" \
+                  -e "s|__REDIS_PASSWORD__|$REDIS_PASSWORD|g" \
+                  -e "s|__MANAGER_SECRET__|$MANAGER_SECRET|g" \
+                  /config-in/$f > /config-out/$f
+              done
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "bai-manager.fullname" . }}-secrets, key: postgres-password } }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "bai-manager.fullname" . }}-secrets, key: redis-password } }
+            - name: MANAGER_SECRET
+              valueFrom: { secretKeyRef: { name: {{ include "bai-manager.fullname" . }}-secrets, key: manager-secret } }
+          volumeMounts:
+            - { name: config-template, mountPath: /config-in }
+            - { name: config-rendered, mountPath: /config-out }
+        - name: gen-rpc-keypair
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              mkdir -p /var/lib/backend.ai/keys
+              if [ ! -f /var/lib/backend.ai/keys/manager.key_secret ]; then
+                backend.ai mgr generate-rpc-keypair /var/lib/backend.ai/keys manager
+              fi
+              echo "---keys dir---"
+              ls -la /var/lib/backend.ai/keys/
+              echo "---secret file---"
+              cat /var/lib/backend.ai/keys/manager.key_secret || true
+          volumeMounts:
+            - name: keys
+              mountPath: /var/lib/backend.ai/keys
+      containers:
+        - name: manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - mgr
+            - start-server
+            - --config
+            - /etc/backend.ai/manager.toml
+          ports:
+            - name: http
+              containerPort: {{ .Values.manager.bindPort }}
+          {{- with .Values.manager.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config-rendered
+              mountPath: /etc/backend.ai
+              readOnly: true
+            - name: keys
+              mountPath: /var/lib/backend.ai/keys
+              readOnly: true
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.manager.bindPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.manager.bindPort }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ include "bai-manager.fullname" . }}-config
+        - name: config-rendered
+          emptyDir: {}
+        - name: keys
+          emptyDir: {}
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+      {{- with .Values.manager.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.manager.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.manager.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

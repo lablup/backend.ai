@@ -1,0 +1,214 @@
+## Single-replica dependencies (etcd, postgres, redis).
+## All three are plain StatefulSets with one PVC each — enough for dev/smoke.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-etcd
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: etcd
+spec:
+  clusterIP: None
+  ports:
+    - name: client
+      port: 2379
+    - name: peer
+      port: 2380
+  selector:
+    app.kubernetes.io/component: etcd
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-etcd
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: etcd
+spec:
+  serviceName: {{ .Release.Name }}-etcd
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: etcd
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: etcd
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: etcd
+          image: {{ .Values.etcd.image }}
+          command:
+            - etcd
+            - --name=etcd0
+            - --data-dir=/var/lib/etcd
+            - --listen-client-urls=http://0.0.0.0:2379
+            - --advertise-client-urls=http://$(POD_IP):2379
+            - --listen-peer-urls=http://0.0.0.0:2380
+          env:
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+          ports:
+            - { name: client, containerPort: 2379 }
+            - { name: peer,   containerPort: 2380 }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/etcd }
+          readinessProbe:
+            tcpSocket: { port: 2379 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- with .Values.etcd.storage.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.etcd.storage.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-postgres
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  ports:
+    - { name: postgres, port: 5432, targetPort: 5432 }
+  selector:
+    app.kubernetes.io/component: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-postgres
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ .Release.Name }}-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: postgres
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: postgres
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.username | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bai-manager.fullname" . }}-secrets
+                  key: postgres-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+          readinessProbe:
+            exec:
+              command: [ "pg_isready", "-U", "{{ .Values.postgres.username }}", "-d", "{{ .Values.postgres.database }}" ]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- with .Values.postgres.storage.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redis
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  ports:
+    - { name: redis, port: 6379, targetPort: 6379 }
+  selector:
+    app.kubernetes.io/component: redis
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-redis
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  serviceName: {{ .Release.Name }}-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: redis
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: redis
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          command:
+            - redis-server
+            - --requirepass
+            - $(REDIS_PASSWORD)
+            - --dir
+            - /data
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bai-manager.fullname" . }}-secrets
+                  key: redis-password
+          ports:
+            - { name: redis, containerPort: 6379 }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          readinessProbe:
+            exec:
+              command: [ "sh", "-c", "redis-cli -a \"$REDIS_PASSWORD\" ping | grep PONG" ]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- with .Values.redis.storage.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.redis.storage.size }}

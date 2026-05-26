@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-webserver.fullname" . }}-config
+  labels:
+    {{- include "bai-webserver.labels" . | nindent 4 }}
+data:
+  webserver.conf: |
+    [service]
+    ip = "{{ .Values.webserver.bindIP }}"
+    port = {{ .Values.webserver.bindPort }}
+    wsproxy.url = ""
+    mode = "{{ .Values.webserver.mode }}"
+    enable_signup = false
+    allow_anonymous_change_password = false
+    allow_project_resource_monitor = false
+    allow_change_signin_mode = false
+    allow_manual_image_name_for_session = false
+    allow_signup_without_confirmation = false
+    always_enqueue_compute_session = false
+    webui_debug = false
+    mask_user_info = false
+
+    [resources]
+    open_port_to_public = true
+    allow_preferred_port = true
+
+    [environments]
+    # Free-form; client receives via /func/environments
+    show = "python,ngc"
+
+    [api]
+    endpoint = "{{ .Values.webserver.apiEndpoint }}"
+    health_check_probe_path = "/"
+
+    [apollo_router]
+    enabled = true
+    endpoint = "http://bai-router-backend-ai-apollo-router.backend-ai.svc.cluster.local:4000"
+    health_check_probe_path = "/health"
+
+    [session]
+    secret = "__SESSION_SECRET__"
+    login_session_extension_sec = 3600
+    max_age = 604800
+    flush_on_startup = false
+    login_block_time = 1200
+    login_allowed_fail_count = 10
+    auto_logout = false
+    max_count_for_preopen_ports = 10
+
+    [session.redis]
+    addr = "bai-redis:6379"
+    password = "__REDIS_PASSWORD__"
+    db = 5
+
+    [session.redis.redis_helper_config]
+    socket_timeout = 5
+    socket_connect_timeout = 2
+    reconnect_poll_timeout = 0.3
+
+    [webserver]
+    static_dir = "ai/backend/web/static"
+
+    [logging]
+    level = "INFO"
+    drivers = ["console"]
+
+    [logging.console]
+    colored = true
+    format = "verbose"
+
+    [logging.pkg-ns]
+    "ai.backend" = "INFO"
+    "aiohttp" = "INFO"
+
+    [debug]
+    enabled = false

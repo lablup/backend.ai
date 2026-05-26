@@ -1,0 +1,45 @@
+{{- if .Values.etcdSeed.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-manager.fullname" . }}-etcd-seed
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+data:
+  etcd-seed.json: |-
+{{- $seed := .Values.etcdSeed.config | deepCopy }}
+{{/*
+  The agent reads this block from etcd and only supports the `addr` form.
+  Bitnami redis in sentinel mode exposes a Service whose endpoints track the
+  current master (sentinel sidecar relabels pods on failover), so pointing
+  there by Service DNS gives failover semantics with a simple standalone URL.
+*/}}
+{{- $_ := set $seed "redis" (dict
+    "addr" (printf "%s:6379" (include "bai-manager.redisHost" .))
+    "password" .Values.redis.password) }}
+    {{- toJson $seed | nindent 4 }}
+{{- if .Values.storageProxy.enabled }}
+{{/*
+  Storage-proxy registration written under the `volumes/` prefix via a second
+  `mgr etcd put-json volumes /seed/volumes-seed.json` invocation in the Job
+  below. Manager reads these at startup (StorageSessionManager) to build its
+  proxy list. Keys under `volumes/proxies/<name>/{client_api, manager_api,
+  secret, ssl_verify}` match the VolumeProxyConfig schema — any deviation
+  causes `StorageProxyNotFound` at folder-op time.
+*/}}
+{{- $firstVolume := index .Values.storageProxy.volumes 0 }}
+{{- $volumesSeed := dict
+    "default_host" (printf "%s:%s" .Values.storageProxy.proxyName $firstVolume.name)
+    "proxies" (dict
+        .Values.storageProxy.proxyName (dict
+            "client_api" (printf "http://%s:%v" .Values.storageProxy.clientApiHost .Values.storageProxy.clientApiPort)
+            "manager_api" (printf "http://%s:%v" .Values.storageProxy.managerApiHost .Values.storageProxy.managerApiPort)
+            "secret" .Values.storageProxy.managerSecret
+            "ssl_verify" (ternary "true" "false" .Values.storageProxy.sslVerify)
+        )
+    )
+}}
+  volumes-seed.json: |-
+    {{- toJson $volumesSeed | nindent 4 }}
+{{- end }}
+{{- end }}

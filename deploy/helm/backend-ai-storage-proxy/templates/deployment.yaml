@@ -1,0 +1,154 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bai-storage-proxy.fullname" . }}
+  labels:
+    {{- include "bai-storage-proxy.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    # Two replicas would race on the same /vfroot subtree and JWT-signing key
+    # state; force Recreate so we never have overlapping instances during
+    # rollout.
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "bai-storage-proxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bai-storage-proxy.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-storage-proxy-toml.yaml") . | sha256sum }}
+        {{- with .Values.storageProxy.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      hostNetwork: true
+      # hostNetwork Pods use the host's /etc/resolv.conf by default, which
+      # does NOT include the cluster DNS (kube-dns/CoreDNS). The storage-proxy
+      # needs to resolve `bai-etcd.backend-ai.svc.cluster.local` for the etcd
+      # client bootstrap, so switch to ClusterFirstWithHostNet — kubelet
+      # injects the cluster DNS ahead of the node's resolvers.
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.storageProxy.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.storageProxy.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.storageProxy.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-etcd
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ .Values.storageProxy.etcd.host }} {{ .Values.storageProxy.etcd.port }}; do
+                echo "waiting for etcd..."; sleep 3;
+              done
+        - name: render-config
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              sed \
+                -e "s|__JWT_SECRET__|$JWT_SECRET|g" \
+                -e "s|__MANAGER_SECRET__|$MANAGER_SECRET|g" \
+                /config-in/storage-proxy.toml > /config-out/storage-proxy.toml
+          env:
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ include "bai-storage-proxy.fullname" . }}-secrets, key: jwt-secret } }
+            - name: MANAGER_SECRET
+              valueFrom: { secretKeyRef: { name: {{ include "bai-storage-proxy.fullname" . }}-secrets, key: manager-secret } }
+          volumeMounts:
+            - { name: config-template, mountPath: /config-in }
+            - { name: config-rendered, mountPath: /config-out }
+        - name: ensure-volume-dirs
+          # Create the per-volume subdirectories under /vfroot (idempotent).
+          # Without this, storage-proxy's first create_folder() will fail
+          # because the volume path does not exist on the NFS share.
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              {{- range $name, $vol := .Values.storageProxy.volumes }}
+              mkdir -p "{{ $.Values.storageProxy.hostPaths.vfroot }}/{{ $vol.subpath }}"
+              {{- end }}
+              ls -la {{ .Values.storageProxy.hostPaths.vfroot }}
+          volumeMounts:
+            - name: vfroot
+              mountPath: {{ .Values.storageProxy.hostPaths.vfroot }}
+              mountPropagation: HostToContainer
+      containers:
+        - name: storage-proxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - storage
+            - start-server
+            - --config
+            - /etc/backend.ai/storage-proxy.toml
+          env:
+            # Force the prometheus_client multiprocess directory to an
+            # absolute path under an emptyDir. Default
+            # `./run/prometheus/<component>` is relative to CWD, and child
+            # workers spawned by aiotools inherit the env var as-is, so
+            # resolution can drift between parent and worker and fail with
+            # FileNotFoundError on the metric .db files.
+            - name: BACKENDAI_PROMETHEUS_DIR
+              value: /tmp/backend.ai/prometheus
+          ports:
+            - { name: client-api,  containerPort: {{ .Values.storageProxy.ports.clientApi }},  hostPort: {{ .Values.storageProxy.ports.clientApi }} }
+            - { name: manager-api, containerPort: {{ .Values.storageProxy.ports.managerApi }}, hostPort: {{ .Values.storageProxy.ports.managerApi }} }
+            - { name: internal,    containerPort: {{ .Values.storageProxy.ports.internal }},   hostPort: {{ .Values.storageProxy.ports.internal }} }
+          volumeMounts:
+            - name: config-rendered
+              mountPath: /etc/backend.ai
+              readOnly: true
+            - name: vfroot
+              # HostToContainer is required: if the NFS mount on the host is
+              # (re)mounted after the Pod starts — e.g., the node reboots and
+              # systemd remounts /vfroot — the Pod would otherwise keep a
+              # stale view of the original (empty) directory. With propagation
+              # the container sees subsequent host mounts automatically.
+              mountPath: {{ .Values.storageProxy.hostPaths.vfroot }}
+              mountPropagation: HostToContainer
+            - name: ipc
+              mountPath: /tmp/backend.ai/ipc
+            - name: prometheus
+              mountPath: /tmp/backend.ai/prometheus
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.storageProxy.ports.managerApi }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.storageProxy.ports.managerApi }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.storageProxy.resources | nindent 12 }}
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ include "bai-storage-proxy.fullname" . }}-config
+        - name: config-rendered
+          emptyDir: {}
+        - name: vfroot
+          hostPath:
+            path: {{ .Values.storageProxy.hostPaths.vfroot }}
+            type: Directory
+        - name: ipc
+          emptyDir: {}
+        - name: prometheus
+          emptyDir: {}

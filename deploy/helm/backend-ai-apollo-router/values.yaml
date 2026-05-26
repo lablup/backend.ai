@@ -1,0 +1,23 @@
+## Apollo Router Helm values.
+
+image:
+  # Official Apollo Router image. Pin to a known-good tag.
+  repository: ghcr.io/apollographql/router
+  tag: v1.55.0
+  pullPolicy: IfNotPresent
+
+router:
+  service:
+    type: ClusterIP
+    port: 4000
+  bindPort: 4000
+
+  # ListenAddress is part of router config below. Replicas can scale horizontally.
+  replicaCount: 1
+
+  # Resources for the router container.
+  resources: {}
+
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []

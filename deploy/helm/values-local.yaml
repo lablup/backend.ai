@@ -1,0 +1,46 @@
+## Local cluster overrides.
+## Usage:
+##   helm install bai deploy/helm/backend-ai-manager \
+##     -n backend-ai --create-namespace \
+##     -f deploy/helm/values-local.yaml
+
+image:
+  repository: 192.168.0.156:5000/backend.ai-manager
+  tag: dev
+  pullPolicy: Always
+
+manager:
+  dockerGid: 984            # ser8: getent group docker
+  # Pin to any node carrying the swarm-manager label. With swarm HA (3+ nodes),
+  # this lets k8s reschedule the manager pod to a different swarm-manager node
+  # on failover. Today only ser8 carries the label.
+  nodeSelector:
+    backendai.io/dedicated: swarm-manager
+  tolerations:
+    - key: backendai.io/dedicated
+      operator: Equal
+      value: swarm-manager
+      effect: NoSchedule
+  secret: "local-dev-manager-secret"
+
+postgres:
+  password: "local-dev-postgres"
+
+redis:
+  password: "local-dev-redis"
+
+## Storage-proxy registration in etcd. `managerSecret` MUST match the value
+## in deploy/helm/values-storage-proxy-local.yaml — both files hand-mirror
+## the shared secret for the lab. Rotate in lockstep if you change either.
+storageProxy:
+  enabled: true
+  proxyName: proxy1
+  clientApiHost: "192.168.0.156"
+  clientApiPort: 6021
+  managerApiHost: "192.168.0.156"
+  managerApiPort: 6022
+  managerSecret: "local-dev-storage-manager-secret"
+  sslVerify: false
+  volumes:
+    - name: volume1
+      backend: vfs

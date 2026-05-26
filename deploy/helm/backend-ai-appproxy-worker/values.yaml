@@ -1,0 +1,39 @@
+## Backend.AI AppProxy Worker Helm values.
+
+image:
+  repository: 192.168.0.156:5000/backend.ai-appproxy
+  tag: dev
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+worker:
+  service:
+    type: ClusterIP
+    apiPort: 10201
+  bindPort: 10201
+  # Use hostNetwork so the bind_port_range (10205-10300) is reachable from
+  # outside the cluster at the node's IP, and the URL the UI receives works
+  # for browser fetch.
+  hostNetwork: true
+  advertisedHost: "192.168.0.156"
+
+  coordinatorEndpoint: "http://bai-appproxy-coordinator-backend-ai-appproxy-coordinator.backend-ai.svc.cluster.local:10200"
+
+  redis:
+    host: bai-redis
+    port: 6379
+    db: 7
+
+  apiToken: "CHANGE-ME-COORDINATOR-API-TOKEN"
+  jwtSecret: "CHANGE-ME-APPPROXY-COORDINATOR-JWT"
+
+  replicaCount: 1
+  resources: {}
+  nodeSelector: {}
+  affinity: {}
+  tolerations:
+    - key: backendai.io/dedicated
+      operator: Equal
+      value: swarm-manager
+      effect: NoSchedule

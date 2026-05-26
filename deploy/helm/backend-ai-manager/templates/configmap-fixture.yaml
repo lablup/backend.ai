@@ -1,0 +1,13 @@
+{{- if .Values.fixture.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-manager.fullname" . }}-fixture
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+data:
+  bootstrap.json: |
+{{ .Files.Get "files/bootstrap-fixture.json" | indent 4 }}
+  resource-slot-types.json: |
+{{ .Files.Get "files/resource-slot-types.json" | indent 4 }}
+{{- end }}

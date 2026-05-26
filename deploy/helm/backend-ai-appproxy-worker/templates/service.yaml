@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bai-appproxy-worker.fullname" . }}
+  labels:
+    {{- include "bai-appproxy-worker.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.worker.service.type }}
+  selector:
+    {{- include "bai-appproxy-worker.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: api
+      port: {{ .Values.worker.service.apiPort }}
+      targetPort: {{ .Values.worker.bindPort }}
+      protocol: TCP

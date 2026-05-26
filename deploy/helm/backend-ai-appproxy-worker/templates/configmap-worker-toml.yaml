@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-appproxy-worker.fullname" . }}-config
+  labels:
+    {{- include "bai-appproxy-worker.labels" . | nindent 4 }}
+data:
+  worker.toml: |
+    [redis]
+    addr = { host = "{{ .Values.worker.redis.host }}", port = {{ .Values.worker.redis.port }} }
+    password = "__REDIS_PASSWORD__"
+
+    [proxy_worker]
+    authority = "worker-1"
+    api_bind_addr = { host = "0.0.0.0", port = {{ .Values.worker.bindPort }} }
+    api_advertised_addr = { host = "{{ .Values.worker.advertisedHost }}", port = {{ .Values.worker.bindPort }} }
+    coordinator_endpoint = "{{ .Values.worker.coordinatorEndpoint }}"
+    verify_coordinator_ssl_certificate = false
+    aiomonitor_termui_port = 48600
+    aiomonitor_webui_port = 49600
+    heartbeat_period_sec = 10
+    frontend_mode = "port"
+    protocol = "http"
+    accepted_traffics = ["interactive", "inference"]
+
+    [proxy_worker.port_proxy]
+    bind_host = "0.0.0.0"
+    advertised_host = "192.168.0.156"
+    bind_port_range = [10301, 10400]
+
+    [secrets]
+    jwt_secret = "__JWT_SECRET__"
+    api_secret = "__API_TOKEN__"
+
+    [permit_hash]
+    secret = "__JWT_SECRET__"
+
+    [logging]
+    level = "INFO"
+    drivers = ["console"]
+
+    [logging.console]
+    colored = true
+    format = "verbose"
+
+    [logging.pkg-ns]
+    "ai.backend" = "INFO"
+    "aiohttp" = "INFO"
+
+    [debug]
+    enabled = false

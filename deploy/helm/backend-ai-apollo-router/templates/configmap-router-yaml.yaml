@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-apollo-router.fullname" . }}-config
+  labels:
+    {{- include "bai-apollo-router.labels" . | nindent 4 }}
+data:
+  router.yaml: |
+    supergraph:
+      listen: 0.0.0.0:{{ .Values.router.bindPort }}
+      path: /admin/gql
+      introspection: true
+    # CORS off on apollo router (webserver proxy already adds CORS).
+    health_check:
+      listen: 0.0.0.0:4000
+      path: /health
+      enabled: true
+    sandbox:
+      enabled: true
+    homepage:
+      enabled: false
+    headers:
+      all:
+        request:
+          - propagate:
+              matching: ".*"

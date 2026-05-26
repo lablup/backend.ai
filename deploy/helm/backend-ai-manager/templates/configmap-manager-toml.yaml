@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-manager.fullname" . }}-config
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+data:
+  alembic.ini: |
+    [alembic]
+    script_location = ai.backend.manager.models:alembic
+    sqlalchemy.url = postgresql+asyncpg://{{ .Values.postgres.username }}:__POSTGRES_PASSWORD__@{{ include "bai-manager.postgresHost" . }}:5432/{{ .Values.postgres.database }}
+
+    [loggers]
+    keys = root,sqlalchemy,alembic
+    [handlers]
+    keys = console
+    [formatters]
+    keys = generic
+    [logger_root]
+    level = WARN
+    handlers = console
+    qualname =
+    [logger_sqlalchemy]
+    level = WARN
+    handlers =
+    qualname = sqlalchemy.engine
+    [logger_alembic]
+    level = INFO
+    handlers =
+    qualname = alembic
+    [handler_console]
+    class = StreamHandler
+    args = (sys.stderr,)
+    level = NOTSET
+    formatter = generic
+    [formatter_generic]
+    format = %(levelname)-5.5s [%(name)s] %(message)s
+    datefmt = %H:%M:%S
+  manager.toml: |
+    [db]
+    type = "postgresql"
+    addr = { host = "{{ include "bai-manager.postgresHost" . }}", port = 5432 }
+    name = {{ .Values.postgres.database | quote }}
+    user = {{ .Values.postgres.username | quote }}
+    password = "__POSTGRES_PASSWORD__"
+
+    [etcd]
+    namespace = "local"
+    addr = { host = "{{ include "bai-manager.etcdHost" . }}", port = 2379 }
+
+    [manager]
+    num-proc = 2
+    service-addr = { host = "0.0.0.0", port = {{ .Values.manager.bindPort }} }
+    announce-addr = { host = "0.0.0.0", port = {{ .Values.manager.bindPort }} }
+    internal-addr = { host = "0.0.0.0", port = 18080 }
+    secret = "__MANAGER_SECRET__"
+    ssl-enabled = false
+    rpc-auth-manager-keypair = "/var/lib/backend.ai/keys/manager.key_secret"
+
+    [redis]
+    addr = { host = "{{ include "bai-manager.redisHost" . }}", port = 6379 }
+    password = "__REDIS_PASSWORD__"
+
+    [network.inter-container]
+    default-driver = "rpc_overlay"
+
+    [logging]
+    level = "INFO"
+    drivers = ["console"]
+
+    [logging.console]
+    colored = false
+    format = "verbose"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: backend-ai-apollo-router
+description: Apollo Router supergraph for backend.ai (graphene legacy + strawberry v2).
+type: application
+version: 0.1.0
+appVersion: "1.55.0"
