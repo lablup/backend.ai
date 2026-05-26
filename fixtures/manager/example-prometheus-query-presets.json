@@ -1,6 +1,7 @@
 {
   "prometheus_query_presets": [
     {
+      "id": "ff5df9a1-e92d-4636-af73-eb491d5aeaca",
       "name": "container_gauge",
       "description": "Current container utilization as a raw gauge value",
       "rank": 100,
@@ -29,6 +30,7 @@
       }
     },
     {
+      "id": "a1863e52-a678-45f7-979c-127af5658417",
       "name": "container_rate",
       "description": "Container utilization rate of change normalized over 5 minutes",
       "rank": 200,
@@ -57,6 +59,7 @@
       }
     },
     {
+      "id": "d5d83b5e-3463-4b5f-beda-1afbe4761e3c",
       "name": "container_diff",
       "description": "Container utilization rate of change over 5 minutes (unnormalized)",
       "rank": 300,
@@ -85,6 +88,7 @@
       }
     },
     {
+      "id": "2f0634e3-a976-4eeb-ba01-1e1829965453",
       "name": "vllm_requests_running",
       "description": "Number of requests currently being processed by vLLM",
       "rank": 400,
@@ -102,6 +106,7 @@
       }
     },
     {
+      "id": "2a0939c6-b634-4f1e-ac8c-8738d7bbc244",
       "name": "vllm_requests_waiting",
       "description": "Number of requests waiting in the vLLM queue",
       "rank": 500,
@@ -119,6 +124,7 @@
       }
     },
     {
+      "id": "00c6467d-58da-4285-9166-fa36404f2012",
       "name": "vllm_gpu_cache_usage",
       "description": "Average GPU KV cache usage percentage across vLLM replicas",
       "rank": 600,
@@ -136,6 +142,7 @@
       }
     },
     {
+      "id": "73f67248-497b-4794-a71a-562fcebc248a",
       "name": "vllm_request_throughput",
       "description": "Request success rate per second over 5 minutes",
       "rank": 700,
@@ -153,6 +160,7 @@
       }
     },
     {
+      "id": "119da10b-23df-4579-8c8b-d6bff18ee1b8",
       "name": "vllm_avg_latency",
       "description": "Average end-to-end request latency over 5 minutes",
       "rank": 800,
