@@ -87,6 +87,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
     DeploymentRevisionPresetCreatorSpec,
+    PresetResourceSlotDependentCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment_revision_preset.updaters import (
     DeploymentRevisionPresetUpdaterSpec,
@@ -245,6 +246,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         input: CreateDeploymentRevisionPresetInput,
     ) -> CreateDeploymentRevisionPresetPayload:
         resource_slots = self._convert_resource_slots_input(input.resource_slots)
+        slot_specs = [
+            PresetResourceSlotDependentCreatorSpec(entry=entry) for entry in resource_slots
+        ]
         resource_opts = self._convert_resource_opts_input(input.resource_opts)
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
@@ -259,7 +263,6 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 rank=0,
                 image_id=input.image_id,
                 model_definition=model_def,
-                resource_slots=resource_slots,
                 resource_opts=resource_opts,
                 cluster_mode=input.cluster_mode,
                 cluster_size=input.cluster_size,
@@ -275,7 +278,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             )
         )
         result = await self._processors.deployment_revision_preset.create.wait_for_complete(
-            CreateDeploymentRevisionPresetAction(creator=creator)
+            CreateDeploymentRevisionPresetAction(creator=creator, resource_slot_specs=slot_specs)
         )
         return CreateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.preset))
 
@@ -283,10 +286,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: UpdateDeploymentRevisionPresetInput,
     ) -> UpdateDeploymentRevisionPresetPayload:
-        resource_slots_state: OptionalState[list[ResourceSlotEntryData]] = (
-            OptionalState.update(self._convert_resource_slots_input(input.resource_slots))
+        slot_specs: list[PresetResourceSlotDependentCreatorSpec] | None = (
+            [
+                PresetResourceSlotDependentCreatorSpec(entry=entry)
+                for entry in self._convert_resource_slots_input(input.resource_slots)
+            ]
             if input.resource_slots is not None
-            else OptionalState.nop()
+            else None
         )
         environ_state: OptionalState[dict[str, str]] = (
             OptionalState.update(self._convert_environ_input(input.environ))
@@ -324,7 +330,6 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 else TriState.update(input.image_id)
             ),
             model_definition=model_def_state,
-            resource_slots=resource_slots_state,
             resource_opts=(
                 OptionalState.update(self._convert_resource_opts_input(input.resource_opts))
                 if input.resource_opts is not None
@@ -366,7 +371,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
         updater: Updater[DeploymentRevisionPresetRow] = Updater(spec=spec, pk_value=input.id)
         result = await self._processors.deployment_revision_preset.update.wait_for_complete(
-            UpdateDeploymentRevisionPresetAction(id=input.id, updater=updater)
+            UpdateDeploymentRevisionPresetAction(
+                id=input.id, updater=updater, resource_slot_specs=slot_specs
+            )
         )
         return UpdateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.preset))
 
