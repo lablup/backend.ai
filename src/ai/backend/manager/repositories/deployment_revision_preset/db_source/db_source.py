@@ -15,7 +15,6 @@ from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
@@ -43,8 +42,8 @@ RANK_GAP = 100
 class DeploymentRevisionPresetDBSource:
     _ops: DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._ops = DBOpsProvider(db)
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
+        self._ops = ops_provider
 
     async def create(
         self,

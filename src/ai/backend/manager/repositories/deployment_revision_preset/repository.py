@@ -8,7 +8,6 @@ from uuid import UUID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
@@ -18,6 +17,7 @@ from ai.backend.manager.repositories.deployment_revision_preset.creators import 
 from ai.backend.manager.repositories.deployment_revision_preset.db_source.db_source import (
     DeploymentRevisionPresetDBSource,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -25,8 +25,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class DeploymentRevisionPresetRepository:
     _db_source: DeploymentRevisionPresetDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = DeploymentRevisionPresetDBSource(db)
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
+        self._db_source = DeploymentRevisionPresetDBSource(ops_provider)
 
     async def create(
         self,

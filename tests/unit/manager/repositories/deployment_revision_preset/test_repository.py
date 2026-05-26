@@ -33,6 +33,7 @@ from ai.backend.manager.repositories.deployment_revision_preset.repository impor
 from ai.backend.manager.repositories.deployment_revision_preset.updaters import (
     DeploymentRevisionPresetUpdaterSpec,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
@@ -94,7 +95,7 @@ async def repository(
                 ResourceSlotTypeRow(slot_name="cpu", slot_type="count"),
                 ResourceSlotTypeRow(slot_name="mem", slot_type="bytes"),
             ])
-        yield DeploymentRevisionPresetRepository(database_connection)
+        yield DeploymentRevisionPresetRepository(DBOpsProvider(database_connection))
 
 
 class TestCreate:
