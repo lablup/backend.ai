@@ -183,9 +183,7 @@ class TestAuditLogMonitorExclusionAtSetupTime:
         mock_action: MockAction,
     ) -> None:
         monitors_without_audit_log = [
-            monitor
-            for monitor in [audit_log_monitor]
-            if not isinstance(monitor, AuditLogMonitor)
+            monitor for monitor in [audit_log_monitor] if not isinstance(monitor, AuditLogMonitor)
         ]
         processor = ActionProcessor[MockAction, MockActionResult](
             func=mock_action_processor_func, monitors=monitors_without_audit_log
