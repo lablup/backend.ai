@@ -10,6 +10,7 @@ from typing import Any, Final, override
 import attrs
 import trafaret as t
 from aiohttp import BodyPartReader, MultipartReader, web
+from aiohttp import StreamReader as AiohttpStreamReader
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import QuotaConfig, StreamReader, VFolderID
@@ -141,6 +142,36 @@ class MultipartFileUploadStreamReader(StreamReader):
 
         while True:
             chunk = await file_part.read_chunk(_DEFAULT_UPLOAD_FILE_CHUNKS)
+            if not chunk:
+                break
+            yield chunk
+
+    @override
+    def content_type(self) -> str | None:
+        return self._content_type
+
+
+class TusChunkUploadStreamReader(StreamReader):
+    """
+    Adapts a raw TUS PATCH request body (``application/offset+octet-stream``)
+    into the common :class:`StreamReader` by reading it in fixed-size chunks,
+    so the upload writer holds only one chunk in memory at a time.
+    """
+
+    def __init__(
+        self,
+        content: AiohttpStreamReader,
+        content_type: str | None,
+        chunk_size: int,
+    ) -> None:
+        self._content = content
+        self._content_type = content_type
+        self._chunk_size = chunk_size
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        while True:
+            chunk = await self._content.read(self._chunk_size)
             if not chunk:
                 break
             yield chunk

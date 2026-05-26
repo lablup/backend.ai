@@ -212,8 +212,12 @@ class TestHappyPath:
         assert response.headers["Upload-Offset"] == str(len(payload))
         final_path = patch_env.vfpath / "result.bin"
         assert final_path.read_bytes() == payload
-        # Session directory must be cleaned up after assembly.
-        assert not patch_env.session_dir.exists()
+        # After assembly the session reclaims chunk data but keeps the small
+        # completed marker (cleanup() no longer rmtree's the dir, so a late
+        # duplicate PATCH observes status=="completed" instead of racing a
+        # directory teardown).
+        assert patch_env.session_dir.exists()
+        assert list((patch_env.session_dir / "chunks").glob("*.dat")) == []
 
     async def test_two_chunks_assemble_in_order(self, patch_env: _PatchEnv) -> None:
         token_data = _token_data(session_id="test-session", total_size=2048, relpath="result.bin")

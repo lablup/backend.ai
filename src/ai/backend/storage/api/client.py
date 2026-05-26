@@ -52,9 +52,9 @@ from ai.backend.storage.services.file_stream.zip import (
 )
 from ai.backend.storage.services.upload.tus_session import (
     TusUploadSession,
-    stream_chunk_to_temp,
+    TusUploadSessionArgs,
 )
-from ai.backend.storage.types import SENTINEL
+from ai.backend.storage.types import SENTINEL, TusChunkUploadStreamReader
 from ai.backend.storage.utils import (
     CheckParamSource,
     build_attachment_headers,
@@ -332,7 +332,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
-            session_dir = _resolve_session_dir(volume, token_data)
+            session_dir = _resolve_tus_upload_session_dir(volume, token_data)
             if not session_dir.exists():
                 raise web.HTTPNotFound(
                     body=dump_json_str(
@@ -344,9 +344,11 @@ async def tus_check_session(request: web.Request) -> web.Response:
                     content_type="application/problem+json",
                 )
             session = TusUploadSession(
-                session_dir,
-                session_id=token_data["session"],
-                total_size=int(token_data["size"]),
+                TusUploadSessionArgs(
+                    session_dir=session_dir,
+                    session_id=token_data["session"],
+                    total_size=int(token_data["size"]),
+                )
             )
             state = await session.read_state()
             headers = _tus_response_headers(
@@ -408,7 +410,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             )
 
         async with ctx.get_volume(token_data["volume"]) as volume:
-            session_dir = _resolve_session_dir(volume, token_data)
+            session_dir = _resolve_tus_upload_session_dir(volume, token_data)
             if not session_dir.exists():
                 raise web.HTTPNotFound(
                     body=dump_json_str(
@@ -420,17 +422,21 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     content_type="application/problem+json",
                 )
             session = TusUploadSession(
-                session_dir,
-                session_id=token_data["session"],
-                total_size=total_size,
+                TusUploadSessionArgs(
+                    session_dir=session_dir,
+                    session_id=token_data["session"],
+                    total_size=total_size,
+                )
             )
             await session.ensure_initialized()
 
-            temp_chunk = session.open_temp_chunk(client_offset)
+            upload_stream = TusChunkUploadStreamReader(
+                request.content, request.content_type, DEFAULT_CHUNK_SIZE
+            )
+            temp_chunk, length, sha256 = await session.write_temp_chunk(
+                client_offset, upload_stream
+            )
             try:
-                length, sha256 = await stream_chunk_to_temp(
-                    request.content, temp_chunk.path, DEFAULT_CHUNK_SIZE
-                )
                 if client_offset + length > total_size:
                     raise UploadOffsetMismatchError(
                         f"Chunk at offset {client_offset} with length {length} "
@@ -463,7 +469,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
-def _resolve_session_dir(volume: AbstractVolume, token_data: UploadTokenData) -> Path:
+def _resolve_tus_upload_session_dir(volume: AbstractVolume, token_data: UploadTokenData) -> Path:
     return volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
 
 
