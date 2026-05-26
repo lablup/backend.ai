@@ -97,7 +97,7 @@ class AgentProcessors(AbstractProcessorPackage):
     ) -> None:
         audit_log_excluded_processor_factory = MonitorFilteredActionProcessorFactory(
             monitors=action_monitors,
-            excluded_monitor_types={AuditLogMonitor},
+            monitor_types_to_exclude={AuditLogMonitor},
         )
 
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)

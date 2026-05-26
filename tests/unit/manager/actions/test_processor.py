@@ -185,7 +185,7 @@ class TestAuditLogMonitorExclusionAtSetupTime:
     ) -> None:
         factory = MonitorFilteredActionProcessorFactory(
             monitors=[audit_log_monitor],
-            excluded_monitor_types={AuditLogMonitor},
+            monitor_types_to_exclude={AuditLogMonitor},
         )
         processor = factory.build(mock_action_processor_func)
 

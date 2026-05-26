@@ -8,20 +8,20 @@ from .base import ActionProcessor
 
 class MonitorFilteredActionProcessorFactory:
     _monitors: Sequence[ActionMonitor] | None
-    _excluded_monitor_types: set[type[ActionMonitor]]
+    _monitor_types_to_exclude: set[type[ActionMonitor]]
 
     def __init__(
         self,
         monitors: Sequence[ActionMonitor] | None = None,
-        excluded_monitor_types: set[type[ActionMonitor]] | None = None,
+        monitor_types_to_exclude: set[type[ActionMonitor]] | None = None,
     ) -> None:
         self._monitors = monitors
-        self._excluded_monitor_types = excluded_monitor_types or set()
+        self._monitor_types_to_exclude = monitor_types_to_exclude or set()
 
     def _build_monitors(self) -> list[ActionMonitor]:
         monitors: list[ActionMonitor] = []
         for monitor in self._monitors or []:
-            if type(monitor) in self._excluded_monitor_types:
+            if type(monitor) in self._monitor_types_to_exclude:
                 continue
             monitors.append(monitor)
         return monitors
