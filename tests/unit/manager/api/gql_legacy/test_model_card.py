@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.manager.api.gql_legacy.vfolder import ModelCard
 
 
@@ -29,9 +30,17 @@ class TestModelCardParseModelModifiedAt:
         return row
 
     @pytest.fixture
-    def model_def_with_metadata(self) -> Callable[[dict[str, Any]], dict[str, Any]]:
-        def _build(metadata: dict[str, Any]) -> dict[str, Any]:
-            return {"models": [{"name": "test-model", "metadata": metadata}]}
+    def model_def_with_metadata(self) -> Callable[[dict[str, Any]], ModelDefinition]:
+        def _build(metadata: dict[str, Any]) -> ModelDefinition:
+            return ModelDefinition.model_validate({
+                "models": [
+                    {
+                        "name": "test-model",
+                        "model_path": "/models/test-model",
+                        "metadata": metadata,
+                    }
+                ]
+            })
 
         return _build
 
@@ -53,7 +62,7 @@ class TestModelCardParseModelModifiedAt:
         self,
         graph_ctx: MagicMock,
         vfolder_row: MagicMock,
-        model_def_with_metadata: Callable[[dict[str, Any]], dict[str, Any]],
+        model_def_with_metadata: Callable[[dict[str, Any]], ModelDefinition],
     ) -> None:
         expected = "2025-12-25T00:00:00Z"
         model_def = model_def_with_metadata({"last_modified": expected})
@@ -66,7 +75,7 @@ class TestModelCardParseModelModifiedAt:
         self,
         graph_ctx: MagicMock,
         vfolder_row: MagicMock,
-        model_def_with_metadata: Callable[[dict[str, Any]], dict[str, Any]],
+        model_def_with_metadata: Callable[[dict[str, Any]], ModelDefinition],
     ) -> None:
         model_def = model_def_with_metadata({})
 
@@ -78,7 +87,7 @@ class TestModelCardParseModelModifiedAt:
         self,
         graph_ctx: MagicMock,
         vfolder_row: MagicMock,
-        model_def_with_metadata: Callable[[dict[str, Any]], dict[str, Any]],
+        model_def_with_metadata: Callable[[dict[str, Any]], ModelDefinition],
     ) -> None:
         vfolder_row.last_used = None
         model_def = model_def_with_metadata({})

@@ -26,7 +26,6 @@ __all__ = (
     "check",
     "etcd_config_iv",
     "merge",
-    "model_definition_iv",
     "override_key",
     "override_with_env",
     "read_from_etcd",
@@ -156,61 +155,6 @@ def _wrap_str_start_command_into_argv(service: Any) -> Any:
     if shell:
         return {**service, "start_command": [shell, "-c", sc]}
     return {**service, "start_command": [sc]}
-
-
-model_definition_iv = t.Dict({
-    t.Key("models"): t.List(
-        t.Dict({
-            t.Key("name"): t.String,
-            t.Key("model_path"): t.String,
-            t.Key("service", default=None): t.Call(_wrap_str_start_command_into_argv)
-            & (
-                t.Null
-                | t.Dict({
-                    # ai.backend.kernel.service.ServiceParser.start_service()
-                    # ai.backend.kernel.service_actions
-                    t.Key("pre_start_actions", default=[]): t.Null
-                    | t.List(
-                        t.Dict({
-                            t.Key("action"): t.String,
-                            t.Key("args"): t.Dict().allow_extra("*"),
-                        })
-                    ),
-                    t.Key("start_command", default=None): t.Null | t.List(t.String),
-                    t.Key("shell", default=DEFAULT_SHELL): t.String,
-                    t.Key("port"): t.ToInt[1:],
-                    t.Key("health_check", default=None): t.Null
-                    | t.Dict({
-                        t.Key("interval", default=10): t.Null | t.ToFloat[0:],
-                        t.Key("path"): t.String,
-                        t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
-                        t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
-                        t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
-                        t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
-                    }),
-                })
-            ),
-            t.Key("metadata", default=None): t.Null
-            | t.Dict({
-                t.Key("author", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("title", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("version", default=None): t.Null | t.Int | t.String,
-                tx.AliasedKey(["created", "created_at"], default=None): t.Null
-                | t.String(allow_blank=True),
-                tx.AliasedKey(["last_modified", "modified_at"], default=None): t.Null
-                | t.String(allow_blank=True),
-                t.Key("description", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("task", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("category", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("architecture", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("framework", default=None): t.Null | t.List(t.String),
-                t.Key("label", default=None): t.Null | t.List(t.String),
-                t.Key("license", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("min_resource", default=None): t.Null | t.Dict().allow_extra("*"),
-            }).allow_extra("*"),
-        })
-    )
-})
 
 
 class PreStartAction(BaseConfigModel):

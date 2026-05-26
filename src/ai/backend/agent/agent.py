@@ -84,7 +84,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelConfig, ModelDefinition
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
@@ -2459,24 +2459,22 @@ class AbstractAgent[
 
     async def _apply_image_cmd_fallback(
         self,
-        models: list[dict[str, Any]],
+        models: list[ModelConfig],
         image: str,
-    ) -> list[dict[str, Any]]:
+    ) -> list[ModelConfig]:
         image_command_loaded = False
         image_command: list[str] | None = None
         for model in models:
-            service = model.get("service")
-            if not isinstance(service, dict):
+            if model.service is None:
                 continue
-            if service.get("start_command"):
+            if model.service.start_command:
                 continue
             if not image_command_loaded:
                 image_command = await self.extract_image_command(image)
                 image_command_loaded = True
             if not image_command:
                 continue
-            service["start_command"] = list(image_command)
-            model["service"] = service
+            model.service.start_command = list(image_command)
         return models
 
     async def create_kernel(
@@ -2804,7 +2802,7 @@ class AbstractAgent[
                         "is_inference": False,
                     })
 
-                    model_definition: Mapping[str, Any] | None = None
+                    model_definition: ModelDefinition | None = None
                     # Read model config
                     model_folders = [
                         folder
@@ -3172,28 +3170,27 @@ class AbstractAgent[
 
                     if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
                         populated_models = await self._apply_image_cmd_fallback(
-                            model_definition["models"],
+                            model_definition.models,
                             ctx.image_ref.canonical,
                         )
                         for model in populated_models:
-                            service = model.get("service")
-                            if not isinstance(service, dict):
+                            if model.service is None:
                                 log.warning(
                                     "create_kernel(kernel:{}, session:{}) skipping model"
                                     " '{}': no service definition",
                                     kernel_id,
                                     session_id,
-                                    model.get("name", "<unknown>"),
+                                    model.name,
                                 )
                                 continue
-                            if not service.get("start_command"):
+                            if not model.service.start_command:
                                 log.warning(
                                     "create_kernel(kernel:{}, session:{}) cannot start model"
                                     " service '{}': no start_command and image {} has no"
                                     " Config.Cmd",
                                     kernel_id,
                                     session_id,
-                                    model.get("name", "<unknown>"),
+                                    model.name,
                                     ctx.image_ref.canonical,
                                 )
                                 continue
@@ -3205,7 +3202,7 @@ class AbstractAgent[
                                 kernel_id,
                                 session_id,
                                 pretty_container_id,
-                                model["name"],
+                                model.name,
                             )
 
                     # Finally we are done.
@@ -3248,10 +3245,10 @@ class AbstractAgent[
     async def start_and_monitor_model_service_health(
         self,
         kernel_obj: KernelObjectType,
-        model: Any,
+        model: ModelConfig,
     ) -> None:
-        log.debug("starting model service of model {}", model["name"])
-        result = await kernel_obj.start_model_service(model)
+        log.debug("starting model service of model {}", model.name)
+        result = await kernel_obj.start_model_service(model.model_dump(mode="json"))
         if result["status"] == "failed":
             log.error(
                 "Model service failed to start for kernel {} (session {}). Destroying kernel.",
@@ -3271,7 +3268,7 @@ class AbstractAgent[
         environ: MutableMapping[str, Any],
         service_ports: list[ServicePort],
         kernel_config: KernelCreationConfig,
-    ) -> Any:
+    ) -> ModelDefinition:
         if len(model_folders) == 0:
             raise ModelFolderNotSpecifiedError(
                 "At least one model virtual folder must be specified"
@@ -3292,29 +3289,28 @@ class AbstractAgent[
                 f" vFolder {model_folder.name} (ID {model_folder.vfid})",
             )
 
-        parsed = ModelDefinition.model_validate(inlined)
-        if not parsed.models:
+        model_definition = ModelDefinition.model_validate(inlined)
+        if not model_definition.models:
             raise ModelDefinitionEmptyError
-        model_definition = parsed.model_dump(mode="json")
-        for model in model_definition["models"]:
+        for model in model_definition.models:
             if "BACKEND_MODEL_NAME" not in environ:
-                environ["BACKEND_MODEL_NAME"] = model["name"]
-            environ["BACKEND_MODEL_PATH"] = model["model_path"]
-            if service := model.get("service"):
-                if service["port"] in (2000, 2001):
+                environ["BACKEND_MODEL_NAME"] = model.name
+            environ["BACKEND_MODEL_PATH"] = model.model_path
+            if model.service is not None:
+                if model.service.port in (2000, 2001):
                     raise ReservedPortError("Port 2000 and 2001 are reserved for internal use")
                 overlapping_services = [
-                    s for s in service_ports if service["port"] in s["container_ports"]
+                    s for s in service_ports if model.service.port in s["container_ports"]
                 ]
                 if len(overlapping_services) > 0:
                     raise PortConflictError(
-                        f"Port {service['port']} overlaps with built-in service"
+                        f"Port {model.service.port} overlaps with built-in service"
                         f" {overlapping_services[0]['name']}"
                     )
                 service_ports.append({
-                    "name": f"{model['name']}-{service['port']}",
+                    "name": f"{model.name}-{model.service.port}",
                     "protocol": ServicePortProtocols.PREOPEN,
-                    "container_ports": (service["port"],),
+                    "container_ports": (model.service.port,),
                     "host_ports": (None,),
                     "is_inference": True,
                 })

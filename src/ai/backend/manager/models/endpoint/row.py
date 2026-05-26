@@ -8,7 +8,6 @@ from collections.abc import (
 )
 from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -18,10 +17,7 @@ from typing import (
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-import trafaret as t
 import yarl
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import (
@@ -33,7 +29,6 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common.config import model_definition_iv
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.project import ProjectID
@@ -85,7 +80,6 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound, ServiceUnavailable
-from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -1247,96 +1241,3 @@ class ModelServiceHelper:
             relpath,
         )
         return cast(dict[str, Any], result)
-
-    @staticmethod
-    async def validate_model_definition_file_exists(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        suggested_path: str | None,
-    ) -> str:
-        """
-        Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
-        Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function ensures
-        at least one model definition file exists under the target VFolder and returns the matched filename.
-        """
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-
-        if suggested_path:
-            path = Path(suggested_path)
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
-            )
-            for item in storage_reply["items"]:
-                if item["name"] == path.name:
-                    return suggested_path
-            else:
-                raise InvalidAPIParameters(
-                    f"Model definition YAML file {suggested_path} not found inside the model storage"
-                )
-        else:
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, "."
-            )
-            model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
-            for item in storage_reply["items"]:
-                if item["name"] in model_definition_candidates:
-                    result: str = item["name"]
-                    return result
-            else:
-                raise InvalidAPIParameters(
-                    'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
-                )
-
-    @staticmethod
-    async def _read_model_definition(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        model_definition_filename: str,
-    ) -> dict[str, Any]:
-        """
-        Reads specified model definition file from target VFolder and returns
-        """
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
-        chunks = await manager_facing_client.fetch_file_content(
-            volume_name,
-            str(vfid),
-            f"./{model_definition_filename}",
-        )
-        model_definition_yaml = chunks.decode("utf-8")
-        yaml = YAML()
-        result: dict[str, Any] = yaml.load(model_definition_yaml)
-        return result
-
-    @staticmethod
-    async def validate_model_definition(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        model_definition_path: str,
-    ) -> dict[str, Any]:
-        """
-        Checks if model definition YAML exists and is syntactically perfect.
-        Returns validated model definition configuration.
-        """
-        raw_model_definition = await ModelServiceHelper._read_model_definition(
-            storage_manager,
-            folder_host,
-            vfid,
-            model_definition_path,
-        )
-
-        try:
-            model_definition = model_definition_iv.check(raw_model_definition)
-            if model_definition is None:
-                raise DataTransformationFailed("Model definition validation returned None")
-            result: dict[str, Any] = model_definition
-            return result
-        except t.DataError as e:
-            raise InvalidAPIParameters(
-                f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",
-            ) from e
-        except YAMLError as e:
-            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e

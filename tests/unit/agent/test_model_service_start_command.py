@@ -7,6 +7,7 @@ from typing import Any, cast
 import pytest
 
 from ai.backend.agent.agent import AbstractAgent
+from ai.backend.common.config import ModelConfig
 
 TEST_IMAGE = "example.com/custom-vllm:latest"
 
@@ -15,7 +16,7 @@ TEST_IMAGE = "example.com/custom-vllm:latest"
 class ModelServiceStartCommandScenario:
     id: str
     image_command: list[str] | None
-    models: list[dict[str, Any]]
+    models: list[ModelConfig]
     expected_start_commands: dict[str, list[str]]
     expected_image_command_calls: int = 1
     expected_unset_models: set[str] = field(default_factory=set)
@@ -44,8 +45,8 @@ def _model(
     port: int,
     start_command: list[str] | None = None,
     shell: str = "/bin/bash",
-) -> dict[str, Any]:
-    return {
+) -> ModelConfig:
+    return ModelConfig.model_validate({
         "name": name,
         "model_path": f"/models/{name}",
         "service": {
@@ -53,7 +54,7 @@ def _model(
             "shell": shell,
             "start_command": start_command if start_command is not None else None,
         },
-    }
+    })
 
 
 class TestPopulateMissingModelServiceStartCommands:
@@ -72,7 +73,7 @@ class TestPopulateMissingModelServiceStartCommands:
     def models(
         self,
         scenario: ModelServiceStartCommandScenario,
-    ) -> list[dict[str, Any]]:
+    ) -> list[ModelConfig]:
         return deepcopy(scenario.models)
 
     @pytest.mark.parametrize(
@@ -119,7 +120,7 @@ class TestPopulateMissingModelServiceStartCommands:
         self,
         scenario: ModelServiceStartCommandScenario,
         agent: _ModelServiceCommandAgent,
-        models: list[dict[str, Any]],
+        models: list[ModelConfig],
         image: str,
     ) -> None:
         populated_models = await AbstractAgent._apply_image_cmd_fallback(
@@ -130,11 +131,15 @@ class TestPopulateMissingModelServiceStartCommands:
 
         assert populated_models is models
         assert agent.calls == [image] * scenario.expected_image_command_calls
-        services = {model["name"]: model["service"] for model in populated_models}
+        services = {model.name: model.service for model in populated_models}
         for model_name, expected_start_command in scenario.expected_start_commands.items():
-            assert services[model_name]["start_command"] == expected_start_command
+            service = services[model_name]
+            assert service is not None
+            assert service.start_command == expected_start_command
         for model_name in scenario.expected_unset_models:
-            assert not services[model_name].get("start_command")
+            service = services[model_name]
+            assert service is not None
+            assert not service.start_command
 
     @pytest.fixture
     def raise_not_implemented_agent(
@@ -157,4 +162,5 @@ class TestPopulateMissingModelServiceStartCommands:
             )
 
         assert raise_not_implemented_agent.calls == [image]
-        assert not models[0]["service"].get("start_command")
+        assert models[0].service is not None
+        assert not models[0].service.start_command
