@@ -1,0 +1,61 @@
+# Backend.AI agent.toml for the dood3 scenario:
+# - agent runs as a host process (systemd or direct), NOT a k8s pod
+# - manager / etcd / redis live in k8s, exposed via NodePort
+# - kernels run on the host's docker daemon (DooD)
+#
+# Adjust the IPs / NodePorts to match your cluster.
+
+[etcd]
+namespace = "local"
+addr = { host = "192.168.0.156", port = 32379 }      # NodePort to in-cluster etcd
+# user = "..."
+# password = "..."
+
+[agent]
+mode = "docker"
+backend = "docker"
+# RPC the manager calls into. Must be reachable from manager pods.
+rpc-listen-addr = { host = "0.0.0.0", port = 6001 }
+# What gets published to etcd so manager pods can reach this agent.
+# Bind addr is 0.0.0.0 (all interfaces); advertised addr is the host IP.
+advertised-rpc-addr = { host = "192.168.0.156", port = 6001 }
+public-host = "192.168.0.156"
+# HTTP probe / debug endpoint
+service-addr = { host = "0.0.0.0", port = 6003 }
+agent-sock-port = 6007
+# Agent identifier in service discovery. Defaults to the hostname with i- prefix.
+# id = "i-ser8"
+scaling-group = "default"
+
+[container]
+port-range = [30000, 31000]
+bind-host = "0.0.0.0"
+advertised-host = "192.168.0.156"
+scratch-type = "hostdir"
+scratch-root = "/var/lib/backend.ai/scratches"
+
+[watcher]
+service-addr = { host = "127.0.0.1", port = 6009 }
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.pkg-ns]
+"ai.backend" = "INFO"
+"aiohttp" = "INFO"
+
+[resource]
+reserved-cpu = 1
+reserved-mem = "1G"
+reserved-disk = "8G"
+
+[debug]
+enabled = false
+
+[otel]
+enabled = false

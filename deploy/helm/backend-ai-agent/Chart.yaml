@@ -1,6 +1,0 @@
-apiVersion: v2
-name: backend-ai-agent
-description: Backend.AI Agent DaemonSet (DooD on each node, one agent per node)
-type: application
-version: 0.1.0
-appVersion: "26.4.0"

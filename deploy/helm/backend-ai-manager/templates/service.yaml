@@ -12,4 +12,7 @@ spec:
     - name: http
       port: {{ .Values.manager.service.port }}
       targetPort: {{ .Values.manager.bindPort }}
+      {{- if and (eq .Values.manager.service.type "NodePort") .Values.manager.service.nodePort }}
+      nodePort: {{ .Values.manager.service.nodePort }}
+      {{- end }}
       protocol: TCP
