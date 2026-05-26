@@ -482,6 +482,19 @@ class DockerCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
+# xz file magic — first 6 bytes of any .xz stream. Used to distinguish a real
+# krunner archive from a Git LFS pointer file that slipped through `git lfs pull`.
+_XZ_MAGIC: Final[bytes] = b"\xfd7zXZ\x00"
+
+
+def _is_valid_xz_archive(path: Path) -> bool:
+    try:
+        with path.open("rb") as f:
+            return f.read(len(_XZ_MAGIC)) == _XZ_MAGIC
+    except OSError:
+        return False
+
+
 async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[str, str | None]:
     docker = Docker()
     arch = get_arch_name()
@@ -542,6 +555,16 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
             ).resolve()
             if not archive_path.exists():
                 log.warning("krunner environment for {} ({}) is not supported!", distro, arch)
+            elif not _is_valid_xz_archive(archive_path):
+                # I-20: a Git LFS pointer file passes `exists()` but its content
+                # is text ("version https://git-lfs..."), not xz. Fail fast so
+                # we don't return a volume name that will break at mount time.
+                log.error(
+                    "krunner archive {} is not a valid xz file "
+                    "(likely an unresolved Git LFS pointer — run `git lfs pull`)",
+                    archive_path,
+                )
+                return distro, None
             else:
                 log.info("populating {} volume version {}", volume_name, current_version)
                 await docker.volumes.create({  # type: ignore[no-untyped-call]
@@ -551,24 +574,36 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 extractor_path = Path(
                     str(files("ai.backend.runner").joinpath("krunner-extractor.sh"))
                 ).resolve()
-                proc = await asyncio.create_subprocess_exec(*[
-                    "docker",
-                    "run",
-                    "--rm",
-                    "-i",
-                    "-v",
-                    f"{archive_path}:/root/archive.tar.xz",
-                    "-v",
-                    f"{extractor_path}:/root/krunner-extractor.sh",
-                    "-v",
-                    f"{volume_name}:/root/volume",
-                    "-e",
-                    f"KRUNNER_VERSION={current_version}",
-                    extractor_image,
-                    "/root/krunner-extractor.sh",
-                ])
-                if await proc.wait() != 0:
-                    raise RuntimeError("extracting krunner environment has failed!")
+                try:
+                    proc = await asyncio.create_subprocess_exec(*[
+                        "docker",
+                        "run",
+                        "--rm",
+                        "-i",
+                        "-v",
+                        f"{archive_path}:/root/archive.tar.xz",
+                        "-v",
+                        f"{extractor_path}:/root/krunner-extractor.sh",
+                        "-v",
+                        f"{volume_name}:/root/volume",
+                        "-e",
+                        f"KRUNNER_VERSION={current_version}",
+                        extractor_image,
+                        "/root/krunner-extractor.sh",
+                    ])
+                    if await proc.wait() != 0:
+                        raise RuntimeError("extracting krunner environment has failed!")
+                except Exception:
+                    # I-24: remove the freshly-created empty volume so the next
+                    # boot retries instead of mounting an empty volume forever.
+                    try:
+                        await DockerVolume(docker, volume_name).delete()  # type: ignore[no-untyped-call]
+                    except DockerError:
+                        log.exception(
+                            "failed to clean up empty krunner volume {} after extraction failure",
+                            volume_name,
+                        )
+                    raise
 
     except Exception:
         log.exception("unexpected error")
