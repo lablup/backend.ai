@@ -7,7 +7,7 @@ import logging
 from collections.abc import Mapping
 from io import IOBase
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 import trafaret as t
 from etcd_client import Client as EtcdClient
@@ -50,6 +50,11 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def __aexit__(self, *exc_info: Any) -> bool | None:
         raise NotImplementedError
+
+
+@runtime_checkable
+class DistributedLockFactory(Protocol):
+    def __call__(self, lock_id: str, lifetime_hint: float) -> AbstractDistributedLock: ...
 
 
 class FileLock(AbstractDistributedLock):

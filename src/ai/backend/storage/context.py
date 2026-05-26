@@ -15,12 +15,14 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
+from ai.backend.common.clients.valkey_client.valkey_tus import ValkeyTusClient
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
 from ai.backend.common.health_checker.probe import HealthProbe
+from ai.backend.common.lock import DistributedLockFactory
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
@@ -106,6 +108,8 @@ class RootContext:
     cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
     manager_client_pool: ManagerHTTPClientPool
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
+    valkey_tus_client: ValkeyTusClient
+    tus_lock_factory: DistributedLockFactory
     health_probe: HealthProbe
     volume_stats_observer: VolumeStatsObserver
     volume_stats_state: VolumeState

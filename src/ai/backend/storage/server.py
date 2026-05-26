@@ -26,11 +26,13 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
+from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_tus import ValkeyTusClient
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.config import (
     ConfigurationError,
@@ -42,6 +44,8 @@ from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
+    REDIS_STREAM_LOCK,
+    REDIS_TUS_DB,
     RedisRole,
 )
 from ai.backend.common.etcd import AsyncEtcd
@@ -111,6 +115,7 @@ from .plugin import (
     StorageManagerWebappPluginContext,
     StoragePluginContext,
 )
+from .services.upload.lock import create_tus_lock_factory
 from .storages.storage_pool import StoragePool
 from .volumes.noop import init_noop_volume
 from .volumes.pool import VolumePool
@@ -644,6 +649,24 @@ async def server_main(
         )
         storage_init_stack.push_async_callback(valkey_artifact_client.close)
 
+        # TUS upload session metadata store (Valkey) and the per-session lock
+        # factory, kept as separate resources. The lock backend is a dedicated
+        # redis-for-lock connection (redis.asyncio, required by RedisLock),
+        # provisioned and owned here; the factory closes over it.
+        valkey_tus_client = await ValkeyTusClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_TUS_DB,
+            human_readable_name=f"storage-proxy-tus-uploader-{pidx}",
+        )
+        storage_init_stack.push_async_callback(valkey_tus_client.close)
+        tus_lock_redis = redis_helper.get_redis_object_for_lock(
+            redis_config.to_redis_profile_target().profile_target(RedisRole.STREAM_LOCK),
+            name=f"storage-proxy-tus-lock-{pidx}",
+            db=REDIS_STREAM_LOCK,
+        )
+        storage_init_stack.push_async_callback(tus_lock_redis.close)
+        tus_lock_factory = create_tus_lock_factory(tus_lock_redis)
+
         # Initialize health probe
         health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
         # Liveness-registered: also surfaced in readiness — connection-stuck
@@ -724,6 +747,8 @@ async def server_main(
             },
             manager_client_pool=manager_client_pool,
             valkey_artifact_client=valkey_artifact_client,
+            valkey_tus_client=valkey_tus_client,
+            tus_lock_factory=tus_lock_factory,
             health_probe=health_probe,
             volume_stats_observer=volume_stats_observer,
             volume_stats_state=volume_stats_state,

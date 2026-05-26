@@ -157,6 +157,7 @@ __all__ = (
     "SlotName",
     "SlotNameField",
     "SlotTypes",
+    "TusSessionId",
     "VFolderHostPermission",
     "VFolderID",
     "VFolderMount",
@@ -395,6 +396,7 @@ HostPID = NewType("HostPID", PID)
 ContainerPID = NewType("ContainerPID", PID)
 
 ContainerId = NewType("ContainerId", str)
+TusSessionId = NewType("TusSessionId", str)
 RuleId = NewType("RuleId", UUID)
 SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
