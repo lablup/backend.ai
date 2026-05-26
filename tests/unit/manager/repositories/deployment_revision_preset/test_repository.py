@@ -18,6 +18,7 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
+from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -147,3 +148,24 @@ class TestUpdate:
 
         slots = await repository.get_resource_slots(data.id)
         assert slots == []
+
+
+class TestGetDelete:
+    async def test_get_by_id_round_trip(
+        self, repository: DeploymentRevisionPresetRepository
+    ) -> None:
+        data = await repository.create(_make_spec(name="p1"), _slot_specs(("cpu", "1")))
+        fetched = await repository.get_by_id(data.id)
+        assert fetched.id == data.id
+        assert fetched.name == "p1"
+
+    async def test_delete_removes_preset_and_slots(
+        self, repository: DeploymentRevisionPresetRepository
+    ) -> None:
+        data = await repository.create(_make_spec(), _slot_specs(("cpu", "1"), ("mem", "8")))
+
+        await repository.delete(data.id)
+
+        with pytest.raises(DeploymentRevisionPresetNotFound):
+            await repository.get_by_id(data.id)
+        assert await repository.get_resource_slots(data.id) == []
