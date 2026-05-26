@@ -18,7 +18,6 @@ from ai.backend.manager.actions.action import (
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.factory import MonitorFilteredActionProcessorFactory
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
@@ -177,17 +176,20 @@ class TestAuditLogMonitorExclusionAtSetupTime:
     def mock_action(self) -> MockAction:
         return MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
 
-    async def test_audit_log_monitor_excluded_via_factory_configuration(
+    async def test_audit_log_monitor_excluded_when_filtered_from_monitor_list(
         self,
         audit_log_monitor: AuditLogMonitor,
         mock_audit_log_repository: MagicMock,
         mock_action: MockAction,
     ) -> None:
-        factory = MonitorFilteredActionProcessorFactory(
-            monitors=[audit_log_monitor],
-            monitor_types_to_exclude={AuditLogMonitor},
+        monitors_without_audit_log = [
+            monitor
+            for monitor in [audit_log_monitor]
+            if not isinstance(monitor, AuditLogMonitor)
+        ]
+        processor = ActionProcessor[MockAction, MockActionResult](
+            func=mock_action_processor_func, monitors=monitors_without_audit_log
         )
-        processor = factory.build(mock_action_processor_func)
 
         await processor.wait_for_complete(mock_action)
 
