@@ -1,10 +1,6 @@
 import logging
-from typing import cast
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.repositories.deployment_revision_preset.creators import (
-    DeploymentRevisionPresetCreatorSpec,
-)
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentRevisionPresetRepository,
 )
@@ -41,11 +37,7 @@ class DeploymentRevisionPresetService:
     async def create(
         self, action: CreateDeploymentRevisionPresetAction
     ) -> CreateDeploymentRevisionPresetActionResult:
-        spec = cast(DeploymentRevisionPresetCreatorSpec, action.creator.spec)
-        next_rank = await self._repository.get_next_rank(spec.runtime_variant_id)
-        spec.rank = next_rank
-
-        data = await self._repository.create(action.creator, action.resource_slot_specs)
+        data = await self._repository.create(action.creator_spec, action.resource_slot_specs)
         return CreateDeploymentRevisionPresetActionResult(preset=data)
 
     async def update(

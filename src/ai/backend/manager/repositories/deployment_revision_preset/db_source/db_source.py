@@ -14,15 +14,17 @@ from ai.backend.manager.data.deployment_revision_preset.types import DeploymentR
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
+    NextValuePolicy,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
+    DeploymentRevisionPresetCreatorSpec,
     PresetResourceSlotDependentCreatorSpec,
     PresetSlotDependency,
 )
@@ -44,21 +46,22 @@ class DeploymentRevisionPresetDBSource:
         self._db = db
         self._ops = DBOpsProvider(db)
 
-    async def get_next_rank(self, variant_id: UUID) -> int:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            stmt = sa.select(sa.func.max(DeploymentRevisionPresetRow.rank)).where(
-                DeploymentRevisionPresetRow.runtime_variant == variant_id
-            )
-            max_rank = (await session.execute(stmt)).scalar_one_or_none()
-            return (max_rank + RANK_GAP) if max_rank is not None else RANK_GAP
-
     async def create(
         self,
-        creator: Creator[DeploymentRevisionPresetRow],
+        spec: DeploymentRevisionPresetCreatorSpec,
         slot_specs: Sequence[PresetResourceSlotDependentCreatorSpec],
     ) -> DeploymentRevisionPresetData:
+        policy = NextValuePolicy(
+            column=DeploymentRevisionPresetRow.rank,
+            scope_condition=lambda: DeploymentRevisionPresetRow.runtime_variant
+            == spec.runtime_variant_id,
+            lock_selector=sa.select(RuntimeVariantRow).where(
+                RuntimeVariantRow.id == spec.runtime_variant_id
+            ),
+            gap=RANK_GAP,
+        )
         async with self._ops.write_ops() as w:
-            created = await w.create(creator)
+            created = await w.create_with_next_value(policy, spec)
             preset = created.row
             await w.bulk_create_dependent(slot_specs, PresetSlotDependency(preset_id=preset.id))
             return preset.to_data()
