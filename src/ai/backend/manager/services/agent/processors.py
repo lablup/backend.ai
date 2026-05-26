@@ -1,5 +1,6 @@
 from typing import override
 
+from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
@@ -93,6 +94,10 @@ class AgentProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        monitors_without_audit_log = [
+            monitor for monitor in action_monitors if not isinstance(monitor, AuditLogMonitor)
+        ]
+
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
         self.get_watcher_status = ActionProcessor(service.get_watcher_status, action_monitors)
         self.watcher_agent_start = ActionProcessor(service.watcher_agent_start, action_monitors)
@@ -100,7 +105,9 @@ class AgentProcessors(AbstractProcessorPackage):
         self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop, action_monitors)
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
         self.get_total_resources = ActionProcessor(service.get_total_resources, action_monitors)
-        self.handle_heartbeat = ActionProcessor(service.handle_heartbeat, action_monitors)
+        self.handle_heartbeat = ActionProcessor(
+            service.handle_heartbeat, monitors_without_audit_log
+        )
         self.mark_agent_exit = ActionProcessor(service.mark_agent_exit, action_monitors)
         self.mark_agent_running = ActionProcessor(service.mark_agent_running, action_monitors)
         self.remove_agent_from_images_by_canonicals = ActionProcessor(
