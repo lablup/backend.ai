@@ -30,6 +30,7 @@ from ai.backend.manager.repositories.base import (
     Creator,
     CreatorResult,
     DependentCreatorSpec,
+    NextValuePolicy,
     Purger,
     PurgerResult,
     Querier,
@@ -47,6 +48,7 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_dependent_creator,
     execute_creator,
     execute_dependent_creator,
+    execute_next_value_creator,
     execute_purger,
     execute_querier,
     execute_updater,
@@ -151,6 +153,19 @@ class WriteOps(ReadOps):
         the repository coordinates the multi-table sequence.
         """
         return await execute_bulk_dependent_creator(self._sess, specs, dependency)
+
+    async def create_with_next_value[TRow: Base](
+        self,
+        policy: NextValuePolicy,
+        spec: DependentCreatorSpec[int, TRow],
+    ) -> CreatorResult[TRow]:
+        """Insert a row assigning the next monotonic column value (e.g. rank), race-free.
+
+        Locks the parent row (FOR UPDATE), computes ``MAX(column) + gap`` within the
+        scope, and inserts via the spec — all within this write transaction so the lock
+        and insert commit together. Must be used inside ``write_ops()``.
+        """
+        return await execute_next_value_creator(self._sess, policy, spec)
 
     async def update[TRow: Base](self, updater: Updater[TRow]) -> UpdaterResult[TRow] | None:
         """Update a single row by primary key."""
