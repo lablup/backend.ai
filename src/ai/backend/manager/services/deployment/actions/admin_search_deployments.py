@@ -31,7 +31,7 @@ class AdminSearchDeploymentsAction(DeploymentBaseAction):
 
 
 @dataclass(frozen=True)
-class AdminSearchDeploymentsActionResult(BaseActionResult):
+class SearchDeploymentsActionResult(BaseActionResult):
     data: list[ModelDeploymentData]
     total_count: int
     has_next_page: bool

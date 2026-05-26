@@ -32,7 +32,7 @@ from ai.backend.manager.services.deployment.actions.access_token.search_access_t
 )
 from ai.backend.manager.services.deployment.actions.admin_search_deployments import (
     AdminSearchDeploymentsAction,
-    AdminSearchDeploymentsActionResult,
+    SearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
@@ -167,7 +167,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         DestroyDeploymentAction, DestroyDeploymentActionResult
     ]
     admin_search_deployments: ActionProcessor[
-        AdminSearchDeploymentsAction, AdminSearchDeploymentsActionResult
+        AdminSearchDeploymentsAction, SearchDeploymentsActionResult
     ]
     search_user_deployments: ActionProcessor[
         SearchUserDeploymentsAction, SearchUserDeploymentsActionResult

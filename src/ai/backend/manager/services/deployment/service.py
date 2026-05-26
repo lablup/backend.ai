@@ -79,7 +79,7 @@ from ai.backend.manager.services.deployment.actions.access_token.search_access_t
 )
 from ai.backend.manager.services.deployment.actions.admin_search_deployments import (
     AdminSearchDeploymentsAction,
-    AdminSearchDeploymentsActionResult,
+    SearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
@@ -429,7 +429,7 @@ class DeploymentService:
 
     async def admin_search_deployments(
         self, action: AdminSearchDeploymentsAction
-    ) -> AdminSearchDeploymentsActionResult:
+    ) -> SearchDeploymentsActionResult:
         """Search every deployment without a scope filter.
 
         Backs the admin search path and the GraphQL DataLoader batch
@@ -437,7 +437,7 @@ class DeploymentService:
         than a separate service class.
         """
         result = await self._deployment_repository.admin_search_deployments(action.querier)
-        return AdminSearchDeploymentsActionResult(
+        return SearchDeploymentsActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
