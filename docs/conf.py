@@ -13,6 +13,7 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+import ast
 import os
 import sys
 from pathlib import Path
@@ -79,9 +80,6 @@ version = ".".join(release.split(".")[:2])
 # `src/ai/backend/client/config.py` (`API_VERSION`). We parse the literal
 # out of the file directly instead of importing the package, so the docs
 # build does not need aiohttp / the full client runtime installed.
-import ast
-
-
 def _read_api_version() -> str:
     source = (root_path / "src/ai/backend/client/config.py").read_text()
     for node in ast.parse(source).body:
