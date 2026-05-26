@@ -1642,8 +1642,10 @@ class ScheduleDBSource:
                                 ),
                             )
                         )
-                    if not per_group_requests:
-                        continue
+                    # Always resolve mounts even when the request list is
+                    # empty: ``prepare_vfolder_mounts`` injects dot-prefixed
+                    # auto-mount vfolders regardless of explicit requests, so
+                    # skipping here would silently drop them.
                     vfolder_mounts_by_role[group.role] = tuple(
                         await self._fetch_vfolder_mounts(
                             db_sess,
