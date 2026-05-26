@@ -5,7 +5,6 @@ from typing import Self
 
 from ai.backend.manager.repositories.types import RepositoryArgs
 
-from .admin_repository import DeploymentAdminRepository
 from .repository import DeploymentRepository
 
 
@@ -14,7 +13,6 @@ class DeploymentRepositories:
     """Container for deployment-related repositories."""
 
     repository: DeploymentRepository
-    admin_repository: DeploymentAdminRepository
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -26,5 +24,4 @@ class DeploymentRepositories:
             args.valkey_live_client,
             args.valkey_schedule_client,
         )
-        admin_repository = DeploymentAdminRepository(args.db)
-        return cls(repository=repository, admin_repository=admin_repository)
+        return cls(repository=repository)

@@ -4,11 +4,11 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
+from ai.backend.common.data.model_deployment.types import DeploymentLifecycleSubStep
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
-    DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
 )

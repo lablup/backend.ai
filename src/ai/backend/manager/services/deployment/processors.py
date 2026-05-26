@@ -146,7 +146,6 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.deployment.admin_service import DeploymentAdminService
     from ai.backend.manager.services.deployment.service import DeploymentService
 
 
@@ -166,6 +165,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     ]
     destroy_deployment: SingleEntityActionProcessor[
         DestroyDeploymentAction, DestroyDeploymentActionResult
+    ]
+    admin_search_deployments: ActionProcessor[
+        AdminSearchDeploymentsAction, AdminSearchDeploymentsActionResult
     ]
     search_user_deployments: ActionProcessor[
         SearchUserDeploymentsAction, SearchUserDeploymentsActionResult
@@ -262,6 +264,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.destroy_deployment = SingleEntityActionProcessor(
             service.destroy_deployment, action_monitors, validators=rbac_single_entity_validators
         )
+        self.admin_search_deployments = ActionProcessor(
+            service.admin_search_deployments, action_monitors
+        )
         self.search_user_deployments = ActionProcessor(
             service.search_user_deployments,
             action_monitors,
@@ -347,6 +352,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             UpdateDeploymentAction.spec(),
             ReplaceDeploymentOptionsAction.spec(),
             DestroyDeploymentAction.spec(),
+            AdminSearchDeploymentsAction.spec(),
             SearchUserDeploymentsAction.spec(),
             SearchProjectDeploymentsAction.spec(),
             SearchProjectDeploymentSummaryAction.spec(),
@@ -381,32 +387,4 @@ class DeploymentProcessors(AbstractProcessorPackage):
             DeleteAccessTokenAction.spec(),
             BulkDeleteAccessTokensAction.spec(),
             SearchAccessTokensAction.spec(),
-        ]
-
-
-class DeploymentAdminProcessors(AbstractProcessorPackage):
-    """Admin (no-scope) processors for deployments.
-
-    Counterpart of :class:`DeploymentProcessors` that owns the no-scope
-    queries — admin search and the DataLoader batch path. Scoped reads
-    stay on :class:`DeploymentProcessors`.
-    """
-
-    admin_search_deployments: ActionProcessor[
-        AdminSearchDeploymentsAction, AdminSearchDeploymentsActionResult
-    ]
-
-    def __init__(
-        self,
-        service: DeploymentAdminService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.admin_search_deployments = ActionProcessor(
-            service.admin_search_deployments, action_monitors
-        )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            AdminSearchDeploymentsAction.spec(),
         ]

@@ -20,9 +20,7 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
-from ai.backend.manager.services.deployment.admin_service import DeploymentAdminService
 from ai.backend.manager.services.deployment.processors import (
-    DeploymentAdminProcessors,
     DeploymentProcessors,
 )
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -393,7 +391,6 @@ def create_services(args: ServiceArgs) -> Services:
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
             appproxy_client_pool=args.appproxy_client_pool,
         ),
-        deployment_admin=DeploymentAdminService(repositories.deployment.admin_repository),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),
         scheduling_history=SchedulingHistoryService(repositories.scheduling_history.repository),
@@ -513,7 +510,6 @@ def create_processors(
             services.artifact_revision, action_monitors, validators
         ),
         deployment=DeploymentProcessors(services.deployment, action_monitors, validators),
-        deployment_admin=DeploymentAdminProcessors(services.deployment_admin, action_monitors),
         storage_namespace=StorageNamespaceProcessors(
             services.storage_namespace, action_monitors, validators
         ),

@@ -621,7 +621,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search deployments (admin, no scope)."""
         querier = self._build_deployment_querier(input)
         action_result = (
-            await self._processors.deployment_admin.admin_search_deployments.wait_for_complete(
+            await self._processors.deployment.admin_search_deployments.wait_for_complete(
                 AdminSearchDeploymentsAction(querier=querier)
             )
         )
@@ -1370,7 +1370,7 @@ class DeploymentAdapter(BaseAdapter):
             conditions=[DeploymentConditions.by_ids(deployment_ids)],
         )
         action_result = (
-            await self._processors.deployment_admin.admin_search_deployments.wait_for_complete(
+            await self._processors.deployment.admin_search_deployments.wait_for_complete(
                 AdminSearchDeploymentsAction(querier=querier)
             )
         )

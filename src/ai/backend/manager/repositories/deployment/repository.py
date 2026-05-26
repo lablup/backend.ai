@@ -1545,6 +1545,20 @@ class DeploymentRepository:
         return await self._db_source.get_route(route_id)
 
     @deployment_repository_resilience.apply()
+    async def admin_search_deployments(
+        self,
+        querier: BatchQuerier,
+    ) -> ModelDeploymentDataSearchResult:
+        """Search every deployment without a scope filter (admin / DataLoader).
+
+        The absence of a scope filter is what makes this admin-only; callers
+        may still narrow the result through the querier's conditions. The
+        ``admin_`` prefix is kept across db_source → repository → service so
+        the unscoped intent is obvious at every call site.
+        """
+        return await self._db_source.admin_search_deployments(querier)
+
+    @deployment_repository_resilience.apply()
     async def search_user_deployments(
         self,
         querier: BatchQuerier,

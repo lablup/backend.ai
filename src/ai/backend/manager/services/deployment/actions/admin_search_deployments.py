@@ -12,9 +12,10 @@ from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAc
 class AdminSearchDeploymentsAction(DeploymentBaseAction):
     """Search every deployment with no scope (superadmin path).
 
-    Routed through ``DeploymentAdminProcessors`` so callers make the
-    admin intent explicit; scope-restricted variants live on the regular
-    ``DeploymentService`` and ``DeploymentRepository``.
+    The ``admin_`` prefix makes the unscoped intent explicit; scope-restricted
+    variants (``search_user_deployments`` / ``search_project_deployments``)
+    live alongside this on the same ``DeploymentService`` /
+    ``DeploymentRepository`` / ``DeploymentProcessors``.
     """
 
     querier: BatchQuerier

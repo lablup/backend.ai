@@ -1135,7 +1135,7 @@ class DeploymentDBSource:
         """Search every endpoint without a scope filter, projecting each row
         directly to ``ModelDeploymentData``.
 
-        Backs ``DeploymentAdminRepository.admin_search_deployments`` — the
+        Backs ``DeploymentRepository.admin_search_deployments`` — the
         admin label makes the unscoped intent explicit at every layer of
         the stack (db_source → repository → service).
         """
@@ -1166,7 +1166,7 @@ class DeploymentDBSource:
 
         Backs the v2 adapter's ``my_search`` path. Scope filter
         (``EndpointRow.created_user == user_id``) is injected via
-        ``execute_batch_querier``'s ``scope`` argument.
+        ``execute_batch_querier``'s ``scopes`` argument.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow)
@@ -1175,7 +1175,7 @@ class DeploymentDBSource:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.EndpointRow.to_model_deployment_data() for row in result.rows]
@@ -1205,7 +1205,7 @@ class DeploymentDBSource:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.EndpointRow.to_model_deployment_data() for row in result.rows]

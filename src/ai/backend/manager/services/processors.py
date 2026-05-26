@@ -78,11 +78,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.container_registry.service import (
         ContainerRegistryService,
     )
-    from ai.backend.manager.services.deployment.admin_service import (
-        DeploymentAdminService,
-    )
     from ai.backend.manager.services.deployment.processors import (
-        DeploymentAdminProcessors,
         DeploymentProcessors,
     )
     from ai.backend.manager.services.deployment.service import (
@@ -408,7 +404,6 @@ class Services:
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
     deployment: DeploymentService
-    deployment_admin: DeploymentAdminService
     storage_namespace: StorageNamespaceService
     audit_log: AuditLogService
     scheduling_history: SchedulingHistoryService
@@ -474,7 +469,6 @@ class Processors(AbstractProcessorPackage):
     artifact_registry: ArtifactRegistryProcessors
     artifact_revision: ArtifactRevisionProcessors
     deployment: DeploymentProcessors
-    deployment_admin: DeploymentAdminProcessors
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
     scheduling_history: SchedulingHistoryProcessors
@@ -533,7 +527,6 @@ class Processors(AbstractProcessorPackage):
             *self.artifact_revision.supported_actions(),
             *self.artifact.supported_actions(),
             *self.deployment.supported_actions(),
-            *self.deployment_admin.supported_actions(),
             *self.storage_namespace.supported_actions(),
             *self.audit_log.supported_actions(),
             *self.scheduling_history.supported_actions(),

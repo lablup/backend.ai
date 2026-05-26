@@ -77,6 +77,10 @@ from ai.backend.manager.services.deployment.actions.access_token.search_access_t
     SearchAccessTokensAction,
     SearchAccessTokensActionResult,
 )
+from ai.backend.manager.services.deployment.actions.admin_search_deployments import (
+    AdminSearchDeploymentsAction,
+    AdminSearchDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
     BulkDeleteAutoScalingRulesActionResult,
@@ -422,6 +426,23 @@ class DeploymentService:
         success = await self._deployment_controller.destroy_deployment(action.deployment_id)
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
         return DestroyDeploymentActionResult(success=success)
+
+    async def admin_search_deployments(
+        self, action: AdminSearchDeploymentsAction
+    ) -> AdminSearchDeploymentsActionResult:
+        """Search every deployment without a scope filter.
+
+        Backs the admin search path and the GraphQL DataLoader batch
+        lookup; the unscoped intent lives on the ``admin_`` prefix rather
+        than a separate service class.
+        """
+        result = await self._deployment_repository.admin_search_deployments(action.querier)
+        return AdminSearchDeploymentsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_user_deployments(
         self, action: SearchUserDeploymentsAction
